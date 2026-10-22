@@ -201,7 +201,7 @@ puts the matches away.
 <kbd>Ctrl+F</kbd> in the Settings window opens its search, and closes it
 again. <kbd>Esc</kbd> closes it too, wherever the focus is in the window,
 including after you have picked a result. Closing the window ends the
-search.
+search. <kbd>Ctrl+W</kbd> closes the Settings window.
 
 <kbd>Ctrl++</kbd> and <kbd>Ctrl+-</kbd> zoom the message in the reading pane
 in and out, with or without Reader View, and so does <kbd>Ctrl</kbd> with the
