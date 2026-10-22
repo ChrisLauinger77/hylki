@@ -6862,13 +6862,13 @@ msgstr "Εισαγωγή των διαδικτυακών λογαριασμών 
 
 msgid ""
 "Mail accounts signed in under GNOME Settings → Online Accounts can be added "
-"here in one click. Google and Microsoft accounts are only supported through "
-"Online Accounts."
+"here in one click. Google accounts are only supported through GNOME Online "
+"Accounts."
 msgstr ""
 "Οι λογαριασμοί αλληλογραφίας στους οποίους έχετε συνδεθεί μέσω Ρυθμίσεις "
 "GNOME → Διαδικτυακοί λογαριασμοί μπορούν να προστεθούν εδώ με ένα κλικ. Οι "
-"λογαριασμοί Google και Microsoft υποστηρίζονται μόνο μέσω των Διαδικτυακών "
-"λογαριασμών."
+"λογαριασμοί Google υποστηρίζονται μόνο μέσω των Διαδικτυακών λογαριασμών του "
+"GNOME."
 
 msgid "No mail accounts were found in Online Accounts."
 msgstr ""

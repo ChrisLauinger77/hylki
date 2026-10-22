@@ -38,6 +38,11 @@
   Four visits to an 81,000-message Archive used to leave the app at about
   1 GB; it now comes back to about 730 MB.
 
+- **Fixed: the first-run wizard said Microsoft accounts need GNOME Online
+  Accounts** (#506). They have had their own sign-in since 1.43.2; the
+  Online Accounts page now says only Google accounts need GNOME Online
+  Accounts.
+
 - **Changed: shorter text in Settings.** Subtitles that repeated their
   title are gone, and the descriptions, setup steps and dialogs left say
   only what the row doesn't. The Blacklist group under Senders is now

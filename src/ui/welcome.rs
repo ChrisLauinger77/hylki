@@ -500,9 +500,10 @@ impl Component for Welcome {
         }
 
         // ---- Page 2: GNOME Online Accounts ----
-        // The accounts already signed in on this computer, Google and
-        // Microsoft among them (their only sign-in), one click each. Nothing
-        // here is required: the footer reads Skip until something is added.
+        // The accounts already signed in on this computer, Google among
+        // them (its only sign-in), one click each. Microsoft has its own
+        // sign-in on the next page (#329). Nothing here is required: the
+        // footer reads Skip until something is added.
         let goa_pg = gtk::Box::new(gtk::Orientation::Vertical, 14);
         let import = gtk::Image::from_icon_name("arrow-into-box-symbolic");
         import.set_pixel_size(36);
@@ -510,7 +511,7 @@ impl Component for Welcome {
         goa_pg.append(&import);
         goa_pg.append(&title(&i18n("Import your online accounts")));
         goa_pg.append(&tagline(&i18n(
-            "Mail accounts signed in under GNOME Settings → Online Accounts can be added here in one click. Google and Microsoft accounts are only supported through Online Accounts.",
+            "Mail accounts signed in under GNOME Settings → Online Accounts can be added here in one click. Google accounts are only supported through GNOME Online Accounts.",
         )));
         let goa_list = card();
         goa_list.set_visible(!model.goa.is_empty());
