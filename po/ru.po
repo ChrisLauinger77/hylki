@@ -1248,6 +1248,15 @@ msgstr "Новое сообщение из шаблона"
 msgid "Send the message you are writing"
 msgstr "Отправить создаваемое сообщение"
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
+msgid "Attach files"
+msgstr "Прикрепить файлы"
+
+msgid "Go to To, Cc or Bcc, showing the row"
+msgstr ""
+
 msgid "Back out of a reply and return to the list"
 msgstr "Отменить ответ и вернуться к списку"
 
@@ -3617,12 +3626,6 @@ msgstr "Зашифровать с помощью OpenPGP для каждого �
 
 msgid "Sign with your OpenPGP key"
 msgstr "Подписать вашим ключом OpenPGP"
-
-#. Save Draft, Save as Template and Delete Draft are not here:
-#. the Save Draft button and its arrow stay in the header at
-#. any width.
-msgid "Attach files"
-msgstr "Прикрепить файлы"
 
 msgid "Upload to cloud storage and share a link"
 msgstr "Загрузить в облачное хранилище и поделиться ссылкой"

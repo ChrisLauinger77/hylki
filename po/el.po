@@ -1178,6 +1178,15 @@ msgstr "Νέο μήνυμα από πρότυπο"
 msgid "Send the message you are writing"
 msgstr "Αποστολή του μηνύματος που συντάσσετε"
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
+msgid "Attach files"
+msgstr "Επισύναψη αρχείων"
+
+msgid "Go to To, Cc or Bcc, showing the row"
+msgstr ""
+
 msgid "Back out of a reply and return to the list"
 msgstr "Έξοδος από την απάντηση και επιστροφή στη λίστα"
 
@@ -3502,12 +3511,6 @@ msgstr "Κρυπτογράφηση με OpenPGP για το κλειδί κάθ�
 
 msgid "Sign with your OpenPGP key"
 msgstr "Υπογραφή με το κλειδί OpenPGP σας"
-
-#. Save Draft, Save as Template and Delete Draft are not here:
-#. the Save Draft button and its arrow stay in the header at
-#. any width.
-msgid "Attach files"
-msgstr "Επισύναψη αρχείων"
 
 msgid "Upload to cloud storage and share a link"
 msgstr "Μεταφόρτωση στον χώρο αποθήκευσης cloud και κοινοποίηση συνδέσμου"

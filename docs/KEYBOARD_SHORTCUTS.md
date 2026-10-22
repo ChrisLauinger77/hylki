@@ -131,6 +131,12 @@ writing, the composer keeps them: there <kbd>Ctrl+U</kbd> underlines.
 any of its address rows. It does what the Send button does, so a message with
 no recipient is not sent, and one scheduled for later is queued.
 
+<kbd>Ctrl+Shift+A</kbd> attaches files, and <kbd>Ctrl+Shift+T</kbd>,
+<kbd>Ctrl+Shift+C</kbd> and <kbd>Ctrl+Shift+B</kbd> put the cursor in To, Cc
+and Bcc, showing the row if it is hidden, as in Thunderbird. Outside the
+composer, <kbd>Ctrl+Shift+A</kbd> and <kbd>Ctrl+Shift+C</kbd> keep the
+meanings below.
+
 In To, Cc and Bcc, a space after an address, <kbd>Return</kbd> or a comma
 makes it a pill, and <kbd>Backspace</kbd> on an empty field turns the last
 pill back into text. See [Addresses as pills](DOCUMENTATION.md#addresses-as-pills).

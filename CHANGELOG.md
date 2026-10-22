@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Added: Thunderbird's composer keys** (#490, #491, requested by
+  warpedwood). In a composer, **Ctrl+Shift+A** attaches files, and
+  **Ctrl+Shift+T**, **Ctrl+Shift+C** and **Ctrl+Shift+B** put the cursor in
+  To, Cc and Bcc, showing the row, and a compact reply's folded fields, if
+  they are hidden. Elsewhere Ctrl+Shift+A still shows or hides the accounts
+  and Ctrl+Shift+C still opens the console.
+
 - **Fixed: the beta used about 300 MB more memory than 1.44.0 at idle**
   (#504). The unified rows built ahead at a start held a second copy of
   every message in them, the Archive's included, and the Contacts list held

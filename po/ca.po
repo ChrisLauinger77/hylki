@@ -1163,6 +1163,15 @@ msgstr "Missatge nou a partir d'una plantilla"
 msgid "Send the message you are writing"
 msgstr "Envia el missatge que estàs escrivint"
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
+msgid "Attach files"
+msgstr "Adjunta fitxers"
+
+msgid "Go to To, Cc or Bcc, showing the row"
+msgstr ""
+
 msgid "Back out of a reply and return to the list"
 msgstr "Surt d'una resposta i torna a la llista"
 
@@ -3505,12 +3514,6 @@ msgstr "Xifra amb OpenPGP amb la clau de cada destinatari"
 
 msgid "Sign with your OpenPGP key"
 msgstr "Signa amb la teva clau OpenPGP"
-
-#. Save Draft, Save as Template and Delete Draft are not here:
-#. the Save Draft button and its arrow stay in the header at
-#. any width.
-msgid "Attach files"
-msgstr "Adjunta fitxers"
 
 msgid "Upload to cloud storage and share a link"
 msgstr "Puja a l'emmagatzematge al núvol i comparteix un enllaç"

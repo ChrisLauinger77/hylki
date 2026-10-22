@@ -1175,6 +1175,15 @@ msgstr "Neue Nachricht aus äage"
 msgid "Send the message you are writing"
 msgstr "Geschriebene Nachricht senden"
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
+msgid "Attach files"
+msgstr "Dateien anhängen"
+
+msgid "Go to To, Cc or Bcc, showing the row"
+msgstr ""
+
 msgid "Back out of a reply and return to the list"
 msgstr "Zurück aus einer Antwort und zurück zur Liste"
 
@@ -3529,12 +3538,6 @@ msgstr "Mit OpenPGP für jeden Empfängerschlüssel verschlüsseln"
 
 msgid "Sign with your OpenPGP key"
 msgstr "Mit eigenem OpenPGP-Schlüssel signieren"
-
-#. Save Draft, Save as Template and Delete Draft are not here:
-#. the Save Draft button and its arrow stay in the header at
-#. any width.
-msgid "Attach files"
-msgstr "Dateien anhängen"
 
 msgid "Upload to cloud storage and share a link"
 msgstr "In Cloud-Speicher hochladen und Link teilen"

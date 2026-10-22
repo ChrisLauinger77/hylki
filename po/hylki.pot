@@ -1092,6 +1092,15 @@ msgstr ""
 msgid "Send the message you are writing"
 msgstr ""
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
+msgid "Attach files"
+msgstr ""
+
+msgid "Go to To, Cc or Bcc, showing the row"
+msgstr ""
+
 msgid "Back out of a reply and return to the list"
 msgstr ""
 
@@ -3200,12 +3209,6 @@ msgid "Encrypt with OpenPGP to every recipient's key"
 msgstr ""
 
 msgid "Sign with your OpenPGP key"
-msgstr ""
-
-#. Save Draft, Save as Template and Delete Draft are not here:
-#. the Save Draft button and its arrow stay in the header at
-#. any width.
-msgid "Attach files"
 msgstr ""
 
 msgid "Upload to cloud storage and share a link"

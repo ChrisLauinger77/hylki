@@ -1784,6 +1784,10 @@ pub enum AppMsg {
     /// The zoom keys in the main window: the inline composer's while it has
     /// the focus and its format zooms, else the message's.
     ZoomKey(i8),
+    /// Ctrl+Shift+A or Ctrl+Shift+C in the main window: the inline
+    /// composer's while it has the focus, else the accounts switch or the
+    /// console.
+    ComposerKey(gtk::gdk::Key),
     /// Settings → Reading: the zoom every launch starts at.
     SetZoomDefault(u32),
     /// Settings: show the Reader View switch in the reader header.
@@ -3392,7 +3396,7 @@ impl SimpleComponent for AppModel {
             // The sidebar's account sections, for those who work from the
             // unified section alone (also Settings → Sidebar).
             let sidebar = gtk::gio::Menu::new();
-            sidebar.append(Some(i18n("Show Accounts").as_str()), Some("app.show-accounts"));
+            sidebar.append_item(&keyed_item(&i18n("Show Accounts"), "app.show-accounts", "<Ctrl><Shift>a"));
             // Focus Mode: the distraction-free layout (also Ctrl+Shift+F
             // and Settings → Appearance, where its parts are chosen).
             sidebar.append(Some(i18n("Focus Mode").as_str()), Some("app.focus-mode"));
@@ -4597,14 +4601,24 @@ impl SimpleComponent for AppModel {
             });
             app.add_action(&quit);
             gtk::prelude::GtkApplicationExt::set_accels_for_action(&app, "app.quit", &["<Ctrl>q"]);
-            // Ctrl+Shift+A shows or hides the sidebar's account sections
-            // (the same switch as the main menu's and Settings'): activating
-            // the stateful action without a value toggles it.
-            gtk::prelude::GtkApplicationExt::set_accels_for_action(
-                &app,
-                "app.show-accounts",
-                &["<Ctrl><Shift>a"],
-            );
+            // Ctrl+Shift+A shows or hides the sidebar's account sections and
+            // Ctrl+Shift+C opens the console, but in a composer they are
+            // Thunderbird's Attach and Cc (#490, #491). An application key
+            // reaches the main window before the composer in it, so the two
+            // belong to actions of their own that ask where the focus is
+            // (AppMsg::ComposerKey). The menus keep the real actions, with
+            // the keys shown beside them, so a click there never reaches a
+            // composer that had the focus before.
+            for (name, keyval, accel) in [
+                ("accounts-key", gtk::gdk::Key::a, "<Ctrl><Shift>a"),
+                ("console-key", gtk::gdk::Key::c, "<Ctrl><Shift>c"),
+            ] {
+                let action = gtk::gio::SimpleAction::new(name, None);
+                let s = sender.clone();
+                action.connect_activate(move |_, _| s.input(AppMsg::ComposerKey(keyval)));
+                app.add_action(&action);
+                gtk::prelude::GtkApplicationExt::set_accels_for_action(&app, &format!("app.{name}"), &[accel]);
+            }
             // Ctrl+Shift+F switches Focus Mode on and off.
             gtk::prelude::GtkApplicationExt::set_accels_for_action(
                 &app,
@@ -4717,8 +4731,6 @@ impl SimpleComponent for AppModel {
             .set_accelerators_for_action::<PrintPreviewAction>(&["<Ctrl><Shift>p"]);
         relm4::main_application()
             .set_accelerators_for_action::<StatusBarAction>(&["<Ctrl><Shift>s"]);
-        relm4::main_application()
-            .set_accelerators_for_action::<ConsoleAction>(&["<Ctrl><Shift>c"]);
         relm4::main_application().set_accelerators_for_action::<FindAction>(&["<Ctrl>f"]);
         relm4::main_application().set_accelerators_for_action::<ShortcutsAction>(&[
             "<Ctrl>question",
@@ -9178,6 +9190,16 @@ impl SimpleComponent for AppModel {
                     None => sender.input(AppMsg::ZoomMessage(step)),
                 }
             }
+            AppMsg::ComposerKey(keyval) => {
+                let compose = self.reader_compose.as_ref().filter(|r| r.window.is_none() && focus_in_compose(&self.window));
+                let shift_ctrl = gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::SHIFT_MASK;
+                match compose.zip(crate::ui::compose::composer_key(keyval, shift_ctrl)) {
+                    Some((r, input)) => r.controller.emit(input),
+                    // Activated without a value, the stateful action toggles.
+                    None if keyval == gtk::gdk::Key::a => relm4::main_application().activate_action("show-accounts", None),
+                    None => sender.input(AppMsg::OpenConsole),
+                }
+            }
             AppMsg::ZoomMessage(step) => {
                 use config::READER_ZOOM_STEPS as STEPS;
                 let at = STEPS.iter().position(|&z| z == self.zoom).unwrap_or(5) as i32;
@@ -13183,7 +13205,7 @@ impl AppModel {
         let status_bar = if self.status_bar_shown { i18n("Hide Status Bar") } else { i18n("Reveal Status Bar") };
         self.help_menu.append(Some(status_bar.as_str()), Some("win.status-bar"));
         if self.console_mode {
-            self.help_menu.append(Some(i18n("Console").as_str()), Some("win.console"));
+            self.help_menu.append_item(&keyed_item(&i18n("Console"), "win.console", "<Ctrl><Shift>c"));
         }
         self.help_menu.append(Some(i18n("Keyboard Shortcuts").as_str()), Some("win.shortcuts"));
         self.help_menu
@@ -25706,6 +25728,14 @@ fn palette_key(sender: &ComponentSender<AppModel>) -> gtk::EventControllerKey {
 }
 
 /// The Ctrl shortcuts that work whether or not single-key ones are on (#328).
+/// A menu entry that shows its keys even though they belong to another
+/// action (see `accounts-key`).
+fn keyed_item(label: &str, action: &str, accel: &str) -> gtk::gio::MenuItem {
+    let item = gtk::gio::MenuItem::new(Some(label), Some(action));
+    item.set_attribute_value("accel", Some(&accel.to_variant()));
+    item
+}
+
 fn ctrl_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<AppMsg> {
     use gtk::gdk::Key;
     match key {
@@ -25811,6 +25841,8 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("c  or  Ctrl+N", i18n_noop("Compose")),
             ("Ctrl+Shift+N", i18n_noop("New message from a template")),
             ("Ctrl+Enter", i18n_noop("Send the message you are writing")),
+            ("Ctrl+Shift+A", i18n_noop("Attach files")),
+            ("Ctrl+Shift+T  /  C  /  B", i18n_noop("Go to To, Cc or Bcc, showing the row")),
             ("Esc", i18n_noop("Back out of a reply and return to the list")),
             ("Ctrl+.  or  Ctrl+;", i18n_noop("Emoji chooser, at the cursor")),
             ("Shift+Return", i18n_noop("New paragraph (Return starts a new line, unless Settings swaps them)")),
