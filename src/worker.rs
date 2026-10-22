@@ -6506,6 +6506,34 @@ fn quote_mailbox(name: &str) -> String {
     out
 }
 
+/// A LIST or LSUB name as the server meant it. imap-proto hands a quoted
+/// string back with its escapes still in, so `"\\All"` arrives as `\\All`
+/// and quote_mailbox would escape it a second time (#514). Atoms cannot hold
+/// a backslash, so only a literal could be wrongly unescaped, and only one
+/// that holds `\\` or `\"`.
+fn imap_unquote(raw: &str) -> std::borrow::Cow<'_, str> {
+    if !raw.contains('\\') {
+        return std::borrow::Cow::Borrowed(raw);
+    }
+    let mut out = String::with_capacity(raw.len());
+    let mut chars = raw.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some(next @ ('\\' | '"')) => out.push(next),
+                Some(next) => {
+                    out.push(c);
+                    out.push(next);
+                }
+                None => out.push(c),
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    std::borrow::Cow::Owned(out)
+}
+
 /// SMTP host: the configured value, or derived from the IMAP host.
 fn smtp_host(account: &AccountConfig) -> String {
     let configured = account.smtp_host.trim();
@@ -6693,7 +6721,7 @@ async fn rename_folder(
             .await
             .unwrap_or_default()
             .iter()
-            .map(|n| n.name().to_string())
+            .map(|n| imap_unquote(n.name()).into_owned())
             .filter(|p| {
                 p.len() > old_path.len() + 1
                     && p.starts_with(old_path)
@@ -7178,18 +7206,20 @@ async fn list_folder_metadata(
         if name.attributes().contains(&NameAttribute::NoSelect) {
             continue;
         }
-        let path = name.name().to_string();
+        let path = imap_unquote(name.name()).into_owned();
+        let delimiter = name.delimiter().map(imap_unquote);
+        let delimiter = delimiter.as_deref();
         // A hidden folder (#239) is left out here, ahead of everything
         // that walks the listing: the sweep, the watchers, the counts.
-        if crate::models::folder_is_hidden(&path, name.delimiter(), hidden) {
+        if crate::models::folder_is_hidden(&path, delimiter, hidden) {
             continue;
         }
-        let (kind, by_special_use) = classify_with_source(&path, name.delimiter(), name.attributes());
+        let (kind, by_special_use) = classify_with_source(&path, delimiter, name.attributes());
         special_use.push(by_special_use);
         folders.push(Folder {
             id: 0, // assigned by order below
             account_id,
-            name: display_name(&path, name.delimiter()),
+            name: display_name(&path, delimiter),
             path,
             kind,
             unread: 0,
@@ -14438,13 +14468,29 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
 
 #[cfg(test)]
 mod uid_set_tests {
-    use super::{quote_mailbox, uid_set};
+    use super::{imap_unquote, quote_mailbox, uid_set};
 
     #[test]
     fn mailbox_names_are_quoted_for_copy() {
         assert_eq!(quote_mailbox("Deleted Messages"), "\"Deleted Messages\"");
         assert_eq!(quote_mailbox("INBOX"), "\"INBOX\"");
         assert_eq!(quote_mailbox("a\"b\\c"), "\"a\\\"b\\\\c\"");
+    }
+
+    #[test]
+    fn listed_names_go_back_to_the_server_as_listed() {
+        use async_imap::imap_proto::{MailboxDatum, Response};
+        let line = b"* LIST (\\HasNoChildren) \"\\\\\" \"\\\\All\"\r\n";
+        let Ok((_, Response::MailboxData(MailboxDatum::List { delimiter, name, .. }))) =
+            async_imap::imap_proto::parser::parse_response(line)
+        else {
+            panic!("LIST did not parse");
+        };
+        assert_eq!(imap_unquote(&name), "\\All");
+        assert_eq!(delimiter.as_deref().map(imap_unquote).as_deref(), Some("\\"));
+        assert_eq!(quote_mailbox(&imap_unquote(&name)), "\"\\\\All\"");
+        assert_eq!(imap_unquote("[Gmail]/All Mail"), "[Gmail]/All Mail");
+        assert_eq!(imap_unquote("a\\\"b\\x"), "a\"b\\x");
     }
 
     #[test]

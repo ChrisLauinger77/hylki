@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Fixed: a folder with a backslash in its name could not be opened**
+  (#514, reported by 3v1n0). The server's escaping was kept in the name, so
+  a Gmail label called `\All` showed as `\\All` and the server answered that
+  no such folder exists.
+
 ## 1.45.0 — 2026-10-22
 
 Everything from 1.45.0-beta.1 to 1.45.0-beta.4: a Debian package with its
