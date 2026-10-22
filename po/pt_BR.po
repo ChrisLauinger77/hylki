@@ -5876,6 +5876,9 @@ msgstr "Posição dos filtros"
 msgid "Contacts placement"
 msgstr "Posição das etiquetas"
 
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Icon rail"
 msgstr "Barra de ícones"
 

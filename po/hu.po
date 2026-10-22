@@ -5905,6 +5905,9 @@ msgstr "A szűrők elhelyezése"
 msgid "Contacts placement"
 msgstr "Címkék elhelyezése"
 
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Icon rail"
 msgstr "Ikonok sora"
 

@@ -2622,6 +2622,7 @@ impl Component for Preferences {
                                     #[name = "contacts_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Contacts placement"),
+                                        set_subtitle: &i18n("'In the footer' disables expand/collapse."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeContactsPlacement(row.selected()));
                                         },

@@ -5860,6 +5860,9 @@ msgstr "Posizione filtri"
 msgid "Contacts placement"
 msgstr "Posizione etichette"
 
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Icon rail"
 msgstr "Barra icone"
 

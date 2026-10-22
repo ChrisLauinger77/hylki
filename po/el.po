@@ -5750,6 +5750,9 @@ msgstr "Θέση αγαπημένων"
 msgid "Contacts placement"
 msgstr "Θέση επαφών"
 
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Icon rail"
 msgstr "Γραμμή εικονιδίων"
 

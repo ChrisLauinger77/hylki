@@ -5697,6 +5697,9 @@ msgstr "Ubicación de Favoritos"
 msgid "Contacts placement"
 msgstr "Ubicación de Contactos"
 
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Icon rail"
 msgstr "Barra de iconos"
 

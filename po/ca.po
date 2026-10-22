@@ -5717,6 +5717,9 @@ msgstr ""
 msgid "Contacts placement"
 msgstr ""
 
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Icon rail"
 msgstr "Barra d'icones"
 

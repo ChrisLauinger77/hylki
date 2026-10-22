@@ -5911,6 +5911,9 @@ msgstr "Расположение фильтров"
 msgid "Contacts placement"
 msgstr "Расположение тегов"
 
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Icon rail"
 msgstr "Полоса с иконками"
 
