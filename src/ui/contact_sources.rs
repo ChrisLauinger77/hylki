@@ -157,11 +157,14 @@ pub enum ContactSourcesOutput {
     SetContactBook(String),
     /// The page is showing: read the books new contacts can go to.
     LoadBooks,
+    /// Keep the Contacts search field open.
+    SetSearchOpen(bool),
 }
 
 #[relm4::component(pub)]
 impl SimpleComponent for ContactSources {
-    type Init = ();
+    /// Whether the Contacts search field is kept open.
+    type Init = bool;
     type Input = ContactSourcesInput;
     type Output = ContactSourcesOutput;
 
@@ -233,6 +236,16 @@ impl SimpleComponent for ContactSources {
                                         },
                                     },
                                 },
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Search"),
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Keep the search field open"),
+                                        set_active: search_open,
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(ContactSourcesOutput::SetSearchOpen(row.is_active()));
+                                        },
+                                    },
+                                },
                             },
                         },
                     },
@@ -284,7 +297,7 @@ impl SimpleComponent for ContactSources {
         }
     }
 
-    fn init(_init: (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+    fn init(search_open: bool, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let widgets = view_output!();
         let model = ContactSources {
             sources: Vec::new(),

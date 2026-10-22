@@ -3941,6 +3941,9 @@ msgstr ""
 msgid "Use Its Own Name"
 msgstr "Utiliser son propre nom"
 
+msgid "All Address Books"
+msgstr "Tous les carnets d’adresses"
+
 msgid "Move Contact?"
 msgstr "Déplacer le contact ?"
 
@@ -4273,6 +4276,9 @@ msgstr "Enregistrer les nouveaux contacts dans"
 
 msgid "Unless another is picked when the contact is made."
 msgstr ""
+
+msgid "Keep the search field open"
+msgstr "Garder le champ de recherche ouvert"
 
 #, fuzzy
 msgid ""
@@ -5865,9 +5871,6 @@ msgstr "Tags et étiquettes sous le texte"
 msgid "Gives the subject its full width."
 msgstr ""
 
-msgid "Keep the search field open"
-msgstr "Garder le champ de recherche ouvert"
-
 msgid "Search field position"
 msgstr ""
 
@@ -6420,6 +6423,10 @@ msgstr "Au-dessus des comptes"
 
 msgid "Below the accounts"
 msgstr "Sous les comptes"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "Enregistrer le filtre ?"
 
 msgid "All Inboxes"
 msgstr "Toutes les boîtes de réception"
@@ -8830,9 +8837,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "{name} est supprimé de votre carnet d’adresses et, pour un carnet "
 #~ "synchronisé, du serveur également."
-
-#~ msgid "All Address Books"
-#~ msgstr "Tous les carnets d’adresses"
 
 #~ msgid "Switch off an address book to leave it out of Hylki."
 #~ msgstr "Désactivez un carnet d’adresses pour l’exclure de Hylki."

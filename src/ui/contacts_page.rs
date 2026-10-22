@@ -216,8 +216,14 @@ pub struct ContactsPage {
     /// The sort and filter button's popover, kept in step with `sort`,
     /// `filters` and `hidden_books`.
     filter_menu: Option<FilterMenu>,
-    /// The search bar is shown: opened, or kept open by the setting the
-    /// message list's search has too.
+    /// The address book dropdown over the list is shown: the sidebar has
+    /// no books under a Contacts row to pick from.
+    book_picker: bool,
+    /// The dropdown's labels as last set, and a guard held while they or
+    /// its choice are set from here, which fires its notify.
+    picker_labels: Vec<String>,
+    picker_guard: Rc<std::cell::Cell<bool>>,
+    /// The search bar is shown: opened, or kept open by its setting.
     search_open: bool,
     search_pinned: bool,
     /// When the bar last closed: the click on the search button that took
@@ -312,6 +318,8 @@ pub enum ContactsPageInput {
     CloseSearch,
     /// The setting that keeps the search field open.
     SetSearchPinned(bool),
+    /// Show the address book dropdown over the list, or not.
+    SetBookPicker(bool),
     /// The list's selection changed.
     SelectionChanged,
     /// Select the first `n` entries of the list (a showcase).
@@ -612,6 +620,18 @@ impl Component for ContactsPage {
                             },
                         },
 
+                        // Which address book the list shows, while the
+                        // sidebar does not list them: every one, or one.
+                        #[name = "book_filter"]
+                        gtk::DropDown {
+                            set_margin_top: 6,
+                            set_margin_bottom: 6,
+                            set_margin_start: 10,
+                            set_margin_end: 10,
+                            set_visible: false,
+                            set_tooltip_text: Some(i18n("Address book").as_str()),
+                        },
+
                         gtk::ScrolledWindow {
                             set_vexpand: true,
                             set_hscrollbar_policy: gtk::PolicyType::Never,
@@ -693,6 +713,9 @@ impl Component for ContactsPage {
             drag: Rc::new(RefCell::new(DragKeys::default())),
             filters: 0,
             filter_menu: None,
+            book_picker: false,
+            picker_labels: Vec::new(),
+            picker_guard: Rc::new(std::cell::Cell::new(false)),
             search_open: false,
             search_pinned: false,
             search_closed_at: None,
@@ -737,6 +760,20 @@ impl Component for ContactsPage {
         }
 
         model.filter_menu = Some(FilterMenu::new(&widgets.filter_btn, sender.input_sender()));
+
+        // The dropdown's own label gives way in a narrow pane; its list
+        // shows each name whole.
+        widgets.book_filter.set_factory(Some(&book_label_factory(true)));
+        widgets.book_filter.set_list_factory(Some(&book_label_factory(false)));
+        {
+            let s = sender.input_sender().clone();
+            let guard = model.picker_guard.clone();
+            widgets.book_filter.connect_selected_notify(move |d| {
+                if !guard.get() {
+                    let _ = s.send(ContactsPageInput::PickBook(d.selected()));
+                }
+            });
+        }
 
         model.selection.set_model(Some(&model.store));
         {
@@ -897,6 +934,13 @@ impl Component for ContactsPage {
                 }
                 if had_focus {
                     widgets.list.grab_focus();
+                }
+            }
+
+            ContactsPageInput::SetBookPicker(on) => {
+                if self.book_picker != on {
+                    self.book_picker = on;
+                    self.sync_book_picker(widgets);
                 }
             }
 
@@ -1726,6 +1770,34 @@ impl ContactsPage {
         entry.grab_focus();
     }
 
+    /// Put the address book dropdown in step with the books and the
+    /// scope. Hidden while there is only one book to show.
+    fn sync_book_picker(&mut self, widgets: &ContactsPageWidgets) {
+        widgets.book_filter.set_visible(self.book_picker && self.filter_books.len() > 1);
+        if !self.book_picker {
+            return;
+        }
+        let mut labels = vec![i18n("All Address Books")];
+        labels.extend(self.filter_books.iter().map(|(_, name)| name.clone()));
+        // A group shows as its book; an account's books as every book.
+        let at = match &self.scope {
+            ContactScope::Book(b) | ContactScope::Group { book: b, .. } => {
+                self.filter_books.iter().position(|(u, _)| u == b).map_or(0, |i| i + 1)
+            }
+            ContactScope::All | ContactScope::Account(_) => 0,
+        } as u32;
+        self.picker_guard.set(true);
+        if labels != self.picker_labels {
+            let strs: Vec<&str> = labels.iter().map(String::as_str).collect();
+            widgets.book_filter.set_model(Some(&gtk::StringList::new(&strs)));
+            self.picker_labels = labels;
+        }
+        if widgets.book_filter.selected() != at {
+            widgets.book_filter.set_selected(at);
+        }
+        self.picker_guard.set(false);
+    }
+
     /// The books and groups for the sidebar, handed over when they change.
     fn publish_tree(&mut self, sender: &ComponentSender<Self>) {
         let directories: std::collections::HashSet<&String> = self.directories.iter().map(|(uid, _)| uid).collect();
@@ -2031,6 +2103,7 @@ impl ContactsPage {
     fn rebuild(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>) {
         let started = std::time::Instant::now();
         self.publish_tree(sender);
+        self.sync_book_picker(widgets);
         // What a row dragged from the list carries.
         self.drag.borrow_mut().keys = self
             .contacts
@@ -3273,6 +3346,32 @@ fn new_menu(button: &gtk::Button, sender: &ComponentSender<ContactsPage>) {
             .icon("system-users-symbolic"),
         ]],
     );
+}
+
+/// The address book dropdown's labels; `ellipsize` for its own, which
+/// the pane's width holds.
+fn book_label_factory(ellipsize: bool) -> gtk::SignalListItemFactory {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(move |_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        let label = gtk::Label::new(None);
+        label.set_xalign(0.0);
+        if ellipsize {
+            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        }
+        item.set_child(Some(&label));
+    });
+    factory.connect_bind(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        let (Some(label), Some(text)) = (
+            item.child().and_downcast::<gtk::Label>(),
+            item.item().and_downcast::<gtk::StringObject>(),
+        ) else {
+            return;
+        };
+        label.set_label(&text.string());
+    });
+    factory
 }
 
 /// Whether a contact matches a search, already lower case; an empty one

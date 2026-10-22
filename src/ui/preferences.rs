@@ -175,6 +175,7 @@ pub struct PrefInit {
     pub list_group_by_date: bool,
     pub list_pills_below: bool,
     pub list_search_open: bool,
+    pub contacts_search_open: bool,
     pub list_search_bottom: bool,
     pub list_bulk_bar_bottom: bool,
     pub single_key_shortcuts: bool,
@@ -1318,6 +1319,8 @@ pub enum PrefOutput {
     SetPillsBelow(bool),
     /// Keep the list's search field open (#446).
     SetListSearchOpen(bool),
+    /// Keep Contacts' search field open.
+    SetContactsSearchOpen(bool),
     /// The list's search field under the rows, not above them (#496).
     SetListSearchBottom(bool),
     /// The list's bulk bar under the rows, not above them (#496).
@@ -3981,7 +3984,6 @@ impl Component for Preferences {
             (&widgets.filtered_placement_row, init.filtered_placement),
             (&widgets.tags_placement_row, init.tags_placement),
             (&widgets.favorites_placement_row, init.favorites_placement),
-            (&widgets.contacts_placement_row, init.contacts_placement),
         ] {
             row.set_model(Some(&gtk::StringList::new(&[
                 i18n("Above the accounts").as_str(),
@@ -3990,6 +3992,14 @@ impl Component for Preferences {
             ])));
             row.set_selected(placement_index(placement));
         }
+        // Contacts alone can sit in the footer, first as the default.
+        widgets.contacts_placement_row.set_model(Some(&gtk::StringList::new(&[
+            i18n("In the footer").as_str(),
+            i18n("Above the accounts").as_str(),
+            i18n("Below the accounts").as_str(),
+            i18n("Off").as_str(),
+        ])));
+        widgets.contacts_placement_row.set_selected(contacts_placement_index(init.contacts_placement));
         widgets.start_view_row.set_model(Some(&gtk::StringList::new(&[
             i18n("All Inboxes").as_str(),
             i18n("The last account's inbox").as_str(),
@@ -4653,7 +4663,7 @@ impl Component for Preferences {
         widgets.translation_slot.set_child(Some(&crate::ui::translation_page::build()));
         model.cloud = Some(cloud);
         let contacts = crate::ui::contact_sources::ContactSources::builder()
-            .launch(())
+            .launch(init.contacts_search_open)
             .forward(sender.input_sender(), PrefInput::Contacts);
         widgets.contacts_slot.set_child(Some(contacts.widget()));
         model.contacts = Some(contacts);
@@ -5195,7 +5205,7 @@ impl Component for Preferences {
                 let _ = sender.output(PrefOutput::SetFavoritesPlacement(placement_from_index(idx)));
             }
             PrefInput::ChangeContactsPlacement(idx) => {
-                let _ = sender.output(PrefOutput::SetContactsPlacement(placement_from_index(idx)));
+                let _ = sender.output(PrefOutput::SetContactsPlacement(contacts_placement_from_index(idx)));
             }
             PrefInput::ChangeStartView(idx) => {
                 use crate::config::StartView;
@@ -5468,6 +5478,9 @@ impl Component for Preferences {
                     Out::DeleteAllLocal => {
                         let _ = sender.output(PrefOutput::DeleteAllLocalContacts);
                     }
+                    Out::SetSearchOpen(on) => {
+                        let _ = sender.output(PrefOutput::SetContactsSearchOpen(on));
+                    }
                     Out::SetContactBook(uid) => {
                         let _ = sender.output(PrefOutput::SetContactBook(uid));
                     }
@@ -5589,7 +5602,7 @@ thread_local! {
 fn placement_index(p: crate::config::SectionPlacement) -> u32 {
     use crate::config::SectionPlacement::*;
     match p {
-        AllInboxes | AboveAccounts => 0,
+        AllInboxes | AboveAccounts | Footer => 0,
         BelowAccounts => 1,
         Off => 2,
     }
@@ -5601,6 +5614,21 @@ fn placement_from_index(idx: u32) -> crate::config::SectionPlacement {
         1 => BelowAccounts,
         2 => Off,
         _ => AboveAccounts,
+    }
+}
+
+/// The Contacts placement combo's rows: the footer, then the others.
+fn contacts_placement_index(p: crate::config::SectionPlacement) -> u32 {
+    match p {
+        crate::config::SectionPlacement::Footer => 0,
+        p => placement_index(p) + 1,
+    }
+}
+
+fn contacts_placement_from_index(idx: u32) -> crate::config::SectionPlacement {
+    match idx {
+        0 => crate::config::SectionPlacement::Footer,
+        idx => placement_from_index(idx - 1),
     }
 }
 

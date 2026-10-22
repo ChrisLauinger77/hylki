@@ -4012,6 +4012,10 @@ msgid "Use Its Own Name"
 msgstr ""
 
 #, fuzzy
+msgid "All Address Books"
+msgstr "Címjegyzék"
+
+#, fuzzy
 msgid "Move Contact?"
 msgstr "Névjegyek megnyitása"
 
@@ -4339,6 +4343,9 @@ msgid "Save new contacts in"
 msgstr "Új névjegy"
 
 msgid "Unless another is picked when the contact is made."
+msgstr ""
+
+msgid "Keep the search field open"
 msgstr ""
 
 #, fuzzy
@@ -5947,9 +5954,6 @@ msgstr ""
 msgid "Gives the subject its full width."
 msgstr ""
 
-msgid "Keep the search field open"
-msgstr ""
-
 #, fuzzy
 msgid "Search field position"
 msgstr "Keresési szűrők"
@@ -6513,6 +6517,10 @@ msgstr "A fiókok felett"
 
 msgid "Below the accounts"
 msgstr "A fiókok alatt"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "Elmented a szűrőt?"
 
 msgid "All Inboxes"
 msgstr "Összes beérkezett"
@@ -8810,10 +8818,6 @@ msgstr "Hyprlab"
 #, fuzzy
 #~ msgid "Choose which address book to search"
 #~ msgstr "Válassza ki a keresendő mappákat"
-
-#, fuzzy
-#~ msgid "All Address Books"
-#~ msgstr "Címjegyzék"
 
 #~ msgid "Sort contacts"
 #~ msgstr "Névjegyek rendezése"

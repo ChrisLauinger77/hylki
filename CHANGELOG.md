@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Changed: Contacts is back in the sidebar's footer** by default, above
+  Attachments, for new and existing installs; one placed Off stays off.
+  **Settings → Sidebar → Sections → Contacts placement** has **In the
+  footer** beside Above the accounts, Below the accounts and Off. Without
+  its books in the sidebar, Contacts has its address book dropdown over the
+  list again, and the footer row's right-click menu opens GNOME Contacts.
+  **Settings → Contacts → Keep the search field open** keeps the Contacts
+  search shown; it no longer follows the message list's setting.
+
 - **Added: recipient pills move between To, Cc and Bcc** (#492, requested by
   warpedwood). Pills are selected as files are, with a click, Ctrl+click and
   Shift+click, across To, Cc and Bcc, or by dragging the pointer over them

@@ -3876,6 +3876,9 @@ msgstr ""
 msgid "Use Its Own Name"
 msgstr ""
 
+msgid "All Address Books"
+msgstr "Totes les llibretes d'adreces"
+
 msgid "Move Contact?"
 msgstr ""
 
@@ -4191,6 +4194,9 @@ msgstr "Desa els contactes nous a"
 
 msgid "Unless another is picked when the contact is made."
 msgstr ""
+
+msgid "Keep the search field open"
+msgstr "Mantén obert el camp de cerca"
 
 #, fuzzy
 msgid ""
@@ -5760,9 +5766,6 @@ msgstr "Etiquetes i etiquetes del servidor sota el text"
 msgid "Gives the subject its full width."
 msgstr ""
 
-msgid "Keep the search field open"
-msgstr "Mantén obert el camp de cerca"
-
 #, fuzzy
 msgid "Search field position"
 msgstr "Cerca filtres"
@@ -6311,6 +6314,10 @@ msgstr "A sobre dels comptes"
 
 msgid "Below the accounts"
 msgstr "A sota dels comptes"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "Vols desar el filtre?"
 
 msgid "All Inboxes"
 msgstr "Totes les bústies d'entrada"
@@ -8668,9 +8675,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
 #~ "sincronitzada, també del servidor."
-
-#~ msgid "All Address Books"
-#~ msgstr "Totes les llibretes d'adreces"
 
 #~ msgid "Switch off an address book to leave it out of Hylki."
 #~ msgstr "Desactiva una llibreta d'adreces per deixar-la fora de l'Hylki."

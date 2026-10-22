@@ -1770,6 +1770,10 @@ pub(crate) struct PrivacyFile {
     /// search button (#446). Off by default.
     #[serde(default)]
     pub(crate) list_search_open: bool,
+    /// Contacts' own search field stays above its list, as
+    /// `list_search_open` keeps the message list's. Off by default.
+    #[serde(default)]
+    pub(crate) contacts_search_open: bool,
     /// The search field and the bulk bar open under the list instead of
     /// above it (#496). Off by default.
     #[serde(default)]
@@ -1863,9 +1867,14 @@ pub(crate) struct PrivacyFile {
     /// Where Favorites sit, the same choices.
     #[serde(default)]
     pub(crate) favorites_placement: SectionPlacement,
-    /// Where Contacts sits, the same choices.
+    /// Where Contacts sits, the same choices or the footer.
     #[serde(default)]
     pub(crate) contacts_placement: SectionPlacement,
+    /// Whether the footer, Contacts' default since 1.45, has been applied
+    /// once to a file that placed it above the accounts without anyone
+    /// choosing that. A new install starts with this set.
+    #[serde(default)]
+    pub(crate) contacts_footer_default_applied: bool,
     /// Whether the sidebar's disclosure chevrons (All Inboxes, account
     /// headers) LEAD their rows; off puts them back at the row's end.
     #[serde(default = "default_chevrons_left")]
@@ -1993,7 +2002,8 @@ impl Default for PrivacyFile {
             filtered_placement: SectionPlacement::AboveAccounts,
             tags_placement: SectionPlacement::AboveAccounts,
             favorites_placement: SectionPlacement::AboveAccounts,
-            contacts_placement: SectionPlacement::AboveAccounts,
+            contacts_placement: SectionPlacement::Footer,
+            contacts_footer_default_applied: true,
             chevrons_left: default_chevrons_left(),
             account_click_folds: false,
             console_mode: false,
@@ -2093,6 +2103,7 @@ impl Default for PrivacyFile {
             list_pills_below: false,
             date_groups_default_applied: true,
             list_search_open: false,
+            contacts_search_open: false,
             list_search_bottom: false,
             list_bulk_bar_bottom: false,
             list_column_widths: Default::default(),
@@ -2183,6 +2194,15 @@ fn apply_new_defaults(file: &mut PrivacyFile) -> bool {
     if !file.date_groups_default_applied {
         file.date_groups_default_applied = true;
         file.list_group_by_date = true;
+        changed = true;
+    }
+    // Contacts back in the footer, the default since 1.45; switched off
+    // stays off.
+    if !file.contacts_footer_default_applied {
+        file.contacts_footer_default_applied = true;
+        if file.contacts_placement != SectionPlacement::Off {
+            file.contacts_placement = SectionPlacement::Footer;
+        }
         changed = true;
     }
     changed
@@ -2363,6 +2383,9 @@ pub enum SectionPlacement {
     AboveAccounts,
     /// In the scrolling sidebar, after the last account.
     BelowAccounts,
+    /// A row of the pinned footer, above Attachments. Only Contacts
+    /// offers it, and has it by default.
+    Footer,
     /// Not in the sidebar at all.
     Off,
 }
@@ -2382,7 +2405,8 @@ pub enum SectionStyle {
 }
 
 impl SectionPlacement {
-    /// Whether the section is in the sidebar.
+    /// Whether the section is in the sidebar's scrolling part, where it
+    /// lists what it holds under its row.
     pub fn shown(self) -> bool {
         matches!(self, Self::AboveAccounts | Self::BelowAccounts)
     }
@@ -4975,7 +4999,23 @@ mod tests {
         // A file from before the key: its old switch decides.
         assert_eq!(file.contacts_placement, Off);
         assert!(!old.place(&mut file));
-        assert_eq!(PrivacyFile::default().contacts_placement, AboveAccounts);
+        assert_eq!(PrivacyFile::default().contacts_placement, Footer);
+    }
+
+    /// Contacts moves to the footer once, from wherever it was put
+    /// unless it was off; afterwards it stays where it is put.
+    #[test]
+    fn contacts_moves_to_the_footer_once() {
+        use super::SectionPlacement::*;
+        let mut file: PrivacyFile = toml::from_str("contacts_placement = \"above_accounts\"\n").unwrap();
+        assert!(super::apply_new_defaults(&mut file));
+        assert_eq!(file.contacts_placement, Footer);
+        file.contacts_placement = BelowAccounts;
+        super::apply_new_defaults(&mut file);
+        assert_eq!(file.contacts_placement, BelowAccounts);
+        let mut off: PrivacyFile = toml::from_str("contacts_placement = \"off\"\n").unwrap();
+        super::apply_new_defaults(&mut off);
+        assert_eq!(off.contacts_placement, Off);
     }
 
     /// The keyring thread runs what is queued in order, a call made from

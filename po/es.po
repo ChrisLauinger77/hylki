@@ -3858,6 +3858,9 @@ msgstr ""
 msgid "Use Its Own Name"
 msgstr "Utilizar su nombre original"
 
+msgid "All Address Books"
+msgstr "Todas las libretas de direcciones"
+
 msgid "Move Contact?"
 msgstr "¿Mover el contacto?"
 
@@ -4185,6 +4188,9 @@ msgstr "Guardar los contactos nuevos en"
 
 msgid "Unless another is picked when the contact is made."
 msgstr "Salvo que se elija otra al crear el contacto."
+
+msgid "Keep the search field open"
+msgstr "Mantener abierto el campo de búsqueda"
 
 msgid ""
 "Evolution and other apps stop seeing it too. Nothing on the server changes."
@@ -5738,9 +5744,6 @@ msgstr "Etiquetas y rótulos debajo del texto"
 msgid "Gives the subject its full width."
 msgstr "Deja todo el ancho disponible para el asunto."
 
-msgid "Keep the search field open"
-msgstr "Mantener abierto el campo de búsqueda"
-
 msgid "Search field position"
 msgstr "Posición del campo de búsqueda"
 
@@ -6287,6 +6290,10 @@ msgstr "Encima de las cuentas"
 
 msgid "Below the accounts"
 msgstr "Debajo de las cuentas"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "¿Guardar el filtro?"
 
 msgid "All Inboxes"
 msgstr "Todas las bandejas de entrada"
@@ -8743,9 +8750,6 @@ msgstr "Hyprlab"
 #, fuzzy
 #~ msgid "Choose which address book to search"
 #~ msgstr "Elegir las carpetas en las que buscar"
-
-#~ msgid "All Address Books"
-#~ msgstr "Todas las libretas de direcciones"
 
 #~ msgid ""
 #~ "{name} is removed from your address book, and for a synced book, from the "

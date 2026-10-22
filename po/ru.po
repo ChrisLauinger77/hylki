@@ -4015,6 +4015,10 @@ msgid "Use Its Own Name"
 msgstr ""
 
 #, fuzzy
+msgid "All Address Books"
+msgstr "Адресная книга"
+
+#, fuzzy
 msgid "Move Contact?"
 msgstr "Открыть «Контакты»"
 
@@ -4347,6 +4351,9 @@ msgid "Save new contacts in"
 msgstr "Новый контакт"
 
 msgid "Unless another is picked when the contact is made."
+msgstr ""
+
+msgid "Keep the search field open"
 msgstr ""
 
 #, fuzzy
@@ -5953,9 +5960,6 @@ msgstr ""
 msgid "Gives the subject its full width."
 msgstr ""
 
-msgid "Keep the search field open"
-msgstr ""
-
 #, fuzzy
 msgid "Search field position"
 msgstr "Поиск фильтров"
@@ -6509,6 +6513,10 @@ msgstr "Над учётными записями"
 
 msgid "Below the accounts"
 msgstr "Под учётными записями"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "Сохранить фильтр?"
 
 msgid "All Inboxes"
 msgstr "Все входящие"
@@ -8816,10 +8824,6 @@ msgstr "Hyprlab"
 #, fuzzy
 #~ msgid "Choose which address book to search"
 #~ msgstr "Выберите папки для поиска"
-
-#, fuzzy
-#~ msgid "All Address Books"
-#~ msgstr "Адресная книга"
 
 #~ msgid "Sort contacts"
 #~ msgstr "Сортировка контактов"

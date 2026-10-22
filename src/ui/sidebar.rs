@@ -370,8 +370,8 @@ pub struct Sidebar {
     custom_chevrons: HashMap<u32, gtk::Image>,
     /// The unified-row list box (one row), when shown.
     unified_list: Option<gtk::ListBox>,
-    /// The pinned footer's single list box (Contacts + Attachments rows) and
-    /// the rows themselves, for selection management.
+    /// The pinned footer's single list box (Contacts + Attachments rows),
+    /// for selection management.
     footer_list: Option<gtk::ListBox>,
     /// The address books and groups the Contacts row lists.
     contact_tree: Option<crate::ui::contacts_page::ContactTree>,
@@ -379,6 +379,8 @@ pub struct Sidebar {
     /// selection handler.
     tree_rows: std::rc::Rc<std::cell::RefCell<Vec<(crate::ui::contacts_page::ContactScope, gtk::ListBoxRow)>>>,
     attachments_row: Option<gtk::ListBoxRow>,
+    /// The footer's Contacts row, when Contacts is placed there.
+    contacts_row: Option<gtk::ListBoxRow>,
     /// Refresh/spinner stack + spinner beside the "New Message" button.
     sync_stack: Option<gtk::Stack>,
     sync_spinner: Option<gtk::Spinner>,
@@ -639,7 +641,6 @@ pub enum SidebarInput {
     ToggleCollapsed,
     /// Show/hide the "Attachments" row in the pinned footer.
     SetAttachmentsRow(bool),
-    /// Show/hide the "Contacts" row in the pinned footer.
     /// Whether any account is syncing — spins the refresh button.
     SetBusy(bool),
     /// Whether the network is down: the refresh button turns orange (#442).
@@ -921,6 +922,7 @@ impl Component for Sidebar {
             contact_tree: None,
             tree_rows: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
             attachments_row: None,
+            contacts_row: None,
             sync_stack: None,
             sync_spinner: None,
             busy: false,
@@ -1192,9 +1194,14 @@ impl Sidebar {
                 if self.selected == Sel::UnifiedTags && !self.unified_tags_shown() {
                     self.selected = Sel::None;
                 }
-                // Contacts placed off takes its selection with it.
-                if matches!(self.selected, Sel::Contacts | Sel::ContactScope(_)) && !self.contacts_shown() {
-                    self.selected = Sel::None;
+                // Contacts placed off takes its selection with it; in the
+                // footer, its one row is every scope.
+                if matches!(self.selected, Sel::Contacts | Sel::ContactScope(_)) {
+                    if self.contacts_placement == crate::config::SectionPlacement::Off {
+                        self.selected = Sel::None;
+                    } else if self.contacts_in_footer() {
+                        self.selected = Sel::Contacts;
+                    }
                 }
                 // A folder picked in a switched-off row's account list is
                 // still the open folder: carry the highlight to the
@@ -1288,8 +1295,11 @@ impl Sidebar {
                 self.selected = Sel::Contacts;
                 self.clear_other_selections(Sel::Contacts);
                 let _ = sender.output(SidebarOutput::ContactsClicked);
-                // The row itself is every contact.
-                let _ = sender.output(SidebarOutput::ContactScope(crate::ui::contacts_page::ContactScope::All));
+                // The row itself is every contact. The footer's opens
+                // Contacts on the book its own picker last showed.
+                if !self.contacts_in_footer() {
+                    let _ = sender.output(SidebarOutput::ContactScope(crate::ui::contacts_page::ContactScope::All));
+                }
             }
 
             SidebarInput::SetContactTree(tree) => {
@@ -1300,6 +1310,7 @@ impl Sidebar {
                 // itself (a book's New Contact opens that book).
                 if matches!(self.selected, Sel::Contacts | Sel::ContactScope(_)) {
                     self.selected = match &tree.scope {
+                        _ if self.contacts_in_footer() => Sel::Contacts,
                         crate::ui::contacts_page::ContactScope::All => Sel::Contacts,
                         scope => Sel::ContactScope(scope.clone()),
                     };
@@ -2187,6 +2198,7 @@ impl Sidebar {
         self.unified_list = None;
         self.footer_list = None;
         self.attachments_row = None;
+        self.contacts_row = None;
         self.outbox_list = None;
         self.folder_badges.clear();
         self.tree_chevrons.clear();
@@ -2436,7 +2448,7 @@ impl Sidebar {
         // whatever the scroller above ends on. ONE list box holds both rows,
         // so they read as one gapless section (beta 1.18.0b feedback) and
         // selecting one automatically clears the other.
-        if self.show_attachments {
+        if self.show_attachments || self.contacts_in_footer() {
             let sep = gtk::Separator::new(gtk::Orientation::Horizontal);
             sep.add_css_class("footer-separator");
             footer.append(&sep);
@@ -2446,37 +2458,42 @@ impl Sidebar {
             list.add_css_class("navigation-sidebar");
             list.add_css_class("sidebar-footer");
 
+            // "Contacts" row: the in-app contacts view, where Settings →
+            // Sidebar puts it by default. Right-click offers GNOME Contacts.
+            if self.contacts_in_footer() {
+                let row = self.footer_row("x-office-address-book-symbolic", &i18n("Contacts"));
+                let right_click = gtk::GestureClick::new();
+                right_click.set_button(3);
+                let s = sender.clone();
+                right_click.connect_pressed(move |gesture, _, x, y| {
+                    let Some(widget) = gesture.widget() else { return };
+                    let s2 = s.clone();
+                    show_context_menu(
+                        &widget,
+                        x,
+                        y,
+                        vec![vec![MenuEntry::new(i18n("Open GNOME Contacts"), move || {
+                            let _ = s2.output(SidebarOutput::OpenGnomeContacts);
+                        })
+                        .icon("adw-external-link-symbolic")]],
+                    );
+                });
+                row.add_controller(right_click);
+                list.append(&row);
+                self.contacts_row = Some(row);
+            }
+
             // "Attachments" row — a gallery of every inbox attachment. The
             // very last row in the sidebar, below Contacts.
             if self.show_attachments {
-                let row = gtk::ListBoxRow::new();
-                let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-                hbox.add_css_class("folder-row");
-                let img = gtk::Image::from_icon_name("mail-attachment-symbolic");
-                img.add_css_class("folder-icon");
-                pin_icon_size(&img);
-                if self.collapsed {
-                    hbox.set_halign(gtk::Align::Center);
-                    row.set_tooltip_text(Some(i18n("Attachments").as_str()));
-                    hbox.append(&img);
-                } else {
-                    if self.chevrons_left {
-                        img.set_margin_start(ROW_LEFT_INSET);
-                    }
-                    hbox.append(&img);
-                    let label = gtk::Label::new(Some(i18n("Attachments").as_str()));
-                    label.set_hexpand(true);
-                    label.set_halign(gtk::Align::Start);
-                    label.add_css_class("account-name");
-                    hbox.append(&label);
-                }
-                row.set_child(Some(&hbox));
+                let row = self.footer_row("mail-attachment-symbolic", &i18n("Attachments"));
                 list.append(&row);
                 self.attachments_row = Some(row);
             }
 
             let s = sender.clone();
             let attachments_row = self.attachments_row.clone();
+            let contacts_row = self.contacts_row.clone();
             let quiet = self.quiet.clone();
             list.connect_row_selected(move |_, row| {
                 if quiet.get() {
@@ -2485,6 +2502,8 @@ impl Sidebar {
                 let Some(row) = row else { return };
                 if Some(row) == attachments_row.as_ref() {
                     s.input(SidebarInput::AttachmentsRowSelected);
+                } else if Some(row) == contacts_row.as_ref() {
+                    s.input(SidebarInput::ContactsRowClicked);
                 }
             });
             footer.append(&list);
@@ -4253,9 +4272,43 @@ impl Sidebar {
         !self.favorite_folders.is_empty() && self.favorites_placement.shown()
     }
 
-    /// Whether Contacts is in the sidebar at all.
+    /// Whether Contacts is a row of the scrolling sidebar, its books
+    /// under it.
     fn contacts_shown(&self) -> bool {
         self.contacts_placement.shown()
+    }
+
+    /// Whether Contacts is a row of the pinned footer.
+    fn contacts_in_footer(&self) -> bool {
+        self.contacts_placement == crate::config::SectionPlacement::Footer
+    }
+
+    /// A row of the pinned footer: an icon and a name, the icon alone
+    /// (the name in its tooltip) on the rail.
+    fn footer_row(&self, icon: &str, name: &str) -> gtk::ListBoxRow {
+        let row = gtk::ListBoxRow::new();
+        let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        hbox.add_css_class("folder-row");
+        let img = gtk::Image::from_icon_name(icon);
+        img.add_css_class("folder-icon");
+        pin_icon_size(&img);
+        if self.collapsed {
+            hbox.set_halign(gtk::Align::Center);
+            row.set_tooltip_text(Some(name));
+            hbox.append(&img);
+        } else {
+            if self.chevrons_left {
+                img.set_margin_start(ROW_LEFT_INSET);
+            }
+            hbox.append(&img);
+            let label = gtk::Label::new(Some(name));
+            label.set_hexpand(true);
+            label.set_halign(gtk::Align::Start);
+            label.add_css_class("account-name");
+            hbox.append(&label);
+        }
+        row.set_child(Some(&hbox));
+        row
     }
 
     fn tags_open(&self, slot: Slot) -> bool {
@@ -4451,6 +4504,10 @@ impl Sidebar {
 
     /// The Contacts row (every contact), or a book or group under it.
     fn select_contacts(&self, scope: Option<&crate::ui::contacts_page::ContactScope>) {
+        if let (Some(list), Some(row)) = (&self.footer_list, &self.contacts_row) {
+            list.select_row(Some(row));
+            return;
+        }
         let Some(w) = self.kind_widgets.get(&UnifiedRow::Contacts) else { return };
         match scope {
             None => w.header.select_row(w.header.row_at_index(0).as_ref()),

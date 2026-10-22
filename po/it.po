@@ -3974,6 +3974,9 @@ msgstr ""
 msgid "Use Its Own Name"
 msgstr ""
 
+msgid "All Address Books"
+msgstr "Tutte le rubriche"
+
 #, fuzzy
 msgid "Move Contact?"
 msgstr "Apri Contatti"
@@ -4310,6 +4313,9 @@ msgid "Save new contacts in"
 msgstr "Salva i nuovi contatti in"
 
 msgid "Unless another is picked when the contact is made."
+msgstr ""
+
+msgid "Keep the search field open"
 msgstr ""
 
 #, fuzzy
@@ -5903,9 +5909,6 @@ msgstr ""
 msgid "Gives the subject its full width."
 msgstr ""
 
-msgid "Keep the search field open"
-msgstr ""
-
 #, fuzzy
 msgid "Search field position"
 msgstr "Filtri di ricerca"
@@ -6457,6 +6460,10 @@ msgstr "Sopra gli account"
 
 msgid "Below the accounts"
 msgstr "Sotto gli account"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "Salvare il filtro?"
 
 msgid "All Inboxes"
 msgstr "Tutte le caselle in arrivo"
@@ -8822,9 +8829,6 @@ msgstr "Hyprlab"
 #, fuzzy
 #~ msgid "Choose which address book to search"
 #~ msgstr "Scegli le cartelle in cui cercare"
-
-#~ msgid "All Address Books"
-#~ msgstr "Tutte le rubriche"
 
 #~ msgid ""
 #~ "{name} is removed from your address book, and for a synced book, from the "

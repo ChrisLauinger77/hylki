@@ -3558,6 +3558,9 @@ msgstr ""
 msgid "Use Its Own Name"
 msgstr ""
 
+msgid "All Address Books"
+msgstr ""
+
 msgid "Move Contact?"
 msgstr ""
 
@@ -3855,6 +3858,9 @@ msgid "Save new contacts in"
 msgstr ""
 
 msgid "Unless another is picked when the contact is made."
+msgstr ""
+
+msgid "Keep the search field open"
 msgstr ""
 
 msgid ""
@@ -5308,9 +5314,6 @@ msgstr ""
 msgid "Gives the subject its full width."
 msgstr ""
 
-msgid "Keep the search field open"
-msgstr ""
-
 msgid "Search field position"
 msgstr ""
 
@@ -5816,6 +5819,9 @@ msgid "Above the accounts"
 msgstr ""
 
 msgid "Below the accounts"
+msgstr ""
+
+msgid "In the footer"
 msgstr ""
 
 msgid "All Inboxes"

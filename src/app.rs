@@ -1016,6 +1016,8 @@ pub struct AppModel {
     list_pills_below: bool,
     /// The list's search field stays open (#446).
     list_search_open: bool,
+    /// Contacts' search field stays open.
+    contacts_search_open: bool,
     /// The list's search field and bulk bar open under the rows (#496).
     list_search_bottom: bool,
     list_bulk_bar_bottom: bool,
@@ -3705,6 +3707,7 @@ impl SimpleComponent for AppModel {
             list_group_by_date: config::load_privacy().list_group_by_date,
             list_pills_below: config::load_privacy().list_pills_below,
             list_search_open: config::load_privacy().list_search_open,
+            contacts_search_open: config::load_privacy().contacts_search_open,
             list_search_bottom: config::load_privacy().list_search_bottom,
             list_bulk_bar_bottom: config::load_privacy().list_bulk_bar_bottom,
             list_column_widths: config::load_list_column_widths(),
@@ -4030,7 +4033,8 @@ impl SimpleComponent for AppModel {
         model.message_list.emit(MessageListInput::SetColumnScroll(model.list_column_scroll));
         model.message_list.emit(MessageListInput::SetSearchPinned(model.list_search_open));
         model.push_list_bars();
-        model.contacts_page.emit(ContactsPageInput::SetSearchPinned(model.list_search_open));
+        model.contacts_page.emit(ContactsPageInput::SetSearchPinned(model.contacts_search_open));
+        model.contacts_page.emit(ContactsPageInput::SetBookPicker(!model.contacts_placement.shown()));
         model.message_list.emit(MessageListInput::SetColumnWidths(model.list_column_widths.clone()));
         model.sidebars_emit(SidebarInput::SetFocus {
             hide_accounts: model.focus.active(config::FocusPart::HideAccounts),
@@ -8724,6 +8728,10 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(PrefOutput::SetListSearchOpen(on)) => {
                 if pref!(self.list_search_open = on) {
                     self.message_list.emit(MessageListInput::SetSearchPinned(on));
+                }
+            }
+            AppMsg::Pref(PrefOutput::SetContactsSearchOpen(on)) => {
+                if pref!(self.contacts_search_open = on) {
                     self.contacts_page.emit(ContactsPageInput::SetSearchPinned(on));
                 }
             }
@@ -8871,6 +8879,9 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetContactsPlacement(p)) => {
                 if pref!(self.contacts_placement = p) {
+                    // Without its books under it in the sidebar, Contacts
+                    // picks them itself.
+                    self.contacts_page.emit(ContactsPageInput::SetBookPicker(!p.shown()));
                     self.rebuild_sidebar();
                 }
             }
@@ -13328,6 +13339,7 @@ impl AppModel {
             list_pills_below: self.list_pills_below,
             date_groups_default_applied: true,
             list_search_open: self.list_search_open,
+            contacts_search_open: self.contacts_search_open,
             list_search_bottom: self.list_search_bottom,
             list_bulk_bar_bottom: self.list_bulk_bar_bottom,
             list_column_widths: config::list_column_widths_to(&self.list_column_widths),
@@ -13362,6 +13374,7 @@ impl AppModel {
             tags_placement: self.tags_placement,
             favorites_placement: self.favorites_placement,
             contacts_placement: self.contacts_placement,
+            contacts_footer_default_applied: true,
             chevrons_left: self.chevrons_left,
             account_click_folds: self.account_click_folds,
             console_mode: self.console_mode,
@@ -22540,6 +22553,7 @@ impl AppModel {
             list_group_by_date: self.list_group_by_date,
             list_pills_below: self.list_pills_below,
             list_search_open: self.list_search_open,
+            contacts_search_open: self.contacts_search_open,
             list_search_bottom: self.list_search_bottom,
             list_bulk_bar_bottom: self.list_bulk_bar_bottom,
             single_key_shortcuts: self.single_key.get(),
