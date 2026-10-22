@@ -1041,7 +1041,10 @@ is red.
 
 Pills are selected as files are: a click selects one, <kbd>Ctrl</kbd>+click
 adds one to the selection or takes it out, and <kbd>Shift</kbd>+click selects
-the pills between. A selection can take pills from To, Cc and Bcc at once.
+the pills between. Dragging the pointer over pills from beside them, or from
+the empty text after them, selects them as dragging over text does, and
+<kbd>Ctrl</kbd> adds them to the selection. A selection can take pills from
+To, Cc and Bcc at once.
 
 The selection can be dragged to another place in its field, or into another
 field. While it is dragged, Cc and Bcc show if they were hidden, and a line

@@ -6,7 +6,7 @@
 //!
 //! Pills are selected like files: a click, Ctrl+click and Shift+click, or
 //! the arrow keys from the start of the text, with Shift to extend, across
-//! To, Cc and Bcc. The selection drags to another place in its field or to
+//! To, Cc and Bcc; or like text, by sweeping the pointer over them. The selection drags to another place in its field or to
 //! another field, and its menu (right click, the menu key) moves it to
 //! another field too; Delete removes it (#492).
 //!
@@ -339,20 +339,77 @@ impl RecipientRow {
         });
         text.add_controller(focus);
 
-        // A click anywhere on the row, pills aside, types into it.
-        let click = gtk::GestureClick::new();
+        // Swept with the pointer from anywhere but a pill, the pills are
+        // selected the way dragging over text selects it, on into the other
+        // fields; Ctrl keeps those already selected. A press on the text
+        // where there is some is left to it, to select text with; one
+        // anywhere else is taken from the text at once, which would claim
+        // it, and is a click into the text when it does not move. In the
+        // capture phase, to see the press before the text does.
+        let sweep = gtk::GestureDrag::new();
+        sweep.set_propagation_phase(gtk::PropagationPhase::Capture);
+        // From where among all the pills it started, the selection Ctrl
+        // kept, and whether it has moved enough to be a sweep.
+        let swept: std::rc::Rc<RefCell<Option<(usize, Vec<gtk::Widget>, bool)>>> = Default::default();
         let weak = self.downgrade();
-        click.connect_released(move |gesture, _, x, y| {
+        let s = swept.clone();
+        sweep.connect_drag_begin(move |gesture, x, y| {
             let Some(row) = weak.upgrade() else { return };
-            let header = gesture.widget();
-            let on_pill = header
-                .and_then(|h| h.pick(x, y, gtk::PickFlags::DEFAULT))
-                .is_some_and(|w| is_in_pill(&w));
-            if !on_pill {
-                row.imp().text.grab_focus();
+            let text = &row.imp().text;
+            let on = row.pick(x, y, gtk::PickFlags::DEFAULT);
+            let on_text = on.as_ref().is_some_and(|w| w.is_ancestor(text) || w == text.upcast_ref::<gtk::Widget>()) && !text.text().is_empty();
+            if on_text || on.is_none_or(|w| is_in_pill(&w) || w.ancestor(gtk::Button::static_type()).is_some()) {
+                gesture.set_state(gtk::EventSequenceState::Denied);
+                return;
+            }
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            let kept = if gesture.current_event_state().contains(gdk::ModifierType::CONTROL_MASK) {
+                row.all_pills().into_iter().filter(is_selected).collect()
+            } else {
+                Vec::new()
+            };
+            s.replace(Some((row.sweep_index(x, y), kept, false)));
+        });
+        let weak = self.downgrade();
+        let s = swept.clone();
+        sweep.connect_drag_update(move |gesture, dx, dy| {
+            let (Some(row), Some((x, y))) = (weak.upgrade(), gesture.start_point()) else { return };
+            let mut swept = s.borrow_mut();
+            let Some((from, kept, moved)) = swept.as_mut() else { return };
+            *moved = *moved || dx.hypot(dy) >= row.settings().gtk_dnd_drag_threshold() as f64;
+            if !*moved {
+                return;
+            }
+            let to = row.sweep_index(x + dx, y + dy);
+            let range = (*from).min(to)..(*from).max(to);
+            for (i, p) in row.all_pills().iter().enumerate() {
+                set_selected(p, range.contains(&i) || kept.contains(p));
             }
         });
-        imp.header.add_controller(click);
+        let weak = self.downgrade();
+        sweep.connect_drag_end(move |gesture, dx, dy| {
+            let Some((from, kept, moved)) = swept.take() else { return };
+            let (Some(row), Some((x, y))) = (weak.upgrade(), gesture.start_point()) else { return };
+            let to = row.sweep_index(x + dx, y + dy);
+            if !moved || (from == to && kept.is_empty()) {
+                row.imp().text.grab_focus();
+                return;
+            }
+            // Shift+click goes on from where the sweep started, and the
+            // focus is on the pill it ended at.
+            let pills = row.all_pills();
+            let (start, end) = if to < from { (from - 1, to) } else { (from, to.max(1) - 1) };
+            let end = if from == to { kept.last() } else { pills.get(end) };
+            if let Some(start) = pills.get(start).filter(|_| from != to) {
+                if let Some(field) = start.ancestor(RecipientRow::static_type()).and_downcast::<RecipientRow>() {
+                    field.imp().anchor.replace(Some(start.clone()));
+                }
+            }
+            if let Some(end) = end {
+                end.grab_focus();
+            }
+        });
+        self.add_controller(sweep);
 
         // A pill dragged here, from this field or another. In the capture
         // phase, ahead of the text's own target, which would take the pill
@@ -650,6 +707,30 @@ impl RecipientRow {
 
     fn pill_list(&self) -> Vec<gtk::Widget> {
         self.imp().pills.borrow().iter().map(|(p, _)| p.clone()).collect()
+    }
+
+    /// The pills of every field shown, in order.
+    fn all_pills(&self) -> Vec<gtk::Widget> {
+        self.fields().iter().filter(|f| f.is_mapped()).flat_map(|f| f.pill_list()).collect()
+    }
+
+    /// Where a sweep at `(x, y)` in this field is, as a place among
+    /// `all_pills`: above a field is before its pills, and below the last
+    /// is after all of them.
+    fn sweep_index(&self, x: f64, y: f64) -> usize {
+        let fields: Vec<_> = self.fields().into_iter().filter(|f| f.is_mapped()).collect();
+        let mut before = 0;
+        for field in &fields {
+            let Some(p) = self.compute_point(field, &gtk::graphene::Point::new(x as f32, y as f32)) else { continue };
+            if p.y() < 0.0 {
+                break;
+            }
+            if (p.y() as i32) < field.height() {
+                return before + field.drop_index(p.x() as f64, p.y() as f64);
+            }
+            before += field.imp().pills.borrow().len();
+        }
+        before
     }
 
     fn index_of(&self, pill: &gtk::Widget) -> Option<usize> {

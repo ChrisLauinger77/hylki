@@ -4,7 +4,8 @@
 
 - **Added: recipient pills move between To, Cc and Bcc** (#492, requested by
   warpedwood). Pills are selected as files are, with a click, Ctrl+click and
-  Shift+click, across To, Cc and Bcc. The selection drags to another place
+  Shift+click, across To, Cc and Bcc, or by dragging the pointer over them
+  from beside them, as over text. The selection drags to another place
   in its field or into another field, with a line marking where it will go;
   Cc and Bcc show during the drag if they were hidden. The right-click menu
   moves the selection to another field, edits a single pill or removes the
