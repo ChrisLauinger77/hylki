@@ -191,7 +191,7 @@ a confirmation that lists them.
 Contacts **Above the accounts**, **Below the accounts** or **Off**, which
 leaves it out of the sidebar. Contacts can also be **In the footer**, where
 it is by default: a row above Attachments, without its address books under
-it. Wherever they are, they are rows like the
+it. The same Contacts placement is in **Settings → Contacts**. Wherever they are, they are rows like the
 unified section's, with a chevron that opens their list. **Section style**
 set to **Tree style** draws all four as a tree instead: the caret that
 opens and closes the list stands where the icon was, and the row has no

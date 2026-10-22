@@ -3860,6 +3860,15 @@ msgstr ""
 msgid "Unless another is picked when the contact is made."
 msgstr ""
 
+msgid "Layout"
+msgstr ""
+
+msgid "Contacts placement"
+msgstr ""
+
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Keep the search field open"
 msgstr ""
 
@@ -5266,12 +5275,6 @@ msgstr ""
 msgid "Favorites placement"
 msgstr ""
 
-msgid "Contacts placement"
-msgstr ""
-
-msgid "'In the footer' disables expand/collapse."
-msgstr ""
-
 msgid "Icon rail"
 msgstr ""
 
@@ -5294,9 +5297,6 @@ msgid "Sent mail uses your account circle"
 msgstr ""
 
 msgid "The account's picture or emoji, as in the sidebar."
-msgstr ""
-
-msgid "Layout"
 msgstr ""
 
 msgid "Automatic uses single lines in wide windows."
@@ -5824,9 +5824,6 @@ msgstr ""
 msgid "Below the accounts"
 msgstr ""
 
-msgid "In the footer"
-msgstr ""
-
 msgid "All Inboxes"
 msgstr ""
 
@@ -5996,6 +5993,9 @@ msgid "Sounds"
 msgstr ""
 
 msgid "Forget this word"
+msgstr ""
+
+msgid "In the footer"
 msgstr ""
 
 #. GNOME Settings' own names for its alert sounds.

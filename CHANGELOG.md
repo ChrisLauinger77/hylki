@@ -5,7 +5,8 @@
 - **Changed: Contacts is back in the sidebar's footer** by default, above
   Attachments, for new and existing installs; one placed Off stays off.
   **Settings → Sidebar → Sections → Contacts placement** has **In the
-  footer** beside Above the accounts, Below the accounts and Off. Without
+  footer** beside Above the accounts, Below the accounts and Off, and
+  Settings → Contacts has the same choice. Without
   its books in the sidebar, Contacts has its address book dropdown over the
   list again, and the footer row's right-click menu opens GNOME Contacts.
   **Settings → Contacts → Keep the search field open** keeps the Contacts

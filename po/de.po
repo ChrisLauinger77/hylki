@@ -4267,6 +4267,15 @@ msgstr "Neue Kontakte speichern in"
 msgid "Unless another is picked when the contact is made."
 msgstr ""
 
+msgid "Layout"
+msgstr "Layout"
+
+msgid "Contacts placement"
+msgstr "Platzierung der Kontakte"
+
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Keep the search field open"
 msgstr "Suchfeld geöffnet lassen"
 
@@ -5807,12 +5816,6 @@ msgstr "Position der Tags"
 msgid "Favorites placement"
 msgstr "Platzierung der Favoriten"
 
-msgid "Contacts placement"
-msgstr "Platzierung der Kontakte"
-
-msgid "'In the footer' disables expand/collapse."
-msgstr ""
-
 msgid "Icon rail"
 msgstr "Symbolleiste"
 
@@ -5840,9 +5843,6 @@ msgid "The account's picture or emoji, as in the sidebar."
 msgstr ""
 "Gesendete Nachrichten verwenden den Gravatar, das Profilbild oder das Emoji "
 "des Kontos, analog zum Symbol in der Seitenleiste."
-
-msgid "Layout"
-msgstr "Layout"
 
 msgid "Automatic uses single lines in wide windows."
 msgstr ""
@@ -6416,10 +6416,6 @@ msgstr "Über den Konten"
 msgid "Below the accounts"
 msgstr "Unterhalb der Konten"
 
-#, fuzzy
-msgid "In the footer"
-msgstr "Filter speichern?"
-
 msgid "All Inboxes"
 msgstr "Alle Posteingänge"
 
@@ -6597,6 +6593,10 @@ msgstr "Töne"
 
 msgid "Forget this word"
 msgstr "Dieses Wort vergessen"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "Filter speichern?"
 
 #. GNOME Settings' own names for its alert sounds.
 msgid "Click"

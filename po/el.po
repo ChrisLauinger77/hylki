@@ -4235,6 +4235,15 @@ msgstr "Αποθήκευση νέων επαφών στο"
 msgid "Unless another is picked when the contact is made."
 msgstr "Εκτός αν επιλεγεί άλλος κατά τη δημιουργία της επαφής."
 
+msgid "Layout"
+msgstr "Διάταξη"
+
+msgid "Contacts placement"
+msgstr "Θέση επαφών"
+
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Keep the search field open"
 msgstr "Διατήρηση ανοιχτού πεδίου αναζήτησης"
 
@@ -5747,12 +5756,6 @@ msgstr "Τοποθέτηση ετικετών"
 msgid "Favorites placement"
 msgstr "Θέση αγαπημένων"
 
-msgid "Contacts placement"
-msgstr "Θέση επαφών"
-
-msgid "'In the footer' disables expand/collapse."
-msgstr ""
-
 msgid "Icon rail"
 msgstr "Γραμμή εικονιδίων"
 
@@ -5778,9 +5781,6 @@ msgstr "Τα απεσταλμένα χρησιμοποιούν τον κύκλο
 
 msgid "The account's picture or emoji, as in the sidebar."
 msgstr "Η εικόνα ή το emoji του λογαριασμού, όπως στην πλευρική στήλη."
-
-msgid "Layout"
-msgstr "Διάταξη"
 
 msgid "Automatic uses single lines in wide windows."
 msgstr "Η αυτόματη επιλογή χρησιμοποιεί μονές γραμμές σε πλατιά παράθυρα."
@@ -6352,10 +6352,6 @@ msgstr "Πάνω από τους λογαριασμούς"
 msgid "Below the accounts"
 msgstr "Κάτω από τους λογαριασμούς"
 
-#, fuzzy
-msgid "In the footer"
-msgstr "Αποθήκευση του φίλτρου;"
-
 msgid "All Inboxes"
 msgstr "Όλα τα Εισερχόμενα"
 
@@ -6532,6 +6528,10 @@ msgstr "Ήχοι"
 
 msgid "Forget this word"
 msgstr "Να ξεχαστεί αυτή η λέξη"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "Αποθήκευση του φίλτρου;"
 
 #. GNOME Settings' own names for its alert sounds.
 msgid "Click"

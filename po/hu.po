@@ -4345,6 +4345,16 @@ msgstr "Új névjegy"
 msgid "Unless another is picked when the contact is made."
 msgstr ""
 
+msgid "Layout"
+msgstr ""
+
+#, fuzzy
+msgid "Contacts placement"
+msgstr "Címkék elhelyezése"
+
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Keep the search field open"
 msgstr ""
 
@@ -5901,13 +5911,6 @@ msgstr "Címkék elhelyezése"
 msgid "Favorites placement"
 msgstr "A szűrők elhelyezése"
 
-#, fuzzy
-msgid "Contacts placement"
-msgstr "Címkék elhelyezése"
-
-msgid "'In the footer' disables expand/collapse."
-msgstr ""
-
 msgid "Icon rail"
 msgstr "Ikonok sora"
 
@@ -5935,9 +5938,6 @@ msgid "The account's picture or emoji, as in the sidebar."
 msgstr ""
 "Az általad elküldött üzenetek a fiók Gravatar-képét, fotóját vagy emojiját "
 "jelenítik meg, ahogyan az oldalsávban található kör is."
-
-msgid "Layout"
-msgstr ""
 
 msgid "Automatic uses single lines in wide windows."
 msgstr ""
@@ -6521,10 +6521,6 @@ msgstr "A fiókok felett"
 msgid "Below the accounts"
 msgstr "A fiókok alatt"
 
-#, fuzzy
-msgid "In the footer"
-msgstr "Elmented a szűrőt?"
-
 msgid "All Inboxes"
 msgstr "Összes beérkezett"
 
@@ -6712,6 +6708,10 @@ msgstr "Hangok"
 
 msgid "Forget this word"
 msgstr "Szó elfelejtése"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "Elmented a szűrőt?"
 
 #. GNOME Settings' own names for its alert sounds.
 msgid "Click"

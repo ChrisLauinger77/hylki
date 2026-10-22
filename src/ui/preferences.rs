@@ -427,6 +427,9 @@ pub struct Preferences {
     /// The content header bar; hidden while the accounts editor subpage is
     /// open, whose own header takes over.
     host_header: Option<adw::HeaderBar>,
+    /// Settings → Sidebar's Contacts placement row, kept in step with the
+    /// same row in Settings → Contacts.
+    contacts_placement_row: Option<adw::ComboRow>,
     /// The OpenPGP page (#133), kept alive with the window.
     pgp_keys: Option<Controller<crate::ui::pgp_keys::PgpKeys>>,
     /// (name, address) per enabled account and alias, the rows of the
@@ -3828,6 +3831,7 @@ impl Component for Preferences {
             split: None,
             accounts_sender: init.accounts_sender.clone(),
             host_header: None,
+            contacts_placement_row: None,
             pgp_keys: None,
             identities: init.identities.clone(),
             cloud: None,
@@ -3993,13 +3997,7 @@ impl Component for Preferences {
             ])));
             row.set_selected(placement_index(placement));
         }
-        // Contacts alone can sit in the footer, first as the default.
-        widgets.contacts_placement_row.set_model(Some(&gtk::StringList::new(&[
-            i18n("In the footer").as_str(),
-            i18n("Above the accounts").as_str(),
-            i18n("Below the accounts").as_str(),
-            i18n("Off").as_str(),
-        ])));
+        widgets.contacts_placement_row.set_model(Some(&contacts_placement_model()));
         widgets.contacts_placement_row.set_selected(contacts_placement_index(init.contacts_placement));
         widgets.start_view_row.set_model(Some(&gtk::StringList::new(&[
             i18n("All Inboxes").as_str(),
@@ -4664,10 +4662,14 @@ impl Component for Preferences {
         widgets.translation_slot.set_child(Some(&crate::ui::translation_page::build()));
         model.cloud = Some(cloud);
         let contacts = crate::ui::contact_sources::ContactSources::builder()
-            .launch(init.contacts_search_open)
+            .launch(crate::ui::contact_sources::ContactSourcesInit {
+                search_open: init.contacts_search_open,
+                placement: init.contacts_placement,
+            })
             .forward(sender.input_sender(), PrefInput::Contacts);
         widgets.contacts_slot.set_child(Some(contacts.widget()));
         model.contacts = Some(contacts);
+        model.contacts_placement_row = Some(widgets.contacts_placement_row.clone());
         // The sidebar (#141): a heading per section, a row per category.
         tracing::debug!("settings window: prefs tail D (before sidebar rows) at {:?}", t_init.elapsed());
         for (section, pages) in SIDE_PAGES {
@@ -5206,7 +5208,11 @@ impl Component for Preferences {
                 let _ = sender.output(PrefOutput::SetFavoritesPlacement(placement_from_index(idx)));
             }
             PrefInput::ChangeContactsPlacement(idx) => {
-                let _ = sender.output(PrefOutput::SetContactsPlacement(contacts_placement_from_index(idx)));
+                let placement = contacts_placement_from_index(idx);
+                if let Some(c) = &self.contacts {
+                    c.emit(crate::ui::contact_sources::ContactSourcesInput::SetPlacement(placement));
+                }
+                let _ = sender.output(PrefOutput::SetContactsPlacement(placement));
             }
             PrefInput::ChangeStartView(idx) => {
                 use crate::config::StartView;
@@ -5482,6 +5488,15 @@ impl Component for Preferences {
                     Out::SetSearchOpen(on) => {
                         let _ = sender.output(PrefOutput::SetContactsSearchOpen(on));
                     }
+                    // Through the Sidebar page's row, which tells the app.
+                    Out::SetPlacement(placement) => {
+                        if let Some(row) = &self.contacts_placement_row {
+                            let idx = contacts_placement_index(placement);
+                            if row.selected() != idx {
+                                row.set_selected(idx);
+                            }
+                        }
+                    }
                     Out::SetContactBook(uid) => {
                         let _ = sender.output(PrefOutput::SetContactBook(uid));
                     }
@@ -5618,15 +5633,26 @@ fn placement_from_index(idx: u32) -> crate::config::SectionPlacement {
     }
 }
 
+/// The Contacts placement combos' choices, here and in Settings →
+/// Contacts: Contacts alone can sit in the footer, first as the default.
+pub(crate) fn contacts_placement_model() -> gtk::StringList {
+    gtk::StringList::new(&[
+        i18n("In the footer").as_str(),
+        i18n("Above the accounts").as_str(),
+        i18n("Below the accounts").as_str(),
+        i18n("Off").as_str(),
+    ])
+}
+
 /// The Contacts placement combo's rows: the footer, then the others.
-fn contacts_placement_index(p: crate::config::SectionPlacement) -> u32 {
+pub(crate) fn contacts_placement_index(p: crate::config::SectionPlacement) -> u32 {
     match p {
         crate::config::SectionPlacement::Footer => 0,
         p => placement_index(p) + 1,
     }
 }
 
-fn contacts_placement_from_index(idx: u32) -> crate::config::SectionPlacement {
+pub(crate) fn contacts_placement_from_index(idx: u32) -> crate::config::SectionPlacement {
     match idx {
         0 => crate::config::SectionPlacement::Footer,
         idx => placement_from_index(idx - 1),

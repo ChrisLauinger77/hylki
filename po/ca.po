@@ -4195,6 +4195,15 @@ msgstr "Desa els contactes nous a"
 msgid "Unless another is picked when the contact is made."
 msgstr ""
 
+msgid "Layout"
+msgstr "Disposició"
+
+msgid "Contacts placement"
+msgstr ""
+
+msgid "'In the footer' disables expand/collapse."
+msgstr ""
+
 msgid "Keep the search field open"
 msgstr "Mantén obert el camp de cerca"
 
@@ -5714,12 +5723,6 @@ msgstr "Col·locació de les etiquetes"
 msgid "Favorites placement"
 msgstr ""
 
-msgid "Contacts placement"
-msgstr ""
-
-msgid "'In the footer' disables expand/collapse."
-msgstr ""
-
 msgid "Icon rail"
 msgstr "Barra d'icones"
 
@@ -5747,9 +5750,6 @@ msgid "The account's picture or emoji, as in the sidebar."
 msgstr ""
 "Els missatges que has enviat porten el Gravatar, la imatge o l'emoji del "
 "compte, com fa el seu cercle a la barra lateral."
-
-msgid "Layout"
-msgstr "Disposició"
 
 msgid "Automatic uses single lines in wide windows."
 msgstr ""
@@ -6318,10 +6318,6 @@ msgstr "A sobre dels comptes"
 msgid "Below the accounts"
 msgstr "A sota dels comptes"
 
-#, fuzzy
-msgid "In the footer"
-msgstr "Vols desar el filtre?"
-
 msgid "All Inboxes"
 msgstr "Totes les bústies d'entrada"
 
@@ -6500,6 +6496,10 @@ msgstr "Sons"
 
 msgid "Forget this word"
 msgstr "Oblida aquesta paraula"
+
+#, fuzzy
+msgid "In the footer"
+msgstr "Vols desar el filtre?"
 
 #. GNOME Settings' own names for its alert sounds.
 msgid "Click"
