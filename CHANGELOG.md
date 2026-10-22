@@ -11,6 +11,22 @@
   `tools/build-packages.sh deb`. See
   [docs/INSTALLING.md](docs/INSTALLING.md#debian-and-ubuntu).
 
+- **Added: a dragged message shows as a card**, as a dragged contact does:
+  the row's circle, the subject and the sender, in place of the envelope.
+  A selection draws up to five cards stacked behind the grabbed one, with a
+  count of the whole selection.
+
+- **Added: Ctrl+C shows beside Copy in the message menu** (#497, requested
+  by valqk), so the key reads as available.
+
+- **Fixed: the single-key shortcuts did nothing with Caps Lock on** (#392,
+  reported by 3v1n0). A key is now read as Shift alone would make it, so
+  Caps Lock no longer turns j into J.
+
+- **Fixed: the filter editor's Save refused an incomplete rule without a
+  word.** Save is now dimmed until the rule has text to match and a folder
+  or a tag, since a rule left in the Inbox with no tag does nothing.
+
 - **Changed: Contacts is back in the sidebar's footer** by default, above
   Attachments, for new and existing installs; one placed Off stays off.
   **Settings → Sidebar → Sections → Contacts placement** has **In the
