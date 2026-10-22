@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## 1.45.0 — 2026-10-22
+
+Everything from 1.45.0-beta.1 to 1.45.0-beta.4: a Debian package with its
+own apt repository, CardDAV accounts, contact groups, Contacts as a full
+address book in the sidebar, Undo Send, recipient pills that move between
+To, Cc and Bcc, Thunderbird's composer keys, subjects hidden in encrypted
+mail, and replied and forwarded arrows in the message list. Greek and
+Spanish are complete.
+
+- **Translations:** Greek (PR #507 by Yiannis Ioannides) and Spanish (PR
+  #508 by Daniel Miguel) are complete; French (PRs #483, #500 by frenchy82),
+  German (PRs #480, #485, #501 by Samuel Edlmeier) and Catalan (PR #489 by
+  jolupa) are up to date.
 
 - **Added: a Debian package** (#503, requested by valqk; the build is adapted
   from PR #310 by Christian Lauinger). Debian 13 and Ubuntu 25.10 and later

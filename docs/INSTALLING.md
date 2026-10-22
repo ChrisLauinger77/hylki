@@ -55,9 +55,9 @@ anything older, use the Flatpak or [build from source](BUILDING.md).
 
 ## Debian and Ubuntu
 
-From 1.45.0, add the signed apt repository on hylki.hyprlab.co and install
-from it. Hylki then updates with the rest of the system, through GNOME
-Software or `apt upgrade`:
+Add the signed apt repository on hylki.hyprlab.co and install from it. Hylki
+then updates with the rest of the system, through GNOME Software or
+`apt upgrade`:
 
 ```sh
 sudo curl -fsSLo /etc/apt/sources.list.d/hylki.sources https://hylki.hyprlab.co/deb/hylki.sources
@@ -120,14 +120,6 @@ same way. Every Debian package carries it, switched off; turn it on once:
 ```sh
 sudo sed -i 's/^Enabled: no/Enabled: yes/' /etc/apt/sources.list.d/hylki-beta.sources
 sudo apt update && sudo apt install hylki
-```
-
-Until 1.45.0 is out there is no stable package to start from: install the
-newest beta from its download, then turn the beta suite on as above.
-
-```sh
-curl -fsSLO https://hylki.hyprlab.co/download/hylki-beta-amd64.deb
-sudo apt install ./hylki-beta-amd64.deb
 ```
 
 To leave the betas, set `Enabled: no` again, then run
