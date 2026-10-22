@@ -146,7 +146,7 @@ pub(crate) const PROVIDERS: &[Provider] = &[
     Provider { label: "IMAP/POP3 Account", brand: "mail", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
     Provider { label: "Custom (OAuth)…", brand: "mail-oauth", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
     Provider { label: "JMAP Server", brand: "mail-jmap", kind: ProviderKind::Jmap, imap_host: "", imap_port: 443, smtp_host: "", smtp_port: 0, hint: i18n_noop("Your JMAP server's address or session URL. No SMTP settings needed.") },
-    Provider { label: "Google (Gmail) — sign in", brand: "gmail", kind: ProviderKind::Google, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Signs in through your browser. No password needed.") },
+    Provider { label: "Google (Gmail)", brand: "gmail", kind: ProviderKind::Google, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Signs in through your browser. No password needed.") },
     Provider { label: "Microsoft 365 / Outlook", brand: "outlook", kind: ProviderKind::Microsoft, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Signs in through your browser. No password needed.") },
     Provider { label: "iCloud", brand: "icloud", kind: ProviderKind::Preset, imap_host: "imap.mail.me.com", imap_port: 993, smtp_host: "smtp.mail.me.com", smtp_port: 587, hint: APP_PW },
     Provider { label: "Yahoo Mail", brand: "yahoo", kind: ProviderKind::Preset, imap_host: "imap.mail.yahoo.com", imap_port: 993, smtp_host: "smtp.mail.yahoo.com", smtp_port: 465, hint: APP_PW },
