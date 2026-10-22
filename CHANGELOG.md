@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Added: a Debian package** (#503, requested by valqk; the build is adapted
+  from PR #310 by Christian Lauinger). Debian 13 and Ubuntu 25.10 and later
+  install Hylki from a signed apt repository on hylki.hyprlab.co, or from the
+  `.deb` attached to each release, and it updates with the rest of the
+  system. The package adds the repository itself, and the beta suite
+  switched off, as the RPM does. It is built in a Debian 13 container by
+  `tools/build-packages.sh deb`. See
+  [docs/INSTALLING.md](docs/INSTALLING.md#debian-and-ubuntu).
+
 - **Changed: Contacts is back in the sidebar's footer** by default, above
   Attachments, for new and existing installs; one placed Off stays off.
   **Settings → Sidebar → Sections → Contacts placement** has **In the
