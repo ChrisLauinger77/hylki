@@ -6492,7 +6492,8 @@ impl AccountsWindow {
 
     /// [`push_form_page`] for any content widget: the filter editor builds
     /// its own page of groups. `entries` are the entry rows whose Enter
-    /// should save.
+    /// should save. Returns the Save button, for a form that dims it while
+    /// it cannot save.
     fn push_form_content(
         &self,
         nav: &adw::NavigationView,
@@ -6502,7 +6503,7 @@ impl AccountsWindow {
         content: &gtk::Widget,
         entries: Vec<adw::EntryRow>,
         save: impl Fn() -> bool + 'static,
-    ) {
+    ) -> gtk::Button {
         let save: std::rc::Rc<dyn Fn() -> bool> = std::rc::Rc::new(save);
         let header = adw::HeaderBar::new();
         header.set_show_end_title_buttons(true);
@@ -6536,6 +6537,7 @@ impl AccountsWindow {
         }
         *self.form_save.borrow_mut() = Some(Box::new(move || save()));
         nav.push(&nav_page);
+        save_btn
     }
 
     /// The filter editor, a page of groups: the account; one group per
@@ -6595,6 +6597,18 @@ impl AccountsWindow {
         // only one). Body conditions (#191) pin the matcher to "contains",
         // the only search a server offers, and say so.
         let conds: std::rc::Rc<std::cell::RefCell<Vec<CondRows>>> = Default::default();
+        // Save stays dimmed until the rule has something to match and
+        // something to do; every row that bears on that calls `changed`.
+        // The check needs the Save button, so it is filled in last.
+        let revalidate: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>> = Default::default();
+        let changed = {
+            let revalidate = revalidate.clone();
+            move || {
+                if let Some(check) = revalidate.borrow().as_ref() {
+                    check();
+                }
+            }
+        };
         let field_names: Vec<String> = FilterField::ALL.iter().map(|f| Self::field_label(*f)).collect();
         let match_names: Vec<String> = FilterMatch::ALL.iter().map(|m| Self::match_label(*m)).collect();
         let make_cond = {
@@ -6720,8 +6734,17 @@ impl AccountsWindow {
             let make_cond = make_cond.clone();
             let form_save = self.form_save.clone();
             let nav = nav.clone();
+            let changed = changed.clone();
             move |init: Option<&crate::config::FilterCondition>| {
                 let c = make_cond(init);
+                {
+                    let changed = changed.clone();
+                    c.value.connect_changed(move |_| changed());
+                }
+                {
+                    let changed = changed.clone();
+                    c.field.connect_selected_notify(move |_| changed());
+                }
                 let after: gtk::Widget = conds
                     .borrow()
                     .last()
@@ -6732,6 +6755,7 @@ impl AccountsWindow {
                     let conds = conds.clone();
                     let page_box = page_box.clone();
                     let relabel = relabel.clone();
+                    let changed = changed.clone();
                     let group = c.group.clone();
                     c.remove.connect_clicked(move |_| {
                         let gone = {
@@ -6744,6 +6768,7 @@ impl AccountsWindow {
                         if let Some(gone) = gone {
                             page_box.remove(&gone.group);
                             relabel();
+                            changed();
                         }
                     });
                 }
@@ -6762,6 +6787,7 @@ impl AccountsWindow {
                 }
                 conds.borrow_mut().push(c);
                 relabel();
+                changed();
             }
         };
         {
@@ -6803,6 +6829,10 @@ impl AccountsWindow {
             let fill_dest = fill_dest.clone();
             account_row.connect_selected_notify(move |row| fill_dest(row.selected() as usize));
         }
+        {
+            let changed = changed.clone();
+            dest_row.connect_selected_notify(move |_| changed());
+        }
 
         // Tag with (#71): none, or one of the tags.
         let tag_row = adw::ComboRow::new();
@@ -6813,6 +6843,10 @@ impl AccountsWindow {
             let mut names: Vec<&str> = vec![none.as_str()];
             names.extend(tags.iter().map(|t| t.name.as_str()));
             tag_row.set_model(Some(&gtk::StringList::new(&names)));
+        }
+        {
+            let changed = changed.clone();
+            tag_row.connect_selected_notify(move |_| changed());
         }
 
         // Filed mail is still new mail: counted by default, so the unread
@@ -6912,8 +6946,9 @@ impl AccountsWindow {
             });
         }
 
-        let s = sender.clone();
-        self.push_form_content(nav, "filter", &title, &verb, scrolled.upcast_ref(), vec![name_row.clone()], move || {
+        // The rule as the form stands, or None while it cannot be saved.
+        let entries = vec![name_row.clone()];
+        let build = move || -> Option<FilterRule> {
             // Every condition with text; a blank extra one is dropped. The
             // matcher of a body condition is whatever the pinned row says.
             let conditions: Vec<crate::config::FilterCondition> = conds
@@ -6933,19 +6968,15 @@ impl AccountsWindow {
                 })
                 .collect();
             let paths = dest_paths.borrow();
-            let (Some(email), Some(dest)) = (
-                emails.get(account_row.selected() as usize),
-                paths.get(dest_row.selected() as usize),
-            ) else {
-                return false;
-            };
+            let email = emails.get(account_row.selected() as usize)?;
+            let dest = paths.get(dest_row.selected() as usize)?;
             let tag = match tag_row.selected() {
                 0 => String::new(),
                 i => tags.get(i as usize - 1).map(|t| t.keyword.clone()).unwrap_or_default(),
             };
             // A rule needs something to match and something to do.
             if conditions.is_empty() || (dest.is_empty() && tag.is_empty()) {
-                return false;
+                return None;
             }
             let mut rule = FilterRule {
                 name: name_row.text().trim().to_string(),
@@ -6960,12 +6991,35 @@ impl AccountsWindow {
                 count_unread: count_row.is_active(),
             };
             rule.set_conditions(conditions);
-            s.input_sender().emit(match edit_index {
-                Some(i) => AccountsInput::FilterEdited(i, rule),
-                None => AccountsInput::FilterAdded(rule),
-            });
-            true
-        });
+            Some(rule)
+        };
+        let build = std::rc::Rc::new(build);
+
+        let s = sender.clone();
+        let save_btn = {
+            let build = build.clone();
+            self.push_form_content(nav, "filter", &title, &verb, scrolled.upcast_ref(), entries, move || {
+                let Some(rule) = build() else {
+                    return false;
+                };
+                s.input_sender().emit(match edit_index {
+                    Some(i) => AccountsInput::FilterEdited(i, rule),
+                    None => AccountsInput::FilterAdded(rule),
+                });
+                true
+            })
+        };
+        // Grey, not a faded blue, while it cannot save.
+        *revalidate.borrow_mut() = Some(Box::new(move || {
+            let ready = build().is_some();
+            save_btn.set_sensitive(ready);
+            if ready {
+                save_btn.add_css_class("suggested-action");
+            } else {
+                save_btn.remove_css_class("suggested-action");
+            }
+        }));
+        changed();
     }
 }
 
