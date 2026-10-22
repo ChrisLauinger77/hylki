@@ -1854,21 +1854,16 @@ impl Row {
         }
         {
             let weak = self.me.clone();
-            drag.connect_drag_begin(move |src, drag| {
-                if let Some(row) = weak.upgrade() {
-                    row.st.borrow_mut().dragging = true;
-                    row.sync_host_classes();
-                }
-                // A white envelope, cursor-sized, centred under the pointer —
-                // without an icon GTK draws the payload text. Set on the
-                // drag's own icon window as a widget, so it is drawn at
-                // logical size from a display-scale texture.
-                let scale = src.widget().map(|w| w.scale_factor()).unwrap_or(1);
-                if let Some(envelope) = crate::app_icon::drag_envelope(scale) {
-                    let icon = gtk::DragIcon::for_drag(drag);
-                    icon.set_child(Some(&envelope));
-                    let half = crate::app_icon::DRAG_ICON_SIZE / 2;
-                    drag.set_hotspot(half, half);
+            drag.connect_drag_begin(move |_, drag| {
+                let Some(row) = weak.upgrade() else { return };
+                row.st.borrow_mut().dragging = true;
+                row.sync_host_classes();
+                // The message as a contact travels: its circle, subject and
+                // sender, hanging from the pointer. Without an icon GTK
+                // draws the payload text.
+                if let Some(card) = row.drag_card() {
+                    gtk::DragIcon::for_drag(drag).set_child(Some(&card));
+                    drag.set_hotspot(0, 0);
                 }
             });
         }
@@ -3077,6 +3072,52 @@ impl Row {
             y: point.y() as f64,
             key: (data.msg.account_id, data.msg.id),
         });
+    }
+
+    /// What a drag of this row carries under the pointer: the row's
+    /// circle, the subject over who it is from (to, in Sent), and how many
+    /// messages go when the row is one of a selection.
+    fn drag_card(&self) -> Option<gtk::Box> {
+        let (data, shared) = (self.data()?, self.shared()?);
+        let look = shared.look.borrow().clone();
+        let card = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        card.add_css_class("message-drag-card");
+        let name = self.face_name(&data, &look);
+        let email = self.face_email(&data, &look);
+        let avatar = adw::Avatar::new(34, Some(&name), true);
+        avatar.set_custom_image(self.w.avatar.custom_image().as_ref());
+        avatar.set_valign(gtk::Align::Center);
+        card.append(&avatar);
+        let text = gtk::Box::new(gtk::Orientation::Vertical, 3);
+        text.set_valign(gtk::Align::Center);
+        let subject = if data.msg.subject.trim().is_empty() { i18n("(no subject)") } else { data.msg.subject.clone() };
+        let title = gtk::Label::new(Some(&subject));
+        title.set_xalign(0.0);
+        title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        title.set_max_width_chars(40);
+        let who = match (name.trim(), email.trim()) {
+            (n, e) if n.is_empty() || n.eq_ignore_ascii_case(e) => e.to_string(),
+            (n, "") => n.to_string(),
+            (n, e) => format!("{n} <{e}>"),
+        };
+        let subtitle = gtk::Label::new(Some(&who));
+        subtitle.add_css_class("dim-label");
+        subtitle.add_css_class("caption");
+        subtitle.set_xalign(0.0);
+        subtitle.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        subtitle.set_max_width_chars(40);
+        text.append(&title);
+        text.append(&subtitle);
+        card.append(&text);
+        let me = (data.msg.account_id, data.msg.id);
+        let selected = shared.selected_drag_keys();
+        if selected.len() > 1 && selected.iter().any(|k| (k.0, k.3) == me) {
+            let count = gtk::Label::new(Some(&selected.len().to_string()));
+            count.add_css_class("message-drag-count");
+            count.set_valign(gtk::Align::Center);
+            card.append(&count);
+        }
+        Some(card)
     }
 
     fn drag_payload(&self) -> Option<gtk::gdk::ContentProvider> {
