@@ -35,6 +35,8 @@ mod handle_write;
 pub(super) mod idle;
 pub(super) mod keywords;
 mod ladder;
+#[cfg(test)]
+mod live_tests;
 pub(super) mod mutate;
 pub(super) mod prefetch;
 pub(super) mod preview_fetch;

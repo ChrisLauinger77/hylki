@@ -350,3 +350,56 @@ fn internal_date_summary(fetch: &Fetch) -> (String, i64) {
         None => (String::new(), 0),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn envelope_name_with_the_headers_quotes_parses_clean() {
+        use async_imap::imap_proto::{AttributeValue, Response};
+        let line = b"* 1 FETCH (ENVELOPE (NIL \"S\" ((\"\\\"Sender Name\\\"\" NIL \"some\" \"mail.tld\")) \
+    NIL NIL NIL NIL NIL NIL NIL))\r\n";
+        let (_, resp) = async_imap::imap_proto::parser::parse_response(line).unwrap();
+        let Response::Fetch(_, attrs) = resp else {
+            panic!("not a FETCH")
+        };
+        let Some(AttributeValue::Envelope(env)) = attrs.first() else {
+            panic!("no ENVELOPE")
+        };
+        let from = env.from.as_ref().unwrap();
+        assert_eq!(
+            address_parts(&from[0]),
+            ("Sender Name".to_string(), "some@mail.tld".to_string())
+        );
+    }
+
+    #[test]
+    fn header_fields_unfold_each_requested_header() {
+        // #334: References and the priority headers come back in one block.
+        let raw =
+            b"References: <a@x>\r\n <b@y>\r\nX-Priority: 1 (Highest)\r\nImportance: high\r\n\r\n";
+        let fields = header_fields(raw);
+        assert_eq!(fields.len(), 3);
+        assert_eq!(
+            fields[0],
+            ("References".to_string(), "<a@x> <b@y>".to_string())
+        );
+        assert_eq!(normalize_msgids(fields[0].1.as_bytes()), "a@x b@y");
+        assert_eq!(
+            fields[1],
+            ("X-Priority".to_string(), "1 (Highest)".to_string())
+        );
+        assert!(header_fields(b"").is_empty());
+    }
+
+    #[test]
+    fn header_references_are_normalized_like_envelope_ids() {
+        // Folded exactly as a server sends it, angle brackets and mixed case.
+        assert_eq!(
+            normalize_msgids(b"<A@x>\r\n <b@Y>\r\n"),
+            "a@x b@y",
+            "ids should be unwrapped, lowercased and space-joined"
+        );
+    }
+}

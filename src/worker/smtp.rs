@@ -248,3 +248,39 @@ pub(super) fn smtp_host(account: &AccountConfig) -> String {
         account.imap_host.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::worker::test_support::sample_account;
+
+    #[test]
+    fn only_an_alias_with_its_own_smtp_switches_transport() {
+        use crate::config::AliasConfig;
+        let account = AccountConfig {
+            email: "me@example.com".into(),
+            aliases: vec![
+                AliasConfig {
+                    identity: "Plain <plain@fwd.example>".into(),
+                    ..Default::default()
+                },
+                AliasConfig {
+                    identity: "Ann Work <ann@work.example>".into(),
+                    smtp_host: "smtp.work.example".into(),
+                    smtp_port: 465,
+                    smtp_username: "ann@work.example".into(),
+                    ..Default::default()
+                },
+            ],
+            ..sample_account()
+        };
+        // A plain alias, and the account's own address, keep the account transport.
+        assert!(alias_with_own_smtp(&account, "plain@fwd.example").is_none());
+        assert!(alias_with_own_smtp(&account, "me@example.com").is_none());
+        // The per-SMTP alias resolves — case-insensitively, as addresses are.
+        let hit = alias_with_own_smtp(&account, "Ann@Work.example").expect("matches");
+        assert_eq!(hit.smtp_host, "smtp.work.example");
+        // An address that is nobody's alias resolves to the account transport.
+        assert!(alias_with_own_smtp(&account, "stranger@else.example").is_none());
+    }
+}

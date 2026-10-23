@@ -210,3 +210,21 @@ pub(in crate::worker) fn missed_new_mail(
         .copied();
     matches!((seen, uid_next), (Some(seen), Some(now)) if now > seen)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// #336: mail that lands while the connection is busy shows only as a
+    /// moved UIDNEXT on the next SELECT.
+    #[test]
+    fn a_moved_uid_next_is_missed_mail() {
+        let path = "INBOX-336-test";
+        assert!(!missed_new_mail(99, path, Some(10)), "nothing loaded yet");
+        note_synced_uid_next(99, path, Some(10));
+        assert!(!missed_new_mail(99, path, Some(10)));
+        assert!(missed_new_mail(99, path, Some(12)));
+        assert!(!missed_new_mail(99, path, None));
+        assert!(!missed_new_mail(98, path, Some(12)), "another account");
+    }
+}

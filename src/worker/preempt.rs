@@ -107,3 +107,272 @@ pub(super) async fn interrupt_read_for_reader<F: std::future::Future>(
         }
     }
 }
+
+#[cfg(test)]
+mod reader_preemption_tests {
+    use super::*;
+    use crate::worker::imap::backfill::restore_interrupted_backfill;
+    use crate::worker::imap::backfill::Backfill;
+    use crate::worker::preempt::interrupt_read_for_reader;
+    use crate::worker::preempt::reorder_reader_loads;
+    use std::time::Duration;
+
+    fn body() -> MailRequest {
+        MailRequest::LoadBody {
+            message_id: 42,
+            path: "INBOX".into(),
+            uid: 42,
+        }
+    }
+
+    #[test]
+    fn a_refresh_tick_does_not_leave_a_folder_sync_ahead_of_the_reader() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tx.send(MailRequest::RefreshUnread).unwrap();
+        tx.send(MailRequest::LoadMessages {
+            folder_id: 1,
+            path: "INBOX".into(),
+        })
+        .unwrap();
+        tx.send(body()).unwrap();
+        let mut backlog = std::collections::VecDeque::new();
+        let first = reorder_reader_loads(
+            MailRequest::SyncFolder {
+                folder_id: 1,
+                path: "INBOX".into(),
+            },
+            &mut rx,
+            &mut backlog,
+        );
+        assert!(matches!(first, MailRequest::LoadBody { .. }));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::SyncFolder { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::RefreshUnread)
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadMessages { .. })
+        ));
+    }
+
+    #[test]
+    fn overtaking_refresh_ticks_still_preserves_mutation_order() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tx.send(MailRequest::RefreshUnread).unwrap();
+        tx.send(MailRequest::SetSeen {
+            path: "INBOX".into(),
+            uid: 42,
+            seen: true,
+        })
+        .unwrap();
+        tx.send(MailRequest::LoadMessages {
+            folder_id: 1,
+            path: "INBOX".into(),
+        })
+        .unwrap();
+        tx.send(MailRequest::RefreshUnread).unwrap();
+        tx.send(body()).unwrap();
+        let mut backlog = std::collections::VecDeque::new();
+        let first = reorder_reader_loads(
+            MailRequest::SyncFolder {
+                folder_id: 1,
+                path: "INBOX".into(),
+            },
+            &mut rx,
+            &mut backlog,
+        );
+        assert!(matches!(first, MailRequest::SyncFolder { .. }));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::RefreshUnread)
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::SetSeen { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadMessages { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::RefreshUnread)
+        ));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_reader_cancels_an_inflight_folder_read() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut backlog = std::collections::VecDeque::new();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            tx.send(body()).unwrap();
+        });
+        let start = tokio::time::Instant::now();
+        let result = interrupt_read_for_reader(
+            tokio::time::sleep(Duration::from_secs(10)),
+            &mut rx,
+            &mut backlog,
+        )
+        .await;
+        assert!(result.is_none());
+        assert_eq!(start.elapsed(), Duration::from_millis(20));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { uid: 42, .. })
+        ));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_reader_does_not_overtake_a_queued_mutation() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut backlog = std::collections::VecDeque::from([MailRequest::SetSeen {
+            path: "INBOX".into(),
+            uid: 42,
+            seen: true,
+        }]);
+        tx.send(body()).unwrap();
+        let result = interrupt_read_for_reader(
+            async {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                7
+            },
+            &mut rx,
+            &mut backlog,
+        )
+        .await;
+        assert_eq!(result, Some(7));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::SetSeen { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { .. })
+        ));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_arriving_mutation_remains_a_barrier_to_a_later_reader() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut backlog = std::collections::VecDeque::new();
+        tx.send(MailRequest::SetSeen {
+            path: "INBOX".into(),
+            uid: 42,
+            seen: true,
+        })
+        .unwrap();
+        tx.send(body()).unwrap();
+        let result = interrupt_read_for_reader(
+            async {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                7
+            },
+            &mut rx,
+            &mut backlog,
+        )
+        .await;
+        assert_eq!(result, Some(7));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::SetSeen { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { .. })
+        ));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancelling_an_owned_read_drops_the_connection() {
+        use tokio::io::AsyncReadExt;
+        let (client, mut server) = tokio::io::duplex(16);
+        let mut session = Some(client);
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut backlog = std::collections::VecDeque::new();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            tx.send(body()).unwrap();
+        });
+        let result = interrupt_read_for_reader(
+            async {
+                let mut owned = session.take().unwrap();
+                let result = owned.read(&mut [0]).await;
+                session = Some(owned);
+                result
+            },
+            &mut rx,
+            &mut backlog,
+        )
+        .await;
+        assert!(result.is_none());
+        assert!(session.is_none());
+        // EOF proves the reader cannot accidentally reuse an interrupted stream.
+        assert_eq!(server.read(&mut [0]).await.unwrap(), 0);
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { .. })
+        ));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancelled_backfill_restores_drained_uids_without_duplicate_jobs() {
+        let job = Backfill {
+            folder_id: 1,
+            path: "INBOX".into(),
+            remaining: Some(vec![3, 2, 1]),
+            gallery: false,
+        };
+        let mut queue = std::collections::VecDeque::from([job.clone()]);
+        // Cancellation before the future's first poll leaves the job queued.
+        restore_interrupted_backfill(&mut queue, job.clone());
+        assert_eq!(queue.len(), 1);
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            tx.send(body()).unwrap();
+        });
+        let result = interrupt_read_for_reader(
+            async {
+                let mut owned = queue.pop_front().unwrap();
+                owned.remaining.as_mut().unwrap().drain(..2);
+                std::future::pending::<()>().await;
+            },
+            &mut rx,
+            &mut Default::default(),
+        )
+        .await;
+        assert!(result.is_none());
+        assert!(queue.is_empty());
+        restore_interrupted_backfill(&mut queue, job);
+        assert_eq!(queue.len(), 1);
+        assert_eq!(
+            queue.front().unwrap().remaining.as_deref(),
+            Some([3, 2, 1].as_slice())
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_closed_queue_does_not_spin_or_cancel_the_read() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        drop(tx);
+        let result = interrupt_read_for_reader(
+            async {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                7
+            },
+            &mut rx,
+            &mut Default::default(),
+        )
+        .await;
+        assert_eq!(result, Some(7));
+    }
+}

@@ -372,6 +372,7 @@ pub(super) fn uid_set(uids: &[u32]) -> String {
 #[cfg(test)]
 mod uid_set_tests {
     use super::{imap_unquote, quote_mailbox, uid_set};
+    use crate::worker::imap::wire::cmd_head;
 
     #[test]
     fn mailbox_names_are_quoted_for_copy() {
@@ -409,5 +410,12 @@ mod uid_set_tests {
         assert_eq!(uid_set(&[7, 7, 7]), "7");
         assert_eq!(uid_set(&[3, 4, 5, 9]), "3:5,9");
         assert_eq!(uid_set(&[]), "");
+    }
+
+    #[test]
+    fn the_wire_log_shows_three_words_of_a_command() {
+        assert_eq!(cmd_head("UID FETCH 1:5 (FLAGS)"), "UID FETCH 1:5");
+        assert_eq!(cmd_head("  NOOP "), "NOOP");
+        assert_eq!(cmd_head(""), "");
     }
 }

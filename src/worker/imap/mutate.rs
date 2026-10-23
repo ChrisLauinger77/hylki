@@ -346,3 +346,41 @@ pub(super) async fn mark_ham(
     }
     move_messages(session, path, uids, dest).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::borrow::Cow;
+
+    /// A message moved in from another account keeps its read and starred
+    /// state as IMAP flags, and asks for none when it had neither (#265).
+    #[test]
+    fn imported_mail_keeps_its_flags() {
+        assert_eq!(
+            import_flags(true, true).as_deref(),
+            Some("(\\Seen \\Flagged)")
+        );
+        assert_eq!(import_flags(true, false).as_deref(), Some("(\\Seen)"));
+        assert_eq!(import_flags(false, true).as_deref(), Some("(\\Flagged)"));
+        assert_eq!(import_flags(false, false), None);
+    }
+
+    #[test]
+    fn kept_flags_keep_the_ones_an_append_can_set() {
+        let flags = vec![
+            Flag::Seen,
+            Flag::Deleted,
+            Flag::Recent,
+            Flag::Custom(Cow::Borrowed("$Label")),
+            Flag::Custom(Cow::Borrowed("\\Weird")),
+            Flag::Draft,
+            Flag::Answered,
+            Flag::Flagged,
+            Flag::MayCreate,
+        ];
+        assert_eq!(
+            kept_flags(flags.into_iter()),
+            ["\\Seen", "$Label", "\\Draft", "\\Answered", "\\Flagged"]
+        );
+    }
+}

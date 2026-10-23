@@ -219,3 +219,32 @@ pub(super) fn load_smtp_password(account: &mut AccountConfig) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::worker::test_support::sample_account;
+
+    /// A password the worker holds is used as it is, and an OAuth account
+    /// needs none, so neither reads the keyring (#375).
+    #[test]
+    fn sign_in_password_prefers_the_held_one() {
+        let held = AccountConfig {
+            password: "pw".into(),
+            smtp_separate: true,
+            smtp_password: "smtp".into(),
+            ..sample_account()
+        };
+        assert_eq!(sign_in_password_blocking(&held, false).as_deref(), Ok("pw"));
+        assert_eq!(
+            sign_in_password_blocking(&held, true).as_deref(),
+            Ok("smtp")
+        );
+        let oauth = AccountConfig {
+            oauth: true,
+            password: String::new(),
+            ..sample_account()
+        };
+        assert_eq!(sign_in_password_blocking(&oauth, false).as_deref(), Ok(""));
+    }
+}

@@ -152,6 +152,7 @@ pub(in crate::worker) fn structure_attachments(
 #[cfg(test)]
 mod attachment_scan_tests {
     use super::{mime_extension, structure_attachments, INLINE_ATTACHMENT_MIN};
+    use crate::worker::imap::structure::structure_has_attachment;
     use async_imap::imap_proto::types::{
         BodyContentCommon, BodyContentSinglePart, BodyStructure, ContentDisposition,
         ContentEncoding, ContentType,
@@ -426,5 +427,101 @@ mod attachment_scan_tests {
         assert_eq!(mime_extension("IMAGE", "PNG"), ".png");
         assert_eq!(mime_extension("application", "pdf"), "");
         assert_eq!(mime_extension("image", "svg+xml"), "");
+    }
+
+    #[test]
+    fn large_cid_image_counts_toward_the_paperclip() {
+        // BODYSTRUCTURE reports the base64 size: 4 characters per 3 bytes, padded.
+        let octets = INLINE_ATTACHMENT_MIN.div_ceil(3) * 4;
+        let raw = format!(
+            concat!(
+                "* 1 FETCH (BODYSTRUCTURE (",
+                "(\"TEXT\" \"HTML\" (\"CHARSET\" \"utf-8\") NIL NIL \"7BIT\" 20 1 NIL NIL NIL NIL)",
+                "(\"IMAGE\" \"JPEG\" (\"NAME\" \"pic.jpg\") \"<pic>\" NIL \"BASE64\" {} NIL ",
+                "(\"INLINE\" (\"FILENAME\" \"pic.jpg\")) NIL NIL)",
+                " \"RELATED\" (\"BOUNDARY\" \"r\") NIL NIL NIL))\r\n",
+            ),
+            octets
+        );
+        assert!(structure_has_attachment(&bodystructure(&raw)));
+    }
+
+    /// Parse a real server BODYSTRUCTURE response into the structure our IMAP
+    /// summary path sees.
+    fn bodystructure(raw: &str) -> async_imap::imap_proto::types::BodyStructure<'_> {
+        use async_imap::imap_proto::{parser::parse_response, AttributeValue, Response};
+        let (_, resp) = parse_response(raw.as_bytes()).expect("parses");
+        match resp {
+            Response::Fetch(_, attrs) => attrs
+                .into_iter()
+                .find_map(|a| match a {
+                    AttributeValue::BodyStructure(bs) => Some(bs),
+                    _ => None,
+                })
+                .expect("has BODYSTRUCTURE"),
+            other => panic!("unexpected response: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn inline_iphone_photo_counts_as_an_attachment() {
+        // Apple marks the JPEG `INLINE` with no Content-ID; requiring a disposition
+        // of `attachment` missed it, so no paperclip and no download.
+        let bs = bodystructure(concat!(
+            "* 1 FETCH (BODYSTRUCTURE (",
+            "(\"TEXT\" \"PLAIN\" (\"CHARSET\" \"us-ascii\") NIL NIL \"7BIT\" 4 2 NIL NIL NIL NIL)",
+            "(\"IMAGE\" \"JPEG\" (\"NAME\" \"a.jpeg\") NIL NIL \"BASE64\" 100 NIL ",
+            "(\"INLINE\" (\"FILENAME\" \"a.jpeg\")) NIL NIL)",
+            "(\"TEXT\" \"PLAIN\" (\"CHARSET\" \"us-ascii\") NIL NIL \"7BIT\" 40 4 NIL NIL NIL NIL)",
+            " \"MIXED\" (\"BOUNDARY\" \"b\") NIL NIL NIL))\r\n",
+        ));
+        assert!(structure_has_attachment(&bs));
+    }
+
+    #[test]
+    fn cid_logo_does_not_count_as_an_attachment() {
+        // Same inline disposition, but a Content-ID: it's rendered in the body.
+        let bs = bodystructure(concat!(
+            "* 1 FETCH (BODYSTRUCTURE (",
+            "(\"TEXT\" \"HTML\" (\"CHARSET\" \"utf-8\") NIL NIL \"7BIT\" 20 1 NIL NIL NIL NIL)",
+            "(\"IMAGE\" \"PNG\" (\"NAME\" \"logo.png\") \"<logo>\" NIL \"BASE64\" 100 NIL ",
+            "(\"INLINE\" (\"FILENAME\" \"logo.png\")) NIL NIL)",
+            " \"RELATED\" (\"BOUNDARY\" \"r\") NIL NIL NIL))\r\n",
+        ));
+        assert!(!structure_has_attachment(&bs));
+    }
+
+    #[test]
+    fn plain_alternative_has_no_attachment() {
+        let bs = bodystructure(concat!(
+            "* 1 FETCH (BODYSTRUCTURE (",
+            "(\"TEXT\" \"PLAIN\" (\"CHARSET\" \"utf-8\") NIL NIL \"7BIT\" 10 1 NIL NIL NIL NIL)",
+            "(\"TEXT\" \"HTML\" (\"CHARSET\" \"utf-8\") NIL NIL \"7BIT\" 20 1 NIL NIL NIL NIL)",
+            " \"ALTERNATIVE\" (\"BOUNDARY\" \"a\") NIL NIL NIL))\r\n",
+        ));
+        assert!(!structure_has_attachment(&bs));
+    }
+
+    /// A meeting request's calendar part is an attachment, however the
+    /// sender labelled it (#223): it arrives as a plain alternative with no
+    /// disposition at all, which is the one text part that still counts.
+    #[test]
+    fn a_calendar_part_counts_as_an_attachment() {
+        let bs = bodystructure(concat!(
+            "* 1 FETCH (BODYSTRUCTURE (",
+            "(\"TEXT\" \"PLAIN\" (\"CHARSET\" \"utf-8\") NIL NIL \"7BIT\" 10 1 NIL NIL NIL NIL)",
+            "(\"TEXT\" \"HTML\" (\"CHARSET\" \"utf-8\") NIL NIL \"7BIT\" 20 1 NIL NIL NIL NIL)",
+            "(\"TEXT\" \"CALENDAR\" (\"CHARSET\" \"utf-8\" \"METHOD\" \"REQUEST\") NIL NIL ",
+            "\"7BIT\" 900 20 NIL NIL NIL NIL)",
+            " \"ALTERNATIVE\" (\"BOUNDARY\" \"a\") NIL NIL NIL))\r\n",
+        ));
+        assert!(structure_has_attachment(&bs));
+        let metas = structure_attachments(&bs);
+        assert_eq!(metas.len(), 1, "only the calendar part: {metas:?}");
+        assert_eq!(metas[0].mime, "text/calendar");
+        assert_eq!(metas[0].section, "3");
+        // Unnamed by the sender, as Outlook sends it: named for its type, so
+        // something will open it.
+        assert!(metas[0].name.ends_with(".ics"), "{}", metas[0].name);
     }
 }

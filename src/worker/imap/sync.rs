@@ -224,3 +224,58 @@ pub(in crate::worker) fn merge_index(cached: Vec<Message>, recent: Vec<Message>)
     out.sort_by(|a, b| b.uid.cmp(&a.uid)); // newest first
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::worker::test_support::flagged_message;
+
+    /// A sync whose recent window came back without some previews must give
+    /// the same list the cache served, or every quiet poll redraws the list
+    /// (#330).
+    #[test]
+    fn merging_a_recent_window_keeps_the_cached_previews() {
+        let cached: Vec<Message> = (1..=3)
+            .map(|uid| Message {
+                preview: format!("text {uid}"),
+                ..flagged_message(uid)
+            })
+            .collect();
+        let recent = vec![
+            Message {
+                unread: false,
+                ..flagged_message(3)
+            },
+            Message {
+                preview: "new text".into(),
+                ..flagged_message(2)
+            },
+        ];
+        let merged = merge_index(cached, recent);
+        let previews: Vec<&str> = merged.iter().map(|m| m.preview.as_str()).collect();
+        assert_eq!(previews, ["text 3", "new text", "text 1"]);
+        assert!(!merged[0].unread, "the server's flags still win");
+    }
+
+    /// The summary fetch never carries Gmail labels (#374): a merge keeps
+    /// the cached ones until the label read replaces them.
+    #[test]
+    fn merging_a_recent_window_keeps_the_cached_labels() {
+        let cached: Vec<Message> = (1..=2)
+            .map(|uid| Message {
+                labels: vec![format!("Label {uid}")],
+                ..flagged_message(uid)
+            })
+            .collect();
+        let merged = merge_index(cached, vec![flagged_message(2), flagged_message(3)]);
+        let labels: Vec<Vec<String>> = merged.iter().map(|m| m.labels.clone()).collect();
+        assert_eq!(
+            labels,
+            [
+                vec![],
+                vec!["Label 2".to_string()],
+                vec!["Label 1".to_string()]
+            ]
+        );
+    }
+}

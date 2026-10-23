@@ -230,4 +230,12 @@ mod tests {
         assert_eq!(unstuffed(b"\r\n"), Some(&b""[..]));
         assert_eq!(unstuffed(b"text"), Some(&b"text"[..]));
     }
+
+    #[test]
+    fn strip_crlf_drops_every_trailing_line_end() {
+        assert_eq!(strip_crlf(b"+OK\r\n"), b"+OK");
+        assert_eq!(strip_crlf(b"a\n\r\n"), b"a");
+        assert_eq!(strip_crlf(b"\r\n"), b"");
+        assert_eq!(strip_crlf(b"a\rb"), b"a\rb");
+    }
 }

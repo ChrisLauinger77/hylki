@@ -281,3 +281,41 @@ pub(super) fn prefetch_status(remaining: usize) -> String {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::worker::test_support::flagged_message;
+
+    /// The loop behind the 2.6 GB report: a message the attachment prefetch
+    /// popped but could not finish (OpenPGP, or a read that would not parse)
+    /// was queued again by the resync the prefetch triggers, and fetched
+    /// again, forever. One attempt per session is all it gets now.
+    #[test]
+    fn attachment_prefetch_never_requeues_a_message_it_already_tried() {
+        let msgs = vec![flagged_message(2383), flagged_message(2372)];
+        let mut queue = std::collections::VecDeque::new();
+        queue_attachment_prefetch(&mut queue, "INBOX", &msgs, None, 7);
+        assert_eq!(
+            queue.len(),
+            2,
+            "both flagged rows are queued the first time"
+        );
+
+        // The prefetch pops 2383 and notes the attempt, as run_one_prefetch does
+        // before anything can go wrong with the read.
+        queue.pop_front();
+        note_attachment_prefetch_tried(7, "INBOX", 2383);
+        assert!(attachment_prefetch_tried(7, "INBOX", 2383));
+
+        // The resync that follows sees the same rows: 2383 must stay out.
+        queue_attachment_prefetch(&mut queue, "INBOX", &msgs, None, 7);
+        assert_eq!(
+            queue.iter().map(|(_, u)| *u).collect::<Vec<_>>(),
+            vec![2372]
+        );
+
+        // Another account's row with the same uid and path is its own attempt.
+        assert!(!attachment_prefetch_tried(8, "INBOX", 2383));
+    }
+}

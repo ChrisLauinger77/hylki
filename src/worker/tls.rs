@@ -52,6 +52,7 @@ pub fn is_hostname_mismatch(error: &str) -> bool {
 #[cfg(test)]
 mod hostname_mismatch_tests {
     use super::is_hostname_mismatch;
+    use crate::worker::tls::is_loopback_host;
 
     #[test]
     fn names_the_name_check_only() {
@@ -67,5 +68,29 @@ mod hostname_mismatch_tests {
         assert!(!is_hostname_mismatch(
             "connecting to imap.example.org timed out after 30 seconds"
         ));
+    }
+
+    #[test]
+    fn only_this_machine_counts_as_a_local_bridge() {
+        for host in [
+            "127.0.0.1",
+            "localhost",
+            "LocalHost",
+            "::1",
+            "[::1]",
+            "127.1.2.3",
+        ] {
+            assert!(is_loopback_host(host), "{host} should be loopback");
+        }
+        // A remote host must keep full certificate verification, however it is
+        // named — including anything merely containing "localhost".
+        for host in [
+            "imap.gmail.com",
+            "127.0.0.1.example.com",
+            "localhost.evil.com",
+            "10.0.1.14",
+        ] {
+            assert!(!is_loopback_host(host), "{host} should not be loopback");
+        }
     }
 }

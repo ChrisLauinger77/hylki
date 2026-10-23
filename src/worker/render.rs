@@ -6,6 +6,8 @@ use crate::worker::{extract_body, wrap_plain};
 
 pub(super) mod attachments;
 pub(super) mod body;
+#[cfg(test)]
+mod tests;
 
 /// What a raw message renders to: body HTML, the sender check (carrying the
 /// OpenPGP verdict, #133, when the message had any), and whether it has

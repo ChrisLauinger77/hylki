@@ -152,3 +152,71 @@ pub(super) fn format_date(raw: &[u8]) -> (String, i64) {
     };
     (label_from_timestamp(dt.timestamp()), dt.timestamp())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn envelope_names_lose_the_quotes_a_server_kept() {
+        // #312: the name as imap-proto hands it back, escapes and all.
+        let name = clean_display_name(&decode_header(&unescape_quoted(br#"\"Sender Name\""#)));
+        assert_eq!(name, "Sender Name");
+        let inner = clean_display_name(&decode_header(&unescape_quoted(br#"Ann \"Nan\" Lee"#)));
+        assert_eq!(inner, r#"Ann "Nan" Lee"#);
+        assert_eq!(clean_display_name("Plain Name"), "Plain Name");
+        // A backslash that escapes nothing is the name's own.
+        assert_eq!(unescape_quoted(br"DOM\user"), br"DOM\user".to_vec());
+        assert_eq!(unescape_quoted(br#"a\\\""#), br#"a\""#.to_vec());
+        // A name an earlier build stored with the escapes still in it.
+        assert_eq!(clean_display_name(r#"\"Sender Name\""#), "Sender Name");
+    }
+
+    #[test]
+    fn decode_header_repairs_interior_spaces() {
+        // DPD's complaints department sends its display name with a literal
+        // trailing space INSIDE the encoded word — illegal, and the decoder
+        // used to give up and show the raw `=?UTF-8?Q?…?=` (beta 1.18.0b
+        // feedback from p-mitana).
+        let raw = b"=?UTF-8?Q?Dzia=C5=82_Reklamacji_DPD ?=";
+        assert_eq!(decode_header(raw).trim_end(), "Dzia\u{142} Reklamacji DPD");
+    }
+
+    #[test]
+    fn decode_header_handles_over_long_encoded_word() {
+        // The Marginalian (Mailchimp) sends the entire subject as one Q-encoded
+        // word ~250 chars long — far past RFC 2047's 75-char limit. Earlier
+        // builds aborted and left the raw `=?utf-8?Q?…?=` in the UI; we now
+        // decode it as Apple Mail and Thunderbird do.
+        let raw = b"=?utf-8?Q?92=2Dyear=2Dold=20artist=20Sheila=20Hicks=20on=20the=20key=20to=20creative=20vitality=2C=20how=20to=20manage=20heartbreak=20like=20Frida=20Kahlo=2C=20the=20elusive=20science=20of=20the=20present=20moment?=";
+        assert_eq!(
+            decode_header(raw),
+            "92-year-old artist Sheila Hicks on the key to creative vitality, \
+             how to manage heartbreak like Frida Kahlo, the elusive science of \
+             the present moment"
+        );
+    }
+
+    #[test]
+    fn decode_header_leaves_plain_text_untouched() {
+        assert_eq!(
+            decode_header(b"Just a normal subject"),
+            "Just a normal subject"
+        );
+    }
+
+    #[test]
+    fn dates_parse_or_fall_back_to_the_text() {
+        assert_eq!(
+            format_date(b" Tue, 1 Jul 2003 10:52:37 +0200 ").1,
+            1057049557
+        );
+        assert_eq!(format_date(b" not a date "), ("not a date".to_string(), 0));
+        assert_eq!(format_timestamp(0), "");
+        assert_eq!(format_timestamp(-5), "");
+        assert_eq!(
+            format_timestamp(1057049557),
+            label_from_timestamp(1057049557)
+        );
+    }
+}

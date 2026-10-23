@@ -666,4 +666,50 @@ mod gmail_label_tests {
             .await
             .expect("skipped");
     }
+
+    fn fetch_attrs(raw: &[u8]) -> Vec<async_imap::imap_proto::AttributeValue<'_>> {
+        match async_imap::imap_proto::parser::parse_response(raw) {
+            Ok((_, async_imap::imap_proto::Response::Fetch(_, attrs))) => attrs,
+            other => panic!("not a FETCH reply: {other:?}"),
+        }
+    }
+
+    /// What Gmail answers `X-GM-LABELS` with (#374): system labels and the
+    /// folder's own label stay off the pills, the rest come through as the
+    /// server spells them.
+    #[test]
+    fn gmail_labels_are_read_from_a_fetch_reply() {
+        let attrs = fetch_attrs(
+            b"* 3 FETCH (UID 7 X-GM-LABELS (\\Inbox \\Important \"My Label\" Work &AOk-t&AOk- \"Clients/Acme\" \\Starred))\r\n",
+        );
+        let (uid, labels) = gmail_labels_of(&attrs, "INBOX").expect("labels");
+        assert_eq!(uid, 7);
+        assert_eq!(labels, ["My Label", "Work", "&AOk-t&AOk-", "Clients/Acme"]);
+        // Read in the Work folder, Work is the folder, not a label on top.
+        let (_, labels) = gmail_labels_of(&attrs, "Work").expect("labels");
+        assert_eq!(labels, ["My Label", "&AOk-t&AOk-", "Clients/Acme"]);
+        // Nested labels keep their whole path; the folder match is exact.
+        let (_, labels) = gmail_labels_of(&attrs, "Clients").expect("labels");
+        assert!(labels.contains(&"Clients/Acme".to_string()));
+
+        let none = fetch_attrs(b"* 4 FETCH (UID 8 X-GM-LABELS ())\r\n");
+        assert_eq!(gmail_labels_of(&none, "INBOX"), Some((8, Vec::new())));
+        let system_only = fetch_attrs(b"* 4 FETCH (UID 8 X-GM-LABELS (\\Sent \\Draft))\r\n");
+        assert_eq!(
+            gmail_labels_of(&system_only, "INBOX"),
+            Some((8, Vec::new()))
+        );
+        // A flag change Gmail volunteers says nothing about labels.
+        let flags = fetch_attrs(b"* 5 FETCH (UID 9 FLAGS (\\Seen))\r\n");
+        assert_eq!(gmail_labels_of(&flags, "INBOX"), None);
+    }
+
+    #[test]
+    fn gmail_labels_shown_skip_system_labels_the_folder_and_repeats() {
+        let labels = ["\\Inbox", "Work", "", "INBOX", "work", "Work", "Travel"];
+        assert_eq!(
+            shown_gmail_labels(labels.into_iter(), "inbox"),
+            ["Work", "work", "Travel"]
+        );
+    }
 }

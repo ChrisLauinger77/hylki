@@ -178,6 +178,9 @@ pub(in crate::worker) fn mailbox(name: &str, addr: &str) -> Result<Mailbox, Smtp
 #[cfg(test)]
 mod recipient_tests {
     use super::{format_recipient, parse_recipients};
+    use crate::worker::clean_recipient_field;
+    use crate::worker::compose::recipients::mailbox;
+    use crate::worker::invalid_recipient;
 
     fn pair(name: &str, email: &str) -> (String, String) {
         (name.to_string(), email.to_string())
@@ -226,5 +229,61 @@ mod recipient_tests {
             format_recipient("Jason Martin", "j@x.example"),
             "Jason Martin <j@x.example>"
         );
+    }
+
+    /// #368: invisible characters pasted along with an address are dropped
+    /// from the address, and kept in a name.
+    #[test]
+    fn pasted_addresses_lose_invisible_characters() {
+        assert_eq!(
+            parse_recipients(
+                "\u{200b}ann\u{200b}@example.com\u{200e}, Bob <\u{feff}bob@example.com\u{a0}>"
+            ),
+            vec![
+                (String::new(), "ann@example.com".to_string()),
+                ("Bob".to_string(), "bob@example.com".to_string())
+            ],
+        );
+        let persian = "\u{0645}\u{06cc}\u{200c}\u{0631}\u{0648}\u{062f}";
+        assert_eq!(
+            parse_recipients(&format!("{persian} <a@b.com>"))[0].0,
+            persian
+        );
+        assert_eq!(
+            clean_recipient_field("ann\u{200b}@example.com, Bob <bob@example.com>").as_deref(),
+            Some("ann@example.com, Bob <bob@example.com>")
+        );
+        assert_eq!(clean_recipient_field("ann@example.com"), None);
+        assert_eq!(
+            invalid_recipient("ann@example.com, Bob <bob@example.com>"),
+            None
+        );
+        assert_eq!(
+            invalid_recipient("ann@example.com, bob@"),
+            Some("bob@".to_string())
+        );
+        assert_eq!(
+            invalid_recipient("ann example.com"),
+            Some("ann example.com".to_string())
+        );
+    }
+
+    #[test]
+    fn mailbox_quotes_display_names_that_are_not_atoms() {
+        // Each of these fails if the mailbox is built by formatting
+        // "Name <addr>" and parsing the result back.
+        for name in ["Alfonso Lizárraga", "Martin, Jason", "Dr. X", "a@b.com"] {
+            let mb = mailbox(name, "a@b.com").expect("mailbox builds");
+            assert_eq!(mb.email.to_string(), "a@b.com");
+        }
+    }
+
+    #[test]
+    fn mailbox_drops_a_name_that_merely_repeats_the_address() {
+        // An import with no separate display name sets both to the address;
+        // "a@b.com <a@b.com>" is noise, so the header carries the address alone.
+        let mb = mailbox("A@B.com", "a@b.com").expect("mailbox builds");
+        assert!(mb.name.is_none());
+        assert_eq!(mb.to_string(), "a@b.com");
     }
 }

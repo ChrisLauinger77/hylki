@@ -134,6 +134,7 @@ pub(super) fn number_folders<T>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::worker::imap::watch::watchable;
 
     fn folder(path: &str, kind: FolderKind) -> Folder {
         Folder {
@@ -175,5 +176,149 @@ mod tests {
                 (8, "Work/b"),
             ]
         );
+    }
+
+    #[test]
+    fn only_the_top_level_inbox_is_the_inbox() {
+        // #344: an archive keeps per-year Inbox and Sent folders.
+        let kind = |p: &str, d: &str| classify_with_source(p, Some(d), &[]).0;
+        assert_eq!(kind("INBOX", "/"), FolderKind::Inbox);
+        assert_eq!(kind("Inbox", "/"), FolderKind::Inbox);
+        assert_eq!(kind("Archiv/2020/Inbox", "/"), FolderKind::Custom);
+        assert_eq!(kind("Archiv/2020/Sent", "/"), FolderKind::Custom);
+        assert_eq!(kind("INBOX.Archiv.Inbox", "."), FolderKind::Custom);
+        // Where servers keep their roles, names still count.
+        assert_eq!(kind("Sent", "/"), FolderKind::Sent);
+        assert_eq!(kind("INBOX.Sent", "."), FolderKind::Sent);
+        assert_eq!(kind("INBOX.Trash", "."), FolderKind::Trash);
+        assert_eq!(kind("[Gmail]/Spam", "/"), FolderKind::Junk);
+        assert_eq!(kind("Projects/Drafts", "/"), FolderKind::Custom);
+        // A dot in a name is not a level when the server's delimiter is /.
+        assert_eq!(kind("v1.0/Sent", "/"), FolderKind::Custom);
+    }
+
+    #[test]
+    fn a_templates_folder_is_found_by_name() {
+        // #360: no SPECIAL-USE attribute marks one.
+        let kind = |p: &str, d: &str| classify_with_source(p, Some(d), &[]).0;
+        assert_eq!(kind("Templates", "/"), FolderKind::Templates);
+        assert_eq!(kind("INBOX.Templates", "."), FolderKind::Templates);
+        assert_eq!(kind("template", "/"), FolderKind::Templates);
+        assert_eq!(kind("Projects/Templates", "/"), FolderKind::Custom);
+        // Listed right after Drafts, ahead of Sent.
+        assert!(folder_order(FolderKind::Drafts) < folder_order(FolderKind::Templates));
+        assert!(folder_order(FolderKind::Templates) < folder_order(FolderKind::Sent));
+        assert!(folder_order(FolderKind::Templates) < folder_order(FolderKind::Custom));
+        // Nothing waits on it, and no conversation reaches into it.
+        assert!(!watchable(FolderKind::Templates));
+        assert!(!chip_counts_all(FolderKind::Templates));
+    }
+
+    #[test]
+    fn folder_names_are_decoded_for_display() {
+        // Issue #1: Gmail's Chinese labels arrived as modified UTF-7 and were
+        // shown verbatim in the sidebar.
+        assert_eq!(display_name("&XfJSoGYfaAc-", Some("/")), "已加星标");
+        // Only the leaf is shown, and the parent may be encoded too.
+        assert_eq!(display_name("&U,BTFw-/&g0l6Pw-", Some("/")), "草稿");
+        assert_eq!(display_name("INBOX.&U,BTFw-", Some(".")), "台北");
+        // Ordinary names are untouched, and INBOX keeps its special casing.
+        assert_eq!(display_name("INBOX", Some("/")), "Inbox");
+        assert_eq!(display_name("[Gmail]/All Mail", Some("/")), "All Mail");
+        assert_eq!(display_name("Tom & Jerry", Some("/")), "Tom & Jerry");
+    }
+
+    #[test]
+    fn special_use_attributes_win_over_names_and_placement() {
+        let cases = [
+            (NameAttribute::Sent, FolderKind::Sent),
+            (NameAttribute::Drafts, FolderKind::Drafts),
+            (NameAttribute::Trash, FolderKind::Trash),
+            (NameAttribute::Junk, FolderKind::Junk),
+            (NameAttribute::Archive, FolderKind::Archive),
+            (NameAttribute::Flagged, FolderKind::Starred),
+        ];
+        for (attr, kind) in cases {
+            // Even deep in a hierarchy and under a name that says otherwise.
+            assert_eq!(
+                classify_with_source("a/b/c/Inbox", Some("/"), &[attr]),
+                (kind, true)
+            );
+        }
+        // `\All` and the other attributes are not mapped: the name decides.
+        assert_eq!(
+            classify_with_source("[Gmail]/All Mail", Some("/"), &[NameAttribute::All]),
+            (FolderKind::Archive, false)
+        );
+        assert_eq!(
+            classify_with_source("Lists", Some("/"), &[NameAttribute::All]),
+            (FolderKind::Custom, false)
+        );
+        // The first mapped attribute decides.
+        assert_eq!(
+            classify_with_source(
+                "X",
+                Some("/"),
+                &[
+                    NameAttribute::Marked,
+                    NameAttribute::Junk,
+                    NameAttribute::Sent
+                ]
+            ),
+            (FolderKind::Junk, true)
+        );
+    }
+
+    #[test]
+    fn folder_names_map_to_roles_where_servers_keep_them() {
+        let kind = |p: &str, d: Option<&str>| classify_with_source(p, d, &[]).0;
+        for (name, want) in [
+            ("Sent Items", FolderKind::Sent),
+            ("sent mail", FolderKind::Sent),
+            ("Deleted", FolderKind::Trash),
+            ("Deleted Items", FolderKind::Trash),
+            ("Bin", FolderKind::Trash),
+            ("Spam", FolderKind::Junk),
+            ("All Mail", FolderKind::Archive),
+            ("Archive", FolderKind::Archive),
+            ("Flagged", FolderKind::Starred),
+            ("Starred", FolderKind::Starred),
+            ("Outbox", FolderKind::Custom),
+        ] {
+            assert_eq!(kind(name, Some("/")), want, "{name}");
+        }
+        // No delimiter (or an empty one): both `/` and `.` split levels.
+        assert_eq!(kind("INBOX.Sent", None), FolderKind::Sent);
+        assert_eq!(kind("INBOX/Sent", Some("")), FolderKind::Sent);
+        assert_eq!(kind("a.b.Sent", None), FolderKind::Custom);
+        // A bracketed container, not only Gmail's, places a role.
+        assert_eq!(kind("[Mail]/Trash", Some("/")), FolderKind::Trash);
+        assert_eq!(kind("Mail/Trash", Some("/")), FolderKind::Custom);
+    }
+
+    #[test]
+    fn folder_order_is_the_persisted_numbering_order() {
+        let order = [
+            FolderKind::Inbox,
+            FolderKind::Starred,
+            FolderKind::Drafts,
+            FolderKind::Templates,
+            FolderKind::Sent,
+            FolderKind::Archive,
+            FolderKind::Junk,
+            FolderKind::Trash,
+            FolderKind::Custom,
+        ];
+        for (i, kind) in order.into_iter().enumerate() {
+            assert_eq!(folder_order(kind), i as u8);
+        }
+    }
+
+    #[test]
+    fn display_name_without_a_delimiter_splits_on_slash_and_dot() {
+        assert_eq!(display_name("inbox", None), "Inbox");
+        assert_eq!(display_name("a.b/c", None), "c");
+        assert_eq!(display_name("a.b", Some("/")), "a.b");
+        assert_eq!(display_name("a/b.c", Some("")), "c");
     }
 }

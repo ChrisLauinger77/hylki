@@ -135,3 +135,27 @@ pub(super) fn custom_flags(flags: &[Flag]) -> Vec<String> {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn system_keywords_are_told_from_tags() {
+        for k in [
+            "\\Seen",
+            "$Junk",
+            "NonJunk",
+            "$Forwarded",
+            "$MDNSent",
+            "$MailFlagBit0",
+            "$X-ME-Annot-2",
+            "$IsNotification",
+        ] {
+            assert!(is_system_keyword(k), "{k}");
+        }
+        for k in ["$label1", "Work", "$Important", "important"] {
+            assert!(!is_system_keyword(k), "{k}");
+        }
+    }
+}

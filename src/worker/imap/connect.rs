@@ -237,6 +237,8 @@ async fn connect_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::worker::smtp::SmtpTls;
+    use crate::worker::test_support::sample_account;
 
     #[test]
     fn xoauth2_sends_the_bearer_once_then_an_empty_answer() {
@@ -252,5 +254,73 @@ mod tests {
         );
         assert_eq!(auth.process(b"{\"status\":\"400\"}"), Vec::<u8>::new());
         assert_eq!(auth.process(b""), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn goa_security_wins_over_the_port() {
+        let sec = |imap_starttls, smtp_starttls| crate::config::ServerSecurity {
+            imap_starttls,
+            smtp_starttls,
+            ..Default::default()
+        };
+        // STARTTLS on a port of the server's own, and TLS from the first
+        // byte on the ports the guess would upgrade on.
+        let account = AccountConfig {
+            imap_host: "mail.example.com".into(),
+            imap_port: 1143,
+            smtp_port: 2525,
+            security: Some(sec(true, false)),
+            ..sample_account()
+        };
+        assert!(imap_uses_starttls(&account));
+        assert!(SmtpTls::for_account(&account).implicit);
+        let account = AccountConfig {
+            imap_port: 143,
+            smtp_port: 587,
+            security: Some(sec(false, false)),
+            ..account
+        };
+        assert!(!imap_uses_starttls(&account));
+        assert!(SmtpTls::for_account(&account).implicit);
+        // Without GOA's word, the ports decide as before.
+        let account = AccountConfig {
+            security: None,
+            ..account
+        };
+        assert!(imap_uses_starttls(&account));
+        assert!(!SmtpTls::for_account(&account).implicit);
+        // An accepted certificate reaches SMTP; the name waiver stays the
+        // account's own.
+        let account = AccountConfig {
+            tls_accept_hostname_mismatch: true,
+            security: Some(crate::config::ServerSecurity {
+                smtp_accept_invalid_certs: true,
+                ..Default::default()
+            }),
+            ..account
+        };
+        let tls = SmtpTls::for_account(&account);
+        assert!(tls.accept_invalid_certs && tls.accept_hostname_mismatch);
+    }
+
+    #[test]
+    fn starttls_is_used_for_143_and_local_bridges_only() {
+        let starttls = |host: &str, port: u16| {
+            imap_uses_starttls(&AccountConfig {
+                imap_host: host.into(),
+                imap_port: port,
+                ..sample_account()
+            })
+        };
+        // Proton Bridge's default endpoint, and a bridge on a changed port.
+        assert!(starttls("127.0.0.1", 1143));
+        assert!(starttls("localhost", 2143));
+        // The conventional STARTTLS port, anywhere.
+        assert!(starttls("imap.example.com", 143));
+        // 993 is implicit TLS even on a bridge, and a remote host on any other
+        // port keeps the implicit-TLS behaviour it had before.
+        assert!(!starttls("127.0.0.1", 993));
+        assert!(!starttls("imap.gmail.com", 993));
+        assert!(!starttls("imap.example.com", 1993));
     }
 }

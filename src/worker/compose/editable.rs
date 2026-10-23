@@ -232,3 +232,198 @@ pub fn editable_from_raw(raw: &[u8], envelope_rcpts: &[String]) -> EditableMessa
         attachments,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::AccountConfig;
+    use crate::worker::compose::build::build_draft;
+    use crate::worker::compose::build::build_email;
+    use crate::worker::summary_from_raw;
+    use crate::worker::test_support::sample_account;
+    use crate::worker::test_support::sample_outgoing;
+    use crate::worker::OutgoingMessage;
+
+    #[test]
+    fn a_queued_message_can_be_taken_apart_for_editing() {
+        // Round trip: compose → build → (failed send) → edit. What comes back has
+        // to be what went in, including the Bcc that lettre strips from the bytes.
+        let account = AccountConfig {
+            name: "Me".into(),
+            email: "me@example.com".into(),
+            ..sample_account()
+        };
+        let msg = OutgoingMessage {
+            to: "Ada Lovelace <ada@example.com>".into(),
+            cc: "carol@example.com".into(),
+            bcc: "hidden@example.com".into(),
+            subject: "Quarterly numbers".into(),
+            body: "First line\nSecond line".into(),
+            ..sample_outgoing()
+        };
+        let email = build_email(&account, &msg).expect("builds");
+        let rcpts: Vec<String> = email
+            .envelope()
+            .to()
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
+        let raw = email.formatted();
+
+        // lettre drops Bcc from the wire format, so the envelope is the only
+        // record of it — which is exactly why it is stored alongside.
+        assert!(!String::from_utf8_lossy(&raw).contains("hidden@example.com"));
+
+        let editable = editable_from_raw(&raw, &rcpts);
+        assert_eq!(editable.to, "Ada Lovelace <ada@example.com>");
+        assert_eq!(editable.cc, "carol@example.com");
+        assert_eq!(editable.bcc, "hidden@example.com");
+        assert_eq!(editable.subject, "Quarterly numbers");
+        // A plain-text body is escaped into HTML for the editor, keeping its lines.
+        assert!(
+            editable.body_html.contains("First line"),
+            "{}",
+            editable.body_html
+        );
+        assert!(
+            editable.body_html.contains("Second line"),
+            "{}",
+            editable.body_html
+        );
+        assert!(editable.attachments.is_empty());
+    }
+
+    /// The copy filed in Sent names the Bcc recipients the wire copy leaves
+    /// out (#476), whether it was sent at once or waited in the Outbox.
+    #[test]
+    fn a_sent_copy_keeps_its_bcc() {
+        let msg = OutgoingMessage {
+            to: "ada@example.com".into(),
+            cc: "carol@example.com".into(),
+            bcc: "Hidden Person <hidden@example.com>, other@example.com".into(),
+            subject: "Quarterly numbers".into(),
+            body: "Hello".into(),
+            ..sample_outgoing()
+        };
+        let email = build_email(&sample_account(), &msg).expect("builds");
+        let rcpts: Vec<String> = email
+            .envelope()
+            .to()
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
+        let raw = email.formatted();
+        assert!(!String::from_utf8_lossy(&raw).contains("hidden@example.com"));
+
+        let bcc_of = |bytes: &[u8]| summary_from_raw(1, 1, 1, bytes).bcc;
+        let copy = with_bcc(&raw, &msg.bcc);
+        assert_eq!(bcc_of(&copy), "hidden@example.com, other@example.com");
+        // Nothing else about the message changes: the bytes that went out
+        // follow the one header put in front of them.
+        assert!(copy.ends_with(&raw));
+        let parsed = mail_parser::MessageParser::default()
+            .parse(&copy)
+            .expect("parses");
+        assert_eq!(
+            parsed.bcc().and_then(|a| a.first()).and_then(|a| a.name()),
+            Some("Hidden Person")
+        );
+        assert_eq!(parsed.subject(), Some("Quarterly numbers"));
+
+        let queued = queued_with_bcc(&raw, &rcpts);
+        assert_eq!(bcc_of(&queued), "hidden@example.com, other@example.com");
+
+        // No Bcc, no change.
+        assert_eq!(with_bcc(&raw, ""), raw);
+        let to_only: Vec<String> = vec!["ada@example.com".into(), "carol@example.com".into()];
+        assert_eq!(queued_with_bcc(&raw, &to_only), raw);
+    }
+
+    #[test]
+    fn editing_a_queued_message_keeps_its_attachments_and_html() {
+        let dir = std::env::temp_dir().join(format!("hylki-edit-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let file = dir.join("report.pdf");
+        std::fs::write(&file, [0x25, 0x50, 0x44, 0x46, 0x00, 0xff]).expect("write");
+
+        let msg = OutgoingMessage {
+            to: "ada@example.com".into(),
+            subject: "With a file".into(),
+            body: "plain fallback".into(),
+            html: "<p>rich <b>body</b></p>".into(),
+            attachments: vec![file.to_string_lossy().to_string()],
+            ..sample_outgoing()
+        };
+        let email = build_email(&sample_account(), &msg).expect("builds");
+        let rcpts: Vec<String> = email
+            .envelope()
+            .to()
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
+        let editable = editable_from_raw(&email.formatted(), &rcpts);
+
+        // The HTML alternative is what the composer edits, not the plain fallback.
+        assert!(
+            editable.body_html.contains("rich <b>body</b>"),
+            "{}",
+            editable.body_html
+        );
+        assert_eq!(editable.attachments.len(), 1);
+        assert_eq!(editable.attachments[0].name, "report.pdf");
+        assert_eq!(
+            editable.attachments[0].data,
+            [0x25, 0x50, 0x44, 0x46, 0x00, 0xff]
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// #349, #350: a saved draft comes back as it was written: the alias it
+    /// was from, its Bcc, its place in the thread, a picture in the text and
+    /// a file beside it.
+    #[test]
+    fn a_saved_draft_comes_back_whole() {
+        let dir = std::env::temp_dir().join(format!("hylki-draft-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let file = dir.join("notes.txt");
+        std::fs::write(&file, b"notes").expect("write");
+
+        let msg = OutgoingMessage {
+            from_alias: Some("Work <work@example.com>".into()),
+            to: "ada@example.com".into(),
+            bcc: "hidden@example.com".into(),
+            subject: "Re: Plans".into(),
+            html: "<p>see <img src=\"data:image/png;base64,iVBORw0KGgo=\"></p>".into(),
+            attachments: vec![file.to_string_lossy().to_string()],
+            in_reply_to: "Orig@Example.com".into(),
+            references: "first@example.com Orig@Example.com".into(),
+            ..sample_outgoing()
+        };
+        let raw = build_draft(&sample_account(), &msg)
+            .expect("builds")
+            .formatted();
+        let editable = editable_from_raw(&raw, &[]);
+
+        assert_eq!(editable.from, "Work <work@example.com>");
+        assert_eq!(editable.bcc, "hidden@example.com");
+        assert_eq!(editable.in_reply_to, "Orig@Example.com");
+        assert_eq!(editable.references, "first@example.com Orig@Example.com");
+        assert!(
+            editable.body_html.contains("data:image/png;base64,"),
+            "{}",
+            editable.body_html
+        );
+        assert!(
+            !editable.body_html.contains("cid:"),
+            "{}",
+            editable.body_html
+        );
+        assert_eq!(
+            editable.attachments.len(),
+            1,
+            "the picture is in the text, not a file"
+        );
+        assert_eq!(editable.attachments[0].name, "notes.txt");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}

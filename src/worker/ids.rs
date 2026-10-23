@@ -79,3 +79,34 @@ mod hash_uid_tests {
         assert_eq!(hash_uid("AAMkAGI2TG93AAA="), 581220562);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn references_and_in_reply_to_merge_without_duplicates() {
+        // A well-formed reply: In-Reply-To repeats the last id of References, and
+        // the ancestry it adds is what lets a thread survive a parent kept in
+        // another folder (#21).
+        assert_eq!(
+            merge_msgids("a@x b@y", "b@y"),
+            "a@x b@y",
+            "the repeated parent should not be listed twice"
+        );
+        // Either side may be the only one present.
+        assert_eq!(merge_msgids("", "b@y"), "b@y");
+        assert_eq!(merge_msgids("a@x", ""), "a@x");
+        assert_eq!(merge_msgids("", ""), "");
+        // A malformed reply whose In-Reply-To names an ancestor References omits.
+        assert_eq!(merge_msgids("a@x", "c@z"), "a@x c@z");
+    }
+
+    #[test]
+    fn first_msgid_is_lowercased_without_brackets() {
+        assert_eq!(first_msgid("<A@X> <b@y>").as_deref(), Some("a@x"));
+        assert_eq!(first_msgid("  plain@id  ").as_deref(), Some("plain@id"));
+        assert_eq!(first_msgid("<>"), None);
+        assert_eq!(first_msgid(""), None);
+    }
+}

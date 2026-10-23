@@ -235,3 +235,44 @@ pub(super) fn cached_folder_kind(
         .find(|f| f.path == path)
         .map(|f| f.kind)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn imap_storage_quota_reads_kibibytes() {
+        use async_imap::types::{Quota, QuotaResource, QuotaResourceName};
+        let quotas = vec![Quota {
+            root_name: String::new(),
+            resources: vec![
+                QuotaResource {
+                    name: QuotaResourceName::Message,
+                    usage: 12,
+                    limit: 1000,
+                },
+                QuotaResource {
+                    name: QuotaResourceName::Storage,
+                    usage: 1024,
+                    limit: 4096,
+                },
+            ],
+        }];
+        assert_eq!(
+            imap_storage_quota(&quotas),
+            Some(MailboxQuota {
+                used: 1024 * 1024,
+                limit: 4096 * 1024
+            })
+        );
+        let unlimited = vec![Quota {
+            root_name: String::new(),
+            resources: vec![QuotaResource {
+                name: QuotaResourceName::Storage,
+                usage: 5,
+                limit: 0,
+            }],
+        }];
+        assert_eq!(imap_storage_quota(&unlimited), None);
+    }
+}

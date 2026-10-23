@@ -456,3 +456,461 @@ fn decode_quoted_printable(src: &[u8]) -> Vec<u8> {
     }
     buf
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preview_skips_the_link_a_marketing_mail_opens_with() {
+        // Cloudways' text/plain alternative, verbatim in shape: the header logo's
+        // link renders as a bare URL above the greeting, and that URL was the
+        // whole preview.
+        let part = concat!(
+            "--751d69df691580924654d5924db69f0ae9507550b8b16fd8b2d83daf1d3f\r\n",
+            "Content-Transfer-Encoding: quoted-printable\r\n",
+            "Content-Type: text/plain; charset=utf-8\r\n",
+            "\r\n",
+            "( https://www.cloudways.com/en?utm_campaign=3DAPI+Keys+being+replaced+by+Ac=\r\n",
+            "cess+Tokens&utm_medium=3Demail_action )\r\n",
+            "\r\n",
+            "Hi Camp crystal clear,\r\n",
+            "\r\n",
+            "We have a quick update on how you connect your AI agent to Cloudways.\r\n",
+            "--751d69df691580924654d5924db69f0ae9507550b8b16fd8b2d83daf1d3f--\r\n",
+        );
+        let preview = preview_from_part(part.as_bytes(), None, None);
+        assert!(preview.starts_with("Hi Camp crystal clear,"), "{preview}");
+        assert!(!preview.contains("utm_campaign"), "{preview}");
+    }
+
+    #[test]
+    fn a_zip_as_the_whole_body_yields_no_preview() {
+        // #241: a DMARC report is a single application/zip part. Base64 or
+        // not, its bytes are a file, not a snippet.
+        let zip = b"PK\x03\x04\x14\x00\x00\x00\x08\x00\x8a\x1eGoogle report\x00\x00\x12\x03\x00PK\x01\x02";
+        let b64 = crate::oauth::base64_encode(zip);
+        assert_eq!(preview_from_part(b64.as_bytes(), None, Some("base64")), "");
+        assert_eq!(preview_from_part(b64.as_bytes(), None, None), "");
+        assert_eq!(preview_from_part(zip, None, Some("binary")), "");
+        // Ordinary text with a tab and line breaks is not "binary".
+        assert_eq!(
+            preview_from_part(b"Hello\tthere\r\nSecond line", None, None),
+            "Hello there Second line"
+        );
+        assert!(!text_like("application/zip"));
+        assert!(text_like("multipart/mixed; boundary=x"));
+    }
+
+    #[test]
+    fn preview_drops_rendered_links_but_keeps_their_text() {
+        assert_eq!(
+            preview_from_part(
+                b"Generate your Access Token ( https://example.com/api?a=1 )Got questions?",
+                None,
+                None
+            ),
+            "Generate your Access Token Got questions?"
+        );
+        // Brackets that are not a link are left exactly as written.
+        assert_eq!(
+            preview_from_part(b"Lunch (the usual place) at noon", None, None),
+            "Lunch (the usual place) at noon"
+        );
+        // A message that is nothing but a link still shows it: better than a
+        // blank row.
+        assert_eq!(
+            preview_from_part(b"https://example.com/only", None, None),
+            "https://example.com/only"
+        );
+    }
+
+    #[test]
+    fn preview_descends_into_a_nested_multipart() {
+        // ProtonMail sends mixed(alternative(plain, html), attachment), so
+        // `BODY[1]` is the whole alternative container rather than any text — and
+        // the preview showed its boundary line ("--b2=_cipkIEq1…") instead of the
+        // message. The bytes below are that fetch, verbatim in shape.
+        let part = concat!(
+            "--b2=_cipkIEq1WkCIMIbpGDVyYc52x8YElrqa8uRU7GKJ8\r\n",
+            "Content-Type: text/plain; charset=utf-8\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "SGVsbG8sIEkgcmVjZW50bHkgaW5zdGFsbGVkIFZpcmVvIGFmdGVyIHJlYWRpbmcgYWJvdXQgaXQg\r\n",
+            "b24gdGhlIG9tZyF1YnVudHUgd2Vic2l0ZS4=\r\n",
+            "\r\n",
+            "--b2=_cipkIEq1WkCIMIbpGDVyYc52x8YElrqa8uRU7GKJ8\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "PGRpdj5IZWxsbzwvZGl2Pg==\r\n",
+            "--b2=_cipkIEq1WkCIMIbpGDVyYc52x8YElrqa8uRU7GKJ8--\r\n",
+        );
+        assert_eq!(
+            preview_from_part(part.as_bytes(), None, None),
+            "Hello, I recently installed Vireo after reading about it on the omg!ubuntu website."
+        );
+        // Nothing of the MIME machinery reaches the list.
+        assert!(!preview_from_part(part.as_bytes(), None, None).contains("--b2="));
+    }
+
+    #[test]
+    fn preview_prefers_plain_text_but_settles_for_html() {
+        let html_only = concat!(
+            "--x\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "\r\n",
+            "<div>Only markup here</div>\r\n",
+            "--x--\r\n",
+        );
+        assert_eq!(
+            preview_from_part(html_only.as_bytes(), None, None),
+            "Only markup here"
+        );
+        // Two levels of nesting — mixed(alternative(...)) — are followed.
+        let nested = concat!(
+            "--outer\r\n",
+            "Content-Type: multipart/alternative; boundary=\"inner\"\r\n",
+            "\r\n",
+            "--inner\r\n",
+            "Content-Type: text/plain\r\n",
+            "\r\n",
+            "Buried but readable\r\n",
+            "--inner--\r\n",
+            "--outer--\r\n",
+        );
+        assert_eq!(
+            preview_from_part(nested.as_bytes(), None, None),
+            "Buried but readable"
+        );
+    }
+
+    #[test]
+    fn a_message_that_merely_starts_with_dashes_is_not_a_multipart() {
+        // A signature separator, or a line of dashes, must still read as text.
+        assert_eq!(
+            preview_from_part(b"-- \r\nRegards,\r\nSteve", None, None),
+            "-- Regards, Steve"
+        );
+        assert_eq!(
+            preview_from_part(b"--\r\nsigned off", None, None),
+            "-- signed off"
+        );
+    }
+
+    /// A PGP/MIME message's first part is the "Version: 1" stub, and an
+    /// inline one begins with the armour; the list says what it is instead.
+    #[test]
+    fn preview_names_an_encrypted_message() {
+        let marker = crate::models::ENCRYPTED_PREVIEW;
+        assert_eq!(preview_from_part(b"Version: 1\r\n", None, None), marker);
+        assert_eq!(preview_from_part(b"version: 1", None, None), marker);
+        assert_eq!(
+            preview_from_part(
+                b"-----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA3\r\n-----END PGP MESSAGE-----\r\n",
+                None,
+                None
+            ),
+            marker
+        );
+        assert!(crate::models::preview_is_encrypted(marker));
+        assert_eq!(crate::models::preview_display(marker), "Encrypted message");
+        assert_eq!(crate::models::preview_display("Hello"), "Hello");
+        assert_eq!(pgp_preview("Version 1 of the plan is attached"), None);
+        assert_eq!(preview_from_part(b"Hello there", None, None), "Hello there");
+    }
+
+    #[test]
+    fn preview_reads_plain_text() {
+        let text = b"Here are the figures we discussed.\r\n\r\nLet me know if the Q3 line looks wrong.\r\n";
+        assert_eq!(
+            preview_from_part(text, None, None),
+            "Here are the figures we discussed. Let me know if the Q3 line looks wrong."
+        );
+        assert_eq!(preview_from_part(b"", None, None), "");
+    }
+
+    #[test]
+    fn a_quoted_printable_preheader_is_not_mistaken_for_base64() {
+        // Cloudflare's newsletter opens its text/plain part with a long run of
+        // invisible padding — U+2007 U+034F over and over — so that the preview
+        // a mail client shows is the sender's chosen line rather than whatever
+        // the message starts with. Quoted-printable, every byte of it spelled
+        // with letters, digits and `=`: base64's alphabet exactly. Guessing
+        // read it as base64 and produced a row of replacement characters.
+        let mut part = b"AI Bot Controls ".to_vec();
+        for _ in 0..40 {
+            part.extend_from_slice(b"=E2=80=87=CD=8F ");
+        }
+        part.extend_from_slice(b"Updates to managing AI crawlers on your account");
+
+        assert!(!looks_like_base64(&part), "padding runs are not base64");
+
+        // Told what it is, which is what the part's own MIME headers say.
+        let told = preview_from_part(&part, Some("UTF-8"), Some("quoted-printable"));
+        assert!(
+            !told.contains('\u{fffd}'),
+            "no replacement characters: {told}"
+        );
+        assert!(told.starts_with("AI Bot Controls"), "{told}");
+        assert!(told.contains("Updates to managing AI crawlers"), "{told}");
+
+        // And the same left to the guess, now that the guess knows better.
+        let guessed = preview_from_part(&part, Some("UTF-8"), None);
+        assert_eq!(guessed, told);
+
+        // Real base64 still reads as base64, truncated (no padding) or whole.
+        let whole = b"VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZywgdHdpY2Uu";
+        assert!(looks_like_base64(whole));
+        assert!(looks_like_base64(
+            b"VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZz0="
+        ));
+
+        // The slice a preview reads ends on a byte count, routinely mid-escape.
+        // The stub is dropped rather than shown as text.
+        let cut = b"AI Bot Controls =E2=80=87=CD=8F =E";
+        let out = preview_from_part(cut, Some("UTF-8"), Some("quoted-printable"));
+        assert!(
+            !out.contains('='),
+            "no half-decoded escape left behind: {out:?}"
+        );
+        assert_eq!(out.trim(), "AI Bot Controls");
+        let cut = b"AI Bot Controls =E2=80=87=CD=8F =";
+        let out = preview_from_part(cut, Some("UTF-8"), Some("quoted-printable"));
+        assert!(!out.contains('='), "nor a bare one: {out:?}");
+    }
+
+    #[test]
+    fn a_preview_of_nothing_but_preheader_padding_reaches_for_the_real_text() {
+        // What the deeper BODY[TEXT] repair read sees: the whole multipart,
+        // each part carrying its own headers. The text is thousands of bytes
+        // past the padding, which is the point of the padding.
+        let mut plain = b"AI Bot Controls ".to_vec();
+        for _ in 0..250 {
+            plain.extend_from_slice(b"=E2=80=87=CD=8F ");
+        }
+        plain.extend_from_slice(b"Updates to managing AI crawlers on your account.");
+        let mut body = Vec::new();
+        body.extend_from_slice(b"--BOUND\r\n");
+        body.extend_from_slice(b"Content-Type: text/plain; charset=UTF-8\r\n");
+        body.extend_from_slice(b"Content-Transfer-Encoding: quoted-printable\r\n\r\n");
+        body.extend_from_slice(&plain);
+        body.extend_from_slice(b"\r\n--BOUND--\r\n");
+
+        let preview = preview_from_part(&body, None, None);
+        assert!(
+            preview.contains("Updates to managing AI crawlers"),
+            "the padding is stepped over, not shown: {preview:?}",
+        );
+        assert!(!preview.contains('\u{fffd}'), "{preview:?}");
+        assert!(
+            !preview.contains('\u{034f}'),
+            "joiners are dropped: {preview:?}"
+        );
+    }
+
+    #[test]
+    fn preview_decodes_the_transfer_encoding_it_was_not_told_about() {
+        // The fetch asks for body bytes only, so the encoding has to be inferred.
+        // Quoted-printable, including a soft line break mid-sentence:
+        let qp = b"Caf=C3=A9 meeting at 3pm =\r\nsharp, bring the numbers";
+        assert_eq!(
+            preview_from_part(qp, None, None),
+            "Café meeting at 3pm sharp, bring the numbers"
+        );
+
+        // Base64 — shown raw this would be gibberish in the list.
+        let encoded = crate::oauth::base64_encode(
+            b"Base64 bodies are common from newsletters and phones alike.",
+        );
+        assert_eq!(
+            preview_from_part(encoded.as_bytes(), None, None),
+            "Base64 bodies are common from newsletters and phones alike."
+        );
+    }
+
+    #[test]
+    fn preview_survives_being_cut_off_mid_stream() {
+        // 2KB of a base64 part almost never lands on a group boundary; the
+        // incomplete tail is dropped rather than decoded into noise.
+        let full = crate::oauth::base64_encode(
+            &b"The quick brown fox jumps over the lazy dog. ".repeat(4),
+        );
+        let truncated = &full[..full.len() - 3];
+        let preview = preview_from_part(truncated.as_bytes(), None, None);
+        assert!(preview.starts_with("The quick brown fox"), "{preview}");
+        // An escape cut in half is dropped, not shown: the slice ends on a
+        // byte count, so its last escape is routinely half there. A lone
+        // trailing "=" is a soft line break in quoted-printable and goes the
+        // same way.
+        assert_eq!(preview_from_part(b"Total: 50=", None, None), "Total: 50");
+        assert_eq!(preview_from_part(b"Total: 50=4", None, None), "Total: 50");
+        // Malformed rather than cut short: "=Z" is no escape at all, and
+        // whatever it is, it isn't ours to remove.
+        assert_eq!(preview_from_part(b"Total: 50=Z", None, None), "Total: 50=Z");
+    }
+
+    #[test]
+    fn preview_reads_html_and_skips_quoted_replies() {
+        let html = b"<html><body><p>Meeting moved to <b>Tuesday</b>.</p></body></html>";
+        assert_eq!(
+            preview_from_part(html, None, None),
+            "Meeting moved to Tuesday."
+        );
+        let reply = b"Sounds good to me.\r\n\r\n> On Monday, Ada wrote:\r\n> the original text\r\n";
+        assert_eq!(preview_from_part(reply, None, None), "Sounds good to me.");
+    }
+
+    #[test]
+    fn preview_is_capped() {
+        let long = "word ".repeat(200);
+        assert_eq!(
+            preview_from_part(long.as_bytes(), None, None)
+                .chars()
+                .count(),
+            PREVIEW_CHARS
+        );
+    }
+
+    #[test]
+    fn short_text_is_not_mistaken_for_base64() {
+        // "Meeting" is all base64 characters, but far too short to be a body.
+        assert_eq!(preview_from_part(b"Meeting", None, None), "Meeting");
+    }
+
+    #[test]
+    fn preview_reads_the_charset_the_part_declares() {
+        // #159: a Hungarian bank's mail, quoted-printable in iso-8859-2. Read as
+        // UTF-8, every accented letter was a replacement character in the list
+        // while the reader showed the message fine.
+        let qp = b"Tisztelt =DCgyfel=FCnk! K=E9rj=FCk, =F5rizze meg.";
+        assert_eq!(
+            preview_from_part(qp, Some("iso-8859-2"), None),
+            "Tisztelt Ügyfelünk! Kérjük, őrizze meg."
+        );
+        // The 8-bit bytes as they are, no transfer encoding; label case and
+        // quotes as servers send them.
+        assert_eq!(
+            preview_from_part(b"\xD5rizze meg", Some("\"ISO-8859-2\""), None),
+            "Őrizze meg"
+        );
+        assert_eq!(
+            preview_from_part(b"\xF5rizze", Some("windows-1250"), None),
+            "őrizze"
+        );
+        // Base64 is decoded to bytes first, then read in the charset.
+        let b64 =
+            crate::oauth::base64_encode(b"Caf\xE9 meeting at three, bring the numbers please.");
+        assert_eq!(
+            preview_from_part(b64.as_bytes(), Some("iso-8859-1"), None),
+            "Café meeting at three, bring the numbers please."
+        );
+        // UTF-8 still reads as UTF-8 whatever it is called.
+        assert_eq!(
+            preview_from_part("Café".as_bytes(), Some("UTF-8"), None),
+            "Café"
+        );
+        assert_eq!(
+            preview_from_part("Café".as_bytes(), Some("utf8"), None),
+            "Café"
+        );
+    }
+
+    #[test]
+    fn preview_parts_of_a_multipart_carry_their_own_charset() {
+        let nested = b"--b1\r\nContent-Type: text/plain; charset=\"iso-8859-2\"\r\n\
+            Content-Transfer-Encoding: quoted-printable\r\n\r\n=D5rizze meg\r\n--b1--\r\n";
+        assert_eq!(preview_from_part(nested, None, None), "Őrizze meg");
+        // A charset on a folded continuation line still counts.
+        let folded = b"--b1\r\nContent-Type: text/html;\r\n\tcharset=iso-8859-2\r\n\r\n\
+            <p>\xD5rizze meg</p>\r\n--b1--\r\n";
+        assert_eq!(preview_from_part(folded, None, None), "Őrizze meg");
+    }
+
+    #[test]
+    fn preview_finds_the_parts_behind_a_mime_preamble() {
+        // A whole body (the BODY[TEXT] retry) can open with the preamble
+        // rather than the boundary.
+        let body = b"This is a multi-part message in MIME format.\r\n\r\n--b1\r\n\
+            Content-Type: image/png\r\nContent-Transfer-Encoding: base64\r\n\r\niVBORw0KGgo=\r\n--b1\r\n\
+            Content-Type: text/plain\r\n\r\nThe photo from Sunday\r\n--b1--\r\n";
+        assert_eq!(preview_from_part(body, None, None), "The photo from Sunday");
+        // But plain text that merely mentions a dashed line is still text.
+        assert_eq!(
+            preview_from_part(b"Hello\r\n--foo\r\nbar", None, None),
+            "Hello --foo bar"
+        );
+    }
+
+    #[test]
+    fn preview_copes_with_bytes_that_are_not_utf8() {
+        // Undeclared 8-bit text reads as Windows-1252, the way browsers do.
+        assert_eq!(
+            preview_from_part(b"Caf\xE9 au lait", None, None),
+            "Café au lait"
+        );
+        // A slice that ends mid-character drops the fragment, not the row.
+        let cut = &"Café".as_bytes()[..4];
+        assert_eq!(preview_from_part(cut, None, None), "Caf");
+        assert_eq!(preview_from_part(cut, Some("utf-8"), None), "Caf");
+        // Declared UTF-8 that isn't: the damage shows as replacement characters.
+        assert_eq!(
+            preview_from_part(b"a\xFFb", Some("utf-8"), None),
+            "a\u{fffd}b"
+        );
+    }
+
+    #[test]
+    fn charset_param_is_read_from_a_content_type() {
+        assert_eq!(
+            charset_param("text/html; charset=\"iso-8859-2\""),
+            Some("iso-8859-2".into())
+        );
+        assert_eq!(
+            charset_param("text/plain; format=flowed; charset=utf-8"),
+            Some("utf-8".into())
+        );
+        assert_eq!(charset_param("multipart/alternative; boundary=b1"), None);
+        assert_eq!(
+            mime_header(
+                "Content-Type: text/plain;\r\n\tcharset=us-ascii\r\nX: y",
+                "content-type"
+            )
+            .as_deref()
+            .and_then(charset_param),
+            Some("us-ascii".into())
+        );
+    }
+
+    /// A part header carrying a non-ASCII character where a header name's
+    /// length falls mid-character used to panic the account's mail thread, so
+    /// its mail never arrived and the spinner turned for good.
+    #[test]
+    fn a_header_line_with_a_multibyte_character_is_not_sliced_apart() {
+        // "content-transfer-encoding" is 25 bytes, and byte 25 of this line
+        // sits inside the two-byte character that starts at byte 24.
+        let headers = "Content-Description: abc\u{f3}de\r\nContent-Transfer-Encoding: base64\r\n";
+        assert_eq!(
+            mime_header(headers, "content-transfer-encoding").as_deref(),
+            Some("base64")
+        );
+        assert_eq!(mime_header(headers, "content-type"), None);
+    }
+
+    /// The same line reached through the preview path that reads it: a part of
+    /// a multipart, headers decoded leniently from raw bytes.
+    #[test]
+    fn a_preview_survives_a_multibyte_part_header() {
+        let part = concat!(
+            "--b1\r\n",
+            "Content-Description: abc\u{f3}de\r\n",
+            "Content-Type: text/plain; charset=utf-8\r\n\r\n",
+            "Hello.\r\n",
+            "--b1--\r\n",
+        );
+        assert_eq!(
+            preview_from_part(part.as_bytes(), None, None).trim(),
+            "Hello."
+        );
+    }
+}

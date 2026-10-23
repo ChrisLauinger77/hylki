@@ -369,3 +369,28 @@ pub(super) async fn selected_unseen(session: &mut ImapSession) -> Option<u32> {
         .ok()
         .map(|uids| uids.len() as u32)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn body_search_keys_quote_and_declare_charset() {
+        // #191: ASCII needles go as a plain quoted string over the listed
+        // uids; quotes and backslashes are escaped; anything beyond ASCII
+        // puts CHARSET UTF-8 at the head of the keys; line breaks vanish.
+        assert_eq!(
+            body_search_query("1:5,9", "unsubscribe"),
+            r#"UID 1:5,9 BODY "unsubscribe""#
+        );
+        assert_eq!(
+            body_search_query("1", r#"say "hi" \now"#),
+            r#"UID 1 BODY "say \"hi\" \\now""#
+        );
+        assert_eq!(
+            body_search_query("1", "café"),
+            r#"CHARSET UTF-8 UID 1 BODY "café""#
+        );
+        assert_eq!(body_search_query("1", "a\r\nb"), r#"UID 1 BODY "ab""#);
+    }
+}

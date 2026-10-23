@@ -135,3 +135,58 @@ pub(crate) fn summary_from_raw(account_id: u32, folder_id: u32, uid: u32, raw: &
     msg.scrub_nuls();
     msg
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn thread_ids_list_in_reply_to_before_references() {
+        let raw = b"Message-ID: <ABC@Example.COM>\r\n\
+    In-Reply-To: <Parent@x>\r\n\
+    References: <Root@x> <PARENT@x>\r\n\
+    Subject: t\r\n\r\nbody\r\n";
+        let parsed = mail_parser::MessageParser::default().parse(&raw[..]);
+        assert_eq!(
+            mp_thread_ids(parsed.as_ref()),
+            ("abc@example.com".to_string(), "parent@x root@x".to_string())
+        );
+        assert_eq!(mp_thread_ids(None), (String::new(), String::new()));
+    }
+
+    #[test]
+    fn a_pop3_summary_comes_from_the_raw_message() {
+        let raw = b"From: Ann <ann@x.example>\r\n\
+    To: b@y.example, c@z.example\r\n\
+    Cc: d@w.example\r\n\
+    Reply-To: ANN@x.example\r\n\
+    Subject: Hello\r\n\
+    Date: Tue, 1 Jul 2003 10:52:37 +0200\r\n\
+    Message-ID: <M1@x>\r\n\
+    X-Priority: 1\r\n\r\nbody\r\n";
+        let m = summary_from_raw(3, 1, 42, raw);
+        assert_eq!((m.id, m.account_id, m.folder_id, m.uid), (42, 3, 1, 42));
+        assert_eq!(m.from_name, "Ann");
+        assert_eq!(m.from_addr, "ann@x.example");
+        assert_eq!(m.to, "b@y.example, c@z.example");
+        assert_eq!(m.cc, "d@w.example");
+        // A Reply-To that only repeats From is dropped.
+        assert_eq!(m.reply_to, "");
+        assert_eq!(m.subject, "Hello");
+        assert_eq!(m.timestamp, 1057049557);
+        assert_eq!(m.date, label_from_timestamp(1057049557));
+        assert_eq!(m.message_id, "m1@x");
+        assert!(m.unread);
+        assert!(!m.starred && !m.answered && !m.has_attachment);
+        assert!(m.preview.is_empty() && m.body.is_empty());
+
+        let bare = summary_from_raw(3, 1, 7, b"\r\nno headers\r\n");
+        assert_eq!(bare.from_name, "Unknown");
+        assert_eq!(bare.from_addr, "");
+        assert_eq!(bare.subject, "(no subject)");
+        assert_eq!(bare.timestamp, 0);
+
+        let nameless = summary_from_raw(3, 1, 7, b"From: a@x\r\n\r\n");
+        assert_eq!(nameless.from_name, "a@x");
+    }
+}

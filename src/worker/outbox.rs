@@ -391,3 +391,371 @@ pub(super) fn due_outbox_items(
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Message;
+    use crate::worker::test_support::flagged_message;
+    use crate::worker::test_support::queued;
+    use crate::worker::test_support::sample_account;
+    use crate::worker::test_support::sample_outgoing;
+
+    /// A sent message marks what it answers in its own account only, the
+    /// reply's original as replied and the forward's as forwarded (#454).
+    #[test]
+    fn a_sent_message_finds_what_it_answered() {
+        let cache = Cache::in_memory().unwrap();
+        let copy = |account_id: u32, uid: u32, id: &str| Message {
+            account_id,
+            message_id: id.into(),
+            ..flagged_message(uid)
+        };
+        cache.upsert_messages(1, "INBOX", &[copy(1, 1, "a@x"), copy(1, 2, "b@x")]);
+        cache.upsert_messages(1, "Archive", &[copy(1, 7, "a@x")]);
+        cache.upsert_messages(2, "INBOX", &[copy(2, 1, "a@x")]);
+        let mut found = answered_copies(Some(&cache), 1, "<A@x>", "");
+        found.sort();
+        assert_eq!(
+            found,
+            [
+                ("Archive".to_string(), 7, false),
+                ("INBOX".to_string(), 1, false)
+            ]
+        );
+        assert_eq!(
+            answered_copies(Some(&cache), 1, "", "b@x"),
+            [("INBOX".to_string(), 2, true)]
+        );
+        assert!(answered_copies(Some(&cache), 1, "", "").is_empty());
+        assert!(answered_copies(Some(&cache), 1, "gone@x", "").is_empty());
+        assert!(answered_copies(None, 1, "a@x", "").is_empty());
+    }
+
+    /// #340: a send that fails on a file gone since it was attached cannot
+    /// be queued either, so the message comes back for a composer instead
+    /// of being dropped.
+    #[test]
+    fn an_unqueueable_failed_send_comes_back() {
+        let cache = Cache::in_memory().expect("cache");
+        let account = sample_account();
+        let mut msg = sample_outgoing();
+        msg.to = "ann@example.com".into();
+        msg.attachments = vec!["/nonexistent/hylki-test/moved.pdf".into()];
+        let events = std::cell::RefCell::new(Vec::new());
+        send_failed(
+            Some(&cache),
+            1,
+            &account,
+            &msg,
+            None,
+            "could not read the attachment",
+            false,
+            &|e| events.borrow_mut().push(e),
+        );
+        let events = events.into_inner();
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, WorkerEvent::Unsent(m) if m.subject == "Subject")),
+            "{events:?}"
+        );
+        // A message that does build is queued and not handed back.
+        msg.attachments.clear();
+        let events = std::cell::RefCell::new(Vec::new());
+        send_failed(
+            Some(&cache),
+            1,
+            &account,
+            &msg,
+            None,
+            "offline",
+            false,
+            &|e| events.borrow_mut().push(e),
+        );
+        assert!(!events
+            .into_inner()
+            .iter()
+            .any(|e| matches!(e, WorkerEvent::Unsent(_))));
+    }
+
+    /// #442: a message sent with no network waits in the Outbox with a
+    /// notice, not an error: nothing failed.
+    #[test]
+    fn an_offline_send_waits_quietly() {
+        let cache = Cache::in_memory().expect("cache");
+        let account = sample_account();
+        let mut msg = sample_outgoing();
+        msg.to = "ann@example.com".into();
+        let events = std::cell::RefCell::new(Vec::new());
+        send_failed(
+            Some(&cache),
+            1,
+            &account,
+            &msg,
+            None,
+            &offline_text(),
+            false,
+            &|e| events.borrow_mut().push(e),
+        );
+        let events = events.into_inner();
+        assert!(
+            events.iter().any(|e| matches!(e, WorkerEvent::Notice(_))),
+            "{events:?}"
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, WorkerEvent::Error { .. })),
+            "{events:?}"
+        );
+        assert_eq!(cache.outbox_items(1).len(), 1);
+    }
+
+    /// #368: a recipient the server refuses comes back to the composer and
+    /// is not queued, where it would fail again on every retry.
+    #[test]
+    fn a_refused_send_comes_back_unqueued() {
+        let cache = Cache::in_memory().expect("cache");
+        let account = sample_account();
+        let mut msg = sample_outgoing();
+        msg.to = "ann@example.com".into();
+        let events = std::cell::RefCell::new(Vec::new());
+        send_failed(
+            Some(&cache),
+            1,
+            &account,
+            &msg,
+            None,
+            "550 no such user",
+            true,
+            &|e| events.borrow_mut().push(e),
+        );
+        assert!(events
+            .into_inner()
+            .iter()
+            .any(|e| matches!(e, WorkerEvent::Unsent(_))));
+        assert!(cache.outbox_items(1).is_empty());
+    }
+
+    #[test]
+    fn a_queued_message_takes_the_sent_copy_folder_it_finds_on_the_way_out() {
+        use crate::models::{Folder, FolderKind};
+        let folder = |id: u32, path: &str, kind: FolderKind| Folder {
+            id,
+            account_id: 1,
+            name: path.to_string(),
+            path: path.to_string(),
+            kind,
+            unread: 0,
+        };
+        let folders = vec![
+            folder(1, "INBOX", FolderKind::Inbox),
+            folder(2, "Sent", FolderKind::Sent),
+        ];
+        let account = |chosen: Option<&str>| AccountConfig {
+            sent_copy_path: chosen.map(str::to_string),
+            ..sample_account()
+        };
+        // The account says Inbox now; the message was queued for Sent. It goes
+        // where the account says today, not where it said last week.
+        assert_eq!(
+            pick_queued_sent_copy(&account(Some("INBOX")), &folders, Some("Sent")).as_deref(),
+            Some("INBOX"),
+        );
+        // Turned back off since queuing: back to the Sent folder.
+        assert_eq!(
+            pick_queued_sent_copy(&account(None), &folders, Some("INBOX")).as_deref(),
+            Some("Sent"),
+        );
+        // Chosen folder gone from the server: Sent rather than a dead name.
+        assert_eq!(
+            pick_queued_sent_copy(&account(Some("Gone")), &folders, Some("Gone")).as_deref(),
+            Some("Sent"),
+        );
+        // No folder list to read (offline, no cache): the queued path stands,
+        // so a send never loses its copy over this.
+        assert_eq!(
+            pick_queued_sent_copy(&account(Some("INBOX")), &[], Some("Sent")).as_deref(),
+            Some("Sent"),
+        );
+        // The server files its own: nothing of ours goes anywhere, whatever
+        // was queued and whatever folder was picked.
+        let server_saves = AccountConfig {
+            sent_copy_path: Some("INBOX".into()),
+            server_saves_sent: true,
+            ..sample_account()
+        };
+        assert_eq!(
+            pick_queued_sent_copy(&server_saves, &folders, Some("Sent")),
+            None
+        );
+        assert_eq!(
+            pick_queued_sent_copy(&server_saves, &[], Some("Sent")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_reply_is_filed_beside_the_message_it_answers() {
+        use crate::config::ReplyCopies;
+        let folder = |id: u32, path: &str, kind: FolderKind| Folder {
+            id,
+            account_id: 1,
+            name: path.to_string(),
+            path: path.to_string(),
+            kind,
+            unread: 0,
+        };
+        let folders = vec![
+            folder(1, "INBOX", FolderKind::Inbox),
+            folder(2, "Sent", FolderKind::Sent),
+            folder(3, "Projects/Hylki", FolderKind::Custom),
+            folder(4, "[Gmail]/All Mail", FolderKind::Archive),
+            folder(5, "Trash", FolderKind::Trash),
+        ];
+        let held = |paths: &[&str]| paths.iter().map(|p| p.to_string()).collect::<Vec<_>>();
+        let pick = |choice, paths: &[&str]| pick_reply_folder(choice, &folders, &held(paths));
+        assert_eq!(
+            pick(ReplyCopies::Original, &["Projects/Hylki"]).as_deref(),
+            Some("Projects/Hylki")
+        );
+        assert_eq!(
+            pick(ReplyCopies::Original, &["INBOX"]).as_deref(),
+            Some("INBOX")
+        );
+        assert_eq!(pick(ReplyCopies::OriginalNotInbox, &["INBOX"]), None);
+        // Gmail's copies under a label, All Mail and the Inbox: the label.
+        assert_eq!(
+            pick(
+                ReplyCopies::OriginalNotInbox,
+                &["INBOX", "[Gmail]/All Mail", "Projects/Hylki"]
+            )
+            .as_deref(),
+            Some("Projects/Hylki"),
+        );
+        assert_eq!(
+            pick(ReplyCopies::Original, &["INBOX", "[Gmail]/All Mail"]).as_deref(),
+            Some("[Gmail]/All Mail")
+        );
+        // Binned, already in Sent, or in a folder deleted since: with sent mail.
+        assert_eq!(pick(ReplyCopies::Original, &["Trash"]), None);
+        assert_eq!(pick(ReplyCopies::Original, &["Sent"]), None);
+        assert_eq!(pick(ReplyCopies::Original, &["Gone"]), None);
+        assert_eq!(pick(ReplyCopies::Original, &[]), None);
+
+        // Off, or the server files its own copy: nothing is looked up.
+        let account = |reply_copies, server_saves_sent| AccountConfig {
+            reply_copies,
+            server_saves_sent,
+            ..sample_account()
+        };
+        let cache = Cache::in_memory().unwrap();
+        cache.save_folders(1, &folders);
+        assert_eq!(
+            reply_copy_path(
+                &account(ReplyCopies::WithSent, false),
+                1,
+                Some(&cache),
+                "a@b"
+            ),
+            None
+        );
+        assert_eq!(
+            reply_copy_path(
+                &account(ReplyCopies::Original, true),
+                1,
+                Some(&cache),
+                "a@b"
+            ),
+            None
+        );
+        assert_eq!(
+            reply_copy_path(&account(ReplyCopies::Original, false), 1, Some(&cache), ""),
+            None
+        );
+        // On: the original is found by its Message-ID, spelled as the
+        // reply spells it, and only among this account's folders.
+        let original = Message {
+            id: 1,
+            account_id: 1,
+            folder_id: 3,
+            uid: 7,
+            from_name: "Ada".into(),
+            from_addr: "ada@example.com".into(),
+            reply_to: String::new(),
+            to: String::new(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Plans".into(),
+            preview: String::new(),
+            body: String::new(),
+            date: String::new(),
+            timestamp: 1,
+            unread: false,
+            starred: false,
+            answered: false,
+            forwarded: false,
+            keywords: Vec::new(),
+            has_attachment: false,
+            message_id: "parent@example.com".into(),
+            references: String::new(),
+            importance: Default::default(),
+            due: 0,
+            labels: Vec::new(),
+        };
+        cache.upsert_messages(1, "Projects/Hylki", std::slice::from_ref(&original));
+        let on = account(ReplyCopies::Original, false);
+        assert_eq!(
+            reply_copy_path(&on, 1, Some(&cache), "<Parent@Example.com>").as_deref(),
+            Some("Projects/Hylki"),
+        );
+        assert_eq!(
+            reply_copy_path(&on, 2, Some(&cache), "parent@example.com"),
+            None
+        );
+        assert_eq!(
+            reply_copy_path(&on, 1, Some(&cache), "other@example.com"),
+            None
+        );
+    }
+
+    #[test]
+    fn a_queued_reply_names_what_it_answers() {
+        let raw =
+            b"From: a@example.com\r\nTo: b@example.com\r\nIn-Reply-To: <Parent@Example.com>\r\n\
+                    Subject: Re: x\r\n\r\nbody\r\n";
+        assert_eq!(raw_in_reply_to(raw), "Parent@Example.com");
+        assert_eq!(raw_in_reply_to(b"Subject: x\r\n\r\nbody\r\n"), "");
+    }
+
+    #[test]
+    fn a_queued_message_keeps_every_recipient_on_retry() {
+        // Bcc exists only in the envelope, so a retry that rebuilds it from the
+        // headers would silently drop those recipients.
+        let item = queued("me@example.com", &["ada@example.com", "bcc@example.com"]);
+        let envelope = outbox_envelope(&item).expect("envelope rebuilds");
+        assert_eq!(
+            envelope.from().map(|f| f.to_string()).as_deref(),
+            Some("me@example.com")
+        );
+        assert_eq!(
+            envelope
+                .to()
+                .iter()
+                .map(|a| a.to_string())
+                .collect::<Vec<_>>(),
+            ["ada@example.com", "bcc@example.com"]
+        );
+    }
+
+    #[test]
+    fn a_queued_message_with_an_unusable_address_is_not_retried() {
+        // Better to leave it in the Outbox saying so than to retry forever.
+        assert!(outbox_envelope(&queued("me@example.com", &["not-an-address"])).is_none());
+        assert!(outbox_envelope(&queued("me@example.com", &[])).is_none());
+        // A missing sender is legal (SMTP's null reverse-path), so it is not a
+        // reason to refuse.
+        assert!(outbox_envelope(&queued("", &["ada@example.com"])).is_some());
+    }
+}
