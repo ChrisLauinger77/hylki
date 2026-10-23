@@ -314,7 +314,7 @@ tags_expanded_accounts = ["b@x"]
 }
 
 /// A missing sidebar.toml and a sidebar.toml without the section keys open
-/// different sections (see REFACTOR_NOTES.md, suspected bugs).
+/// different sections, a known quirk.
 #[test]
 fn sidebar_state_defaults() {
     let missing = SidebarState::default();

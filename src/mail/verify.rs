@@ -471,8 +471,8 @@ mod tests {
 
     /// The two registrable-domain rules in the crate, side by side: this
     /// one (a fixed list of second-level labels) and the logo cache's (any
-    /// short label under a two-letter TLD). They disagree on some domains;
-    /// see REFACTOR_NOTES.md, suspected bug B6.
+    /// short label under a two-letter TLD). They disagree on some domains,
+    /// a known quirk.
     #[test]
     fn registrable_domain_rules_agree_and_differ_as_recorded() {
         let logo = |d: &str| crate::services::logo::domain_of(&format!("someone@{d}"));

@@ -394,7 +394,7 @@ fn an_indent_is_not_a_quote() {
 }
 
 // Characterization tests (restructure, area D): they pin what the code
-// does today, quirks included. See REFACTOR_NOTES.md, suspected bugs.
+// does today, quirks included.
 
 const MARK: &str = "<mark style=\"background:#fff3a3;color:#000\">";
 

@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn a_window_without_a_subject_says_so() {
         assert_eq!(title_text(&member(1, "Hello")), "Hello");
-        // Untranslated (see REFACTOR_NOTES, suspected bugs).
+        // Untranslated, a known quirk.
         assert_eq!(title_text(&member(1, "  ")), "(No subject)");
         assert_eq!(title_text(&member(1, " x ")), " x ");
     }

@@ -11,7 +11,7 @@ fn recipient_names_prefer_the_display_name() {
     assert_eq!(recipient_names("\"Ann\" <a@x>"), "Ann");
     assert_eq!(recipient_names("<a@x>"), "a@x");
     assert_eq!(recipient_names(" , ,"), "");
-    // Splits on every comma, quoted or not (see REFACTOR_NOTES, suspected bugs).
+    // Splits on every comma, quoted or not, a known quirk.
     assert_eq!(recipient_names("\"Doe, Jane\" <j@x>"), "\"Doe, Jane");
 }
 

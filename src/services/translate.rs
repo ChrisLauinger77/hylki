@@ -693,8 +693,8 @@ mod tests {
         assert_eq!(normalize("sr@latin"), "sr");
     }
 
-    /// A block over [`CHUNK`] is never split: it goes as a piece of its own
-    /// (see REFACTOR_NOTES.md, suspected bug B12).
+    /// A block over [`CHUNK`] is never split: it goes as a piece of its own,
+    /// a known quirk.
     #[test]
     fn pieces_fill_up_to_the_limit_and_an_oversized_block_goes_whole() {
         let x = |n: usize| "x".repeat(n);

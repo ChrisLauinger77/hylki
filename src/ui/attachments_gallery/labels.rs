@@ -155,8 +155,7 @@ mod tests {
         assert_eq!(scan_text(false, 1), "Indexing 1 messages…");
     }
 
-    /// The table's date ignores the date-style setting (REFACTOR_NOTES.md,
-    /// suspected bug B5).
+    /// The table's date ignores the date-style setting, a known quirk.
     #[test]
     fn table_dates_use_a_fixed_pattern() {
         assert_eq!(date_text(1_787_745_600), "Aug 26, 2026");
