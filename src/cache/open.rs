@@ -178,133 +178,23 @@ impl Cache {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap_or(0);
+        drop_stale_tables(conn, version);
+        conn.execute_batch(SCHEMA)?;
+        for sql in ADDED_COLUMNS {
+            let _ = conn.execute(sql, []);
+        }
+        clean_on_every_open(conn);
+        Self::repair_rows_from(conn, version);
+        let _ = conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION};"));
+        Ok(())
+    }
+
+    /// The one-time repairs of rows an older build stored, by the version
+    /// the database was at.
+    fn repair_rows_from(conn: &Connection, version: i64) {
         // Upgrading in place (layout current, message index preserved) rather
         // than wiping and re-syncing the whole mailbox.
         let upgrading_index = (LAYOUT_VERSION..SCHEMA_VERSION).contains(&version);
-        if version < LAYOUT_VERSION {
-            let _ = conn.execute_batch(
-                "DROP TABLE IF EXISTS folders;\
-                 DROP TABLE IF EXISTS messages;\
-                 DROP TABLE IF EXISTS bodies;\
-                 DROP TABLE IF EXISTS sender_checks;\
-                 DROP TABLE IF EXISTS attachments;\
-                 DROP TABLE IF EXISTS attachments_checked;",
-            );
-        } else if version < RENDER_VERSION {
-            // The layout is current but `bodies` holds HTML rendered by an older
-            // build. `LoadBody` serves that cache without ever re-fetching, so a
-            // stale entry would survive forever — drop it and let it re-render on
-            // next open. The message index is kept: it's expensive to rebuild.
-            let _ = conn
-                .execute_batch("DROP TABLE IF EXISTS bodies; DROP TABLE IF EXISTS sender_checks;");
-            // Attachment lists cached by builds before v13 are wrong in place
-            // (small declared files missing, blobs duplicated per Gmail label),
-            // and `attachments_checked` would keep them from ever re-fetching.
-            // The re-fetch is bounded: the prefetch re-touches only the newest
-            // messages per folder, the rest heal lazily on open.
-            if version < 13 {
-                let _ = conn.execute_batch(
-                    "DROP TABLE IF EXISTS attachments; DROP TABLE IF EXISTS attachments_checked;",
-                );
-            }
-        }
-        conn.execute_batch(SCHEMA)?;
-        // `messages` predates the preview column, and `CREATE TABLE IF NOT
-        // EXISTS` leaves an existing table alone. Add it in place rather than
-        // dropping the index, which would cost every user a full re-sync; the
-        // error when it is already there is the expected outcome, not a problem.
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN preview TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        // Send Later (#145): when a queued message is due; NULL sends at once.
-        let _ = conn.execute("ALTER TABLE outbox ADD COLUMN send_at INTEGER", []);
-        // And the message a queued forward forwards (#454).
-        let _ = conn.execute(
-            "ALTER TABLE outbox ADD COLUMN forwards TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        // Same in-place treatment for `reply_to` (added later still): existing
-        // rows carry an empty value until their folder's recent window
-        // re-syncs, and Reply falls back to the sender until then.
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN reply_to TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        // And for `keywords` (tags, #71): existing rows read as untagged until
-        // their folder syncs again and the flags come down with the rest.
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN keywords TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        // And the list's Importance and Due columns (#334): mail already
-        // cached reads as normal, and undated, until it is fetched again.
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN importance INTEGER NOT NULL DEFAULT 0",
-            [],
-        );
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN due INTEGER NOT NULL DEFAULT 0",
-            [],
-        );
-        // And Gmail's labels (#374): mail already cached shows none until its
-        // folder's recent window syncs, or the backfill reaches it.
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN gmail_labels TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        // And replied and forwarded (#454), the same way.
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN answered INTEGER NOT NULL DEFAULT 0",
-            [],
-        );
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN forwarded INTEGER NOT NULL DEFAULT 0",
-            [],
-        );
-        // And the Bcc of a sent copy (#476).
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN bcc TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        // And the OpenPGP verdict (#133) beside the sender check, as JSON;
-        // empty for a message that carried none. Kept as a marker: nothing
-        // OpenPGP is cached, so a body that was (by the first build of the
-        // feature, which cached signed mail) is dropped here, and the
-        // message is fetched and verified afresh at its next open.
-        let _ = conn.execute(
-            "ALTER TABLE sender_checks ADD COLUMN pgp TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        // And the meeting invitation (#223) beside it, as JSON; empty for a
-        // message that carries none.
-        let _ = conn.execute(
-            "ALTER TABLE sender_checks ADD COLUMN invite TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        // And the sensitivity label (#411). A check stored before has none:
-        // its message shows its label once it is fetched again.
-        let _ = conn.execute(
-            "ALTER TABLE sender_checks ADD COLUMN label TEXT NOT NULL DEFAULT ''",
-            [],
-        );
-        delete_downloaded_where_check(conn, "s.pgp != ''");
-        // Previews cached by a build that showed MIME machinery or a tracking
-        // link instead of the message: a multipart's boundary ("--b2=_cipk…") or
-        // the rendered link a marketing mail opens with ("( https://…"). Clearing
-        // them shows nothing until the folder syncs again, which beats showing
-        // either.
-        let _ = conn.execute(
-            "UPDATE messages SET preview = ''              WHERE preview LIKE '--%' OR preview LIKE '( http%'",
-            [],
-        );
-        // Previews cached as the PGP/MIME version stub (#133) become the
-        // encrypted-message marker the list draws a lock for.
-        let _ = conn.execute(
-            "UPDATE messages SET preview = ?1 \
-             WHERE preview LIKE 'Version: 1' OR preview = 'Encrypted message'",
-            [crate::models::ENCRYPTED_PREVIEW],
-        );
         if upgrading_index {
             Self::redecode_encoded_subjects(conn);
         }
@@ -344,8 +234,6 @@ impl Cache {
                 [],
             );
         }
-        let _ = conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION};"));
-        Ok(())
     }
 
     /// One-time upgrade fix: earlier builds cached a message's subject verbatim
@@ -499,4 +387,104 @@ fn delete_downloaded_where_check(conn: &Connection, condition: &str) {
             [],
         );
     }
+}
+
+/// Drop the tables an older build filled in a way this one cannot use:
+/// every table of a layout before [`LAYOUT_VERSION`], and the rendered
+/// bodies and verdicts (with the attachment lists before v13) of one before
+/// [`RENDER_VERSION`].
+fn drop_stale_tables(conn: &Connection, version: i64) {
+    if version < LAYOUT_VERSION {
+        let _ = conn.execute_batch(
+            "DROP TABLE IF EXISTS folders;\
+             DROP TABLE IF EXISTS messages;\
+             DROP TABLE IF EXISTS bodies;\
+             DROP TABLE IF EXISTS sender_checks;\
+             DROP TABLE IF EXISTS attachments;\
+             DROP TABLE IF EXISTS attachments_checked;",
+        );
+    } else if version < RENDER_VERSION {
+        // The layout is current but `bodies` holds HTML rendered by an older
+        // build. `LoadBody` serves that cache without ever re-fetching, so a
+        // stale entry would survive forever — drop it and let it re-render on
+        // next open. The message index is kept: it's expensive to rebuild.
+        let _ =
+            conn.execute_batch("DROP TABLE IF EXISTS bodies; DROP TABLE IF EXISTS sender_checks;");
+        // Attachment lists cached by builds before v13 are wrong in place
+        // (small declared files missing, blobs duplicated per Gmail label),
+        // and `attachments_checked` would keep them from ever re-fetching.
+        // The re-fetch is bounded: the prefetch re-touches only the newest
+        // messages per folder, the rest heal lazily on open.
+        if version < 13 {
+            let _ = conn.execute_batch(
+                "DROP TABLE IF EXISTS attachments; DROP TABLE IF EXISTS attachments_checked;",
+            );
+        }
+    }
+}
+
+/// Columns added to a table after it was first created, in the order they
+/// came. `CREATE TABLE IF NOT EXISTS` leaves an existing table alone, so
+/// each is added in place rather than dropping the message index, which
+/// would cost every user a full re-sync; the error when a column is already
+/// there is the expected outcome, not a problem.
+const ADDED_COLUMNS: [&str; 14] = [
+    // The list preview.
+    "ALTER TABLE messages ADD COLUMN preview TEXT NOT NULL DEFAULT ''",
+    // Send Later (#145): when a queued message is due; NULL sends at once.
+    "ALTER TABLE outbox ADD COLUMN send_at INTEGER",
+    // And the message a queued forward forwards (#454).
+    "ALTER TABLE outbox ADD COLUMN forwards TEXT NOT NULL DEFAULT ''",
+    // Same in-place treatment for `reply_to` (added later still): existing
+    // rows carry an empty value until their folder's recent window
+    // re-syncs, and Reply falls back to the sender until then.
+    "ALTER TABLE messages ADD COLUMN reply_to TEXT NOT NULL DEFAULT ''",
+    // And for `keywords` (tags, #71): existing rows read as untagged until
+    // their folder syncs again and the flags come down with the rest.
+    "ALTER TABLE messages ADD COLUMN keywords TEXT NOT NULL DEFAULT ''",
+    // And the list's Importance and Due columns (#334): mail already
+    // cached reads as normal, and undated, until it is fetched again.
+    "ALTER TABLE messages ADD COLUMN importance INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE messages ADD COLUMN due INTEGER NOT NULL DEFAULT 0",
+    // And Gmail's labels (#374): mail already cached shows none until its
+    // folder's recent window syncs, or the backfill reaches it.
+    "ALTER TABLE messages ADD COLUMN gmail_labels TEXT NOT NULL DEFAULT ''",
+    // And replied and forwarded (#454), the same way.
+    "ALTER TABLE messages ADD COLUMN answered INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE messages ADD COLUMN forwarded INTEGER NOT NULL DEFAULT 0",
+    // And the Bcc of a sent copy (#476).
+    "ALTER TABLE messages ADD COLUMN bcc TEXT NOT NULL DEFAULT ''",
+    // And the OpenPGP verdict (#133) beside the sender check, as JSON;
+    // empty for a message that carried none. Kept as a marker: nothing
+    // OpenPGP is cached, so a body that was (by the first build of the
+    // feature, which cached signed mail) is dropped here, and the
+    // message is fetched and verified afresh at its next open.
+    "ALTER TABLE sender_checks ADD COLUMN pgp TEXT NOT NULL DEFAULT ''",
+    // And the meeting invitation (#223) beside it, as JSON; empty for a
+    // message that carries none.
+    "ALTER TABLE sender_checks ADD COLUMN invite TEXT NOT NULL DEFAULT ''",
+    // And the sensitivity label (#411). A check stored before has none:
+    // its message shows its label once it is fetched again.
+    "ALTER TABLE sender_checks ADD COLUMN label TEXT NOT NULL DEFAULT ''",
+];
+
+/// The cleanups run at every open, whatever the version.
+fn clean_on_every_open(conn: &Connection) {
+    delete_downloaded_where_check(conn, "s.pgp != ''");
+    // Previews cached by a build that showed MIME machinery or a tracking
+    // link instead of the message: a multipart's boundary ("--b2=_cipk…") or
+    // the rendered link a marketing mail opens with ("( https://…"). Clearing
+    // them shows nothing until the folder syncs again, which beats showing
+    // either.
+    let _ = conn.execute(
+        "UPDATE messages SET preview = ''              WHERE preview LIKE '--%' OR preview LIKE '( http%'",
+        [],
+    );
+    // Previews cached as the PGP/MIME version stub (#133) become the
+    // encrypted-message marker the list draws a lock for.
+    let _ = conn.execute(
+        "UPDATE messages SET preview = ?1 \
+         WHERE preview LIKE 'Version: 1' OR preview = 'Encrypted message'",
+        [crate::models::ENCRYPTED_PREVIEW],
+    );
 }
