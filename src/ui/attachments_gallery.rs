@@ -15,9 +15,9 @@ use std::collections::HashMap;
 
 use crate::i18n::i18n;
 use crate::models::{GalleryItem, GallerySort};
-use crate::ui::context_menu::{show_context_menu, MenuEntry};
 
 mod cell;
+mod items;
 mod labels;
 mod msg;
 mod open_file;
@@ -25,6 +25,7 @@ mod ratio_box;
 mod scope;
 mod table;
 mod thumbnails;
+mod update;
 
 use cell::build_cell;
 pub(crate) use cell::{deleting_label, deleting_over, deleting_veil, fade_out};
@@ -747,26 +748,7 @@ impl Component for AttachmentsGallery {
                 items,
                 total,
                 offset,
-            } => {
-                if offset == 0 {
-                    // The first page of a fresh query replaces everything.
-                    self.all_items = items;
-                } else if offset as usize == self.all_items.len() {
-                    self.all_items.extend(items);
-                } else {
-                    // A page for a query that has since changed: its offset no
-                    // longer lines up with what is loaded, so appending it
-                    // would interleave rows from two different orderings. Drop
-                    // it and wait for the page the current query asked for.
-                    self.loading_more = false;
-                    self.update_view(widgets, sender);
-                    return;
-                }
-                self.total = total;
-                self.loading = false;
-                self.loading_more = false;
-                self.rebuild_view(&sender);
-            }
+            } => self.on_page(items, total, offset, &sender),
             GalleryInput::LoadMore => self.load_more(&sender),
             GalleryInput::ScanProgress => {
                 if self.all_items.len() <= PAGE_SIZE as usize {
@@ -780,180 +762,33 @@ impl Component for AttachmentsGallery {
                 path,
                 uid,
                 items,
-            } => {
-                let mut touched = false;
-                for row in self.all_items.iter_mut().filter(|i| {
-                    i.account_id == account_id
-                        && i.folder_path == path
-                        && i.uid == uid
-                        && i.data.is_none()
-                }) {
-                    // Match on the name rather than the index: the scan numbers
-                    // parts as the server describes them and the fetch numbers
-                    // them as the parser finds them, which need not agree.
-                    if let Some(found) = items.iter().find(|a| a.name == row.name) {
-                        row.data = Some(found.data.clone());
-                        row.size = found.data.len() as u64;
-                        row.downloaded = true;
-                        touched = true;
-                    }
-                }
-                if touched {
-                    self.rebuild_view(&sender);
-                    if self.preview.is_some() {
-                        self.refresh_preview(&sender);
-                    }
-                }
-            }
-            GalleryInput::SetDeleting(key, on) => {
-                self.deleting.retain(|k| *k != key);
-                if on {
-                    self.deleting.push(key);
-                }
-                self.rebuild_view(&sender);
-            }
-            GalleryInput::Removed(key) => {
-                let at = self.all_items.iter().position(|i| key_of(i) == key);
-                let shown: Option<gtk::Widget> = at.and_then(|at| {
-                    if self.view_table {
-                        self.table.row_at_index(at as i32).map(|r| r.upcast())
-                    } else {
-                        self.flow.child_at_index(at as i32).map(|c| c.upcast())
-                    }
-                });
-                let s = sender.clone();
-                let done = move || s.input(GalleryInput::RemoveNow(key.clone()));
-                match shown {
-                    Some(w) => fade_out(&w, done),
-                    None => done(),
-                }
-            }
+            } => self.on_fetched(account_id, path, uid, items, &sender),
+            GalleryInput::SetDeleting(key, on) => self.on_set_deleting(key, on, &sender),
+            GalleryInput::Removed(key) => self.on_removed(key, &sender),
             GalleryInput::RemoveNow(key) => {
-                self.deleting.retain(|k| *k != key);
-                // In place, rather than a reload that would lose the user's
-                // place in a long list.
-                let Some(at) = self.all_items.iter().position(|i| key_of(i) == key) else {
-                    self.rebuild_view(&sender);
+                if !self.on_remove_now(key, &sender) {
                     return;
-                };
-                self.all_items.remove(at);
-                self.total = self.total.saturating_sub(1);
-                self.preview = match self.preview {
-                    Some(p) if p == at => None,
-                    Some(p) if p > at => Some(p - 1),
-                    p => p,
-                };
-                self.rebuild_view(&sender);
-            }
-            GalleryInput::SetQuery(q) => {
-                if self.query != q {
-                    self.query = q;
-                    if let Some(t) = self.query_timer.take() {
-                        t.remove();
-                    }
-                    let s = sender.clone();
-                    self.query_timer = Some(glib::timeout_add_local_once(
-                        std::time::Duration::from_millis(SEARCH_DEBOUNCE_MS as u64),
-                        move || s.input(GalleryInput::ApplyQuery),
-                    ));
                 }
             }
+            GalleryInput::SetQuery(q) => self.on_set_query(q, &sender),
             GalleryInput::ApplyQuery => {
                 self.query_timer = None;
                 self.reload(&sender);
             }
-            GalleryInput::SetSort(i) => {
-                let sort = GallerySort::from_index(i);
-                if self.sort != sort {
-                    self.sort = sort;
-                    crate::config::save_gallery_sort(i);
-                    self.reload(&sender);
-                }
-            }
-            GalleryInput::SortColumn(col) => {
-                // First click sorts a column its natural way; a second flips it.
-                let sort = match (col, self.sort) {
-                    (0, GallerySort::Name) => GallerySort::NameDesc,
-                    (0, _) => GallerySort::Name,
-                    (1, GallerySort::Sender) => GallerySort::SenderDesc,
-                    (1, _) => GallerySort::Sender,
-                    (2, GallerySort::Newest) => GallerySort::Oldest,
-                    (2, _) => GallerySort::Newest,
-                    (3, GallerySort::Largest) => GallerySort::Smallest,
-                    (3, _) => GallerySort::Largest,
-                    (4, GallerySort::Type) => GallerySort::TypeDesc,
-                    (4, _) | (_, _) => GallerySort::Type,
-                };
-                // The dropdown follows; its notify handler sees the same value
-                // and does nothing further.
-                widgets.sort_dropdown.set_selected(sort.index());
-                if self.sort != sort {
-                    self.sort = sort;
-                    crate::config::save_gallery_sort(sort.index());
-                    self.reload(&sender);
-                }
-            }
-            GalleryInput::SetViewTable(table) => {
-                if self.view_table != table {
-                    self.view_table = table;
-                    self.rebuild_view(&sender);
-                    crate::config::save_gallery_table_view(table);
-                }
-            }
-            GalleryInput::SetThumbWidth(v) => {
-                let width = (v.round() as i32).clamp(140, 380);
-                if width != self.thumb_width {
-                    self.thumb_width = width;
-                    // One rebuild once the drag settles, not one per pixel.
-                    if let Some(id) = self.resize_timer.take() {
-                        id.remove();
-                    }
-                    let s = sender.clone();
-                    self.resize_timer = Some(glib::timeout_add_local_once(
-                        std::time::Duration::from_millis(150),
-                        move || s.input(GalleryInput::ApplyThumbWidth),
-                    ));
-                }
-            }
-            GalleryInput::ApplyThumbWidth => {
-                self.resize_timer = None;
-                if !self.view_table {
-                    self.rebuild_view(&sender);
-                }
-                crate::config::save_gallery_thumb_width(self.thumb_width);
-            }
+            GalleryInput::SetSort(i) => self.on_set_sort(i, &sender),
+            GalleryInput::SortColumn(col) => self.on_sort_column(col, widgets, &sender),
+            GalleryInput::SetViewTable(table) => self.on_set_view_table(table, &sender),
+            GalleryInput::SetThumbWidth(v) => self.on_set_thumb_width(v, &sender),
+            GalleryInput::ApplyThumbWidth => self.on_apply_thumb_width(&sender),
             GalleryInput::SetTypeFilter(bucket) => {
                 if self.type_filter != bucket {
                     self.type_filter = bucket;
                     self.reload(&sender);
                 }
             }
-            GalleryInput::SetAccounts(accounts) => {
-                self.accounts = accounts;
-                self.rebuild_account_names();
-                // The dropdown's rows just changed under it; start from "All
-                // accounts" rather than whichever row the old list had there.
-                self.account_filter = None;
-                widgets.account_dropdown.set_selected(0);
-                self.recompute_scope();
-                self.rebuild_folder_list(&sender);
-                self.reload(&sender);
-            }
+            GalleryInput::SetAccounts(accounts) => self.on_set_accounts(accounts, widgets, &sender),
             GalleryInput::SetAccountFilter(row) => {
-                // Row 0 is "All accounts"; the rest index `accounts` in order.
-                let filter = (row as usize)
-                    .checked_sub(1)
-                    .and_then(|i| self.accounts.get(i))
-                    .map(|a| a.id);
-                if self.account_filter != filter {
-                    self.account_filter = filter;
-                    // Keeps the dropdown honest when the message came from
-                    // somewhere other than the dropdown itself. Setting it to
-                    // the row it already holds emits nothing, so this cannot
-                    // loop back round.
-                    widgets.account_dropdown.set_selected(row);
-                    self.reload(&sender);
-                }
+                self.on_set_account_filter(row, widgets, &sender)
             }
             GalleryInput::SetIncludeArchive(on) => {
                 if self.include_archive != on {
@@ -971,16 +806,7 @@ impl Component for AttachmentsGallery {
                 account_id,
                 path,
                 on,
-            } => {
-                let entry = self.overrides.entry(account_id).or_default();
-                if entry.insert(path, on) != Some(on) {
-                    // The list already draws this tick; rebuilding it here
-                    // would tear down the check button mid-signal.
-                    self.recompute_scope();
-                    self.save_scope();
-                    self.reload(&sender);
-                }
-            }
+            } => self.on_set_folder(account_id, path, on, &sender),
             GalleryInput::SetLoading(on) => self.loading = on,
             GalleryInput::Activate(i) => {
                 if (i as usize) < self.all_items.len() {
@@ -994,16 +820,7 @@ impl Component for AttachmentsGallery {
                 self.preview = None;
                 self.preview_texture = None;
             }
-            GalleryInput::PreviewRendered(key) => {
-                // Only meaningful if the rendered PDF is still on show.
-                let still_current = self
-                    .current()
-                    .and_then(|i| i.data.as_ref())
-                    .is_some_and(|d| thumb_cache_key(d) == key);
-                if still_current {
-                    self.refresh_preview(&sender);
-                }
-            }
+            GalleryInput::PreviewRendered(key) => self.on_preview_rendered(key, &sender),
             GalleryInput::OpenCurrent => {
                 if let Some(i) = self.preview {
                     self.open_item(i, &sender);
@@ -1017,23 +834,8 @@ impl Component for AttachmentsGallery {
             GalleryInput::OpenItem(i) => self.open_item(i, &sender),
             GalleryInput::DownloadItem(i) => self.download_item(i, &sender),
             GalleryInput::GoToItem(i) => self.goto_item(i, &sender),
-            GalleryInput::ShowcaseDelete(name) => {
-                match self.all_items.iter().position(|i| i.name == name) {
-                    Some(i) => sender.input(GalleryInput::DeleteItem(i)),
-                    None => tracing::warn!("showcase: no {name:?} in the gallery"),
-                }
-            }
-            GalleryInput::DeleteItem(i) => {
-                if let Some(item) = self.item_at(i) {
-                    let _ = sender.output(GalleryOutput::DeleteFromServer {
-                        account_id: item.account_id,
-                        folder_path: item.folder_path.clone(),
-                        uid: item.uid,
-                        name: item.name.clone(),
-                        size: item.size,
-                    });
-                }
-            }
+            GalleryInput::ShowcaseDelete(name) => self.on_showcase_delete(name, &sender),
+            GalleryInput::DeleteItem(i) => self.on_delete_item(i, &sender),
             GalleryInput::OpenExternal(i) => {
                 // Double-click: skip/close the preview and open the file directly.
                 self.preview = None;
@@ -1042,369 +844,10 @@ impl Component for AttachmentsGallery {
             GalleryInput::ContextMenu { index, x, y } => {
                 self.show_context_menu(index, x, y, &sender)
             }
-            GalleryInput::ShowcaseSearch(text) => {
-                let entry = widgets.search_entry.clone();
-                entry.grab_focus();
-                // Goes through `search-changed`, so this is the same path a
-                // typed character takes, debounce and all.
-                entry.set_text(&text);
-                glib::timeout_add_seconds_local_once(2, move || {
-                    // `has_focus` also needs the window to be the active one,
-                    // which it need not be under a private bus; `is_focus` is
-                    // the question actually being asked — is this still the
-                    // toplevel's focus widget.
-                    let focus = entry
-                        .root()
-                        .and_downcast::<gtk::Window>()
-                        .and_then(|w| gtk::prelude::GtkWindowExt::focus(&w));
-                    // A GtkSearchEntry is composite: the focus widget is the
-                    // GtkText inside it, so ask whether the focus is anywhere
-                    // within the entry rather than whether it *is* the entry.
-                    let kept = focus.as_ref().is_some_and(|f| {
-                        f == entry.upcast_ref::<gtk::Widget>() || f.is_ancestor(&entry)
-                    });
-                    tracing::info!(
-                        target: "hylki::showcase",
-                        "gallery search focus: kept={kept} holder={} toolbar_visible={} text={:?}",
-                        focus.map(|w| w.type_().name().to_string()).unwrap_or_else(|| "none".into()),
-                        entry.parent().is_some_and(|p| p.is_visible()),
-                        entry.text()
-                    );
-                });
-            }
-            GalleryInput::ShowcaseFolders => {
-                widgets.folders_button.popup();
-                // A popover is its own surface, so the window snapshot never
-                // has it: capture its contents directly, as the context menu
-                // does (see `ui::context_menu`).
-                if let Ok(path) = std::env::var("HYLKI_SHOWCASE") {
-                    let content = widgets.folders_box.clone();
-                    glib::timeout_add_seconds_local_once(1, move || {
-                        crate::app::showcase_capture(content.upcast_ref(), &path);
-                    });
-                }
-            }
+            GalleryInput::ShowcaseSearch(text) => self.on_showcase_search(text, widgets),
+            GalleryInput::ShowcaseFolders => self.on_showcase_folders(widgets),
         }
         self.update_view(widgets, sender);
-    }
-}
-
-impl AttachmentsGallery {
-    /// What the gallery holds in RAM, for the memory section of an export:
-    /// items listed, of which carrying their file bytes, and those bytes.
-    pub fn memory_stats(&self) -> (usize, usize, u64) {
-        let with_data = self.all_items.iter().filter(|i| i.data.is_some()).count();
-        let bytes = self
-            .all_items
-            .iter()
-            .filter_map(|i| i.data.as_ref())
-            .map(|d| d.len() as u64)
-            .sum();
-        (self.all_items.len(), with_data, bytes)
-    }
-
-    fn page(&self) -> &'static str {
-        if self.loading && self.all_items.is_empty() {
-            "loading"
-        } else if !self.all_items.is_empty() {
-            if self.view_table {
-                "table"
-            } else {
-                "grid"
-            }
-        } else if self.is_narrowed() {
-            // Nothing matched, but something would without the search or the
-            // filters — a different message from an empty gallery.
-            "noresults"
-        } else {
-            "empty"
-        }
-    }
-
-    /// Whether the search bar and the footer are on show. They stay up while a
-    /// search narrows the gallery to nothing: the entry being typed into lives
-    /// in the toolbar, and a toolbar that hid itself the moment a query matched
-    /// nothing would take the focus with it mid-word.
-    fn show_chrome(&self) -> bool {
-        !self.all_items.is_empty() || self.is_narrowed() || self.scan_remaining > 0
-    }
-
-    /// Whether the user has narrowed the view at all. Used only to choose
-    /// between the two empty states, so an archive with no attachments in it
-    /// doesn't tell the user to try a different search they never made.
-    fn is_narrowed(&self) -> bool {
-        !self.query.trim().is_empty() || self.type_filter != 0 || self.account_filter.is_some()
-    }
-
-    /// Ask for the first page again, dropping whatever is loaded: what every
-    /// change to the scope, the search, the type filter or the sort has to do,
-    /// because all four are applied by the database and not here.
-    /// Ask for the first page again: what every change to the scope, the
-    /// search, the type filter or the sort has to do, because all four are
-    /// applied by the database and not here.
-    ///
-    /// What is already on screen deliberately stays there until the
-    /// replacement page arrives. Emptying the list first would take the
-    /// toolbar and footer down with it — and the search entry lives in the
-    /// toolbar, so a search would lose the focus of whoever was typing it
-    /// after the first letter.
-    fn reload(&mut self, sender: &ComponentSender<Self>) {
-        self.preview = None;
-        self.preview_texture = None;
-        self.loading = true;
-        self.request_page(0, sender);
-    }
-
-    /// Ask for the next page, unless one is already on its way or the last page
-    /// has already landed.
-    fn load_more(&mut self, sender: &ComponentSender<Self>) {
-        if self.loading_more || !self.has_more() {
-            return;
-        }
-        let offset = self.all_items.len() as u32;
-        self.request_page(offset, sender);
-    }
-
-    fn has_more(&self) -> bool {
-        (self.all_items.len() as u32) < self.total
-    }
-
-    /// The query as it stands, for the app to run against the cache.
-    fn request_page(&mut self, offset: u32, sender: &ComponentSender<Self>) {
-        self.loading_more = true;
-        let folders: Vec<(u32, String)> = self
-            .accounts
-            .iter()
-            .flat_map(|a| {
-                a.folders
-                    .iter()
-                    .filter(|f| self.folder_included(a.id, &f.path))
-                    .map(|f| (a.id, f.path.clone()))
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-        let _ = sender.output(GalleryOutput::Load(GalleryRequest {
-            folders,
-            account_id: self.account_filter,
-            tokens: self
-                .query
-                .split_whitespace()
-                .map(|t| t.to_lowercase())
-                .collect(),
-            bucket: self.type_filter,
-            sort: self.sort,
-            offset,
-            limit: PAGE_SIZE,
-        }));
-    }
-
-    /// The `GalleryItem` at display position `display`. The database returns
-    /// rows already filtered and in order, so position is a direct index.
-    fn item_at(&self, display: usize) -> Option<&GalleryItem> {
-        self.all_items.get(display)
-    }
-
-    fn current(&self) -> Option<&GalleryItem> {
-        self.preview.and_then(|i| self.item_at(i))
-    }
-
-    fn step(&mut self, delta: i32, sender: &ComponentSender<Self>) {
-        if self.all_items.is_empty() {
-            return;
-        }
-        if let Some(i) = self.preview {
-            let n = self.all_items.len() as i32;
-            self.preview = Some((((i as i32 + delta) % n + n) % n) as usize);
-            self.refresh_preview(sender);
-        }
-    }
-
-    /// Work out what the lightbox shows for the current item: an image decodes
-    /// on the spot; a PDF's first page comes from the full-size render cache,
-    /// or a worker renders it now and [`GalleryInput::PreviewRendered`] circles
-    /// back here. Anything else has no texture — the file-icon page shows.
-    fn refresh_preview(&mut self, sender: &ComponentSender<Self>) {
-        self.preview_texture = None;
-        let Some(item) = self.current() else { return };
-        let Some(data) = item.data.as_ref() else {
-            // Never downloaded (or too big to have ridden along with the page):
-            // ask for it, and the spinner shows until `Fetched` circles back.
-            if !self.fetching {
-                self.fetch_item(item, sender);
-            }
-            return;
-        };
-        if item.is_image() {
-            self.preview_texture = texture_from(data);
-            return;
-        }
-        if !is_pdf_name(&item.name) {
-            return;
-        }
-        let key = thumb_cache_key(data);
-        match PDF_PREVIEWS.with(|c| c.borrow().get(&key).cloned()) {
-            Some(texture) => self.preview_texture = texture,
-            None => {
-                let s = sender.clone();
-                lightbox_pdf_texture(data, move |_| {
-                    s.input(GalleryInput::PreviewRendered(key));
-                });
-            }
-        }
-    }
-
-    /// Repopulate whichever view is showing. The other keeps stale children;
-    /// switching to it rebuilds it, so only one view's widgets are ever built
-    /// for a given change.
-    fn rebuild_view(&mut self, sender: &ComponentSender<Self>) {
-        if self.view_table {
-            self.rebuild_table(sender);
-        } else {
-            self.rebuild_grid(sender);
-        }
-    }
-
-    fn rebuild_grid(&mut self, sender: &ComponentSender<Self>) {
-        // Remove existing cells; only FlowBoxChild children (not, say, a popover
-        // that happens to be parented nearby).
-        let mut child = self.flow.first_child();
-        while let Some(c) = child {
-            let next = c.next_sibling();
-            if c.downcast_ref::<gtk::FlowBoxChild>().is_some() {
-                self.flow.remove(&c);
-            }
-            child = next;
-        }
-        for display in 0..self.all_items.len() {
-            if let Some(item) = self.item_at(display) {
-                let deleting = self.deleting.contains(&key_of(item));
-                self.flow.append(&build_cell(
-                    display,
-                    item,
-                    self.thumb_width,
-                    deleting,
-                    sender,
-                ));
-            }
-        }
-    }
-
-    fn rebuild_table(&mut self, sender: &ComponentSender<Self>) {
-        while let Some(row) = self.table.first_child() {
-            self.table.remove(&row);
-        }
-        for display in 0..self.all_items.len() {
-            if let Some(item) = self.item_at(display) {
-                let deleting = self.deleting.contains(&key_of(item));
-                self.table
-                    .append(&build_row(display, item, deleting, sender));
-            }
-        }
-    }
-
-    /// Open item `index` in its default application. A file whose bytes were
-    /// never downloaded — most of an archive — is fetched first, and opens when
-    /// [`GalleryInput::Fetched`] brings it back.
-    fn open_item(&self, index: usize, sender: &ComponentSender<Self>) {
-        let Some(item) = self.item_at(index) else {
-            return;
-        };
-        match &item.data {
-            Some(data) => {
-                let parent = self.flow.root().and_downcast::<gtk::Window>();
-                open_bytes(&item.name, data, parent.as_ref());
-            }
-            None => self.fetch_item(item, sender),
-        }
-    }
-
-    /// Ask the app to download the message this item belongs to.
-    fn fetch_item(&self, item: &GalleryItem, sender: &ComponentSender<Self>) {
-        let _ = sender.output(GalleryOutput::Fetch {
-            account_id: item.account_id,
-            folder_path: item.folder_path.clone(),
-            uid: item.uid,
-        });
-    }
-
-    /// Save item `index` to a file the user chooses.
-    fn download_item(&self, index: usize, sender: &ComponentSender<Self>) {
-        let Some(item) = self.item_at(index) else {
-            return;
-        };
-        let Some(data) = item.data.clone() else {
-            // Not in hand yet: fetch it, and the user can save it once the
-            // thumbnail fills in.
-            self.fetch_item(item, sender);
-            return;
-        };
-        let dialog = gtk::FileDialog::builder()
-            .title(&i18n("Save Attachment"))
-            .initial_name(&item.name)
-            .modal(true)
-            .build();
-        let parent = self.flow.root().and_downcast::<gtk::Window>();
-        dialog.save(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-            if let Ok(file) = res {
-                if let Some(path) = file.path() {
-                    if let Err(e) = std::fs::write(&path, &data) {
-                        tracing::warn!("could not save attachment: {e}");
-                    }
-                }
-            }
-        });
-    }
-
-    fn goto_item(&mut self, index: usize, sender: &ComponentSender<Self>) {
-        if let Some(item) = self.item_at(index) {
-            let _ = sender.output(GalleryOutput::OpenMessage {
-                account_id: item.account_id,
-                folder_path: item.folder_path.clone(),
-                uid: item.uid,
-            });
-            self.preview = None;
-        }
-    }
-
-    /// Pop up the right-click menu (Download / Open / Go to Message) at the click
-    /// point `(x, y)` (relative to cell `index`). Download/Open are only enabled
-    /// when the file's bytes are cached.
-    fn show_context_menu(&self, index: usize, x: f64, y: f64, sender: &ComponentSender<Self>) {
-        if self.item_at(index).is_none() {
-            return;
-        }
-
-        // Both act on a file that was never downloaded too: they fetch it
-        // first. Greying them out would be wrong now that most of an archive's
-        // attachments are known but not held.
-        let s = sender.clone();
-        let open = MenuEntry::new(i18n("Open"), move || s.input(GalleryInput::OpenItem(index)))
-            .icon("document-open-symbolic");
-        let s = sender.clone();
-        let download = MenuEntry::new(i18n("Download…"), move || {
-            s.input(GalleryInput::DownloadItem(index))
-        })
-        .icon("folder-download-symbolic");
-        let s = sender.clone();
-        let goto = MenuEntry::new(i18n("Go to Message"), move || {
-            s.input(GalleryInput::GoToItem(index))
-        })
-        .icon("mail-unread-symbolic");
-        let s = sender.clone();
-        let delete = MenuEntry::new(i18n("Delete from Server…"), move || {
-            s.input(GalleryInput::DeleteItem(index))
-        })
-        .icon("user-trash-symbolic");
-        let sections = vec![vec![open, download, goto], vec![delete]];
-
-        // Anchor on the clicked cell/row itself so the click point (already
-        // relative to it) needs no coordinate translation.
-        let source: Option<gtk::Widget> = if self.view_table {
-            self.table.row_at_index(index as i32).map(|r| r.upcast())
-        } else {
-            self.flow.child_at_index(index as i32).map(|c| c.upcast())
-        };
-        show_context_menu(source.as_ref().unwrap_or(&self.root), x, y, sections);
     }
 }
 
