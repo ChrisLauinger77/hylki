@@ -129,7 +129,7 @@ pub fn tray_image(id: &str) -> std::borrow::Cow<'static, [u8]> {
         Some(std::path::PathBuf::from(&icon))
     } else {
         // In the desktop's icon folders: Hylki's own search leaves them out.
-        crate::app::desktop_icon_theme()
+        crate::icon_theme::desktop_icon_theme()
             .lookup_icon(
                 &icon,
                 &[],
@@ -241,7 +241,7 @@ fn hicolor_dir() -> Option<PathBuf> {
 }
 
 /// An icon folder only Hylki writes to, which its own icon lookups search in
-/// place of the shared ones (`apply_icon_theme` in app.rs): the chosen app
+/// place of the shared ones (`icon_theme::apply_icon_theme`): the chosen app
 /// icon is copied here so the window finds it by name.
 pub fn private_icons_root() -> Option<PathBuf> {
     Some(dirs::data_dir()?.join("hylki/icons"))

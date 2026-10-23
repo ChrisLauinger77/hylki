@@ -21,6 +21,7 @@ mod goa;
 mod graph_directory;
 mod graph_labels;
 mod i18n;
+mod icon_theme;
 mod invite;
 mod launcher_badge;
 mod legacy;
