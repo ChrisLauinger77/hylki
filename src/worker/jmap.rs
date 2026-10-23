@@ -20,6 +20,13 @@
 //! standard but has not been tried by hand.
 
 use super::*;
+use crate::worker::chores::{
+    auto_empty_due, auto_empty_roles, clean_lists_due, graph_before_date, role_folder_path,
+};
+use crate::worker::folders::chip_count_of;
+use crate::worker::headers::label_from_timestamp;
+use crate::worker::ids::{hash_uid, normalize_msgid};
+use crate::worker::reconcile::{listing_gone, window_gone};
 
 /// The newest summaries a folder load lists, for a quick first paint; the
 /// background index fetches the rest of the folder (#429).

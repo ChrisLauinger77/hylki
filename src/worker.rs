@@ -31,15 +31,32 @@ use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::models::{Account, Folder, FolderKind, KeywordFinding, MailboxQuota, Message};
 
 mod api;
+mod chores;
+mod folders;
 mod graph;
+mod headers;
+mod ids;
 mod imap_io;
 mod jmap;
 mod lane;
 mod preempt;
+mod reconcile;
 mod strip;
 
 pub use api::{CalendarPart, MailRequest, OutgoingMessage, WorkerEvent};
+use chores::{
+    auto_empty_due, auto_empty_roles, clean_lists_due, clean_lists_query, imap_before_date,
+    role_folder_path,
+};
+pub use folders::chip_counts_all;
+pub(crate) use folders::folder_order;
+use folders::{classify_with_source, display_name};
 use graph::*;
+use headers::{
+    bytes_to_string, format_date, format_timestamp, label_from_timestamp, unescape_quoted,
+};
+pub(crate) use headers::{clean_display_name, decode_header, unescape_quoted_str};
+use ids::{first_msgid, hash_uid, merge_msgids, normalize_msgid, normalize_msgids};
 use imap_io::ImapIo;
 use lane::{cache_lane, related_from_cache, serve_cached_body, thread_summaries_with_members};
 use preempt::{interrupt_read_for_reader, reorder_reader_loads};
@@ -321,9 +338,6 @@ pub fn readable_error(text: &str) -> String {
 /// tree over and over. Explicit [`MailRequest::RefreshUnread`]s are never
 /// throttled — a refresh the user asked for always runs.
 const UNREAD_SWEEP_MIN: Duration = Duration::from_secs(60);
-/// How often an account's Junk / Trash auto-empty (#140) may run: it rides
-/// the unread sweep, but a server needs asking only a few times a day.
-const AUTO_EMPTY_MIN: Duration = Duration::from_secs(6 * 60 * 60);
 
 /// How many leased per-folder IDLE watcher connections one account may hold at
 /// once (see [`watch_folder`]). The Inbox's permanent watcher and the main
@@ -4229,17 +4243,6 @@ pub(crate) fn answered_copies(
         .collect()
 }
 
-/// The first Message-ID of a header's worth, as the cache keys it.
-fn first_msgid(ids: &str) -> Option<String> {
-    let id = ids
-        .split_whitespace()
-        .next()?
-        .trim_start_matches('<')
-        .trim_end_matches('>')
-        .to_ascii_lowercase();
-    (!id.is_empty()).then_some(id)
-}
-
 /// Mark what a sent message answered (#454): `\Answered` on the original
 /// of a reply, `$Forwarded` on that of a forward. A mailbox that takes no
 /// keywords has nowhere to keep `$Forwarded`, and the arrow then lasts until
@@ -7542,63 +7545,6 @@ async fn list_folder_metadata(
     Ok(folders)
 }
 
-/// Re-list folders (e.g. after auto-creating one) and push them to the UI.
-/// Auto-empty (#140): the roles the account wants emptied, with their ages.
-fn auto_empty_roles(account: &AccountConfig) -> Vec<(FolderKind, &'static str, u32)> {
-    [
-        (FolderKind::Junk, "junk", account.empty_junk_days),
-        (FolderKind::Trash, "trash", account.empty_trash_days),
-    ]
-    .into_iter()
-    .filter(|(_, _, days)| *days > 0)
-    .collect()
-}
-
-/// The folder holding a role for this account: the manual assignment (#82)
-/// when there is one, else the folder the listing detected.
-fn role_folder_path(
-    account: &AccountConfig,
-    folders: &[Folder],
-    kind: FolderKind,
-    role: &str,
-) -> Option<String> {
-    if let Some(p) = account.folder_roles.get(role) {
-        if !p.is_empty() {
-            return Some(p.clone());
-        }
-    }
-    folders
-        .iter()
-        .find(|f| f.kind == kind)
-        .map(|f| f.path.clone())
-}
-
-/// Whether the auto-empty is due: something is configured, and the last run
-/// on this connection is older than [`AUTO_EMPTY_MIN`] (or never happened).
-fn auto_empty_due(account: &AccountConfig, last: &mut Option<std::time::Instant>) -> bool {
-    if auto_empty_roles(account).is_empty() {
-        return false;
-    }
-    if last.is_some_and(|t| t.elapsed() < AUTO_EMPTY_MIN) {
-        return false;
-    }
-    *last = Some(std::time::Instant::now());
-    true
-}
-
-/// The cut-off, `days` ago, in the form IMAP SEARCH wants ("1-Aug-2026").
-/// SEARCH BEFORE compares internal dates by day, in the server's clock.
-fn imap_before_date(days: u32) -> String {
-    let cutoff = chrono::Utc::now() - chrono::Duration::days(i64::from(days));
-    cutoff.format("%-d-%b-%Y").to_string()
-}
-
-/// The same cut-off as an RFC 3339 instant for Graph's `$filter`.
-fn graph_before_date(days: u32) -> String {
-    let cutoff = chrono::Utc::now() - chrono::Duration::days(i64::from(days));
-    cutoff.format("%Y-%m-%dT%H:%M:%SZ").to_string()
-}
-
 /// Auto-empty (#140) for an IMAP account: delete for good whatever in the
 /// Junk / Trash folder is older than the account's chosen age. Rides the
 /// unread sweep, at most every [`AUTO_EMPTY_MIN`]. Age is the message's
@@ -7663,26 +7609,6 @@ async fn auto_empty_imap(
     if purged_any {
         refresh_folders(account_id, account, session, cache, emit).await;
     }
-}
-
-/// Whether moving old list mail (#407) is due, on the same terms as
-/// [`auto_empty_due`]: set for the account, and not run in the last
-/// [`AUTO_EMPTY_MIN`] on this connection.
-fn clean_lists_due(account: &AccountConfig, last: &mut Option<std::time::Instant>) -> bool {
-    if account.clean_lists_days == 0 || last.is_some_and(|t| t.elapsed() < AUTO_EMPTY_MIN) {
-        return false;
-    }
-    *last = Some(std::time::Instant::now());
-    true
-}
-
-/// The candidates for the list clean-up (#407), as an IMAP search: older
-/// than the cut-off and not starred. Which of them are list mail is read
-/// from their headers: a `HEADER List-Unsubscribe ""` search would be one
-/// round trip, but not every server answers it (Stalwart searches only the
-/// headers it indexes, and finds nothing).
-fn clean_lists_query(days: u32) -> String {
-    format!("UNFLAGGED BEFORE {}", imap_before_date(days))
 }
 
 /// Which of `uids` (in the selected folder) carry a List-Unsubscribe
@@ -7817,6 +7743,7 @@ async fn refresh_folder_names(
     }
 }
 
+/// Re-list folders (e.g. after auto-creating one) and push them to the UI.
 async fn refresh_folders(
     account_id: u32,
     account: &AccountConfig,
@@ -8010,22 +7937,6 @@ async fn refresh_unread_counts(
         );
     }
     (changed, true)
-}
-
-/// Whether a folder's sidebar chip counts every message rather than unread
-/// ones. Drafts: a draft is never unread, and the chip is there to say how
-/// many are waiting to be finished.
-pub fn chip_counts_all(kind: FolderKind) -> bool {
-    kind == FolderKind::Drafts
-}
-
-/// The chip number for a folder whose messages are all in hand.
-fn chip_count_of(kind: FolderKind, messages: &[Message]) -> u32 {
-    if chip_counts_all(kind) {
-        messages.len() as u32
-    } else {
-        messages.iter().filter(|m| m.unread).count() as u32
-    }
 }
 
 /// The chip number for the currently-selected mailbox: unseen, or every
@@ -9610,48 +9521,6 @@ async fn backfill_worklist(
     Ok(remaining)
 }
 
-/// The cached rows a listing of a folder's newest mail shows to be gone
-/// (#429), for the Graph and JMAP paths, whose listings no longer replace
-/// the cached folder. A `complete` listing is the whole folder; otherwise it
-/// speaks only for mail newer than the oldest it holds, the rest being the
-/// background index's to reconcile.
-fn window_gone(
-    cached: &std::collections::HashMap<u32, i64>,
-    listed: &[Message],
-    complete: bool,
-) -> Vec<u32> {
-    let seen: std::collections::HashSet<u32> = listed.iter().map(|m| m.uid).collect();
-    let oldest = listed.iter().map(|m| m.timestamp).min();
-    let mut gone: Vec<u32> = cached
-        .iter()
-        .filter(|(uid, ts)| {
-            !seen.contains(uid) && (complete || oldest.is_some_and(|oldest| **ts > oldest))
-        })
-        .map(|(uid, _)| *uid)
-        .collect();
-    gone.sort_unstable();
-    gone
-}
-
-/// The cached rows a complete id listing of a folder shows to be gone
-/// (#429). A row that arrived since the listing began (`since`, less a
-/// margin for the server's clock) is spared: the listing could not know
-/// it, and the next look at the folder's newest mail settles it.
-fn listing_gone(
-    cached: &std::collections::HashMap<u32, i64>,
-    server: &std::collections::HashSet<u32>,
-    since: i64,
-) -> Vec<u32> {
-    let cutoff = since - 600;
-    let mut gone: Vec<u32> = cached
-        .iter()
-        .filter(|(uid, ts)| !server.contains(uid) && **ts < cutoff)
-        .map(|(uid, _)| *uid)
-        .collect();
-    gone.sort_unstable();
-    gone
-}
-
 /// Fetch message summaries for a specific set of UIDs (used by the backfill).
 async fn fetch_summaries_by_uid(
     account_id: u32,
@@ -10004,34 +9873,6 @@ fn custom_flags(flags: &[Flag]) -> Vec<String> {
         .collect()
 }
 
-/// Normalize a single Message-ID: strip angle brackets/whitespace, lowercase.
-/// The spelling it arrived in is noted for the wire
-/// ([`crate::cache::note_msgid_case`]).
-fn normalize_msgid(raw: &[u8]) -> String {
-    let s = String::from_utf8_lossy(raw);
-    let exact = s
-        .trim()
-        .trim_start_matches('<')
-        .trim_end_matches('>')
-        .trim();
-    crate::cache::note_msgid_case(exact);
-    exact.to_ascii_lowercase()
-}
-
-/// Normalize a whitespace-separated list of Message-IDs into a canonical string.
-fn normalize_msgids(raw: &[u8]) -> String {
-    let s = String::from_utf8_lossy(raw);
-    s.split_whitespace()
-        .map(|tok| {
-            let exact = tok.trim_start_matches('<').trim_end_matches('>').trim();
-            crate::cache::note_msgid_case(exact);
-            exact.to_ascii_lowercase()
-        })
-        .filter(|t| !t.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
 /// The headers of a `HEADER.FIELDS` block, unfolded, as (name, value).
 ///
 /// What comes back is a small header block (the requested headers that the
@@ -10107,19 +9948,6 @@ fn message_id_of(fetch: &Fetch) -> String {
         return String::new();
     }
     normalize_msgid(value.as_bytes())
-}
-
-/// Combine two normalized Message-ID lists, keeping the first list's order and
-/// dropping duplicates. References already contains In-Reply-To on a well-formed
-/// message; on a malformed one either may hold the only usable link.
-fn merge_msgids(a: &str, b: &str) -> String {
-    let mut out: Vec<&str> = Vec::new();
-    for id in a.split_whitespace().chain(b.split_whitespace()) {
-        if !out.contains(&id) {
-            out.push(id);
-        }
-    }
-    out.join(" ")
 }
 
 /// Whether an IMAP BODYSTRUCTURE contains a part marked as an attachment.
@@ -10479,30 +10307,6 @@ fn strip_crlf(line: &[u8]) -> &[u8] {
         end -= 1;
     }
     &line[..end]
-}
-
-/// Stable u32 id derived from a server's string id (POP3 UIDL, JMAP and Graph
-/// message ids), since the rest of the app keys messages by u32. The ids are
-/// kept in the cache, so the hash must never change: it is pinned to SipHash-1-3
-/// with zero keys, which is what std's `DefaultHasher` gave when they were
-/// first stored, rather than left to `DefaultHasher`, which may change.
-fn hash_uid(uid: &str) -> u32 {
-    use std::hash::{Hash, Hasher};
-    let mut h = siphasher::sip::SipHasher13::new();
-    uid.hash(&mut h);
-    (h.finish() & 0x7fff_ffff) as u32
-}
-
-/// Format a unix timestamp the same way [`format_date`] labels mail dates.
-fn label_from_timestamp(ts: i64) -> String {
-    let now = crate::datefmt::now();
-    if crate::datefmt::day_key(ts) == crate::datefmt::day_key(now) {
-        crate::datefmt::time(ts)
-    } else if crate::datefmt::year(ts) == crate::datefmt::year(now) {
-        crate::datefmt::day_month(ts)
-    } else {
-        crate::datefmt::day_month_year(ts)
-    }
 }
 
 /// Build a message summary from a full RFC 822 message (POP3 has no ENVELOPE).
@@ -11521,93 +11325,6 @@ async fn run_mock(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Classify a folder, also reporting whether the kind came from an RFC 6154
-/// SPECIAL-USE attribute (`true`) rather than name matching (`false`). This lets
-/// `list_folders` prefer the real special-use folder when a server also exposes a
-/// stray folder that merely *looks* like it fills the same role — e.g. Gmail's
-/// real `[Gmail]/Trash` (\Trash) next to a plain top-level `Trash` label.
-fn classify_with_source(
-    path: &str,
-    delimiter: Option<&str>,
-    attrs: &[NameAttribute],
-) -> (FolderKind, bool) {
-    // Prefer RFC 6154 SPECIAL-USE attributes; fall back to name matching.
-    for a in attrs {
-        match a {
-            NameAttribute::Sent => return (FolderKind::Sent, true),
-            NameAttribute::Drafts => return (FolderKind::Drafts, true),
-            NameAttribute::Trash => return (FolderKind::Trash, true),
-            NameAttribute::Junk => return (FolderKind::Junk, true),
-            NameAttribute::Archive => return (FolderKind::Archive, true),
-            NameAttribute::Flagged => return (FolderKind::Starred, true),
-            _ => {}
-        }
-    }
-
-    // INBOX is the one name RFC 3501 fixes, and only as the whole path: an
-    // `Archiv/2020/Inbox` is an ordinary folder (#344).
-    if path.eq_ignore_ascii_case("INBOX") {
-        return (FolderKind::Inbox, false);
-    }
-    // The other roles go by name only where a server keeps them: at the top,
-    // or one level down under INBOX (Dovecot, Courier) or a bracketed
-    // container ([Gmail]). A `Sent` deeper in an archive is the user's own.
-    let parts: Vec<&str> = match delimiter {
-        Some(d) if !d.is_empty() => path.split(d).collect(),
-        _ => path.split(['/', '.']).collect(),
-    };
-    let placed = match parts.as_slice() {
-        [_] => true,
-        [parent, _] => parent.eq_ignore_ascii_case("INBOX") || parent.starts_with('['),
-        _ => false,
-    };
-    if !placed {
-        return (FolderKind::Custom, false);
-    }
-    let leaf = parts.last().copied().unwrap_or(path).to_lowercase();
-    let kind = match leaf.as_str() {
-        "sent" | "sent items" | "sent mail" => FolderKind::Sent,
-        "drafts" => FolderKind::Drafts,
-        name if crate::models::is_templates_name(name) => FolderKind::Templates,
-        "trash" | "deleted" | "deleted items" | "bin" => FolderKind::Trash,
-        "junk" | "spam" => FolderKind::Junk,
-        "archive" | "all mail" => FolderKind::Archive,
-        "starred" | "flagged" => FolderKind::Starred,
-        _ => FolderKind::Custom,
-    };
-    (kind, false)
-}
-
-pub(crate) fn folder_order(kind: FolderKind) -> u8 {
-    match kind {
-        FolderKind::Inbox => 0,
-        FolderKind::Starred => 1,
-        FolderKind::Drafts => 2,
-        FolderKind::Templates => 3,
-        FolderKind::Sent => 4,
-        FolderKind::Archive => 5,
-        FolderKind::Junk => 6,
-        FolderKind::Trash => 7,
-        FolderKind::Custom => 8,
-    }
-}
-
-/// Show only the leaf segment of a hierarchical mailbox path, with INBOX
-/// special-cased.
-fn display_name(path: &str, delimiter: Option<&str>) -> String {
-    if path.eq_ignore_ascii_case("inbox") {
-        return i18n("Inbox");
-    }
-    let leaf = match delimiter {
-        Some(d) if !d.is_empty() => path.rsplit(d).next().unwrap_or(path),
-        _ => path.rsplit(['/', '.']).next().unwrap_or(path),
-    };
-    // Split first, decode second: the delimiter is ASCII and modified UTF-7
-    // never produces one inside an escaped run (that is why `,` stands in for
-    // `/`), so the leaf is always a whole name (issue #1).
-    crate::mutf7::decode(leaf)
-}
-
 /// Join an envelope address list into "a@x.com, b@y.com" (emails only).
 fn address_list(addrs: Option<&Vec<async_imap::imap_proto::types::Address>>) -> String {
     addrs
@@ -11646,136 +11363,6 @@ fn address_parts(addr: &async_imap::imap_proto::types::Address) -> (String, Stri
     (name, email)
 }
 
-/// Undo an IMAP quoted string's backslash escapes. imap-proto hands ENVELOPE
-/// strings back as they were on the wire, so a server that keeps the header's
-/// own quotes sends `"\"Sender Name\""` and the backslashes would reach the
-/// list (#312).
-fn unescape_quoted(raw: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(raw.len());
-    let mut bytes = raw.iter().copied().peekable();
-    while let Some(b) = bytes.next() {
-        // Only the two escapes a quoted string has: a backslash before
-        // anything else came in a literal and is the name's own.
-        match bytes.peek() {
-            Some(&next @ (b'\\' | b'"')) if b == b'\\' => {
-                out.push(next);
-                bytes.next();
-            }
-            _ => out.push(b),
-        }
-    }
-    out
-}
-
-/// [`unescape_quoted`] for a string already stored.
-pub(crate) fn unescape_quoted_str(s: &str) -> String {
-    if s.contains('\\') {
-        String::from_utf8_lossy(&unescape_quoted(s.as_bytes())).into_owned()
-    } else {
-        s.to_string()
-    }
-}
-
-/// A display name without the quotes its header wrapped it in. RFC 3501 has
-/// the server give the phrase alone, but some pass `"Sender Name"` through
-/// whole (#312). Called on stored names too, which may still carry the
-/// escapes an earlier build kept.
-pub(crate) fn clean_display_name(name: &str) -> String {
-    let name = unescape_quoted_str(name);
-    let trimmed = name.trim();
-    trimmed
-        .strip_prefix('"')
-        .and_then(|n| n.strip_suffix('"'))
-        .map(str::trim)
-        .unwrap_or(trimmed)
-        .to_string()
-}
-
-fn bytes_to_string(b: &[u8]) -> String {
-    String::from_utf8_lossy(b).into_owned()
-}
-
-/// Decode a header value that may be RFC 2047 encoded ("=?UTF-8?…?=").
-///
-/// Some senders (notably Mailchimp) emit a single encoded-word far longer than
-/// RFC 2047's 75-character limit — e.g. The Marginalian's newsletter subjects.
-/// The decoder aborts on over-long words by default, which would leave the raw
-/// `=?utf-8?Q?…?=` gibberish in the UI; we ask it to decode them anyway, as
-/// Apple Mail and Thunderbird do.
-pub(crate) fn decode_header(raw: &[u8]) -> String {
-    use rfc2047_decoder::{Decoder, RecoverStrategy};
-    let decode = |bytes: &[u8]| -> Option<String> {
-        Decoder::new()
-            .too_long_encoded_word_strategy(RecoverStrategy::Decode)
-            .decode(bytes)
-            .ok()
-    };
-    let first = decode(raw).unwrap_or_else(|| String::from_utf8_lossy(raw).into_owned());
-    if !first.contains("=?") {
-        return first;
-    }
-    // Still carrying raw encoded words — some senders put literal spaces
-    // inside them ("…_DPD ?="), which the decoder refuses. Repair and retry.
-    repair_spaces_in_encoded_words(&first)
-        .and_then(|fixed| decode(fixed.as_bytes()))
-        .filter(|s| !s.contains("=?"))
-        .unwrap_or(first)
-}
-
-/// Map illegal raw spaces inside RFC 2047 encoded words to their legal
-/// spelling (`_` for Q encoding, dropped for B), so the word decodes instead
-/// of showing as `=?UTF-8?Q?…?=` gibberish. `None` when nothing needed it.
-fn repair_spaces_in_encoded_words(s: &str) -> Option<String> {
-    let mut out = String::with_capacity(s.len());
-    let mut rest = s;
-    let mut repaired = false;
-    while let Some(start) = rest.find("=?") {
-        let (head, tail) = rest.split_at(start);
-        out.push_str(head);
-        let Some(end) = tail.find("?=") else {
-            out.push_str(tail);
-            rest = "";
-            break;
-        };
-        let word = &tail[..end + 2];
-        let parts: Vec<&str> = word.split('?').collect();
-        // "=?charset?enc?text?=" splits to ["=", cs, enc, text…, "="].
-        if parts.len() >= 5 && word.contains(' ') {
-            let charset = parts[1];
-            let enc = parts[2];
-            let text = word[..word.len() - 2].splitn(4, '?').nth(3).unwrap_or("");
-            let fixed = if enc.eq_ignore_ascii_case("q") {
-                text.replace(' ', "_")
-            } else {
-                text.replace(' ', "")
-            };
-            if fixed != text {
-                repaired = true;
-            }
-            out.push_str("=?");
-            out.push_str(charset);
-            out.push('?');
-            out.push_str(enc);
-            out.push('?');
-            out.push_str(&fixed);
-            out.push_str("?=");
-        } else {
-            out.push_str(word);
-        }
-        rest = &tail[end + 2..];
-    }
-    out.push_str(rest);
-    repaired.then_some(out)
-}
-
-/// Compact date label from a unix timestamp (same style as [`format_date`]).
-fn format_timestamp(ts: i64) -> String {
-    if ts <= 0 {
-        return String::new();
-    }
-    label_from_timestamp(ts)
-}
-
 /// Fall back to the server's `INTERNALDATE` (the delivery date) when a message
 /// carries no parseable `Date:` header. Some senders omit `Date:` entirely,
 /// which would otherwise leave the row with a blank date label and a zero sort
@@ -11789,16 +11376,6 @@ fn internal_date_summary(fetch: &Fetch) -> (String, i64) {
         }
         None => (String::new(), 0),
     }
-}
-
-/// Parse an RFC 2822 date into a compact label and a sortable unix timestamp.
-fn format_date(raw: &[u8]) -> (String, i64) {
-    let s = String::from_utf8_lossy(raw);
-    let s = s.trim();
-    let Ok(dt) = chrono::DateTime::parse_from_rfc2822(s) else {
-        return (s.to_string(), 0);
-    };
-    (label_from_timestamp(dt.timestamp()), dt.timestamp())
 }
 
 /// Extract a renderable HTML body from a raw RFC 822 message. A lone HTML part is
@@ -12354,6 +11931,8 @@ pub(super) fn sample_account() -> AccountConfig {
 mod tests {
 
     use super::*;
+    use crate::worker::chores::graph_before_date;
+    use crate::worker::chores::AUTO_EMPTY_MIN;
 
     #[test]
     fn only_the_top_level_inbox_is_the_inbox() {
