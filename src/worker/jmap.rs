@@ -20,6 +20,7 @@
 //! standard but has not been tried by hand.
 
 use super::*;
+use crate::worker::auth::sign_in_password_blocking;
 use crate::worker::chores::{
     auto_empty_due, auto_empty_roles, clean_lists_due, graph_before_date, role_folder_path,
 };
@@ -407,7 +408,7 @@ pub(super) fn jmap_connect(account: &AccountConfig) -> Result<JmapSession, Strin
     let filled;
     let account = if account.password.is_empty() {
         filled = AccountConfig {
-            password: super::sign_in_password_blocking(account, false)?,
+            password: sign_in_password_blocking(account, false)?,
             ..account.clone()
         };
         &filled

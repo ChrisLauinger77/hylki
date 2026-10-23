@@ -4,7 +4,7 @@
 use lettre::message::Mailbox;
 use lettre::Address;
 
-use crate::worker::SmtpError;
+use crate::worker::smtp::SmtpError;
 
 /// Parse a recipient field ("Name <a@b>, c@d") into (name, email) pairs.
 ///

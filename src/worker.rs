@@ -16,8 +16,7 @@ use async_imap::types::{Fetch, Flag, NameAttribute};
 use async_imap::Session;
 use async_native_tls::TlsStream;
 use futures::TryStreamExt;
-use lettre::transport::smtp::authentication::Credentials;
-use lettre::{Address, AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
+use lettre::Address;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
@@ -28,8 +27,10 @@ use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::models::{Account, Folder, FolderKind, KeywordFinding, MailboxQuota, Message};
 
 mod api;
+mod auth;
 mod chores;
 mod compose;
+mod conn_test;
 mod folders;
 mod graph;
 mod headers;
@@ -39,9 +40,13 @@ mod jmap;
 mod lane;
 mod preempt;
 mod reconcile;
+mod smtp;
 mod strip;
+mod tls;
 
 pub use api::{CalendarPart, MailRequest, OutgoingMessage, WorkerEvent};
+use auth::{fetch_oauth_token, oauth_user, sign_in_password};
+pub(crate) use auth::{forget_access_token, oauth_token_blocking};
 use chores::{
     auto_empty_due, auto_empty_roles, clean_lists_due, clean_lists_query, imap_before_date,
     role_folder_path,
@@ -49,10 +54,11 @@ use chores::{
 pub(crate) use compose::build::sent_body_preview;
 use compose::build::{build_draft, build_email, draft_message_id, restore_msgid_case};
 pub use compose::editable::editable_from_raw;
-use compose::editable::{queued_with_bcc, with_bcc};
+use compose::editable::queued_with_bcc;
 pub use compose::recipients::{
     clean_recipient_field, format_recipient, invalid_recipient, parse_recipients,
 };
+pub use conn_test::{test_alias_smtp_blocking, test_connection_blocking, ConnTest};
 pub use folders::chip_counts_all;
 pub(crate) use folders::folder_order;
 use folders::{classify_with_source, display_name};
@@ -65,6 +71,9 @@ use ids::{first_msgid, hash_uid, merge_msgids, normalize_msgid, normalize_msgids
 use imap_io::ImapIo;
 use lane::{cache_lane, related_from_cache, serve_cached_body, thread_summaries_with_members};
 use preempt::{interrupt_read_for_reader, reorder_reader_loads};
+use smtp::{send_raw_smtp, send_smtp, smtp_refused};
+pub use tls::is_hostname_mismatch;
+use tls::{is_loopback_host, tls_connector};
 
 /// Number of most-recent messages to fetch attachment info (BODYSTRUCTURE) for;
 /// older messages get an envelope-only index row and resolve attachments on open.
@@ -3967,8 +3976,6 @@ fn guess_mime(name: &str) -> String {
         .unwrap_or_else(|| "application/octet-stream".to_string())
 }
 
-type SmtpError = Box<dyn std::error::Error + Send + Sync>;
-
 // ---------------------------------------------------------------------------
 // Outbox
 // ---------------------------------------------------------------------------
@@ -4563,366 +4570,6 @@ fn outbox_envelope(item: &crate::models::OutboxItem) -> Option<lettre::address::
         return None;
     }
     lettre::address::Envelope::new(from, to).ok()
-}
-
-/// How one SMTP endpoint is secured: TLS from the first byte or a STARTTLS
-/// upgrade, and how far its certificate is checked.
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct SmtpTls {
-    implicit: bool,
-    accept_hostname_mismatch: bool,
-    accept_invalid_certs: bool,
-}
-
-impl SmtpTls {
-    /// By the port alone: 465 is implicit TLS, everything else (587, etc.)
-    /// STARTTLS.
-    fn by_port(port: u16, accept_hostname_mismatch: bool) -> Self {
-        SmtpTls {
-            implicit: port == 465,
-            accept_hostname_mismatch,
-            accept_invalid_certs: false,
-        }
-    }
-
-    /// The account's own server: as GNOME Online Accounts records it where
-    /// it does (#254), else by the port.
-    fn for_account(account: &AccountConfig) -> Self {
-        let by_port = SmtpTls::by_port(account.smtp_port, account.tls_accept_hostname_mismatch);
-        match &account.security {
-            Some(sec) => SmtpTls {
-                implicit: !sec.smtp_starttls,
-                accept_invalid_certs: sec.smtp_accept_invalid_certs,
-                ..by_port
-            },
-            None => by_port,
-        }
-    }
-}
-
-/// TLS settings for an SMTP connection, matching [`tls_connector`]: a local
-/// bridge's self-signed certificate is accepted, and one the user accepted
-/// in GNOME Settings (#254), a certificate in another name where the
-/// account asks for it (#246), every other host is verified.
-fn smtp_tls_parameters(
-    host: &str,
-    tls: SmtpTls,
-) -> Result<lettre::transport::smtp::client::TlsParameters, lettre::transport::smtp::Error> {
-    use lettre::transport::smtp::client::TlsParameters;
-    let accept_hostname_mismatch = tls.accept_hostname_mismatch;
-    if is_loopback_host(host) || tls.accept_invalid_certs {
-        TlsParameters::builder(host.to_string())
-            .dangerous_accept_invalid_certs(true)
-            .dangerous_accept_invalid_hostnames(true)
-            .build()
-    } else if accept_hostname_mismatch {
-        TlsParameters::builder(host.to_string())
-            .dangerous_accept_invalid_hostnames(true)
-            .build()
-    } else {
-        TlsParameters::new(host.to_string())
-    }
-}
-
-/// The account's send-as alias matching `addr` (case-insensitive), when that
-/// alias carries its own SMTP transport (#34). Plain aliases — and the
-/// account's own address — resolve to `None`: the account's transport.
-fn alias_with_own_smtp<'a>(
-    account: &'a AccountConfig,
-    addr: &str,
-) -> Option<&'a crate::config::AliasConfig> {
-    account
-        .aliases
-        .iter()
-        .find(|a| a.has_own_smtp() && a.address().eq_ignore_ascii_case(addr.trim()))
-}
-
-/// A TLS-configured transport builder for one SMTP endpoint. A loopback
-/// bridge signs its own certificate (see `is_loopback_host`), so the relay
-/// builders' verification would reject it — TLS stays required, only the
-/// certificate checks are relaxed.
-fn smtp_transport_builder(
-    host: &str,
-    port: u16,
-    smtp_tls: SmtpTls,
-) -> Result<lettre::transport::smtp::AsyncSmtpTransportBuilder, SmtpError> {
-    let implicit_tls = smtp_tls.implicit;
-    let relaxed = smtp_tls.accept_hostname_mismatch || smtp_tls.accept_invalid_certs;
-    let builder = if is_loopback_host(host) || relaxed {
-        let tls = smtp_tls_parameters(host, smtp_tls)?;
-        let mode = if implicit_tls {
-            lettre::transport::smtp::client::Tls::Wrapper(tls)
-        } else {
-            lettre::transport::smtp::client::Tls::Required(tls)
-        };
-        AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(host).tls(mode)
-    } else if implicit_tls {
-        AsyncSmtpTransport::<Tokio1Executor>::relay(host)?
-    } else {
-        AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(host)?
-    };
-    Ok(builder.port(port))
-}
-
-/// An SMTP transport, configured but not yet connected: the account's own, or —
-/// when `alias` is given — the alias's separate server and credentials (#34).
-async fn smtp_transport(
-    account: &AccountConfig,
-    alias: Option<&crate::config::AliasConfig>,
-) -> Result<AsyncSmtpTransport<Tokio1Executor>, SmtpError> {
-    if let Some(alias) = alias {
-        // An alias's own transport is always password-authenticated, never the
-        // account's OAuth: it is a different provider's server, which knows
-        // nothing of the account's tokens. The password lives in the keyring
-        // and is fetched here (the in-memory config never carries it).
-        let password = if alias.smtp_password.is_empty() {
-            crate::config::load_alias_smtp_password(&account.email, &alias.address()).ok_or_else(
-                || -> SmtpError {
-                    format!(
-                        "no SMTP password stored for the alias {} — re-enter it in \
-                         Accounts",
-                        alias.address()
-                    )
-                    .into()
-                },
-            )?
-        } else {
-            alias.smtp_password.clone()
-        };
-        let tls = SmtpTls::by_port(alias.smtp_port, account.tls_accept_hostname_mismatch);
-        return Ok(
-            smtp_transport_builder(alias.smtp_host.trim(), alias.smtp_port, tls)?
-                .credentials(Credentials::new(alias.smtp_username.clone(), password))
-                .build(),
-        );
-    }
-    let host = smtp_host(account);
-    let mut builder =
-        smtp_transport_builder(&host, account.smtp_port, SmtpTls::for_account(account))?;
-    if account.oauth {
-        // XOAUTH2: the "password" is a fresh OAuth token from GOA.
-        let token = fetch_oauth_token(account)
-            .await
-            .ok_or_else(|| -> SmtpError {
-                "could not get an OAuth token from GNOME Online Accounts".into()
-            })?;
-        let user = oauth_user(account);
-        builder = builder
-            .credentials(Credentials::new(user, token))
-            .authentication(vec![
-                lettre::transport::smtp::authentication::Mechanism::Xoauth2,
-            ]);
-    } else if account.security.as_ref().is_some_and(|s| s.smtp_no_auth) {
-        // GNOME Online Accounts says this server takes mail without a
-        // sign-in (#254); offering one it does not advertise would fail.
-    } else {
-        // Use the separate SMTP credentials when configured, else the IMAP ones.
-        let password = sign_in_password(account, true).await?;
-        let creds = if account.smtp_separate {
-            Credentials::new(account.smtp_username.clone(), password)
-        } else {
-            Credentials::new(account.username.clone(), password)
-        };
-        builder = builder.credentials(creds);
-    }
-    Ok(builder.build())
-}
-
-/// Send an already-built message: the bytes that go on the wire, plus the
-/// envelope they are addressed with. Retrying an Outbox message goes through
-/// here, so what is retried is byte-for-byte what was composed.
-async fn send_raw_smtp(
-    account: &AccountConfig,
-    envelope: &lettre::address::Envelope,
-    raw: &[u8],
-) -> Result<(), SmtpError> {
-    // The envelope sender names the identity this leaves as. When it is an
-    // alias with its own SMTP, the mail goes out through that transport (#34);
-    // Outbox retries come through here too, so a queued alias send retries on
-    // the alias's server.
-    let alias = envelope
-        .from()
-        .and_then(|f| alias_with_own_smtp(account, f.as_ref()));
-    let host = alias
-        .map(|a| a.smtp_host.trim().to_string())
-        .unwrap_or_else(|| smtp_host(account));
-    if !crate::power::reaches(&host) {
-        return Err(offline_text().into());
-    }
-    let mailer = smtp_transport(account, alias).await?;
-    // The SMTP leg for the console: size and recipient count, then the verdict.
-    tracing::debug!(
-        target: "hylki::smtp",
-        "> send {} bytes to {} recipient(s) via {}",
-        raw.len(),
-        envelope.to().len(),
-        alias.map(|a| a.smtp_host.as_str()).unwrap_or(&smtp_host(account)),
-    );
-    let r = mailer.send_raw(envelope, raw).await;
-    match &r {
-        Ok(_) => tracing::debug!(target: "hylki::smtp", "< OK (send)"),
-        Err(e) => tracing::warn!(target: "hylki::smtp", "< {e} (send)"),
-    }
-    r?;
-    Ok(())
-}
-
-/// A permanent (5xx) SMTP answer other than a failed sign-in. A wrong
-/// password is fixed in Settings and the queued message then goes; a refused
-/// recipient never will.
-fn smtp_refused(e: &SmtpError) -> bool {
-    e.downcast_ref::<lettre::transport::smtp::Error>()
-        .filter(|e| e.is_permanent())
-        .and_then(|e| e.status())
-        .is_some_and(|code| !(530..540).contains(&u16::from(code)))
-}
-
-/// Send `msg`, and hand back the bytes to file as its Sent copy: what went
-/// out, with the Bcc put back (#476).
-async fn send_smtp(account: &AccountConfig, msg: &OutgoingMessage) -> Result<Vec<u8>, SmtpError> {
-    let email = build_email(account, msg)?;
-    let raw = email.formatted();
-    send_raw_smtp(account, email.envelope(), &raw).await?;
-    Ok(with_bcc(&raw, &msg.bcc))
-}
-
-/// The SASL identity for XOAUTH2 (the IMAP/SMTP username, else the email).
-fn oauth_user(account: &AccountConfig) -> String {
-    if account.username.trim().is_empty() {
-        account.email.clone()
-    } else {
-        account.username.clone()
-    }
-}
-
-/// Fetch a fresh OAuth access token for this account — from GNOME Online Accounts
-/// (imported) or by refreshing a natively-added account's stored refresh token.
-async fn fetch_oauth_token(account: &AccountConfig) -> Option<String> {
-    // The keyring and the remembered tokens answer at once; only a refresh
-    // goes over the network, and it goes off the async threads.
-    if account.goa_id.is_none() {
-        let settings = account.oauth_settings.clone()?;
-        let refresh = crate::config::load_oauth_refresh(&account.email)?;
-        if let Some(token) = cached_access_token(&refresh) {
-            return Some(token);
-        }
-        let account = account.clone();
-        return tokio::task::spawn_blocking(move || {
-            refreshed_access_token(&account, &settings, refresh)
-        })
-        .await
-        .ok()
-        .flatten();
-    }
-    let account = account.clone();
-    tokio::task::spawn_blocking(move || oauth_token_blocking(&account))
-        .await
-        .ok()
-        .flatten()
-}
-
-/// [`fetch_oauth_token`] for a plain thread (blocking): the composer's
-/// directory search asks from one (#410). It shares the remembered access
-/// tokens, so it seldom costs a refresh of its own.
-pub(crate) fn oauth_token_blocking(account: &AccountConfig) -> Option<String> {
-    if let Some(goa_id) = account.goa_id.as_deref() {
-        return crate::goa::oauth_token(goa_id);
-    }
-    // Natively-added OAuth account: refresh with the keyring-stored refresh token.
-    // The client credentials saved with the account MUST be used — a refresh token
-    // is bound to the OAuth client that issued it, so switching clients requires
-    // re-adding the account (a fresh sign-in), not swapping creds here.
-    let settings = account.oauth_settings.as_ref()?;
-    let refresh = crate::config::load_oauth_refresh(&account.email)?;
-    if let Some(token) = cached_access_token(&refresh) {
-        return Some(token);
-    }
-    refreshed_access_token(account, settings, refresh)
-}
-
-/// A new access token from the provider for `refresh` (blocking).
-fn refreshed_access_token(
-    account: &AccountConfig,
-    settings: &crate::config::OAuthSettings,
-    refresh: String,
-) -> Option<String> {
-    let email = &account.email;
-    let user = oauth_user(account);
-    let fresh = crate::oauth::refresh_access_token_as(settings, &refresh, Some(&user))
-        .map_err(|e| tracing::warn!("OAuth token refresh for {email} failed: {e}"))
-        .ok()?;
-    // The provider spent the old refresh token and handed out another:
-    // that one is what works from now on.
-    let refresh = match fresh.refresh_token {
-        Some(rotated) => match crate::config::store_oauth_refresh(email, &rotated) {
-            Ok(()) => rotated,
-            Err(e) => {
-                tracing::warn!("could not keep the new OAuth refresh token for {email}: {e}");
-                refresh
-            }
-        },
-        None => refresh,
-    };
-    if let Some(secs) = fresh.expires_in {
-        remember_access_token(&refresh, &fresh.access_token, secs);
-    }
-    Some(fresh.access_token)
-}
-
-/// Access tokens minted for natively-added OAuth accounts, by the refresh
-/// token they came from, with when to stop using them. Every IMAP
-/// connection, SMTP send and Graph request asked the provider for a new one
-/// before; a token is good for an hour. Keyed by refresh token, so a fresh
-/// sign-in never picks up the old account's token.
-static ACCESS_TOKENS: std::sync::Mutex<
-    Option<std::collections::HashMap<String, (String, std::time::Instant)>>,
-> = std::sync::Mutex::new(None);
-
-/// How long before its stated expiry a token is no longer handed out, so a
-/// long sync that starts with it does not run past the end.
-const ACCESS_TOKEN_MARGIN: u64 = 5 * 60;
-
-fn cached_access_token(refresh: &str) -> Option<String> {
-    let mut g = ACCESS_TOKENS.lock().ok()?;
-    let map = g.get_or_insert_with(Default::default);
-    match map.get(refresh) {
-        Some((token, until)) if std::time::Instant::now() < *until => Some(token.clone()),
-        Some(_) => {
-            map.remove(refresh);
-            None
-        }
-        None => None,
-    }
-}
-
-fn remember_access_token(refresh: &str, token: &str, expires_in: u64) {
-    let Some(secs) = expires_in
-        .checked_sub(ACCESS_TOKEN_MARGIN)
-        .filter(|s| *s > 0)
-    else {
-        return;
-    };
-    if let Ok(mut g) = ACCESS_TOKENS.lock() {
-        let until = std::time::Instant::now() + Duration::from_secs(secs);
-        g.get_or_insert_with(Default::default)
-            .insert(refresh.to_string(), (token.to_string(), until));
-    }
-}
-
-/// Stop handing out this account's remembered access token: the server
-/// turned it down, so the next sign-in asks the provider for a new one.
-pub(crate) fn forget_access_token(account: &AccountConfig) {
-    if account.goa_id.is_some() || account.oauth_settings.is_none() {
-        return;
-    }
-    let Some(refresh) = crate::config::load_oauth_refresh(&account.email) else {
-        return;
-    };
-    if let Ok(mut g) = ACCESS_TOKENS.lock() {
-        if let Some(map) = g.as_mut() {
-            map.remove(&refresh);
-        }
-    }
 }
 
 /// XOAUTH2 SASL authenticator for async-imap.
@@ -5752,18 +5399,6 @@ fn imap_unquote(raw: &str) -> std::borrow::Cow<'_, str> {
     std::borrow::Cow::Owned(out)
 }
 
-/// SMTP host: the configured value, or derived from the IMAP host.
-fn smtp_host(account: &AccountConfig) -> String {
-    let configured = account.smtp_host.trim();
-    if !configured.is_empty() {
-        configured.to_string()
-    } else if let Some(rest) = account.imap_host.strip_prefix("imap") {
-        format!("smtp{rest}")
-    } else {
-        account.imap_host.clone()
-    }
-}
-
 async fn store_flag(
     session: &mut ImapSession,
     path: &str,
@@ -6045,54 +5680,6 @@ async fn mark_ham(
     move_messages(session, path, uids, dest).await
 }
 
-/// Whether a host is this machine. Local mail bridges — Proton Bridge, hydroxide,
-/// DavMail — terminate TLS with a certificate generated on the machine itself at
-/// install time: no CA has signed it and it is issued for an address rather than
-/// a name, so it fails both checks. Verification is relaxed for loopback
-/// addresses only, where anyone able to intercept the connection is already
-/// running code as the user, and never for a host reached over a network.
-fn is_loopback_host(host: &str) -> bool {
-    let host = host.trim().trim_start_matches('[').trim_end_matches(']');
-    host.eq_ignore_ascii_case("localhost")
-        || host
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback())
-}
-
-/// A TLS connector for a mail server: it tolerates a local bridge’s self-signed
-/// certificate and one the user accepted in GNOME Settings (#254), waives the
-/// name check alone where the account asks for it (#246: a valid certificate
-/// in another name, as shared hosting serves), and verifies everything else
-/// normally.
-fn tls_connector(
-    host: &str,
-    accept_hostname_mismatch: bool,
-    accept_invalid_certs: bool,
-) -> async_native_tls::TlsConnector {
-    let tls = async_native_tls::TlsConnector::new();
-    if is_loopback_host(host) || accept_invalid_certs {
-        tls.danger_accept_invalid_certs(true)
-            .danger_accept_invalid_hostnames(true)
-    } else if accept_hostname_mismatch {
-        tls.danger_accept_invalid_hostnames(true)
-    } else {
-        tls
-    }
-}
-
-/// Whether a connection error is the certificate's name not matching the
-/// host (#246), which the account's "Accept a certificate for another
-/// name" switch is for. The wording is OpenSSL's, via native-tls.
-pub fn is_hostname_mismatch(error: &str) -> bool {
-    let e = error.to_ascii_lowercase();
-    e.contains("hostname mismatch")
-        || e.contains("host name mismatch")
-        || e.contains("certificate name does not match")
-        || e.contains("does not match the")
-        || e.contains("invalid for name")
-        || e.contains("notvalidforname")
-}
-
 /// Whether the IMAP connection opens in plaintext and upgrades with STARTTLS
 /// instead of negotiating TLS from the first byte. 993 is always implicit TLS
 /// and 143 is the conventional STARTTLS port; a local bridge listens on a port
@@ -6109,56 +5696,6 @@ fn imap_uses_starttls(account: &AccountConfig) -> bool {
 /// together. A server (or middlebox) that accepts the socket and then stalls
 /// would otherwise hang the worker with no error ever surfacing.
 const IMAP_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
-
-/// The password an account signs in with: the one the worker holds or, when
-/// it holds none, the keyring's, read again at every sign-in. The worker reads
-/// the keyring once when it starts, and a keyring locked or still starting at
-/// login then left the account signing in with an empty password until Hylki
-/// restarted (#375). A keyring that cannot be read is reported as such, and
-/// no sign-in goes out without the password.
-pub(super) fn sign_in_password_blocking(
-    account: &AccountConfig,
-    smtp: bool,
-) -> Result<String, String> {
-    let separate = smtp && account.smtp_separate;
-    let held = if separate {
-        &account.smtp_password
-    } else {
-        &account.password
-    };
-    if !held.is_empty() || account.oauth {
-        return Ok(held.clone());
-    }
-    let read = if separate {
-        crate::config::read_smtp_password(&account.email)
-    } else {
-        crate::config::read_password(&account.email)
-    };
-    read.map(Option::unwrap_or_default).map_err(|e| {
-        tracing::warn!("could not read the keyring for {}: {e}", account.email);
-        i18n_f(
-            "Could not read the password for {email} from the keyring ({e}). Hylki tries again at the next connection.",
-            &[("email", &account.email), ("e", &e)],
-        )
-    })
-}
-
-/// [`sign_in_password_blocking`] off the async runtime's threads: a keyring
-/// that does not answer holds its caller for the whole D-Bus timeout.
-async fn sign_in_password(account: &AccountConfig, smtp: bool) -> Result<String, String> {
-    let held = if smtp && account.smtp_separate {
-        &account.smtp_password
-    } else {
-        &account.password
-    };
-    if !held.is_empty() || account.oauth {
-        return Ok(held.clone());
-    }
-    let account = account.clone();
-    tokio::task::spawn_blocking(move || sign_in_password_blocking(&account, smtp))
-        .await
-        .map_err(|e| e.to_string())?
-}
 
 async fn connect(account: &AccountConfig) -> Result<ImapSession, Box<dyn std::error::Error>> {
     if !crate::power::reaches(&account.imap_host) {
@@ -6263,208 +5800,6 @@ async fn connect_inner(
         r?
     };
     Ok(session)
-}
-
-/// Outcome of a credential/connection test for the Accounts window.
-#[derive(Debug)]
-pub struct ConnTest {
-    /// Incoming server (IMAP or POP3, per the account's protocol).
-    pub incoming: Result<(), String>,
-    pub smtp: Result<(), String>,
-}
-
-/// Test that the account's servers accept the given credentials (no mail sent).
-pub async fn test_connection(account: &AccountConfig) -> ConnTest {
-    let incoming = match account.protocol {
-        crate::config::Protocol::Pop3 => test_pop3(account).await,
-        crate::config::Protocol::Jmap => jmap::test_jmap(account).await,
-        _ => test_imap(account).await,
-    };
-    // A JMAP account sends through the server itself: there is no SMTP to
-    // test, and the Accounts window leaves that line out.
-    let smtp = if account.protocol == crate::config::Protocol::Jmap {
-        Ok(())
-    } else {
-        test_smtp(account).await
-    };
-    ConnTest { incoming, smtp }
-}
-
-async fn test_pop3(account: &AccountConfig) -> Result<(), String> {
-    let mut pop = Pop3::connect(account).await?;
-    pop.login(&account.username, &sign_in_password(account, false).await?)
-        .await?;
-    pop.quit().await;
-    Ok(())
-}
-
-/// Blocking wrapper around [`test_connection`] that spins up its own Tokio
-/// runtime — call it from `spawn_blocking` so the IMAP/SMTP sockets have an I/O
-/// reactor regardless of the caller's runtime.
-pub fn test_connection_blocking(account: AccountConfig) -> ConnTest {
-    match tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(rt) => rt.block_on(test_connection(&account)),
-        Err(e) => ConnTest {
-            incoming: Err(e.to_string()),
-            smtp: Err(e.to_string()),
-        },
-    }
-}
-
-async fn test_imap(account: &AccountConfig) -> Result<(), String> {
-    // Stringify the (non-Send) error before any further await so the returned
-    // future stays Send (required by relm4's command runner).
-    let mut session = connect(account).await.map_err(|e| e.to_string())?;
-    let _ = session.logout().await;
-    Ok(())
-}
-
-/// Connect to the SMTP server and authenticate (then quit) — verifies the send
-/// credentials without delivering anything.
-async fn test_smtp(account: &AccountConfig) -> Result<(), String> {
-    use lettre::transport::smtp::authentication::Mechanism;
-
-    let host = smtp_host(account);
-    // Authenticate the same way the send path does: XOAUTH2 with a fresh token
-    // for OAuth accounts, otherwise the password (SMTP-specific if configured).
-    if !account.oauth && account.security.as_ref().is_some_and(|s| s.smtp_no_auth) {
-        return smtp_auth_check(
-            &host,
-            account.smtp_port,
-            None,
-            &[],
-            SmtpTls::for_account(account),
-        )
-        .await;
-    }
-    let (creds, mechanisms): (Credentials, &[Mechanism]) = if account.oauth {
-        let token = fetch_oauth_token(account)
-            .await
-            .ok_or_else(|| "could not get an OAuth token".to_string())?;
-        (
-            Credentials::new(oauth_user(account), token),
-            &[Mechanism::Xoauth2],
-        )
-    } else {
-        let password = sign_in_password(account, true).await?;
-        let user = if account.smtp_separate {
-            &account.smtp_username
-        } else {
-            &account.username
-        };
-        (
-            Credentials::new(user.clone(), password),
-            &[Mechanism::Plain, Mechanism::Login],
-        )
-    };
-    smtp_auth_check(
-        &host,
-        account.smtp_port,
-        Some(&creds),
-        mechanisms,
-        SmtpTls::for_account(account),
-    )
-    .await
-}
-
-/// Test a send-as alias's own SMTP server and credentials (#34): connect,
-/// authenticate, quit. Used by the alias editor's Test button; an alias without
-/// its own transport has nothing of its own to test.
-pub async fn test_alias_smtp(
-    account_email: &str,
-    alias: &crate::config::AliasConfig,
-) -> Result<(), String> {
-    use lettre::transport::smtp::authentication::Mechanism;
-
-    let password = if alias.smtp_password.is_empty() {
-        crate::config::load_alias_smtp_password(account_email, &alias.address()).unwrap_or_default()
-    } else {
-        alias.smtp_password.clone()
-    };
-    let creds = Credentials::new(alias.smtp_username.clone(), password);
-    smtp_auth_check(
-        alias.smtp_host.trim(),
-        alias.smtp_port,
-        Some(&creds),
-        &[Mechanism::Plain, Mechanism::Login],
-        SmtpTls::by_port(
-            alias.smtp_port,
-            account_accepts_hostname_mismatch(account_email),
-        ),
-    )
-    .await
-}
-
-/// The account's name-check waiver (#246), by its address: the alias test
-/// is handed the address alone.
-fn account_accepts_hostname_mismatch(account_email: &str) -> bool {
-    crate::config::load()
-        .unwrap_or_default()
-        .iter()
-        .find(|a| a.email.eq_ignore_ascii_case(account_email))
-        .is_some_and(|a| a.tls_accept_hostname_mismatch)
-}
-
-/// Blocking wrapper around [`test_alias_smtp`] — call from `spawn_blocking`,
-/// like [`test_connection_blocking`].
-pub fn test_alias_smtp_blocking(
-    account_email: String,
-    alias: crate::config::AliasConfig,
-) -> Result<(), String> {
-    match tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(rt) => rt.block_on(test_alias_smtp(&account_email, &alias)),
-        Err(e) => Err(e.to_string()),
-    }
-}
-
-/// Shared SMTP credential check: connect (implicit TLS or STARTTLS, as
-/// `smtp_tls` says), authenticate unless there are no credentials to, quit.
-async fn smtp_auth_check(
-    host: &str,
-    port: u16,
-    creds: Option<&Credentials>,
-    mechanisms: &[lettre::transport::smtp::authentication::Mechanism],
-    smtp_tls: SmtpTls,
-) -> Result<(), String> {
-    use lettre::transport::smtp::client::AsyncSmtpConnection;
-    use lettre::transport::smtp::extension::ClientId;
-
-    let hello = ClientId::default();
-    let tls = smtp_tls_parameters(host, smtp_tls).map_err(|e| e.to_string())?;
-    // A (host, port) pair resolves bare IPv6 addresses correctly; a "host:port"
-    // string would mis-parse their colons.
-    let addr = (host, port);
-    let timeout = Some(std::time::Duration::from_secs(20));
-
-    let mut conn = if smtp_tls.implicit {
-        AsyncSmtpConnection::connect_tokio1(addr, timeout, &hello, Some(tls), None)
-            .await
-            .map_err(|e| e.to_string())?
-    } else {
-        let mut conn = AsyncSmtpConnection::connect_tokio1(addr, timeout, &hello, None, None)
-            .await
-            .map_err(|e| e.to_string())?;
-        conn.starttls(tls, &hello)
-            .await
-            .map_err(|e| e.to_string())?;
-        conn
-    };
-    let result = match creds {
-        Some(creds) => conn
-            .auth(mechanisms, creds)
-            .await
-            .map(|_| ())
-            .map_err(|e| e.to_string()),
-        None => Ok(()),
-    };
-    let _ = conn.quit().await;
-    result
 }
 
 async fn list_folders(
@@ -10984,10 +10319,14 @@ pub(super) fn sample_account() -> AccountConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::worker::auth::sign_in_password_blocking;
     use crate::worker::chores::graph_before_date;
     use crate::worker::chores::AUTO_EMPTY_MIN;
     use crate::worker::compose::build::build_message;
+    use crate::worker::compose::editable::with_bcc;
     use crate::worker::compose::recipients::mailbox;
+    use crate::worker::smtp::alias_with_own_smtp;
+    use crate::worker::smtp::SmtpTls;
 
     #[test]
     fn only_the_top_level_inbox_is_the_inbox() {

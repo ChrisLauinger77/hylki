@@ -12,6 +12,7 @@
 //! available from list queries.
 
 use super::*;
+use crate::worker::auth::fetch_oauth_token;
 use crate::worker::chores::{
     auto_empty_due, auto_empty_roles, graph_before_date, role_folder_path,
 };

@@ -8,7 +8,8 @@ use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::worker::compose::pgp_mime::{pgp_wrap, protect_headers, PgpEntity, PROTECTED_SUBJECT};
 use crate::worker::compose::recipients::mailbox;
-use crate::worker::{extract_body, guess_mime, parse_recipients, OutgoingMessage, SmtpError};
+use crate::worker::smtp::SmtpError;
+use crate::worker::{extract_body, guess_mime, parse_recipients, OutgoingMessage};
 
 /// The Message-ID a built draft carries, bare, to find it again among the
 /// Drafts folder's messages once it is saved (#340).

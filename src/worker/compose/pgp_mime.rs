@@ -6,7 +6,8 @@ use lettre::message::Mailbox;
 use crate::config::AccountConfig;
 use crate::i18n::i18n_f;
 use crate::worker::compose::recipients::mailbox;
-use crate::worker::{parse_recipients, OutgoingMessage, SmtpError};
+use crate::worker::smtp::SmtpError;
+use crate::worker::{parse_recipients, OutgoingMessage};
 
 /// A message body before OpenPGP wrapping: one MIME entity either way.
 pub(in crate::worker) enum PgpEntity {
