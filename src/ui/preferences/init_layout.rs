@@ -40,7 +40,7 @@ impl Preferences {
             .forward(sender.input_sender(), PrefInput::Contacts);
         widgets.contacts_slot.set_child(Some(contacts.widget()));
         self.contacts = Some(contacts);
-        self.contacts_placement_row = Some(widgets.contacts_placement_row.clone());
+        self.contacts_placement_row = Some(widgets.sidebar.contacts_placement_row.clone());
     }
 
     /// The category sidebar (#141): a heading per section, a row per
@@ -84,13 +84,16 @@ impl Preferences {
         root.add_breakpoint(narrow);
         self.panels_stack = Some(widgets.panels_stack.clone());
         self.accounts_slot = Some(widgets.accounts_slot.clone());
-        self.toolbar_editor = Some(ToolbarEditor::build(&widgets.toolbar_editor_box, sender));
+        self.toolbar_editor = Some(ToolbarEditor::build(
+            &widgets.appearance.toolbar_editor_box,
+            sender,
+        ));
         // The toolbar editor's zones want a row of six chips: the page's
         // column is 40px wider than the stock preferences clamp allows.
         widen_page(widgets.appearance_page.upcast_ref(), 640);
         self.rebuild_toolbar_chips();
-        self.column_editor = Some(ColumnEditor::build(&widgets.column_editor_box, sender));
-        self.columns_group = Some(widgets.columns_group.clone().upcast());
+        self.column_editor = Some(ColumnEditor::build(&widgets.list.column_editor_box, sender));
+        self.columns_group = Some(widgets.list.columns_group.clone().upcast());
         self.rebuild_column_chips();
     }
 

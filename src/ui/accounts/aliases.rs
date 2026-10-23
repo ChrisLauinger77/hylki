@@ -25,13 +25,14 @@ impl AccountsWindow {
         widgets: &AccountsWindowWidgets,
         sender: &ComponentSender<Self>,
     ) {
-        let list = &widgets.hidden_list;
+        let list = &widgets.form.hidden_list;
         while let Some(child) = list.first_child() {
             list.remove(&child);
         }
         // An empty boxed-list draws as a bare frame; say "none" instead.
         list.set_visible(!self.hidden_edits.is_empty());
         widgets
+            .form
             .hidden_empty
             .set_visible(self.hidden_edits.is_empty());
         for (i, path) in self.hidden_edits.iter().enumerate() {
@@ -338,7 +339,7 @@ impl AccountsWindow {
             // The keyring entry (if the alias had its own SMTP) is
             // dropped on Save, when the removal actually takes effect.
             self.alias_edits.remove(i);
-            self.rebuild_alias_list(&widgets.aliases_list, &sender);
+            self.rebuild_alias_list(&widgets.form.aliases_list, &sender);
         }
     }
 
@@ -367,7 +368,7 @@ impl AccountsWindow {
         // account's own address or another alias — the send path picks
         // an alias's transport by matching the From address, so a
         // duplicate would make "which server sends this?" ambiguous.
-        let account_email = trimmed(&widgets.email_row);
+        let account_email = trimmed(&widgets.form.email_row);
         let duplicate = addr.eq_ignore_ascii_case(&account_email)
             || self.alias_edits.iter().enumerate().any(|(i, a)| {
                 Some(i) != self.alias_editing && a.address().eq_ignore_ascii_case(&addr)
@@ -412,7 +413,7 @@ impl AccountsWindow {
         }
         self.alias_editing = None;
         self.close_alias_dialog();
-        self.rebuild_alias_list(&widgets.aliases_list, &sender);
+        self.rebuild_alias_list(&widgets.form.aliases_list, &sender);
     }
 
     pub(super) fn on_alias_dialog_test(
@@ -430,7 +431,7 @@ impl AccountsWindow {
             smtp_username: trimmed(&d.user_row),
             smtp_password: d.pass_row.text().to_string(),
         };
-        let email = trimmed(&widgets.email_row);
+        let email = trimmed(&widgets.form.email_row);
         d.test_btn.set_sensitive(false);
         d.test_result.set_visible(true);
         d.test_result.set_css_classes(&["dim-label"]);
