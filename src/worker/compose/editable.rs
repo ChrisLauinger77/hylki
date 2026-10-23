@@ -1,9 +1,10 @@
 //! Taking a queued or saved message apart again for editing, and putting
 //! back the Bcc a sent copy or a retry needs.
 
+use crate::encoding::escape_html;
 use crate::worker::compose::recipients::mailbox;
 use crate::worker::render::attachments::attachment_parts;
-use crate::worker::render::body::{escape_html, inline_cid_images};
+use crate::worker::render::body::inline_cid_images;
 use crate::worker::{format_recipient, parse_recipients};
 
 /// Render an address header back into the form the composer's fields use —

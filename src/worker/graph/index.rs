@@ -93,8 +93,8 @@ fn graph_fetch_run(
             "{base}/me/mailFolders/{folder_graph_id}/messages\
              ?$filter=receivedDateTime%20ge%20{}%20and%20receivedDateTime%20le%20{}\
              &$orderby=receivedDateTime%20desc&$top={GRAPH_BACKFILL_CHUNK}&{GRAPH_MSG_SELECT}",
-            crate::percent::encode(&run.oldest),
-            crate::percent::encode(&run.newest),
+            crate::encoding::percent::encode(&run.oldest),
+            crate::encoding::percent::encode(&run.newest),
         );
         // Bounded, should many messages share the run's end dates.
         graph_paged(token, &url, run.ids.len() + GRAPH_BACKFILL_CHUNK)?

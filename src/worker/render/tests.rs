@@ -280,7 +280,7 @@ fn cid_resources_are_not_listed_as_attachments() {
 /// A `multipart/related` whose `cid:` image decodes to `bytes` bytes.
 fn cid_mail_with_image_of(bytes: usize) -> String {
     // base64 of `bytes` zeroes: 4 chars per 3 bytes, rounded up.
-    let payload = crate::oauth::base64_encode(&vec![0u8; bytes]);
+    let payload = crate::encoding::base64_encode(&vec![0u8; bytes]);
     concat!(
         "Content-Type: multipart/related; boundary=R\r\n",
         "Subject: Photo\r\n\r\n",
@@ -330,7 +330,7 @@ fn gmail_mail_with_files(files: &[(&str, &str, usize)]) -> String {
         ));
         raw.push_str("Content-Transfer-Encoding: base64\r\n");
         raw.push_str(&format!("Content-ID: <f_a1b2c3d4{i}>\r\n\r\n"));
-        raw.push_str(&crate::oauth::base64_encode(&vec![0u8; *bytes]));
+        raw.push_str(&crate::encoding::base64_encode(&vec![0u8; *bytes]));
         raw.push_str("\r\n");
     }
     raw.push_str("--M--\r\n");

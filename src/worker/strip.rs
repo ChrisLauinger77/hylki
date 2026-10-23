@@ -9,6 +9,7 @@
 use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 
 use crate::cache::Cache;
+use crate::encoding::{base64_encode, base64_lines};
 use crate::worker::render::attachments::{attachment_parts, extract_attachments, guess_mime};
 use crate::worker::WorkerEvent;
 
@@ -94,10 +95,10 @@ pub(super) fn without_attachment(
     let headers = raw
         .get(start..part.offset_body)
         .ok_or(StripError::NotFound)?;
-    let eol: &[u8] = if raw.windows(2).any(|w| w == b"\r\n") {
-        b"\r\n"
+    let eol = if raw.windows(2).any(|w| w == b"\r\n") {
+        "\r\n"
     } else {
-        b"\n"
+        "\n"
     };
     let mut out = Vec::with_capacity(raw.len() - (end - start) + 512);
     out.extend_from_slice(&raw[..start]);
@@ -108,25 +109,25 @@ pub(super) fn without_attachment(
 
 /// The part that takes an attachment's place: Thunderbird's shape, with the
 /// original part headers kept in the text as it keeps them.
-fn placeholder(name: &str, original_headers: &[u8], date: &str, eol: &[u8]) -> Vec<u8> {
+fn placeholder(name: &str, original_headers: &[u8], date: &str, eol: &str) -> Vec<u8> {
     let label = header_param(&format!("Deleted: {name}"));
     let note = crate::i18n::i18n(
         "You deleted an attachment from this message. The original MIME headers for the attachment were:",
     );
     let mut body = note.into_bytes();
-    body.extend_from_slice(eol);
+    body.extend_from_slice(eol.as_bytes());
     // The original headers, less the blank line that ended them, in this
     // message's line endings.
     let text = String::from_utf8_lossy(original_headers);
     for line in text.trim_end_matches(['\r', '\n']).lines() {
         body.extend_from_slice(line.trim_end_matches('\r').as_bytes());
-        body.extend_from_slice(eol);
+        body.extend_from_slice(eol.as_bytes());
     }
     let ascii = body.is_ascii();
     let mut out = Vec::new();
     let mut line = |s: &str| {
         out.extend_from_slice(s.as_bytes());
-        out.extend_from_slice(eol);
+        out.extend_from_slice(eol.as_bytes());
     };
     line(&format!(
         "Content-Type: text/x-moz-deleted; charset=UTF-8; name={label}"
@@ -144,16 +145,11 @@ fn placeholder(name: &str, original_headers: &[u8], date: &str, eol: &[u8]) -> V
     if ascii {
         out.extend_from_slice(&body);
     } else {
-        use base64::Engine;
-        let encoded = base64::engine::general_purpose::STANDARD.encode(&body);
-        for chunk in encoded.as_bytes().chunks(76) {
-            out.extend_from_slice(chunk);
-            out.extend_from_slice(eol);
-        }
+        out.extend_from_slice(base64_lines(&body, eol).as_bytes());
     }
     // The boundary that follows belongs on a line of its own; the part
     // replaced ended just before the line break that precedes it.
-    if out.ends_with(eol) {
+    if out.ends_with(eol.as_bytes()) {
         out.truncate(out.len() - eol.len());
     }
     out
@@ -165,12 +161,8 @@ fn header_param(value: &str) -> String {
     if value.is_ascii() && !value.contains(['"', '\\', '\r', '\n']) {
         return format!("\"{value}\"");
     }
-    use base64::Engine;
     let clean: String = value.chars().filter(|c| !c.is_control()).collect();
-    format!(
-        "\"=?UTF-8?B?{}?=\"",
-        base64::engine::general_purpose::STANDARD.encode(clean.as_bytes())
-    )
+    format!("\"=?UTF-8?B?{}?=\"", base64_encode(clean.as_bytes()))
 }
 
 /// Now, as Thunderbird dates the note: `Thu Sep 25 10:00:00 2026`.

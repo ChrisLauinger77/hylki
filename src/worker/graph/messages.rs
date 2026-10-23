@@ -235,7 +235,7 @@ pub(super) fn graph_find_by_msgid(
     let url = format!(
         "{base}/me/mailFolders/{folder_graph_id}/messages\
          ?$filter=internetMessageId%20eq%20{}&$top=10&{GRAPH_MSG_SELECT}",
-        crate::percent::encode(&literal)
+        crate::encoding::percent::encode(&literal)
     );
     let items = graph_paged(token, &url, 10)?;
     Ok(items

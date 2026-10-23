@@ -63,7 +63,6 @@ pub(super) fn origin_of(url: &str) -> &str {
 }
 
 pub(super) fn jmap_auth(account: &AccountConfig) -> String {
-    use base64::Engine;
     // Fastmail takes an API token, never the account password (#356).
     if account.jmap_token {
         return format!("Bearer {}", account.password.trim());
@@ -73,8 +72,7 @@ pub(super) fn jmap_auth(account: &AccountConfig) -> String {
     } else {
         &account.username
     };
-    let b64 =
-        base64::engine::general_purpose::STANDARD.encode(format!("{user}:{}", account.password));
+    let b64 = crate::encoding::base64_encode(format!("{user}:{}", account.password).as_bytes());
     format!("Basic {b64}")
 }
 

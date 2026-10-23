@@ -121,8 +121,6 @@ mod workers;
 pub(crate) use accounts::finish_keyring_writes;
 pub(crate) use model::AppModel;
 pub(crate) use msg::AppMsg;
-// The worker reads `crate::app::message_text` (until the worker branch is merged).
-pub(crate) use crate::quote::message_text;
 pub(crate) use uri_queue::{
     is_message_file, queue_attach_files, queue_mailto, queue_message_file, queue_mid,
 };

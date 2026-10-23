@@ -17,8 +17,6 @@ use crate::config::OAuthSettings;
 mod flow;
 mod tokens;
 
-// The worker reads base64 through this path (until the worker branch is merged).
-pub use crate::encoding::{base64_decode, base64_encode};
 pub use flow::{microsoft_prompt, open_uri, run_flow, run_flow_as, Authorization};
 pub use tokens::{exchange_code, microsoft_whoami, refresh_access_token, refresh_access_token_as};
 

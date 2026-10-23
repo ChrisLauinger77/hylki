@@ -147,8 +147,7 @@ pub(super) fn graph_post_mime(
     url: &str,
     raw: &[u8],
 ) -> Result<serde_json::Value, String> {
-    use base64::Engine;
-    let b64 = base64::engine::general_purpose::STANDARD.encode(raw);
+    let b64 = crate::encoding::base64_encode(raw);
     graph_wire("POST(mime)", url);
     let resp = ureq::post(url)
         .set("Authorization", &graph_auth(token))
