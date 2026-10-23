@@ -83,7 +83,7 @@ fn bases() -> Vec<(&'static str, PathBuf)> {
 /// not exist yet. Runs before anything reads its settings.
 pub fn migrate_dirs() {
     let mut from: Option<&'static Predecessor> = None;
-    let in_flatpak = Path::new("/.flatpak-info").exists();
+    let in_flatpak = crate::platform::is_flatpak();
     let home = dirs::home_dir();
     for (sub, base) in bases() {
         let new = base.join("hylki");
@@ -166,20 +166,13 @@ fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// The user's home as the host sees it (inside Flatpak too).
-fn host_home() -> Option<PathBuf> {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .or_else(dirs::home_dir)
-}
-
 /// Whether a predecessor is still installed, as far as this process can
 /// see: its user-scope Flatpak export, or a binary on the usual paths. A
 /// system-scope Flatpak is not visible from inside the sandbox, so
 /// "not seen" is not "gone" — callers only act on what they can verify.
 fn predecessor_seen(pred: &Predecessor) -> bool {
     let mut paths = vec![PathBuf::from("/var/lib/flatpak/exports/bin").join(pred.app_id)];
-    if let Some(home) = host_home() {
+    if let Some(home) = crate::platform::home() {
         paths.push(
             home.join(".local/share/flatpak/exports/bin")
                 .join(pred.app_id),
@@ -239,7 +232,9 @@ fn tidy_nautilus_extension() {
 }
 
 fn tidy_launchers() {
-    let Some(home) = host_home() else { return };
+    let Some(home) = crate::platform::home() else {
+        return;
+    };
     let share = home.join(".local/share");
     for pred in PREDECESSORS {
         if predecessor_seen(pred) {
@@ -290,7 +285,7 @@ fn tidy_launchers() {
 /// setting, so the user is pointed at Settings → Default Apps instead.
 pub fn default_mailer() -> Option<&'static Predecessor> {
     let mut files = Vec::new();
-    if let Some(home) = host_home() {
+    if let Some(home) = crate::platform::home() {
         files.push(home.join(".config/mimeapps.list"));
         files.push(home.join(".local/share/applications/mimeapps.list"));
     }

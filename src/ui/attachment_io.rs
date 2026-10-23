@@ -56,7 +56,7 @@ pub(crate) fn open_bytes(name: &str, data: &[u8], parent: Option<&gtk::Window>) 
     // sandbox the portal is the only road out and GIO's launcher is the one
     // that can't work. So each side leads with the road that works for it
     // and keeps the other as the fallback.
-    if std::path::Path::new("/.flatpak-info").exists() {
+    if crate::platform::is_flatpak() {
         // Inside the sandbox the file was staged into the app's PRIVATE /tmp —
         // a path the host cannot read. Handing the portal a file:// URI string
         // therefore launches a handler pointed at a file that, host-side, does
