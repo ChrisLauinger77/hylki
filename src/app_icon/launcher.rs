@@ -1,6 +1,7 @@
 //! The launcher: a copy of the desktop entry in the user's applications
 //! directory pointing at the chosen icon, and the `mimeinfo.cache` beside
 //! it that keeps Hylki the mail handler while the copy exists.
+
 use std::path::PathBuf;
 
 use super::{host_data_home, icon_is_ours};

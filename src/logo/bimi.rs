@@ -1,5 +1,6 @@
 //! BIMI: the logo a sender publishes for mail clients, named by a DNS TXT
 //! record at `default._bimi.<domain>`.
+
 use super::bundled::{looks_like_svg, square_svg};
 use super::site::USER_AGENT;
 use super::{domain_of, host_of, BIMI_MAX_BYTES, LOGO_PX};

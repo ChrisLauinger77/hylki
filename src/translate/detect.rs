@@ -1,5 +1,6 @@
 //! Telling a message's language offline, from its visible words, so the
 //! banner is offered only when it differs from the reader's.
+
 use super::base;
 
 /// Which language a message's text is in, when that can be told with

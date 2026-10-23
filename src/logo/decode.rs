@@ -1,5 +1,6 @@
 //! Turning fetched bytes into a texture, and remembering the answer (or
 //! the miss) for the domain.
+
 use super::bundled::{bundled_entry, looks_like_svg, square_svg};
 use super::{bimi_path, domain_of, img_path, miss_path, CACHE, LOGO_PX, MISSES};
 

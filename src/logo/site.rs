@@ -1,5 +1,6 @@
 //! The site's own icon: what its home page and web manifest declare, and
 //! the well-known paths, largest first.
+
 use super::bundled::looks_like_svg;
 
 /// Where a site publishes its icon, largest first: what its home page and
