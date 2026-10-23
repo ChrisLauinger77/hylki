@@ -12,8 +12,8 @@ use crate::config::{
     split_identity, AccountConfig, AliasConfig, NamedSignature, OAuthSettings, Protocol,
 };
 use crate::i18n::{i18n, i18n_f, i18n_noop};
-use crate::ui::preferences::{SenderRow, SenderRowOutput};
 use crate::ui::rich_editor::{self, RichEditor};
+use crate::ui::sender_row::{SenderRow, SenderRowOutput};
 use crate::worker::{self, ConnTest};
 
 const DEFAULT_COLOR: &str = "#3584e4";
@@ -604,9 +604,6 @@ pub enum AccountsOutput {
     LeaveNeedsPrompt(String),
 }
 
-/// Whether a GOA account's mail runs over the Microsoft Graph API: the
-/// "Microsoft 365" (`ms_graph`) provider has no IMAP — its token is
-/// Graph-scoped — so the imported account uses [`Protocol::Graph`] (issue #36).
 /// Stop a row's subtitle from squeezing out the row's value.
 ///
 /// An [`adw::ActionRow`] gives its title block whatever width the text asks
@@ -3758,7 +3755,6 @@ impl Component for AccountsWindow {
 }
 
 impl AccountsWindow {
-    /// Rebuild the editor's send-as alias list from `alias_edits` (#34).
     /// The signature editor, created (and mounted in its holder) on first
     /// use: a WebKit view is the slowest thing the panel would otherwise
     /// build, for a field most visits never reach.
@@ -3928,6 +3924,7 @@ impl AccountsWindow {
         }
     }
 
+    /// Rebuild the editor's send-as alias list from `alias_edits` (#34).
     fn rebuild_alias_list(&self, list: &gtk::ListBox, sender: &ComponentSender<Self>) {
         while let Some(child) = list.first_child() {
             list.remove(&child);
@@ -4165,7 +4162,6 @@ impl AccountsWindow {
         });
     }
 
-    /// Rebuild the draggable account list.
     /// Fill the editor's Special Folders combos (#82) for `acc` (None = a new
     /// account, whose folders aren't known yet): "Automatic" plus the account's
     /// live folder list, with any saved assignment selected.
@@ -4299,6 +4295,7 @@ impl AccountsWindow {
         roles
     }
 
+    /// Rebuild the draggable account list.
     fn rebuild_account_list(&self, list: &gtk::ListBox, sender: &ComponentSender<Self>) {
         while let Some(child) = list.first_child() {
             list.remove(&child);
@@ -4572,11 +4569,6 @@ impl AccountsWindow {
         }
     }
 
-    /// Show/hide credential rows based on the Authentication combo, and pre-fill
-    /// server settings for known OAuth providers.
-    /// Adapt the editor to the selected provider: show server + credential fields
-    /// for password providers, the OAuth sign-in for OAuth providers, and fill in
-    /// the servers for known providers.
     /// The mark over the form: a GNOME Online Account's comes from the
     /// account itself (its picker is hidden), otherwise the picker's, with
     /// a manual account's tile naming the protocol chosen below it.
@@ -4665,6 +4657,11 @@ impl AccountsWindow {
         });
     }
 
+    /// Show/hide credential rows based on the Authentication combo, and pre-fill
+    /// server settings for known OAuth providers.
+    /// Adapt the editor to the selected provider: show server + credential fields
+    /// for password providers, the OAuth sign-in for OAuth providers, and fill in
+    /// the servers for known providers.
     fn apply_provider(&self, widgets: &AccountsWindowWidgets) {
         let p = provider_at(widgets.provider_row.selected());
         self.refresh_provider_mark(widgets);
@@ -4762,8 +4759,6 @@ impl AccountsWindow {
         apply_protocol(widgets);
     }
 
-    /// Build the OAuth client config from the form. Google/Microsoft use built-in
-    /// endpoints + credentials; "Custom OAuth" uses the user-entered fields.
     /// A sign-in that asked for more scopes (#410, #411) finished: its
     /// refresh token is the one to save, and a new account takes its
     /// address and name from it.
@@ -4803,6 +4798,8 @@ impl AccountsWindow {
         Ok(())
     }
 
+    /// Build the OAuth client config from the form. Google/Microsoft use built-in
+    /// endpoints + credentials; "Custom OAuth" uses the user-entered fields.
     fn oauth_settings_from_form(&self, widgets: &AccountsWindowWidgets) -> OAuthSettings {
         let provider = provider_at(widgets.provider_row.selected()).oauth_name();
         if let Some(name) = provider {
@@ -5041,7 +5038,6 @@ fn display_name(acc: &AccountConfig) -> String {
     }
 }
 
-/// Build an `AccountConfig` from the current editor form values.
 impl AccountsWindow {
     /// The emoji to save: the editor's, unless the circle is set to show a
     /// picture.
@@ -5193,6 +5189,7 @@ fn import_avatar_file(src: &std::path::Path) -> Result<String, String> {
     Ok(name)
 }
 
+/// Build an `AccountConfig` from the current editor form values.
 fn read_account(
     widgets: &AccountsWindowWidgets,
     emoji: Option<String>,

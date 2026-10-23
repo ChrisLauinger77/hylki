@@ -309,45 +309,6 @@ const FETCH_INTERVALS: &[(&str, u64)] = &[
     (i18n_noop("Every 30 minutes"), 1800),
 ];
 
-// ---- Allowed-sender row -----------------------------------------------------
-
-pub struct SenderRow {
-    addr: String,
-}
-
-#[derive(Debug)]
-pub enum SenderRowOutput {
-    Remove(String),
-}
-
-#[relm4::factory(pub)]
-impl FactoryComponent for SenderRow {
-    type Init = String;
-    type Input = ();
-    type Output = SenderRowOutput;
-    type CommandOutput = ();
-    type ParentWidget = gtk::ListBox;
-
-    view! {
-        adw::ActionRow {
-            set_title: &self.addr,
-            add_suffix = &gtk::Button {
-                set_icon_name: "user-trash-symbolic",
-                set_valign: gtk::Align::Center,
-                set_tooltip_text: Some(i18n("Remove").as_str()),
-                add_css_class: "flat",
-                connect_clicked[sender, addr = self.addr.clone()] => move |_| {
-                    let _ = sender.output(SenderRowOutput::Remove(addr.clone()));
-                },
-            },
-        }
-    }
-
-    fn init_model(addr: Self::Init, _index: &DynamicIndex, _sender: FactorySender<Self>) -> Self {
-        Self { addr }
-    }
-}
-
 // ---- Preferences window -----------------------------------------------------
 
 pub struct Preferences {
