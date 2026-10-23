@@ -1,7 +1,8 @@
 //! Characterization tests for the list's pure helpers: they pin today's
 //! behaviour, quirks included, before the module is split.
 
-use super::{bare_address, normalize_subject, tag_sort_key, CheckFilter, SortOrder};
+use super::filters::{bare_address, CheckFilter};
+use super::sort::{normalize_subject, tag_sort_key, SortOrder};
 use crate::models::Message;
 
 fn blank() -> Message {
