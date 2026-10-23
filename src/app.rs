@@ -13139,43 +13139,24 @@ impl SimpleComponent for AppModel {
                         self.folder_choice_map_with(account_id, &folders),
                     ));
                 }
-                // Merge unread counts by PATH, and never let a zero overwrite
-                // a known count: a refresh's per-folder STATUS can fail
-                // silently (Gmail right after a RENAME answers zeros), and
-                // adopting them wholesale wiped every unread chip. A genuine
-                // zero re-asserts through the per-folder sync events.
-                let prev_by_path: std::collections::HashMap<String, u32> = self
-                    .folders
-                    .get(&account_id)
-                    .map(|old| {
-                        old.iter()
-                            .map(|f| {
-                                let n = self
-                                    .folder_unread
-                                    .get(&(account_id, f.id))
-                                    .copied()
-                                    .unwrap_or(f.unread);
-                                (f.path.clone(), n)
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
+                let unread = merged_unread(
+                    account_id,
+                    self.folders.get(&account_id).map(Vec::as_slice),
+                    &self.folder_unread,
+                    &folders,
+                );
                 self.folder_unread.retain(|(a, _), _| *a != account_id);
-                for f in &folders {
-                    let known = prev_by_path.get(&f.path).copied().unwrap_or(0);
-                    let n = if f.unread > 0 { f.unread } else { known };
-                    self.folder_unread.insert((account_id, f.id), n);
+                for (folder_id, n) in unread {
+                    self.folder_unread.insert((account_id, folder_id), n);
                 }
                 // An identical list — above all the refresh confirming an
                 // optimistic folder move, whose local reshape mirrors the
                 // worker exactly — changes nothing on screen: skip the rebuild
                 // so the sidebar's rows don't vanish and reappear for it.
-                let unchanged = self.folders.get(&account_id).is_some_and(|old| {
-                    old.len() == folders.len()
-                        && old.iter().zip(&folders).all(|(a, b)| {
-                            a.id == b.id && a.path == b.path && a.kind == b.kind && a.name == b.name
-                        })
-                });
+                let unchanged = self
+                    .folders
+                    .get(&account_id)
+                    .is_some_and(|old| same_folder_list(old, &folders));
                 // Ids are list positions, so a folder another client added,
                 // renamed or removed shifts them (a refresh re-lists the
                 // folders). The open folder and the cached lists follow their
@@ -21319,174 +21300,13 @@ impl AppModel {
         windowed: bool,
         can_toggle: bool,
     ) -> (u32, ComposeInit) {
-        // Selectable "from" identities, in display order: each account, then
-        // one entry per send-as alias it defines (#34) — same transport and
-        // signature, a different From on the wire. Built from the CONFIG, not
-        // the live account list: launched cold by a mailto/file hand-off
-        // (Nautilus's "Send by email", #105) the composer opens before any
-        // worker has connected, and the live list is still empty — which
-        // hid the From row entirely.
-        // The demo's stand-in accounts count here too, so a demo reply
-        // carries a signature like a real one.
-        let config = self.effective_config();
-        let mut emails: Vec<String> = Vec::new();
-        for email in &self.account_order {
-            if config.iter().any(|c| c.enabled && &c.email == email) && !emails.contains(email) {
-                emails.push(email.clone());
-            }
-        }
-        for c in config.iter().filter(|c| c.enabled) {
-            if !emails.contains(&c.email) {
-                emails.push(c.email.clone());
-            }
-        }
-        let accounts: Vec<ComposeAccount> = emails
-            .iter()
-            .flat_map(|email| {
-                let Some((idx, cfg)) = config.iter().enumerate().find(|(_, c)| &c.email == email)
-                else {
-                    return Vec::new();
-                };
-                let id = idx as u32 + 1;
-                let label = if cfg.name.trim().is_empty() {
-                    cfg.email.clone()
-                } else {
-                    format!("{} <{}>", cfg.name, cfg.email)
-                };
-                let cfg = Some(cfg);
-                let (signatures, default) = cfg.map(|c| c.signature_set()).unwrap_or_default();
-                let signature = default
-                    .map(|i| signatures[i].html.clone())
-                    .unwrap_or_default();
-                let pgp_key = cfg.and_then(|c| c.pgp_key.clone());
-                let sign_default = cfg.is_some_and(|c| c.sign_by_default);
-                let mut identities = vec![ComposeAccount {
-                    id,
-                    label,
-                    signature: signature.clone(),
-                    signatures: signatures.clone(),
-                    email: email.clone(),
-                    pgp_key: pgp_key.clone(),
-                    sign_default,
-                    alias_from: None,
-                }];
-                for alias in cfg.map(|c| c.aliases.as_slice()).unwrap_or_default() {
-                    let (name, addr) = split_identity(&alias.identity);
-                    if addr.is_empty() {
-                        continue;
-                    }
-                    let display = if name.is_empty() {
-                        addr.clone()
-                    } else {
-                        format!("{name} <{addr}>")
-                    };
-                    identities.push(ComposeAccount {
-                        id,
-                        label: display.clone(),
-                        signature: signature.clone(),
-                        signatures: signatures.clone(),
-                        email: addr,
-                        pgp_key: pgp_key.clone(),
-                        sign_default,
-                        alias_from: Some(display),
-                    });
-                }
-                // A JMAP server's own identities (#346), unless the account
-                // already lists the address. A catch-all (`*@domain`) is no
-                // address to send from; typing one into From uses it.
-                for (name, addr) in self
-                    .server_identities
-                    .get(&id)
-                    .map(Vec::as_slice)
-                    .unwrap_or_default()
-                {
-                    if addr.starts_with("*@")
-                        || identities
-                            .iter()
-                            .any(|i| i.email.eq_ignore_ascii_case(addr))
-                    {
-                        continue;
-                    }
-                    let display = if name.is_empty() || name.eq_ignore_ascii_case(addr) {
-                        addr.clone()
-                    } else {
-                        format!("{name} <{addr}>")
-                    };
-                    identities.push(ComposeAccount {
-                        id,
-                        label: display.clone(),
-                        signature: signature.clone(),
-                        signatures: signatures.clone(),
-                        email: addr.clone(),
-                        pgp_key: pgp_key.clone(),
-                        sign_default,
-                        alias_from: Some(display),
-                    });
-                }
-                identities
-            })
-            .collect();
-        // Default identity: for a reply, whichever of the account's addresses
-        // the original was sent to — mail to an alias is answered as the alias.
-        // For a new message, the default sender chosen in Settings (#157), if
-        // it is one of this account's addresses. Otherwise (and when nothing
-        // matches) the account's own address.
-        // A reply to a `+tag` address of one of the account's identities
-        // (#347) answers from that address, as typed, through the identity.
-        let plus = (prefill.custom_from.trim().is_empty())
-            .then(|| {
-                crate::worker::parse_recipients(&prefill.reply_addressed_to)
-                    .into_iter()
-                    .find_map(|(_, addr)| {
-                        let (user, host) = addr.split_once('@')?;
-                        let (base, _tag) = user.split_once('+')?;
-                        let plain = format!("{base}@{host}");
-                        let i = accounts.iter().position(|c| {
-                            c.id == account_id && c.email.eq_ignore_ascii_case(&plain)
-                        })?;
-                        let (name, _) = crate::config::split_identity(
-                            &accounts[i]
-                                .alias_from
-                                .clone()
-                                .unwrap_or_else(|| accounts[i].label.clone()),
-                        );
-                        Some((i, crate::worker::format_recipient(&name, &addr)))
-                    })
-            })
-            .flatten();
+        let accounts = compose_identities(
+            &self.account_order,
+            self.effective_config(),
+            &self.server_identities,
+        );
         let mut prefill = prefill;
-        if let Some((_, from)) = &plus {
-            prefill.custom_from = from.clone();
-        }
-        let hay = prefill.reply_addressed_to.to_lowercase();
-        let want = prefill.from_address.trim().to_lowercase();
-        let by_reply = || {
-            (!hay.is_empty())
-                .then(|| {
-                    accounts.iter().position(|c| {
-                        c.id == account_id && hay.contains(c.email.to_lowercase().as_str())
-                    })
-                })
-                .flatten()
-        };
-        let selected = plus
-            .map(|(i, _)| i)
-            .or_else(by_reply)
-            .or_else(|| {
-                (!want.is_empty())
-                    .then(|| {
-                        accounts
-                            .iter()
-                            .position(|c| c.id == account_id && c.email.to_lowercase() == want)
-                    })
-                    .flatten()
-            })
-            .or_else(|| {
-                accounts
-                    .iter()
-                    .position(|c| c.id == account_id && c.alias_from.is_none())
-            })
-            .unwrap_or(0);
+        let selected = choose_identity(&accounts, account_id, &mut prefill);
 
         // A reply or forward to plain-text mail answers in kind when the
         // setting says so (#436); anything else starts in the chosen format.
@@ -24124,23 +23944,11 @@ impl AppModel {
         {
             let key_prefix = format!("{email}\t");
             for k in self.tree_collapsed.iter_mut() {
-                if let Some(rest) = k.strip_prefix(&key_prefix) {
-                    if rest == path {
-                        *k = format!("{key_prefix}{new_path}");
-                    } else if let Some(r) = rest.strip_prefix(&old_prefix) {
-                        *k = format!("{key_prefix}{new_prefix}{r}");
-                    }
-                }
+                rekey_folder_key(k, &key_prefix, &path, &new_path, delim);
             }
             // So do favorites (#367), keeping their place in the list.
             for k in self.favorites.iter_mut() {
-                if let Some(rest) = k.strip_prefix(&key_prefix) {
-                    if rest == path {
-                        *k = format!("{key_prefix}{new_path}");
-                    } else if let Some(r) = rest.strip_prefix(&old_prefix) {
-                        *k = format!("{key_prefix}{new_prefix}{r}");
-                    }
-                }
+                rekey_folder_key(k, &key_prefix, &path, &new_path, delim);
             }
             // So does the folder order. A renamed folder keeps its place; one
             // moved under another parent has left the siblings it was placed
@@ -24152,13 +23960,7 @@ impl AppModel {
                 self.folder_order.retain(|k| *k != own_key);
             }
             for k in self.folder_order.iter_mut() {
-                if let Some(rest) = k.strip_prefix(&key_prefix) {
-                    if rest == path {
-                        *k = format!("{key_prefix}{new_path}");
-                    } else if let Some(r) = rest.strip_prefix(&old_prefix) {
-                        *k = format!("{key_prefix}{new_prefix}{r}");
-                    }
-                }
+                rekey_folder_key(k, &key_prefix, &path, &new_path, delim);
             }
             self.save_sidebar_state();
         }
@@ -27260,40 +27062,18 @@ impl AppModel {
                 kept.push(m);
                 continue;
             }
-            let recipients = [m.to.as_str(), m.cc.as_str()]
-                .into_iter()
-                .filter(|s| !s.trim().is_empty())
-                .collect::<Vec<_>>()
-                .join(", ");
             let body_hits = hits
                 .and_then(|h| h.get(&m.uid))
                 .map(Vec::as_slice)
                 .unwrap_or(&[]);
-            let input = config::FilterInput {
-                from_addr: &m.from_addr,
-                from_name: &m.from_name,
-                subject: &m.subject,
-                recipients: &recipients,
-                reply_to: &m.reply_to,
-                // The list rarely carries a body (the demo's does); the
-                // preview is what a sync brings for every message.
-                body: if m.body.is_empty() {
-                    &m.preview
-                } else {
-                    &m.body
-                },
-                body_hits,
-                contacts: contacts.as_deref(),
-            };
-            let matching: Vec<&&config::FilterRule> = rules
-                .iter()
-                .enumerate()
-                .filter(|(_, r)| r.matches(&input))
-                .map(|(i, r)| {
-                    per_rule[i] += 1;
-                    r
-                })
-                .collect();
+            let matching: Vec<&&config::FilterRule> =
+                rules_matching(&rules, &m, body_hits, contacts.as_deref())
+                    .into_iter()
+                    .map(|i| {
+                        per_rule[i] += 1;
+                        &rules[i]
+                    })
+                    .collect();
             if !matching.is_empty() {
                 matched += 1;
             }
@@ -30267,6 +30047,98 @@ impl AppModel {
     }
 }
 
+/// Unread counts for a fresh folder listing of `account_id`, as
+/// (folder id, count). Merged by PATH, and a zero never overwrites a known
+/// count: a refresh's per-folder STATUS can fail silently (Gmail right after
+/// a RENAME answers zeros), and adopting them wholesale wiped every unread
+/// chip. A genuine zero re-asserts through the per-folder sync events.
+/// `known` is the app's own count per (account, folder id), which wins over
+/// what the old listing said.
+fn merged_unread(
+    account_id: u32,
+    old: Option<&[Folder]>,
+    known: &HashMap<(u32, u32), u32>,
+    folders: &[Folder],
+) -> Vec<(u32, u32)> {
+    let prev_by_path: HashMap<&str, u32> = old
+        .map(|old| {
+            old.iter()
+                .map(|f| {
+                    let n = known.get(&(account_id, f.id)).copied().unwrap_or(f.unread);
+                    (f.path.as_str(), n)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    folders
+        .iter()
+        .map(|f| {
+            let known = prev_by_path.get(f.path.as_str()).copied().unwrap_or(0);
+            (f.id, if f.unread > 0 { f.unread } else { known })
+        })
+        .collect()
+}
+
+/// Whether two listings show the same folders: same ids, paths, kinds and
+/// names, in the same order. Unread counts do not count.
+fn same_folder_list(old: &[Folder], new: &[Folder]) -> bool {
+    old.len() == new.len()
+        && old
+            .iter()
+            .zip(new)
+            .all(|(a, b)| a.id == b.id && a.path == b.path && a.kind == b.kind && a.name == b.name)
+}
+
+/// The rules among `rules` that match `m`, as indexes in order. The list
+/// rarely carries a body (the demo's does); the preview is what a sync
+/// brings for every message, so it stands in for an empty body.
+fn rules_matching(
+    rules: &[&config::FilterRule],
+    m: &Message,
+    body_hits: &[String],
+    contacts: Option<&std::collections::HashSet<String>>,
+) -> Vec<usize> {
+    let recipients = [m.to.as_str(), m.cc.as_str()]
+        .into_iter()
+        .filter(|s| !s.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let input = config::FilterInput {
+        from_addr: &m.from_addr,
+        from_name: &m.from_name,
+        subject: &m.subject,
+        recipients: &recipients,
+        reply_to: &m.reply_to,
+        body: if m.body.is_empty() {
+            &m.preview
+        } else {
+            &m.body
+        },
+        body_hits,
+        contacts,
+    };
+    rules
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.matches(&input))
+        .map(|(i, _)| i)
+        .collect()
+}
+
+/// A sidebar key ("email\tpath", `key_prefix` being "email\t") after the
+/// folder `path` became `new_path`: the folder's own key and its children's
+/// follow it, any other key is left alone.
+fn rekey_folder_key(key: &mut String, key_prefix: &str, path: &str, new_path: &str, delim: char) {
+    let Some(rest) = key.strip_prefix(key_prefix) else {
+        return;
+    };
+    if rest == path {
+        *key = format!("{key_prefix}{new_path}");
+    } else if let Some(r) = rest.strip_prefix(&format!("{path}{delim}")) {
+        *key = format!("{key_prefix}{new_path}{delim}{r}");
+    }
+}
+
 /// The folder a sent copy is filed in (#199): the chosen one when the account
 /// still has it, else the Sent folder, else nowhere. A choice whose folder was
 /// renamed or removed server-side falls back rather than appending into a
@@ -31783,6 +31655,187 @@ fn window_drop_target(
         true
     });
     drop
+}
+
+/// Selectable "from" identities, in display order: each account, then
+/// one entry per send-as alias it defines (#34) — same transport and
+/// signature, a different From on the wire. Built from the CONFIG, not
+/// the live account list: launched cold by a mailto/file hand-off
+/// (Nautilus's "Send by email", #105) the composer opens before any
+/// worker has connected, and the live list is still empty — which
+/// hid the From row entirely.
+/// The demo's stand-in accounts count here too, so a demo reply
+/// carries a signature like a real one.
+fn compose_identities(
+    account_order: &[String],
+    config: &[AccountConfig],
+    server_identities: &HashMap<u32, Vec<(String, String)>>,
+) -> Vec<ComposeAccount> {
+    let mut emails: Vec<String> = Vec::new();
+    for email in account_order {
+        if config.iter().any(|c| c.enabled && &c.email == email) && !emails.contains(email) {
+            emails.push(email.clone());
+        }
+    }
+    for c in config.iter().filter(|c| c.enabled) {
+        if !emails.contains(&c.email) {
+            emails.push(c.email.clone());
+        }
+    }
+    emails
+        .iter()
+        .flat_map(|email| {
+            let Some((idx, cfg)) = config.iter().enumerate().find(|(_, c)| &c.email == email)
+            else {
+                return Vec::new();
+            };
+            let id = idx as u32 + 1;
+            let label = if cfg.name.trim().is_empty() {
+                cfg.email.clone()
+            } else {
+                format!("{} <{}>", cfg.name, cfg.email)
+            };
+            let cfg = Some(cfg);
+            let (signatures, default) = cfg.map(|c| c.signature_set()).unwrap_or_default();
+            let signature = default
+                .map(|i| signatures[i].html.clone())
+                .unwrap_or_default();
+            let pgp_key = cfg.and_then(|c| c.pgp_key.clone());
+            let sign_default = cfg.is_some_and(|c| c.sign_by_default);
+            let mut identities = vec![ComposeAccount {
+                id,
+                label,
+                signature: signature.clone(),
+                signatures: signatures.clone(),
+                email: email.clone(),
+                pgp_key: pgp_key.clone(),
+                sign_default,
+                alias_from: None,
+            }];
+            for alias in cfg.map(|c| c.aliases.as_slice()).unwrap_or_default() {
+                let (name, addr) = split_identity(&alias.identity);
+                if addr.is_empty() {
+                    continue;
+                }
+                let display = if name.is_empty() {
+                    addr.clone()
+                } else {
+                    format!("{name} <{addr}>")
+                };
+                identities.push(ComposeAccount {
+                    id,
+                    label: display.clone(),
+                    signature: signature.clone(),
+                    signatures: signatures.clone(),
+                    email: addr,
+                    pgp_key: pgp_key.clone(),
+                    sign_default,
+                    alias_from: Some(display),
+                });
+            }
+            // A JMAP server's own identities (#346), unless the account
+            // already lists the address. A catch-all (`*@domain`) is no
+            // address to send from; typing one into From uses it.
+            for (name, addr) in server_identities
+                .get(&id)
+                .map(Vec::as_slice)
+                .unwrap_or_default()
+            {
+                if addr.starts_with("*@")
+                    || identities
+                        .iter()
+                        .any(|i| i.email.eq_ignore_ascii_case(addr))
+                {
+                    continue;
+                }
+                let display = if name.is_empty() || name.eq_ignore_ascii_case(addr) {
+                    addr.clone()
+                } else {
+                    format!("{name} <{addr}>")
+                };
+                identities.push(ComposeAccount {
+                    id,
+                    label: display.clone(),
+                    signature: signature.clone(),
+                    signatures: signatures.clone(),
+                    email: addr.clone(),
+                    pgp_key: pgp_key.clone(),
+                    sign_default,
+                    alias_from: Some(display),
+                });
+            }
+            identities
+        })
+        .collect()
+}
+
+/// Default identity: for a reply, whichever of the account's addresses
+/// the original was sent to — mail to an alias is answered as the alias.
+/// For a new message, the default sender chosen in Settings (#157), if
+/// it is one of this account's addresses. Otherwise (and when nothing
+/// matches) the account's own address.
+/// A reply to a `+tag` address of one of the account's identities
+/// (#347) answers from that address, as typed, through the identity.
+///
+/// Returns the index into `accounts`; a `+tag` reply also sets
+/// `prefill.custom_from`.
+fn choose_identity(
+    accounts: &[ComposeAccount],
+    account_id: u32,
+    prefill: &mut ComposePrefill,
+) -> usize {
+    let plus = (prefill.custom_from.trim().is_empty())
+        .then(|| {
+            crate::worker::parse_recipients(&prefill.reply_addressed_to)
+                .into_iter()
+                .find_map(|(_, addr)| {
+                    let (user, host) = addr.split_once('@')?;
+                    let (base, _tag) = user.split_once('+')?;
+                    let plain = format!("{base}@{host}");
+                    let i = accounts
+                        .iter()
+                        .position(|c| c.id == account_id && c.email.eq_ignore_ascii_case(&plain))?;
+                    let (name, _) = crate::config::split_identity(
+                        &accounts[i]
+                            .alias_from
+                            .clone()
+                            .unwrap_or_else(|| accounts[i].label.clone()),
+                    );
+                    Some((i, crate::worker::format_recipient(&name, &addr)))
+                })
+        })
+        .flatten();
+    if let Some((_, from)) = &plus {
+        prefill.custom_from = from.clone();
+    }
+    let hay = prefill.reply_addressed_to.to_lowercase();
+    let want = prefill.from_address.trim().to_lowercase();
+    let by_reply = || {
+        (!hay.is_empty())
+            .then(|| {
+                accounts.iter().position(|c| {
+                    c.id == account_id && hay.contains(c.email.to_lowercase().as_str())
+                })
+            })
+            .flatten()
+    };
+    plus.map(|(i, _)| i)
+        .or_else(by_reply)
+        .or_else(|| {
+            (!want.is_empty())
+                .then(|| {
+                    accounts
+                        .iter()
+                        .position(|c| c.id == account_id && c.email.to_lowercase() == want)
+                })
+                .flatten()
+        })
+        .or_else(|| {
+            accounts
+                .iter()
+                .position(|c| c.id == account_id && c.alias_from.is_none())
+        })
+        .unwrap_or(0)
 }
 
 /// A reply's subject: the original's, with one "Re:" in front.
@@ -34049,5 +34102,636 @@ mod tests {
         assert!(credits(TRANSLATORS)
             .iter()
             .all(|(_, _, note)| !note.is_empty()));
+    }
+
+    // Characterization tests (restructure step A0.1): they pin what these
+    // helpers do today, quirks included, before the code moves.
+
+    /// A message with only the fields a test names filled in.
+    fn mail(account_id: u32, folder_id: u32, uid: u32) -> Message {
+        let mut m = labelled(folder_id, uid, "");
+        m.account_id = account_id;
+        m
+    }
+
+    #[test]
+    fn reply_subject_adds_one_re_whatever_its_case() {
+        assert_eq!(reply_subject("Lunch"), "Re: Lunch");
+        assert_eq!(reply_subject("re: Lunch"), "re: Lunch");
+        assert_eq!(reply_subject("RE:Lunch"), "RE:Lunch");
+        assert_eq!(reply_subject("Fwd: Lunch"), "Re: Fwd: Lunch");
+        assert_eq!(reply_subject(""), "Re: ");
+    }
+
+    #[test]
+    fn thread_chain_appends_the_message_once() {
+        let mut m = mail(1, 1, 1);
+        m.references = "a@x  b@x a@x".into();
+        m.message_id = "b@x".into();
+        assert_eq!(thread_chain(&m), "a@x b@x");
+        m.message_id = String::new();
+        m.references = String::new();
+        assert_eq!(thread_chain(&m), "");
+    }
+
+    #[test]
+    fn bare_address_takes_the_angle_part_lowercased() {
+        assert_eq!(bare_address(" Ana <Ana@X.org> "), "ana@x.org");
+        assert_eq!(bare_address("\"ana@x.org\""), "ana@x.org");
+        assert_eq!(bare_address("<>"), "");
+        assert_eq!(bare_address("a>b<c"), "a>b<c");
+    }
+
+    #[test]
+    fn own_address_matches_aliases_and_plus_tags() {
+        let own = vec!["Me <me@x.org>".to_string(), "alias@y.org".to_string()];
+        assert!(is_own_address("ME@x.org", &own));
+        assert!(is_own_address("me+news@x.org", &own));
+        assert!(is_own_address("\"Alias\" <alias@y.org>", &own));
+        assert!(!is_own_address("other@x.org", &own));
+        assert!(!is_own_address("", &own));
+        assert!(!is_own_address("me@x.org", &[String::new()]));
+    }
+
+    #[test]
+    fn unsent_prefill_paragraphs_split_on_lf_only() {
+        let m = crate::worker::OutgoingMessage {
+            from_account_id: 1,
+            from_alias: Some("Me <me@x.org>".into()),
+            to: "a@x".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            reply_to: String::new(),
+            subject: "S".into(),
+            body: "one\r\n\r\ntwo <b>\nthree\n\nfour".into(),
+            html: " ".into(),
+            attachments: vec!["/nonexistent/hylki-test-file".into()],
+            in_reply_to: String::new(),
+            references: String::new(),
+            forwards: String::new(),
+            draft_origin: None,
+            outbox_origin: Some(7),
+            sign: false,
+            encrypt: true,
+            send_at: Some(5),
+            calendar: None,
+        };
+        let p = unsent_prefill(m);
+        assert_eq!(
+            p.body_html,
+            "<p>one\r<br>\r<br>two &lt;b&gt;<br>three</p><p>four</p>"
+        );
+        assert!(p.attachments.is_empty(), "unreadable files are left out");
+        assert_eq!(p.from_address, "me@x.org");
+        assert_eq!(p.custom_from, "Me <me@x.org>");
+        assert!(p.resumed && p.encrypt && !p.template);
+        assert_eq!((p.outbox_origin, p.send_at), (Some(7), Some(5)));
+    }
+
+    #[test]
+    fn body_look_folds_bgcolor_in_front_of_the_style() {
+        assert_eq!(
+            body_look("<html><BODY bgcolor=\"#fff\" style=\"color: red\">x</body>").as_deref(),
+            Some("background-color:#fff;color: red;")
+        );
+        assert_eq!(
+            body_look("<body bgcolor=red>").as_deref(),
+            Some("background-color:red;")
+        );
+        assert_eq!(body_look("<body style=' '>"), None);
+        assert_eq!(body_look("<p>no body</p>"), None);
+        assert_eq!(body_look("<body style=\"unclosed>"), None);
+    }
+
+    #[test]
+    fn breaks_turn_every_line_end_into_one_br() {
+        assert_eq!(breaks("a\r\nb\rc\nd"), "a<br>b<br>c<br>d");
+    }
+
+    #[test]
+    fn empty_blocks_are_trimmed_from_both_ends() {
+        assert_eq!(
+            trim_empty_blocks(" <br> <p></p><p>x</p><div><br></div>&nbsp; "),
+            "<p>x</p>"
+        );
+        assert_eq!(trim_empty_blocks("<br/><br />"), "");
+    }
+
+    #[test]
+    fn quote_blocks_escape_the_attribution() {
+        assert_eq!(
+            quote_block("On <d>,\nA wrote:", "a & b\nc"),
+            "<p class=\"hylki-quote-attr\">On &lt;d&gt;,<br>A wrote:</p><blockquote><div style=\"white-space:pre-wrap\">a &amp; b<br>c</div></blockquote>"
+        );
+        assert_eq!(
+            quote_block_html("A", "<p>x</p>"),
+            "<p class=\"hylki-quote-attr\">A</p><blockquote><p>x</p></blockquote>"
+        );
+        assert_eq!(
+            quote_block_html("A", "<p style=\"background: red\">x</p>"),
+            "<p class=\"hylki-quote-attr\">A</p><blockquote class=\"hylki-quote-mail\"><p style=\"background: red\">x</p></blockquote>"
+        );
+    }
+
+    #[test]
+    fn message_text_trims_plain_text() {
+        assert_eq!(message_text("  hello\n "), "hello");
+    }
+
+    #[test]
+    fn prefix_check_ignores_ascii_case_and_char_boundaries() {
+        assert!(starts_with_ignore_case("Content-Type", "content-"));
+        assert!(!starts_with_ignore_case("Co", "content"));
+        assert!(!starts_with_ignore_case("é1", "e"));
+    }
+
+    #[test]
+    fn view_keys_differ_by_view_and_account() {
+        let inbox = UnifiedView::Kind(FolderKind::Inbox);
+        assert_eq!(view_key_of(inbox, None), view_key_of(inbox, None));
+        assert_ne!(view_key_of(inbox, None), view_key_of(inbox, Some(1)));
+        assert_ne!(
+            view_key_of(inbox, None),
+            view_key_of(UnifiedView::Favorites, None)
+        );
+    }
+
+    /// The fingerprint ignores order, and (B29) only hashes the lengths of
+    /// the text fields: an equal-length edit leaves it unchanged.
+    #[test]
+    fn content_fingerprint_ignores_order_and_same_length_text() {
+        let a = mail(1, 1, 1);
+        let mut b = mail(1, 1, 2);
+        b.subject = "abc".into();
+        let fp = content_fp([&a, &b].into_iter());
+        assert_eq!(fp, content_fp([&b, &a].into_iter()));
+        let mut b2 = b.clone();
+        b2.subject = "xyz".into();
+        assert_eq!(fp, content_fp([&a, &b2].into_iter()));
+        let mut b3 = b.clone();
+        b3.unread = true;
+        assert_ne!(fp, content_fp([&a, &b3].into_iter()));
+        assert_ne!(content_fp([&a].into_iter()), content_fp(std::iter::empty()));
+    }
+
+    #[test]
+    fn a_search_from_the_inbox_spans_all_folders() {
+        assert_eq!(default_scope(true), SearchScope::AllFolders);
+        assert_eq!(default_scope(false), SearchScope::ThisFolder);
+    }
+
+    #[test]
+    fn same_mail_needs_id_sender_and_time() {
+        let mut a = labelled(1, 1, "<a@x>");
+        a.from_addr = "s@x".into();
+        a.timestamp = 5;
+        let mut b = a.clone();
+        b.folder_id = 2;
+        b.subject = "other".into();
+        assert!(same_mail(&a, &b));
+        b.timestamp = 6;
+        assert!(!same_mail(&a, &b));
+        let mut c = a.clone();
+        c.message_id = String::new();
+        assert!(!same_mail(&c, &c.clone()));
+    }
+
+    #[test]
+    fn events_match_by_body_key_or_by_id() {
+        let mut m = mail(2, 3, 40);
+        m.id = 9;
+        assert_eq!(body_key(&m), (2, 3, 40));
+        assert!(is_event_target(&m, Some((2, 3, 40)), 7, 7));
+        assert!(!is_event_target(&m, Some((2, 3, 41)), 2, 9));
+        assert!(is_event_target(&m, None, 2, 9));
+        assert!(!is_event_target(&m, None, 2, 40));
+    }
+
+    #[test]
+    fn contact_import_summary_counts() {
+        use crate::local_contacts::ImportOutcome;
+        let none = ImportOutcome {
+            errors: 1,
+            ..Default::default()
+        };
+        assert_eq!(
+            import_summary(&none),
+            (
+                "No contacts were found in the selected files".to_string(),
+                true
+            )
+        );
+        let ok = ImportOutcome {
+            added: 2,
+            updated: 1,
+            ..Default::default()
+        };
+        assert_eq!(
+            import_summary(&ok),
+            ("Contacts imported: 2 new, 1 updated".to_string(), false)
+        );
+        let mixed = ImportOutcome {
+            added: 1,
+            skipped: 3,
+            ..Default::default()
+        };
+        assert_eq!(
+            import_summary(&mixed).0,
+            "Contacts imported: 1 new, 0 updated, 3 skipped, 0 damaged"
+        );
+    }
+
+    #[test]
+    fn showcase_values_take_an_optional_delay() {
+        assert_eq!(showcase_at("inbox@3", 1), ("inbox", 3));
+        assert_eq!(showcase_at("inbox", 1), ("inbox", 1));
+        assert_eq!(showcase_at("a@b@x", 1), ("a@b", 1));
+    }
+
+    #[test]
+    fn filter_run_totals_add_up_the_folders() {
+        let mut run = FilterRun {
+            folders: Default::default(),
+            pending: Default::default(),
+            reported: false,
+            dialog: None,
+        };
+        run.folders.insert(
+            (1, 1),
+            FolderTally {
+                checked: 3,
+                matched: 2,
+                tagged: 1,
+                filed: 0,
+            },
+        );
+        run.folders.insert(
+            (1, 2),
+            FolderTally {
+                checked: 4,
+                matched: 1,
+                tagged: 0,
+                filed: 1,
+            },
+        );
+        run.pending.insert((1, 2));
+        let t = run.totals();
+        assert_eq!((t.checked, t.matched, t.tagged, t.filed), (7, 3, 1, 1));
+        assert_eq!(run.done_count(), 1);
+    }
+
+    /// B2 in the map: an empty `answers` never matches, since an empty
+    /// reference is never in a whitespace split.
+    #[test]
+    fn a_provisional_card_is_copied_by_its_sent_copy() {
+        let mut sent = mail(1, 5, 0);
+        sent.timestamp = 1000;
+        let p = Provisional {
+            message: sent.clone(),
+            answers: "parent@x".into(),
+        };
+        let mut copy = mail(1, 9, 77);
+        copy.timestamp = 970;
+        copy.references = "root@x parent@x".into();
+        assert!(p.copied_by(&copy));
+        copy.timestamp = 969;
+        assert!(!p.copied_by(&copy));
+        copy.timestamp = 2000;
+        copy.uid = 0;
+        assert!(!p.copied_by(&copy));
+        copy.uid = 77;
+        copy.account_id = 2;
+        assert!(!p.copied_by(&copy));
+        let empty = Provisional {
+            message: sent,
+            answers: String::new(),
+        };
+        copy.account_id = 1;
+        assert!(!empty.copied_by(&copy));
+    }
+
+    #[test]
+    fn smart_folders_read_recipients_and_fall_back_to_the_preview() {
+        use crate::config::{FilterMatch, SmartCondition, SmartField, SmartFolder};
+        let ctx = SmartContext {
+            tags: Vec::new(),
+            tag_list: Vec::new(),
+            contacts: None,
+        };
+        let folder = |field, value: &str| SmartFolder {
+            id: "s".into(),
+            name: "S".into(),
+            account_email: String::new(),
+            folder: None,
+            any: false,
+            conditions: vec![SmartCondition {
+                field,
+                matcher: FilterMatch::Contains,
+                value: value.into(),
+            }],
+        };
+        let mut m = mail(1, 1, 1);
+        m.cc = "carol@x".into();
+        m.preview = "quarterly numbers".into();
+        assert!(ctx.matches(&folder(SmartField::Recipients, "carol"), &m));
+        assert!(ctx.matches(&folder(SmartField::Body, "quarterly"), &m));
+        m.body = "something else".into();
+        assert!(!ctx.matches(&folder(SmartField::Body, "quarterly"), &m));
+    }
+
+    #[test]
+    fn hand_off_files_go_to_one_side() {
+        let files = vec![std::path::PathBuf::from("/a"), "/b".into()];
+        let attached = HandOffFiles::of(files.clone(), false);
+        assert_eq!((attached.attach.len(), attached.cloud.len()), (2, 0));
+        let linked = HandOffFiles::of(files, true);
+        assert_eq!((linked.attach.len(), linked.cloud.len()), (0, 2));
+    }
+
+    #[test]
+    fn attachment_targets_key_the_gallery_by_path_uid_and_name() {
+        let t = AttachmentTarget {
+            account_id: 1,
+            message_id: 2,
+            path: "INBOX".into(),
+            uid: 3,
+            name: "a.pdf".into(),
+            size: 4,
+        };
+        assert_eq!(
+            t.gallery_key(),
+            (1, "INBOX".to_string(), 3, "a.pdf".to_string())
+        );
+    }
+
+    /// B17 in the map: the delimiter is the first separator found in any
+    /// path, so a '/' server whose first folder has a '.' in its name gets
+    /// no namespace.
+    #[test]
+    fn folder_namespace_takes_the_first_separator_seen() {
+        let custom = |path: &str| Folder {
+            id: 1,
+            account_id: 1,
+            name: path.into(),
+            path: path.into(),
+            kind: FolderKind::Custom,
+            unread: 0,
+        };
+        assert_eq!(
+            AppModel::infer_folder_namespace(&[custom("INBOX.a"), custom("INBOX.b")]),
+            "INBOX."
+        );
+        assert_eq!(
+            AppModel::infer_folder_namespace(&[custom("v1.2"), custom("INBOX/b")]),
+            ""
+        );
+    }
+
+    #[test]
+    fn goa_reconcile_drops_pauses_and_resumes() {
+        let mut config = demo_account_configs();
+        config.truncate(3);
+        config[0].goa_id = Some("gone".into());
+        config[1].goa_id = Some("paused".into());
+        config[1].enabled = true;
+        config[2].goa_id = None;
+        let removed_email = config[0].email.clone();
+        let mut live = crate::goa::GoaLiveState {
+            account_ids: ["paused".to_string()].into(),
+            disabled_mail_ids: ["paused".to_string()].into(),
+            mail: Default::default(),
+        };
+        let out = reconcile_goa(&mut config, &live);
+        assert_eq!(out.removed, vec![removed_email]);
+        assert!(out.paused_changed && !out.servers_changed);
+        assert_eq!(config.len(), 2);
+        assert!(config[0].goa_mail_disabled && !config[0].enabled);
+        assert!(config[0].goa_enabled_before_mail_disabled);
+        let again = reconcile_goa(&mut config, &live);
+        assert!(!again.paused_changed && again.removed.is_empty());
+        live.disabled_mail_ids.clear();
+        let back = reconcile_goa(&mut config, &live);
+        assert!(back.paused_changed);
+        assert!(!config[0].goa_mail_disabled && config[0].enabled);
+    }
+
+    #[test]
+    fn sidebar_and_worker_outputs_map_to_app_messages() {
+        let dbg = |m: AppMsg| format!("{m:?}");
+        assert_eq!(
+            dbg(sidebar_output_msg(SidebarOutput::UnifiedSelected)),
+            dbg(AppMsg::UnifiedSelected(UnifiedView::Kind(
+                FolderKind::Inbox
+            )))
+        );
+        assert_eq!(
+            dbg(sidebar_output_msg(SidebarOutput::UnifiedTagsSelected)),
+            dbg(AppMsg::TagSelected {
+                keyword: None,
+                account: None
+            })
+        );
+        assert_eq!(
+            dbg(map_event(3, WorkerEvent::BulkComplete)),
+            dbg(AppMsg::BulkComplete)
+        );
+        assert_eq!(
+            dbg(map_event(
+                3,
+                WorkerEvent::AttachmentsScanned {
+                    folder_path: "INBOX".into(),
+                    added: 1,
+                    remaining: 2
+                }
+            )),
+            dbg(AppMsg::AttachmentsScanned {
+                account_id: 3,
+                folder_path: "INBOX".into(),
+                added: 1,
+                remaining: 2
+            })
+        );
+    }
+
+    // Characterization tests (A0.2) for logic pulled out of methods.
+
+    fn identities_fixture() -> Vec<ComposeAccount> {
+        let mut config = demo_account_configs();
+        config.truncate(2);
+        config[0].email = "a@x.com".into();
+        config[0].name = "Ann".into();
+        config[0].aliases = vec![
+            toml::from_str("identity = \"Bea <ba@x.com>\"").unwrap(),
+            toml::from_str("identity = \"Nobody <>\"").unwrap(),
+        ];
+        config[1].email = "c@y.org".into();
+        config[1].name = " ".into();
+        let mut server = HashMap::new();
+        server.insert(
+            1,
+            vec![
+                ("".to_string(), "*@x.com".to_string()),
+                ("".to_string(), "BA@x.com".to_string()),
+                ("Ann".to_string(), "info@x.com".to_string()),
+            ],
+        );
+        server.insert(2, vec![("c@y.org".to_string(), "c2@y.org".to_string())]);
+        compose_identities(&["c@y.org".to_string()], &config, &server)
+    }
+
+    #[test]
+    fn compose_identities_follow_the_sidebar_order_then_aliases() {
+        let ids = identities_fixture();
+        let rows: Vec<(u32, &str, &str, Option<&str>)> = ids
+            .iter()
+            .map(|c| {
+                (
+                    c.id,
+                    c.label.as_str(),
+                    c.email.as_str(),
+                    c.alias_from.as_deref(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            rows,
+            vec![
+                (2, "c@y.org", "c@y.org", None),
+                (
+                    2,
+                    "c@y.org <c2@y.org>",
+                    "c2@y.org",
+                    Some("c@y.org <c2@y.org>")
+                ),
+                (1, "Ann <a@x.com>", "a@x.com", None),
+                (1, "Bea <ba@x.com>", "ba@x.com", Some("Bea <ba@x.com>")),
+                (
+                    1,
+                    "Ann <info@x.com>",
+                    "info@x.com",
+                    Some("Ann <info@x.com>")
+                ),
+            ]
+        );
+    }
+
+    /// B5 in the map: the reply identity is found by substring, so mail to
+    /// the alias ba@x.com is answered from the account a@x.com, which comes
+    /// first and is contained in it.
+    #[test]
+    fn reply_identity_is_chosen_by_substring_of_the_recipients() {
+        let ids = identities_fixture();
+        let mut reply = ComposePrefill {
+            reply_addressed_to: "Bea <ba@x.com>, ".into(),
+            ..Default::default()
+        };
+        assert_eq!(choose_identity(&ids, 1, &mut reply), 2);
+        assert!(reply.custom_from.is_empty());
+        let mut info = ComposePrefill {
+            reply_addressed_to: "info@x.com".into(),
+            ..Default::default()
+        };
+        assert_eq!(choose_identity(&ids, 1, &mut info), 4);
+        let mut chosen = ComposePrefill {
+            from_address: " BA@x.com ".into(),
+            ..Default::default()
+        };
+        assert_eq!(choose_identity(&ids, 1, &mut chosen), 3);
+        let mut plain = ComposePrefill::default();
+        assert_eq!(choose_identity(&ids, 1, &mut plain), 2);
+        assert_eq!(choose_identity(&ids, 9, &mut plain), 0);
+    }
+
+    #[test]
+    fn a_reply_to_a_plus_address_keeps_it_as_the_from() {
+        let ids = identities_fixture();
+        let mut reply = ComposePrefill {
+            reply_addressed_to: "ba+lists@x.com".into(),
+            ..Default::default()
+        };
+        assert_eq!(choose_identity(&ids, 1, &mut reply), 3);
+        assert_eq!(reply.custom_from, "Bea <ba+lists@x.com>");
+        let mut typed = ComposePrefill {
+            reply_addressed_to: "ba+lists@x.com".into(),
+            custom_from: "Me <me@x.com>".into(),
+            ..Default::default()
+        };
+        assert_eq!(choose_identity(&ids, 1, &mut typed), 2);
+        assert_eq!(typed.custom_from, "Me <me@x.com>");
+    }
+
+    fn folder(id: u32, path: &str, unread: u32) -> Folder {
+        Folder {
+            id,
+            account_id: 1,
+            name: path.into(),
+            path: path.into(),
+            kind: FolderKind::Custom,
+            unread,
+        }
+    }
+
+    #[test]
+    fn unread_counts_merge_by_path_and_never_drop_to_zero() {
+        let old = vec![folder(1, "INBOX", 5), folder(2, "A", 3), folder(3, "B", 0)];
+        let mut known = HashMap::new();
+        known.insert((1, 2), 7);
+        known.insert((2, 1), 99);
+        let new = vec![
+            folder(1, "INBOX", 0),
+            folder(2, "B", 0),
+            folder(3, "A", 0),
+            folder(4, "C", 2),
+        ];
+        assert_eq!(
+            merged_unread(1, Some(&old), &known, &new),
+            vec![(1, 5), (2, 0), (3, 7), (4, 2)]
+        );
+        assert_eq!(merged_unread(1, None, &known, &new[..1]), vec![(1, 0)]);
+    }
+
+    #[test]
+    fn folder_lists_compare_without_their_counts() {
+        let a = vec![folder(1, "INBOX", 5), folder(2, "A", 3)];
+        let mut b = a.clone();
+        b[1].unread = 0;
+        assert!(same_folder_list(&a, &b));
+        b[1].name = "a".into();
+        assert!(!same_folder_list(&a, &b));
+        assert!(!same_folder_list(&a, &a[..1]));
+    }
+
+    #[test]
+    fn filter_rules_read_recipients_and_the_preview() {
+        use crate::config::{FilterField, FilterMatch};
+        let mut rules = demo_filters();
+        rules[0].field = FilterField::Recipients;
+        rules[0].matcher = FilterMatch::Contains;
+        rules[0].value = "carol".into();
+        rules[1].field = FilterField::Body;
+        rules[1].value = "invoice".into();
+        let rules: Vec<&config::FilterRule> = rules.iter().collect();
+        let mut m = mail(1, 1, 1);
+        m.cc = "Carol <carol@x>".into();
+        m.preview = "Your invoice".into();
+        assert_eq!(rules_matching(&rules, &m, &[], None), vec![0, 1]);
+        m.body = "nothing here".into();
+        assert_eq!(rules_matching(&rules, &m, &[], None), vec![0]);
+        m.subject = "Your order".into();
+        assert_eq!(rules_matching(&rules, &m, &[], None), vec![0, 2]);
+    }
+
+    #[test]
+    fn sidebar_keys_follow_a_renamed_folder_and_its_children() {
+        let rekey = |k: &str, delim| {
+            let mut k = k.to_string();
+            rekey_folder_key(&mut k, "me@x\t", "A/B", "A/C", delim);
+            k
+        };
+        assert_eq!(rekey("me@x\tA/B", '/'), "me@x\tA/C");
+        assert_eq!(rekey("me@x\tA/B/D", '/'), "me@x\tA/C/D");
+        assert_eq!(rekey("me@x\tA/BB", '/'), "me@x\tA/BB");
+        assert_eq!(rekey("you@x\tA/B", '/'), "you@x\tA/B");
+        assert_eq!(rekey("me@x\tA/B.D", '.'), "me@x\tA/C.D");
     }
 }
