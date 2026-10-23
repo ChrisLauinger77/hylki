@@ -1,7 +1,10 @@
 //! Attachment chips and their thumbnails (#299).
 
 use super::messages::ComposeInput;
+use super::types::ComposeStep;
 use super::Compose;
+use super::ComposeWidgets;
+use crate::i18n::i18n_noop;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::is_image_name;
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
@@ -381,5 +384,82 @@ impl Compose {
         flow.set_visible(
             !self.attachments.is_empty() || !self.cloud_links.is_empty() || self.cloud_busy > 0,
         );
+    }
+}
+
+impl Compose {
+    /// Handles [`ComposeInput::AttachFiles`].
+    pub(super) fn on_attach_files(
+        &mut self,
+        sender: &ComponentSender<Self>,
+        root: &adw::BreakpointBin,
+    ) {
+        let dialog = gtk::FileDialog::new();
+        dialog.set_title(&i18n("Attach Files"));
+        let parent = root.root().and_downcast::<gtk::Window>();
+        let s = sender.input_sender().clone();
+        dialog.open_multiple(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
+            if let Ok(model) = res {
+                let mut paths = Vec::new();
+                for i in 0..model.n_items() {
+                    if let Some(file) = model.item(i).and_downcast::<gtk::gio::File>() {
+                        if let Some(p) = file.path() {
+                            paths.push(p);
+                        }
+                    }
+                }
+                if !paths.is_empty() {
+                    let _ = s.send(ComposeInput::AddAttachments(paths));
+                }
+            }
+        });
+    }
+
+    /// Handles [`ComposeInput::AddAttachments`].
+    pub(super) fn on_add_attachments(
+        &mut self,
+        paths: Vec<std::path::PathBuf>,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        if paths.is_empty() {
+            return;
+        }
+        self.fields_dirty = true;
+        let at = self.attachments.len();
+        let what = attachment_label(i18n_noop("Attach {name}"), &paths[0], paths.len());
+        self.attachments.extend(paths.iter().cloned());
+        self.push_history(
+            what,
+            ComposeStep::Remove {
+                at,
+                count: paths.len(),
+            },
+        );
+        self.rebuild_attachments(&widgets.attach_box, sender);
+        self.report_history(sender);
+    }
+
+    /// Handles [`ComposeInput::RemoveAttachment`].
+    pub(super) fn on_remove_attachment(
+        &mut self,
+        i: usize,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        if i < self.attachments.len() {
+            self.fields_dirty = true;
+            let path = self.attachments.remove(i);
+            let what = attachment_label(i18n_noop("Remove {name}"), &path, 1);
+            self.push_history(
+                what,
+                ComposeStep::Insert {
+                    at: i,
+                    paths: vec![path],
+                },
+            );
+            self.rebuild_attachments(&widgets.attach_box, sender);
+            self.report_history(sender);
+        }
     }
 }

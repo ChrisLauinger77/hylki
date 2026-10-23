@@ -223,7 +223,7 @@ impl Compose {
             match step {
                 0 => type_in(&self.editor, "ONETWO"),
                 1..=3 => self.editor.editing_command("DeleteBackward"),
-                4 => attach(&sender),
+                4 => attach(sender),
                 5..=9 => sender
                     .input_sender()
                     .emit(ComposeInput::History { redo: false }),
@@ -248,7 +248,7 @@ impl Compose {
         } else {
             match step {
                 0 => type_in(&self.editor, "ONE"),
-                1 => attach(&sender),
+                1 => attach(sender),
                 2 => type_in(&self.editor, "TWO"),
                 3..=8 => sender
                     .input_sender()
@@ -287,5 +287,23 @@ impl Compose {
             names(&self.attachments),
         );
         let _ = widgets;
+    }
+}
+
+impl Compose {
+    /// Handles [`ComposeInput::BodyHistory`].
+    pub(super) fn on_body_history(&mut self, can_undo: bool, sender: &ComponentSender<Self>) {
+        // A fresh edit takes its place in the order — one marker
+        // covers a whole run of typing, since the editor coalesces
+        // its own steps and this only has to say where they sit.
+        if can_undo
+            && !matches!(
+                self.undo_stack.last().map(|e| &e.step),
+                Some(ComposeStep::Body)
+            )
+        {
+            self.push_history(i18n("Typing"), ComposeStep::Body);
+        }
+        self.report_history(sender);
     }
 }

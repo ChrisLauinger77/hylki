@@ -1,12 +1,14 @@
 //! Sending and saving: the From, the outgoing message, OpenPGP checks before a
 //! send, and Send Later.
 
+use super::messages::ComposeOutput;
 use super::messages::{ComposeInput, OutgoingFields};
 use super::types::ComposeAccount;
 use super::Compose;
 use super::ComposeWidgets;
 use crate::config::ComposeFormat;
 use crate::i18n::{i18n, i18n_f};
+use crate::models::DraftOrigin;
 use crate::worker::OutgoingMessage;
 use adw::prelude::*;
 use relm4::prelude::*;
@@ -325,6 +327,445 @@ impl Compose {
             encrypt: self.encrypt,
             calendar: None,
             send_at: self.send_at,
+        }
+    }
+}
+
+impl Compose {
+    /// Handles [`ComposeInput::SaveDraftIfDirty`].
+    pub(super) fn on_save_draft_if_dirty(&mut self, sender: &ComponentSender<Self>) {
+        // Save only if the user actually edited something, so navigating
+        // away from a pristine quote-only reply doesn't litter Drafts.
+        if self.fields_dirty {
+            sender.input_sender().emit(ComposeInput::SaveDraft);
+        } else {
+            let s = sender.clone();
+            let id = self.compose_id;
+            self.editor.is_dirty(move |body_dirty| {
+                if body_dirty {
+                    s.input_sender().emit(ComposeInput::SaveDraft);
+                } else {
+                    let _ = s.output(ComposeOutput::Close(id));
+                }
+            });
+        }
+    }
+
+    /// Handles [`ComposeInput::CustomFrom`].
+    pub(super) fn on_custom_from(&mut self, on: bool, widgets: &ComposeWidgets) {
+        self.custom_from = on;
+        if on {
+            // Start from the address that was picked, to edit.
+            let idx = widgets.from_row.selected() as usize;
+            let start = self
+                .accounts
+                .get(idx)
+                .map(identity_display)
+                .unwrap_or_default();
+            if widgets.custom_from_row.text().trim().is_empty() {
+                widgets.custom_from_row.set_text(&start);
+            }
+            widgets.from_row.set_visible(false);
+            widgets.custom_from_row.set_visible(true);
+            widgets.custom_from_row.grab_focus();
+        } else {
+            widgets.custom_from_row.set_visible(false);
+            widgets.from_row.set_visible(true);
+        }
+    }
+
+    /// Handles [`ComposeInput::AccountChanged`].
+    pub(super) fn on_account_changed(&mut self, widgets: &ComposeWidgets) {
+        self.follow_account_signing(widgets);
+        let idx = widgets.from_row.selected() as usize;
+        // Another account may suggest from elsewhere: what a
+        // directory answered for the last one is not kept.
+        let account_changed = self
+            .accounts
+            .get(idx)
+            .is_some_and(|a| a.id != self.from_account);
+        if let Some(id) = self
+            .accounts
+            .get(idx)
+            .map(|a| a.id)
+            .filter(|id| *id != self.from_account)
+        {
+            self.from_account = id;
+            self.directory_generation = self.directory_generation.wrapping_add(1);
+            self.directory_matches.clear();
+        }
+        // Swap the editor's signature block for the new account's.
+        // An alias or another identity of the same account shares
+        // its signatures, so the one picked from them stays.
+        let Some(account) = self.accounts.get(idx) else {
+            return;
+        };
+        self.signature_btn
+            .set_visible(!account.signatures.is_empty());
+        let new_sig = account.signature.clone();
+        if !account_changed || new_sig == self.current_sig {
+            return;
+        }
+        self.put_signature(new_sig);
+    }
+
+    /// Handles [`ComposeInput::ToggleSign`].
+    pub(super) fn on_toggle_sign(&mut self, on: bool) {
+        self.sign = on;
+        // Anything but the composer's own setting is a choice for
+        // this message, which a later From change must not undo.
+        if self.sign_expected.take() != Some(on) {
+            self.sign_touched = true;
+        }
+    }
+
+    /// Handles [`ComposeInput::PgpChecked`].
+    pub(super) fn on_pgp_checked(
+        &mut self,
+        checked: Vec<String>,
+        result: Result<(), String>,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        self.pgp_checking = false;
+        match result {
+            Ok(()) => {
+                self.pgp_cleared = Some(checked);
+                sender.input_sender().emit(ComposeInput::Send);
+            }
+            Err(problem) => {
+                let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
+                let dialog = adw::MessageDialog::new(
+                    parent.as_ref(),
+                    Some(&i18n("Cannot send with OpenPGP")),
+                    Some(&problem),
+                );
+                dialog.add_response("ok", &i18n("OK"));
+                dialog.present();
+            }
+        }
+    }
+
+    /// Handles [`ComposeInput::Send`].
+    pub(super) fn on_send(&mut self, widgets: &ComposeWidgets, sender: &ComponentSender<Self>) {
+        let to = widgets.to_row.text().trim().to_string();
+        if to.is_empty() {
+            widgets.to_row.add_css_class("error");
+            return;
+        }
+        // The composer closes on Send, so an address the message
+        // cannot go to is caught here, while it can still be fixed
+        // (#368). Invisible characters pasted along with an address
+        // are taken out first, where the user can see the result.
+        for row in [&widgets.to_row, &widgets.cc_row, &widgets.bcc_row] {
+            if let Some(clean) = crate::worker::clean_recipient_field(&row.text()) {
+                row.set_text(&clean);
+            }
+        }
+        if let Some(clean) = crate::worker::clean_recipient_field(&widgets.reply_to_row.text()) {
+            widgets.reply_to_row.set_text(&clean);
+        }
+        let rows: [(&gtk::Widget, String); 4] = [
+            (widgets.to_row.upcast_ref(), widgets.to_row.text()),
+            (widgets.cc_row.upcast_ref(), widgets.cc_row.text()),
+            (widgets.bcc_row.upcast_ref(), widgets.bcc_row.text()),
+            (
+                widgets.reply_to_row.upcast_ref(),
+                widgets.reply_to_row.text().to_string(),
+            ),
+        ];
+        if let Some((row, addr)) = rows
+            .iter()
+            .find_map(|(row, text)| crate::worker::invalid_recipient(text).map(|addr| (row, addr)))
+        {
+            row.add_css_class("error");
+            let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
+            let dialog = adw::MessageDialog::new(
+                parent.as_ref(),
+                Some(&i18n("Check the address")),
+                Some(&i18n_f(
+                    "“{addr}” is not an email address.",
+                    &[("addr", &addr)],
+                )),
+            );
+            dialog.add_response("ok", &i18n("OK"));
+            dialog.present();
+            return;
+        }
+        let to = widgets.to_row.text().trim().to_string();
+        // A file moved or deleted since it was attached (#340): the
+        // composer closes on Send, so this is the last moment the
+        // message can still be fixed rather than lost.
+        let missing: Vec<String> = self
+            .attachments
+            .iter()
+            .filter(|p| std::fs::File::open(p).is_err())
+            .map(|p| {
+                p.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default()
+            })
+            .collect();
+        if !missing.is_empty() {
+            self.rebuild_attachments(&widgets.attach_box, sender);
+            let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
+            let dialog = adw::MessageDialog::new(
+            parent.as_ref(),
+            Some(&i18n("An attachment is missing")),
+            Some(&i18n_f(
+                "Hylki cannot read {names}. It was moved or deleted after it was attached. Remove it, or attach it again from where it is now.",
+                &[("names", &missing.join(", "))],
+            )),
+        );
+            dialog.add_response("ok", &i18n("OK"));
+            dialog.present();
+            return;
+        }
+        let cc = widgets.cc_row.text().trim().to_string();
+        let bcc = widgets.bcc_row.text().trim().to_string();
+        let reply_to = widgets.reply_to_row.text().trim().to_string();
+        let subject = widgets.subject_row.text().to_string();
+        let idx = widgets.from_row.selected() as usize;
+        // OpenPGP (#133): say what is missing before anything leaves.
+        // gpg answers on a worker thread, since a stale keyring lock
+        // makes it wait about ten seconds (#316); its answer sends
+        // again, and passes here when nothing has changed since.
+        if self.sign || self.encrypt {
+            let from = self.accounts.get(idx);
+            let from_email = from.map(|a| a.email.clone()).unwrap_or_default();
+            let key = from.and_then(|a| a.pgp_key.clone());
+            let encrypt = self.encrypt;
+            let fields = [to.clone(), cc.clone(), bcc.clone()];
+            let mut checked = vec![
+                from_email.clone(),
+                key.clone().unwrap_or_default(),
+                encrypt.to_string(),
+            ];
+            checked.extend(fields.iter().cloned());
+            if self.pgp_cleared.take().as_ref() != Some(&checked) {
+                if !self.pgp_checking {
+                    self.pgp_checking = true;
+                    let s = sender.clone();
+                    gtk::glib::spawn_future_local(async move {
+                        let result = gtk::gio::spawn_blocking(move || {
+                            let fields: Vec<&str> = fields.iter().map(String::as_str).collect();
+                            pgp_send_check(&from_email, key.as_deref(), &fields, encrypt)
+                        })
+                        .await
+                        .unwrap_or_else(|_| Err("task failed".into()));
+                        s.input_sender()
+                            .emit(ComposeInput::PgpChecked { checked, result });
+                    });
+                }
+                return;
+            }
+        }
+        let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
+        let from_alias = match self.chosen_from(widgets) {
+            Ok(from) => from,
+            Err(why) => {
+                let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
+                let dialog = adw::MessageDialog::new(
+                    parent.as_ref(),
+                    Some(&i18n("Check the From address")),
+                    Some(&why),
+                );
+                dialog.add_response("ok", &i18n("OK"));
+                dialog.present();
+                return;
+            }
+        };
+
+        // Pull the body out of the editor (async), then finish
+        // sending via SendBody. The send-time reader also recuts any
+        // picture armed for it; a draft save below does not. In a
+        // source format `html` carries the source itself, which
+        // `outgoing_body` converts.
+        let s = sender.clone();
+        self.read_body_as(self.format, true, move |html, text| {
+            s.input_sender()
+                .emit(ComposeInput::SendBody(OutgoingFields {
+                    html,
+                    text,
+                    to: to.clone(),
+                    cc: cc.clone(),
+                    bcc: bcc.clone(),
+                    reply_to: reply_to.clone(),
+                    subject: subject.clone(),
+                    from_account_id,
+                    from_alias: from_alias.clone(),
+                }));
+        });
+    }
+
+    /// Handles [`ComposeInput::SendBody`].
+    pub(super) fn on_send_body(&mut self, fields: OutgoingFields, sender: &ComponentSender<Self>) {
+        let mut out = self.outgoing_message(fields);
+        // A draft goes once it is sent; a template stays to be used
+        // again.
+        if self.template {
+            out.draft_origin = None;
+        }
+        let _ = sender.output(ComposeOutput::Send {
+            id: self.compose_id,
+            message: Box::new(out),
+        });
+        let _ = sender.output(ComposeOutput::Close(self.compose_id));
+    }
+
+    /// Handles [`ComposeInput::SaveDraftBody`].
+    pub(super) fn on_save_draft_body(
+        &mut self,
+        fields: OutgoingFields,
+        as_template: bool,
+        sender: &ComponentSender<Self>,
+    ) {
+        let mut out = self.outgoing_message(fields);
+        if as_template {
+            // A copy, cut loose from wherever this message came
+            // from: saving it replaces no draft and no queued
+            // message, and a message started from it answers
+            // nothing and waits for no time.
+            out.draft_origin = None;
+            out.outbox_origin = None;
+            out.in_reply_to.clear();
+            out.references.clear();
+            out.forwards.clear();
+            out.send_at = None;
+            let _ = sender.output(ComposeOutput::SaveTemplate(Box::new(out)));
+            return;
+        }
+        if self.template {
+            let _ = sender.output(ComposeOutput::SaveTemplate(Box::new(out)));
+        } else {
+            let _ = sender.output(ComposeOutput::SaveDraft(Box::new(out)));
+        }
+        let _ = sender.output(ComposeOutput::Close(self.compose_id));
+    }
+
+    /// Handles [`ComposeInput::AutoSave`].
+    pub(super) fn on_auto_save(&mut self, sender: &ComponentSender<Self>) {
+        if self.autosave_off || self.autosaving || self.asking_discard || self.translating {
+            return;
+        }
+        // Not before anything was written: an untouched reply is
+        // no draft.
+        if self.fields_dirty {
+            sender.input_sender().emit(ComposeInput::AutoSaveRead);
+        } else {
+            let s = sender.clone();
+            self.editor.is_dirty(move |dirty| {
+                if dirty {
+                    s.input_sender().emit(ComposeInput::AutoSaveRead);
+                }
+            });
+        }
+    }
+
+    /// Handles [`ComposeInput::AutoSaveRead`].
+    pub(super) fn on_auto_save_read(
+        &mut self,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        if self.autosaving {
+            return;
+        }
+        let fields = self.draft_fields(widgets);
+        let s = sender.clone();
+        self.read_body_as(self.format, false, move |html, text| {
+            s.input_sender()
+                .emit(ComposeInput::AutoSaveBody(OutgoingFields {
+                    html,
+                    text,
+                    ..fields.clone()
+                }));
+        });
+    }
+
+    /// Handles [`ComposeInput::AutoSaveBody`].
+    pub(super) fn on_auto_save_body(
+        &mut self,
+        fields: OutgoingFields,
+        sender: &ComponentSender<Self>,
+    ) {
+        let OutgoingFields {
+            html,
+            text,
+            to,
+            cc,
+            bcc,
+            reply_to,
+            subject,
+            from_account_id,
+            from_alias,
+        } = fields;
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (
+            &html,
+            &text,
+            &to,
+            &cc,
+            &bcc,
+            &reply_to,
+            &subject,
+            from_account_id,
+            &from_alias,
+            &self.attachments,
+        )
+            .hash(&mut h);
+        let hash = h.finish();
+        // Unchanged since the last save, or nothing in it at all.
+        let empty = [&to, &cc, &bcc, &subject]
+            .iter()
+            .all(|f| f.trim().is_empty())
+            && text.trim().is_empty()
+            && self.attachments.is_empty();
+        if self.autosaved == Some(hash) || empty || self.autosaving {
+            return;
+        }
+        let out = self.outgoing_message(OutgoingFields {
+            html,
+            text,
+            to,
+            cc,
+            bcc,
+            reply_to,
+            subject,
+            from_account_id,
+            from_alias,
+        });
+        self.autosaving = true;
+        self.autosave_pending = Some(hash);
+        let _ = sender.output(ComposeOutput::AutoSave {
+            id: self.compose_id,
+            message: Box::new(out),
+        });
+    }
+
+    /// Handles [`ComposeInput::Autosaved`].
+    pub(super) fn on_autosaved(&mut self, saved: bool, origin: Option<DraftOrigin>) {
+        self.autosaving = false;
+        let pending = self.autosave_pending.take();
+        if !saved {
+            // Offline, say: the next tick tries again.
+            return;
+        }
+        match origin {
+            Some(origin) => {
+                if self.draft_origin.is_none() {
+                    self.autosave_made = true;
+                }
+                self.draft_origin = Some(origin);
+                self.autosaved = pending;
+            }
+            // Saved, but not found again to be replaced next time:
+            // one more save would leave a second copy behind.
+            None => {
+                tracing::info!("automatic draft save stopped: the saved copy was not found");
+                self.autosave_off = true;
+            }
         }
     }
 }

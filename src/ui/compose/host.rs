@@ -2,9 +2,12 @@
 //! or folded, and leaving it.
 
 use super::messages::ComposeInput;
+use super::messages::ComposeOutput;
+use super::types::Field;
 use super::Compose;
 use super::ComposeWidgets;
 use crate::i18n::i18n;
+use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use adw::prelude::*;
 use relm4::prelude::*;
 
@@ -132,5 +135,225 @@ impl Compose {
         } else {
             self.editor.grab_focus();
         }
+    }
+}
+
+impl Compose {
+    /// Handles [`ComposeInput::Cancel`].
+    pub(super) fn on_cancel(&mut self, sender: &ComponentSender<Self>) {
+        if self.asking_discard {
+            return;
+        }
+        if self.fields_dirty {
+            sender.input_sender().emit(ComposeInput::ConfirmDiscard);
+        } else {
+            let s = sender.clone();
+            self.editor.is_dirty(move |body_dirty| {
+                s.input_sender().emit(if body_dirty {
+                    ComposeInput::ConfirmDiscard
+                } else {
+                    ComposeInput::Discard
+                });
+            });
+        }
+    }
+
+    /// Handles [`ComposeInput::ConfirmDiscard`].
+    pub(super) fn on_confirm_discard(
+        &mut self,
+        sender: &ComponentSender<Self>,
+        root: &adw::BreakpointBin,
+    ) {
+        if self.asking_discard {
+            return;
+        }
+        self.asking_discard = true;
+        let parent = root.root().and_downcast::<gtk::Window>();
+        confirm_discard_dialog(
+            parent.as_ref(),
+            self.template,
+            sender.input_sender().clone(),
+        );
+    }
+
+    /// Handles [`ComposeInput::Discard`].
+    pub(super) fn on_discard(&mut self, sender: &ComponentSender<Self>) {
+        // A message nobody saved leaves nothing behind, though the
+        // composer saved it on its own meanwhile (#340).
+        match self.draft_origin.clone().filter(|_| self.autosave_made) {
+            Some(origin) => {
+                let _ = sender.output(ComposeOutput::DiscardAutosave {
+                    id: self.compose_id,
+                    origin,
+                });
+            }
+            None => {
+                let _ = sender.output(ComposeOutput::Close(self.compose_id));
+            }
+        }
+    }
+
+    /// Handles [`ComposeInput::FocusField`].
+    pub(super) fn on_focus_field(&mut self, field: Field, widgets: &ComposeWidgets) {
+        if !widgets.fields_list.is_visible() {
+            // The chevron's toggle sends ShowFields, which records it.
+            widgets.fields_btn.set_active(true);
+            widgets.fields_list.set_visible(true);
+        }
+        let row = match field {
+            Field::To => &widgets.to_row,
+            Field::Cc => &widgets.cc_row,
+            Field::Bcc => &widgets.bcc_row,
+        };
+        row.set_visible(true);
+        row.grab_focus();
+    }
+
+    /// Handles [`ComposeInput::SetNarrow`].
+    pub(super) fn on_set_narrow(
+        &mut self,
+        narrow: bool,
+        widgets: &ComposeWidgets,
+        root: &adw::BreakpointBin,
+    ) {
+        self.narrow = narrow;
+        self.dress_format_buttons();
+        // Folded, the header is as narrow as it gets: the pane goes
+        // no narrower, so a small window stops shrinking rather than
+        // cutting Send off at its edge. Unfolded, the floor drops
+        // back, or the pane could never get narrow enough to fold.
+        let (root, header) = (root.clone(), widgets.header.clone());
+        gtk::glib::idle_add_local_once(move || {
+            let floor = if narrow {
+                header
+                    .measure(gtk::Orientation::Horizontal, -1)
+                    .0
+                    .max(COMPOSE_MIN_WIDTH)
+            } else {
+                COMPOSE_MIN_WIDTH
+            };
+            root.set_size_request(floor, 200);
+        });
+    }
+
+    /// Handles [`ComposeInput::OverflowMenu`].
+    pub(super) fn on_overflow_menu(
+        &mut self,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        let entry = |label: String, icon: &str, msg: fn() -> ComposeInput| {
+            let s = sender.clone();
+            MenuEntry::new(&label, move || s.input_sender().emit(msg()))
+                .icon(format!("{icon}-symbolic"))
+        };
+        // Save Draft, Save as Template and Delete Draft are not here:
+        // the Save Draft button and its arrow stay in the header at
+        // any width.
+        let mut attach = vec![entry(i18n("Attach files"), "mail-attachment", || {
+            ComposeInput::AttachFiles
+        })];
+        if !self.cloud_accounts.is_empty() {
+            attach.push(
+                entry(
+                    i18n("Upload to cloud storage and share a link"),
+                    "cloud",
+                    || ComposeInput::CloudAttach,
+                )
+                .enabled(self.cloud_busy == 0),
+            );
+        }
+        attach.push(entry(
+            i18n("Open Contacts"),
+            "x-office-address-book",
+            || ComposeInput::OpenContacts,
+        ));
+        // The OpenPGP toggles go through their buttons so the
+        // toggled handlers keep the model and the buttons agreeing.
+        let mut pgp = Vec::new();
+        if crate::pgp::available() {
+            let check =
+                |on: bool, icon: &str| if on { "verified-checkmark" } else { icon }.to_string();
+            let sign = widgets.sign_btn.clone();
+            pgp.push(
+                MenuEntry::new(i18n("Sign with your OpenPGP key"), move || {
+                    sign.set_active(!sign.is_active())
+                })
+                .icon(format!("{}-symbolic", check(self.sign, "security-high"))),
+            );
+            let encrypt = widgets.encrypt_btn.clone();
+            pgp.push(
+                MenuEntry::new(
+                    i18n("Encrypt with OpenPGP to every recipient's key"),
+                    move || encrypt.set_active(!encrypt.is_active()),
+                )
+                .icon(format!(
+                    "{}-symbolic",
+                    check(self.encrypt, "channel-secure")
+                )),
+            );
+        }
+        // The format chooser, the preview toggle and Insert Signature
+        // are not here: they sit at the end of the formatting row,
+        // which a narrow pane never folds away.
+        let mut host = Vec::new();
+        if self.can_toggle {
+            host.push(if self.windowed {
+                entry(i18n("Collapse into reader"), "view-restore", || {
+                    ComposeInput::ToggleWindowed
+                })
+            } else {
+                entry(i18n("Open in window"), "view-fullscreen", || {
+                    ComposeInput::ToggleWindowed
+                })
+            });
+        }
+        let btn = &widgets.overflow_btn;
+        show_context_menu(
+            btn,
+            (btn.width() / 2) as f64,
+            btn.height() as f64,
+            vec![attach, pgp, host],
+        );
+    }
+
+    /// Handles [`ComposeInput::DeleteDraft`].
+    pub(super) fn on_delete_draft(&mut self, sender: &ComponentSender<Self>) {
+        if let Some(origin) = self.draft_origin.clone() {
+            let _ = sender.output(ComposeOutput::DeleteDraft {
+                id: self.compose_id,
+                origin,
+            });
+        }
+    }
+
+    /// Handles [`ComposeInput::SetDecorations`].
+    pub(super) fn on_set_decorations(&mut self, on: bool, widgets: &ComposeWidgets) {
+        self.decorations = on;
+        size_for_host(
+            &widgets.toolbar_root,
+            &widgets.header,
+            &widgets.editor_holder,
+            self.windowed,
+            on,
+        );
+    }
+
+    /// Handles [`ComposeInput::SetWindowed`].
+    pub(super) fn on_set_windowed(&mut self, windowed: bool, widgets: &ComposeWidgets) {
+        self.windowed = windowed;
+        set_toggle_icon(&widgets.toggle_btn, windowed);
+        size_for_host(
+            &widgets.toolbar_root,
+            &widgets.header,
+            &widgets.editor_holder,
+            windowed,
+            self.decorations,
+        );
+        // A compact reply grows its field rows back in a window (and
+        // sheds them again if it returns inline).
+        widgets
+            .fields_list
+            .set_visible(!(self.compact && !windowed) || self.fields_shown);
     }
 }

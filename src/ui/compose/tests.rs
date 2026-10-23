@@ -26,7 +26,7 @@ fn initial_suggestions_keep_addresses_added_while_loading() {
         members: Vec::new(),
         hide_addresses: true,
     }));
-    super::merge_loaded_suggestions(&mut current, vec![contact, group]);
+    super::suggest::merge_loaded_suggestions(&mut current, vec![contact, group]);
     assert_eq!(current.len(), 3);
     let ann = &current[0];
     assert_eq!(ann.name, "Ann Contact");
@@ -39,14 +39,14 @@ fn initial_suggestions_keep_addresses_added_while_loading() {
 #[test]
 fn initial_suggestions_keep_newer_names_and_frequency() {
     let mut current = vec![suggestion("Ann", "ann@example.org", 3)];
-    super::merge_loaded_suggestions(
+    super::suggest::merge_loaded_suggestions(
         &mut current,
         vec![suggestion("ann@example.org", "ann@example.org", 1)],
     );
     assert_eq!(current.len(), 1);
     assert_eq!(current[0].name, "Ann");
     assert_eq!(current[0].score, 3);
-    super::merge_loaded_suggestions(&mut current, Vec::new());
+    super::suggest::merge_loaded_suggestions(&mut current, Vec::new());
     assert_eq!(current[0].name, "Ann");
 }
 
@@ -105,15 +105,15 @@ fn pinned_froms_compare_by_name_and_address() {
 fn pinned_attachment_labels() {
     let pdf = std::path::Path::new("/a/b.pdf");
     assert_eq!(
-        super::attachment_label("Attach {name}", pdf, 1),
+        super::attachments::attachment_label("Attach {name}", pdf, 1),
         "Attach b.pdf"
     );
     assert_eq!(
-        super::attachment_label("Attach {name}", pdf, 3),
+        super::attachments::attachment_label("Attach {name}", pdf, 3),
         "Attach 3 attachments"
     );
     assert_eq!(
-        super::attachment_label("Attach {name}", std::path::Path::new("/"), 1),
+        super::attachments::attachment_label("Attach {name}", std::path::Path::new("/"), 1),
         "Attach "
     );
 }
@@ -190,11 +190,29 @@ fn pinned_translate_scripts_are_unchanged() {
         }
         (s.len(), h)
     }
-    assert_eq!(fnv(super::SHOWCASE_PLAIN_LOG), (393, 0x667da3e64a4a676e));
-    assert_eq!(fnv(super::TR_QUOTE_TEXT), (453, 0xc2a237f0c7dc2fab));
-    assert_eq!(fnv(super::TR_RICH_BEGIN), (1701, 0xd3cb51e10a1c983c));
-    assert_eq!(fnv(super::TR_RICH_END), (731, 0x866624ea47866e35));
-    assert_eq!(fnv(super::TR_SOURCE_BEGIN), (780, 0x3eff7dececcface9));
-    assert_eq!(fnv(super::TR_SOURCE_END), (721, 0xdfc354ea9d805901));
-    assert_eq!(fnv(super::TR_CANCEL), (197, 0x2cb5c4f7c3471566));
+    assert_eq!(
+        fnv(super::format::SHOWCASE_PLAIN_LOG),
+        (393, 0x667da3e64a4a676e)
+    );
+    assert_eq!(
+        fnv(super::translate::TR_QUOTE_TEXT),
+        (453, 0xc2a237f0c7dc2fab)
+    );
+    assert_eq!(
+        fnv(super::translate::TR_RICH_BEGIN),
+        (1701, 0xd3cb51e10a1c983c)
+    );
+    assert_eq!(
+        fnv(super::translate::TR_RICH_END),
+        (731, 0x866624ea47866e35)
+    );
+    assert_eq!(
+        fnv(super::translate::TR_SOURCE_BEGIN),
+        (780, 0x3eff7dececcface9)
+    );
+    assert_eq!(
+        fnv(super::translate::TR_SOURCE_END),
+        (721, 0xdfc354ea9d805901)
+    );
+    assert_eq!(fnv(super::translate::TR_CANCEL), (197, 0x2cb5c4f7c3471566));
 }

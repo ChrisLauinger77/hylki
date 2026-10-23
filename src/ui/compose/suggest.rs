@@ -1,8 +1,10 @@
 //! Address completion: the suggestion list, its ranking, and the popover under
 //! a recipient field.
 
+use super::messages::{ComposeInput, ComposeOutput};
 use super::types::Field;
 use super::Compose;
+use super::ComposeWidgets;
 use crate::contacts::Suggestion;
 use crate::ui::recipient_row::RecipientRow;
 use adw::prelude::*;
@@ -223,5 +225,239 @@ impl Compose {
         self.completion.set_child(Some(&list));
         self.completion.popup();
         self.completion_open.set(true);
+    }
+}
+
+impl Compose {
+    /// Handles [`ComposeInput::OpenContacts`].
+    pub(super) fn on_open_contacts(
+        &mut self,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+        root: &adw::BreakpointBin,
+    ) {
+        // Browse contacts; the chosen one is appended to the To field.
+        let Some(win) = root.root().and_downcast::<gtk::Window>() else {
+            return;
+        };
+        let to_row = widgets.to_row.clone();
+        let s = sender.clone();
+        crate::ui::contacts_browser::present(
+            &win,
+            move |contact| {
+                to_row.add_recipient(&crate::worker::format_recipient(
+                    &contact.name,
+                    &contact.email,
+                ));
+            },
+            move || {
+                let _ = s.output(ComposeOutput::ShowContacts);
+            },
+        );
+    }
+
+    /// Handles [`ComposeInput::Suggest`].
+    pub(super) fn on_suggest(
+        &mut self,
+        field: Field,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        let row = match field {
+            Field::To => &widgets.to_row,
+            Field::Cc => &widgets.cc_row,
+            Field::Bcc => &widgets.bcc_row,
+        };
+        self.directory_generation = self.directory_generation.wrapping_add(1);
+        self.directory_matches.clear();
+        let token = recipient_token(row);
+        if token.chars().count() >= crate::directory::MIN_QUERY {
+            // A directory is asked once the typing pauses, not per key.
+            let generation = self.directory_generation;
+            let s = sender.input_sender().clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
+                let _ = s.send(ComposeInput::DirectoryLookup {
+                    field,
+                    token,
+                    generation,
+                });
+            });
+        }
+        self.show_completion(field, row, &widgets.bcc_row);
+    }
+
+    /// Handles [`ComposeInput::SuggestionsLoaded`].
+    pub(super) fn on_suggestions_loaded(
+        &mut self,
+        loaded: Vec<Suggestion>,
+        widgets: &ComposeWidgets,
+    ) {
+        tracing::debug!("composer suggestions loaded: {}", loaded.len());
+        merge_loaded_suggestions(&mut self.suggestions, loaded);
+        // The user may already be typing. Update that field's
+        // matches without touching its text, caret or dirty state.
+        for (field, row) in [
+            (Field::To, &widgets.to_row),
+            (Field::Cc, &widgets.cc_row),
+            (Field::Bcc, &widgets.bcc_row),
+        ] {
+            if recipient_focused(row) {
+                self.show_completion(field, row, &widgets.bcc_row);
+                break;
+            }
+        }
+    }
+
+    /// Handles [`ComposeInput::DirectoryLookup`].
+    pub(super) fn on_directory_lookup(
+        &mut self,
+        field: Field,
+        token: String,
+        generation: u64,
+        sender: &ComponentSender<Self>,
+    ) {
+        if generation == self.directory_generation {
+            let s = sender.input_sender().clone();
+            // An account that suggests only its own asks its
+            // directory alone, no LDAP and no other tenant.
+            let own = self.own_mail.get(&self.from_account);
+            let narrowed = own.is_some();
+            if let Some(own) = own {
+                tracing::debug!(
+                    target: "hylki::graph",
+                    "suggestions narrowed to {}: its directory and {} addresses from its mail",
+                    own.account.email,
+                    own.addresses.len()
+                );
+            }
+            let graph = match own {
+                Some(own) => std::sync::Arc::new(vec![own.account.clone()]),
+                None => self.graph_directories.clone(),
+            };
+            std::thread::spawn(move || {
+                // Both at once: the slower decides when the list
+                // grows, not the two one after the other.
+                let (matches, failed) = std::thread::scope(|scope| {
+                    let org = (!graph.is_empty())
+                        .then(|| scope.spawn(|| crate::graph_directory::search(&token, &graph)));
+                    let (mut matches, failed) = if narrowed {
+                        Default::default()
+                    } else {
+                        crate::directory::search(&token)
+                    };
+                    if let Some(found) = org.and_then(|h| h.join().ok()) {
+                        matches.extend(found);
+                    }
+                    (matches, failed)
+                });
+                let _ = s.send(ComposeInput::DirectoryResults {
+                    field,
+                    token,
+                    generation,
+                    matches,
+                    failed,
+                });
+            });
+        }
+    }
+
+    /// A directory that cannot be asked says so once, whatever came of the
+    /// typing meanwhile.
+    pub(super) fn report_directory_failures(
+        &mut self,
+        failed: Vec<crate::directory::DirectoryFailure>,
+        sender: &ComponentSender<Self>,
+    ) {
+        for f in failed {
+            let text = f.text();
+            if self.directory_errors_shown.insert(text.clone()) {
+                let _ = sender.output(ComposeOutput::DirectoryError(text));
+            }
+        }
+    }
+
+    /// Handles [`ComposeInput::DirectoryResults`].
+    pub(super) fn on_directory_results(
+        &mut self,
+        field: Field,
+        token: String,
+        generation: u64,
+        matches: Vec<Suggestion>,
+        widgets: &ComposeWidgets,
+    ) {
+        let row = match field {
+            Field::To => &widgets.to_row,
+            Field::Cc => &widgets.cc_row,
+            Field::Bcc => &widgets.bcc_row,
+        };
+        if generation == self.directory_generation
+            && recipient_token(row) == token
+            && !matches.is_empty()
+        {
+            self.directory_matches = matches;
+            if recipient_focused(row) {
+                self.show_completion(field, row, &widgets.bcc_row);
+            }
+        }
+    }
+
+    /// Handles [`ComposeInput::AddSuggestions`].
+    pub(super) fn on_add_suggestions(&mut self, account_id: u32, new: Vec<Suggestion>) {
+        for n in new {
+            let key = n.email.to_lowercase();
+            if let Some(own) = self.own_mail.get_mut(&account_id) {
+                own.addresses.insert(key.clone());
+            }
+            match self
+                .suggestions
+                .iter_mut()
+                .find(|s| s.email.to_lowercase() == key)
+            {
+                Some(s) => {
+                    s.score += 1;
+                    if s.name.trim().is_empty() || s.name == s.email {
+                        s.name = n.name;
+                    }
+                }
+                None => self.suggestions.push(n),
+            }
+        }
+    }
+
+    /// Handles [`ComposeInput::CompletionMove`].
+    pub(super) fn on_completion_move(&mut self, delta: i32) {
+        if self.completion_count == 0 {
+            return;
+        }
+        let max = self.completion_count as i32 - 1;
+        let new = (self.completion_selected as i32 + delta).clamp(0, max) as usize;
+        self.completion_selected = new;
+        if let Some(list) = &self.completion_list {
+            if let Some(row) = list.row_at_index(new as i32) {
+                list.select_row(Some(&row));
+            }
+        }
+    }
+
+    /// Handles [`ComposeInput::CompletionAccept`].
+    pub(super) fn on_completion_accept(&mut self, widgets: &ComposeWidgets) {
+        let row = match self.completion_field {
+            Some(Field::To) => &widgets.to_row,
+            Some(Field::Cc) => &widgets.cc_row,
+            Some(Field::Bcc) => &widgets.bcc_row,
+            None => return,
+        };
+        let token = row.typed();
+        if !token.is_empty() {
+            let chosen = self
+                .ranked_matches(&token)
+                .into_iter()
+                .nth(self.completion_selected);
+            if let Some(sug) = chosen {
+                complete_field(row, &widgets.bcc_row, &sug);
+            }
+        }
+        self.completion_open.set(false);
+        self.completion.popdown();
     }
 }

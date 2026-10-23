@@ -5,12 +5,11 @@ use relm4::prelude::*;
 
 use crate::config::{ComposeFormat, SignaturePosition};
 use crate::contacts::Suggestion;
-use crate::i18n::{i18n, i18n_f, i18n_noop};
+use crate::i18n::{i18n, i18n_f};
 use crate::models::DraftOrigin;
-use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::ui::drop_zones::{DropChoice, DropContext, DropZones};
 use crate::ui::recipient_row::RecipientRow;
-use crate::ui::rich_editor::{self, js_escape, RichEditor, SourceKind};
+use crate::ui::rich_editor::{self, RichEditor, SourceKind};
 
 mod attachments;
 mod cloud;
@@ -27,29 +26,21 @@ mod tests;
 mod translate;
 mod types;
 
-use attachments::{attachment_label, AttachThumbs};
-use cloud::{cloud_upload_dialog, html_escape};
+use attachments::AttachThumbs;
+use cloud::not_signed_in;
 use format::{format_icon, format_label, markdown_body, SHOWCASE_PLAIN_LOG, ZOOM};
 use host::{
-    confirm_discard_dialog, header_rows_width, set_toggle_icon, size_for_host,
-    COMPOSE_ACTIONS_BREAKPOINT, COMPOSE_MIN_WIDTH,
+    header_rows_width, set_toggle_icon, size_for_host, COMPOSE_ACTIONS_BREAKPOINT,
+    COMPOSE_MIN_WIDTH,
 };
 pub(crate) use keys::composer_key;
 use keys::{focus_is_entry, zoom_key};
 use messages::OutgoingFields;
 pub use messages::{ComposeInput, ComposeOutput};
-use send::{
-    identity_display, next_monday, pgp_send_check, pick_send_time, preset_time, same_from,
-    AUTOSAVE_SECS,
-};
+use send::{identity_display, next_monday, pick_send_time, preset_time, same_from, AUTOSAVE_SECS};
 use signature::sig_html;
-use suggest::{complete_field, merge_loaded_suggestions, recipient_focused, recipient_token};
-pub use translate::TranslateHow;
-use translate::{
-    TR_CANCEL, TR_QUOTE_TEXT, TR_RICH_BEGIN, TR_RICH_END, TR_SOURCE_BEGIN, TR_SOURCE_END,
-};
-use types::{CloudLink, ComposeStep, ComposeUndoEntry};
-pub use types::{ComposeAccount, ComposeInit, ComposePrefill, Field, OwnMail, OwnOnly, SigPlace};
+use types::{CloudLink, ComposeUndoEntry};
+pub use types::{ComposeAccount, ComposeInit, ComposePrefill, Field, OwnMail, OwnOnly};
 
 pub struct Compose {
     accounts: Vec<ComposeAccount>,
@@ -281,7 +272,7 @@ impl Component for Compose {
                                             #[wrap(Some)]
                                             set_child = &gtk::Label { set_label: &i18n("Save as Template"), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
-                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                if let Some(p) = b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>() { p.popdown(); }
                                                 sender.input_sender().emit(ComposeInput::SaveAsTemplate);
                                             },
                                         },
@@ -298,7 +289,7 @@ impl Component for Compose {
                                             #[wrap(Some)]
                                             set_child = &gtk::Label { set_label: &i18n("Delete Draft"), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
-                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                if let Some(p) = b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>() { p.popdown(); }
                                                 sender.input_sender().emit(ComposeInput::DeleteDraft);
                                             },
                                         },
@@ -342,7 +333,7 @@ impl Component for Compose {
                                             #[wrap(Some)]
                                             set_child = &gtk::Label { set_label: &i18n("Send now"), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
-                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                if let Some(p) = b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>() { p.popdown(); }
                                                 sender.input_sender().emit(ComposeInput::ClearSendAt);
                                                 sender.input_sender().emit(ComposeInput::Send);
                                             },
@@ -354,7 +345,7 @@ impl Component for Compose {
                                             #[wrap(Some)]
                                             set_child = &gtk::Label { set_label: &i18n_f("Tomorrow morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
-                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                if let Some(p) = b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>() { p.popdown(); }
                                                 sender.input_sender().emit(ComposeInput::SendAt(preset_time(1, 8)));
                                             },
                                         },
@@ -364,7 +355,7 @@ impl Component for Compose {
                                             #[wrap(Some)]
                                             set_child = &gtk::Label { set_label: &i18n_f("Tomorrow afternoon ({time})", &[("time", &crate::datefmt::clock_label(13))]), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
-                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                if let Some(p) = b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>() { p.popdown(); }
                                                 sender.input_sender().emit(ComposeInput::SendAt(preset_time(1, 13)));
                                             },
                                         },
@@ -374,7 +365,7 @@ impl Component for Compose {
                                             #[wrap(Some)]
                                             set_child = &gtk::Label { set_label: &i18n_f("Monday morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
-                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                if let Some(p) = b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>() { p.popdown(); }
                                                 sender.input_sender().emit(ComposeInput::SendAt(next_monday(8)));
                                             },
                                         },
@@ -385,7 +376,7 @@ impl Component for Compose {
                                             #[wrap(Some)]
                                             set_child = &gtk::Label { set_label: &i18n("Pick a date and time…"), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
-                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                if let Some(p) = b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>() { p.popdown(); }
                                                 sender.input_sender().emit(ComposeInput::PickSendTime);
                                             },
                                         },
@@ -1491,56 +1482,18 @@ impl Component for Compose {
         sender: ComponentSender<Self>,
         root: &Self::Root,
     ) {
-        'handle: {
+        // Each arm handles its message in full, or hands it to an `on_*`
+        // method that returns early where it has to; every message ends at
+        // `update_view` below.
+        {
             match message {
-                ComposeInput::Cancel => {
-                    if self.asking_discard {
-                        break 'handle;
-                    }
-                    if self.fields_dirty {
-                        sender.input_sender().emit(ComposeInput::ConfirmDiscard);
-                    } else {
-                        let s = sender.clone();
-                        self.editor.is_dirty(move |body_dirty| {
-                            s.input_sender().emit(if body_dirty {
-                                ComposeInput::ConfirmDiscard
-                            } else {
-                                ComposeInput::Discard
-                            });
-                        });
-                    }
-                }
+                ComposeInput::Cancel => self.on_cancel(&sender),
 
-                ComposeInput::ConfirmDiscard => {
-                    if self.asking_discard {
-                        break 'handle;
-                    }
-                    self.asking_discard = true;
-                    let parent = root.root().and_downcast::<gtk::Window>();
-                    confirm_discard_dialog(
-                        parent.as_ref(),
-                        self.template,
-                        sender.input_sender().clone(),
-                    );
-                }
+                ComposeInput::ConfirmDiscard => self.on_confirm_discard(&sender, root),
 
                 ComposeInput::KeepEditing => self.asking_discard = false,
 
-                ComposeInput::Discard => {
-                    // A message nobody saved leaves nothing behind, though the
-                    // composer saved it on its own meanwhile (#340).
-                    match self.draft_origin.clone().filter(|_| self.autosave_made) {
-                        Some(origin) => {
-                            let _ = sender.output(ComposeOutput::DiscardAutosave {
-                                id: self.compose_id,
-                                origin,
-                            });
-                        }
-                        None => {
-                            let _ = sender.output(ComposeOutput::Close(self.compose_id));
-                        }
-                    }
-                }
+                ComposeInput::Discard => self.on_discard(&sender),
 
                 ComposeInput::SendAt(at) => {
                     self.send_at = Some(at);
@@ -1551,20 +1504,7 @@ impl Component for Compose {
                     self.send_at = None;
                 }
 
-                ComposeInput::FocusField(field) => {
-                    if !widgets.fields_list.is_visible() {
-                        // The chevron's toggle sends ShowFields, which records it.
-                        widgets.fields_btn.set_active(true);
-                        widgets.fields_list.set_visible(true);
-                    }
-                    let row = match field {
-                        Field::To => &widgets.to_row,
-                        Field::Cc => &widgets.cc_row,
-                        Field::Bcc => &widgets.bcc_row,
-                    };
-                    row.set_visible(true);
-                    row.grab_focus();
-                }
+                ComposeInput::FocusField(field) => self.on_focus_field(field, widgets),
 
                 ComposeInput::ShowFields(on) => {
                     self.fields_shown = on;
@@ -1573,126 +1513,11 @@ impl Component for Compose {
                         .set_visible(!(self.compact && !self.windowed) || on);
                 }
 
-                ComposeInput::SetNarrow(narrow) => {
-                    self.narrow = narrow;
-                    self.dress_format_buttons();
-                    // Folded, the header is as narrow as it gets: the pane goes
-                    // no narrower, so a small window stops shrinking rather than
-                    // cutting Send off at its edge. Unfolded, the floor drops
-                    // back, or the pane could never get narrow enough to fold.
-                    let (root, header) = (root.clone(), widgets.header.clone());
-                    gtk::glib::idle_add_local_once(move || {
-                        let floor = if narrow {
-                            header
-                                .measure(gtk::Orientation::Horizontal, -1)
-                                .0
-                                .max(COMPOSE_MIN_WIDTH)
-                        } else {
-                            COMPOSE_MIN_WIDTH
-                        };
-                        root.set_size_request(floor, 200);
-                    });
-                }
+                ComposeInput::SetNarrow(narrow) => self.on_set_narrow(narrow, widgets, root),
 
-                ComposeInput::OverflowMenu => {
-                    let entry = |label: String, icon: &str, msg: fn() -> ComposeInput| {
-                        let s = sender.clone();
-                        MenuEntry::new(&label, move || s.input_sender().emit(msg()))
-                            .icon(&format!("{icon}-symbolic"))
-                    };
-                    // Save Draft, Save as Template and Delete Draft are not here:
-                    // the Save Draft button and its arrow stay in the header at
-                    // any width.
-                    let mut attach = vec![entry(i18n("Attach files"), "mail-attachment", || {
-                        ComposeInput::AttachFiles
-                    })];
-                    if !self.cloud_accounts.is_empty() {
-                        attach.push(
-                            entry(
-                                i18n("Upload to cloud storage and share a link"),
-                                "cloud",
-                                || ComposeInput::CloudAttach,
-                            )
-                            .enabled(self.cloud_busy == 0),
-                        );
-                    }
-                    attach.push(entry(
-                        i18n("Open Contacts"),
-                        "x-office-address-book",
-                        || ComposeInput::OpenContacts,
-                    ));
-                    // The OpenPGP toggles go through their buttons so the
-                    // toggled handlers keep the model and the buttons agreeing.
-                    let mut pgp = Vec::new();
-                    if crate::pgp::available() {
-                        let check = |on: bool, icon: &str| {
-                            if on { "verified-checkmark" } else { icon }.to_string()
-                        };
-                        let sign = widgets.sign_btn.clone();
-                        pgp.push(
-                            MenuEntry::new(&i18n("Sign with your OpenPGP key"), move || {
-                                sign.set_active(!sign.is_active())
-                            })
-                            .icon(&format!("{}-symbolic", check(self.sign, "security-high"))),
-                        );
-                        let encrypt = widgets.encrypt_btn.clone();
-                        pgp.push(
-                            MenuEntry::new(
-                                &i18n("Encrypt with OpenPGP to every recipient's key"),
-                                move || encrypt.set_active(!encrypt.is_active()),
-                            )
-                            .icon(&format!(
-                                "{}-symbolic",
-                                check(self.encrypt, "channel-secure")
-                            )),
-                        );
-                    }
-                    // The format chooser, the preview toggle and Insert Signature
-                    // are not here: they sit at the end of the formatting row,
-                    // which a narrow pane never folds away.
-                    let mut host = Vec::new();
-                    if self.can_toggle {
-                        host.push(if self.windowed {
-                            entry(i18n("Collapse into reader"), "view-restore", || {
-                                ComposeInput::ToggleWindowed
-                            })
-                        } else {
-                            entry(i18n("Open in window"), "view-fullscreen", || {
-                                ComposeInput::ToggleWindowed
-                            })
-                        });
-                    }
-                    let btn = &widgets.overflow_btn;
-                    show_context_menu(
-                        btn,
-                        (btn.width() / 2) as f64,
-                        btn.height() as f64,
-                        vec![attach, pgp, host],
-                    );
-                }
+                ComposeInput::OverflowMenu => self.on_overflow_menu(widgets, &sender),
 
-                ComposeInput::CloudAttach => {
-                    let dialog = gtk::FileDialog::new();
-                    dialog.set_title(&i18n("Upload to Cloud Storage"));
-                    let parent = root.root().and_downcast::<gtk::Window>();
-                    let s = sender.input_sender().clone();
-                    dialog.open_multiple(
-                        parent.as_ref(),
-                        gtk::gio::Cancellable::NONE,
-                        move |res| {
-                            if let Ok(model) = res {
-                                let paths: Vec<_> = (0..model.n_items())
-                                    .filter_map(|i| {
-                                        model.item(i).and_downcast::<gtk::gio::File>()?.path()
-                                    })
-                                    .collect();
-                                if !paths.is_empty() {
-                                    let _ = s.send(ComposeInput::CloudPicked(paths));
-                                }
-                            }
-                        },
-                    );
-                }
+                ComposeInput::CloudAttach => self.on_cloud_attach(&sender, root),
 
                 ComposeInput::DroppedFiles(choice, paths) => match choice {
                     DropChoice::Attach => sender
@@ -1704,384 +1529,71 @@ impl Component for Compose {
                     }
                 },
 
-                ComposeInput::CloudPicked(paths) => {
-                    let parent = root.root().and_downcast::<gtk::Window>();
-                    cloud_upload_dialog(
-                        parent.as_ref(),
-                        &self.cloud_accounts,
-                        paths,
-                        sender.input_sender().clone(),
-                    );
-                }
+                ComposeInput::CloudPicked(paths) => self.on_cloud_picked(paths, &sender, root),
 
                 ComposeInput::CloudUpload {
                     paths,
                     account,
                     link_password,
-                } => {
-                    if !account.has_secret() {
-                        sender
-                            .input_sender()
-                            .emit(ComposeInput::CloudUploadSignedIn {
-                                paths,
-                                account,
-                                link_password,
-                                password: Some(String::new()),
-                            });
-                        break 'handle;
-                    }
-                    // Off the main thread: the keyring may wait on its user.
-                    let key = account.key();
-                    let s = sender.input_sender().clone();
-                    crate::config::keyring_then(
-                        move || crate::config::load_cloud_password(&key),
-                        move |password| {
-                            s.emit(ComposeInput::CloudUploadSignedIn {
-                                paths,
-                                account,
-                                link_password,
-                                password,
-                            })
-                        },
-                    );
-                }
+                } => self.on_cloud_upload(paths, account, link_password, &sender),
 
                 ComposeInput::CloudUploadSignedIn {
                     paths,
                     account,
                     link_password,
                     password,
-                } => {
-                    let Some(password) = password else {
-                        let parent = root.root().and_downcast::<gtk::Window>();
-                        let d = adw::MessageDialog::new(
-                        parent.as_ref(),
-                        Some(i18n("Not signed in").as_str()),
-                        Some(i18n_f("The sign-in for {name} is not in the keyring. Open Settings, Cloud Storage, and enter it again.", &[("name", &account.name)]).as_str()),
-                    );
-                        d.add_response("ok", &i18n("OK"));
-                        d.present();
-                        break 'handle;
-                    };
-                    for path in paths {
-                        let name = path
-                            .file_name()
-                            .map(|s| s.to_string_lossy().to_string())
-                            .unwrap_or_default();
-                        self.cloud_busy += 1;
-                        self.rebuild_attachments(&widgets.attach_box, &sender);
-                        let s = sender.input_sender().clone();
-                        let (a, pw, lp) =
-                            (account.clone(), password.clone(), link_password.clone());
-                        std::thread::spawn(move || {
-                            let result =
-                                crate::cloud::upload_and_share(&a, &pw, &path, lp.as_deref());
-                            let _ = s.send(ComposeInput::CloudUploaded { name, result });
-                        });
-                    }
-                }
+                } => match password {
+                    Some(password) => self.on_cloud_upload_signed_in(
+                        paths,
+                        account,
+                        link_password,
+                        password,
+                        widgets,
+                        &sender,
+                    ),
+                    None => not_signed_in(root, &account.name),
+                },
 
                 ComposeInput::CloudUploaded { name, result } => {
-                    self.cloud_busy = self.cloud_busy.saturating_sub(1);
-                    match result {
-                        Ok(share) => {
-                            let id = format!(
-                                "hylki-cloud-{}",
-                                crate::rng::token(8).unwrap_or_else(|_| share.size.to_string())
-                            );
-                            let mut caption = crate::models::human_size(share.size);
-                            if let Some(d) = &share.expires {
-                                caption.push_str(&format!(
-                                    ", {}",
-                                    i18n_f("link expires {date}", &[("date", d)])
-                                ));
-                            }
-                            if share.password.is_some() {
-                                caption.push_str(&format!(", {}", i18n("password-protected")));
-                            }
-                            let html = format!(
-                            "<p id=\"{id}\" data-hylki-cloud=\"1\">\u{1F4CE} <a href=\"{url}\">{name}</a> ({caption})</p>",
-                            url = html_escape(&share.url),
-                            name = html_escape(&share.name),
-                            caption = html_escape(&caption),
-                        );
-                            // Into the body where the user's own text ends: above
-                            // the signature, and above a quoted original in a
-                            // reply, so the link reads as part of the message.
-                            if let Some(kind) = self.editor.source_kind() {
-                                let line = match kind {
-                                    SourceKind::Markdown => format!(
-                                        "\u{1F4CE} [{name}]({url}) ({caption})",
-                                        name = share.name,
-                                        url = share.url,
-                                        caption = caption,
-                                    ),
-                                    SourceKind::Html => html.clone(),
-                                };
-                                // The same place, said in text: above the `-- `
-                                // signature line if there is one, else at the end.
-                                self.editor.run_js(&format!(
-                                "(function(){{var t=document.getElementById('src');if(!t)return;\
-                                 var l='{}';var v=t.value;var i=v.lastIndexOf('\\n-- \\n');\
-                                 if(i>=0){{v=v.slice(0,i)+'\\n'+l+'\\n'+v.slice(i);}}\
-                                 else{{v=v.replace(/\\s*$/,'')+'\\n\\n'+l+'\\n';}}\
-                                 t.value=v;window.__hylkiDirty=true;}})()",
-                                js_escape(&line)
-                            ));
-                                if let Some(p) = share.password.clone() {
-                                    self.cloud_passwords.push((share.name.clone(), p));
-                                }
-                                self.cloud_links.push(CloudLink {
-                                    id,
-                                    name: share.name,
-                                    url: share.url,
-                                });
-                                self.rebuild_attachments(&widgets.attach_box, &sender);
-                                break 'handle;
-                            }
-                            self.editor.run_js(&format!(
-                            "(function(){{var d=document.createElement('div');d.innerHTML='{}';\
-                             var p=d.firstChild;var b=document.body;\
-                             var first=null;var cands=b.querySelectorAll('.hylki-sig,.hylki-quote-attr,blockquote');\
-                             for(var i=0;i<cands.length;i++){{var t=cands[i];while(t.parentNode&&t.parentNode!==b)t=t.parentNode;\
-                             if(t.parentNode===b&&(!first||(t.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING)))first=t;}}\
-                             if(first)b.insertBefore(p,first);else b.appendChild(p);\
-                             window.__hylkiPlainFix&&window.__hylkiPlainFix();\
-                             document.dispatchEvent(new Event('input'));}})()",
-                            js_escape(&html)
-                        ));
-                            if let Some(p) = share.password.clone() {
-                                self.cloud_passwords.push((share.name.clone(), p));
-                            }
-                            self.cloud_links.push(CloudLink {
-                                id,
-                                name: share.name,
-                                url: share.url,
-                            });
-                        }
-                        Err(e) => {
-                            let parent = root.root().and_downcast::<gtk::Window>();
-                            let d = adw::MessageDialog::new(
-                                parent.as_ref(),
-                                Some(
-                                    i18n_f("Could not upload {name}", &[("name", &name)]).as_str(),
-                                ),
-                                Some(&e),
-                            );
-                            d.add_response("ok", &i18n("OK"));
-                            d.present();
-                        }
-                    }
-                    self.rebuild_attachments(&widgets.attach_box, &sender);
+                    self.on_cloud_uploaded(name, result, widgets, &sender, root)
                 }
 
-                ComposeInput::RemoveCloudLink(i) => {
-                    if i < self.cloud_links.len() {
-                        let link = self.cloud_links.remove(i);
-                        self.cloud_passwords.retain(|(n, _)| *n != link.name);
-                        // Source mode has no element to remove: the line that
-                        // names the link is what goes.
-                        if self.editor.source_kind().is_some() {
-                            self.editor.run_js(&format!(
-                            "(function(){{var t=document.getElementById('src');if(!t)return;\
-                             var u='{}';\
-                             t.value=t.value.split('\\n').filter(function(l){{return l.indexOf(u)<0;}})\
-                               .join('\\n');window.__hylkiDirty=true;}})()",
-                            js_escape(&link.url)
-                        ));
-                            self.rebuild_attachments(&widgets.attach_box, &sender);
-                            break 'handle;
-                        }
-                        self.editor.run_js(&format!(
-                        "(function(){{var p=document.getElementById('{}');if(p)p.remove();document.dispatchEvent(new Event('input'));}})()",
-                        js_escape(&link.id)
-                    ));
-                        self.rebuild_attachments(&widgets.attach_box, &sender);
-                    }
-                }
+                ComposeInput::RemoveCloudLink(i) => self.on_remove_cloud_link(i, widgets, &sender),
 
-                ComposeInput::CopyCloudPasswords => {
-                    let text = self
-                        .cloud_passwords
-                        .iter()
-                        .map(|(n, p)| format!("{n}: {p}"))
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    if let Some(display) = gtk::gdk::Display::default() {
-                        display.clipboard().set_text(&text);
-                    }
-                }
+                ComposeInput::CopyCloudPasswords => self.on_copy_cloud_passwords(),
 
                 ComposeInput::PickSendTime => {
                     let parent = root.root().and_downcast::<gtk::Window>();
                     pick_send_time(parent.as_ref(), self.send_at, sender.input_sender().clone());
                 }
 
-                ComposeInput::DeleteDraft => {
-                    if let Some(origin) = self.draft_origin.clone() {
-                        let _ = sender.output(ComposeOutput::DeleteDraft {
-                            id: self.compose_id,
-                            origin,
-                        });
-                    }
-                }
+                ComposeInput::DeleteDraft => self.on_delete_draft(&sender),
 
                 ComposeInput::ToggleWindowed => {
                     let _ = sender.output(ComposeOutput::ToggleWindow(self.compose_id));
                 }
 
-                ComposeInput::SetDecorations(on) => {
-                    self.decorations = on;
-                    size_for_host(
-                        &widgets.toolbar_root,
-                        &widgets.header,
-                        &widgets.editor_holder,
-                        self.windowed,
-                        on,
-                    );
-                }
+                ComposeInput::SetDecorations(on) => self.on_set_decorations(on, widgets),
 
-                ComposeInput::SetWindowed(windowed) => {
-                    self.windowed = windowed;
-                    set_toggle_icon(&widgets.toggle_btn, windowed);
-                    size_for_host(
-                        &widgets.toolbar_root,
-                        &widgets.header,
-                        &widgets.editor_holder,
-                        windowed,
-                        self.decorations,
-                    );
-                    // A compact reply grows its field rows back in a window (and
-                    // sheds them again if it returns inline).
-                    widgets
-                        .fields_list
-                        .set_visible(!(self.compact && !windowed) || self.fields_shown);
-                }
+                ComposeInput::SetWindowed(windowed) => self.on_set_windowed(windowed, widgets),
 
                 ComposeInput::FocusInitial => self.focus_initial(widgets),
 
                 ComposeInput::MarkFieldsDirty => self.fields_dirty = true,
 
-                ComposeInput::SaveDraftIfDirty => {
-                    // Save only if the user actually edited something, so navigating
-                    // away from a pristine quote-only reply doesn't litter Drafts.
-                    if self.fields_dirty {
-                        sender.input_sender().emit(ComposeInput::SaveDraft);
-                    } else {
-                        let s = sender.clone();
-                        let id = self.compose_id;
-                        self.editor.is_dirty(move |body_dirty| {
-                            if body_dirty {
-                                s.input_sender().emit(ComposeInput::SaveDraft);
-                            } else {
-                                let _ = s.output(ComposeOutput::Close(id));
-                            }
-                        });
-                    }
-                }
+                ComposeInput::SaveDraftIfDirty => self.on_save_draft_if_dirty(&sender),
 
-                ComposeInput::OpenContacts => {
-                    // Browse contacts; the chosen one is appended to the To field.
-                    let Some(win) = root.root().and_downcast::<gtk::Window>() else {
-                        break 'handle;
-                    };
-                    let to_row = widgets.to_row.clone();
-                    let s = sender.clone();
-                    crate::ui::contacts_browser::present(
-                        &win,
-                        move |contact| {
-                            to_row.add_recipient(&crate::worker::format_recipient(
-                                &contact.name,
-                                &contact.email,
-                            ));
-                        },
-                        move || {
-                            let _ = s.output(ComposeOutput::ShowContacts);
-                        },
-                    );
-                }
+                ComposeInput::OpenContacts => self.on_open_contacts(widgets, &sender, root),
 
-                ComposeInput::AttachFiles => {
-                    let dialog = gtk::FileDialog::new();
-                    dialog.set_title(&i18n("Attach Files"));
-                    let parent = root.root().and_downcast::<gtk::Window>();
-                    let s = sender.input_sender().clone();
-                    dialog.open_multiple(
-                        parent.as_ref(),
-                        gtk::gio::Cancellable::NONE,
-                        move |res| {
-                            if let Ok(model) = res {
-                                let mut paths = Vec::new();
-                                for i in 0..model.n_items() {
-                                    if let Some(file) =
-                                        model.item(i).and_downcast::<gtk::gio::File>()
-                                    {
-                                        if let Some(p) = file.path() {
-                                            paths.push(p);
-                                        }
-                                    }
-                                }
-                                if !paths.is_empty() {
-                                    let _ = s.send(ComposeInput::AddAttachments(paths));
-                                }
-                            }
-                        },
-                    );
-                }
+                ComposeInput::AttachFiles => self.on_attach_files(&sender, root),
 
                 ComposeInput::AddAttachments(paths) => {
-                    if paths.is_empty() {
-                        break 'handle;
-                    }
-                    self.fields_dirty = true;
-                    let at = self.attachments.len();
-                    let what = attachment_label(i18n_noop("Attach {name}"), &paths[0], paths.len());
-                    self.attachments.extend(paths.iter().cloned());
-                    self.push_history(
-                        what,
-                        ComposeStep::Remove {
-                            at,
-                            count: paths.len(),
-                        },
-                    );
-                    self.rebuild_attachments(&widgets.attach_box, &sender);
-                    self.report_history(&sender);
+                    self.on_add_attachments(paths, widgets, &sender)
                 }
 
-                ComposeInput::RemoveAttachment(i) => {
-                    if i < self.attachments.len() {
-                        self.fields_dirty = true;
-                        let path = self.attachments.remove(i);
-                        let what = attachment_label(i18n_noop("Remove {name}"), &path, 1);
-                        self.push_history(
-                            what,
-                            ComposeStep::Insert {
-                                at: i,
-                                paths: vec![path],
-                            },
-                        );
-                        self.rebuild_attachments(&widgets.attach_box, &sender);
-                        self.report_history(&sender);
-                    }
-                }
+                ComposeInput::RemoveAttachment(i) => self.on_remove_attachment(i, widgets, &sender),
 
-                ComposeInput::Zoom(step) => {
-                    if !self.zoomable.get() {
-                        break 'handle;
-                    }
-                    use crate::config::READER_ZOOM_STEPS as STEPS;
-                    let now = ZOOM.load(std::sync::atomic::Ordering::Relaxed);
-                    let at = STEPS.iter().position(|&z| z == now).unwrap_or(5) as i32;
-                    let zoom = match step {
-                        0 => 100,
-                        s => {
-                            STEPS[(at + i32::from(s.signum())).clamp(0, STEPS.len() as i32 - 1)
-                                as usize]
-                        }
-                    };
-                    ZOOM.store(zoom, std::sync::atomic::Ordering::Relaxed);
-                    self.editor.set_zoom(zoom);
-                }
+                ComposeInput::Zoom(step) => self.on_zoom(step),
 
                 ComposeInput::History { redo } => {
                     self.history_step(redo, widgets, &sender);
@@ -2095,186 +1607,21 @@ impl Component for Compose {
                     widgets.from_row.set_selected(n);
                 }
 
-                ComposeInput::BodyHistory(can_undo) => {
-                    // A fresh edit takes its place in the order — one marker
-                    // covers a whole run of typing, since the editor coalesces
-                    // its own steps and this only has to say where they sit.
-                    if can_undo
-                        && !matches!(
-                            self.undo_stack.last().map(|e| &e.step),
-                            Some(ComposeStep::Body)
-                        )
-                    {
-                        self.push_history(i18n("Typing"), ComposeStep::Body);
-                    }
-                    self.report_history(&sender);
-                }
+                ComposeInput::BodyHistory(can_undo) => self.on_body_history(can_undo, &sender),
 
-                ComposeInput::CustomFrom(on) => {
-                    self.custom_from = on;
-                    if on {
-                        // Start from the address that was picked, to edit.
-                        let idx = widgets.from_row.selected() as usize;
-                        let start = self
-                            .accounts
-                            .get(idx)
-                            .map(identity_display)
-                            .unwrap_or_default();
-                        if widgets.custom_from_row.text().trim().is_empty() {
-                            widgets.custom_from_row.set_text(&start);
-                        }
-                        widgets.from_row.set_visible(false);
-                        widgets.custom_from_row.set_visible(true);
-                        widgets.custom_from_row.grab_focus();
-                    } else {
-                        widgets.custom_from_row.set_visible(false);
-                        widgets.from_row.set_visible(true);
-                    }
-                }
+                ComposeInput::CustomFrom(on) => self.on_custom_from(on, widgets),
 
-                ComposeInput::AccountChanged => {
-                    self.follow_account_signing(widgets);
-                    let idx = widgets.from_row.selected() as usize;
-                    // Another account may suggest from elsewhere: what a
-                    // directory answered for the last one is not kept.
-                    let account_changed = self
-                        .accounts
-                        .get(idx)
-                        .is_some_and(|a| a.id != self.from_account);
-                    if let Some(id) = self
-                        .accounts
-                        .get(idx)
-                        .map(|a| a.id)
-                        .filter(|id| *id != self.from_account)
-                    {
-                        self.from_account = id;
-                        self.directory_generation = self.directory_generation.wrapping_add(1);
-                        self.directory_matches.clear();
-                    }
-                    // Swap the editor's signature block for the new account's.
-                    // An alias or another identity of the same account shares
-                    // its signatures, so the one picked from them stays.
-                    let Some(account) = self.accounts.get(idx) else {
-                        break 'handle;
-                    };
-                    self.signature_btn
-                        .set_visible(!account.signatures.is_empty());
-                    let new_sig = account.signature.clone();
-                    if !account_changed || new_sig == self.current_sig {
-                        break 'handle;
-                    }
-                    self.put_signature(new_sig);
-                }
+                ComposeInput::AccountChanged => self.on_account_changed(widgets),
 
-                ComposeInput::InsertSignature(place) => {
-                    let idx = widgets.from_row.selected() as usize;
-                    let sig = self
-                        .accounts
-                        .get(idx)
-                        .map(|a| self.chosen_signature(a))
-                        .unwrap_or_default();
-                    self.insert_signature(sig, place);
-                }
+                ComposeInput::InsertSignature(place) => self.on_insert_signature(place, widgets),
 
-                ComposeInput::SignatureClicked => {
-                    let idx = widgets.from_row.selected() as usize;
-                    let Some(account) = self.accounts.get(idx) else {
-                        break 'handle;
-                    };
-                    if account.signatures.len() < 2 {
-                        sender
-                            .input_sender()
-                            .emit(ComposeInput::InsertSignature(SigPlace::Cursor));
-                        break 'handle;
-                    }
-                    // The one in the message is drawn as chosen; a body that
-                    // started without one (Edit as New, a draft) may still
-                    // carry the default's text, which is no harm to show.
-                    let list: Vec<MenuEntry> = account
-                        .signatures
-                        .iter()
-                        .enumerate()
-                        .map(|(i, sig)| {
-                            let s = sender.clone();
-                            MenuEntry::new(&sig.name, move || {
-                                s.input_sender().emit(ComposeInput::UseSignature(Some(i)))
-                            })
-                            .selected(!self.current_sig.is_empty() && sig.html == self.current_sig)
-                        })
-                        .collect();
-                    let s = sender.clone();
-                    let none = MenuEntry::new(i18n("No Signature"), move || {
-                        s.input_sender().emit(ComposeInput::UseSignature(None))
-                    })
-                    .selected(self.current_sig.is_empty());
-                    let btn = &self.signature_btn;
-                    show_context_menu(
-                        btn,
-                        (btn.width() / 2) as f64,
-                        btn.height() as f64,
-                        vec![list, vec![none]],
-                    );
-                }
+                ComposeInput::SignatureClicked => self.on_signature_clicked(widgets, &sender),
 
-                ComposeInput::UseSignature(choice) => {
-                    let idx = widgets.from_row.selected() as usize;
-                    let sig = match choice {
-                        Some(i) => match self.accounts.get(idx).and_then(|a| a.signatures.get(i)) {
-                            Some(sig) => sig.html.clone(),
-                            None => break 'handle,
-                        },
-                        None => String::new(),
-                    };
-                    if sig != self.current_sig {
-                        self.put_signature(sig);
-                    }
-                }
+                ComposeInput::UseSignature(choice) => self.on_use_signature(choice, widgets),
 
-                ComposeInput::SignatureMenu => {
-                    let entry = |label: String, place: SigPlace| {
-                        let s = sender.clone();
-                        MenuEntry::new(&label, move || {
-                            s.input_sender().emit(ComposeInput::InsertSignature(place))
-                        })
-                    };
-                    let btn = &self.signature_btn;
-                    show_context_menu(
-                        btn,
-                        (btn.width() / 2) as f64,
-                        btn.height() as f64,
-                        vec![vec![
-                            entry(i18n("Insert Before the Text"), SigPlace::Start),
-                            entry(i18n("Insert After the Text"), SigPlace::End),
-                        ]],
-                    );
-                }
+                ComposeInput::SignatureMenu => self.on_signature_menu(&sender),
 
-                ComposeInput::Suggest(field) => {
-                    let row = match field {
-                        Field::To => &widgets.to_row,
-                        Field::Cc => &widgets.cc_row,
-                        Field::Bcc => &widgets.bcc_row,
-                    };
-                    self.directory_generation = self.directory_generation.wrapping_add(1);
-                    self.directory_matches.clear();
-                    let token = recipient_token(row);
-                    if token.chars().count() >= crate::directory::MIN_QUERY {
-                        // A directory is asked once the typing pauses, not per key.
-                        let generation = self.directory_generation;
-                        let s = sender.input_sender().clone();
-                        gtk::glib::timeout_add_local_once(
-                            std::time::Duration::from_millis(300),
-                            move || {
-                                let _ = s.send(ComposeInput::DirectoryLookup {
-                                    field,
-                                    token,
-                                    generation,
-                                });
-                            },
-                        );
-                    }
-                    self.show_completion(field, row, &widgets.bcc_row);
-                }
+                ComposeInput::Suggest(field) => self.on_suggest(field, widgets, &sender),
 
                 ComposeInput::DirectoriesKnown { graph, own_mail } => {
                     self.graph_directories = std::sync::Arc::new(graph);
@@ -2282,72 +1629,14 @@ impl Component for Compose {
                 }
 
                 ComposeInput::SuggestionsLoaded(loaded) => {
-                    tracing::debug!("composer suggestions loaded: {}", loaded.len());
-                    merge_loaded_suggestions(&mut self.suggestions, loaded);
-                    // The user may already be typing. Update that field's
-                    // matches without touching its text, caret or dirty state.
-                    for (field, row) in [
-                        (Field::To, &widgets.to_row),
-                        (Field::Cc, &widgets.cc_row),
-                        (Field::Bcc, &widgets.bcc_row),
-                    ] {
-                        if recipient_focused(row) {
-                            self.show_completion(field, row, &widgets.bcc_row);
-                            break;
-                        }
-                    }
+                    self.on_suggestions_loaded(loaded, widgets)
                 }
 
                 ComposeInput::DirectoryLookup {
                     field,
                     token,
                     generation,
-                } => {
-                    if generation == self.directory_generation {
-                        let s = sender.input_sender().clone();
-                        // An account that suggests only its own asks its
-                        // directory alone, no LDAP and no other tenant.
-                        let own = self.own_mail.get(&self.from_account);
-                        let narrowed = own.is_some();
-                        if let Some(own) = own {
-                            tracing::debug!(
-                                target: "hylki::graph",
-                                "suggestions narrowed to {}: its directory and {} addresses from its mail",
-                                own.account.email,
-                                own.addresses.len()
-                            );
-                        }
-                        let graph = match own {
-                            Some(own) => std::sync::Arc::new(vec![own.account.clone()]),
-                            None => self.graph_directories.clone(),
-                        };
-                        std::thread::spawn(move || {
-                            // Both at once: the slower decides when the list
-                            // grows, not the two one after the other.
-                            let (matches, failed) = std::thread::scope(|scope| {
-                                let org = (!graph.is_empty()).then(|| {
-                                    scope.spawn(|| crate::graph_directory::search(&token, &graph))
-                                });
-                                let (mut matches, failed) = if narrowed {
-                                    Default::default()
-                                } else {
-                                    crate::directory::search(&token)
-                                };
-                                if let Some(found) = org.and_then(|h| h.join().ok()) {
-                                    matches.extend(found);
-                                }
-                                (matches, failed)
-                            });
-                            let _ = s.send(ComposeInput::DirectoryResults {
-                                field,
-                                token,
-                                generation,
-                                matches,
-                                failed,
-                            });
-                        });
-                    }
-                }
+                } => self.on_directory_lookup(field, token, generation, &sender),
 
                 ComposeInput::DirectoryResults {
                     field,
@@ -2356,497 +1645,58 @@ impl Component for Compose {
                     matches,
                     failed,
                 } => {
-                    // A directory that cannot be asked says so once, whatever
-                    // came of the typing meanwhile.
-                    for f in failed {
-                        let text = f.text();
-                        if self.directory_errors_shown.insert(text.clone()) {
-                            let _ = sender.output(ComposeOutput::DirectoryError(text));
-                        }
-                    }
-                    let row = match field {
-                        Field::To => &widgets.to_row,
-                        Field::Cc => &widgets.cc_row,
-                        Field::Bcc => &widgets.bcc_row,
-                    };
-                    if generation == self.directory_generation
-                        && recipient_token(row) == token
-                        && !matches.is_empty()
-                    {
-                        self.directory_matches = matches;
-                        if recipient_focused(row) {
-                            self.show_completion(field, row, &widgets.bcc_row);
-                        }
-                    }
+                    self.report_directory_failures(failed, &sender);
+                    self.on_directory_results(field, token, generation, matches, widgets);
                 }
 
                 ComposeInput::AddSuggestions { account_id, new } => {
-                    for n in new {
-                        let key = n.email.to_lowercase();
-                        if let Some(own) = self.own_mail.get_mut(&account_id) {
-                            own.addresses.insert(key.clone());
-                        }
-                        match self
-                            .suggestions
-                            .iter_mut()
-                            .find(|s| s.email.to_lowercase() == key)
-                        {
-                            Some(s) => {
-                                s.score += 1;
-                                if s.name.trim().is_empty() || s.name == s.email {
-                                    s.name = n.name;
-                                }
-                            }
-                            None => self.suggestions.push(n),
-                        }
-                    }
+                    self.on_add_suggestions(account_id, new)
                 }
 
-                ComposeInput::CompletionMove(delta) => {
-                    if self.completion_count == 0 {
-                        break 'handle;
-                    }
-                    let max = self.completion_count as i32 - 1;
-                    let new = (self.completion_selected as i32 + delta).clamp(0, max) as usize;
-                    self.completion_selected = new;
-                    if let Some(list) = &self.completion_list {
-                        if let Some(row) = list.row_at_index(new as i32) {
-                            list.select_row(Some(&row));
-                        }
-                    }
-                }
+                ComposeInput::CompletionMove(delta) => self.on_completion_move(delta),
 
-                ComposeInput::CompletionAccept => {
-                    let row = match self.completion_field {
-                        Some(Field::To) => &widgets.to_row,
-                        Some(Field::Cc) => &widgets.cc_row,
-                        Some(Field::Bcc) => &widgets.bcc_row,
-                        None => break 'handle,
-                    };
-                    let token = row.typed();
-                    if !token.is_empty() {
-                        let chosen = self
-                            .ranked_matches(&token)
-                            .into_iter()
-                            .nth(self.completion_selected);
-                        if let Some(sug) = chosen {
-                            complete_field(row, &widgets.bcc_row, &sug);
-                        }
-                    }
-                    self.completion_open.set(false);
-                    self.completion.popdown();
-                }
+                ComposeInput::CompletionAccept => self.on_completion_accept(widgets),
 
                 ComposeInput::CompletionClose => {
                     self.completion_open.set(false);
                     self.completion.popdown();
                 }
 
-                ComposeInput::ToggleSign(on) => {
-                    self.sign = on;
-                    // Anything but the composer's own setting is a choice for
-                    // this message, which a later From change must not undo.
-                    if self.sign_expected.take() != Some(on) {
-                        self.sign_touched = true;
-                    }
-                }
+                ComposeInput::ToggleSign(on) => self.on_toggle_sign(on),
 
-                ComposeInput::FormatMenu => {
-                    let btn = &self.format_btn;
-                    show_context_menu(
-                        btn,
-                        (btn.width() / 2) as f64,
-                        btn.height() as f64,
-                        vec![self.format_entries(&sender)],
-                    );
-                }
+                ComposeInput::FormatMenu => self.on_format_menu(&sender),
 
-                ComposeInput::TranslateMenu => {
-                    if self.translating {
-                        break 'handle;
-                    }
-                    let s = sender.input_sender().clone();
-                    let js = format!(
-                        "JSON.stringify({{q:{TR_QUOTE_TEXT},t:window.__hylkiTrState||''}})"
-                    );
-                    self.editor.eval(&js, move |text| {
-                        let _ = s.send(ComposeInput::ShowTranslateMenu(text));
-                    });
-                }
+                ComposeInput::TranslateMenu => self.on_translate_menu(&sender),
 
                 ComposeInput::ShowTranslateMenu(found) => {
-                    let v: serde_json::Value = serde_json::from_str(&found).unwrap_or_default();
-                    let quoted = v["q"].as_str().unwrap_or_default().to_string();
-                    let entry = |code: String, label: String| {
-                        let s = sender.clone();
-                        MenuEntry::new(label, move || {
-                            s.input_sender()
-                                .emit(ComposeInput::TranslateTo(code.clone()))
-                        })
-                    };
-                    // Back to what was written, or to the translation again,
-                    // while the translation is still the last thing done to the
-                    // text (#327).
-                    let toggle = match v["t"].as_str() {
-                        Some("translated") => Some((i18n("Show Original"), true)),
-                        Some("original") => Some((i18n("Show Translation"), false)),
-                        _ => None,
-                    };
-                    let toggle = toggle.map(|(label, original)| {
-                        let s = sender.clone();
-                        vec![MenuEntry::new(label, move || {
-                            s.input_sender()
-                                .emit(ComposeInput::TranslateToggle { original })
-                        })]
-                    });
-                    // First what the conversation suggests: the language of the
-                    // message being answered, then the one last used.
-                    let mut first = Vec::new();
-                    let quoted = crate::translate::detect(&quoted);
-                    if let Some(lang) = &quoted {
-                        first.push(
-                            entry(
-                                lang.clone(),
-                                i18n_f(
-                                    "{language} (the quoted message)",
-                                    &[("language", &crate::translate::language_name(lang))],
-                                ),
-                            )
-                            .icon("mail-reply-sender-symbolic"),
-                        );
-                    }
-                    if let Some(last) = crate::translate::last_compose_target() {
-                        if quoted.as_deref().map(crate::translate::base)
-                            != Some(crate::translate::base(&last))
-                        {
-                            first.push(
-                                entry(last.clone(), crate::translate::language_name(&last))
-                                    .icon("translate-symbolic"),
-                            );
-                        }
-                    }
-                    let all: Vec<MenuEntry> = crate::translate::LANGUAGES
-                        .iter()
-                        .map(|code| entry(code.to_string(), crate::translate::language_name(code)))
-                        .collect();
-                    let mut sections = if first.is_empty() {
-                        vec![all]
-                    } else {
-                        vec![
-                            first,
-                            vec![MenuEntry::submenu(i18n("Other Languages"), vec![all])],
-                        ]
-                    };
-                    if let Some(toggle) = toggle {
-                        sections.insert(0, toggle);
-                    }
-                    let btn = &self.translate_btn;
-                    crate::ui::context_menu::show_context_menu_with_header(
-                        btn,
-                        (btn.width() / 2) as f64,
-                        btn.height() as f64,
-                        Some(&i18n("Translate into")),
-                        sections,
-                    );
+                    self.on_show_translate_menu(found, &sender)
                 }
 
-                ComposeInput::TranslateTo(target) => {
-                    if self.translating {
-                        break 'handle;
-                    }
-                    // A message going out encrypted must not have its text
-                    // handed to a third party on the way.
-                    if self.encrypt {
-                        let parent = root.root().and_downcast::<gtk::Window>();
-                        let d = adw::MessageDialog::new(
-                        parent.as_ref(),
-                        Some(&i18n("Not translated")),
-                        Some(&i18n("This message is set to be encrypted, so its text is not sent for translation.")),
-                    );
-                        d.add_response("ok", &i18n("OK"));
-                        d.present();
-                        break 'handle;
-                    }
-                    self.translating = true;
-                    self.translate_btn.set_sensitive(false);
-                    let js = match self.format {
-                        ComposeFormat::Html => TR_SOURCE_BEGIN.replace("HTMLFLAG", "true"),
-                        ComposeFormat::Markdown => TR_SOURCE_BEGIN.replace("HTMLFLAG", "false"),
-                        _ => TR_RICH_BEGIN.to_string(),
-                    };
-                    let s = sender.input_sender().clone();
-                    self.editor.eval(&js, move |found| {
-                        let _ = s.send(ComposeInput::TranslateBegun { found, target });
-                    });
-                }
+                ComposeInput::TranslateTo(target) => self.on_translate_to(target, &sender, root),
 
                 ComposeInput::TranslateBegun { found, target } => {
-                    let v: serde_json::Value = serde_json::from_str(&found).unwrap_or_default();
-                    let how = match self.format {
-                        ComposeFormat::Html => TranslateHow::Html,
-                        ComposeFormat::Markdown => TranslateHow::Markdown,
-                        _ => TranslateHow::Rich,
-                    };
-                    let parts: Vec<String> = match (&how, v["text"].as_str()) {
-                        (TranslateHow::Html, Some(text)) => vec![text.to_string()],
-                        (TranslateHow::Markdown, Some(text)) => {
-                            crate::translate::text_to_parts(text)
-                        }
-                        _ => v["parts"]
-                            .as_array()
-                            .map(|a| {
-                                a.iter()
-                                    .filter_map(|p| p.as_str().map(str::to_string))
-                                    .collect()
-                            })
-                            .unwrap_or_default(),
-                    };
-                    if parts.is_empty() {
-                        self.translating = false;
-                        self.translate_btn.set_sensitive(true);
-                        self.editor.run_js(TR_CANCEL);
-                        if v["empty"].as_bool() == Some(true) {
-                            let parent = root.root().and_downcast::<gtk::Window>();
-                            let d = adw::MessageDialog::new(
-                                parent.as_ref(),
-                                Some(&i18n("Nothing to translate yet")),
-                                Some(&i18n(
-                                    "Write something first, or select the text to translate.",
-                                )),
-                            );
-                            d.add_response("ok", &i18n("OK"));
-                            d.present();
-                        }
-                        break 'handle;
-                    }
-                    // The subject goes too when the whole message is translated,
-                    // unless it is a reply's or a forward's: that one is already
-                    // in the conversation's language.
-                    let subject = widgets.subject_row.text().trim().to_string();
-                    let subject = (v["sel"].as_bool() != Some(true)
-                        && !subject.is_empty()
-                        && self.in_reply_to.trim().is_empty()
-                        && !crate::models::is_reply_or_forward_subject(&subject))
-                    .then_some(subject);
-                    let mut parts = parts;
-                    if let Some(subject) = &subject {
-                        parts.push(gtk::glib::markup_escape_text(subject).to_string());
-                    }
-                    let s = sender.input_sender().clone();
-                    std::thread::spawn(move || {
-                        let settings = crate::translate::load();
-                        let key = crate::translate::load_key(settings.service).unwrap_or_default();
-                        let result =
-                            crate::translate::translate_parts(&settings, &key, &parts, &target);
-                        let _ = s.send(ComposeInput::Translated {
-                            result,
-                            how,
-                            subject,
-                        });
-                    });
+                    self.on_translate_begun(found, target, widgets, &sender, root)
                 }
 
                 ComposeInput::TranslateToggle { original } => {
-                    self.history_step(!original, widgets, &sender);
-                    if let Some((written, translated)) = &self.tr_subject {
-                        let (from, to) = if original {
-                            (translated, written)
-                        } else {
-                            (written, translated)
-                        };
-                        if widgets.subject_row.text().as_str() == from.as_str() {
-                            widgets.subject_row.set_text(to);
-                        }
-                    }
+                    self.on_translate_toggle(original, widgets, &sender)
                 }
 
                 ComposeInput::Translated {
                     result,
                     how,
                     subject,
-                } => {
-                    self.translating = false;
-                    self.translate_btn.set_sensitive(true);
-                    match result {
-                        // One edit, so Ctrl+Z gives back what was written.
-                        Ok(mut parts) => {
-                            self.tr_subject = None;
-                            if let Some(original) = subject {
-                                let translated = parts.pop().map(|t| {
-                                    crate::markdown::plain_text(&t)
-                                        .split_whitespace()
-                                        .collect::<Vec<_>>()
-                                        .join(" ")
-                                });
-                                if let Some(translated) = translated.filter(|t| !t.is_empty()) {
-                                    widgets.subject_row.set_text(&translated);
-                                    self.tr_subject = Some((original, translated));
-                                }
-                            }
-                            let (end, text) = match how {
-                                TranslateHow::Rich => (TR_RICH_END, parts.concat()),
-                                TranslateHow::Html => (TR_SOURCE_END, parts.concat()),
-                                TranslateHow::Markdown => {
-                                    (TR_SOURCE_END, crate::translate::parts_to_text(&parts))
-                                }
-                            };
-                            let arg = serde_json::to_string(&text).unwrap_or_else(|_| "''".into());
-                            self.editor.run_js(&end.replace("ARG", &arg));
-                        }
-                        Err(why) => {
-                            self.editor.run_js(TR_CANCEL);
-                            let parent = root.root().and_downcast::<gtk::Window>();
-                            let d = adw::MessageDialog::new(
-                                parent.as_ref(),
-                                Some(&i18n("Could not translate")),
-                                Some(&why),
-                            );
-                            d.add_response("ok", &i18n("OK"));
-                            d.present();
-                        }
-                    }
-                }
+                } => self.on_translated(result, how, subject, widgets, root),
 
-                ComposeInput::SetFormat(to) => {
-                    if to == self.format {
-                        break 'handle;
-                    }
-                    // Plain text shows only what is sent (#424), so moving a
-                    // formatted body there drops what it cannot show, and the
-                    // way back does not bring it back.
-                    if self.format == ComposeFormat::Rich && to == ComposeFormat::Plain {
-                        let s = sender.clone();
-                        self.editor.eval(
-                            "String(!!(window.__hylkiPlainLoses&&window.__hylkiPlainLoses()))",
-                            move |loses| {
-                                s.input_sender().emit(if loses == "true" {
-                                    ComposeInput::AskPlain
-                                } else {
-                                    ComposeInput::ApplyFormat(ComposeFormat::Plain)
-                                });
-                            },
-                        );
-                        break 'handle;
-                    }
-                    sender.input_sender().emit(ComposeInput::ApplyFormat(to));
-                }
+                ComposeInput::SetFormat(to) => self.on_set_format(to, &sender),
 
-                ComposeInput::AskPlain => {
-                    let dialog = adw::AlertDialog::new(
-                        Some(&i18n("Switch to plain text?")),
-                        Some(&i18n("Formatting, images and links are removed.")),
-                    );
-                    dialog.add_response("cancel", &i18n("Cancel"));
-                    dialog.add_response("switch", &i18n("Switch"));
-                    dialog.set_response_appearance("switch", adw::ResponseAppearance::Destructive);
-                    dialog.set_default_response(Some("cancel"));
-                    dialog.set_close_response("cancel");
-                    let s = sender.input_sender().clone();
-                    dialog.connect_response(None, move |_, resp| {
-                        if resp == "switch" {
-                            let _ = s.send(ComposeInput::ApplyFormat(ComposeFormat::Plain));
-                        }
-                    });
-                    dialog.present(Some(root));
-                    // HYLKI_SHOWCASE_PLAIN_ANSWER=switch|cancel answers it two
-                    // seconds on (demo only), for a check without a pointer.
-                    if let (Ok(answer), Some(_)) = (
-                        std::env::var("HYLKI_SHOWCASE_PLAIN_ANSWER"),
-                        std::env::var_os("HYLKI_DEMO"),
-                    ) {
-                        tracing::info!("showcase plain: asked before switching");
-                        let (d, s) = (dialog.clone(), sender.input_sender().clone());
-                        gtk::glib::timeout_add_seconds_local_once(2, move || {
-                            d.force_close();
-                            if answer == "switch" {
-                                let _ = s.send(ComposeInput::ApplyFormat(ComposeFormat::Plain));
-                            }
-                        });
-                    }
-                }
+                ComposeInput::AskPlain => self.on_ask_plain(&sender, root),
 
-                ComposeInput::ApplyFormat(to) => {
-                    let from = self.format;
-                    if to == from {
-                        break 'handle;
-                    }
-                    self.format = to;
-                    self.editor
-                        .set_formatting_visible(to == ComposeFormat::Rich);
-                    self.zoomable.set(to != ComposeFormat::Rich);
-                    self.editor.set_zoom(if self.zoomable.get() {
-                        ZOOM.load(std::sync::atomic::Ordering::Relaxed)
-                    } else {
-                        100
-                    });
-                    if let Some(zones) = &self.drop_zones {
-                        zones.set_allow_inline(to == ComposeFormat::Rich);
-                    }
-                    self.dress_format_buttons();
-                    self.preview_btn.set_visible(to.is_source());
-                    // A preview of the old format's render would be a lie about
-                    // the new one.
-                    self.preview_btn.set_active(false);
-                    // Every change reloads the body, plain text included: it
-                    // shows the message flattened to what is sent (#424), so it
-                    // cannot share the rich document's undo history.
-                    let s = sender.clone();
-                    self.read_body_as(from, false, move |body, _| {
-                        s.input_sender()
-                            .emit(ComposeInput::LoadAs { from, to, body });
-                    });
-                }
+                ComposeInput::ApplyFormat(to) => self.on_apply_format(to, &sender),
 
-                ComposeInput::LoadAs { from, to, body } => {
-                    // Every conversion goes through HTML: it is the one form
-                    // all four formats can be written to and read back from.
-                    let html = match from {
-                        ComposeFormat::Markdown => crate::markdown::to_html(&body),
-                        _ => body,
-                    };
-                    self.editor.set_plain(to == ComposeFormat::Plain);
-                    match to {
-                        ComposeFormat::Markdown => self
-                            .editor
-                            .set_source(SourceKind::Markdown, &markdown_body(&html)),
-                        ComposeFormat::Html => self
-                            .editor
-                            .set_source(SourceKind::Html, &crate::markdown::pretty_html(&html)),
-                        ComposeFormat::Rich | ComposeFormat::Plain => self.editor.set_html(&html),
-                    }
-                    self.editor.grab_focus();
-                    // HYLKI_SHOWCASE_PLAIN_LOG logs the reloaded body, its font
-                    // and the text it sends (demo only).
-                    if std::env::var_os("HYLKI_SHOWCASE_PLAIN_LOG").is_some()
-                        && std::env::var_os("HYLKI_DEMO").is_some()
-                    {
-                        let ed = self.editor.clone();
-                        gtk::glib::timeout_add_local_once(
-                            std::time::Duration::from_millis(1500),
-                            move || {
-                                ed.eval(SHOWCASE_PLAIN_LOG, move |v| {
-                                    tracing::info!("showcase plain: {to:?} {v}")
-                                });
-                            },
-                        );
-                    }
-                }
+                ComposeInput::LoadAs { from, to, body } => self.on_load_as(from, to, body),
 
-                ComposeInput::TogglePreview(on) => {
-                    // Keep the button with the state, for the times the message
-                    // arrives from somewhere other than a click on it.
-                    if self.preview_btn.is_active() != on {
-                        self.preview_btn.set_active(on);
-                    }
-                    if !on {
-                        self.editor.show_preview(None);
-                        break 'handle;
-                    }
-                    let s = sender.clone();
-                    self.read_body_as(self.format, false, move |body, _| {
-                        s.input_sender().emit(ComposeInput::ShowPreview(body));
-                    });
-                }
+                ComposeInput::TogglePreview(on) => self.on_toggle_preview(on, &sender),
 
                 ComposeInput::ShowPreview(body) => {
                     let html = match self.format {
@@ -2863,195 +1713,11 @@ impl Component for Compose {
                     }
                 }
                 ComposeInput::PgpChecked { checked, result } => {
-                    self.pgp_checking = false;
-                    match result {
-                        Ok(()) => {
-                            self.pgp_cleared = Some(checked);
-                            sender.input_sender().emit(ComposeInput::Send);
-                        }
-                        Err(problem) => {
-                            let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-                            let dialog = adw::MessageDialog::new(
-                                parent.as_ref(),
-                                Some(&i18n("Cannot send with OpenPGP")),
-                                Some(&problem),
-                            );
-                            dialog.add_response("ok", &i18n("OK"));
-                            dialog.present();
-                        }
-                    }
+                    self.on_pgp_checked(checked, result, widgets, &sender)
                 }
-                ComposeInput::Send => {
-                    let to = widgets.to_row.text().trim().to_string();
-                    if to.is_empty() {
-                        widgets.to_row.add_css_class("error");
-                        break 'handle;
-                    }
-                    // The composer closes on Send, so an address the message
-                    // cannot go to is caught here, while it can still be fixed
-                    // (#368). Invisible characters pasted along with an address
-                    // are taken out first, where the user can see the result.
-                    for row in [&widgets.to_row, &widgets.cc_row, &widgets.bcc_row] {
-                        if let Some(clean) = crate::worker::clean_recipient_field(&row.text()) {
-                            row.set_text(&clean);
-                        }
-                    }
-                    if let Some(clean) =
-                        crate::worker::clean_recipient_field(&widgets.reply_to_row.text())
-                    {
-                        widgets.reply_to_row.set_text(&clean);
-                    }
-                    let rows: [(&gtk::Widget, String); 4] = [
-                        (widgets.to_row.upcast_ref(), widgets.to_row.text()),
-                        (widgets.cc_row.upcast_ref(), widgets.cc_row.text()),
-                        (widgets.bcc_row.upcast_ref(), widgets.bcc_row.text()),
-                        (
-                            widgets.reply_to_row.upcast_ref(),
-                            widgets.reply_to_row.text().to_string(),
-                        ),
-                    ];
-                    if let Some((row, addr)) = rows.iter().find_map(|(row, text)| {
-                        crate::worker::invalid_recipient(text).map(|addr| (row, addr))
-                    }) {
-                        row.add_css_class("error");
-                        let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-                        let dialog = adw::MessageDialog::new(
-                            parent.as_ref(),
-                            Some(&i18n("Check the address")),
-                            Some(&i18n_f(
-                                "“{addr}” is not an email address.",
-                                &[("addr", &addr)],
-                            )),
-                        );
-                        dialog.add_response("ok", &i18n("OK"));
-                        dialog.present();
-                        break 'handle;
-                    }
-                    let to = widgets.to_row.text().trim().to_string();
-                    // A file moved or deleted since it was attached (#340): the
-                    // composer closes on Send, so this is the last moment the
-                    // message can still be fixed rather than lost.
-                    let missing: Vec<String> = self
-                        .attachments
-                        .iter()
-                        .filter(|p| std::fs::File::open(p).is_err())
-                        .map(|p| {
-                            p.file_name()
-                                .map(|n| n.to_string_lossy().to_string())
-                                .unwrap_or_default()
-                        })
-                        .collect();
-                    if !missing.is_empty() {
-                        self.rebuild_attachments(&widgets.attach_box, &sender);
-                        let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-                        let dialog = adw::MessageDialog::new(
-                        parent.as_ref(),
-                        Some(&i18n("An attachment is missing")),
-                        Some(&i18n_f(
-                            "Hylki cannot read {names}. It was moved or deleted after it was attached. Remove it, or attach it again from where it is now.",
-                            &[("names", &missing.join(", "))],
-                        )),
-                    );
-                        dialog.add_response("ok", &i18n("OK"));
-                        dialog.present();
-                        break 'handle;
-                    }
-                    let cc = widgets.cc_row.text().trim().to_string();
-                    let bcc = widgets.bcc_row.text().trim().to_string();
-                    let reply_to = widgets.reply_to_row.text().trim().to_string();
-                    let subject = widgets.subject_row.text().to_string();
-                    let idx = widgets.from_row.selected() as usize;
-                    // OpenPGP (#133): say what is missing before anything leaves.
-                    // gpg answers on a worker thread, since a stale keyring lock
-                    // makes it wait about ten seconds (#316); its answer sends
-                    // again, and passes here when nothing has changed since.
-                    if self.sign || self.encrypt {
-                        let from = self.accounts.get(idx);
-                        let from_email = from.map(|a| a.email.clone()).unwrap_or_default();
-                        let key = from.and_then(|a| a.pgp_key.clone());
-                        let encrypt = self.encrypt;
-                        let fields = vec![to.clone(), cc.clone(), bcc.clone()];
-                        let mut checked = vec![
-                            from_email.clone(),
-                            key.clone().unwrap_or_default(),
-                            encrypt.to_string(),
-                        ];
-                        checked.extend(fields.iter().cloned());
-                        if self.pgp_cleared.take().as_ref() != Some(&checked) {
-                            if !self.pgp_checking {
-                                self.pgp_checking = true;
-                                let s = sender.clone();
-                                gtk::glib::spawn_future_local(async move {
-                                    let result = gtk::gio::spawn_blocking(move || {
-                                        let fields: Vec<&str> =
-                                            fields.iter().map(String::as_str).collect();
-                                        pgp_send_check(
-                                            &from_email,
-                                            key.as_deref(),
-                                            &fields,
-                                            encrypt,
-                                        )
-                                    })
-                                    .await
-                                    .unwrap_or_else(|_| Err("task failed".into()));
-                                    s.input_sender()
-                                        .emit(ComposeInput::PgpChecked { checked, result });
-                                });
-                            }
-                            break 'handle;
-                        }
-                    }
-                    let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
-                    let from_alias = match self.chosen_from(widgets) {
-                        Ok(from) => from,
-                        Err(why) => {
-                            let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-                            let dialog = adw::MessageDialog::new(
-                                parent.as_ref(),
-                                Some(&i18n("Check the From address")),
-                                Some(&why),
-                            );
-                            dialog.add_response("ok", &i18n("OK"));
-                            dialog.present();
-                            break 'handle;
-                        }
-                    };
+                ComposeInput::Send => self.on_send(widgets, &sender),
 
-                    // Pull the body out of the editor (async), then finish
-                    // sending via SendBody. The send-time reader also recuts any
-                    // picture armed for it; a draft save below does not. In a
-                    // source format `html` carries the source itself, which
-                    // `outgoing_body` converts.
-                    let s = sender.clone();
-                    self.read_body_as(self.format, true, move |html, text| {
-                        s.input_sender()
-                            .emit(ComposeInput::SendBody(OutgoingFields {
-                                html,
-                                text,
-                                to: to.clone(),
-                                cc: cc.clone(),
-                                bcc: bcc.clone(),
-                                reply_to: reply_to.clone(),
-                                subject: subject.clone(),
-                                from_account_id,
-                                from_alias: from_alias.clone(),
-                            }));
-                    });
-                }
-
-                ComposeInput::SendBody(fields) => {
-                    let mut out = self.outgoing_message(fields);
-                    // A draft goes once it is sent; a template stays to be used
-                    // again.
-                    if self.template {
-                        out.draft_origin = None;
-                    }
-                    let _ = sender.output(ComposeOutput::Send {
-                        id: self.compose_id,
-                        message: Box::new(out),
-                    });
-                    let _ = sender.output(ComposeOutput::Close(self.compose_id));
-                }
+                ComposeInput::SendBody(fields) => self.on_send_body(fields, &sender),
 
                 msg @ (ComposeInput::SaveDraft | ComposeInput::SaveAsTemplate) => {
                     let as_template = matches!(msg, ComposeInput::SaveAsTemplate);
@@ -3073,149 +1739,15 @@ impl Component for Compose {
                 ComposeInput::SaveDraftBody {
                     fields,
                     as_template,
-                } => {
-                    let mut out = self.outgoing_message(fields);
-                    if as_template {
-                        // A copy, cut loose from wherever this message came
-                        // from: saving it replaces no draft and no queued
-                        // message, and a message started from it answers
-                        // nothing and waits for no time.
-                        out.draft_origin = None;
-                        out.outbox_origin = None;
-                        out.in_reply_to.clear();
-                        out.references.clear();
-                        out.forwards.clear();
-                        out.send_at = None;
-                        let _ = sender.output(ComposeOutput::SaveTemplate(Box::new(out)));
-                        break 'handle;
-                    }
-                    if self.template {
-                        let _ = sender.output(ComposeOutput::SaveTemplate(Box::new(out)));
-                    } else {
-                        let _ = sender.output(ComposeOutput::SaveDraft(Box::new(out)));
-                    }
-                    let _ = sender.output(ComposeOutput::Close(self.compose_id));
-                }
+                } => self.on_save_draft_body(fields, as_template, &sender),
 
-                ComposeInput::AutoSave => {
-                    if self.autosave_off
-                        || self.autosaving
-                        || self.asking_discard
-                        || self.translating
-                    {
-                        break 'handle;
-                    }
-                    // Not before anything was written: an untouched reply is
-                    // no draft.
-                    if self.fields_dirty {
-                        sender.input_sender().emit(ComposeInput::AutoSaveRead);
-                    } else {
-                        let s = sender.clone();
-                        self.editor.is_dirty(move |dirty| {
-                            if dirty {
-                                s.input_sender().emit(ComposeInput::AutoSaveRead);
-                            }
-                        });
-                    }
-                }
+                ComposeInput::AutoSave => self.on_auto_save(&sender),
 
-                ComposeInput::AutoSaveRead => {
-                    if self.autosaving {
-                        break 'handle;
-                    }
-                    let fields = self.draft_fields(widgets);
-                    let s = sender.clone();
-                    self.read_body_as(self.format, false, move |html, text| {
-                        s.input_sender()
-                            .emit(ComposeInput::AutoSaveBody(OutgoingFields {
-                                html,
-                                text,
-                                ..fields.clone()
-                            }));
-                    });
-                }
+                ComposeInput::AutoSaveRead => self.on_auto_save_read(widgets, &sender),
 
-                ComposeInput::AutoSaveBody(fields) => {
-                    let OutgoingFields {
-                        html,
-                        text,
-                        to,
-                        cc,
-                        bcc,
-                        reply_to,
-                        subject,
-                        from_account_id,
-                        from_alias,
-                    } = fields;
-                    use std::hash::{Hash, Hasher};
-                    let mut h = std::collections::hash_map::DefaultHasher::new();
-                    (
-                        &html,
-                        &text,
-                        &to,
-                        &cc,
-                        &bcc,
-                        &reply_to,
-                        &subject,
-                        from_account_id,
-                        &from_alias,
-                        &self.attachments,
-                    )
-                        .hash(&mut h);
-                    let hash = h.finish();
-                    // Unchanged since the last save, or nothing in it at all.
-                    let empty = [&to, &cc, &bcc, &subject]
-                        .iter()
-                        .all(|f| f.trim().is_empty())
-                        && text.trim().is_empty()
-                        && self.attachments.is_empty();
-                    if self.autosaved == Some(hash) || empty || self.autosaving {
-                        break 'handle;
-                    }
-                    let out = self.outgoing_message(OutgoingFields {
-                        html,
-                        text,
-                        to,
-                        cc,
-                        bcc,
-                        reply_to,
-                        subject,
-                        from_account_id,
-                        from_alias,
-                    });
-                    self.autosaving = true;
-                    self.autosave_pending = Some(hash);
-                    let _ = sender.output(ComposeOutput::AutoSave {
-                        id: self.compose_id,
-                        message: Box::new(out),
-                    });
-                }
+                ComposeInput::AutoSaveBody(fields) => self.on_auto_save_body(fields, &sender),
 
-                ComposeInput::Autosaved { saved, origin } => {
-                    self.autosaving = false;
-                    let pending = self.autosave_pending.take();
-                    if !saved {
-                        // Offline, say: the next tick tries again.
-                        break 'handle;
-                    }
-                    match origin {
-                        Some(origin) => {
-                            if self.draft_origin.is_none() {
-                                self.autosave_made = true;
-                            }
-                            self.draft_origin = Some(origin);
-                            self.autosaved = pending;
-                        }
-                        // Saved, but not found again to be replaced next time:
-                        // one more save would leave a second copy behind.
-                        None => {
-                            tracing::info!(
-                                "automatic draft save stopped: the saved copy was not found"
-                            );
-                            self.autosave_off = true;
-                        }
-                    }
-                }
+                ComposeInput::Autosaved { saved, origin } => self.on_autosaved(saved, origin),
             }
         }
         // Overriding `update_with_view` takes over relm4's default, which

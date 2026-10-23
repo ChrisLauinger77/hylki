@@ -2,7 +2,11 @@
 //! body.
 
 use super::messages::ComposeInput;
+use super::types::CloudLink;
+use super::{Compose, ComposeWidgets};
 use crate::i18n::i18n;
+use crate::i18n::i18n_f;
+use crate::ui::rich_editor::{js_escape, SourceKind};
 use adw::prelude::*;
 use relm4::prelude::*;
 
@@ -140,4 +144,261 @@ pub(super) fn cloud_upload_dialog(
         });
     });
     dialog.present();
+}
+
+impl Compose {
+    /// Handles [`ComposeInput::CloudAttach`].
+    pub(super) fn on_cloud_attach(
+        &mut self,
+        sender: &ComponentSender<Self>,
+        root: &adw::BreakpointBin,
+    ) {
+        let dialog = gtk::FileDialog::new();
+        dialog.set_title(&i18n("Upload to Cloud Storage"));
+        let parent = root.root().and_downcast::<gtk::Window>();
+        let s = sender.input_sender().clone();
+        dialog.open_multiple(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
+            if let Ok(model) = res {
+                let paths: Vec<_> = (0..model.n_items())
+                    .filter_map(|i| model.item(i).and_downcast::<gtk::gio::File>()?.path())
+                    .collect();
+                if !paths.is_empty() {
+                    let _ = s.send(ComposeInput::CloudPicked(paths));
+                }
+            }
+        });
+    }
+
+    /// Handles [`ComposeInput::CloudPicked`].
+    pub(super) fn on_cloud_picked(
+        &mut self,
+        paths: Vec<std::path::PathBuf>,
+        sender: &ComponentSender<Self>,
+        root: &adw::BreakpointBin,
+    ) {
+        let parent = root.root().and_downcast::<gtk::Window>();
+        cloud_upload_dialog(
+            parent.as_ref(),
+            &self.cloud_accounts,
+            paths,
+            sender.input_sender().clone(),
+        );
+    }
+
+    /// Handles [`ComposeInput::CloudUpload`].
+    pub(super) fn on_cloud_upload(
+        &mut self,
+        paths: Vec<std::path::PathBuf>,
+        account: crate::cloud::CloudAccount,
+        link_password: Option<String>,
+        sender: &ComponentSender<Self>,
+    ) {
+        if !account.has_secret() {
+            sender
+                .input_sender()
+                .emit(ComposeInput::CloudUploadSignedIn {
+                    paths,
+                    account,
+                    link_password,
+                    password: Some(String::new()),
+                });
+            return;
+        }
+        // Off the main thread: the keyring may wait on its user.
+        let key = account.key();
+        let s = sender.input_sender().clone();
+        crate::config::keyring_then(
+            move || crate::config::load_cloud_password(&key),
+            move |password| {
+                s.emit(ComposeInput::CloudUploadSignedIn {
+                    paths,
+                    account,
+                    link_password,
+                    password,
+                })
+            },
+        );
+    }
+
+    /// Handles [`ComposeInput::CloudUploadSignedIn`].
+    pub(super) fn on_cloud_upload_signed_in(
+        &mut self,
+        paths: Vec<std::path::PathBuf>,
+        account: crate::cloud::CloudAccount,
+        link_password: Option<String>,
+        password: String,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        for path in paths {
+            let name = path
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+            self.cloud_busy += 1;
+            self.rebuild_attachments(&widgets.attach_box, sender);
+            let s = sender.input_sender().clone();
+            let (a, pw, lp) = (account.clone(), password.clone(), link_password.clone());
+            std::thread::spawn(move || {
+                let result = crate::cloud::upload_and_share(&a, &pw, &path, lp.as_deref());
+                let _ = s.send(ComposeInput::CloudUploaded { name, result });
+            });
+        }
+    }
+
+    /// Handles [`ComposeInput::CloudUploaded`].
+    pub(super) fn on_cloud_uploaded(
+        &mut self,
+        name: String,
+        result: Result<crate::cloud::ShareResult, String>,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+        root: &adw::BreakpointBin,
+    ) {
+        self.cloud_busy = self.cloud_busy.saturating_sub(1);
+        match result {
+            Ok(share) => {
+                let id = format!(
+                    "hylki-cloud-{}",
+                    crate::rng::token(8).unwrap_or_else(|_| share.size.to_string())
+                );
+                let mut caption = crate::models::human_size(share.size);
+                if let Some(d) = &share.expires {
+                    caption.push_str(&format!(
+                        ", {}",
+                        i18n_f("link expires {date}", &[("date", d)])
+                    ));
+                }
+                if share.password.is_some() {
+                    caption.push_str(&format!(", {}", i18n("password-protected")));
+                }
+                let html = format!(
+                "<p id=\"{id}\" data-hylki-cloud=\"1\">\u{1F4CE} <a href=\"{url}\">{name}</a> ({caption})</p>",
+                url = html_escape(&share.url),
+                name = html_escape(&share.name),
+                caption = html_escape(&caption),
+            );
+                // Into the body where the user's own text ends: above
+                // the signature, and above a quoted original in a
+                // reply, so the link reads as part of the message.
+                if let Some(kind) = self.editor.source_kind() {
+                    let line = match kind {
+                        SourceKind::Markdown => format!(
+                            "\u{1F4CE} [{name}]({url}) ({caption})",
+                            name = share.name,
+                            url = share.url,
+                            caption = caption,
+                        ),
+                        SourceKind::Html => html.clone(),
+                    };
+                    // The same place, said in text: above the `-- `
+                    // signature line if there is one, else at the end.
+                    self.editor.run_js(&format!(
+                        "(function(){{var t=document.getElementById('src');if(!t)return;\
+                     var l='{}';var v=t.value;var i=v.lastIndexOf('\\n-- \\n');\
+                     if(i>=0){{v=v.slice(0,i)+'\\n'+l+'\\n'+v.slice(i);}}\
+                     else{{v=v.replace(/\\s*$/,'')+'\\n\\n'+l+'\\n';}}\
+                     t.value=v;window.__hylkiDirty=true;}})()",
+                        js_escape(&line)
+                    ));
+                    if let Some(p) = share.password.clone() {
+                        self.cloud_passwords.push((share.name.clone(), p));
+                    }
+                    self.cloud_links.push(CloudLink {
+                        id,
+                        name: share.name,
+                        url: share.url,
+                    });
+                    self.rebuild_attachments(&widgets.attach_box, sender);
+                    return;
+                }
+                self.editor.run_js(&format!(
+                "(function(){{var d=document.createElement('div');d.innerHTML='{}';\
+                 var p=d.firstChild;var b=document.body;\
+                 var first=null;var cands=b.querySelectorAll('.hylki-sig,.hylki-quote-attr,blockquote');\
+                 for(var i=0;i<cands.length;i++){{var t=cands[i];while(t.parentNode&&t.parentNode!==b)t=t.parentNode;\
+                 if(t.parentNode===b&&(!first||(t.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING)))first=t;}}\
+                 if(first)b.insertBefore(p,first);else b.appendChild(p);\
+                 window.__hylkiPlainFix&&window.__hylkiPlainFix();\
+                 document.dispatchEvent(new Event('input'));}})()",
+                js_escape(&html)
+            ));
+                if let Some(p) = share.password.clone() {
+                    self.cloud_passwords.push((share.name.clone(), p));
+                }
+                self.cloud_links.push(CloudLink {
+                    id,
+                    name: share.name,
+                    url: share.url,
+                });
+            }
+            Err(e) => {
+                let parent = root.root().and_downcast::<gtk::Window>();
+                let d = adw::MessageDialog::new(
+                    parent.as_ref(),
+                    Some(i18n_f("Could not upload {name}", &[("name", &name)]).as_str()),
+                    Some(&e),
+                );
+                d.add_response("ok", &i18n("OK"));
+                d.present();
+            }
+        }
+        self.rebuild_attachments(&widgets.attach_box, sender);
+    }
+
+    /// Handles [`ComposeInput::RemoveCloudLink`].
+    pub(super) fn on_remove_cloud_link(
+        &mut self,
+        i: usize,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        if i < self.cloud_links.len() {
+            let link = self.cloud_links.remove(i);
+            self.cloud_passwords.retain(|(n, _)| *n != link.name);
+            // Source mode has no element to remove: the line that
+            // names the link is what goes.
+            if self.editor.source_kind().is_some() {
+                self.editor.run_js(&format!(
+                    "(function(){{var t=document.getElementById('src');if(!t)return;\
+                 var u='{}';\
+                 t.value=t.value.split('\\n').filter(function(l){{return l.indexOf(u)<0;}})\
+                   .join('\\n');window.__hylkiDirty=true;}})()",
+                    js_escape(&link.url)
+                ));
+                self.rebuild_attachments(&widgets.attach_box, sender);
+                return;
+            }
+            self.editor.run_js(&format!(
+            "(function(){{var p=document.getElementById('{}');if(p)p.remove();document.dispatchEvent(new Event('input'));}})()",
+            js_escape(&link.id)
+        ));
+            self.rebuild_attachments(&widgets.attach_box, sender);
+        }
+    }
+
+    /// Handles [`ComposeInput::CopyCloudPasswords`].
+    pub(super) fn on_copy_cloud_passwords(&mut self) {
+        let text = self
+            .cloud_passwords
+            .iter()
+            .map(|(n, p)| format!("{n}: {p}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if let Some(display) = gtk::gdk::Display::default() {
+            display.clipboard().set_text(&text);
+        }
+    }
+}
+
+/// The cloud account's sign-in is missing from the keyring.
+pub(super) fn not_signed_in(root: &adw::BreakpointBin, name: &str) {
+    let parent = root.root().and_downcast::<gtk::Window>();
+    let d = adw::MessageDialog::new(
+    parent.as_ref(),
+    Some(i18n("Not signed in").as_str()),
+    Some(i18n_f("The sign-in for {name} is not in the keyring. Open Settings, Cloud Storage, and enter it again.", &[("name", name)]).as_str()),
+);
+    d.add_response("ok", &i18n("OK"));
+    d.present();
 }

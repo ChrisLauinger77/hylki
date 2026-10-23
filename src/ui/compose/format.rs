@@ -5,7 +5,9 @@ use super::messages::ComposeInput;
 use super::Compose;
 use crate::config::ComposeFormat;
 use crate::i18n::{i18n, i18n_f};
+use crate::ui::context_menu::show_context_menu;
 use crate::ui::context_menu::MenuEntry;
+use crate::ui::rich_editor::SourceKind;
 use adw::prelude::*;
 use relm4::prelude::*;
 
@@ -109,5 +111,181 @@ impl Compose {
             .selected(format == self.format)
         })
         .collect()
+    }
+}
+
+impl Compose {
+    /// Handles [`ComposeInput::Zoom`].
+    pub(super) fn on_zoom(&mut self, step: i8) {
+        if !self.zoomable.get() {
+            return;
+        }
+        use crate::config::READER_ZOOM_STEPS as STEPS;
+        let now = ZOOM.load(std::sync::atomic::Ordering::Relaxed);
+        let at = STEPS.iter().position(|&z| z == now).unwrap_or(5) as i32;
+        let zoom = match step {
+            0 => 100,
+            s => STEPS[(at + i32::from(s.signum())).clamp(0, STEPS.len() as i32 - 1) as usize],
+        };
+        ZOOM.store(zoom, std::sync::atomic::Ordering::Relaxed);
+        self.editor.set_zoom(zoom);
+    }
+
+    /// Handles [`ComposeInput::FormatMenu`].
+    pub(super) fn on_format_menu(&mut self, sender: &ComponentSender<Self>) {
+        let btn = &self.format_btn;
+        show_context_menu(
+            btn,
+            (btn.width() / 2) as f64,
+            btn.height() as f64,
+            vec![self.format_entries(sender)],
+        );
+    }
+
+    /// Handles [`ComposeInput::SetFormat`].
+    pub(super) fn on_set_format(&mut self, to: ComposeFormat, sender: &ComponentSender<Self>) {
+        if to == self.format {
+            return;
+        }
+        // Plain text shows only what is sent (#424), so moving a
+        // formatted body there drops what it cannot show, and the
+        // way back does not bring it back.
+        if self.format == ComposeFormat::Rich && to == ComposeFormat::Plain {
+            let s = sender.clone();
+            self.editor.eval(
+                "String(!!(window.__hylkiPlainLoses&&window.__hylkiPlainLoses()))",
+                move |loses| {
+                    s.input_sender().emit(if loses == "true" {
+                        ComposeInput::AskPlain
+                    } else {
+                        ComposeInput::ApplyFormat(ComposeFormat::Plain)
+                    });
+                },
+            );
+            return;
+        }
+        sender.input_sender().emit(ComposeInput::ApplyFormat(to));
+    }
+
+    /// Handles [`ComposeInput::AskPlain`].
+    pub(super) fn on_ask_plain(
+        &mut self,
+        sender: &ComponentSender<Self>,
+        root: &adw::BreakpointBin,
+    ) {
+        let dialog = adw::AlertDialog::new(
+            Some(&i18n("Switch to plain text?")),
+            Some(&i18n("Formatting, images and links are removed.")),
+        );
+        dialog.add_response("cancel", &i18n("Cancel"));
+        dialog.add_response("switch", &i18n("Switch"));
+        dialog.set_response_appearance("switch", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let s = sender.input_sender().clone();
+        dialog.connect_response(None, move |_, resp| {
+            if resp == "switch" {
+                let _ = s.send(ComposeInput::ApplyFormat(ComposeFormat::Plain));
+            }
+        });
+        dialog.present(Some(root));
+        // HYLKI_SHOWCASE_PLAIN_ANSWER=switch|cancel answers it two
+        // seconds on (demo only), for a check without a pointer.
+        if let (Ok(answer), Some(_)) = (
+            std::env::var("HYLKI_SHOWCASE_PLAIN_ANSWER"),
+            std::env::var_os("HYLKI_DEMO"),
+        ) {
+            tracing::info!("showcase plain: asked before switching");
+            let (d, s) = (dialog.clone(), sender.input_sender().clone());
+            gtk::glib::timeout_add_seconds_local_once(2, move || {
+                d.force_close();
+                if answer == "switch" {
+                    let _ = s.send(ComposeInput::ApplyFormat(ComposeFormat::Plain));
+                }
+            });
+        }
+    }
+
+    /// Handles [`ComposeInput::ApplyFormat`].
+    pub(super) fn on_apply_format(&mut self, to: ComposeFormat, sender: &ComponentSender<Self>) {
+        let from = self.format;
+        if to == from {
+            return;
+        }
+        self.format = to;
+        self.editor
+            .set_formatting_visible(to == ComposeFormat::Rich);
+        self.zoomable.set(to != ComposeFormat::Rich);
+        self.editor.set_zoom(if self.zoomable.get() {
+            ZOOM.load(std::sync::atomic::Ordering::Relaxed)
+        } else {
+            100
+        });
+        if let Some(zones) = &self.drop_zones {
+            zones.set_allow_inline(to == ComposeFormat::Rich);
+        }
+        self.dress_format_buttons();
+        self.preview_btn.set_visible(to.is_source());
+        // A preview of the old format's render would be a lie about
+        // the new one.
+        self.preview_btn.set_active(false);
+        // Every change reloads the body, plain text included: it
+        // shows the message flattened to what is sent (#424), so it
+        // cannot share the rich document's undo history.
+        let s = sender.clone();
+        self.read_body_as(from, false, move |body, _| {
+            s.input_sender()
+                .emit(ComposeInput::LoadAs { from, to, body });
+        });
+    }
+
+    /// Handles [`ComposeInput::LoadAs`].
+    pub(super) fn on_load_as(&mut self, from: ComposeFormat, to: ComposeFormat, body: String) {
+        // Every conversion goes through HTML: it is the one form
+        // all four formats can be written to and read back from.
+        let html = match from {
+            ComposeFormat::Markdown => crate::markdown::to_html(&body),
+            _ => body,
+        };
+        self.editor.set_plain(to == ComposeFormat::Plain);
+        match to {
+            ComposeFormat::Markdown => self
+                .editor
+                .set_source(SourceKind::Markdown, &markdown_body(&html)),
+            ComposeFormat::Html => self
+                .editor
+                .set_source(SourceKind::Html, &crate::markdown::pretty_html(&html)),
+            ComposeFormat::Rich | ComposeFormat::Plain => self.editor.set_html(&html),
+        }
+        self.editor.grab_focus();
+        // HYLKI_SHOWCASE_PLAIN_LOG logs the reloaded body, its font
+        // and the text it sends (demo only).
+        if std::env::var_os("HYLKI_SHOWCASE_PLAIN_LOG").is_some()
+            && std::env::var_os("HYLKI_DEMO").is_some()
+        {
+            let ed = self.editor.clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
+                ed.eval(SHOWCASE_PLAIN_LOG, move |v| {
+                    tracing::info!("showcase plain: {to:?} {v}")
+                });
+            });
+        }
+    }
+
+    /// Handles [`ComposeInput::TogglePreview`].
+    pub(super) fn on_toggle_preview(&mut self, on: bool, sender: &ComponentSender<Self>) {
+        // Keep the button with the state, for the times the message
+        // arrives from somewhere other than a click on it.
+        if self.preview_btn.is_active() != on {
+            self.preview_btn.set_active(on);
+        }
+        if !on {
+            self.editor.show_preview(None);
+            return;
+        }
+        let s = sender.clone();
+        self.read_body_as(self.format, false, move |body, _| {
+            s.input_sender().emit(ComposeInput::ShowPreview(body));
+        });
     }
 }

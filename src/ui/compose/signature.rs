@@ -1,10 +1,13 @@
 //! Signatures: which one, where it goes, and swapping one for another in rich
 //! and source bodies.
 
+use super::messages::ComposeInput;
 use super::types::{ComposeAccount, SigPlace};
 use super::Compose;
 use super::ComposeWidgets;
 use crate::config::SignaturePosition;
+use crate::i18n::i18n;
+use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::ui::rich_editor::{self, js_escape, SourceKind};
 use adw::prelude::*;
 use relm4::prelude::*;
@@ -235,5 +238,98 @@ window.__hylkiDirty=true;})()"#
             self.sign_expected = Some(on);
             widgets.sign_btn.set_active(on);
         }
+    }
+}
+
+impl Compose {
+    /// Handles [`ComposeInput::InsertSignature`].
+    pub(super) fn on_insert_signature(&mut self, place: SigPlace, widgets: &ComposeWidgets) {
+        let idx = widgets.from_row.selected() as usize;
+        let sig = self
+            .accounts
+            .get(idx)
+            .map(|a| self.chosen_signature(a))
+            .unwrap_or_default();
+        self.insert_signature(sig, place);
+    }
+
+    /// Handles [`ComposeInput::SignatureClicked`].
+    pub(super) fn on_signature_clicked(
+        &mut self,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        let idx = widgets.from_row.selected() as usize;
+        let Some(account) = self.accounts.get(idx) else {
+            return;
+        };
+        if account.signatures.len() < 2 {
+            sender
+                .input_sender()
+                .emit(ComposeInput::InsertSignature(SigPlace::Cursor));
+            return;
+        }
+        // The one in the message is drawn as chosen; a body that
+        // started without one (Edit as New, a draft) may still
+        // carry the default's text, which is no harm to show.
+        let list: Vec<MenuEntry> = account
+            .signatures
+            .iter()
+            .enumerate()
+            .map(|(i, sig)| {
+                let s = sender.clone();
+                MenuEntry::new(&sig.name, move || {
+                    s.input_sender().emit(ComposeInput::UseSignature(Some(i)))
+                })
+                .selected(!self.current_sig.is_empty() && sig.html == self.current_sig)
+            })
+            .collect();
+        let s = sender.clone();
+        let none = MenuEntry::new(i18n("No Signature"), move || {
+            s.input_sender().emit(ComposeInput::UseSignature(None))
+        })
+        .selected(self.current_sig.is_empty());
+        let btn = &self.signature_btn;
+        show_context_menu(
+            btn,
+            (btn.width() / 2) as f64,
+            btn.height() as f64,
+            vec![list, vec![none]],
+        );
+    }
+
+    /// Handles [`ComposeInput::UseSignature`].
+    pub(super) fn on_use_signature(&mut self, choice: Option<usize>, widgets: &ComposeWidgets) {
+        let idx = widgets.from_row.selected() as usize;
+        let sig = match choice {
+            Some(i) => match self.accounts.get(idx).and_then(|a| a.signatures.get(i)) {
+                Some(sig) => sig.html.clone(),
+                None => return,
+            },
+            None => String::new(),
+        };
+        if sig != self.current_sig {
+            self.put_signature(sig);
+        }
+    }
+
+    /// Handles [`ComposeInput::SignatureMenu`].
+    pub(super) fn on_signature_menu(&mut self, sender: &ComponentSender<Self>) {
+        let entry = |label: String, place: SigPlace| {
+            let s = sender.clone();
+            MenuEntry::new(&label, move || {
+                s.input_sender().emit(ComposeInput::InsertSignature(place))
+            })
+        };
+        let btn = &self.signature_btn;
+        show_context_menu(
+            btn,
+            (btn.width() / 2) as f64,
+            btn.height() as f64,
+            vec![vec![
+                entry(i18n("Insert Before the Text"), SigPlace::Start),
+                entry(i18n("Insert After the Text"), SigPlace::End),
+            ]],
+        );
     }
 }
