@@ -56,11 +56,12 @@ impl AppModel {
     ) {
         let (purge, move_out): (Vec<Message>, Vec<Message>) =
             messages.into_iter().partition(|m| self.in_trash(m));
-        match move_out.len() {
-            0 => {}
-            1 => self.move_to(move_out.into_iter().next().unwrap(), FolderKind::Trash),
-            _ => self.apply_bulk_move(BulkAction::Delete, move_out),
+        if move_out.len() > 1 {
+            self.apply_bulk_move(BulkAction::Delete, move_out);
+        } else if let Some(m) = move_out.into_iter().next() {
+            self.move_to(m, FolderKind::Trash);
         }
+
         if !purge.is_empty() {
             self.confirm_purge(purge, sender);
         }

@@ -588,7 +588,8 @@ impl MessageList {
             }
             let expanded = meta.expanded;
             let mut it = members.into_iter();
-            let head = it.next().unwrap();
+            let head = it.next().expect("a group holds at least one message");
+
             shown.push(head.clone());
             rows.push(Rc::new(RowData {
                 msg: head,

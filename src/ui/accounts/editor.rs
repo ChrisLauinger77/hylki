@@ -383,10 +383,11 @@ impl AccountsWindow {
         // account still carries the right servers). Manual/Custom are left alone.
         let servers = match p.kind {
             ProviderKind::Preset => Some((p.imap_host, p.imap_port, p.smtp_host, p.smtp_port)),
-            ProviderKind::Google | ProviderKind::Microsoft => {
-                crate::oauth::preset(p.oauth_name().unwrap())
-                    .map(|o| (o.imap_host, o.imap_port, o.smtp_host, o.smtp_port))
-            }
+            ProviderKind::Google | ProviderKind::Microsoft => p
+                .oauth_name()
+                .and_then(crate::oauth::preset)
+                .map(|o| (o.imap_host, o.imap_port, o.smtp_host, o.smtp_port)),
+
             ProviderKind::Manual | ProviderKind::CustomOAuth | ProviderKind::Jmap => None,
         };
         if let Some((ih, ip, sh, sp)) = servers {

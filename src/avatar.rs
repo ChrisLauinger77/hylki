@@ -10,7 +10,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 
 use gtk::prelude::{Cast, TextureExt};
 
@@ -448,7 +448,8 @@ fn cache_missing_contact(email: &str, generation: u64) {
 }
 
 // Raw Gravatar results coalesce duplicate rows for one sender and preserve a
-// definitive 404 across list rebuilds. Transient failures are never cached.
+// definitive 404 across list rebuilds. A transient failure is kept only for
+// a short while (`RetryAfter`), so the rows asking at once share one try.
 enum RawGravatar {
     Found(DecodedImage),
     Missing,
@@ -461,11 +462,26 @@ static GRAVATAR_EMAIL_LOCKS: OnceLock<Mutex<HashMap<String, Arc<Mutex<()>>>>> = 
 static GRAVATAR_GATE: OnceLock<(Mutex<usize>, Condvar)> = OnceLock::new();
 const MAX_GRAVATAR_REQUESTS: usize = 4;
 
+/// The Gravatar results so far, locked; a poisoned lock is taken over, as
+/// every lock here is.
+fn gravatar_bytes() -> MutexGuard<'static, RawGravatarCache> {
+    GRAVATAR_BYTES
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+}
+
+/// The count of Gravatar requests in flight, and the wake-up for a request
+/// waiting for a slot.
+fn gravatar_gate() -> &'static (Mutex<usize>, Condvar) {
+    GRAVATAR_GATE.get_or_init(|| (Mutex::new(0), Condvar::new()))
+}
+
 struct GravatarSlot;
 
 impl GravatarSlot {
     fn acquire() -> Self {
-        let (active, wake) = GRAVATAR_GATE.get_or_init(|| (Mutex::new(0), Condvar::new()));
+        let (active, wake) = gravatar_gate();
         let mut active = active.lock().unwrap_or_else(|p| p.into_inner());
         while *active >= MAX_GRAVATAR_REQUESTS {
             active = wake.wait(active).unwrap_or_else(|p| p.into_inner());
@@ -477,7 +493,7 @@ impl GravatarSlot {
 
 impl Drop for GravatarSlot {
     fn drop(&mut self) {
-        let (active, wake) = GRAVATAR_GATE.get().expect("Gravatar gate initialized");
+        let (active, wake) = gravatar_gate();
         let mut active = active.lock().unwrap_or_else(|p| p.into_inner());
         *active = active.saturating_sub(1);
         wake.notify_one();
@@ -501,10 +517,7 @@ fn gravatar_image(email: &str) -> Result<Option<DecodedImage>, ()> {
     };
     let _email_guard = email_lock.lock().unwrap_or_else(|p| p.into_inner());
     {
-        let mut cache = GRAVATAR_BYTES
-            .get_or_init(|| Mutex::new(HashMap::new()))
-            .lock()
-            .unwrap_or_else(|p| p.into_inner());
+        let mut cache = gravatar_bytes();
         match cache.get(&key) {
             Some(RawGravatar::Found(bytes)) => return Ok(Some(bytes.clone())),
             Some(RawGravatar::Missing) => return Ok(None),
@@ -529,12 +542,7 @@ fn gravatar_image(email: &str) -> Result<Option<DecodedImage>, ()> {
     {
         Ok(response) => response,
         Err(ureq::Error::Status(404, _)) => {
-            GRAVATAR_BYTES
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap_or_else(|p| p.into_inner())
-                .insert(key, RawGravatar::Missing);
+            gravatar_bytes().insert(key, RawGravatar::Missing);
             return Ok(None);
         }
         Err(_) => {
@@ -563,25 +571,15 @@ fn gravatar_image(email: &str) -> Result<Option<DecodedImage>, ()> {
         cache_gravatar_retry(key);
         return Err(());
     };
-    GRAVATAR_BYTES
-        .get()
-        .unwrap()
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .insert(key, RawGravatar::Found(image.clone()));
+    gravatar_bytes().insert(key, RawGravatar::Found(image.clone()));
     Ok(Some(image))
 }
 
 fn cache_gravatar_retry(key: String) {
-    GRAVATAR_BYTES
-        .get()
-        .expect("Gravatar cache initialized")
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .insert(
-            key,
-            RawGravatar::RetryAfter(std::time::Instant::now() + std::time::Duration::from_secs(30)),
-        );
+    gravatar_bytes().insert(
+        key,
+        RawGravatar::RetryAfter(std::time::Instant::now() + std::time::Duration::from_secs(30)),
+    );
 }
 
 /// Only hand known raster formats to GdkPixbuf. In particular, an address-book

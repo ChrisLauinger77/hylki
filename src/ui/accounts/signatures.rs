@@ -35,16 +35,15 @@ impl AccountsWindow {
     /// use: a WebKit view is the slowest thing the panel would otherwise
     /// build, for a field most visits never reach.
     pub(super) fn sig_editor(&mut self, widgets: &AccountsWindowWidgets) -> &RichEditor {
-        if self.sig_editor.is_none() {
+        self.sig_editor.get_or_insert_with(|| {
             let editor = RichEditor::new("", None, false);
             // The text keeps its height when the toolbar wraps or is
             // expanded to a second row; the panel grows instead.
             editor.set_text_height(130);
             editor.toolbar_end().append(&self.sig_source_btn);
             widgets.form.sig_holder.append(&editor.widget);
-            self.sig_editor = Some(editor);
-        }
-        self.sig_editor.as_ref().expect("created above")
+            editor
+        })
     }
 
     /// Set "Edit HTML" and the formatting tools to the mode the signature

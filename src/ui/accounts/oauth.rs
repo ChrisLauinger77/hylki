@@ -147,7 +147,9 @@ impl AccountsWindow {
     ) -> OAuthSettings {
         let provider = provider_at(widgets.form.provider_row.selected()).oauth_name();
         if let Some(name) = provider {
-            let p = crate::oauth::preset(name).unwrap();
+            let p = crate::oauth::preset(name)
+                .expect("oauth_name only names providers oauth has a preset for");
+
             let (client_id, client_secret) = crate::oauth::provider_credentials(name);
             let mut settings = OAuthSettings {
                 auth_url: p.auth_url.to_string(),

@@ -246,7 +246,9 @@ impl RecipientRow {
     /// taken away.
     pub fn connect_changed<F: Fn(&Self) + 'static>(&self, f: F) -> glib::SignalHandlerId {
         self.connect_local("changed", false, move |values| {
-            let row = values[0].get::<Self>().expect("RecipientRow");
+            let row = values[0]
+                .get::<Self>()
+                .expect("a signal's first value is the row it was emitted on");
             f(&row);
             None
         })
@@ -282,8 +284,11 @@ impl RecipientRow {
     /// drag.
     pub fn connect_pill_drag<F: Fn(&Self, bool) + 'static>(&self, f: F) -> glib::SignalHandlerId {
         self.connect_local("pill-drag", false, move |values| {
-            let row = values[0].get::<Self>().expect("RecipientRow");
+            let row = values[0]
+                .get::<Self>()
+                .expect("a signal's first value is the row it was emitted on");
             f(&row, values[1].get::<bool>().unwrap_or(false));
+
             None
         })
     }

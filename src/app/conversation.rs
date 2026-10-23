@@ -404,8 +404,7 @@ impl AppModel {
                 .iter()
                 .find(|(_, p)| p.copied_by(r))
                 .map(|(k, _)| *k);
-            if let Some(key) = took_over {
-                let p = self.provisionals.remove(&key).expect("found above");
+            if let Some((key, p)) = took_over.and_then(|key| self.provisionals.remove_entry(&key)) {
                 self.related_ids
                     .insert((r.account_id, r.folder_id, r.uid), key.1);
                 conv.retain(|m| (m.account_id, m.id) != key);

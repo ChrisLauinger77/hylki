@@ -9,7 +9,7 @@
 //! nothing misspelled — same silence the body would show.
 
 use std::cell::RefCell;
-use std::ffi::{c_char, c_int, c_void, CString};
+use std::ffi::{c_char, c_int, c_void, CStr, CString};
 use std::rc::Rc;
 
 mod dictionaries;
@@ -42,19 +42,16 @@ impl SpellChecker {
     /// one per language per process, alive for its whole life.
     fn new(lang: &str) -> Option<SpellChecker> {
         unsafe {
-            let so = CString::new("libenchant-2.so.2").ok()?;
-            let lib = dlopen(so.as_ptr(), 1 /* RTLD_LAZY */);
+            let lib = dlopen(c"libenchant-2.so.2".as_ptr(), 1 /* RTLD_LAZY */);
             if lib.is_null() {
                 return None;
             }
-            let sym = |name: &str| {
-                let n = CString::new(name).unwrap();
-                dlsym(lib, n.as_ptr())
-            };
-            let init = sym("enchant_broker_init");
-            let req = sym("enchant_broker_request_dict");
-            let check = sym("enchant_dict_check");
-            let add = sym("enchant_dict_add");
+            let sym = |name: &CStr| dlsym(lib, name.as_ptr());
+            let init = sym(c"enchant_broker_init");
+            let req = sym(c"enchant_broker_request_dict");
+            let check = sym(c"enchant_dict_check");
+            let add = sym(c"enchant_dict_add");
+
             if init.is_null() || req.is_null() || check.is_null() || add.is_null() {
                 return None;
             }

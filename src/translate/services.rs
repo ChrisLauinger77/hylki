@@ -53,17 +53,20 @@ pub(super) fn batches(chunks: &[String], service: Service) -> Vec<Vec<String>> {
     let mut out: Vec<Vec<String>> = Vec::new();
     let mut size = 0;
     for c in chunks {
-        let full = match out.last() {
-            None => true,
-            Some(last) => service == Service::Libre || size + c.len() > BATCH || last.len() >= 50,
-        };
-        if full {
-            out.push(Vec::new());
-            size = 0;
+        match out.last_mut() {
+            Some(last)
+                if service != Service::Libre && size + c.len() <= BATCH && last.len() < 50 =>
+            {
+                size += c.len();
+                last.push(c.clone());
+            }
+            _ => {
+                size = c.len();
+                out.push(vec![c.clone()]);
+            }
         }
-        size += c.len();
-        out.last_mut().unwrap().push(c.clone());
     }
+
     out
 }
 

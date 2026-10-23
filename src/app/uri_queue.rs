@@ -20,8 +20,15 @@ fn send_or_park<T>(pending: &std::sync::Mutex<Vec<T>>, item: T, msg: fn(T) -> Ap
         Some(s) => {
             let _ = s.send(msg(item));
         }
-        None => pending.lock().unwrap().push(item),
+        None => parked(pending).push(item),
     }
+}
+
+/// One of the queues below, locked. Nothing that runs while one is held can
+/// panic (a push, or a drain that sends each item on), so none is ever
+/// poisoned.
+fn parked<T>(queue: &std::sync::Mutex<Vec<T>>) -> std::sync::MutexGuard<'_, Vec<T>> {
+    queue.lock().expect("a parked queue is never poisoned")
 }
 
 /// Route a `mailto:` URI to the app (from main's `connect_open`).
@@ -418,16 +425,16 @@ impl AppModel {
     /// ran — install the live sender and drain anything that queued early.
     pub(super) fn drain_hand_off_queues(&self, sender: &ComponentSender<Self>) {
         let _ = MAILTO_SENDER.set(sender.input_sender().clone());
-        for uri in MAILTO_PENDING.lock().unwrap().drain(..) {
+        for uri in parked(&MAILTO_PENDING).drain(..) {
             sender.input(AppMsg::OpenMailto(uri));
         }
-        for uri in MID_PENDING.lock().unwrap().drain(..) {
+        for uri in parked(&MID_PENDING).drain(..) {
             sender.input(AppMsg::OpenMid(uri));
         }
-        for path in FILE_PENDING.lock().unwrap().drain(..) {
+        for path in parked(&FILE_PENDING).drain(..) {
             sender.input(AppMsg::OpenMessageFile(path));
         }
-        for paths in ATTACH_PENDING.lock().unwrap().drain(..) {
+        for paths in parked(&ATTACH_PENDING).drain(..) {
             sender.input(AppMsg::OpenWithFiles(paths));
         }
     }
