@@ -12,6 +12,7 @@ use crate::worker::graph::ops::{
     graph_purge_uids, graph_undo_move,
 };
 use crate::worker::ids::hash_uid;
+use crate::worker::index_queue::IndexQueue;
 use crate::worker::strip::{cache_rewritten, strip_refused};
 use crate::worker::{blocking, WorkerEvent};
 

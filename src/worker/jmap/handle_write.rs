@@ -4,6 +4,7 @@
 use super::JmapWorker;
 use crate::i18n::{i18n, i18n_f};
 use crate::worker::ids::hash_uid;
+use crate::worker::index_queue::IndexQueue;
 use crate::worker::jmap::folders::{jmap_create_mailbox, refresh_jmap_folders};
 use crate::worker::jmap::index::jmap_load_folder;
 use crate::worker::jmap::ops::{

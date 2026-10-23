@@ -1,14 +1,14 @@
 //! The background index (#429): loading a folder's newest mail, then the
 //! rest of it a request at a time.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::time::Duration;
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::time::{Duration, Instant};
 
 use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::models::{FolderKind, Message};
-use crate::worker::folders::chip_count_of;
 use crate::worker::ids::hash_uid;
+use crate::worker::index_queue::{IndexJob, IndexQueue};
 use crate::worker::jmap::folders::{jmap_list_folders, JmapFolder};
 use crate::worker::jmap::messages::{jmap_get_messages, jmap_id_page, jmap_list_newest};
 use crate::worker::jmap::wire::JmapSession;
@@ -105,6 +105,44 @@ impl JmapBackfill {
     }
 }
 
+impl IndexJob for JmapBackfill {
+    fn start(path: &str, told: bool) -> Self {
+        JmapBackfill::new(path, told)
+    }
+
+    fn path(&self) -> &str {
+        &self.path
+    }
+}
+
+impl IndexQueue for JmapState {
+    type Job = JmapBackfill;
+    const RELIST_AFTER: Duration = JMAP_RELIST_AFTER;
+
+    fn jobs(&mut self) -> &mut VecDeque<JmapBackfill> {
+        &mut self.backfill
+    }
+
+    fn listed(&mut self) -> &mut HashMap<String, Instant> {
+        &mut self.listed
+    }
+
+    fn folder_ids(&self) -> Vec<(u32, String)> {
+        self.folders
+            .iter()
+            .map(|(path, (id, _))| (*id, path.clone()))
+            .collect()
+    }
+
+    fn hidden(&self) -> &[String] {
+        &self.hidden
+    }
+
+    fn drafts(&self) -> Option<&(u32, String)> {
+        self.drafts.as_ref()
+    }
+}
+
 impl JmapState {
     pub(super) fn new(account: &AccountConfig) -> JmapState {
         JmapState {
@@ -122,74 +160,6 @@ impl JmapState {
             looked_up: HashMap::new(),
             backfill_wait: None,
         }
-    }
-
-    /// Queue a folder's background index unless it is queued already;
-    /// `front` puts it at the head, for the folder on screen.
-    pub(super) fn queue_backfill(&mut self, path: &str, front: bool, told: bool) {
-        if let Some(i) = self.backfill.iter().position(|j| j.path == path) {
-            if front && i > 0 {
-                if let Some(job) = self.backfill.remove(i) {
-                    self.backfill.push_front(job);
-                }
-            }
-            return;
-        }
-        let job = JmapBackfill::new(path, told);
-        if front {
-            self.backfill.push_front(job);
-        } else {
-            self.backfill.push_back(job);
-        }
-    }
-
-    /// Queue every listed, unhidden folder's background index, in the
-    /// folder list's order.
-    pub(super) fn queue_all_backfills(&mut self) {
-        let mut folders: Vec<(u32, String)> = self
-            .folders
-            .iter()
-            .map(|(path, (id, _))| (*id, path.clone()))
-            .collect();
-        folders.sort();
-        for (_, path) in folders {
-            if !self.listed.contains_key(&path)
-                && !crate::models::folder_is_hidden(&path, Some("/"), &self.hidden)
-            {
-                self.queue_backfill(&path, false, false);
-            }
-        }
-    }
-
-    /// After a folder's newest mail has been listed: whether its index is
-    /// complete now, as on the Graph path.
-    pub(super) fn index_after_load(&mut self, path: &str, complete: bool, user: bool) -> bool {
-        if complete {
-            self.backfill.retain(|j| j.path != path);
-            self.listed
-                .insert(path.to_string(), std::time::Instant::now());
-            return true;
-        }
-        match self.listed.get(path) {
-            Some(at) => {
-                if user && at.elapsed() >= JMAP_RELIST_AFTER {
-                    self.queue_backfill(path, true, true);
-                }
-                true
-            }
-            None => {
-                self.queue_backfill(path, user, false);
-                false
-            }
-        }
-    }
-
-    pub(super) fn chip_count(&self, folder_id: u32, messages: &[Message]) -> u32 {
-        let kind = match &self.drafts {
-            Some((id, _)) if *id == folder_id => FolderKind::Drafts,
-            _ => FolderKind::Custom,
-        };
-        chip_count_of(kind, messages)
     }
 
     pub(super) fn adopt_folders(&mut self, list: &[JmapFolder]) {

@@ -1,18 +1,19 @@
 //! The background index (#429): loading a folder's newest mail, then the
 //! rest of it a request at a time, in runs of missing mail.
 
-use std::time::Duration;
+use std::collections::{HashMap, VecDeque};
+use std::time::{Duration, Instant};
 
 use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::models::{FolderKind, Message};
-use crate::worker::folders::chip_count_of;
 use crate::worker::graph::folders::{graph_list_folders, GraphFolder};
 use crate::worker::graph::http::{graph_get_json_opt, graph_paged, graph_token, GRAPH_BASE};
 use crate::worker::graph::messages::{
     graph_id_page, graph_ids_url, graph_list_messages, graph_message, GRAPH_MSG_SELECT,
 };
 use crate::worker::ids::hash_uid;
+use crate::worker::index_queue::{IndexJob, IndexQueue};
 use crate::worker::reconcile::{listing_gone, window_gone};
 use crate::worker::{blocking, WorkerEvent};
 
@@ -151,6 +152,44 @@ impl GraphBackfill {
     }
 }
 
+impl IndexJob for GraphBackfill {
+    fn start(path: &str, told: bool) -> Self {
+        GraphBackfill::new(path, told)
+    }
+
+    fn path(&self) -> &str {
+        &self.path
+    }
+}
+
+impl IndexQueue for GraphState {
+    type Job = GraphBackfill;
+    const RELIST_AFTER: Duration = GRAPH_RELIST_AFTER;
+
+    fn jobs(&mut self) -> &mut VecDeque<GraphBackfill> {
+        &mut self.backfill
+    }
+
+    fn listed(&mut self) -> &mut HashMap<String, Instant> {
+        &mut self.listed
+    }
+
+    fn folder_ids(&self) -> Vec<(u32, String)> {
+        self.folders
+            .iter()
+            .map(|(path, (id, _))| (*id, path.clone()))
+            .collect()
+    }
+
+    fn hidden(&self) -> &[String] {
+        &self.hidden
+    }
+
+    fn drafts(&self) -> Option<&(u32, String)> {
+        self.drafts.as_ref()
+    }
+}
+
 /// Per-account state the Graph loop threads through its handlers.
 pub(super) struct GraphState {
     /// Hylki folder path → (folder id, Graph folder id), from the last listing.
@@ -194,80 +233,6 @@ impl GraphState {
             looked_up: Default::default(),
             backfill_wait: None,
         }
-    }
-
-    /// Queue a folder's background index unless it is queued already.
-    /// `front` puts it at the head of the queue (back there, if it was
-    /// queued): the folder on screen goes before the rest of the mailbox.
-    pub(super) fn queue_backfill(&mut self, path: &str, front: bool, told: bool) {
-        if let Some(i) = self.backfill.iter().position(|j| j.path == path) {
-            if front && i > 0 {
-                if let Some(job) = self.backfill.remove(i) {
-                    self.backfill.push_front(job);
-                }
-            }
-            return;
-        }
-        let job = GraphBackfill::new(path, told);
-        if front {
-            self.backfill.push_front(job);
-        } else {
-            self.backfill.push_back(job);
-        }
-    }
-
-    /// Queue every listed folder's background index, the Inbox and the
-    /// other special folders first, as the folder list orders them.
-    pub(super) fn queue_all_backfills(&mut self) {
-        let mut folders: Vec<(u32, String)> = self
-            .folders
-            .iter()
-            .map(|(path, (id, _))| (*id, path.clone()))
-            .collect();
-        folders.sort();
-        for (_, path) in folders {
-            if !self.listed.contains_key(&path)
-                && !crate::models::folder_is_hidden(&path, Some("/"), &self.hidden)
-            {
-                self.queue_backfill(&path, false, false);
-            }
-        }
-    }
-
-    /// After a folder's newest mail has been listed: whether its index is
-    /// complete now. A folder that fits in the first page is; so is one
-    /// whose background index has run, though opening it again after a
-    /// while queues another pass for mail deleted elsewhere. Otherwise its
-    /// background index is queued, first in line when `user` opened it.
-    pub(super) fn index_after_load(&mut self, path: &str, complete: bool, user: bool) -> bool {
-        if complete {
-            self.backfill.retain(|j| j.path != path);
-            self.listed
-                .insert(path.to_string(), std::time::Instant::now());
-            return true;
-        }
-        match self.listed.get(path) {
-            Some(at) => {
-                if user && at.elapsed() >= GRAPH_RELIST_AFTER {
-                    self.queue_backfill(path, true, true);
-                }
-                true
-            }
-            None => {
-                self.queue_backfill(path, user, false);
-                false
-            }
-        }
-    }
-
-    /// The chip number for a folder just loaded: every draft in Drafts,
-    /// unread mail elsewhere.
-    pub(super) fn chip_count(&self, folder_id: u32, messages: &[Message]) -> u32 {
-        let kind = match &self.drafts {
-            Some((id, _)) if *id == folder_id => FolderKind::Drafts,
-            _ => FolderKind::Custom,
-        };
-        chip_count_of(kind, messages)
     }
 
     pub(super) fn adopt_folders(&mut self, list: &[GraphFolder]) {

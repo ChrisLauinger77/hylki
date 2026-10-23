@@ -7,6 +7,7 @@ use super::JmapWorker;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::KeywordFinding;
 use crate::worker::ids::hash_uid;
+use crate::worker::index_queue::IndexQueue;
 use crate::worker::jmap::chores::{auto_empty_jmap, clean_lists_jmap, emit_jmap_body_hits};
 use crate::worker::jmap::folders::{jmap_refresh_unread, refresh_jmap_folders};
 use crate::worker::jmap::index::{jmap_load_folder, jmap_sync_folder};

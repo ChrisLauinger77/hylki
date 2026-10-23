@@ -28,6 +28,7 @@ mod graph;
 mod headers;
 mod ids;
 mod imap;
+mod index_queue;
 mod jmap;
 mod lane;
 mod mock;

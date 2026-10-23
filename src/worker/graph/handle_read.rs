@@ -9,6 +9,7 @@ use crate::worker::graph::folders::graph_refresh_unread;
 use crate::worker::graph::http::{graph_get_json, graph_token, GRAPH_BASE};
 use crate::worker::graph::index::{graph_load_folder, graph_sync_folder};
 use crate::worker::graph::ops::graph_fetch_raw;
+use crate::worker::index_queue::IndexQueue;
 use crate::worker::render::attachments::extract_attachments;
 use crate::worker::render::body_cacheable;
 use crate::worker::{blocking, render_raw, WorkerEvent};

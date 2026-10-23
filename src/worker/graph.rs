@@ -391,6 +391,7 @@ mod tests {
     use crate::worker::graph::messages::graph_message;
     use crate::worker::graph::messages::GRAPH_FIRST_PAGE;
     use crate::worker::ids::hash_uid;
+    use crate::worker::index_queue::IndexQueue;
     use crate::worker::reconcile::window_gone;
 
     use super::*;

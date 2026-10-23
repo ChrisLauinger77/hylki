@@ -371,6 +371,7 @@ impl<E: Fn(WorkerEvent)> JmapWorker<E> {
 
 #[cfg(test)]
 mod tests {
+    use crate::worker::index_queue::IndexQueue;
     /// #414: lone LFs become CRLF; CRLFs stay as they are.
     #[test]
     fn submission_bytes_get_crlf_line_endings() {
