@@ -14,7 +14,6 @@ use super::model::AppModel;
 use super::msg::AppMsg;
 use super::theme::{apply_app_theme, WIZARD_HOLDS_LIGHT};
 
-/// `HYLKI_DEMO` is set, so removing all real accounts leaves the app blank.
 /// Whether saving `new` over `old` changes only what the app itself draws
 /// or puts in the composer: the signature, the color, emoji or picture, the
 /// Gravatar switch, the label, or a place in the unified section. Workers
@@ -677,10 +676,10 @@ impl AppModel {
     /// With no accounts, no worker events will populate the sidebar, so render
     /// its empty state (the "Add first account" prompt) up front — and greet
     /// a first run with the welcome wizard (src/ui/welcome.rs).
-    /// A restart the wizard's language pick asked for: the wizard comes
-    /// back once, whatever mode this is; the flag must not reach a
-    /// later restart (the icon change's), so it is cleared here.
     pub(super) fn open_wizard_if_needed(&mut self, sender: &ComponentSender<Self>) {
+        // A restart the wizard's language pick asked for: the wizard comes
+        // back once, whatever mode this is; the flag must not reach a
+        // later restart (the icon change's), so it is cleared here.
         let wizard_again = std::env::var_os(crate::WIZARD_AGAIN_VAR).is_some();
         if wizard_again {
             std::env::remove_var(crate::WIZARD_AGAIN_VAR);

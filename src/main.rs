@@ -305,7 +305,7 @@ fn open_files(app: &adw::Application, files: &[gtk::gio::File], _hint: &str) {
 
 /// A brand-new install (no accounts, not the demo) is greeted by the
 /// welcome wizard alone; the main window appears when the wizard finishes
-/// or is closed (app.rs presents it from the wizard's hand-off).
+/// or is closed (app/accounts.rs presents it from the wizard's hand-off).
 fn is_first_run() -> bool {
     std::env::var("HYLKI_DEMO").is_err()
         && config::load().unwrap_or_default().is_empty()

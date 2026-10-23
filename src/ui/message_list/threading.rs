@@ -161,17 +161,6 @@ pub(super) fn unasked_threads(
         .collect()
 }
 
-/// Group messages into conversations by their reply headers (Message-ID linked
-/// via In-Reply-To / References), scoped per account. Returns each message's
-/// thread key `(account_id, root)`, looked up by [`thread_slot`]. Messages with
-/// no reply relationship get a unique key (a thread of one) — so unrelated
-/// messages that merely share a subject are never threaded together.
-///
-/// Age plays no part: a message threads because its headers say what it answers,
-/// and those are indexed with every message. Grouping runs over the rendered
-/// window, so covering the whole mailbox costs no more than covering a day of
-/// it; what a conversation costs to *open* is bounded separately, by
-/// `THREAD_MEMBER_LIMIT`.
 /// What working out conversations reads of each message, to take to a
 /// thread.
 pub(super) fn thread_inputs(source: &[Rc<Message>]) -> Vec<ThreadInput> {
@@ -273,6 +262,17 @@ impl ThreadFields for ThreadInput {
     }
 }
 
+/// Group messages into conversations by their reply headers (Message-ID linked
+/// via In-Reply-To / References), scoped per account. Returns each message's
+/// thread key `(account_id, root)`, looked up by [`thread_slot`]. Messages with
+/// no reply relationship get a unique key (a thread of one) — so unrelated
+/// messages that merely share a subject are never threaded together.
+///
+/// Age plays no part: a message threads because its headers say what it answers,
+/// and those are indexed with every message. Grouping runs over the rendered
+/// window, so covering the whole mailbox costs no more than covering a day of
+/// it; what a conversation costs to *open* is bounded separately, by
+/// `THREAD_MEMBER_LIMIT`.
 pub(super) fn compute_thread_keys<M: ThreadFields>(
     msgs: &[M],
     links: &[(u32, String, String)],

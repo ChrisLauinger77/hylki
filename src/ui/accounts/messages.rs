@@ -277,9 +277,8 @@ pub(super) type SignInResult = Result<(String, Option<(String, String)>), String
 pub(crate) enum AccountsCmd {
     /// Test-connection result.
     Test(ConnTest),
-    /// OAuth sign-in result: the refresh token, or an error message.
     /// A browser sign-in finished: the refresh token, and who signed in
-    /// when the provider says (Microsoft).
+    /// when the provider says (Microsoft); or why it failed.
     OAuth(SignInResult),
     /// The sign-in that asked for the directory's scopes (#410) finished,
     /// as [`AccountsCmd::OAuth`].

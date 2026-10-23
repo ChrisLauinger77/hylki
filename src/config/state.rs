@@ -326,7 +326,6 @@ pub(crate) fn load_drawer_state() -> DrawerState {
     }
 }
 
-/// Persist whether the attachment drawer is collapsed.
 /// The remembered summary-fetch mode for an account (#226), as
 /// (use ENVELOPE, preview items rejected). The default when nothing is known.
 pub(crate) fn load_fetch_mode(email: &str) -> (bool, bool) {
@@ -381,6 +380,7 @@ pub(crate) fn save_fetch_mode(email: &str, use_envelope: bool, previews_rejected
     save_state(&s);
 }
 
+/// Persist whether the attachment drawer is collapsed.
 pub(crate) fn save_drawer_collapsed(collapsed: bool) {
     update_state(|s| s.drawer_collapsed = collapsed);
 }
@@ -469,8 +469,6 @@ pub(crate) fn save_gallery_scope(archive: bool, other: bool, folders: &[(u32, St
     save_state(&s);
 }
 
-/// The About window's height: tall by default, remembering the user's own
-/// vertical resize across restarts.
 /// The split-reply panel's dragged height; 0 when it has never been dragged
 /// (the caller computes an opening default from the pane).
 pub(crate) fn load_split_reply_height() -> i32 {
@@ -486,6 +484,8 @@ pub(crate) fn save_split_reply_height(height: i32) {
     update_state(|s| s.split_reply_height = height.clamp(220, 4000));
 }
 
+/// The About window's height: tall by default, remembering the user's own
+/// vertical resize across restarts.
 pub(crate) fn load_about_height() -> i32 {
     load_state().about_height.clamp(400, 4000)
 }

@@ -291,7 +291,6 @@ impl RecipientRow {
                 .get::<Self>()
                 .expect("a signal's first value is the row it was emitted on");
             f(&row, values[1].get::<bool>().unwrap_or(false));
-
             None
         })
     }

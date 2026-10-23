@@ -392,7 +392,6 @@ impl AppModel {
                 .reader_bin
                 .child()
                 .expect("the view puts the reader pane in reader_bin");
-
             widgets.reader_bin.set_child(None::<&gtk::Widget>);
             // Split-reply slot (#86) above the reader; the full-cover
             // revealer stays an overlay above the whole assembly. A Paned

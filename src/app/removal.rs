@@ -61,7 +61,6 @@ impl AppModel {
         } else if let Some(m) = move_out.into_iter().next() {
             self.move_to(m, FolderKind::Trash);
         }
-
         if !purge.is_empty() {
             self.confirm_purge(purge, sender);
         }

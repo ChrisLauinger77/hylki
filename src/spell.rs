@@ -51,7 +51,6 @@ impl SpellChecker {
             let req = sym(c"enchant_broker_request_dict");
             let check = sym(c"enchant_dict_check");
             let add = sym(c"enchant_dict_add");
-
             if init.is_null() || req.is_null() || check.is_null() || add.is_null() {
                 return None;
             }

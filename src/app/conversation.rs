@@ -197,6 +197,7 @@ impl AppModel {
         self.push_member_checks();
     }
 
+    /// Ask for one conversation re-render shortly from now, collapsing a burst of
     /// arriving bodies into a single one.
     ///
     /// A conversation is rendered as one document with every member's body
@@ -218,7 +219,6 @@ impl AppModel {
     /// The header follows the message the user selected, not whatever sorted to
     /// the top: a conversation can now include replies of your own pulled in from
     /// Sent, and one of those being the newest shouldn't retitle the reader.
-    /// Ask for one conversation re-render shortly from now, collapsing a burst of
     pub(super) fn show_thread(&self) {
         let Some(head) = self.current_thread.first() else {
             return;

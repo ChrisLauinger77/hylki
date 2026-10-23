@@ -236,7 +236,8 @@ pub(crate) struct MessageView {
     /// When find last closed itself (empty entry blur) — the toolbar click
     /// that caused the blur must not instantly reopen it.
     find_closed_at: Option<std::time::Instant>,
-    /// Which message the document currently on screen was rendered for, so an
+    /// The web view the wrapper document (`conversation_document`) is shown
+    /// in.
     webview: webkit6::WebView,
     /// Bumped per render: each load gets a unique base URI so WebKit treats it
     /// as a fresh document and re-fetches resources (reusing `about:blank` does

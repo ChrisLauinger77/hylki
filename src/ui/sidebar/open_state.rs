@@ -328,7 +328,6 @@ impl Sidebar {
         }
     }
 
-    /// Whether a unified Starred / Sent / Drafts row's account list is open.
     /// The paths of an account's folders that are favorites.
     pub(super) fn favorite_paths(&self, account_id: u32) -> Vec<String> {
         self.favorite_folders
@@ -346,6 +345,7 @@ impl Sidebar {
             .collect()
     }
 
+    /// Whether a unified Starred / Sent / Drafts row's account list is open.
     fn kind_open(&self, kind: FolderKind) -> bool {
         self.kind_expanded.get(&kind).copied().unwrap_or(false)
     }

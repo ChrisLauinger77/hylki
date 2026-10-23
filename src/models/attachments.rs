@@ -30,7 +30,6 @@ pub(crate) fn is_image_name(name: &str) -> bool {
     .any(|ext| lower.ends_with(ext))
 }
 
-/// The lowercase extension of a filename (empty when there is none).
 /// The file's extension, lower-cased, or empty when the name has none: a
 /// generated "attachment-1", or a dotless name from a sender's client.
 /// Whatever follows the last dot only counts as an extension when it looks

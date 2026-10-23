@@ -387,8 +387,6 @@ impl AppModel {
         }
     }
 
-    /// User clicked "Load attachments" for a message whose attachments weren't
-    /// pre-downloaded — fetch them from the server now.
     /// A composer sent a message; `from` is that composer's id.
     fn on_send_message(
         &mut self,

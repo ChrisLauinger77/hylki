@@ -349,7 +349,7 @@ impl MessageList {
         }
     }
 
-    /// `rebuild_rows`, keeping a list read from the very top at the top.
+    /// Run `rebuild_rows`, keeping a list read from the very top at the top.
     /// The view holds its place by a row, so a new message put in above the
     /// first one landed out of sight, just above the view (#400). Scrolled
     /// down, the view keeps the row it has, as before.
@@ -589,7 +589,6 @@ impl MessageList {
             let expanded = meta.expanded;
             let mut it = members.into_iter();
             let head = it.next().expect("a group holds at least one message");
-
             shown.push(head.clone());
             rows.push(Rc::new(RowData {
                 msg: head,

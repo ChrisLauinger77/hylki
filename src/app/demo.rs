@@ -4,7 +4,7 @@
 use crate::config::{self, AccountConfig};
 
 /// Whether to serve the built-in sample/demo data (for screenshots). Off unless
-/// `HYLKI_DEMO` is set.
+/// `HYLKI_DEMO` is set, so removing all real accounts leaves the app blank.
 pub(super) fn demo_mode() -> bool {
     std::env::var_os("HYLKI_DEMO").is_some()
 }

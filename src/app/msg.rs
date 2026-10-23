@@ -343,8 +343,6 @@ pub(crate) enum AppMsg {
     },
     /// A card's "Add sender to Contacts" button.
     CardContact(Box<Message>),
-    /// A right-click on a reader card: that message's full menu (the list
-    /// row's) at window point (x, y).
     /// A reader's right-click: the message's menu at (x, y) in the main
     /// window, or in the pop-out opened for `popout`.
     CardMenu {
@@ -766,8 +764,6 @@ pub(crate) enum AppMsg {
         books: Vec<crate::contacts::Book>,
     },
     ViewSource,
-    /// User clicked "Load attachments" for a message whose attachments weren't
-    /// pre-downloaded — fetch them from the server now.
     /// A composer sent a message; `from` is that composer's id.
     SendMessage {
         from: u32,
@@ -891,7 +887,6 @@ pub(crate) enum AppMsg {
     },
     /// The tags changed in Settings (#71).
     SetTags(Vec<config::Tag>),
-    /// A tag row in the sidebar was chosen: list everything carrying it.
     /// A tag row was chosen: its keyword (`None` for the unified Tags row,
     /// every tag at once), and the account it is scoped to (an account
     /// section's own Tags row) or `None` for every account.

@@ -355,7 +355,6 @@ impl AppModel {
         });
 
         let ty = &*<(u32, u32, u32)>::static_variant_type();
-
         let open = gtk::gio::SimpleAction::new(crate::notify::OPEN_MESSAGE_ACTION, Some(ty));
         let win = self.window.clone();
         let osender = sender.clone();

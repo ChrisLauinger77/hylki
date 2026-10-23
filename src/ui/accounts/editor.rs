@@ -387,7 +387,6 @@ impl AccountsWindow {
                 .oauth_name()
                 .and_then(crate::oauth::preset)
                 .map(|o| (o.imap_host, o.imap_port, o.smtp_host, o.smtp_port)),
-
             ProviderKind::Manual | ProviderKind::CustomOAuth | ProviderKind::Jmap => None,
         };
         if let Some((ih, ip, sh, sp)) = servers {

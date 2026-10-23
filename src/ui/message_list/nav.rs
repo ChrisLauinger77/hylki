@@ -17,7 +17,6 @@ impl MessageList {
         }
     }
 
-    /// The selected rows' positions, in list order.
     /// The row the keyboard is on, if it is on one.
     pub(super) fn cursor_position(&self) -> Option<usize> {
         self.shared
@@ -27,6 +26,7 @@ impl MessageList {
             .and_then(|r| r.position())
     }
 
+    /// The selected rows' positions, in list order.
     pub(super) fn selected_positions(&self) -> Vec<usize> {
         let set = self.shared.selection.selection();
         match gtk::BitsetIter::init_first(&set) {

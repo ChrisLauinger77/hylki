@@ -277,8 +277,6 @@ impl ListRow {
     }
 }
 
-/// The list view's rows: made for the lines on screen and bound to each
-/// line scrolled to.
 /// What a contact row carries when dragged to the sidebar: the book and
 /// UID of each contact by its index (`None` for a group, or a card EDS
 /// has not named), and the indexes selected together, which go as one.
@@ -351,6 +349,8 @@ pub(super) fn is_member(g: &ContactDetails, m: &Member, p: &ContactDetails) -> b
                 .any(|e| e.value.eq_ignore_ascii_case(&m.email)))
 }
 
+/// The list view's rows: made for the lines on screen and bound to each
+/// line scrolled to.
 pub(super) fn row_factory(
     rows: &Rc<RefCell<HashMap<usize, Rc<ListRow>>>>,
     input: &relm4::Sender<ContactsPageInput>,

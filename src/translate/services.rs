@@ -66,7 +66,6 @@ pub(super) fn batches(chunks: &[String], service: Service) -> Vec<Vec<String>> {
             }
         }
     }
-
     out
 }
 

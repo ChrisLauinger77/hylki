@@ -450,8 +450,6 @@ impl Cache {
         run().unwrap_or_default()
     }
 
-    /// Store the Gmail labels read for these uids; returns how many rows
-    /// changed.
     /// Add Gmail labels to one cached message, or take them off (#374): what
     /// tagging on Gmail changed, before the next sync says it again.
     pub(crate) fn set_gmail_label(
@@ -481,6 +479,8 @@ impl Cache {
         );
     }
 
+    /// Store the Gmail labels read for these uids; returns how many rows
+    /// changed.
     pub(crate) fn set_gmail_labels(
         &self,
         account_id: u32,

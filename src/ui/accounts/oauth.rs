@@ -63,8 +63,6 @@ fn sign_in(
     });
 }
 
-/// A list-item factory whose labels never ellipsize, so a `ComboRow` popup grows
-/// to fit its longest option instead of truncating it.
 /// Open GNOME Settings → Online Accounts. Uses D-Bus app activation so it works
 /// both natively and inside a Flatpak (with `--talk-name=org.gnome.Settings`);
 /// falls back to the CLI on non-GNOME/older setups.
@@ -149,7 +147,6 @@ impl AccountsWindow {
         if let Some(name) = provider {
             let p = crate::oauth::preset(name)
                 .expect("oauth_name only names providers oauth has a preset for");
-
             let (client_id, client_secret) = crate::oauth::provider_credentials(name);
             let mut settings = OAuthSettings {
                 auth_url: p.auth_url.to_string(),

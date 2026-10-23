@@ -116,7 +116,7 @@ impl Compose {
             // Ctrl+ / Ctrl- / Ctrl+0 zoom the body, as they zoom the reader,
             // in the formats whose size is not part of the message. This
             // is a composer window's; inline, the main window's own keys
-            // get there first and pass them on (app.rs).
+            // get there first and pass them on (app/shortcuts.rs).
             if let Some(step) = zoom_key(keyval, state) {
                 if zoomable.get() {
                     s.input_sender().emit(ComposeInput::Zoom(step));
@@ -138,7 +138,7 @@ impl Compose {
             // Thunderbird's keys (#490, #491): Ctrl+Shift+A attaches files,
             // Ctrl+Shift+T, C and B go to To, Cc and Bcc. A composer window
             // gets them here; inline, the same keys are the main window's
-            // first, and app.rs passes them on.
+            // first, and app/shortcuts.rs passes them on.
             if let Some(input) = composer_key(keyval, state) {
                 s.input_sender().emit(input);
                 return Propagation::Stop;

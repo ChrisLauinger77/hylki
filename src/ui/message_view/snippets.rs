@@ -8,11 +8,6 @@ use crate::i18n::i18n;
 use crate::models::Message;
 use relm4::prelude::*;
 
-/// The tag chips of a card header (#71): one pill per keyword naming a tag,
-/// colored inline (the document has no access to the app's stylesheet).
-/// A card's Unsubscribe banner: the container, always emitted so a verdict
-/// arriving later can be patched into it (empty, it is hidden by the
-/// stylesheet). `inner` is what [`MessageView::unsub_inner_html`] rendered.
 /// Where a folded card's bar takes the sender's circle, which the document
 /// builder fills in with the one the card's header wears.
 pub(super) const FOLD_BAR_FACE: &str = "\u{1}face\u{1}";
@@ -51,6 +46,9 @@ pub(super) fn template_row_html(key: (u32, u32)) -> String {
     )
 }
 
+/// A card's Unsubscribe banner: the container, always emitted so a verdict
+/// arriving later can be patched into it (empty, it is hidden by the
+/// stylesheet). `inner` is what [`MessageView::unsub_inner_html`] rendered.
 pub(super) fn unsub_row_html(key: (u32, u32), inner: &str) -> String {
     format!(
         "<div class=\"hylki-unsub\" data-key=\"{}:{}\">{inner}</div>",
@@ -101,6 +99,8 @@ pub(super) fn att_chips_html(key: (u32, u32), atts: &[CardAttachment]) -> String
     out
 }
 
+/// The tag chips of a card header (#71): one pill per keyword naming a tag,
+/// colored inline (the document has no access to the app's stylesheet).
 pub(super) fn tag_chips_html(
     tags: &[crate::config::Tag],
     keywords: &[String],

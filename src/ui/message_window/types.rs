@@ -171,7 +171,6 @@ pub(crate) enum MessageWindowInput {
     /// A toast for the main window.
     Notice(String),
     AllowSender(String),
-    /// The message card's own Reply/Reply all/Forward button.
     /// An action chosen on one card — in a conversation window, possibly a
     /// member other than the popped-out message itself.
     CardAction {

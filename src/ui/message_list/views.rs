@@ -122,8 +122,6 @@ impl MessageList {
         (self.views.len(), (n, bytes), maps)
     }
 
-    /// The source changed: its conversations are to be worked out again,
-    /// and an answer still on its way from a background thread is stale.
     /// What a rebuild reads besides the messages, as one number: a kept view
     /// is shown again only under the settings it was built with.
     fn rows_signature(&self) -> u64 {

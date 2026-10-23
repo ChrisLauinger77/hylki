@@ -124,7 +124,6 @@ pub(crate) struct AccountsWindow {
     /// filled the form without recording it, where the safe answer is that
     /// it was touched.
     editor_seed: Option<String>,
-    /// WYSIWYG editor for the account signature.
     /// The signature's rich editor — a WebKit view, so it is created when
     /// an account's editor first opens rather than with the panel.
     sig_editor: Option<RichEditor>,

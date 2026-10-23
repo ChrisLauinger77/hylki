@@ -76,7 +76,6 @@ pub(crate) fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'st
             editor,
             view,
             header,
-
             ground,
             cards: Vec::new(),
             text: None,

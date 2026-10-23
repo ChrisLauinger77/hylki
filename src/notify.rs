@@ -3,7 +3,7 @@
 //! Uses the running `gtk::Application`'s `send_notification`, which routes through
 //! the desktop notification portal automatically under Flatpak. The click actions
 //! ([`PRESENT_ACTION`], [`OPEN_MESSAGE_ACTION`]) are registered on the application
-//! in `app.rs` (they need the app's message channel to navigate).
+//! in `app/notifications.rs` (they need the app's message channel to navigate).
 
 use crate::i18n::i18n;
 use gtk::gio;
