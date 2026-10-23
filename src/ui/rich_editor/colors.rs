@@ -97,10 +97,7 @@ pub(super) fn color_menu(
             }
             let picker = gtk::ColorDialog::new();
             picker.set_with_alpha(false);
-            let initial = chosen
-                .borrow()
-                .clone()
-                .unwrap_or(gtk::gdk::RGBA::new(0.5, 0.5, 0.5, 1.0));
+            let initial = (*chosen.borrow()).unwrap_or(gtk::gdk::RGBA::new(0.5, 0.5, 0.5, 1.0));
             let parent = b.root().and_downcast::<gtk::Window>();
             let (weak, apply) = (weak.clone(), apply.clone());
             picker.choose_rgba(

@@ -265,7 +265,7 @@ impl RecipientRow {
             let at = row.drop_index(x, y);
             // No marker where letting go leaves the pills as they are, nor
             // in a field with no pills, where its own highlight says enough.
-            let moving = dragged.as_ref().map(|p| acting_on(p)).unwrap_or_default();
+            let moving = dragged.as_ref().map(acting_on).unwrap_or_default();
             let stays = row.would_stay(&moving, at);
             let empty = row.imp().pills.borrow().is_empty();
             row.imp().flow.set_marker((!stays && !empty).then_some(at));

@@ -54,7 +54,7 @@ pub fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
             .header
             .as_ref()
             .filter(|_| p.header_shown)
-            .and_then(|h| bounds(h));
+            .and_then(bounds);
         // Where the reader leaves its background to the window, the window's
         // color is what shows.
         let ground = ground_behind(
