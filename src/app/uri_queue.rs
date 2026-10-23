@@ -325,57 +325,7 @@ impl AppModel {
             AppMsg::OpenMessageFile(path) => self.open_message_file(&path, &sender),
             AppMsg::PickMessageFile => self.pick_message_file(&sender),
 
-            AppMsg::OpenMid(uri) => {
-                // The cache first: it holds every message Hylki has listed,
-                // across accounts, and answers at once. Only a miss asks the
-                // servers, one HEADER search per folder per account.
-                let Some(id) = parse_mid(&uri) else {
-                    tracing::warn!("mid: link not understood: {uri}");
-                    return;
-                };
-                let hits: Vec<(u32, String, u32)> = crate::cache::Cache::open()
-                    .map(|c| c.locate_by_message_id(&id))
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|(acc, path, _)| {
-                        self.folders
-                            .get(acc)
-                            .is_some_and(|fs| fs.iter().any(|f| f.path == *path))
-                    })
-                    .collect();
-                // The copy in the account currently in view wins when several
-                // accounts hold the message (a mail sent to two of them).
-                let preferred = self.current.as_ref().map(|m| m.account_id);
-                if let Some((account_id, folder_path, uid)) = hits
-                    .iter()
-                    .find(|(acc, _, _)| Some(*acc) == preferred)
-                    .or_else(|| hits.first())
-                    .cloned()
-                {
-                    tracing::info!(
-                        "mid: {id} is cached in account {account_id}, {folder_path} uid {uid}"
-                    );
-                    sender.input(AppMsg::OpenAttachmentMessage {
-                        account_id,
-                        folder_path,
-                        uid,
-                    });
-                    return;
-                }
-                if self.workers.is_empty() {
-                    self.notice_error(i18n_f(
-                        "No message with the ID {id} was found",
-                        &[("id", &id)],
-                    ));
-                    return;
-                }
-                self.mid_searches.insert(id.clone(), self.workers.len());
-                for w in self.workers.values() {
-                    let _ = w.send(MailRequest::Locate {
-                        message_id: id.clone(),
-                    });
-                }
-            }
+            AppMsg::OpenMid(uri) => self.open_mid(uri, sender),
 
             AppMsg::MidLocated {
                 account_id,
@@ -408,6 +358,58 @@ impl AppModel {
                 }
             }
             _ => unreachable!("not routed to on_uri_queue"),
+        }
+    }
+
+    /// A `mid:` link (RFC 2392) from anywhere on the system (#130): open the
+    /// message with that Message-ID.
+    fn open_mid(&mut self, uri: String, sender: ComponentSender<Self>) {
+        // The cache first: it holds every message Hylki has listed,
+        // across accounts, and answers at once. Only a miss asks the
+        // servers, one HEADER search per folder per account.
+        let Some(id) = parse_mid(&uri) else {
+            tracing::warn!("mid: link not understood: {uri}");
+            return;
+        };
+        let hits: Vec<(u32, String, u32)> = crate::cache::Cache::open()
+            .map(|c| c.locate_by_message_id(&id))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(acc, path, _)| {
+                self.folders
+                    .get(acc)
+                    .is_some_and(|fs| fs.iter().any(|f| f.path == *path))
+            })
+            .collect();
+        // The copy in the account currently in view wins when several
+        // accounts hold the message (a mail sent to two of them).
+        let preferred = self.current.as_ref().map(|m| m.account_id);
+        if let Some((account_id, folder_path, uid)) = hits
+            .iter()
+            .find(|(acc, _, _)| Some(*acc) == preferred)
+            .or_else(|| hits.first())
+            .cloned()
+        {
+            tracing::info!("mid: {id} is cached in account {account_id}, {folder_path} uid {uid}");
+            sender.input(AppMsg::OpenAttachmentMessage {
+                account_id,
+                folder_path,
+                uid,
+            });
+            return;
+        }
+        if self.workers.is_empty() {
+            self.notice_error(i18n_f(
+                "No message with the ID {id} was found",
+                &[("id", &id)],
+            ));
+            return;
+        }
+        self.mid_searches.insert(id.clone(), self.workers.len());
+        for w in self.workers.values() {
+            let _ = w.send(MailRequest::Locate {
+                message_id: id.clone(),
+            });
         }
     }
 

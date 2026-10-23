@@ -485,54 +485,7 @@ impl AppModel {
                 );
             }
 
-            AppMsg::OpenMailto(uri) => {
-                // A mailto: link from anywhere on the system (the desktop file
-                // registers the scheme). Same open-composer flow as ComposeTo,
-                // with the URI's subject/cc/bcc/body carried along.
-                let Some(mut prefill) = parse_mailto(&uri) else {
-                    return;
-                };
-                // attach= names files (#90): keep only the ones that really
-                // exist as regular files. Whatever attaches shows up as a
-                // normal removable chip in the composer, so nothing rides
-                // along invisibly if a web link (rather than Nautilus)
-                // carried the parameter. The ones that don't are reported,
-                // not dropped in silence: from inside the Flatpak sandbox a
-                // path the file manager can see may be one Hylki cannot.
-                let (attachments, dropped): (Vec<_>, Vec<_>) =
-                    std::mem::take(&mut prefill.attachments)
-                        .into_iter()
-                        .partition(|p| p.is_file());
-                for p in &dropped {
-                    tracing::warn!(
-                        "mailto attach ignored (not a readable file): {}",
-                        p.display()
-                    );
-                }
-                tracing::info!(
-                    "mailto hand-off: {} attachment(s) named, {} readable",
-                    attachments.len() + dropped.len(),
-                    attachments.len()
-                );
-                if !attachments.is_empty() {
-                    // Files came along (Files' own "Email…" entry): the same
-                    // choice of destination as "Send with Hylki".
-                    self.begin_hand_off(
-                        FileHandOff {
-                            base: prefill,
-                            files: attachments,
-                            dropped,
-                        },
-                        &sender,
-                    );
-                    return;
-                }
-                // None of the named files could be read (#339): asking where
-                // no files should go helps nobody, so the message opens with
-                // the error beside it.
-                self.compose_addressed(prefill, &sender);
-                self.after_hand_off(0, dropped);
-            }
+            AppMsg::OpenMailto(uri) => self.open_mailto(uri, sender),
 
             AppMsg::PresentComposers => {
                 crate::desktop::present_window(&self.window);
@@ -544,5 +497,54 @@ impl AppModel {
             }
             _ => unreachable!("not routed to on_compose_open"),
         }
+    }
+
+    /// A `mailto:` link handed to the app: a composer with what it carries.
+    fn open_mailto(&mut self, uri: String, sender: ComponentSender<Self>) {
+        // A mailto: link from anywhere on the system (the desktop file
+        // registers the scheme). Same open-composer flow as ComposeTo,
+        // with the URI's subject/cc/bcc/body carried along.
+        let Some(mut prefill) = parse_mailto(&uri) else {
+            return;
+        };
+        // attach= names files (#90): keep only the ones that really
+        // exist as regular files. Whatever attaches shows up as a
+        // normal removable chip in the composer, so nothing rides
+        // along invisibly if a web link (rather than Nautilus)
+        // carried the parameter. The ones that don't are reported,
+        // not dropped in silence: from inside the Flatpak sandbox a
+        // path the file manager can see may be one Hylki cannot.
+        let (attachments, dropped): (Vec<_>, Vec<_>) = std::mem::take(&mut prefill.attachments)
+            .into_iter()
+            .partition(|p| p.is_file());
+        for p in &dropped {
+            tracing::warn!(
+                "mailto attach ignored (not a readable file): {}",
+                p.display()
+            );
+        }
+        tracing::info!(
+            "mailto hand-off: {} attachment(s) named, {} readable",
+            attachments.len() + dropped.len(),
+            attachments.len()
+        );
+        if !attachments.is_empty() {
+            // Files came along (Files' own "Email…" entry): the same
+            // choice of destination as "Send with Hylki".
+            self.begin_hand_off(
+                FileHandOff {
+                    base: prefill,
+                    files: attachments,
+                    dropped,
+                },
+                &sender,
+            );
+            return;
+        }
+        // None of the named files could be read (#339): asking where
+        // no files should go helps nobody, so the message opens with
+        // the error beside it.
+        self.compose_addressed(prefill, &sender);
+        self.after_hand_off(0, dropped);
     }
 }

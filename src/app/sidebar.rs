@@ -301,64 +301,7 @@ impl AppModel {
                 }
             }
 
-            AppMsg::SidebarSectionsOpen {
-                all_inboxes,
-                filtered,
-                tags,
-                starred,
-                sent,
-                drafts,
-                archive,
-                junk,
-                trash,
-                favorites,
-                smart,
-                contacts,
-            } => {
-                let now = (
-                    all_inboxes,
-                    filtered,
-                    tags,
-                    starred,
-                    sent,
-                    drafts,
-                    archive,
-                    junk,
-                    trash,
-                    favorites,
-                    smart,
-                    contacts,
-                );
-                let was = (
-                    self.unified_expanded,
-                    self.filtered_expanded,
-                    self.tags_expanded,
-                    self.starred_expanded,
-                    self.sent_expanded,
-                    self.drafts_expanded,
-                    self.archive_expanded,
-                    self.junk_expanded,
-                    self.trash_expanded,
-                    self.favorites_expanded,
-                    self.smart_expanded,
-                    self.contacts_expanded,
-                );
-                if now != was {
-                    self.unified_expanded = all_inboxes;
-                    self.filtered_expanded = filtered;
-                    self.tags_expanded = tags;
-                    self.starred_expanded = starred;
-                    self.sent_expanded = sent;
-                    self.drafts_expanded = drafts;
-                    self.archive_expanded = archive;
-                    self.junk_expanded = junk;
-                    self.trash_expanded = trash;
-                    self.favorites_expanded = favorites;
-                    self.smart_expanded = smart;
-                    self.contacts_expanded = contacts;
-                    self.save_sidebar_state();
-                }
-            }
+            msg @ AppMsg::SidebarSectionsOpen { .. } => self.on_sidebar_sections_open(msg),
 
             AppMsg::AccountsReordered(emails) => {
                 // Display order only (by email) — no reconnect needed.
@@ -381,6 +324,71 @@ impl AppModel {
                 }
             }
             _ => unreachable!("not routed to on_sidebar"),
+        }
+    }
+
+    /// The sidebar's All Inboxes / Filtered Folders / Tags sections were
+    /// opened or folded — record it with the layout.
+    fn on_sidebar_sections_open(&mut self, msg: AppMsg) {
+        let AppMsg::SidebarSectionsOpen {
+            all_inboxes,
+            filtered,
+            tags,
+            starred,
+            sent,
+            drafts,
+            archive,
+            junk,
+            trash,
+            favorites,
+            smart,
+            contacts,
+        } = msg
+        else {
+            unreachable!("only SidebarSectionsOpen comes here")
+        };
+        let now = (
+            all_inboxes,
+            filtered,
+            tags,
+            starred,
+            sent,
+            drafts,
+            archive,
+            junk,
+            trash,
+            favorites,
+            smart,
+            contacts,
+        );
+        let was = (
+            self.unified_expanded,
+            self.filtered_expanded,
+            self.tags_expanded,
+            self.starred_expanded,
+            self.sent_expanded,
+            self.drafts_expanded,
+            self.archive_expanded,
+            self.junk_expanded,
+            self.trash_expanded,
+            self.favorites_expanded,
+            self.smart_expanded,
+            self.contacts_expanded,
+        );
+        if now != was {
+            self.unified_expanded = all_inboxes;
+            self.filtered_expanded = filtered;
+            self.tags_expanded = tags;
+            self.starred_expanded = starred;
+            self.sent_expanded = sent;
+            self.drafts_expanded = drafts;
+            self.archive_expanded = archive;
+            self.junk_expanded = junk;
+            self.trash_expanded = trash;
+            self.favorites_expanded = favorites;
+            self.smart_expanded = smart;
+            self.contacts_expanded = contacts;
+            self.save_sidebar_state();
         }
     }
 }

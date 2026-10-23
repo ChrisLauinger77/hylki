@@ -309,83 +309,7 @@ impl AppModel {
     /// The messages the router sends here (see `AppModel::route`).
     pub(super) fn on_send(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
         match msg {
-            AppMsg::SendMessage { from, out } => {
-                // A reply sent from the split pane becomes its own card in
-                // the conversation, instead of sliding away (send_morph.rs):
-                // its card is built now, for the composer's close to carry
-                // the editor to.
-                self.arriving = None;
-                if self.reply_joins(from, &out) {
-                    match self.provisional_message(&out) {
-                        Some(m) => self.arriving = Some((from, m, motion_wanted())),
-                        None => {
-                            tracing::info!(target: "hylki::morph", "no send morph: the reply's card could not be built")
-                        }
-                    }
-                }
-                let account_id = out.from_account_id;
-                // Remember who this went to, now, whatever route it takes
-                // from here (straight out, the Outbox, Send Later): the next
-                // composer suggests them, and so do the ones already open.
-                let recipients: Vec<(String, String)> = [&out.to, &out.cc, &out.bcc]
-                    .into_iter()
-                    .flat_map(|f| crate::worker::parse_recipients(f))
-                    .collect();
-                if let Some(c) = self.cache.as_ref() {
-                    c.record_addresses(&recipients);
-                }
-                let own: HashSet<String> =
-                    self.config.iter().map(|c| c.email.to_lowercase()).collect();
-                let fresh: Vec<crate::contacts::Suggestion> = recipients
-                    .into_iter()
-                    .filter(|(_, e)| e.contains('@'))
-                    .map(|(name, email)| crate::contacts::Suggestion {
-                        name: if name.is_empty() { email.clone() } else { name },
-                        own: own.contains(&email.to_lowercase()),
-                        email,
-                        from_contacts: false,
-                        from_directory: false,
-                        score: 1,
-                        group: None,
-                    })
-                    .collect();
-                if !fresh.is_empty() {
-                    for host in &self.composers {
-                        host.controller.emit(ComposeInput::AddSuggestions {
-                            account_id,
-                            new: fresh.clone(),
-                        });
-                    }
-                    if let Some(rc) = &self.reader_compose {
-                        rc.controller.emit(ComposeInput::AddSuggestions {
-                            account_id,
-                            new: fresh.clone(),
-                        });
-                    }
-                }
-                let sent_path = self.sent_copy_path(account_id);
-                if out.send_at.is_some() {
-                    // Send Later has its own way back: the message waits in
-                    // the Outbox, where it can be edited or dropped.
-                    self.send_to(
-                        account_id,
-                        MailRequest::Send {
-                            message: out,
-                            sent_path,
-                            ticket: 0,
-                        },
-                    );
-                } else {
-                    let origin = match self.reader_compose.as_ref().filter(|r| r.id == from) {
-                        Some(r) if r.window.is_none() => r.answering.map_or(
-                            crate::outgoing::Origin::Pane,
-                            crate::outgoing::Origin::Split,
-                        ),
-                        _ => crate::outgoing::Origin::Window,
-                    };
-                    self.queue_send(origin, out, sent_path, &sender);
-                }
-            }
+            AppMsg::SendMessage { from, out } => self.on_send_message(from, out, sender),
 
             AppMsg::DispatchSend(ticket) => self.dispatch_send(ticket),
 
@@ -447,6 +371,91 @@ impl AppModel {
                 self.compose_unsent(account_id, *message, &sender);
             }
             _ => unreachable!("not routed to on_send"),
+        }
+    }
+
+    /// User clicked "Load attachments" for a message whose attachments weren't
+    /// pre-downloaded — fetch them from the server now.
+    /// A composer sent a message; `from` is that composer's id.
+    fn on_send_message(
+        &mut self,
+        from: u32,
+        out: Box<OutgoingMessage>,
+        sender: ComponentSender<Self>,
+    ) {
+        // A reply sent from the split pane becomes its own card in
+        // the conversation, instead of sliding away (send_morph.rs):
+        // its card is built now, for the composer's close to carry
+        // the editor to.
+        self.arriving = None;
+        if self.reply_joins(from, &out) {
+            match self.provisional_message(&out) {
+                Some(m) => self.arriving = Some((from, m, motion_wanted())),
+                None => {
+                    tracing::info!(target: "hylki::morph", "no send morph: the reply's card could not be built")
+                }
+            }
+        }
+        let account_id = out.from_account_id;
+        // Remember who this went to, now, whatever route it takes
+        // from here (straight out, the Outbox, Send Later): the next
+        // composer suggests them, and so do the ones already open.
+        let recipients: Vec<(String, String)> = [&out.to, &out.cc, &out.bcc]
+            .into_iter()
+            .flat_map(|f| crate::worker::parse_recipients(f))
+            .collect();
+        if let Some(c) = self.cache.as_ref() {
+            c.record_addresses(&recipients);
+        }
+        let own: HashSet<String> = self.config.iter().map(|c| c.email.to_lowercase()).collect();
+        let fresh: Vec<crate::contacts::Suggestion> = recipients
+            .into_iter()
+            .filter(|(_, e)| e.contains('@'))
+            .map(|(name, email)| crate::contacts::Suggestion {
+                name: if name.is_empty() { email.clone() } else { name },
+                own: own.contains(&email.to_lowercase()),
+                email,
+                from_contacts: false,
+                from_directory: false,
+                score: 1,
+                group: None,
+            })
+            .collect();
+        if !fresh.is_empty() {
+            for host in &self.composers {
+                host.controller.emit(ComposeInput::AddSuggestions {
+                    account_id,
+                    new: fresh.clone(),
+                });
+            }
+            if let Some(rc) = &self.reader_compose {
+                rc.controller.emit(ComposeInput::AddSuggestions {
+                    account_id,
+                    new: fresh.clone(),
+                });
+            }
+        }
+        let sent_path = self.sent_copy_path(account_id);
+        if out.send_at.is_some() {
+            // Send Later has its own way back: the message waits in
+            // the Outbox, where it can be edited or dropped.
+            self.send_to(
+                account_id,
+                MailRequest::Send {
+                    message: out,
+                    sent_path,
+                    ticket: 0,
+                },
+            );
+        } else {
+            let origin = match self.reader_compose.as_ref().filter(|r| r.id == from) {
+                Some(r) if r.window.is_none() => r.answering.map_or(
+                    crate::outgoing::Origin::Pane,
+                    crate::outgoing::Origin::Split,
+                ),
+                _ => crate::outgoing::Origin::Window,
+            };
+            self.queue_send(origin, out, sent_path, &sender);
         }
     }
 }

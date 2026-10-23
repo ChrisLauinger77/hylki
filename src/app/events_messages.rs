@@ -17,49 +17,7 @@ impl AppModel {
                 account_id,
                 folder_id,
                 messages,
-            } => {
-                // Background backfill: grow the folder's search index without
-                // disturbing the current view (no title/query reset).
-                let messages = self.merge_local_tags(account_id, messages);
-                let messages = self.drop_pending_moves(account_id, folder_id, messages);
-                let messages = self.apply_blacklist(account_id, folder_id, messages);
-                // Only onto a folder listed whole already. An entry started
-                // here would hold just the newest arrivals, and a search or
-                // a unified view would take it for the folder (#472); one
-                // not open has its rows on disk, where the worker put them.
-                let Some(entry) = self.message_cache.get_mut(&(account_id, folder_id)) else {
-                    return;
-                };
-                let existing: std::collections::HashSet<u32> =
-                    entry.iter().map(|m| m.uid).collect();
-                let fresh: Vec<Message> = messages
-                    .into_iter()
-                    .filter(|m| !existing.contains(&m.uid))
-                    .collect();
-                if fresh.is_empty() {
-                    return;
-                }
-                entry.extend(fresh.iter().cloned());
-                // Feed the visible list so search covers the new messages live.
-                if self.unified {
-                    if self.is_unified_target(account_id, folder_id) {
-                        // A folder read where it is has them already.
-                        if !self.unified_unfilled.contains(&(account_id, folder_id)) {
-                            self.unified_slices
-                                .entry((account_id, folder_id))
-                                .or_default()
-                                .extend(fresh.iter().cloned());
-                        }
-                        self.message_list
-                            .emit(MessageListInput::AppendMessages { messages: fresh });
-                    }
-                } else if let Some(sel) = self.selected.as_ref() {
-                    if sel.account_id == account_id && sel.folder_id == folder_id {
-                        self.message_list
-                            .emit(MessageListInput::AppendMessages { messages: fresh });
-                    }
-                }
-            }
+            } => self.on_messages_append(account_id, folder_id, messages),
 
             AppMsg::BackfillDone {
                 account_id,
@@ -74,46 +32,7 @@ impl AppModel {
                 message_id,
                 path,
                 uid,
-            } => {
-                // A conversation member the cache still listed turned out to
-                // be gone from the server (#257): take it out of the open
-                // conversation rather than show it as a blank card.
-                let folder = self.folder_by_path(account_id, &path).map(|f| f.id);
-                if let Some(fid) = folder {
-                    if let Some(msgs) = self.message_cache.get_mut(&(account_id, fid)) {
-                        msgs.retain(|m| m.uid != uid);
-                    }
-                }
-                // The message the reader was opened on stays: that one is
-                // the list's to settle, by its own sync.
-                let opened = self
-                    .current
-                    .as_ref()
-                    .map(|c| (c.account_id, c.id, c.folder_id));
-                let before = self.current_thread.len();
-                self.current_thread.retain(|m| {
-                    let gone = m.account_id == account_id
-                        && m.id == message_id
-                        && folder.is_none_or(|fid| m.folder_id == fid);
-                    !gone || opened == Some((m.account_id, m.id, m.folder_id))
-                });
-                // Remembered conversations may hold it too, and the list's
-                // badges counted it.
-                self.forget_threads(account_id);
-                self.message_list
-                    .emit(MessageListInput::RecheckThreadSummaries(account_id));
-                if self.current_thread.len() != before {
-                    if self.current_thread.len() > 1 {
-                        self.queue_thread_render(&sender);
-                    } else {
-                        // Nothing left to make a conversation of.
-                        self.current_thread.clear();
-                        let current = self.current.clone();
-                        let loading = current.as_ref().is_some_and(|c| c.body.is_empty());
-                        self.show_message(current, loading);
-                    }
-                }
-            }
+            } => self.on_message_gone(account_id, message_id, path, uid, sender),
 
             AppMsg::RefsRepaired {
                 account_id,
@@ -133,6 +52,99 @@ impl AppModel {
                 }
             }
             _ => unreachable!("not routed to on_events_messages"),
+        }
+    }
+
+    /// Additional indexed summaries from the background backfill (search index).
+    fn on_messages_append(&mut self, account_id: u32, folder_id: u32, messages: Vec<Message>) {
+        // Background backfill: grow the folder's search index without
+        // disturbing the current view (no title/query reset).
+        let messages = self.merge_local_tags(account_id, messages);
+        let messages = self.drop_pending_moves(account_id, folder_id, messages);
+        let messages = self.apply_blacklist(account_id, folder_id, messages);
+        // Only onto a folder listed whole already. An entry started
+        // here would hold just the newest arrivals, and a search or
+        // a unified view would take it for the folder (#472); one
+        // not open has its rows on disk, where the worker put them.
+        let Some(entry) = self.message_cache.get_mut(&(account_id, folder_id)) else {
+            return;
+        };
+        let existing: std::collections::HashSet<u32> = entry.iter().map(|m| m.uid).collect();
+        let fresh: Vec<Message> = messages
+            .into_iter()
+            .filter(|m| !existing.contains(&m.uid))
+            .collect();
+        if fresh.is_empty() {
+            return;
+        }
+        entry.extend(fresh.iter().cloned());
+        // Feed the visible list so search covers the new messages live.
+        if self.unified {
+            if self.is_unified_target(account_id, folder_id) {
+                // A folder read where it is has them already.
+                if !self.unified_unfilled.contains(&(account_id, folder_id)) {
+                    self.unified_slices
+                        .entry((account_id, folder_id))
+                        .or_default()
+                        .extend(fresh.iter().cloned());
+                }
+                self.message_list
+                    .emit(MessageListInput::AppendMessages { messages: fresh });
+            }
+        } else if let Some(sel) = self.selected.as_ref() {
+            if sel.account_id == account_id && sel.folder_id == folder_id {
+                self.message_list
+                    .emit(MessageListInput::AppendMessages { messages: fresh });
+            }
+        }
+    }
+
+    /// A message the cache listed is no longer in `path` on the server.
+    fn on_message_gone(
+        &mut self,
+        account_id: u32,
+        message_id: u32,
+        path: String,
+        uid: u32,
+        sender: ComponentSender<Self>,
+    ) {
+        // A conversation member the cache still listed turned out to
+        // be gone from the server (#257): take it out of the open
+        // conversation rather than show it as a blank card.
+        let folder = self.folder_by_path(account_id, &path).map(|f| f.id);
+        if let Some(fid) = folder {
+            if let Some(msgs) = self.message_cache.get_mut(&(account_id, fid)) {
+                msgs.retain(|m| m.uid != uid);
+            }
+        }
+        // The message the reader was opened on stays: that one is
+        // the list's to settle, by its own sync.
+        let opened = self
+            .current
+            .as_ref()
+            .map(|c| (c.account_id, c.id, c.folder_id));
+        let before = self.current_thread.len();
+        self.current_thread.retain(|m| {
+            let gone = m.account_id == account_id
+                && m.id == message_id
+                && folder.is_none_or(|fid| m.folder_id == fid);
+            !gone || opened == Some((m.account_id, m.id, m.folder_id))
+        });
+        // Remembered conversations may hold it too, and the list's
+        // badges counted it.
+        self.forget_threads(account_id);
+        self.message_list
+            .emit(MessageListInput::RecheckThreadSummaries(account_id));
+        if self.current_thread.len() != before {
+            if self.current_thread.len() > 1 {
+                self.queue_thread_render(&sender);
+            } else {
+                // Nothing left to make a conversation of.
+                self.current_thread.clear();
+                let current = self.current.clone();
+                let loading = current.as_ref().is_some_and(|c| c.body.is_empty());
+                self.show_message(current, loading);
+            }
         }
     }
 

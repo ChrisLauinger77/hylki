@@ -175,87 +175,7 @@ impl AppModel {
                 }
             }
 
-            AppMsg::ShowcaseSend(text) => {
-                // Every frame interval for a second and a half, to compare
-                // the send morph with the slide it replaces.
-                if let Some(clock) = self.window.frame_clock() {
-                    let last = std::rc::Rc::new(std::cell::Cell::new(0i64));
-                    let id = clock.connect_after_paint(move |c| {
-                        let now = c.frame_time();
-                        if last.get() > 0 {
-                            tracing::debug!(target: "hylki::frames", "frame {} ms", (now - last.get()) / 1000);
-                        }
-                        last.set(now);
-                    });
-                    let c2 = clock.clone();
-                    let cell = std::rc::Rc::new(std::cell::Cell::new(Some(id)));
-                    gtk::glib::timeout_add_local_once(
-                        std::time::Duration::from_millis(2500),
-                        move || {
-                            if let Some(id) = cell.take() {
-                                c2.disconnect(id);
-                            }
-                        },
-                    );
-                }
-                let Some(rc) = self.reader_compose.as_ref().map(|r| &r.controller) else {
-                    return;
-                };
-                let editor = crate::ui::send_morph::find_widget(rc.widget().upcast_ref(), &|w| {
-                    w.is::<webkit6::WebView>()
-                })
-                .and_downcast::<webkit6::WebView>();
-                let Some(editor) = editor else { return };
-                let js = format!(
-                    "document.body.focus();{}",
-                    text.split('\n')
-                        .map(|l| format!(
-                            "document.execCommand('insertText',false,{});",
-                            serde_json::to_string(l).unwrap_or_default()
-                        ))
-                        .collect::<Vec<_>>()
-                        .join("document.execCommand('insertParagraph');")
-                );
-                webkit6::prelude::WebViewExt::evaluate_javascript(
-                    &editor,
-                    &js,
-                    None,
-                    None,
-                    None::<&gtk::gio::Cancellable>,
-                    |_| {},
-                );
-                let c = rc.sender().clone();
-                gtk::glib::timeout_add_local_once(
-                    std::time::Duration::from_millis(600),
-                    move || {
-                        c.emit(ComposeInput::Send);
-                    },
-                );
-                // The whole window every quarter second for six seconds from
-                // Send, to see what the reader does while the message goes.
-                if let Some(dir) = std::env::var_os("HYLKI_MORPH_FRAMES") {
-                    let window: gtk::Widget = self.window.clone().upcast();
-                    for i in 0..24u64 {
-                        let (dir, window) = (dir.clone(), window.clone());
-                        gtk::glib::timeout_add_local_once(
-                            std::time::Duration::from_millis(600 + i * 250),
-                            move || {
-                                crate::ui::send_morph::capture_next_frame(
-                                    &window.clone(),
-                                    move |still| {
-                                        if let Some((tex, _)) = still {
-                                            let _ = tex.save_to_png(
-                                                std::path::Path::new(&dir)
-                                                    .join(format!("win-{:05}.png", i * 250)),
-                                            );
-                                        }
-                                    },
-                                );
-                            },
-                        );
-                    }
-                }
-            }
+            AppMsg::ShowcaseSend(text) => self.showcase_send(text),
 
             AppMsg::ShowcaseNewAccount(provider) => {
                 if let Some(acc) = &self.accounts_win {
@@ -279,6 +199,81 @@ impl AppModel {
                 }
             }
             _ => unreachable!("not routed to on_showcase"),
+        }
+    }
+
+    /// Showcase only (HYLKI_SHOWCASE_SEND): write `text` in the split
+    /// reply's editor and send it, to watch the send morph.
+    fn showcase_send(&mut self, text: String) {
+        // Every frame interval for a second and a half, to compare
+        // the send morph with the slide it replaces.
+        if let Some(clock) = self.window.frame_clock() {
+            let last = std::rc::Rc::new(std::cell::Cell::new(0i64));
+            let id = clock.connect_after_paint(move |c| {
+                let now = c.frame_time();
+                if last.get() > 0 {
+                    tracing::debug!(target: "hylki::frames", "frame {} ms", (now - last.get()) / 1000);
+                }
+                last.set(now);
+            });
+            let c2 = clock.clone();
+            let cell = std::rc::Rc::new(std::cell::Cell::new(Some(id)));
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
+                if let Some(id) = cell.take() {
+                    c2.disconnect(id);
+                }
+            });
+        }
+        let Some(rc) = self.reader_compose.as_ref().map(|r| &r.controller) else {
+            return;
+        };
+        let editor = crate::ui::send_morph::find_widget(rc.widget().upcast_ref(), &|w| {
+            w.is::<webkit6::WebView>()
+        })
+        .and_downcast::<webkit6::WebView>();
+        let Some(editor) = editor else { return };
+        let js = format!(
+            "document.body.focus();{}",
+            text.split('\n')
+                .map(|l| format!(
+                    "document.execCommand('insertText',false,{});",
+                    serde_json::to_string(l).unwrap_or_default()
+                ))
+                .collect::<Vec<_>>()
+                .join("document.execCommand('insertParagraph');")
+        );
+        webkit6::prelude::WebViewExt::evaluate_javascript(
+            &editor,
+            &js,
+            None,
+            None,
+            None::<&gtk::gio::Cancellable>,
+            |_| {},
+        );
+        let c = rc.sender().clone();
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
+            c.emit(ComposeInput::Send);
+        });
+        // The whole window every quarter second for six seconds from
+        // Send, to see what the reader does while the message goes.
+        if let Some(dir) = std::env::var_os("HYLKI_MORPH_FRAMES") {
+            let window: gtk::Widget = self.window.clone().upcast();
+            for i in 0..24u64 {
+                let (dir, window) = (dir.clone(), window.clone());
+                gtk::glib::timeout_add_local_once(
+                    std::time::Duration::from_millis(600 + i * 250),
+                    move || {
+                        crate::ui::send_morph::capture_next_frame(&window.clone(), move |still| {
+                            if let Some((tex, _)) = still {
+                                let _ = tex.save_to_png(
+                                    std::path::Path::new(&dir)
+                                        .join(format!("win-{:05}.png", i * 250)),
+                                );
+                            }
+                        });
+                    },
+                );
+            }
         }
     }
 }

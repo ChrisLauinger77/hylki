@@ -92,68 +92,7 @@ impl AppModel {
                 account_id,
                 folder_id,
                 message_id,
-            } => {
-                // The user clicked a new-mail notification: they've engaged with
-                // that account's mail, so clear its toast, then navigate to the
-                // message's folder and open it in the reader.
-                crate::notify::withdraw_mail(account_id);
-                tracing::info!(
-                    "notification: open account {account_id} folder {folder_id} message {message_id} (unified row: {})",
-                    self.unified_inboxes_shown()
-                );
-                if let Some((name, path, kind)) = self
-                    .folder_by_id(account_id, folder_id)
-                    .map(|f| (f.name.clone(), f.path.clone(), f.kind))
-                {
-                    // Ask for the body before anything else goes to the
-                    // account's worker. Opening Inboxes below asks every
-                    // account for its inbox list, and the worker serves one
-                    // request at a time: the body request the selection
-                    // sends afterwards would wait behind that whole fetch
-                    // (and the IDLE hand-off before it), so the message the
-                    // user clicked sat on a spinner while the list loaded.
-                    // Sent first, it comes back into the body cache, which
-                    // the selection reads before fetching. A body already
-                    // there (prefetched on arrival) needs nothing.
-                    let uid = self
-                        .message_cache
-                        .get(&(account_id, folder_id))
-                        .and_then(|msgs| msgs.iter().find(|m| m.id == message_id))
-                        .map(|m| m.uid);
-                    if let Some(uid) = uid {
-                        if !self.body_cache.contains_key(&(account_id, folder_id, uid)) {
-                            self.send_to(
-                                account_id,
-                                MailRequest::LoadBody {
-                                    message_id,
-                                    path: path.clone(),
-                                    uid,
-                                },
-                            );
-                        }
-                    }
-                    // Mail that landed in an inbox opens in the unified
-                    // Inboxes when the sidebar has that row (the view the
-                    // app opens with; the account's own Inbox row may sit
-                    // inside a folded section, where a highlight has nowhere
-                    // to show). Without the row — one account, or the
-                    // preference off — or when a filter filed the message
-                    // elsewhere, its folder opens directly and the sidebar
-                    // unfolds the account to show where that is. Both emit
-                    // the (cached) list synchronously, so the SelectAndLoad
-                    // that follows finds the row and opens it.
-                    if kind == FolderKind::Inbox
-                        && self.unified_inboxes_shown()
-                        && self.in_unified(account_id)
-                    {
-                        self.open_unified(UnifiedView::Kind(FolderKind::Inbox), &sender);
-                    } else {
-                        self.select_folder(account_id, folder_id, name, path);
-                    }
-                    self.message_list
-                        .emit(MessageListInput::SelectAndLoad((account_id, message_id)));
-                }
-            }
+            } => self.open_from_notification(account_id, folder_id, message_id, sender),
 
             AppMsg::NotificationMarkRead {
                 account_id,
@@ -294,6 +233,76 @@ impl AppModel {
                 self.rebuild_help_menu();
             }
             _ => unreachable!("not routed to on_notifications"),
+        }
+    }
+
+    /// A new-mail desktop notification was clicked — open that message.
+    fn open_from_notification(
+        &mut self,
+        account_id: u32,
+        folder_id: u32,
+        message_id: u32,
+        sender: ComponentSender<Self>,
+    ) {
+        // The user clicked a new-mail notification: they've engaged with
+        // that account's mail, so clear its toast, then navigate to the
+        // message's folder and open it in the reader.
+        crate::notify::withdraw_mail(account_id);
+        tracing::info!(
+            "notification: open account {account_id} folder {folder_id} message {message_id} (unified row: {})",
+            self.unified_inboxes_shown()
+        );
+        if let Some((name, path, kind)) = self
+            .folder_by_id(account_id, folder_id)
+            .map(|f| (f.name.clone(), f.path.clone(), f.kind))
+        {
+            // Ask for the body before anything else goes to the
+            // account's worker. Opening Inboxes below asks every
+            // account for its inbox list, and the worker serves one
+            // request at a time: the body request the selection
+            // sends afterwards would wait behind that whole fetch
+            // (and the IDLE hand-off before it), so the message the
+            // user clicked sat on a spinner while the list loaded.
+            // Sent first, it comes back into the body cache, which
+            // the selection reads before fetching. A body already
+            // there (prefetched on arrival) needs nothing.
+            let uid = self
+                .message_cache
+                .get(&(account_id, folder_id))
+                .and_then(|msgs| msgs.iter().find(|m| m.id == message_id))
+                .map(|m| m.uid);
+            if let Some(uid) = uid {
+                if !self.body_cache.contains_key(&(account_id, folder_id, uid)) {
+                    self.send_to(
+                        account_id,
+                        MailRequest::LoadBody {
+                            message_id,
+                            path: path.clone(),
+                            uid,
+                        },
+                    );
+                }
+            }
+            // Mail that landed in an inbox opens in the unified
+            // Inboxes when the sidebar has that row (the view the
+            // app opens with; the account's own Inbox row may sit
+            // inside a folded section, where a highlight has nowhere
+            // to show). Without the row — one account, or the
+            // preference off — or when a filter filed the message
+            // elsewhere, its folder opens directly and the sidebar
+            // unfolds the account to show where that is. Both emit
+            // the (cached) list synchronously, so the SelectAndLoad
+            // that follows finds the row and opens it.
+            if kind == FolderKind::Inbox
+                && self.unified_inboxes_shown()
+                && self.in_unified(account_id)
+            {
+                self.open_unified(UnifiedView::Kind(FolderKind::Inbox), &sender);
+            } else {
+                self.select_folder(account_id, folder_id, name, path);
+            }
+            self.message_list
+                .emit(MessageListInput::SelectAndLoad((account_id, message_id)));
         }
     }
 

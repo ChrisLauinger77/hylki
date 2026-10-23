@@ -69,66 +69,7 @@ impl AppModel {
                 path,
                 message_id,
                 items,
-            } => {
-                let key = self.event_key(account_id, &path, message_id);
-                if let Some(k) = key {
-                    self.attachment_cache.insert(k, items.clone());
-                }
-                let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
-                // A file the gallery asked for: hand the bytes straight over so
-                // the thumbnail and the preview fill in without a reload, which
-                // would throw away the user's place in the list.
-                if self.showing_gallery {
-                    self.gallery.emit(GalleryInput::SetFetching(false));
-                    self.gallery.emit(GalleryInput::Fetched {
-                        account_id,
-                        path: path.clone(),
-                        uid: key.map_or(message_id, |k| k.2),
-                        items: items.clone(),
-                    });
-                }
-                if self.current.as_ref().is_some_and(is_target) {
-                    self.attachments_loading = false;
-                    self.attachments = items.clone();
-                    self.sync_attachment_drawer();
-                }
-                // With a conversation open the drawer spans the whole thread, so
-                // any member's arrival re-merges the union (this supersedes the
-                // single-message assignment above when both apply).
-                if self.current_thread.len() > 1 && self.current_thread.iter().any(is_target) {
-                    self.attachments_loading = false;
-                    self.refresh_thread_attachments();
-                }
-                for p in self.popouts.values() {
-                    let member = p.members.iter().find(|(k, (a, id))| {
-                        key.map_or(*a == account_id && *id == message_id, |key| *k == key)
-                    });
-                    if let Some((_, (a, id))) = member {
-                        p.controller.emit(MessageWindowInput::SetAttachments {
-                            account_id: *a,
-                            id: *id,
-                            items: items.clone(),
-                        });
-                    }
-                }
-                // These files were fetched to be carried into a copy of the
-                // message; they are cached now, so the second pass stages them.
-                if let Some(pending) = self.pending_edit_as_new.take() {
-                    if is_target(&pending) {
-                        self.edit_as_new(pending, &sender);
-                    } else {
-                        self.pending_edit_as_new = Some(pending);
-                    }
-                }
-                // The same for a forward that carries them (#240).
-                if let Some((pending, inline)) = self.pending_forward.take() {
-                    if is_target(&pending) {
-                        self.forward(pending, inline, &sender);
-                    } else {
-                        self.pending_forward = Some((pending, inline));
-                    }
-                }
-            }
+            } => self.on_attachments_arrived(account_id, path, message_id, items, sender),
 
             AppMsg::AttachmentsPending {
                 account_id,
@@ -251,6 +192,76 @@ impl AppModel {
                 }
             }
             _ => unreachable!("not routed to on_events_bodies"),
+        }
+    }
+
+    /// These, like `Body`, name the folder: a UID means a message only
+    /// within its folder.
+    fn on_attachments_arrived(
+        &mut self,
+        account_id: u32,
+        path: String,
+        message_id: u32,
+        items: Vec<Attachment>,
+        sender: ComponentSender<Self>,
+    ) {
+        let key = self.event_key(account_id, &path, message_id);
+        if let Some(k) = key {
+            self.attachment_cache.insert(k, items.clone());
+        }
+        let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
+        // A file the gallery asked for: hand the bytes straight over so
+        // the thumbnail and the preview fill in without a reload, which
+        // would throw away the user's place in the list.
+        if self.showing_gallery {
+            self.gallery.emit(GalleryInput::SetFetching(false));
+            self.gallery.emit(GalleryInput::Fetched {
+                account_id,
+                path: path.clone(),
+                uid: key.map_or(message_id, |k| k.2),
+                items: items.clone(),
+            });
+        }
+        if self.current.as_ref().is_some_and(is_target) {
+            self.attachments_loading = false;
+            self.attachments = items.clone();
+            self.sync_attachment_drawer();
+        }
+        // With a conversation open the drawer spans the whole thread, so
+        // any member's arrival re-merges the union (this supersedes the
+        // single-message assignment above when both apply).
+        if self.current_thread.len() > 1 && self.current_thread.iter().any(is_target) {
+            self.attachments_loading = false;
+            self.refresh_thread_attachments();
+        }
+        for p in self.popouts.values() {
+            let member = p.members.iter().find(|(k, (a, id))| {
+                key.map_or(*a == account_id && *id == message_id, |key| *k == key)
+            });
+            if let Some((_, (a, id))) = member {
+                p.controller.emit(MessageWindowInput::SetAttachments {
+                    account_id: *a,
+                    id: *id,
+                    items: items.clone(),
+                });
+            }
+        }
+        // These files were fetched to be carried into a copy of the
+        // message; they are cached now, so the second pass stages them.
+        if let Some(pending) = self.pending_edit_as_new.take() {
+            if is_target(&pending) {
+                self.edit_as_new(pending, &sender);
+            } else {
+                self.pending_edit_as_new = Some(pending);
+            }
+        }
+        // The same for a forward that carries them (#240).
+        if let Some((pending, inline)) = self.pending_forward.take() {
+            if is_target(&pending) {
+                self.forward(pending, inline, &sender);
+            } else {
+                self.pending_forward = Some((pending, inline));
+            }
         }
     }
 

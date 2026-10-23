@@ -462,92 +462,100 @@ impl AppModel {
                 self.attachment_drawer
                     .emit(AttachmentDrawerInput::NotDeleted(name, size as usize));
             }
-            AppMsg::AttachmentDeleted {
-                account_id,
-                message_id,
-                path,
-                uid,
-                new_uid,
-                name,
-                size,
-            } => {
-                // The file fades out where it is shown; the lists that
-                // follow wait for it.
-                let t = self.take_deleting(account_id, message_id, &name);
-                self.gallery.emit(GalleryInput::Removed((
-                    account_id,
-                    path.clone(),
-                    uid,
-                    name.clone(),
-                )));
-                let shown = t.map_or(size, |t| t.size) as usize;
-                self.attachment_drawer
-                    .emit(AttachmentDrawerInput::Deleted(name.clone(), shown));
-                if let Some(p) = self.popouts.get(&(account_id, message_id)) {
-                    p.controller
-                        .emit(MessageWindowInput::Drawer(AttachmentDrawerInput::Deleted(
-                            name.clone(),
-                            shown,
-                        )));
-                }
-                let key = (account_id, message_id);
-                let members = self.conversation_members();
-                self.thread_cache
-                    .retain(|_, members| !members.iter().any(|m| (m.account_id, m.id) == key));
-                let folder = self.folder_by_path(account_id, &path).map(|f| f.id);
-                if let Some(fid) = folder {
-                    self.body_cache.remove(&(account_id, fid, uid));
-                }
-                let held = folder.map(|fid| (account_id, fid, uid));
-                if new_uid == Some(uid) {
-                    // The same message, one file fewer (Microsoft 365): the
-                    // reader drops the file where it stands.
-                    if let Some(mut items) = held.and_then(|k| self.attachment_cache.remove(&k)) {
-                        if let Some(at) = items
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, a)| a.name == name)
-                            .min_by_key(|(_, a)| (a.data.len() as u64).abs_diff(size))
-                            .map(|(i, _)| i)
-                        {
-                            items.remove(at);
-                        }
-                        sender.input(AppMsg::Attachments {
-                            account_id,
-                            path,
-                            message_id,
-                            items,
-                        });
-                    }
-                    return;
-                }
-                // A copy took the message's place under a new UID. The list,
-                // loaded again first, may already have carried the selection
-                // over to it by Message-ID, the files it held with it; if not,
-                // the copy is opened here.
-                if let Some(k) = held {
-                    self.attachment_cache.remove(&k);
-                }
-                let Some(new_uid) = new_uid else { return };
-                let now = (account_id, new_uid);
-                if let Some(fid) = folder {
-                    self.attachment_cache.remove(&(account_id, fid, new_uid));
-                }
-                if members.contains(&now) {
-                    self.send_to(
-                        account_id,
-                        MailRequest::LoadAttachments {
-                            message_id: new_uid,
-                            path,
-                            uid: new_uid,
-                            download: true,
-                        },
-                    );
-                } else if members.contains(&key) {
-                    self.message_list.emit(MessageListInput::SelectAndLoad(now));
-                }
-            }
+            msg @ AppMsg::AttachmentDeleted { .. } => self.on_attachment_deleted(msg, sender),
             _ => unreachable!("not routed to on_attachments"),
+        }
+    }
+
+    /// The worker did it: the message is `new_uid` now (the same UID on
+    /// Microsoft 365, a new one elsewhere, `None` if it was not found again).
+    fn on_attachment_deleted(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        let AppMsg::AttachmentDeleted {
+            account_id,
+            message_id,
+            path,
+            uid,
+            new_uid,
+            name,
+            size,
+        } = msg
+        else {
+            unreachable!("only AttachmentDeleted comes here")
+        };
+        // The file fades out where it is shown; the lists that
+        // follow wait for it.
+        let t = self.take_deleting(account_id, message_id, &name);
+        self.gallery.emit(GalleryInput::Removed((
+            account_id,
+            path.clone(),
+            uid,
+            name.clone(),
+        )));
+        let shown = t.map_or(size, |t| t.size) as usize;
+        self.attachment_drawer
+            .emit(AttachmentDrawerInput::Deleted(name.clone(), shown));
+        if let Some(p) = self.popouts.get(&(account_id, message_id)) {
+            p.controller
+                .emit(MessageWindowInput::Drawer(AttachmentDrawerInput::Deleted(
+                    name.clone(),
+                    shown,
+                )));
+        }
+        let key = (account_id, message_id);
+        let members = self.conversation_members();
+        self.thread_cache
+            .retain(|_, members| !members.iter().any(|m| (m.account_id, m.id) == key));
+        let folder = self.folder_by_path(account_id, &path).map(|f| f.id);
+        if let Some(fid) = folder {
+            self.body_cache.remove(&(account_id, fid, uid));
+        }
+        let held = folder.map(|fid| (account_id, fid, uid));
+        if new_uid == Some(uid) {
+            // The same message, one file fewer (Microsoft 365): the
+            // reader drops the file where it stands.
+            if let Some(mut items) = held.and_then(|k| self.attachment_cache.remove(&k)) {
+                if let Some(at) = items
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, a)| a.name == name)
+                    .min_by_key(|(_, a)| (a.data.len() as u64).abs_diff(size))
+                    .map(|(i, _)| i)
+                {
+                    items.remove(at);
+                }
+                sender.input(AppMsg::Attachments {
+                    account_id,
+                    path,
+                    message_id,
+                    items,
+                });
+            }
+            return;
+        }
+        // A copy took the message's place under a new UID. The list,
+        // loaded again first, may already have carried the selection
+        // over to it by Message-ID, the files it held with it; if not,
+        // the copy is opened here.
+        if let Some(k) = held {
+            self.attachment_cache.remove(&k);
+        }
+        let Some(new_uid) = new_uid else { return };
+        let now = (account_id, new_uid);
+        if let Some(fid) = folder {
+            self.attachment_cache.remove(&(account_id, fid, new_uid));
+        }
+        if members.contains(&now) {
+            self.send_to(
+                account_id,
+                MailRequest::LoadAttachments {
+                    message_id: new_uid,
+                    path,
+                    uid: new_uid,
+                    download: true,
+                },
+            );
+        } else if members.contains(&key) {
+            self.message_list.emit(MessageListInput::SelectAndLoad(now));
         }
     }
 }

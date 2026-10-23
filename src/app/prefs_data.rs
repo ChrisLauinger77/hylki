@@ -202,60 +202,64 @@ impl AppModel {
     /// The messages the router sends here (see `AppModel::route`).
     pub(super) fn on_prefs_data(&mut self, msg: AppMsg) {
         match msg {
-            AppMsg::ImportSettingsFrom(path) => {
-                let outcome = std::fs::read_to_string(&path)
-                    .map_err(|e| e.to_string())
-                    .and_then(|t| crate::config::import_bundle(&t));
-                match outcome {
-                    Ok(n) => {
-                        // Imported files are on disk; the running model still
-                        // holds the old world, so a clean restart is the
-                        // honest way to apply everything at once.
-                        // Parent on whichever window is focused (Settings,
-                        // normally) — a modal behind the focused window reads
-                        // as a freeze.
-                        let parent = relm4::main_application()
-                            .active_window()
-                            .unwrap_or_else(|| self.window.clone().upcast());
-                        let alert = adw::MessageDialog::new(
-                            Some(&parent),
-                            Some(i18n("Settings Imported").as_str()),
-                            Some(&i18n_f(
-                                "{n} mail account(s), the cloud storage accounts and all \
+            AppMsg::ImportSettingsFrom(path) => self.import_settings_from(path),
+            _ => unreachable!("not routed to on_prefs_data"),
+        }
+    }
+
+    /// Second stage of ImportSettings: the chosen file, applied on a clean
+    /// main-loop turn (working inside the chooser's completion callback froze
+    /// the app when the confirmation dialog presented there).
+    fn import_settings_from(&mut self, path: std::path::PathBuf) {
+        let outcome = std::fs::read_to_string(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|t| crate::config::import_bundle(&t));
+        match outcome {
+            Ok(n) => {
+                // Imported files are on disk; the running model still
+                // holds the old world, so a clean restart is the
+                // honest way to apply everything at once.
+                // Parent on whichever window is focused (Settings,
+                // normally) — a modal behind the focused window reads
+                // as a freeze.
+                let parent = relm4::main_application()
+                    .active_window()
+                    .unwrap_or_else(|| self.window.clone().upcast());
+                let alert = adw::MessageDialog::new(
+                    Some(&parent),
+                    Some(i18n("Settings Imported").as_str()),
+                    Some(&i18n_f(
+                        "{n} mail account(s), the cloud storage accounts and all \
                                  preferences were imported. Restart Hylki to apply them. \
                                  Passwords and sign-ins are not part of a backup; re-enter \
                                  them on first use if this is a new machine.",
-                                &[("n", &n.to_string())],
-                            )),
-                        );
-                        alert.add_response("later", &i18n("Later"));
-                        alert.add_response("restart", &i18n("Restart Hylki"));
-                        alert
-                            .set_response_appearance("restart", adw::ResponseAppearance::Suggested);
-                        alert.connect_response(None, |_, resp| {
-                            if resp == "restart" {
-                                // A detached shell starts the next instance
-                                // once this one has quit and released its
-                                // D-Bus name (started immediately, the new
-                                // instance would just relay to the dying
-                                // primary and exit).
-                                if let Ok(exe) = std::env::current_exe() {
-                                    let _ = std::process::Command::new("sh")
-                                        .arg("-c")
-                                        .arg(format!("sleep 1.5; exec '{}'", exe.display()))
-                                        .spawn();
-                                }
-                                relm4::main_application().quit();
-                            }
-                        });
-                        alert.present();
+                        &[("n", &n.to_string())],
+                    )),
+                );
+                alert.add_response("later", &i18n("Later"));
+                alert.add_response("restart", &i18n("Restart Hylki"));
+                alert.set_response_appearance("restart", adw::ResponseAppearance::Suggested);
+                alert.connect_response(None, |_, resp| {
+                    if resp == "restart" {
+                        // A detached shell starts the next instance
+                        // once this one has quit and released its
+                        // D-Bus name (started immediately, the new
+                        // instance would just relay to the dying
+                        // primary and exit).
+                        if let Ok(exe) = std::env::current_exe() {
+                            let _ = std::process::Command::new("sh")
+                                .arg("-c")
+                                .arg(format!("sleep 1.5; exec '{}'", exe.display()))
+                                .spawn();
+                        }
+                        relm4::main_application().quit();
                     }
-                    Err(e) => {
-                        self.notice_error(i18n_f("Import failed: {e}", &[("e", &(e).to_string())]));
-                    }
-                }
+                });
+                alert.present();
             }
-            _ => unreachable!("not routed to on_prefs_data"),
+            Err(e) => {
+                self.notice_error(i18n_f("Import failed: {e}", &[("e", &(e).to_string())]));
+            }
         }
     }
 }

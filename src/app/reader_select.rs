@@ -65,81 +65,7 @@ impl AppModel {
                 solo,
             } => self.on_message_selected(m, thread, solo, sender),
 
-            AppMsg::ThreadGrew { message: m, thread } => {
-                // Only for the conversation on screen: the reader's primary
-                // is that head. A reply of the user's own filed in Sent is
-                // not in the folder's list and stays as the related lookup
-                // left it — kept below.
-                let key = (m.account_id, m.id);
-                if self.current.as_ref().map(|c| (c.account_id, c.id)) != Some(key) {
-                    return;
-                }
-                let existing = std::mem::take(&mut self.current_thread);
-                let mut conv: Vec<Message> = existing.clone();
-                for tm in &thread {
-                    let k = (tm.account_id, tm.id);
-                    if !self.listed_thread.contains(&k) {
-                        self.listed_thread.push(k);
-                    }
-                    if conv.iter().any(|e| (e.account_id, e.id) == k) {
-                        continue;
-                    }
-                    let mut tm = tm.clone();
-                    if k == key {
-                        tm.unread = false;
-                        if let Some(c) = self.current.as_ref().filter(|c| !c.body.is_empty()) {
-                            tm.body = c.body.clone();
-                        }
-                    } else if tm.body.is_empty() {
-                        if let Some(b) = self.body_cache.get(&body_key(&tm)) {
-                            tm.body = b.clone();
-                        }
-                    }
-                    conv.push(tm);
-                }
-                // Chronological, as a conversation is stored (display order
-                // is show_thread's business).
-                conv.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.uid.cmp(&b.uid)));
-                tracing::info!(
-                    "conversation on screen grew: {} -> {} messages",
-                    existing.len(),
-                    conv.len()
-                );
-                self.current_thread = conv;
-                self.thread_key = Some(body_key(&m));
-                // The conversation is already painted: the new card joins it
-                // in place. Its body, when not prefetched, is asked for and
-                // the render follows its arrival (the Body handler repaints a
-                // conversation as bodies land) rather than showing an empty
-                // card first.
-                self.thread_painted = true;
-                self.thread_related_pending = false;
-                self.remember_thread();
-                // What is on screen stays where it is: the render keeps the
-                // reader's place through its saved anchor, and when none is
-                // recorded yet (no scroll since the conversation opened) the
-                // card that was at the top of the pane is pinned there — so
-                // with newest first, the new card slots in above it unseen,
-                // and is marked read only once the user scrolls up to it.
-                let top = if self.thread_newest_first {
-                    existing.iter().max_by_key(|tm| tm.timestamp)
-                } else {
-                    existing.first()
-                }
-                .map(|tm| (tm.account_id, tm.id))
-                .or_else(|| self.current.as_ref().map(|c| (c.account_id, c.id)));
-                if let Some((account_id, id)) = top {
-                    self.message_view
-                        .emit(MessageViewInput::HoldPlace { account_id, id });
-                }
-                let to_load = self.missing_thread_bodies(None);
-                if to_load.is_empty() {
-                    self.show_thread();
-                } else {
-                    self.request_bodies(to_load);
-                }
-                self.load_thread_attachments();
-            }
+            AppMsg::ThreadGrew { message: m, thread } => self.on_thread_grew(m, thread),
 
             AppMsg::Related {
                 account_id,
@@ -285,56 +211,7 @@ impl AppModel {
             }
 
             AppMsg::ThreadMessageSeen { account_id, id } => {
-                // Reading one message of a conversation marks only that message,
-                // exactly as opening it on its own would.
-                let target = self
-                    .current_thread
-                    .iter_mut()
-                    .find(|m| m.account_id == account_id && m.id == id)
-                    .filter(|m| m.unread)
-                    .map(|m| {
-                        m.unread = false;
-                        (m.uid, m.folder_id)
-                    });
-                let Some((uid, folder_id)) = target else {
-                    return;
-                };
-                if let Some(c) = self
-                    .current
-                    .as_mut()
-                    .filter(|c| (c.account_id, c.id) == (account_id, id))
-                {
-                    c.unread = false;
-                }
-                if let Some(path) = self.folder_path(account_id, folder_id) {
-                    self.pending_seen.insert(
-                        (account_id, path.clone(), uid),
-                        (true, std::time::Instant::now()),
-                    );
-                    self.send_to(
-                        account_id,
-                        MailRequest::SetSeen {
-                            path,
-                            uid,
-                            seen: true,
-                        },
-                    );
-                }
-                // Reading the new mail inside its conversation answers the
-                // notification as opening it on its own does (#333).
-                crate::notify::withdraw_mail(account_id);
-                self.message_list
-                    .emit(MessageListInput::MarkRead((account_id, folder_id, id)));
-                self.mark_cached_read(account_id, folder_id, id);
-                // The card's dot clears in place as the viewport observer
-                // marks it (#100) — this path never told the view before.
-                self.message_view
-                    .emit(MessageViewInput::ClearDot { account_id, id });
-                if let Some(n) = self.folder_unread.get_mut(&(account_id, folder_id)) {
-                    *n = n.saturating_sub(1);
-                }
-                self.remember_thread();
-                self.push_unread_counts();
+                self.on_thread_message_seen(account_id, id)
             }
 
             AppMsg::RenderThread => {
@@ -361,7 +238,141 @@ impl AppModel {
         }
     }
 
-    /// AppMsg::MessageSelected.
+    /// The open conversation gained a member (a reply synced in while it
+    /// was on screen): show it in place, without a re-selection.
+    fn on_thread_grew(&mut self, m: Box<Message>, thread: Vec<Message>) {
+        // Only for the conversation on screen: the reader's primary
+        // is that head. A reply of the user's own filed in Sent is
+        // not in the folder's list and stays as the related lookup
+        // left it — kept below.
+        let key = (m.account_id, m.id);
+        if self.current.as_ref().map(|c| (c.account_id, c.id)) != Some(key) {
+            return;
+        }
+        let existing = std::mem::take(&mut self.current_thread);
+        let mut conv: Vec<Message> = existing.clone();
+        for tm in &thread {
+            let k = (tm.account_id, tm.id);
+            if !self.listed_thread.contains(&k) {
+                self.listed_thread.push(k);
+            }
+            if conv.iter().any(|e| (e.account_id, e.id) == k) {
+                continue;
+            }
+            let mut tm = tm.clone();
+            if k == key {
+                tm.unread = false;
+                if let Some(c) = self.current.as_ref().filter(|c| !c.body.is_empty()) {
+                    tm.body = c.body.clone();
+                }
+            } else if tm.body.is_empty() {
+                if let Some(b) = self.body_cache.get(&body_key(&tm)) {
+                    tm.body = b.clone();
+                }
+            }
+            conv.push(tm);
+        }
+        // Chronological, as a conversation is stored (display order
+        // is show_thread's business).
+        conv.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.uid.cmp(&b.uid)));
+        tracing::info!(
+            "conversation on screen grew: {} -> {} messages",
+            existing.len(),
+            conv.len()
+        );
+        self.current_thread = conv;
+        self.thread_key = Some(body_key(&m));
+        // The conversation is already painted: the new card joins it
+        // in place. Its body, when not prefetched, is asked for and
+        // the render follows its arrival (the Body handler repaints a
+        // conversation as bodies land) rather than showing an empty
+        // card first.
+        self.thread_painted = true;
+        self.thread_related_pending = false;
+        self.remember_thread();
+        // What is on screen stays where it is: the render keeps the
+        // reader's place through its saved anchor, and when none is
+        // recorded yet (no scroll since the conversation opened) the
+        // card that was at the top of the pane is pinned there — so
+        // with newest first, the new card slots in above it unseen,
+        // and is marked read only once the user scrolls up to it.
+        let top = if self.thread_newest_first {
+            existing.iter().max_by_key(|tm| tm.timestamp)
+        } else {
+            existing.first()
+        }
+        .map(|tm| (tm.account_id, tm.id))
+        .or_else(|| self.current.as_ref().map(|c| (c.account_id, c.id)));
+        if let Some((account_id, id)) = top {
+            self.message_view
+                .emit(MessageViewInput::HoldPlace { account_id, id });
+        }
+        let to_load = self.missing_thread_bodies(None);
+        if to_load.is_empty() {
+            self.show_thread();
+        } else {
+            self.request_bodies(to_load);
+        }
+        self.load_thread_attachments();
+    }
+
+    /// A conversation message was scrolled all the way through — mark it read on
+    /// the server, in the caches and in the list.
+    fn on_thread_message_seen(&mut self, account_id: u32, id: u32) {
+        // Reading one message of a conversation marks only that message,
+        // exactly as opening it on its own would.
+        let target = self
+            .current_thread
+            .iter_mut()
+            .find(|m| m.account_id == account_id && m.id == id)
+            .filter(|m| m.unread)
+            .map(|m| {
+                m.unread = false;
+                (m.uid, m.folder_id)
+            });
+        let Some((uid, folder_id)) = target else {
+            return;
+        };
+        if let Some(c) = self
+            .current
+            .as_mut()
+            .filter(|c| (c.account_id, c.id) == (account_id, id))
+        {
+            c.unread = false;
+        }
+        if let Some(path) = self.folder_path(account_id, folder_id) {
+            self.pending_seen.insert(
+                (account_id, path.clone(), uid),
+                (true, std::time::Instant::now()),
+            );
+            self.send_to(
+                account_id,
+                MailRequest::SetSeen {
+                    path,
+                    uid,
+                    seen: true,
+                },
+            );
+        }
+        // Reading the new mail inside its conversation answers the
+        // notification as opening it on its own does (#333).
+        crate::notify::withdraw_mail(account_id);
+        self.message_list
+            .emit(MessageListInput::MarkRead((account_id, folder_id, id)));
+        self.mark_cached_read(account_id, folder_id, id);
+        // The card's dot clears in place as the viewport observer
+        // marks it (#100) — this path never told the view before.
+        self.message_view
+            .emit(MessageViewInput::ClearDot { account_id, id });
+        if let Some(n) = self.folder_unread.get_mut(&(account_id, folder_id)) {
+            *n = n.saturating_sub(1);
+        }
+        self.remember_thread();
+        self.push_unread_counts();
+    }
+
+    /// `solo` marks a reply the user picked out of a conversation on screen:
+    /// show that message alone and don't go looking for its siblings.
     fn on_message_selected(
         &mut self,
         m: Message,

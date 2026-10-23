@@ -450,59 +450,7 @@ impl AppModel {
 
             AppMsg::PrebuildNext => self.prebuild_next(&sender),
 
-            AppMsg::UnifiedFoldersLoaded { lists } => {
-                let open = self.unified;
-                let mut landed = false;
-                for ((account_id, folder_id), messages) in lists {
-                    // The worker's own answer may have come first. An empty
-                    // folder is recorded as read too: building a unified row
-                    // ahead waits on all of its folders.
-                    if self
-                        .message_cache
-                        .get(&(account_id, folder_id))
-                        .is_some_and(|c| !c.is_empty())
-                    {
-                        continue;
-                    }
-                    if messages.is_empty() {
-                        self.message_cache
-                            .entry((account_id, folder_id))
-                            .or_default();
-                        continue;
-                    }
-                    let messages = self.overlay_local_state(account_id, folder_id, messages);
-                    if open && self.is_unified_target(account_id, folder_id) {
-                        if self.unified_reads_through() {
-                            self.unified_slices.remove(&(account_id, folder_id));
-                            self.unified_unfilled.insert((account_id, folder_id));
-                        } else {
-                            self.unified_unfilled.remove(&(account_id, folder_id));
-                            self.unified_slices
-                                .insert((account_id, folder_id), messages.clone());
-                        }
-                        landed = true;
-                    } else if !open
-                        && self
-                            .selected
-                            .as_ref()
-                            .is_some_and(|s| (s.account_id, s.folder_id) == (account_id, folder_id))
-                    {
-                        // The folder on show had only its newest so far.
-                        self.message_list.emit(MessageListInput::SetMessages {
-                            messages: messages.clone(),
-                        });
-                    }
-                    self.message_cache
-                        .insert((account_id, folder_id), messages.into());
-                }
-                // A view left before its folders landed.
-                self.shed_large_folders();
-                if landed {
-                    self.emit_unified();
-                    self.push_index_complete();
-                }
-                self.schedule_prebuild(&sender);
-            }
+            AppMsg::UnifiedFoldersLoaded { lists } => self.on_unified_folders_loaded(lists, sender),
 
             AppMsg::PushUnreadCounts => self.push_unread_counts(),
 
@@ -524,6 +472,66 @@ impl AppModel {
             }
             _ => unreachable!("not routed to on_unified"),
         }
+    }
+
+    /// Folders not in memory yet, read whole from the index off the main
+    /// thread: for the unified view being opened, or ahead of it (`Preload`).
+    fn on_unified_folders_loaded(
+        &mut self,
+        lists: Vec<((u32, u32), Vec<Message>)>,
+        sender: ComponentSender<Self>,
+    ) {
+        let open = self.unified;
+        let mut landed = false;
+        for ((account_id, folder_id), messages) in lists {
+            // The worker's own answer may have come first. An empty
+            // folder is recorded as read too: building a unified row
+            // ahead waits on all of its folders.
+            if self
+                .message_cache
+                .get(&(account_id, folder_id))
+                .is_some_and(|c| !c.is_empty())
+            {
+                continue;
+            }
+            if messages.is_empty() {
+                self.message_cache
+                    .entry((account_id, folder_id))
+                    .or_default();
+                continue;
+            }
+            let messages = self.overlay_local_state(account_id, folder_id, messages);
+            if open && self.is_unified_target(account_id, folder_id) {
+                if self.unified_reads_through() {
+                    self.unified_slices.remove(&(account_id, folder_id));
+                    self.unified_unfilled.insert((account_id, folder_id));
+                } else {
+                    self.unified_unfilled.remove(&(account_id, folder_id));
+                    self.unified_slices
+                        .insert((account_id, folder_id), messages.clone());
+                }
+                landed = true;
+            } else if !open
+                && self
+                    .selected
+                    .as_ref()
+                    .is_some_and(|s| (s.account_id, s.folder_id) == (account_id, folder_id))
+            {
+                // The folder on show had only its newest so far.
+                self.message_list.emit(MessageListInput::SetMessages {
+                    messages: messages.clone(),
+                });
+            }
+            self.message_cache
+                .insert((account_id, folder_id), messages.into());
+        }
+        // A view left before its folders landed.
+        self.shed_large_folders();
+        if landed {
+            self.emit_unified();
+            self.push_index_complete();
+        }
+        self.schedule_prebuild(&sender);
     }
 }
 
