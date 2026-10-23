@@ -369,6 +369,14 @@ msgstr "Aucun dossier Brouillons disponible pour ce compte"
 msgid "No Templates folder available for this account"
 msgstr "Aucun dossier Modèles disponible pour ce compte"
 
+msgid ""
+"The forward of filter {rule} was refused. The message was left where it is "
+"and will be tried again"
+msgstr ""
+
+msgid "The forward of filter {rule} is waiting in the Outbox"
+msgstr ""
+
 msgid "No filters to apply here yet"
 msgstr "Aucun filtre à appliquer ici pour l’instant"
 
@@ -401,6 +409,23 @@ msgstr[1] "Classé {n} messages"
 msgid "Folder {done} of {total}"
 msgstr "Dossier {done} sur {total}"
 
+msgid "started {n} forward"
+msgid_plural "started {n} forwards"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "marked {n} message as read"
+msgid_plural "marked {n} messages as read"
+msgstr[0] "Classé {n} message"
+msgstr[1] "Classé {n} messages"
+
+#, fuzzy
+msgid "deleted {n} message"
+msgid_plural "deleted {n} messages"
+msgstr[0] "Supprimer {n} messages"
+msgstr[1] "Supprimer {n} messages"
+
 msgid "Filters looked at {n} message, and it matched nothing"
 msgid_plural "Filters looked at {n} messages, and none of them matched"
 msgstr[0] ""
@@ -411,6 +436,12 @@ msgstr[1] ""
 #. Matches that needed nothing: the rules had already done their
 #. work on an earlier sync (#201). Saying "none matched" here
 #. made working rules look broken.
+#, fuzzy
+msgid "Filters looked at {n} message"
+msgid_plural "Filters looked at {n} messages"
+msgstr[0] "Les filtres ont marqué {tagged} sur {n} message"
+msgstr[1] "Les filtres ont marqué {tagged} sur {n} messages"
+
 msgid ""
 "Filters matched {matched} of {n} message, and it was already tagged or filed"
 msgid_plural ""
@@ -1886,6 +1917,44 @@ msgstr ""
 msgid "Enable this account"
 msgstr "Activer ce compte"
 
+#, fuzzy
+msgid "Forward to"
+msgstr "Transférer"
+
+msgid "Move to"
+msgstr "Déplacer vers"
+
+msgid "forwards to {to}"
+msgstr ""
+
+#, fuzzy
+msgid "marked as read"
+msgstr "Marquer comme lu"
+
+msgid "deleted for good"
+msgstr ""
+
+msgid "Then"
+msgstr "Alors"
+
+#, fuzzy
+msgid "Add Action"
+msgstr "Ajouter un compte"
+
+#, fuzzy
+msgid "Remove action"
+msgstr "Supprimer la condition"
+
+msgid "Addresses, separated by commas"
+msgstr ""
+
+msgid "Folder"
+msgstr "Dossier"
+
+#, fuzzy
+msgid "Permanently deletes the message"
+msgstr "Traduire ce message"
+
 msgid "Show"
 msgstr "Afficher"
 
@@ -2109,21 +2178,6 @@ msgstr "Adresse d’expéditeur utilisée en l’absence de Reply-To"
 msgid "Looks in the system address books and the Hylki book"
 msgstr ""
 "Recherche dans les carnets d’adresses du système et dans le carnet Hylki"
-
-msgid "Then"
-msgstr "Alors"
-
-msgid "Move to"
-msgstr "Déplacer vers"
-
-msgid "Leave in Inbox to only tag matching mail"
-msgstr ""
-"Laisser dans la boîte de réception pour seulement ajouter le tag aux "
-"messages correspondants"
-
-#. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
-msgid "Leave in Inbox"
-msgstr "Laisser dans la boîte de réception"
 
 msgid "Tag with"
 msgstr "Ajouter le tag"
@@ -5997,9 +6051,6 @@ msgstr "Nouveau message à partir d’un modèle…"
 msgid "Favorites"
 msgstr "Favoris"
 
-msgid "Folder"
-msgstr "Dossier"
-
 msgid "Show each inbox"
 msgstr "Afficher chaque boîte de réception"
 
@@ -7553,6 +7604,14 @@ msgstr "La boîte de réception unifiée en mode clair"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Leave in Inbox to only tag matching mail"
+#~ msgstr ""
+#~ "Laisser dans la boîte de réception pour seulement ajouter le tag aux "
+#~ "messages correspondants"
+
+#~ msgid "Leave in Inbox"
+#~ msgstr "Laisser dans la boîte de réception"
+
 #~ msgid ""
 #~ "Which browser a link in a message opens in. Inside its Flatpak sandbox "
 #~ "Hylki cannot see the applications installed on the system, so links leave "
@@ -8912,9 +8971,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Show or hide filters"
 #~ msgstr "Afficher ou masquer les filtres"
-
-#~ msgid "Add Account"
-#~ msgstr "Ajouter un compte"
 
 #~ msgid "LDAP Directories"
 #~ msgstr "Annuaires LDAP"

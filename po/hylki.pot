@@ -344,6 +344,14 @@ msgstr ""
 msgid "No Templates folder available for this account"
 msgstr ""
 
+msgid ""
+"The forward of filter {rule} was refused. The message was left where it is "
+"and will be tried again"
+msgstr ""
+
+msgid "The forward of filter {rule} is waiting in the Outbox"
+msgstr ""
+
 msgid "No filters to apply here yet"
 msgstr ""
 
@@ -376,6 +384,21 @@ msgstr[1] ""
 msgid "Folder {done} of {total}"
 msgstr ""
 
+msgid "started {n} forward"
+msgid_plural "started {n} forwards"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "marked {n} message as read"
+msgid_plural "marked {n} messages as read"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "deleted {n} message"
+msgid_plural "deleted {n} messages"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Filters looked at {n} message, and it matched nothing"
 msgid_plural "Filters looked at {n} messages, and none of them matched"
 msgstr[0] ""
@@ -384,6 +407,11 @@ msgstr[1] ""
 #. Matches that needed nothing: the rules had already done their
 #. work on an earlier sync (#201). Saying "none matched" here
 #. made working rules look broken.
+msgid "Filters looked at {n} message"
+msgid_plural "Filters looked at {n} messages"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid ""
 "Filters matched {matched} of {n} message, and it was already tagged or filed"
 msgid_plural ""
@@ -1750,6 +1778,39 @@ msgstr ""
 msgid "Enable this account"
 msgstr ""
 
+msgid "Forward to"
+msgstr ""
+
+msgid "Move to"
+msgstr ""
+
+msgid "forwards to {to}"
+msgstr ""
+
+msgid "marked as read"
+msgstr ""
+
+msgid "deleted for good"
+msgstr ""
+
+msgid "Then"
+msgstr ""
+
+msgid "Add Action"
+msgstr ""
+
+msgid "Remove action"
+msgstr ""
+
+msgid "Addresses, separated by commas"
+msgstr ""
+
+msgid "Folder"
+msgstr ""
+
+msgid "Permanently deletes the message"
+msgstr ""
+
 msgid "Show"
 msgstr ""
 
@@ -1955,19 +2016,6 @@ msgid "From address when no Reply-To is set"
 msgstr ""
 
 msgid "Looks in the system address books and the Hylki book"
-msgstr ""
-
-msgid "Then"
-msgstr ""
-
-msgid "Move to"
-msgstr ""
-
-msgid "Leave in Inbox to only tag matching mail"
-msgstr ""
-
-#. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
-msgid "Leave in Inbox"
 msgstr ""
 
 msgid "Tag with"
@@ -5474,9 +5522,6 @@ msgid "New Message from Template…"
 msgstr ""
 
 msgid "Favorites"
-msgstr ""
-
-msgid "Folder"
 msgstr ""
 
 msgid "Show each inbox"

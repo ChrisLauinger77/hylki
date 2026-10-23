@@ -54,6 +54,8 @@ mod drafts;
 mod events_bodies;
 mod events_folders;
 mod events_messages;
+mod filter_actions;
+mod filter_forward;
 mod filter_run;
 mod filters;
 mod flags;

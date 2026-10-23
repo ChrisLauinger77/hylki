@@ -382,6 +382,14 @@ msgstr "Для этой учётной записи недоступна пап�
 msgid "No Templates folder available for this account"
 msgstr "Для этой учётной записи недоступна папка «Шаблоны»"
 
+msgid ""
+"The forward of filter {rule} was refused. The message was left where it is "
+"and will be tried again"
+msgstr ""
+
+msgid "The forward of filter {rule} is waiting in the Outbox"
+msgstr ""
+
 msgid "No filters to apply here yet"
 msgstr "Здесь пока нет фильтров для применения"
 
@@ -418,6 +426,26 @@ msgstr[2] "Перемещено {n} писем"
 msgid "Folder {done} of {total}"
 msgstr "Папка {done} из {total}"
 
+msgid "started {n} forward"
+msgid_plural "started {n} forwards"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#, fuzzy
+msgid "marked {n} message as read"
+msgid_plural "marked {n} messages as read"
+msgstr[0] "Перемещено {n} письмо"
+msgstr[1] "Перемещено {n} письма"
+msgstr[2] "Перемещено {n} писем"
+
+#, fuzzy
+msgid "deleted {n} message"
+msgid_plural "deleted {n} messages"
+msgstr[0] "Удалить {n} сообщений"
+msgstr[1] "Удалить {n} сообщений"
+msgstr[2] "Удалить {n} сообщений"
+
 msgid "Filters looked at {n} message, and it matched nothing"
 msgid_plural "Filters looked at {n} messages, and none of them matched"
 msgstr[0] "Фильтры проверили {n} письмо, и совпадений не найдено"
@@ -427,6 +455,13 @@ msgstr[2] "Фильтры проверили {n} писем, и совпаден
 #. Matches that needed nothing: the rules had already done their
 #. work on an earlier sync (#201). Saying "none matched" here
 #. made working rules look broken.
+#, fuzzy
+msgid "Filters looked at {n} message"
+msgid_plural "Filters looked at {n} messages"
+msgstr[0] "Фильтры добавили метку к {tagged} из {n} письма"
+msgstr[1] "Фильтры добавили метки к {tagged} из {n} писем"
+msgstr[2] "Фильтры добавили метки к {tagged} из {n} писем"
+
 msgid ""
 "Filters matched {matched} of {n} message, and it was already tagged or filed"
 msgid_plural ""
@@ -1966,6 +2001,44 @@ msgstr ""
 msgid "Enable this account"
 msgstr "Включить эту учётную запись"
 
+#, fuzzy
+msgid "Forward to"
+msgstr "Переслать"
+
+msgid "Move to"
+msgstr "Переместить в"
+
+msgid "forwards to {to}"
+msgstr ""
+
+#, fuzzy
+msgid "marked as read"
+msgstr "Отметить как прочитанное"
+
+msgid "deleted for good"
+msgstr ""
+
+msgid "Then"
+msgstr "Затем"
+
+#, fuzzy
+msgid "Add Action"
+msgstr "Добавить учётную запись"
+
+#, fuzzy
+msgid "Remove action"
+msgstr "Удалить условие"
+
+msgid "Addresses, separated by commas"
+msgstr ""
+
+msgid "Folder"
+msgstr "Папка"
+
+#, fuzzy
+msgid "Permanently deletes the message"
+msgstr "Перевести это сообщение"
+
 msgid "Show"
 msgstr "Показать"
 
@@ -2187,20 +2260,6 @@ msgstr "Адрес отправителя, если не указан адрес
 
 msgid "Looks in the system address books and the Hylki book"
 msgstr ""
-
-msgid "Then"
-msgstr "Затем"
-
-msgid "Move to"
-msgstr "Переместить в"
-
-msgid "Leave in Inbox to only tag matching mail"
-msgstr ""
-"Оставить во «Входящих», чтобы только размечать подходящие письма тегами"
-
-#. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
-msgid "Leave in Inbox"
-msgstr "Оставить во «Входящих»"
 
 msgid "Tag with"
 msgstr "Присвоить тег"
@@ -6102,9 +6161,6 @@ msgstr "Новое сообщение из шаблона…"
 msgid "Favorites"
 msgstr "Избранное"
 
-msgid "Folder"
-msgstr "Папка"
-
 msgid "Show each inbox"
 msgstr "Показывать каждую папку «Входящие»"
 
@@ -7657,6 +7713,13 @@ msgstr "Общие входящие в светлом режиме"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Leave in Inbox to only tag matching mail"
+#~ msgstr ""
+#~ "Оставить во «Входящих», чтобы только размечать подходящие письма тегами"
+
+#~ msgid "Leave in Inbox"
+#~ msgstr "Оставить во «Входящих»"
+
 #~ msgid ""
 #~ "Which browser a link in a message opens in. Inside its Flatpak sandbox "
 #~ "Hylki cannot see the applications installed on the system, so links leave "
@@ -8855,9 +8918,6 @@ msgstr "Hyprlab"
 #, fuzzy
 #~ msgid "Edit Account"
 #~ msgstr "Редактировать облачную учётную запись"
-
-#~ msgid "Add Account"
-#~ msgstr "Добавить учётную запись"
 
 #, fuzzy
 #~ msgid "Use this account's address books"

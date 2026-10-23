@@ -368,6 +368,14 @@ msgstr "No hi ha cap carpeta d'esborranys disponible per a aquest compte"
 msgid "No Templates folder available for this account"
 msgstr "No hi ha cap carpeta de plantilles disponible per a aquest compte"
 
+msgid ""
+"The forward of filter {rule} was refused. The message was left where it is "
+"and will be tried again"
+msgstr ""
+
+msgid "The forward of filter {rule} is waiting in the Outbox"
+msgstr ""
+
 msgid "No filters to apply here yet"
 msgstr "Encara no hi ha filtres per aplicar aquí"
 
@@ -400,6 +408,23 @@ msgstr[1] "S'han arxivat {n} missatges"
 msgid "Folder {done} of {total}"
 msgstr "Carpeta {done} de {total}"
 
+msgid "started {n} forward"
+msgid_plural "started {n} forwards"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "marked {n} message as read"
+msgid_plural "marked {n} messages as read"
+msgstr[0] "S'ha arxivat {n} missatge"
+msgstr[1] "S'han arxivat {n} missatges"
+
+#, fuzzy
+msgid "deleted {n} message"
+msgid_plural "deleted {n} messages"
+msgstr[0] "Suprimeix {n} missatges"
+msgstr[1] "Suprimeix {n} missatges"
+
 msgid "Filters looked at {n} message, and it matched nothing"
 msgid_plural "Filters looked at {n} messages, and none of them matched"
 msgstr[0] "Els filtres han revisat {n} missatge i no n'ha coincidit cap"
@@ -408,6 +433,12 @@ msgstr[1] "Els filtres han revisat {n} missatges i no n'ha coincidit cap"
 #. Matches that needed nothing: the rules had already done their
 #. work on an earlier sync (#201). Saying "none matched" here
 #. made working rules look broken.
+#, fuzzy
+msgid "Filters looked at {n} message"
+msgid_plural "Filters looked at {n} messages"
+msgstr[0] "Els filtres han etiquetat {tagged} d'{n} missatge"
+msgstr[1] "Els filtres han etiquetat {tagged} de {n} missatges"
+
 msgid ""
 "Filters matched {matched} of {n} message, and it was already tagged or filed"
 msgid_plural ""
@@ -1866,6 +1897,44 @@ msgstr ""
 msgid "Enable this account"
 msgstr "Activa aquest compte"
 
+#, fuzzy
+msgid "Forward to"
+msgstr "Reenvia"
+
+msgid "Move to"
+msgstr "Mou a"
+
+msgid "forwards to {to}"
+msgstr ""
+
+#, fuzzy
+msgid "marked as read"
+msgstr "Marca com a llegit"
+
+msgid "deleted for good"
+msgstr ""
+
+msgid "Then"
+msgstr "Llavors"
+
+#, fuzzy
+msgid "Add Action"
+msgstr "Acció"
+
+#, fuzzy
+msgid "Remove action"
+msgstr "Elimina la condició"
+
+msgid "Addresses, separated by commas"
+msgstr ""
+
+msgid "Folder"
+msgstr "Carpeta"
+
+#, fuzzy
+msgid "Permanently deletes the message"
+msgstr "Tradueix aquest missatge"
+
 msgid "Show"
 msgstr "Mostra"
 
@@ -2080,20 +2149,6 @@ msgstr "Adreça del remitent quan no s'ha definit cap Reply-To"
 
 msgid "Looks in the system address books and the Hylki book"
 msgstr "Cerca a les llibretes d'adreces del sistema i a la llibreta de l'Hylki"
-
-msgid "Then"
-msgstr "Llavors"
-
-msgid "Move to"
-msgstr "Mou a"
-
-msgid "Leave in Inbox to only tag matching mail"
-msgstr ""
-"Deixa-ho a la bústia d'entrada per només etiquetar el correu que coincideixi"
-
-#. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
-msgid "Leave in Inbox"
-msgstr "Deixa-ho a la bústia d'entrada"
 
 msgid "Tag with"
 msgstr "Etiqueta amb"
@@ -5854,9 +5909,6 @@ msgstr "Missatge nou a partir d'una plantilla…"
 msgid "Favorites"
 msgstr "Preferits"
 
-msgid "Folder"
-msgstr "Carpeta"
-
 msgid "Show each inbox"
 msgstr "Mostra cada bústia d'entrada"
 
@@ -7358,3 +7410,11 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Leave in Inbox to only tag matching mail"
+#~ msgstr ""
+#~ "Deixa-ho a la bústia d'entrada per només etiquetar el correu que "
+#~ "coincideixi"
+
+#~ msgid "Leave in Inbox"
+#~ msgstr "Deixa-ho a la bústia d'entrada"

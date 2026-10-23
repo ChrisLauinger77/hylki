@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Added: filters can forward, mark as read and delete** (#521, by Fabio
+  Rotondo). The "Then" part of a filter is a list of actions built row by
+  row: Forward to, Mark as Read, Move to and Delete. A forward is the
+  manual Forward's message, sent once per message, and only for mail of the
+  last 30 days that arrived after the Forward was added; older mail is left
+  alone by every action of that rule. Nothing else the rule does happens
+  until the forward has gone: a refused forward is tried again on the next
+  sync, and one waiting in the Outbox holds the original until it is sent.
+  Encrypted mail is never forwarded. Delete erases the message from the
+  server without going through Trash, and cannot be combined with Move.
+
 - **Added: a message in a conversation can be dragged to a folder.** A drag
   from its header, or from its folded card, carries it to a folder in the
   sidebar as a drag of its row in the list does, with the same card under

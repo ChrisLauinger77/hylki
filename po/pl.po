@@ -381,6 +381,14 @@ msgstr "To konto nie ma katalogu szkiców"
 msgid "No Templates folder available for this account"
 msgstr "To konto nie ma katalogu szkiców"
 
+msgid ""
+"The forward of filter {rule} was refused. The message was left where it is "
+"and will be tried again"
+msgstr ""
+
+msgid "The forward of filter {rule} is waiting in the Outbox"
+msgstr ""
+
 msgid "No filters to apply here yet"
 msgstr "Nie ma jeszcze filtrów do zastosowania"
 
@@ -417,6 +425,26 @@ msgstr[2] "Przeniesiono {n} wiadomości"
 msgid "Folder {done} of {total}"
 msgstr "Katalog {done} z {total}"
 
+msgid "started {n} forward"
+msgid_plural "started {n} forwards"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#, fuzzy
+msgid "marked {n} message as read"
+msgid_plural "marked {n} messages as read"
+msgstr[0] "Przeniesiono {n} wiadomość"
+msgstr[1] "Przeniesiono {n} wiadomości"
+msgstr[2] "Przeniesiono {n} wiadomości"
+
+#, fuzzy
+msgid "deleted {n} message"
+msgid_plural "deleted {n} messages"
+msgstr[0] "Usuń wiadomości ({n})"
+msgstr[1] "Usuń wiadomości ({n})"
+msgstr[2] "Usuń wiadomości ({n})"
+
 msgid "Filters looked at {n} message, and it matched nothing"
 msgid_plural "Filters looked at {n} messages, and none of them matched"
 msgstr[0] "Filtry sprawdziły {n} wiadomość, ale nie pasowała do żadnego z nich"
@@ -426,6 +454,13 @@ msgstr[2] "Filtry sprawdziły {n} wiadomości, ale żadna do nich nie pasowała"
 #. Matches that needed nothing: the rules had already done their
 #. work on an earlier sync (#201). Saying "none matched" here
 #. made working rules look broken.
+#, fuzzy
+msgid "Filters looked at {n} message"
+msgid_plural "Filters looked at {n} messages"
+msgstr[0] "Filtry oznaczyły etykietą {tagged} z {n} wiadomości"
+msgstr[1] "Filtry oznaczyły etykietą {tagged} z {n} wiadomości"
+msgstr[2] "Filtry oznaczyły etykietą {tagged} z {n} wiadomości"
+
 msgid ""
 "Filters matched {matched} of {n} message, and it was already tagged or filed"
 msgid_plural ""
@@ -1989,6 +2024,44 @@ msgstr ""
 msgid "Enable this account"
 msgstr "Włącz to konto"
 
+#, fuzzy
+msgid "Forward to"
+msgstr "Przekaż dalej"
+
+msgid "Move to"
+msgstr "Przenieś do"
+
+msgid "forwards to {to}"
+msgstr ""
+
+#, fuzzy
+msgid "marked as read"
+msgstr "Oznacz jako przeczytane"
+
+msgid "deleted for good"
+msgstr ""
+
+msgid "Then"
+msgstr "Wtedy"
+
+#, fuzzy
+msgid "Add Action"
+msgstr "Dodaj konto"
+
+#, fuzzy
+msgid "Remove action"
+msgstr "Usuń warunek"
+
+msgid "Addresses, separated by commas"
+msgstr ""
+
+msgid "Folder"
+msgstr "Katalog"
+
+#, fuzzy
+msgid "Permanently deletes the message"
+msgstr "Usuń tę wiadomość"
+
 msgid "Show"
 msgstr "Wyświetl"
 
@@ -2213,21 +2286,6 @@ msgstr "Adres nadawcy, jeśli nie ustawiono nagłówka Reply-To"
 
 msgid "Looks in the system address books and the Hylki book"
 msgstr ""
-
-msgid "Then"
-msgstr "Wtedy"
-
-msgid "Move to"
-msgstr "Przenieś do"
-
-msgid "Leave in Inbox to only tag matching mail"
-msgstr ""
-"Wybierz „Pozostaw w skrzynce odbiorczej”, aby tylko oznaczać pasującą pocztę "
-"etykietą"
-
-#. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
-msgid "Leave in Inbox"
-msgstr "Pozostaw w skrzynce odbiorczej"
 
 msgid "Tag with"
 msgstr "Oznacz etykietą"
@@ -6179,9 +6237,6 @@ msgstr ""
 msgid "Favorites"
 msgstr ""
 
-msgid "Folder"
-msgstr "Katalog"
-
 msgid "Show each inbox"
 msgstr "Wyświetl poszczególne skrzynki odbiorcze"
 
@@ -7744,6 +7799,14 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Leave in Inbox to only tag matching mail"
+#~ msgstr ""
+#~ "Wybierz „Pozostaw w skrzynce odbiorczej”, aby tylko oznaczać pasującą "
+#~ "pocztę etykietą"
+
+#~ msgid "Leave in Inbox"
+#~ msgstr "Pozostaw w skrzynce odbiorczej"
+
 #~ msgid ""
 #~ "Which browser a link in a message opens in. Inside its Flatpak sandbox "
 #~ "Hylki cannot see the applications installed on the system, so links leave "
@@ -8847,10 +8910,6 @@ msgstr "Hyprlab"
 #, fuzzy
 #~ msgid "Edit Account"
 #~ msgstr "Modyfikuj konto w chmurze"
-
-#, fuzzy
-#~ msgid "Add Account"
-#~ msgstr "Dodaj konto"
 
 #, fuzzy
 #~ msgid "Use this account's address books"

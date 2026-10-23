@@ -379,6 +379,14 @@ msgstr "Nessuna cartella Bozze disponibile per questo account"
 msgid "No Templates folder available for this account"
 msgstr "Nessuna cartella Modelli disponibile per questo account"
 
+msgid ""
+"The forward of filter {rule} was refused. The message was left where it is "
+"and will be tried again"
+msgstr ""
+
+msgid "The forward of filter {rule} is waiting in the Outbox"
+msgstr ""
+
 msgid "No filters to apply here yet"
 msgstr "Nessun filtro da applicare qui ancora"
 
@@ -411,6 +419,23 @@ msgstr[1] "Archiviati {n} messaggi"
 msgid "Folder {done} of {total}"
 msgstr "Cartella {done} di {total}"
 
+msgid "started {n} forward"
+msgid_plural "started {n} forwards"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "marked {n} message as read"
+msgid_plural "marked {n} messages as read"
+msgstr[0] "Archiviato {n} messaggio"
+msgstr[1] "Archiviati {n} messaggi"
+
+#, fuzzy
+msgid "deleted {n} message"
+msgid_plural "deleted {n} messages"
+msgstr[0] "Elimina {n} messaggi"
+msgstr[1] "Elimina {n} messaggi"
+
 msgid "Filters looked at {n} message, and it matched nothing"
 msgid_plural "Filters looked at {n} messages, and none of them matched"
 msgstr[0] ""
@@ -421,6 +446,12 @@ msgstr[1] ""
 #. Matches that needed nothing: the rules had already done their
 #. work on an earlier sync (#201). Saying "none matched" here
 #. made working rules look broken.
+#, fuzzy
+msgid "Filters looked at {n} message"
+msgid_plural "Filters looked at {n} messages"
+msgstr[0] "I filtri hanno etichettato {tagged} di {n} messaggio"
+msgstr[1] "I filtri hanno etichettato {tagged} di {n} messaggi"
+
 msgid ""
 "Filters matched {matched} of {n} message, and it was already tagged or filed"
 msgid_plural ""
@@ -1913,6 +1944,44 @@ msgstr ""
 msgid "Enable this account"
 msgstr "Abilita questo account"
 
+#, fuzzy
+msgid "Forward to"
+msgstr "Inoltra"
+
+msgid "Move to"
+msgstr "Sposta in"
+
+msgid "forwards to {to}"
+msgstr ""
+
+#, fuzzy
+msgid "marked as read"
+msgstr "Segna come letto"
+
+msgid "deleted for good"
+msgstr ""
+
+msgid "Then"
+msgstr "Allora"
+
+#, fuzzy
+msgid "Add Action"
+msgstr "Aggiungi account"
+
+#, fuzzy
+msgid "Remove action"
+msgstr "Rimuovi condizione"
+
+msgid "Addresses, separated by commas"
+msgstr ""
+
+msgid "Folder"
+msgstr "Cartella"
+
+#, fuzzy
+msgid "Permanently deletes the message"
+msgstr "Traduci questo messaggio"
+
 msgid "Show"
 msgstr "Mostra"
 
@@ -2135,20 +2204,6 @@ msgstr "Indirizzo mittente quando non è impostato Rispondi a"
 
 msgid "Looks in the system address books and the Hylki book"
 msgstr "Cerca nelle rubriche di sistema e nella rubrica Hylki"
-
-msgid "Then"
-msgstr "Allora"
-
-msgid "Move to"
-msgstr "Sposta in"
-
-msgid "Leave in Inbox to only tag matching mail"
-msgstr ""
-"Lascia nella Posta in arrivo per etichettare solo la posta corrispondente"
-
-#. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
-msgid "Leave in Inbox"
-msgstr "Lascia nella Posta in arrivo"
 
 msgid "Tag with"
 msgstr "Etichetta con"
@@ -6041,9 +6096,6 @@ msgstr "Nuovo messaggio da modello…"
 msgid "Favorites"
 msgstr "Preferiti"
 
-msgid "Folder"
-msgstr "Cartella"
-
 msgid "Show each inbox"
 msgstr "Mostra ogni posta in arrivo"
 
@@ -7595,6 +7647,13 @@ msgstr "La posta in arrivo unificata in modalità chiara"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Leave in Inbox to only tag matching mail"
+#~ msgstr ""
+#~ "Lascia nella Posta in arrivo per etichettare solo la posta corrispondente"
+
+#~ msgid "Leave in Inbox"
+#~ msgstr "Lascia nella Posta in arrivo"
+
 #~ msgid ""
 #~ "Which browser a link in a message opens in. Inside its Flatpak sandbox "
 #~ "Hylki cannot see the applications installed on the system, so links leave "
@@ -8867,10 +8926,6 @@ msgstr "Hyprlab"
 #, fuzzy
 #~ msgid "Edit Account"
 #~ msgstr "Modifica account cloud"
-
-#, fuzzy
-#~ msgid "Add Account"
-#~ msgstr "Aggiungi account"
 
 #, fuzzy
 #~ msgid "Use this account's address books"
