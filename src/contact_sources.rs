@@ -569,6 +569,23 @@ mod tests {
     use super::{book_used, group_of, THIS_COMPUTER};
     use std::collections::{HashMap, HashSet};
 
+    /// contacts.toml as written: the switched-off IDs, then the names.
+    #[test]
+    fn contacts_toml_format() {
+        let file = super::SwitchFile {
+            off: vec!["eds-local".into(), "goa1".into()],
+            names: [("book-1".to_string(), "Family".to_string())]
+                .into_iter()
+                .collect(),
+        };
+        assert_eq!(
+            toml::to_string_pretty(&file).unwrap(),
+            "off = [\n    \"eds-local\",\n    \"goa1\",\n]\n\n[names]\nbook-1 = \"Family\"\n"
+        );
+        let empty: super::SwitchFile = toml::from_str("").unwrap();
+        assert!(empty.off.is_empty() && empty.names.is_empty());
+    }
+
     fn sources() -> HashMap<String, String> {
         HashMap::from([
             (

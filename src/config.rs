@@ -10,6 +10,11 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+pub(crate) mod golden;
+#[cfg(test)]
+mod snapshot_tests;
+
 /// Write a config file that only its owner can read, without ever having
 /// existed as anything else.
 ///
@@ -4970,11 +4975,18 @@ pub fn load_drawer_state() -> DrawerState {
 /// The remembered summary-fetch mode for an account (#226), as
 /// (use ENVELOPE, preview items rejected). The default when nothing is known.
 pub fn load_fetch_mode(email: &str) -> (bool, bool) {
-    match load_state()
-        .fetch_modes
-        .get(&email.to_ascii_lowercase())
-        .map(String::as_str)
-    {
+    fetch_mode_from_name(
+        load_state()
+            .fetch_modes
+            .get(&email.to_ascii_lowercase())
+            .map(String::as_str),
+    )
+}
+
+/// A fetch mode as state.toml names it, read back; the default for no name
+/// or one this build does not know.
+fn fetch_mode_from_name(name: Option<&str>) -> (bool, bool) {
+    match name {
         Some("headers") => (false, false),
         Some("no-previews") => (true, true),
         Some("headers-no-previews") => (false, true),
@@ -4982,15 +4994,21 @@ pub fn load_fetch_mode(email: &str) -> (bool, bool) {
     }
 }
 
-/// Remember the summary-fetch mode that worked for an account (#226); the
-/// default is remembered by forgetting.
-pub fn save_fetch_mode(email: &str, use_envelope: bool, previews_rejected: bool) {
-    let mode = match (use_envelope, previews_rejected) {
+/// The name state.toml keeps a fetch mode under; `None` for the default,
+/// which is stored as no entry at all.
+fn fetch_mode_name(use_envelope: bool, previews_rejected: bool) -> Option<&'static str> {
+    match (use_envelope, previews_rejected) {
         (true, false) => None,
         (false, false) => Some("headers"),
         (true, true) => Some("no-previews"),
         (false, true) => Some("headers-no-previews"),
-    };
+    }
+}
+
+/// Remember the summary-fetch mode that worked for an account (#226); the
+/// default is remembered by forgetting.
+pub fn save_fetch_mode(email: &str, use_envelope: bool, previews_rejected: bool) {
+    let mode = fetch_mode_name(use_envelope, previews_rejected);
     let key = email.to_ascii_lowercase();
     let mut s = load_state();
     let current = s.fetch_modes.get(&key).map(String::as_str);
