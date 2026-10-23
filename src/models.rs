@@ -15,6 +15,8 @@ pub use outbox::*;
 pub use verdicts::*;
 
 #[cfg(test)]
+pub(crate) mod test_util;
+#[cfg(test)]
 mod tests;
 
 /// A configured mail account (one IMAP/SMTP identity).

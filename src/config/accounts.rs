@@ -763,4 +763,21 @@ mod tests {
             (0, 0, 0)
         );
     }
+
+    #[test]
+    fn identities_split_into_name_and_address() {
+        use super::split_identity;
+        assert_eq!(
+            split_identity("Ann Work <ann@work.example>"),
+            ("Ann Work".into(), "ann@work.example".into())
+        );
+        assert_eq!(
+            split_identity("ann@shop.example"),
+            (String::new(), "ann@shop.example".into())
+        );
+        assert_eq!(
+            split_identity("\"Quoted\" <q@x.example>"),
+            ("Quoted".into(), "q@x.example".into())
+        );
+    }
 }
