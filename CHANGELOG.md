@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.45.1 — 2026-10-22
+
+A folder with a backslash in its name opens, typing in the search field no
+longer holds up the window, Ctrl+, opens Settings and Ctrl+W closes every
+Hylki window. German and Catalan are complete.
+
+- **Translations:** German (PR #517 by Samuel Edlmeier) and Catalan (PR
+  #516 by jolupa) are complete.
 
 - **Fixed: a folder with a backslash in its name could not be opened**
   (#514, reported by 3v1n0). The server's escaping was kept in the name, so
