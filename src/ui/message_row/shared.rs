@@ -259,15 +259,6 @@ impl RowShared {
     }
 }
 
-/// How many cards a dragged selection draws at most; the count says the rest.
-pub(super) const DRAG_STACK: usize = 5;
-
-/// How far each card behind sits from the one in front, down and right.
-pub(super) const DRAG_STACK_STEP: i32 = 5;
-
-/// The width of every card in a dragged selection's stack.
-pub(super) const DRAG_CARD_WIDTH: i32 = 300;
-
 /// How many rows the view's spares hold at most. A long list keeps about
 /// two hundred rows made, far more than a window shows: GTK's list view
 /// fills rows well beyond the visible ones.

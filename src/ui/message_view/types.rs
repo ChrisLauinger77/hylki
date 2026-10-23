@@ -361,6 +361,9 @@ pub(crate) enum MessageViewInput {
     CloseFind,
     /// The find bar under the message, not above it (#392).
     SetFindBottom(bool),
+    /// A drag began on this card's header: carry it, or the selected cards
+    /// it is one of, to a folder.
+    DragCard((u32, u32)),
     FindChanged(String),
     FindNext,
     FindPrev,

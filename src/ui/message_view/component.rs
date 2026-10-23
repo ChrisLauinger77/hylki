@@ -639,6 +639,7 @@ impl Component for MessageView {
             MessageViewInput::OpenFind => self.on_open_find(&sender),
             MessageViewInput::CloseFind => self.on_close_find(),
             MessageViewInput::SetFindBottom(on) => self.on_set_find_bottom(on),
+            MessageViewInput::DragCard(key) => self.on_drag_card(key),
             MessageViewInput::FindChanged(text) => self.on_find_changed(text),
             MessageViewInput::FindNext => self.eval_find("hylkiFindStep(1)"),
             MessageViewInput::FindPrev => self.eval_find("hylkiFindStep(-1)"),

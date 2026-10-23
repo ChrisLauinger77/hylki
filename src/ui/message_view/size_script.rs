@@ -361,6 +361,18 @@ return JSON.stringify({key:(m&&m.dataset&&m.dataset.key)||'',sel:sel});};\
    frame, which never reports its own clicks, picks that card as a click\
    on the rest of the card does. A link or a text selection in the body\
    keeps the click to itself. mo is p (plain), t (Ctrl) or r (Shift). */\
+/* The card a press at widget point (x, y) can drag: one whose header, or\
+   folded bar, is under it, away from the buttons, links and chips there.\
+   Its key, or nothing. */\
+window.__hylkiDragAt=function(x,y,w){var r=window.innerWidth/w;x*=r;y*=r;\
+var el=document.elementFromPoint(x,y);if(!el||!el.closest)return '';\
+if(el.closest('button,a,input,.hylki-addr,.hylki-acts,.hylki-tags,.hylki-verify,.hylki-rcpt'))return '';\
+var h=el.closest('.hylki-msg-hdr,.hylki-fbar');if(!h)return '';\
+var m=h.closest('.hylki-msg');return (m&&m.dataset.key)||h.dataset.key||'';};\
+/* The reader drags a card by its header itself; WebKit's own drag of the\
+   avatar picture there would start first and carry only the picture. */\
+document.addEventListener('dragstart',function(e){var t=e.target;\
+if(t&&t.closest&&t.closest('.hylki-msg-hdr,.hylki-fbar'))e.preventDefault();},true);\
 window.__hylkiPickAt=function(x,y,w,mo){var r=window.innerWidth/w;x*=r;y*=r;\
 var f=document.elementFromPoint(x,y);\
 if(!f||f.tagName!=='IFRAME'||!f.classList.contains('hylki-frame'))return;\

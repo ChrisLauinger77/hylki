@@ -1441,7 +1441,14 @@ Message List → Preview lines** asks for; the subject is the conversation's,
 in the heading above. A click on the card opens it again; a double-click on
 the header still opens the message in a window of its own. A click anywhere
 else on a message, its text included, selects it, and the action keys act
-on it.
+on it. <kbd>Ctrl</kbd> and a click add a message to the selection or take it
+out, and <kbd>Shift</kbd> and a click select every message from the first
+selected to that one. Archive, Delete, Spam and Move act on the selected
+messages alone, and the rest of the conversation stays open.
+
+A message's header, or its folded card, drags it to a folder in the sidebar,
+as its row in the message list does; with several selected, the drag carries
+all of them. A drag across the message's text selects the text.
 
 **Settings → Conversations → Fold earlier messages** decides how a
 conversation opens: **Never** shows every message, **Messages already read**

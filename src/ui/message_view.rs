@@ -7,6 +7,7 @@
 //! Link clicks open in the browser.
 
 mod bridge;
+mod card_drag;
 mod cards;
 mod chrome;
 mod component;
@@ -235,6 +236,9 @@ pub(crate) struct MessageView {
     /// the bar and the alert it follows when it is at the top.
     find_bottom: bool,
     find_bar: Option<(gtk::Revealer, gtk::Widget)>,
+    /// The primary button's press over the reader: a click that selects a
+    /// card, or a drag that carries one to a folder.
+    pointer: card_drag::Pointer,
     /// The page shown while a message loads, and whether it is holding the
     /// keyboard for the web view meanwhile (#392). A web view whose document
     /// is being replaced drops the keys it is given, so a shortcut pressed

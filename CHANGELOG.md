@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **Added: a message in a conversation can be dragged to a folder.** A drag
+  from its header, or from its folded card, carries it to a folder in the
+  sidebar as a drag of its row in the list does, with the same card under
+  the pointer. With several cards selected, the drag carries all of them.
+  The message leaves the conversation, which stays open with the rest.
+
+- **Fixed: Ctrl or Shift and a click on a card selected only that card.**
+  Several cards of a conversation are all its one row in the list, which
+  counted that row once per card, took the mismatch for a selection of its
+  own and handed the reader back a single card.
+
+- **Fixed: deleting several selected cards deleted the whole conversation.**
+  Archive, Delete, Delete Permanently, Spam and Move to Inbox went to the
+  list, whose one row stands for the whole conversation. They now act on
+  the selected messages, which leave the conversation as a single deleted
+  card does.
+
 - **Fixed: a click on a message's text did not select its card.** In a
   conversation, only a click on a card's header or its edges selected it.
   The text sits in a frame that runs no scripts, so the page never heard

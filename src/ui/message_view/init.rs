@@ -106,6 +106,7 @@ impl MessageView {
             find_return: None,
             find_bottom: false,
             find_bar: None,
+            pointer: Default::default(),
             loading_page: None,
             focus_held: std::cell::Cell::new(false),
             find_closed_at: None,
@@ -192,7 +193,7 @@ impl MessageView {
 
     /// The reader's right-click menu (see the comment inside).
     pub(super) fn watch_context_menu(&self, sender: &ComponentSender<Self>) {
-        self.watch_body_clicks();
+        self.watch_pointer(sender);
         // A right-click anywhere in the reader (a card's header, its body
         // frame, which never reports events to the page, or the space
         // between cards) shows the message's own menu, the same one the list
@@ -264,49 +265,6 @@ impl MessageView {
         }
     }
 
-    /// A click on a card's body selects the card, as one on its header
-    /// does. The body frames run no scripts, so the page never hears their
-    /// clicks; it only noticed one when the frame took the focus, which
-    /// never happened while the keyboard was elsewhere in the window. A
-    /// legacy controller watches the raw press and release because WebKit
-    /// claims the click, and a GestureClick then never sees it released.
-    /// The page is asked which frame the point hit.
-    fn watch_body_clicks(&self) {
-        // Pointer travel past which a press and release is a drag (a text
-        // selection), not a click.
-        const SLOP: f64 = 4.0;
-        let pressed = std::rc::Rc::new(std::cell::Cell::new(None::<(f64, f64)>));
-        let legacy = gtk::EventControllerLegacy::new();
-        legacy.set_propagation_phase(gtk::PropagationPhase::Capture);
-        legacy.connect_event(move |ctl, event| {
-            let primary = event
-                .downcast_ref::<gtk::gdk::ButtonEvent>()
-                .is_some_and(|b| b.button() == gtk::gdk::BUTTON_PRIMARY);
-            if !primary {
-                return gtk::glib::Propagation::Proceed;
-            }
-            let Some(at) = event.position() else {
-                return gtk::glib::Propagation::Proceed;
-            };
-            match event.event_type() {
-                gtk::gdk::EventType::ButtonPress => pressed.set(Some(at)),
-                gtk::gdk::EventType::ButtonRelease => {
-                    let Some(from) = pressed.take() else {
-                        return gtk::glib::Propagation::Proceed;
-                    };
-                    if (at.0 - from.0).hypot(at.1 - from.1) <= SLOP {
-                        if let Some(view) = ctl.widget().and_downcast::<webkit6::WebView>() {
-                            pick_card_at(&view, at, event.modifier_state());
-                        }
-                    }
-                }
-                _ => {}
-            }
-            gtk::glib::Propagation::Proceed
-        });
-        self.webview.add_controller(legacy);
-    }
-
     /// The `hylki` script-message handler.
     pub(super) fn watch_bridge(&self, sender: &ComponentSender<Self>) {
         // Everything the page posts to the `hylki` handler (see bridge.rs).
@@ -365,33 +323,4 @@ impl MessageView {
             });
         }
     }
-}
-
-/// Ask the page to select the card whose body frame is under `surface`, a
-/// point in the view's surface coordinates, as a click on the card would.
-fn pick_card_at(view: &webkit6::WebView, surface: (f64, f64), state: gtk::gdk::ModifierType) {
-    let Some(native) = view.native() else { return };
-    let (dx, dy) = native.surface_transform();
-    let Some(at) = native.compute_point(
-        view,
-        &gtk::graphene::Point::new((surface.0 - dx) as f32, (surface.1 - dy) as f32),
-    ) else {
-        return;
-    };
-    let mode = if state.contains(gtk::gdk::ModifierType::SHIFT_MASK) {
-        'r'
-    } else if state.contains(gtk::gdk::ModifierType::CONTROL_MASK) {
-        't'
-    } else {
-        'p'
-    };
-    let (x, y) = (at.x(), at.y());
-    let width = view.width().max(1);
-    view.evaluate_javascript(
-        &format!("window.__hylkiPickAt({x},{y},{width},'{mode}')"),
-        None,
-        None,
-        None::<&gtk::gio::Cancellable>,
-        |_| {},
-    );
 }
