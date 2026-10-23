@@ -558,6 +558,25 @@ mod tests {
         );
     }
 
+    /// The key files written for EDS, pinned: a new account, and an
+    /// existing one rewritten over what EDS had.
+    #[test]
+    fn the_source_key_files_as_written() {
+        use crate::config::golden::assert_golden;
+        let mut a = Account::empty();
+        a.url = "dav.example.org".into();
+        a.user = " ann ".into();
+        let new = a.to_source(&parse_url(&a.url).unwrap());
+        assert_golden("carddav/testdata/source-new.ini", &new);
+        a.data = "[Data Source]\nDisplayName=Old\nEnabled=true\nParent=\n\n\
+                  [Collection]\nBackendName=webdav\nCalendarEnabled=true\nX-Kept=1\n"
+            .into();
+        a.name = "Work".into();
+        a.enabled = false;
+        let again = a.to_source(&parse_url("http://127.0.0.1:5232/dav/").unwrap());
+        assert_golden("carddav/testdata/source-rewritten.ini", &again);
+    }
+
     /// Against a real server, in a session with EDS and a keyring:
     /// `CARDDAV_LIVE='https://dav.example.org/|user|password'`. Sets the
     /// account up, waits for its books, syncs and lists the contacts, then
