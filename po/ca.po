@@ -6240,6 +6240,9 @@ msgstr "No s'ha pogut carregar el codi font: {e}"
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Un compte de Microsoft no pot rebre correu d'un altre compte"
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Connecting to {host}…"
 msgstr "S'està connectant a {host}…"
 

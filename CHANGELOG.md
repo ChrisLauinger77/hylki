@@ -14,7 +14,9 @@
   symlink as a folder (`dovecot.sieve`) and answers its SELECT with NO
   [SERVERBUG], which is how it showed. A folder the server refuses is now
   left out of the index for the session after one try, and one that fails
-  for any other reason after three tries in a row.
+  for any other reason after three tries in a row. The first folder left
+  out is named in the status bar with the server's reason, once a run; the
+  log names every one.
 
 ## 1.45.1 — 2026-10-22
 

@@ -5837,6 +5837,9 @@ msgstr ""
 msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Connecting to {host}…"
 msgstr ""
 

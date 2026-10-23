@@ -6566,6 +6566,9 @@ msgstr "Nie udało się wczytać źródła: {e}"
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Konto Microsoft nie może przyjmować poczty z innego konta"
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Connecting to {host}…"
 msgstr "Łączenie z serwerem {host}…"
 

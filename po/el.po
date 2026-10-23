@@ -6336,6 +6336,9 @@ msgstr ""
 "Ένας λογαριασμός Microsoft δεν μπορεί να λαμβάνει αλληλογραφία από άλλον "
 "λογαριασμό"
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Connecting to {host}…"
 msgstr "Σύνδεση στο {host}…"
 

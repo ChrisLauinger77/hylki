@@ -6471,6 +6471,9 @@ msgstr "Não foi possível carregar o código fonte: {e}"
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Uma conta Microsoft não pode receber correio de outra conta"
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Connecting to {host}…"
 msgstr "A ligar a {host}…"
 

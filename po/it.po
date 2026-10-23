@@ -6424,6 +6424,9 @@ msgstr "Impossibile caricare il sorgente: {e}"
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Un account Microsoft non può ricevere posta da un altro account"
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Connecting to {host}…"
 msgstr "Connessione a {host} in corso…"
 

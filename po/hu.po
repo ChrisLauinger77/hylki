@@ -6514,6 +6514,9 @@ msgstr "A forrás nem tölthető be: {e}"
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Egy Microsoft-fiók nem tud e-maileket fogadni egy másik fióktól"
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Connecting to {host}…"
 msgstr "Kapcsolódás ehhez: {host}…"
 

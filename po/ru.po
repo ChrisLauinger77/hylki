@@ -6488,6 +6488,9 @@ msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 "Учётная запись Microsoft не может получать почту из другой учётной записи"
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Connecting to {host}…"
 msgstr "Подключение к {host}…"
 

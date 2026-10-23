@@ -6,10 +6,13 @@ use futures::TryStreamExt;
 
 use crate::cache::Cache;
 use crate::config::AccountConfig;
+use crate::i18n::i18n_f;
 use crate::models::Message;
 use crate::worker::ids::merge_msgids;
 use crate::worker::imap::connect::connect;
-use crate::worker::imap::fetch_mode::{compact_parse_error, is_parse_error, step_fetch_mode};
+use crate::worker::imap::fetch_mode::{
+    compact_parse_error, is_parse_error, readable_error, step_fetch_mode,
+};
 use crate::worker::imap::gmail::read_gmail_labels;
 use crate::worker::imap::prefetch::queue_attachment_prefetch;
 use crate::worker::imap::summary::{build_summary, references_of, summary_from_headers};
@@ -132,8 +135,15 @@ fn refused(e: &async_imap::error::Error) -> bool {
     )
 }
 
+/// Whether a folder left out of the index has been shown in the status bar
+/// this run. Once is enough (#512): the next one, on this account or another
+/// on the same server, most likely has the same cause, and the log names
+/// every one.
+static LEFT_OUT_SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Leave a folder out of the background index for the session: the list
-/// stops promising more of it, and the log says why once.
+/// stops promising more of it, the log says why, and the first one of the
+/// run is shown in the status bar.
 fn give_up_backfill(
     job: &Backfill,
     account_id: u32,
@@ -148,6 +158,27 @@ fn give_up_backfill(
     emit(WorkerEvent::BackfillDone {
         folder_id: job.folder_id,
     });
+    if !LEFT_OUT_SHOWN.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        emit(WorkerEvent::error(i18n_f(
+            "“{folder}” is left out of search: {reason}",
+            &[("folder", &job.path), ("reason", &server_reason(e))],
+        )));
+    }
+}
+
+/// What the server said in a NO or BAD, without the response-code wrapping
+/// async-imap puts round it or the time and timings Dovecot ends with.
+fn server_reason(e: &async_imap::error::Error) -> String {
+    let text = e.to_string();
+    let said = text
+        .split_once("info: Some(\"")
+        .and_then(|(_, rest)| rest.rsplit_once("\")"))
+        .map_or(text.as_str(), |(said, _)| said);
+    let said = said
+        .match_indices(" [")
+        .find(|(i, _)| said[i + 2..].starts_with(|c: char| c.is_ascii_digit()))
+        .map_or(said, |(i, _)| &said[..i]);
+    readable_error(&compact_parse_error(said))
 }
 
 // select! may receive a reader before polling the job at all. In that case
@@ -352,5 +383,69 @@ pub(super) async fn run_one_backfill(
         emit(WorkerEvent::BackfillDone {
             folder_id: job.folder_id,
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Dovecot's refusal of a Sieve script's symlink, as async-imap hands it
+    /// over (#512).
+    fn serverbug() -> async_imap::error::Error {
+        async_imap::error::Error::No(
+            "code: None, info: Some(\"[SERVERBUG] Internal error occurred. Refer to server log \
+             for more information. [2026-10-23 12:42:56] (0.001 + 0.013 + 0.012 secs).\")"
+                .into(),
+        )
+    }
+
+    #[test]
+    fn server_reason_keeps_the_servers_words() {
+        assert_eq!(
+            server_reason(&serverbug()),
+            "[SERVERBUG] Internal error occurred. Refer to server log for more information."
+        );
+        assert_eq!(
+            server_reason(&async_imap::error::Error::ConnectionLost),
+            async_imap::error::Error::ConnectionLost.to_string()
+        );
+    }
+
+    /// Only the first folder left out in a run reaches the status bar; the
+    /// list is told about every one.
+    #[test]
+    fn a_left_out_folder_is_shown_once_a_run() {
+        let job = |folder_id| Backfill {
+            folder_id,
+            path: "dovecot.sieve".into(),
+            remaining: None,
+            gallery: false,
+            failures: 0,
+        };
+        let events = std::cell::RefCell::new(Vec::new());
+        let emit = |ev| events.borrow_mut().push(ev);
+        give_up_backfill(&job(1), 1, &serverbug(), &emit);
+        give_up_backfill(&job(2), 2, &serverbug(), &emit);
+        let events = events.into_inner();
+        let shown: Vec<&String> = events
+            .iter()
+            .filter_map(|ev| match ev {
+                WorkerEvent::Error { text, .. } => Some(text),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                "“dovecot.sieve” is left out of search: [SERVERBUG] Internal error occurred. \
+              Refer to server log for more information."
+            ]
+        );
+        let done = events
+            .iter()
+            .filter(|ev| matches!(ev, WorkerEvent::BackfillDone { .. }))
+            .count();
+        assert_eq!(done, 2);
     }
 }
