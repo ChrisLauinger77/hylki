@@ -184,7 +184,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
             path,
             body,
         } => {
-            let body = crate::legacy::current_markup(body);
+            let body = crate::desktop::legacy::current_markup(body);
             AppMsg::Body {
                 account_id,
                 message_id,
@@ -302,7 +302,7 @@ impl AppModel {
 
     /// The Refresh buttons and the status bar follow the network (#442).
     fn show_network_state(&self) {
-        let offline = !crate::power::online();
+        let offline = !crate::desktop::power::online();
         crate::ui::show_refresh_offline(&self.sidebar_refresh, offline);
         if let Some(button) = self
             .peek_refresh_stack
@@ -320,7 +320,7 @@ impl AppModel {
     /// waits on its next request, and a recount is one it does anyway
     /// (#442).
     pub(super) fn saving_data_changed(&self, was: bool) {
-        if was && !crate::power::saving_data() {
+        if was && !crate::desktop::power::saving_data() {
             tracing::info!("saving data no longer: resuming the work done ahead");
             for w in self.workers.values() {
                 let _ = w.send(MailRequest::RefreshUnread);
@@ -338,7 +338,7 @@ impl AppModel {
             let id = gtk::glib::timeout_add_seconds_local(secs, move || {
                 // Offline the check would only fail, and a Refresh would
                 // try anyway (#442).
-                if crate::power::online() {
+                if crate::desktop::power::online() {
                     let _ = input.send(AppMsg::Refresh);
                 }
                 gtk::glib::ControlFlow::Continue
@@ -559,8 +559,8 @@ impl AppModel {
                 // The monitor can be wrong about the network (one with no
                 // default route): a Refresh asked for while it says offline
                 // tries the servers anyway (#442).
-                if !crate::power::online() {
-                    crate::power::try_anyway();
+                if !crate::desktop::power::online() {
+                    crate::desktop::power::try_anyway();
                 }
                 if self.unified {
                     let reqs = self.unified_targets();
@@ -615,7 +615,7 @@ impl AppModel {
                 // Still rejoining the Wi-Fi: a reconnect now would fail and
                 // leave the account offline until the next auto-fetch.
                 // NetworkBack does it once the network is up.
-                if !crate::power::online() {
+                if !crate::desktop::power::online() {
                     return;
                 }
                 self.reconnect_workers(&sender);
@@ -652,7 +652,7 @@ impl AppModel {
             AppMsg::MeteredChanged => {
                 // The flag has already flipped, so before it the connection
                 // was the other way.
-                let was = self.metered_save_data && !crate::power::metered();
+                let was = self.metered_save_data && !crate::desktop::power::metered();
                 self.saving_data_changed(was);
             }
 
@@ -694,7 +694,7 @@ impl AppModel {
         // The peek panel's Refresh: the same icon/spinner faces.
         fill_refresh_faces(&self.peek_refresh_stack, &self.peek_refresh_spinner);
         // Started with no network: orange from the first frame (#442).
-        if !crate::power::online() {
+        if !crate::desktop::power::online() {
             self.show_network_state();
         }
         if self.rail_active {
@@ -748,32 +748,32 @@ pub(super) fn watch_system_events(sender: &ComponentSender<AppModel>) {
     // on wake we reconnect every worker and refresh, otherwise no new mail
     // arrives until the next auto-fetch (#322). logind is instant but out
     // of the Flatpak's reach; the clock check covers it there.
-    crate::power::watch_resume({
+    crate::desktop::power::watch_resume({
         let s = sender.input_sender().clone();
         move || {
             let _ = s.send(AppMsg::SystemResumed);
         }
     });
-    crate::power::watch_clock_gap({
+    crate::desktop::power::watch_clock_gap({
         let s = sender.input_sender().clone();
         move || {
             let _ = s.send(AppMsg::SystemResumed);
         }
     });
     // A dock that has just (re)started holds no badge until we send it.
-    crate::launcher_badge::watch_dock({
+    crate::desktop::launcher_badge::watch_dock({
         let s = sender.input_sender().clone();
         move || {
             let _ = s.send(AppMsg::LauncherCountLost);
         }
     });
-    crate::power::watch_network({
+    crate::desktop::power::watch_network({
         let s = sender.input_sender().clone();
         move |change| {
             let _ = s.send(match change {
-                crate::power::NetworkChange::Back => AppMsg::NetworkBack,
-                crate::power::NetworkChange::Lost => AppMsg::NetworkLost,
-                crate::power::NetworkChange::Metered(_) => AppMsg::MeteredChanged,
+                crate::desktop::power::NetworkChange::Back => AppMsg::NetworkBack,
+                crate::desktop::power::NetworkChange::Lost => AppMsg::NetworkLost,
+                crate::desktop::power::NetworkChange::Metered(_) => AppMsg::MeteredChanged,
             });
         }
     });

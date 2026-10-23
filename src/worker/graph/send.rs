@@ -25,7 +25,7 @@ pub(super) async fn graph_send_message(
     // header the Bcc recipients get nothing (#476). Exchange removes it on
     // delivery and keeps it on the Sent Items copy.
     let raw = with_bcc(&email.formatted(), &message.bcc);
-    if !crate::power::reaches_internet() {
+    if !crate::desktop::power::reaches_internet() {
         return Err(offline_text());
     }
     let token = graph_token(account, emit)

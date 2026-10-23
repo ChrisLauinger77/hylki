@@ -104,9 +104,9 @@ pub(crate) fn export_text(memory: &str) -> String {
             })
         })
         .unwrap_or_else(|| "unknown OS".to_string());
-    let host = if crate::platform::is_flatpak() {
+    let host = if crate::desktop::platform::is_flatpak() {
         "Flatpak"
-    } else if crate::platform::is_appimage() {
+    } else if crate::desktop::platform::is_appimage() {
         "AppImage"
     } else {
         "host build"

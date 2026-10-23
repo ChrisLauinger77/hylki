@@ -240,7 +240,7 @@ impl AppModel {
     /// false for the proactive one-time tip (which offers "Don't show again").
     #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn show_keyring_help(&self, problem: bool) {
-        let mint = crate::platform::is_mint_cinnamon();
+        let mint = crate::desktop::platform::is_mint_cinnamon();
 
         let heading = if problem {
             i18n("Hylki couldn’t save your password")
@@ -281,7 +281,7 @@ impl AppModel {
                  password empty). This is convenient, but your saved passwords are then \
                  stored unencrypted at rest — only do this on a machine you trust.",
             );
-            if crate::platform::is_flatpak() {
+            if crate::desktop::platform::is_flatpak() {
                 body.push_str(
                     "\n\nNote: run these steps on the host system (not inside the \
                      Flatpak) — Hylki uses whatever keyring your desktop provides.",
@@ -651,7 +651,7 @@ impl AppModel {
     /// again after "Don't show again".
     pub(super) fn show_startup_notices(&self, sender: &ComponentSender<Self>) {
         if !self.config.is_empty()
-            && crate::platform::is_mint_cinnamon()
+            && crate::desktop::platform::is_mint_cinnamon()
             && !config::mint_keyring_help_dismissed()
         {
             sender.input(AppMsg::ShowKeyringHelp { problem: false });
@@ -661,15 +661,17 @@ impl AppModel {
         // `legacy`): say so once, and take its start-at-login over — the
         // portal's autostart entry is per app ID, so it has to be asked
         // for again under this one.
-        if let Some(from) = crate::legacy::migrated_from() {
+        if let Some(from) = crate::desktop::legacy::migrated_from() {
             if self.run_in_background.get() && self.autostart {
-                crate::background::request(true);
+                crate::desktop::background::request(true);
             }
             sender.input(AppMsg::ShowCarryOverNotice(from));
         } else if std::env::var_os("HYLKI_SHOWCASE_CARRY_OVER").is_some() {
             // Opens the notice as if Vireo's data had just come across, for
             // checking it by hand.
-            sender.input(AppMsg::ShowCarryOverNotice(&crate::legacy::PREDECESSORS[0]));
+            sender.input(AppMsg::ShowCarryOverNotice(
+                &crate::desktop::legacy::PREDECESSORS[0],
+            ));
         }
     }
 

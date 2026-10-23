@@ -10,7 +10,7 @@ use gtk::prelude::*;
 /// The gallery as one row that scrolls sideways, its edges fading into the
 /// card wherever there is more to scroll to.
 pub(super) fn strip(selected: &str, tile: i32, on_pick: Rc<dyn Fn(&str)>) -> gtk::Overlay {
-    let n = crate::app_icon::catalog().count() as u32;
+    let n = crate::desktop::app_icon::catalog().count() as u32;
     let row = build(selected, tile, n.max(1), on_pick);
     row.set_halign(gtk::Align::Start);
     row.set_hexpand(false);
@@ -107,12 +107,12 @@ fn build(selected: &str, tile: i32, per_line: u32, on_pick: Rc<dyn Fn(&str)>) ->
     grid.set_hexpand(true);
 
     let mut to_select = None;
-    for choice in crate::app_icon::catalog() {
+    for choice in crate::desktop::app_icon::catalog() {
         let cell = gtk::Box::new(gtk::Orientation::Vertical, 4);
         cell.set_halign(gtk::Align::Center);
         let pic = gtk::Picture::new();
         // 2x for HiDPI; still far cheaper than decoding the full 512.
-        if let Some(tex) = crate::app_icon::texture(choice.id, tile * 2) {
+        if let Some(tex) = crate::desktop::app_icon::texture(choice.id, tile * 2) {
             pic.set_paintable(Some(&tex));
         }
         pic.set_size_request(tile, tile);

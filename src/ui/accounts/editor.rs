@@ -230,11 +230,14 @@ impl AccountsWindow {
         while let Some(child) = widgets.form.provider_mark.first_child() {
             widgets.form.provider_mark.remove(&child);
         }
-        widgets.form.provider_mark.append(&crate::brand::mark(
-            brand,
-            56,
-            crate::brand::GENERIC_MAIL,
-        ));
+        widgets
+            .form
+            .provider_mark
+            .append(&crate::desktop::brand::mark(
+                brand,
+                56,
+                crate::desktop::brand::GENERIC_MAIL,
+            ));
     }
 
     /// Push is IMAP IDLE or a JMAP event stream. Microsoft 365 polls and

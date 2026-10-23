@@ -5,7 +5,7 @@
 //! `theme.rs` maps them onto libadwaita's color roles. Edit the
 //! generator, not this file.
 
-use crate::theme::{Palette, Theme};
+use crate::desktop::theme::{Palette, Theme};
 
 const ROSE: Theme = Theme {
     id: "rose",

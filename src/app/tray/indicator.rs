@@ -1,6 +1,6 @@
 //! A tray icon, for the desktops that have a tray (issue #116).
 //!
-//! GNOME has none — its answer is Background Apps, see [`crate::background`] —
+//! GNOME has none — its answer is Background Apps, see [`crate::desktop::background`] —
 //! but Cinnamon, KDE, MATE, XFCE and GNOME with the AppIndicator extension all
 //! speak the freedesktop **StatusNotifierItem** protocol: the app publishes an
 //! item over D-Bus and registers it with `org.kde.StatusNotifierWatcher`, and
@@ -694,7 +694,7 @@ mod tests {
             for dotted in [false, true] {
                 let set = render_set(
                     icon,
-                    crate::app_icon::png_for(crate::app_icon::DEFAULT_ID),
+                    crate::desktop::app_icon::png_for(crate::desktop::app_icon::DEFAULT_ID),
                     dotted,
                 );
                 assert_eq!(set.len(), SIZES.len(), "{icon:?} dotted={dotted}");
@@ -760,7 +760,7 @@ mod tests {
         let size = 32usize;
         let plain = render(
             TrayIcon::Symbolic,
-            crate::app_icon::png_for(crate::app_icon::DEFAULT_ID),
+            crate::desktop::app_icon::png_for(crate::desktop::app_icon::DEFAULT_ID),
             false,
             size as i32,
             1.0,
@@ -768,7 +768,7 @@ mod tests {
         .unwrap();
         let dotted = render(
             TrayIcon::Symbolic,
-            crate::app_icon::png_for(crate::app_icon::DEFAULT_ID),
+            crate::desktop::app_icon::png_for(crate::desktop::app_icon::DEFAULT_ID),
             true,
             size as i32,
             1.0,
@@ -798,7 +798,7 @@ mod tests {
         let size = 32usize;
         let icon = render(
             TrayIcon::Hylki,
-            crate::app_icon::png_for(crate::app_icon::DEFAULT_ID),
+            crate::desktop::app_icon::png_for(crate::desktop::app_icon::DEFAULT_ID),
             true,
             size as i32,
             0.5,

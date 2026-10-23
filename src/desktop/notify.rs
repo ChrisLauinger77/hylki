@@ -145,7 +145,7 @@ pub(crate) fn new_mail(
 pub(crate) fn sound_for_new_mail() {
     match crate::config::new_mail_sound() {
         None => tracing::debug!("new-mail sound: switched off"),
-        Some(_) if crate::desktop::quiet() => {
+        Some(_) if crate::desktop::session::quiet() => {
             tracing::info!("new-mail sound: not played, Do Not Disturb is on");
         }
         Some(sound) => play_sound(&sound, false),

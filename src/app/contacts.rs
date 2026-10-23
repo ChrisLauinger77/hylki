@@ -251,7 +251,7 @@ impl AppModel {
             }
 
             AppMsg::ShowContactsPage => {
-                crate::desktop::present_window(&self.window);
+                crate::desktop::session::present_window(&self.window);
                 sender.input(AppMsg::OpenContacts);
             }
 

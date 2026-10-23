@@ -164,7 +164,7 @@ pub(crate) struct Preferences {
     /// files and the whole cache file, in bytes; `None` while measuring.
     storage: Option<(u64, u64, u64)>,
     /// The GNOME Files extension (#188): installed, loaded, loader present.
-    nautilus: crate::nautilus_ext::State,
+    nautilus: crate::desktop::nautilus_ext::State,
     /// The terminal command that installs the nautilus-python package on
     /// this machine, for the copyable row; `None` on a distribution whose
     /// package manager is not known.
@@ -389,8 +389,8 @@ impl Component for Preferences {
         let t_init = std::time::Instant::now();
         let mut model = Preferences {
             storage: None,
-            nautilus: crate::nautilus_ext::State::read(),
-            nautilus_cmd: crate::platform::nautilus_python_install_command(),
+            nautilus: crate::desktop::nautilus_ext::State::read(),
+            nautilus_cmd: crate::desktop::platform::nautilus_python_install_command(),
             files: init.files,
             files_rows: None,
             spell_langs: None,
@@ -561,7 +561,7 @@ impl Component for Preferences {
             PrefInput::SetSpellcheckLangs(langs) => self.on_set_spellcheck_langs(langs),
             PrefInput::NautilusRestartFiles => self.on_nautilus_restart_files(root),
             PrefInput::NautilusRefresh => {
-                self.nautilus = crate::nautilus_ext::State::read();
+                self.nautilus = crate::desktop::nautilus_ext::State::read();
             }
             PrefInput::ToggleAvatars(on) => self.on_toggle_avatars(on, sender),
             PrefInput::ToggleThreading(on) => self.on_toggle_threading(on, sender),

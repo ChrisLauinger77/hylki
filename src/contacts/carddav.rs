@@ -74,7 +74,7 @@ impl Account {
     }
 
     fn from_source(uid: &str, path: &str, data: &str, books: Vec<String>) -> Option<Self> {
-        let kf = crate::platform::keyfile(data)?;
+        let kf = crate::desktop::platform::keyfile(data)?;
         let get = |group: &str, key: &str| {
             kf.string(group, key)
                 .map(|s| s.to_string())
@@ -99,7 +99,7 @@ impl Account {
 
     /// The source key file for this account, over what EDS had.
     fn to_source(&self, url: &ServerUrl) -> String {
-        let kf = crate::platform::keyfile(&self.data).unwrap_or_default();
+        let kf = crate::desktop::platform::keyfile(&self.data).unwrap_or_default();
         kf.set_string("Data Source", "DisplayName", &self.title());
         kf.set_boolean("Data Source", "Enabled", self.enabled);
         if self.data.is_empty() {
@@ -177,7 +177,7 @@ pub(crate) fn list() -> Result<Vec<Account>, String> {
     let sources = crate::contacts::registry_sources().ok_or_else(not_available)?;
     let mut books: HashMap<String, Vec<String>> = HashMap::new();
     for (_, _, data) in &sources {
-        let Some(kf) = crate::platform::keyfile(data) else {
+        let Some(kf) = crate::desktop::platform::keyfile(data) else {
             continue;
         };
         if !kf.has_group("Address Book") {
@@ -360,7 +360,7 @@ fn server_books() -> Vec<String> {
     let disabled: HashSet<String> = sources
         .iter()
         .filter(|(_, _, data)| {
-            crate::platform::keyfile(data)
+            crate::desktop::platform::keyfile(data)
                 .is_some_and(|kf| kf.boolean("Data Source", "Enabled").ok() == Some(false))
         })
         .map(|(_, uid, _)| uid.clone())
@@ -368,7 +368,7 @@ fn server_books() -> Vec<String> {
     sources
         .iter()
         .filter_map(|(_, uid, data)| {
-            let kf = crate::platform::keyfile(data)?;
+            let kf = crate::desktop::platform::keyfile(data)?;
             let backend = kf.string("Address Book", "BackendName").ok()?.to_string();
             let parent = kf
                 .string("Data Source", "Parent")
@@ -498,7 +498,7 @@ mod tests {
         a.url = "dav.example.org".into();
         a.user = "ann".into();
         let data = a.to_source(&parse_url(&a.url).unwrap());
-        let kf = crate::platform::keyfile(&data).unwrap();
+        let kf = crate::desktop::platform::keyfile(&data).unwrap();
         assert_eq!(kf.string("Collection", "BackendName").unwrap(), "webdav");
         assert!(kf.boolean("Collection", "ContactsEnabled").unwrap());
         assert!(!kf.boolean("Collection", "CalendarEnabled").unwrap());

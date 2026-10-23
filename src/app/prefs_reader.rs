@@ -52,7 +52,7 @@ impl AppModel {
         });
         let plain_font = self.plain_monospace.then(|| {
             if self.plain_font.trim().is_empty() {
-                crate::desktop::monospace_font()
+                crate::desktop::session::monospace_font()
             } else {
                 self.plain_font.clone()
             }

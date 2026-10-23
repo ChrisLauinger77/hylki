@@ -72,7 +72,7 @@ pub(crate) fn apply_icon_theme(desktop: bool) {
         }
     }
     // The app icon chosen in Settings, for the window's own icon.
-    if let Some(own) = crate::app_icon::private_icons_root() {
+    if let Some(own) = crate::desktop::app_icon::private_icons_root() {
         paths.push(own);
     }
     // Running from the source tree: the app's icons as the install has them.

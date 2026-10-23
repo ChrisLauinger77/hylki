@@ -227,10 +227,10 @@ pub(crate) fn provider_factory() -> gtk::SignalListItemFactory {
         let Some(old) = bx.first_child() else { return };
         let label = old.next_sibling().and_downcast::<gtk::Label>();
         bx.remove(&old);
-        bx.prepend(&crate::brand::mark(
+        bx.prepend(&crate::desktop::brand::mark(
             provider.brand,
             20,
-            crate::brand::GENERIC_MAIL,
+            crate::desktop::brand::GENERIC_MAIL,
         ));
         if let Some(label) = label {
             label.set_label(&name);

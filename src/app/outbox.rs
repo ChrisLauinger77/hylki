@@ -112,7 +112,7 @@ impl AppModel {
                 (body, o.message.attachments.is_empty())
             });
         if let Some((body, no_files)) = outgoing {
-            message.body = crate::legacy::current_markup(body);
+            message.body = crate::desktop::legacy::current_markup(body);
             message.date = item.status.clone();
             message.has_attachment = !no_files;
             self.attachments.clear();
@@ -123,7 +123,8 @@ impl AppModel {
             self.show_message(Some(message), false);
             return;
         }
-        message.body = crate::legacy::current_markup(crate::worker::extract_body(&item.raw));
+        message.body =
+            crate::desktop::legacy::current_markup(crate::worker::extract_body(&item.raw));
         message.date = crate::models::OutboxItem::waiting_label(item.queued_at);
         self.attachments = crate::worker::extract_attachments_of(&item.raw);
         self.attachments_loading = false;
@@ -268,7 +269,7 @@ impl AppModel {
             AppMsg::SendDueScheduled => {
                 // Its one try would be spent on no network; the time is
                 // still past when the network is back (#442).
-                if !crate::power::reaches_internet() {
+                if !crate::desktop::power::reaches_internet() {
                     return;
                 }
                 let now = crate::datefmt::now();

@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 /// The extension, verbatim: `data/nautilus/hylki-nautilus.py`.
-pub(crate) const SOURCE: &str = include_str!("../data/nautilus/hylki-nautilus.py");
+pub(crate) const SOURCE: &str = include_str!("../../data/nautilus/hylki-nautilus.py");
 pub(crate) const FILE_NAME: &str = "hylki-nautilus.py";
 /// Written by the extension itself when Files loads it: the SHA-256 of the
 /// file it loaded (see `_mark_loaded` in the extension).
@@ -31,8 +31,8 @@ pub(crate) enum Status {
 /// XDG_DATA_HOME is the sandbox's private dir, so the host's default is
 /// used (where the manifest mounts `xdg-data/nautilus-python/extensions`).
 pub(crate) fn dir() -> Option<PathBuf> {
-    let base = if crate::platform::is_flatpak() {
-        crate::platform::home()?.join(".local/share")
+    let base = if crate::desktop::platform::is_flatpak() {
+        crate::desktop::platform::home()?.join(".local/share")
     } else {
         dirs::data_dir()?
     };
@@ -88,7 +88,7 @@ fn loaded_at(marker: &std::path::Path) -> bool {
 /// are installed, judged by their library in the places distributions put
 /// it. `None` inside the Flatpak, which cannot see the host's /usr.
 fn loader_present() -> Option<bool> {
-    if crate::platform::is_flatpak() {
+    if crate::desktop::platform::is_flatpak() {
         return None;
     }
     const DIRS: &[&str] = &[
@@ -134,7 +134,7 @@ pub(crate) fn record_launcher() {
     let Some(path) = launcher_record() else {
         return;
     };
-    let Some(bundle) = crate::platform::appimage() else {
+    let Some(bundle) = crate::desktop::platform::appimage() else {
         let _ = std::fs::remove_file(&path);
         return;
     };

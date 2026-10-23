@@ -313,7 +313,9 @@ impl MessageView {
         // reader drops its watcher the next time the theme changes.
         {
             let s = sender.input_sender().clone();
-            crate::theme::connect_changed(move || s.send(MessageViewInput::ThemeChanged).is_ok());
+            crate::desktop::theme::connect_changed(move || {
+                s.send(MessageViewInput::ThemeChanged).is_ok()
+            });
         }
     }
 }

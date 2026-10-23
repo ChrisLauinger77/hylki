@@ -353,7 +353,7 @@ impl AppModel {
         });
         win.connect_is_active_notify(|w| {
             if w.is_active() {
-                crate::notify::withdraw_compose_ready();
+                crate::desktop::notify::withdraw_compose_ready();
             }
         });
         win.present();

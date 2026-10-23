@@ -46,10 +46,10 @@ const ICON_GENERATION: u32 = 3;
 /// The icon this build installs under its app ID.
 #[cfg(not(feature = "beta"))]
 const DEFAULT_PNG: &[u8] =
-    include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.png");
+    include_bytes!("../../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.png");
 #[cfg(feature = "beta")]
 const DEFAULT_PNG: &[u8] =
-    include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.Beta.png");
+    include_bytes!("../../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.Beta.png");
 
 /// The gallery, in display order: the build's own icon (the opened
 /// envelope, so it has no entry of its own), the same envelope on a blue,
@@ -66,22 +66,22 @@ const CATALOG: &[IconChoice] = &[
     IconChoice {
         id: "square",
         label: i18n_noop("Blue square"),
-        png: include_bytes!("../data/icons/alt/square.png"),
+        png: include_bytes!("../../data/icons/alt/square.png"),
     },
     IconChoice {
         id: "square-dark",
         label: i18n_noop("Navy square"),
-        png: include_bytes!("../data/icons/alt/square-dark.png"),
+        png: include_bytes!("../../data/icons/alt/square-dark.png"),
     },
     IconChoice {
         id: "square-yellow",
         label: i18n_noop("Yellow square"),
-        png: include_bytes!("../data/icons/alt/square-yellow.png"),
+        png: include_bytes!("../../data/icons/alt/square-yellow.png"),
     },
     IconChoice {
         id: "classic",
         label: i18n_noop("Classic"),
-        png: include_bytes!("../data/icons/alt/classic.png"),
+        png: include_bytes!("../../data/icons/alt/classic.png"),
     },
 ];
 
@@ -129,7 +129,7 @@ pub(crate) fn tray_image(id: &str) -> std::borrow::Cow<'static, [u8]> {
         Some(std::path::PathBuf::from(&icon))
     } else {
         // In the desktop's icon folders: Hylki's own search leaves them out.
-        crate::icon_theme::desktop_icon_theme()
+        crate::desktop::icon_theme::desktop_icon_theme()
             .lookup_icon(
                 &icon,
                 &[],
@@ -228,12 +228,12 @@ fn icon_name(id: &str) -> String {
 /// used (that is where the manifest mounts `xdg-data/icons/hicolor` and
 /// `xdg-data/applications`).
 fn host_data_home() -> Option<PathBuf> {
-    if !crate::platform::is_flatpak() {
+    if !crate::desktop::platform::is_flatpak() {
         if let Some(d) = dirs::data_dir() {
             return Some(d);
         }
     }
-    Some(crate::platform::home()?.join(".local/share"))
+    Some(crate::desktop::platform::home()?.join(".local/share"))
 }
 
 fn hicolor_dir() -> Option<PathBuf> {

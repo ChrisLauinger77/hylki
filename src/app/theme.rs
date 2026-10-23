@@ -1,6 +1,6 @@
 //! The app's look outside the mail: light or dark, the colors that follow
 //! the light/dark flip, and reduced motion. The icon theme is in
-//! [`crate::icon_theme`].
+//! [`crate::desktop::icon_theme`].
 
 use adw::prelude::*;
 

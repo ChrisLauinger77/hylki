@@ -3,8 +3,8 @@
 use adw::prelude::*;
 use relm4::prelude::*;
 
+use crate::desktop::memory_report::{human_bytes, human_count, messages_bytes};
 use crate::i18n::i18n;
-use crate::memory_report::{human_bytes, human_count, messages_bytes};
 use crate::ui::notifications::NotifyInput;
 
 use super::model::AppModel;
@@ -18,23 +18,23 @@ fn count((n, b): (usize, usize)) -> String {
 /// The heading, uptime, the process tree and who holds the heap.
 fn memory_processes(out: &mut String) {
     out.push_str("== Memory ==\n");
-    if let Some(up) = crate::memory_report::uptime() {
+    if let Some(up) = crate::desktop::memory_report::uptime() {
         out.push_str(&format!(
             "Running for {}\n",
-            crate::memory_report::human_duration(up)
+            crate::desktop::memory_report::human_duration(up)
         ));
     }
     out.push_str("Processes:\n");
-    for line in crate::memory_report::process_lines() {
+    for line in crate::desktop::memory_report::process_lines() {
         out.push_str(&line);
         out.push('\n');
     }
-    for line in crate::memory_report::web_view_lines() {
+    for line in crate::desktop::memory_report::web_view_lines() {
         out.push_str(&line);
         out.push('\n');
     }
-    let (rust_live, rust_peak) = crate::memory_report::rust_heap();
-    let (sql_live, sql_peak) = crate::memory_report::sqlite_heap();
+    let (rust_live, rust_peak) = crate::desktop::memory_report::rust_heap();
+    let (sql_live, sql_peak) = crate::desktop::memory_report::sqlite_heap();
     out.push_str(&format!(
         "  of which Rust code holds {} (peak {}); SQLite holds {} (peak {}); the rest is GTK, WebKit, the graphics driver and other libraries\n",
         human_bytes(rust_live as u64),
@@ -68,7 +68,7 @@ impl AppModel {
         let renderer = gtk::prelude::NativeExt::renderer(&self.window)
             .map(|r| r.type_().name().to_string())
             .unwrap_or_else(|| "none yet".to_string());
-        let libs = crate::memory_report::graphics_libraries();
+        let libs = crate::desktop::memory_report::graphics_libraries();
         // Mesa's Vulkan loader maps every installed driver to enumerate the
         // devices, so lavapipe (and with it LLVM) shows up on a machine that
         // draws with its GPU too; software rendering is the verdict only when
@@ -231,7 +231,7 @@ impl AppModel {
             human_count(circles),
             human_bytes(circle_bytes as u64)
         ));
-        let (lines, line_bytes) = crate::console_log::stats();
+        let (lines, line_bytes) = crate::desktop::console_log::stats();
         out.push_str(&format!(
             "  console: {} lines, {}\n",
             human_count(lines),
@@ -253,7 +253,7 @@ impl AppModel {
             }
 
             AppMsg::ExportLogTo(path) => {
-                let text = crate::console_log::export_text(&self.memory_report());
+                let text = crate::desktop::console_log::export_text(&self.memory_report());
                 match std::fs::write(&path, text) {
                     Ok(()) => tracing::info!("log exported to {}", path.display()),
                     Err(e) => tracing::warn!("log export to {} failed: {e}", path.display()),
@@ -270,8 +270,8 @@ impl AppModel {
 /// the app: a user's log showed 1.73 GB held with 270 MB live.
 pub(super) fn start_heap_trim() {
     gtk::glib::timeout_add_seconds_local(30, || {
-        if let Some(held) = crate::memory_report::trim_if_worthwhile() {
-            tracing::debug!(target: "hylki::memory", "trimmed the heap: {} was freed but held", crate::memory_report::human_bytes(held as u64));
+        if let Some(held) = crate::desktop::memory_report::trim_if_worthwhile() {
+            tracing::debug!(target: "hylki::memory", "trimmed the heap: {} was freed but held", crate::desktop::memory_report::human_bytes(held as u64));
         }
         gtk::glib::ControlFlow::Continue
     });

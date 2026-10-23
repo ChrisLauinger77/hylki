@@ -20,7 +20,7 @@ fn restart_service_name() -> String {
 /// in place. The caller quits only on `Ok`, so a failed attempt leaves the
 /// app running rather than gone.
 pub(crate) fn launch_restart_helper() -> Result<(), String> {
-    if crate::platform::is_flatpak() {
+    if crate::desktop::platform::is_flatpak() {
         activate_restart_service()
     } else {
         spawn_restart_helper()
@@ -32,7 +32,7 @@ pub(crate) fn launch_restart_helper() -> Result<(), String> {
 /// temporary mount, which is unmounted as this process exits, so a helper
 /// holding it would re-exec a path that had stopped resolving.
 fn relaunch_path() -> Result<PathBuf, String> {
-    match crate::platform::appimage() {
+    match crate::desktop::platform::appimage() {
         Some(bundle) => Ok(bundle),
         None => std::env::current_exe().map_err(|e| e.to_string()),
     }

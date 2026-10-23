@@ -127,7 +127,7 @@ pub(super) fn with_given_name(name: &str, given: Option<&String>) -> String {
 }
 
 pub(super) fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> String {
-    let own = crate::platform::keyfile_value(book_data, "Data Source", "DisplayName");
+    let own = crate::desktop::platform::keyfile_value(book_data, "Data Source", "DisplayName");
     let (backend, identity, top_display) = book_account(book_data, sources);
     let account = identity.or(top_display.or(own.clone()));
     let label = match (backend.as_deref(), account.as_deref()) {
@@ -159,24 +159,32 @@ fn book_account(
     book_data: &str,
     sources: &HashMap<String, String>,
 ) -> (Option<String>, Option<String>, Option<String>) {
-    let mut backend = crate::platform::keyfile_value(book_data, "Address Book", "BackendName");
+    let mut backend =
+        crate::desktop::platform::keyfile_value(book_data, "Address Book", "BackendName");
     let mut identity: Option<String> = None;
     let mut top_display = None;
     let mut current = book_data.to_string();
     for _ in 0..4 {
-        let Some(parent) = crate::platform::keyfile_value(&current, "Data Source", "Parent") else {
+        let Some(parent) =
+            crate::desktop::platform::keyfile_value(&current, "Data Source", "Parent")
+        else {
             break;
         };
         let Some(parent_data) = sources.get(&parent) else {
             break;
         };
-        if let Some(b) = crate::platform::keyfile_value(parent_data, "Collection", "BackendName") {
+        if let Some(b) =
+            crate::desktop::platform::keyfile_value(parent_data, "Collection", "BackendName")
+        {
             backend = Some(b);
         }
         if identity.is_none() {
-            identity = crate::platform::keyfile_value(parent_data, "Collection", "Identity");
+            identity =
+                crate::desktop::platform::keyfile_value(parent_data, "Collection", "Identity");
         }
-        if let Some(d) = crate::platform::keyfile_value(parent_data, "Data Source", "DisplayName") {
+        if let Some(d) =
+            crate::desktop::platform::keyfile_value(parent_data, "Data Source", "DisplayName")
+        {
             top_display = Some(d);
         }
         current = parent_data.clone();
@@ -219,7 +227,7 @@ pub(super) fn group_format_for(backend: Option<&str>) -> Option<GroupFormat> {
 
 /// Whether a source keyfile's `[Data Source]` group says `Enabled=false`.
 pub(super) fn data_source_disabled(data: &str) -> bool {
-    crate::platform::keyfile(data).and_then(|kf| kf.boolean("Data Source", "Enabled").ok())
+    crate::desktop::platform::keyfile(data).and_then(|kf| kf.boolean("Data Source", "Enabled").ok())
         == Some(false)
 }
 

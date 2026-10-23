@@ -149,7 +149,7 @@ impl Directory {
     }
 
     fn from_source(uid: &str, path: &str, data: &str) -> Option<Self> {
-        let kf = crate::platform::keyfile(data)?;
+        let kf = crate::desktop::platform::keyfile(data)?;
         let get = |group: &str, key: &str| {
             kf.string(group, key)
                 .map(|s| s.to_string())
@@ -193,7 +193,7 @@ impl Directory {
     /// Saved by Hylki before 1.44, with its encryption only under a key EDS
     /// never read, so EDS has been connecting without any (#307).
     fn wants_security_moved(&self) -> bool {
-        crate::platform::keyfile(&self.data).is_some_and(|kf| {
+        crate::desktop::platform::keyfile(&self.data).is_some_and(|kf| {
             kf.has_key("LDAP Backend", "SecurityMethod")
                 .unwrap_or(false)
                 && !kf.has_key("Security", "Method").unwrap_or(false)
@@ -202,7 +202,7 @@ impl Directory {
 
     /// The source key file for this directory, over what EDS had.
     fn to_source(&self) -> String {
-        let kf = crate::platform::keyfile(&self.data).unwrap_or_default();
+        let kf = crate::desktop::platform::keyfile(&self.data).unwrap_or_default();
         kf.set_string("Data Source", "DisplayName", &self.title());
         kf.set_boolean("Data Source", "Enabled", self.enabled);
         if self.data.is_empty() {

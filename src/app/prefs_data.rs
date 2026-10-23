@@ -166,7 +166,7 @@ impl AppModel {
                     &title,
                     &name,
                     move |path| {
-                        std::fs::write(path, crate::console_log::export_text(&memory))
+                        std::fs::write(path, crate::desktop::console_log::export_text(&memory))
                             .map_err(|e| e.to_string())
                     },
                     |path| {

@@ -32,7 +32,7 @@ pub(crate) struct Book {
 // visible by the `--filesystem=xdg-{data,cache,config}/evolution:ro` grants). So
 // under Flatpak resolve them from the real home instead of the redirected XDG env.
 fn host_xdg(sandbox: fn() -> Option<PathBuf>, subdir: &str) -> Option<PathBuf> {
-    if crate::platform::is_flatpak() {
+    if crate::desktop::platform::is_flatpak() {
         dirs::home_dir().map(|h| h.join(subdir))
     } else {
         sandbox()
@@ -455,7 +455,7 @@ pub(super) fn open_book_db(path: &std::path::Path) -> rusqlite::Result<rusqlite:
     // Under Flatpak the book DB lives on a read-only host mount; a WAL database
     // can't be opened read-only there (it needs to touch the -shm/-wal files), so
     // open it `immutable=1` to read the committed snapshot without any locking.
-    if crate::platform::is_flatpak() {
+    if crate::desktop::platform::is_flatpak() {
         rusqlite::Connection::open_with_flags(
             format!("file:{}?immutable=1", path.to_string_lossy()),
             flags,
@@ -582,7 +582,7 @@ fn book_read_only(conn: &zbus::blocking::Connection, dest: &str, uid: &str) -> b
 /// Best-effort display name from the EDS source file for a book UID.
 pub(super) fn source_display_name(uid: &str) -> Option<String> {
     let path = config_dir()?.join(format!("sources/{uid}.source"));
-    crate::platform::keyfile_value(
+    crate::desktop::platform::keyfile_value(
         &std::fs::read_to_string(path).ok()?,
         "Data Source",
         "DisplayName",

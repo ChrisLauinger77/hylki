@@ -139,7 +139,7 @@ pub(crate) fn language_name(code: &str) -> String {
         "ja" => "日本語".into(),
         "zh-Hans" | "zh" => "中文（简体）".into(),
         "zh-Hant" => "中文（繁體）".into(),
-        _ => crate::spell::language_display_name(&code.replace('-', "_")),
+        _ => crate::desktop::spell::language_display_name(&code.replace('-', "_")),
     }
 }
 

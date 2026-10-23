@@ -123,7 +123,7 @@ pub(super) fn present(
 /// `gnome-contacts -i <uid>` selects the individual; the Flatpak D-Bus path
 /// can only raise the app.
 pub(super) fn launch_gnome_contacts_for(uid: &str) {
-    if crate::platform::is_flatpak() || uid.is_empty() {
+    if crate::desktop::platform::is_flatpak() || uid.is_empty() {
         launch_gnome_contacts();
         return;
     }
@@ -145,7 +145,7 @@ pub(crate) fn launch_gnome_contacts() {
     // Inside a Flatpak sandbox `gnome-contacts` isn't on the path, so a plain
     // exec fails. Reach the host app by D-Bus-activating it (it's a
     // DBusActivatable GApplication).
-    if crate::platform::is_flatpak() {
+    if crate::desktop::platform::is_flatpak() {
         if let Err(e) = activate_host_contacts() {
             // No `flatpak-spawn --host` fallback: reaching it needs
             // --talk-name=org.freedesktop.Flatpak, which is a general-purpose

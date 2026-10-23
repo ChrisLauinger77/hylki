@@ -43,7 +43,7 @@ pub(crate) fn decode_and_cache(email: &str, bytes: &[u8]) -> Option<gtk::gdk::Te
 /// Remember that a sender's domain has no usable icon.
 pub(crate) fn remember_missing(email: &str) {
     // Not looked up at all, offline or metered (#442).
-    if !crate::power::fetches_ahead() {
+    if !crate::desktop::power::fetches_ahead() {
         return;
     }
     if let Some(domain) = domain_of(email) {

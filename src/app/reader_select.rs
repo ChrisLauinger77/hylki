@@ -368,7 +368,7 @@ impl AppModel {
         }
         // Reading the new mail inside its conversation answers the
         // notification as opening it on its own does (#333).
-        crate::notify::withdraw_mail(account_id);
+        crate::desktop::notify::withdraw_mail(account_id);
         self.message_list
             .emit(MessageListInput::MarkRead((account_id, folder_id, id)));
         self.mark_cached_read(account_id, folder_id, id);

@@ -190,7 +190,7 @@ impl<E: Fn(WorkerEvent)> JmapWorker<E> {
         let emit = &self.emit;
         emit(WorkerEvent::Status(i18n("Sending…")));
         restore_msgid_case(cache.as_ref(), &mut message);
-        let reachable = crate::power::reaches_url(&jmap_base_url(account));
+        let reachable = crate::desktop::power::reaches_url(&jmap_base_url(account));
         let sent = match jmap_session(account, state, emit).await {
             Some(s) if reachable => jmap_send_message(
                 &s,

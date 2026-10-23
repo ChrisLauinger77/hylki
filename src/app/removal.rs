@@ -263,7 +263,7 @@ impl AppModel {
         self.send_to(account_id, MailRequest::MarkAllRead { folder_id, path });
         // Everything here is read now — the account's new-mail notification
         // included (issue #41).
-        crate::notify::withdraw_mail(account_id);
+        crate::desktop::notify::withdraw_mail(account_id);
         self.refresh_list_display();
         self.push_unread_counts();
     }

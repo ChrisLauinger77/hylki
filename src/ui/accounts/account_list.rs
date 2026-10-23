@@ -68,7 +68,7 @@ impl AccountsWindow {
             // The provider's mark, right of the name and address, named on
             // hover.
             let brand = brand_for_account(acc);
-            let mark = crate::brand::mark(brand, 24, crate::brand::GENERIC_MAIL);
+            let mark = crate::desktop::brand::mark(brand, 24, crate::desktop::brand::GENERIC_MAIL);
             mark.set_tooltip_text(Some(&provider_name(brand, acc)));
             hbox.append(&size_slot(mark.upcast_ref(), &mark_widths));
 
@@ -120,10 +120,10 @@ impl AccountsWindow {
         for (pos, g) in self.goa.iter().enumerate() {
             let row = adw::ActionRow::new();
             row.set_title(&g.email);
-            row.add_prefix(&crate::brand::mark(
+            row.add_prefix(&crate::desktop::brand::mark(
                 brand_for_goa(&g.provider),
                 24,
-                crate::brand::GENERIC_MAIL,
+                crate::desktop::brand::GENERIC_MAIL,
             ));
             let mut subtitle = if g.provider.is_empty() {
                 i18n("Mail")

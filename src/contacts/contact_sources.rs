@@ -109,7 +109,7 @@ pub(crate) fn group_of(uid: &str, sources: &HashMap<String, String>) -> String {
         let Some(data) = sources.get(&current) else {
             break;
         };
-        let Some(kf) = crate::platform::keyfile(data) else {
+        let Some(kf) = crate::desktop::platform::keyfile(data) else {
             break;
         };
         if kf.has_group("Collection") {
@@ -126,7 +126,7 @@ pub(crate) fn group_of(uid: &str, sources: &HashMap<String, String>) -> String {
     }
     let local = sources
         .get(uid)
-        .and_then(|d| crate::platform::keyfile_value(d, "Address Book", "BackendName"))
+        .and_then(|d| crate::desktop::platform::keyfile_value(d, "Address Book", "BackendName"))
         .is_some_and(|b| b == "local");
     if local {
         THIS_COMPUTER.to_string()
@@ -321,7 +321,7 @@ fn list_own() -> Vec<Source> {
             continue;
         }
         let data = sources.get(&id).cloned().unwrap_or_default();
-        let kf = crate::platform::keyfile(&data);
+        let kf = crate::desktop::platform::keyfile(&data);
         let display = key_of(&kf, "Data Source", "DisplayName");
         let goa_id = key_of(&kf, "GNOME Online Accounts", "AccountId");
         let source = if !goa_id.is_empty() {
@@ -391,7 +391,7 @@ fn books_by_group(
 ) -> HashMap<String, Vec<(Book, bool)>> {
     let mut groups: HashMap<String, Vec<(Book, bool)>> = HashMap::new();
     for (uid, data) in sources {
-        let Some(kf) = crate::platform::keyfile(data) else {
+        let Some(kf) = crate::desktop::platform::keyfile(data) else {
             continue;
         };
         let Ok(backend) = kf.string("Address Book", "BackendName") else {
@@ -474,7 +474,7 @@ fn online_source(
         .find_map(|b| {
             sources
                 .get(&b.uid)
-                .and_then(|d| crate::platform::keyfile_value(d, "Authentication", "Host"))
+                .and_then(|d| crate::desktop::platform::keyfile_value(d, "Authentication", "Host"))
         })
         .unwrap_or_default();
     let mark = online_mark(goa.map_or("", |g| g.provider_type.as_str()), &host);
@@ -621,7 +621,7 @@ fn ldap_sources(off: &HashSet<String>) -> Vec<Source> {
 /// writes, and nothing else tells them apart. Hylki's ask for address books
 /// only, with no calendar or mail address.
 fn is_hylki_made(data: &str) -> bool {
-    crate::platform::keyfile(data).is_some_and(|kf| {
+    crate::desktop::platform::keyfile(data).is_some_and(|kf| {
         kf.boolean("Collection", "CalendarEnabled").ok() == Some(false)
             && kf.boolean("Collection", "MailEnabled").ok() == Some(false)
     })

@@ -71,7 +71,7 @@ pub(crate) fn export_bundle() -> Result<String, String> {
         window: read_toml(window_path()),
         state: read_toml(state_path()),
         cloud: Some(crate::services::cloud::load_accounts()),
-        spell_words: Some(crate::spell::all_personal_words()),
+        spell_words: Some(crate::desktop::spell::all_personal_words()),
     };
     toml::to_string_pretty(&bundle).map_err(|e| e.to_string())
 }
@@ -100,7 +100,7 @@ pub(crate) fn import_bundle(text: &str) -> Result<usize, String> {
     // checker more.
     if let Some(words) = &bundle.spell_words {
         for (lang, list) in words {
-            crate::spell::merge_personal_words(lang, list);
+            crate::desktop::spell::merge_personal_words(lang, list);
         }
     }
     Ok(bundle.accounts.len())

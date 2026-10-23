@@ -312,7 +312,7 @@ pub(crate) fn read_smtp_password(email: &str) -> Result<Option<String>, String> 
 /// service so accounts added there keep working. The old entry is left as
 /// it is: the old app may still be installed and using it.
 fn load_legacy_key(key: &str) -> Option<String> {
-    for pred in crate::legacy::PREDECESSORS {
+    for pred in crate::desktop::legacy::PREDECESSORS {
         let Ok(old) = keyring::Entry::new(pred.keyring_service, key) else {
             continue;
         };

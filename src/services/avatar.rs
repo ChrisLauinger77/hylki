@@ -80,7 +80,7 @@ pub(crate) fn cache_stats() -> (usize, u64, usize, u64) {
         let bytes = c
             .values()
             .filter_map(|e| e.texture.as_ref())
-            .map(crate::memory_report::texture_bytes)
+            .map(crate::desktop::memory_report::texture_bytes)
             .sum();
         (c.len(), bytes)
     });
@@ -89,7 +89,7 @@ pub(crate) fn cache_stats() -> (usize, u64, usize, u64) {
         let bytes = c
             .values()
             .flatten()
-            .map(crate::memory_report::texture_bytes)
+            .map(crate::desktop::memory_report::texture_bytes)
             .sum();
         (c.len(), bytes)
     });
@@ -537,7 +537,7 @@ fn gravatar_image(email: &str) -> Result<Option<DecodedImage>, ()> {
     }
 
     // Offline or metered, a later bind asks again (#442).
-    if !crate::power::fetches_ahead() {
+    if !crate::desktop::power::fetches_ahead() {
         return Err(());
     }
     let _slot = GravatarSlot::acquire();
@@ -617,7 +617,7 @@ pub(crate) fn photo_thumb_stats() -> (usize, u64) {
         map.len(),
         map.values()
             .flatten()
-            .map(crate::memory_report::texture_bytes)
+            .map(crate::desktop::memory_report::texture_bytes)
             .sum(),
     )
 }

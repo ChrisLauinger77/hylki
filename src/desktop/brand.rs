@@ -15,7 +15,7 @@ macro_rules! brands {
         /// The PNG for a brand id, or none for an id we have no mark for.
         pub(crate) fn png(id: &str) -> Option<&'static [u8]> {
             match id {
-                $($id => Some(include_bytes!(concat!("../data/brands/", $id, ".png"))),)*
+                $($id => Some(include_bytes!(concat!("../../data/brands/", $id, ".png"))),)*
                 _ => None,
             }
         }

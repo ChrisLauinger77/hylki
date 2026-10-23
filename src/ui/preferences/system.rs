@@ -16,8 +16,8 @@ pub(super) fn link_group_description(browsers: &[crate::ui::launch::Browser]) ->
 }
 
 /// The Files extension row's subtitle: where it stands, and where it lives.
-pub(super) fn nautilus_status_text(state: &crate::nautilus_ext::State) -> String {
-    use crate::nautilus_ext::Status;
+pub(super) fn nautilus_status_text(state: &crate::desktop::nautilus_ext::State) -> String {
+    use crate::desktop::nautilus_ext::Status;
     let state_text = match state.status {
         Status::NotInstalled => i18n("Not installed"),
         Status::Installed if state.loaded => i18n("Installed and loaded by Files"),
@@ -28,7 +28,7 @@ pub(super) fn nautilus_status_text(state: &crate::nautilus_ext::State) -> String
         Status::Outdated => i18n("Installed, but from another version"),
     };
     let state = state_text;
-    match crate::nautilus_ext::path() {
+    match crate::desktop::nautilus_ext::path() {
         Some(p) => {
             let shown = p.display().to_string();
             let shown = match std::env::var("HOME") {
@@ -95,10 +95,10 @@ impl Preferences {
     }
 
     pub(super) fn on_nautilus_install(&mut self, root: &adw::Window) {
-        if let Err(e) = crate::nautilus_ext::install() {
+        if let Err(e) = crate::desktop::nautilus_ext::install() {
             report(root, &i18n("Could not install the extension"), &e);
         }
-        self.nautilus = crate::nautilus_ext::State::read();
+        self.nautilus = crate::desktop::nautilus_ext::State::read();
     }
 
     pub(super) fn on_measure_storage(&mut self, sender: ComponentSender<Self>) {
@@ -175,10 +175,10 @@ impl Preferences {
     }
 
     pub(super) fn on_nautilus_remove(&mut self, root: &adw::Window) {
-        if let Err(e) = crate::nautilus_ext::remove() {
+        if let Err(e) = crate::desktop::nautilus_ext::remove() {
             report(root, &i18n("Could not remove the extension"), &e);
         }
-        self.nautilus = crate::nautilus_ext::State::read();
+        self.nautilus = crate::desktop::nautilus_ext::State::read();
     }
 
     pub(super) fn on_change_files_action(&mut self, idx: u32, sender: ComponentSender<Self>) {
@@ -245,10 +245,10 @@ impl Preferences {
     }
 
     pub(super) fn on_nautilus_restart_files(&mut self, root: &adw::Window) {
-        if let Err(e) = crate::nautilus_ext::quit_files() {
+        if let Err(e) = crate::desktop::nautilus_ext::quit_files() {
             report(root, &i18n("Could not restart Files"), &e);
         }
-        self.nautilus = crate::nautilus_ext::State::read();
+        self.nautilus = crate::desktop::nautilus_ext::State::read();
     }
 
     pub(super) fn on_change_tray_icon(&mut self, index: u32, sender: ComponentSender<Self>) {

@@ -435,7 +435,7 @@ pub(super) async fn jmap_session(
         return Some(s.clone());
     }
     // The Refresh button already says the network is down (#442).
-    if !crate::power::reaches_url(&jmap_base_url(account)) {
+    if !crate::desktop::power::reaches_url(&jmap_base_url(account)) {
         return None;
     }
     let a = account.clone();

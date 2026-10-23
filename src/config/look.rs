@@ -126,7 +126,7 @@ pub(super) fn default_text_scale() -> u32 {
 /// as the desktop's own size.
 pub(crate) fn load_text_scale() -> u32 {
     let percent = load_privacy().text_scale;
-    if crate::text_scale::STEPS.contains(&percent) {
+    if crate::desktop::text_scale::STEPS.contains(&percent) {
         percent
     } else {
         100
@@ -137,7 +137,7 @@ pub(crate) fn load_text_scale() -> u32 {
 pub(crate) fn load_theme() -> String {
     let id = load_privacy().theme;
     if id.is_empty() {
-        crate::theme::SYSTEM_ID.to_string()
+        crate::desktop::theme::SYSTEM_ID.to_string()
     } else {
         id
     }

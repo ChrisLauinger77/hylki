@@ -190,9 +190,9 @@ impl AppModel {
         self.note_inbox_arrivals(account_id, folder_id, &messages);
         // The notified mail was read somewhere else, on the phone or
         // in another client: the notification goes too (#333).
-        if let Some((f, mid)) = crate::notify::posted_for(account_id) {
+        if let Some((f, mid)) = crate::desktop::notify::posted_for(account_id) {
             if f == folder_id && messages.iter().any(|m| m.id == mid && !m.unread) {
-                crate::notify::withdraw_mail(account_id);
+                crate::desktop::notify::withdraw_mail(account_id);
             }
         }
         // An Archive answers each visit with the same tens of

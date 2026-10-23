@@ -504,11 +504,11 @@ impl AppModel {
             AppMsg::OpenMailto(uri) => self.open_mailto(uri, sender),
 
             AppMsg::PresentComposers => {
-                crate::desktop::present_window(&self.window);
+                crate::desktop::session::present_window(&self.window);
                 // The newest standalone composer is the one the alert was
                 // about; transient for the main window, it sits above it.
                 if let Some(h) = self.composers.last() {
-                    crate::desktop::present_window(&h.window);
+                    crate::desktop::session::present_window(&h.window);
                 }
             }
             _ => unreachable!("not routed to on_compose_open"),

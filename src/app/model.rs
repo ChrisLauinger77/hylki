@@ -463,7 +463,7 @@ pub(crate) struct AppModel {
     /// What the launcher icon's badge counts (#271, #431).
     pub(super) launcher_badge: config::LauncherBadge,
     /// Inbox mail that arrived while the window was not in front (#431).
-    pub(super) arrivals: crate::launcher_badge::Arrivals,
+    pub(super) arrivals: crate::desktop::launcher_badge::Arrivals,
     /// The chosen app icon (an `app_icon::catalog` id); the tray draws it.
     pub(super) app_icon: String,
     /// A restart is on its way (Restart Now clicked, settle timer running).

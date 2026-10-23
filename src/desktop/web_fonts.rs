@@ -87,7 +87,7 @@ fn fallback_conf() -> Option<String> {
     if let Ok(path) = std::env::var("HYLKI_FONT_FALLBACK_CONF") {
         return std::path::Path::new(&path).is_file().then_some(path);
     }
-    (crate::platform::is_flatpak() && std::path::Path::new(FALLBACK_CONF).is_file())
+    (crate::desktop::platform::is_flatpak() && std::path::Path::new(FALLBACK_CONF).is_file())
         .then(|| FALLBACK_CONF.to_string())
 }
 
@@ -95,7 +95,9 @@ fn fallback_conf() -> Option<String> {
 fn runtime_key() -> String {
     std::fs::read_to_string("/.flatpak-info")
         .ok()
-        .and_then(|info| crate::platform::keyfile_value(&info, "Instance", "runtime-commit"))
+        .and_then(|info| {
+            crate::desktop::platform::keyfile_value(&info, "Instance", "runtime-commit")
+        })
         .unwrap_or_else(|| "host".to_string())
 }
 

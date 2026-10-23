@@ -209,7 +209,7 @@ pub(super) async fn graph_token(
 ) -> Option<String> {
     // Offline, no token is no fault of the sign-in; the Refresh button
     // already says the network is down (#442).
-    if !crate::power::reaches_internet() {
+    if !crate::desktop::power::reaches_internet() {
         return None;
     }
     match fetch_oauth_token(account).await {

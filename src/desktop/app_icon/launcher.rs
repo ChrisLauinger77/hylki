@@ -84,7 +84,7 @@ impl Launcher {
         if user_path.exists() && !ours {
             return Launcher::Owned(user_path);
         }
-        if crate::platform::is_flatpak() {
+        if crate::desktop::platform::is_flatpak() {
             let base = PathBuf::from("/app/share/applications").join(&file);
             let Some((exec, try_exec)) = flatpak_exec() else {
                 return Launcher::None;
@@ -104,7 +104,7 @@ impl Launcher {
         // and touch its `Icon` line alone, as for any other entry we did not
         // write ourselves. Nothing to point at means nothing to do: an
         // un-integrated bundle has no launcher at all.
-        if let Some(bundle) = crate::platform::appimage() {
+        if let Some(bundle) = crate::desktop::platform::appimage() {
             return match launcher_running(&user_dir, &bundle) {
                 Some(path) => Launcher::Owned(path),
                 None => Launcher::None,
@@ -228,7 +228,7 @@ fn flatpak_exec() -> Option<(String, String)> {
 
 /// One key's value from a desktop file's main group (not an action's).
 fn desktop_value(text: &str, key: &str) -> Option<String> {
-    crate::platform::keyfile_value(text, "Desktop Entry", key)
+    crate::desktop::platform::keyfile_value(text, "Desktop Entry", key)
 }
 
 /// Returns whether the user's directory holds a copy of ours afterwards,
@@ -449,7 +449,7 @@ fn collect_mime_types(
 /// that has none or is `Hidden`.
 fn desktop_mime_types(text: &str) -> Vec<String> {
     const MAIN: &str = "Desktop Entry";
-    let Some(kf) = crate::platform::keyfile(text) else {
+    let Some(kf) = crate::desktop::platform::keyfile(text) else {
         return Vec::new();
     };
     if kf.boolean(MAIN, "Hidden").unwrap_or(false) {

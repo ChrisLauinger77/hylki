@@ -78,12 +78,12 @@ impl AppModel {
         let in_front = self.window.is_active()
             || (demo_mode() && std::env::var_os("HYLKI_SHOWCASE_IN_FRONT").is_some());
         if !in_front {
-            crate::notify::new_mail(
+            crate::desktop::notify::new_mail(
                 account_id, folder_id, message_id, from, subject, others, in_place,
             );
         } else if crate::config::sound_when_focused() {
             tracing::info!("new mail with the window in front: the sound alone");
-            crate::notify::sound_for_new_mail();
+            crate::desktop::notify::sound_for_new_mail();
         } else {
             tracing::debug!("new mail with the window in front: no notification, no sound");
         }
@@ -128,7 +128,7 @@ impl AppModel {
                 if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
                 {
                     self.move_to(m, FolderKind::Archive);
-                    crate::notify::withdraw_mail(account_id);
+                    crate::desktop::notify::withdraw_mail(account_id);
                 }
             }
 
@@ -142,7 +142,7 @@ impl AppModel {
                     // The same path as the Delete key: to Trash, with the
                     // usual undo; a message already there asks first.
                     self.delete_messages(vec![m], &sender);
-                    crate::notify::withdraw_mail(account_id);
+                    crate::desktop::notify::withdraw_mail(account_id);
                 }
             }
 
@@ -154,7 +154,7 @@ impl AppModel {
                 if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
                 {
                     self.mark_spam_msg(m);
-                    crate::notify::withdraw_mail(account_id);
+                    crate::desktop::notify::withdraw_mail(account_id);
                 }
             }
 
@@ -218,7 +218,7 @@ impl AppModel {
                 tracing::error!("[account {account_id}] {text}");
                 // A connection that died with the network: the Refresh
                 // button already says it is down (#442).
-                if connectivity && !crate::power::reaches_internet() {
+                if connectivity && !crate::desktop::power::reaches_internet() {
                     return;
                 }
                 let text = crate::worker::readable_error(&text);
@@ -227,7 +227,11 @@ impl AppModel {
                 // blips that auto-recover), and only when unfocused — the in-app bar
                 // already surfaces it while you're looking.
                 if self.notifications_enabled && !connectivity && !self.window.is_active() {
-                    crate::notify::error(account_id, &format!("{label}: mail error"), &text);
+                    crate::desktop::notify::error(
+                        account_id,
+                        &format!("{label}: mail error"),
+                        &text,
+                    );
                 }
                 self.notifications.emit(NotifyInput::Push {
                     text: format!("{label}: {text}"),
@@ -261,7 +265,7 @@ impl AppModel {
         // The user clicked a new-mail notification: they've engaged with
         // that account's mail, so clear its toast, then navigate to the
         // message's folder and open it in the reader.
-        crate::notify::withdraw_mail(account_id);
+        crate::desktop::notify::withdraw_mail(account_id);
         tracing::info!(
             "notification: open account {account_id} folder {folder_id} message {message_id} (unified row: {})",
             self.unified_inboxes_shown()
@@ -335,10 +339,10 @@ impl AppModel {
     /// own present, which raises the composer too.
     fn install_present_actions(&self, sender: &ComponentSender<Self>) {
         let app = relm4::main_application();
-        let present = gtk::gio::SimpleAction::new(crate::notify::PRESENT_ACTION, None);
+        let present = gtk::gio::SimpleAction::new(crate::desktop::notify::PRESENT_ACTION, None);
         let win = self.window.clone();
         present.connect_activate(move |_, _| {
-            crate::desktop::present_window(&win);
+            crate::desktop::session::present_window(&win);
         });
         app.add_action(&present);
 
@@ -346,7 +350,7 @@ impl AppModel {
         // the click raises the composer too, and the alert goes away by
         // itself once any window of ours has the focus.
         let present_compose =
-            gtk::gio::SimpleAction::new(crate::notify::PRESENT_COMPOSE_ACTION, None);
+            gtk::gio::SimpleAction::new(crate::desktop::notify::PRESENT_COMPOSE_ACTION, None);
         let psender = sender.clone();
         present_compose.connect_activate(move |_, _| {
             psender.input(AppMsg::PresentComposers);
@@ -355,7 +359,7 @@ impl AppModel {
         let fsender = sender.clone();
         self.window.connect_is_active_notify(move |w| {
             if w.is_active() {
-                crate::notify::withdraw_compose_ready();
+                crate::desktop::notify::withdraw_compose_ready();
                 // Focus comes back after an unlock, when the dock has
                 // just been rebuilt without the badge; and the mail
                 // that arrived meanwhile has now been seen (#431).
@@ -371,11 +375,12 @@ impl AppModel {
         ty: &gtk::glib::VariantTy,
     ) {
         let app = relm4::main_application();
-        let open = gtk::gio::SimpleAction::new(crate::notify::OPEN_MESSAGE_ACTION, Some(ty));
+        let open =
+            gtk::gio::SimpleAction::new(crate::desktop::notify::OPEN_MESSAGE_ACTION, Some(ty));
         let win = self.window.clone();
         let osender = sender.clone();
         open.connect_activate(move |_, param| {
-            crate::desktop::present_window(&win);
+            crate::desktop::session::present_window(&win);
             if let Some((account_id, folder_id, message_id)) =
                 param.and_then(|v| v.get::<(u32, u32, u32)>())
             {
@@ -401,7 +406,7 @@ impl AppModel {
         // composer follows once its body is in.
         for (name, mk) in [
             (
-                crate::notify::REPLY_ACTION,
+                crate::desktop::notify::REPLY_ACTION,
                 (&|account_id, folder_id, message_id| AppMsg::NotificationReply {
                     account_id,
                     folder_id,
@@ -409,7 +414,7 @@ impl AppModel {
                 }) as &dyn Fn(u32, u32, u32) -> AppMsg,
             ),
             (
-                crate::notify::FORWARD_ACTION,
+                crate::desktop::notify::FORWARD_ACTION,
                 &|account_id, folder_id, message_id| AppMsg::NotificationForward {
                     account_id,
                     folder_id,
@@ -421,7 +426,7 @@ impl AppModel {
             let win = self.window.clone();
             let asender = sender.clone();
             act.connect_activate(move |_, param| {
-                crate::desktop::present_window(&win);
+                crate::desktop::session::present_window(&win);
                 if let Some((account_id, folder_id, message_id)) =
                     param.and_then(|v| v.get::<(u32, u32, u32)>())
                 {
@@ -442,7 +447,7 @@ impl AppModel {
     /// could only linger (#333). New mail since is notified afresh.
     pub(super) fn withdraw_stale_notifications(&self) {
         for a in &self.accounts {
-            crate::notify::withdraw_mail(a.id);
+            crate::desktop::notify::withdraw_mail(a.id);
         }
     }
 }
@@ -454,7 +459,7 @@ fn install_quiet_message_actions(sender: &ComponentSender<AppModel>, ty: &gtk::g
     // without presenting the window — that's their point.
     for (name, mk) in [
         (
-            crate::notify::MARK_READ_ACTION,
+            crate::desktop::notify::MARK_READ_ACTION,
             (&|account_id, folder_id, message_id| AppMsg::NotificationMarkRead {
                 account_id,
                 folder_id,
@@ -462,7 +467,7 @@ fn install_quiet_message_actions(sender: &ComponentSender<AppModel>, ty: &gtk::g
             }) as &dyn Fn(u32, u32, u32) -> AppMsg,
         ),
         (
-            crate::notify::ARCHIVE_ACTION,
+            crate::desktop::notify::ARCHIVE_ACTION,
             &|account_id, folder_id, message_id| AppMsg::NotificationArchive {
                 account_id,
                 folder_id,
@@ -470,7 +475,7 @@ fn install_quiet_message_actions(sender: &ComponentSender<AppModel>, ty: &gtk::g
             },
         ),
         (
-            crate::notify::DELETE_ACTION,
+            crate::desktop::notify::DELETE_ACTION,
             &|account_id, folder_id, message_id| AppMsg::NotificationDelete {
                 account_id,
                 folder_id,
@@ -478,7 +483,7 @@ fn install_quiet_message_actions(sender: &ComponentSender<AppModel>, ty: &gtk::g
             },
         ),
         (
-            crate::notify::SPAM_ACTION,
+            crate::desktop::notify::SPAM_ACTION,
             &|account_id, folder_id, message_id| AppMsg::NotificationSpam {
                 account_id,
                 folder_id,
@@ -491,7 +496,7 @@ fn install_quiet_message_actions(sender: &ComponentSender<AppModel>, ty: &gtk::g
         act.connect_activate(move |_, param| {
             // No window will spend the shell's launch token, so
             // end the launch here, or the busy pointer stays up.
-            crate::startup::complete();
+            crate::desktop::startup::complete();
             if let Some((account_id, folder_id, message_id)) =
                 param.and_then(|v| v.get::<(u32, u32, u32)>())
             {

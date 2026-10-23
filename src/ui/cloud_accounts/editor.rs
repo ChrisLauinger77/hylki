@@ -76,7 +76,7 @@ impl EditorRows {
             let Some(old) = bx.first_child() else { return };
             let label = old.next_sibling().and_downcast::<gtk::Label>();
             bx.remove(&old);
-            bx.prepend(&crate::brand::image(service.brand(), 20));
+            bx.prepend(&crate::desktop::brand::image(service.brand(), 20));
             if let Some(label) = label {
                 label.set_label(service.name);
             }
@@ -262,7 +262,7 @@ pub(super) fn build_editor(
     } = EditorRows::new(&account, index);
     let set_header_mark = {
         let header_mark = header_mark.clone();
-        move |id: &str| match crate::brand::texture(id, 112) {
+        move |id: &str| match crate::desktop::brand::texture(id, 112) {
             Some(t) => header_mark.set_paintable(Some(&t)),
             None => header_mark.set_icon_name(Some("cloud-symbolic")),
         }

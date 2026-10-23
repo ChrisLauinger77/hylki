@@ -83,7 +83,7 @@ fn bases() -> Vec<(&'static str, PathBuf)> {
 /// not exist yet. Runs before anything reads its settings.
 pub(crate) fn migrate_dirs() {
     let mut from: Option<&'static Predecessor> = None;
-    let in_flatpak = crate::platform::is_flatpak();
+    let in_flatpak = crate::desktop::platform::is_flatpak();
     let home = dirs::home_dir();
     for (sub, base) in bases() {
         let new = base.join("hylki");
@@ -172,7 +172,7 @@ fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// "not seen" is not "gone" — callers only act on what they can verify.
 fn predecessor_seen(pred: &Predecessor) -> bool {
     let mut paths = vec![PathBuf::from("/var/lib/flatpak/exports/bin").join(pred.app_id)];
-    if let Some(home) = crate::platform::home() {
+    if let Some(home) = crate::desktop::platform::home() {
         paths.push(
             home.join(".local/share/flatpak/exports/bin")
                 .join(pred.app_id),
@@ -197,7 +197,7 @@ pub(crate) fn tidy_host() {
 }
 
 fn tidy_nautilus_extension() {
-    let Some(dir) = crate::nautilus_ext::dir() else {
+    let Some(dir) = crate::desktop::nautilus_ext::dir() else {
         return;
     };
     for pred in PREDECESSORS {
@@ -205,9 +205,9 @@ fn tidy_nautilus_extension() {
         if !old.exists() {
             continue;
         }
-        let ours = dir.join(crate::nautilus_ext::FILE_NAME);
+        let ours = dir.join(crate::desktop::nautilus_ext::FILE_NAME);
         if !ours.exists() {
-            if let Err(e) = std::fs::write(&ours, crate::nautilus_ext::SOURCE) {
+            if let Err(e) = std::fs::write(&ours, crate::desktop::nautilus_ext::SOURCE) {
                 tracing::warn!(
                     "could not install the Files extension in place of {}: {e}",
                     old.display()
@@ -232,7 +232,7 @@ fn tidy_nautilus_extension() {
 }
 
 fn tidy_launchers() {
-    let Some(home) = crate::platform::home() else {
+    let Some(home) = crate::desktop::platform::home() else {
         return;
     };
     let share = home.join(".local/share");
@@ -260,7 +260,7 @@ fn tidy_launchers() {
         match std::fs::remove_file(&launcher) {
             Ok(()) => {
                 tracing::info!("removed {}", launcher.display());
-                crate::app_icon::sync_mime_cache(&share.join("applications"));
+                crate::desktop::app_icon::sync_mime_cache(&share.join("applications"));
             }
             Err(e) => tracing::warn!("could not remove {}: {e}", launcher.display()),
         }
@@ -285,7 +285,7 @@ fn tidy_launchers() {
 /// setting, so the user is pointed at Settings → Default Apps instead.
 pub(crate) fn default_mailer() -> Option<&'static Predecessor> {
     let mut files = Vec::new();
-    if let Some(home) = crate::platform::home() {
+    if let Some(home) = crate::desktop::platform::home() {
         files.push(home.join(".config/mimeapps.list"));
         files.push(home.join(".local/share/applications/mimeapps.list"));
     }

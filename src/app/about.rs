@@ -126,7 +126,7 @@ fn about_info_rows(page: &gtk::Box, nav: &adw::NavigationView, sender: &Componen
 
     // Linux Mint (Cinnamon): re-open the one-time keyring setup tip. Shown only
     // where that tip applies, so Mint users who dismissed it can find it again.
-    if crate::platform::is_mint_cinnamon() {
+    if crate::desktop::platform::is_mint_cinnamon() {
         let keyring_row = adw::ActionRow::builder()
             .title(i18n("Keyring Setup Help"))
             .subtitle(i18n("Make account passwords persist on Linux Mint"))

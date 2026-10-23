@@ -91,7 +91,9 @@ pub(super) fn dest_from_service_files(
         let name = entry.file_name().to_string_lossy().to_string();
         if name.contains(file_needle) && name.ends_with(".service") {
             if let Ok(text) = std::fs::read_to_string(entry.path()) {
-                if let Some(n) = crate::platform::keyfile_value(&text, "D-BUS Service", "Name") {
+                if let Some(n) =
+                    crate::desktop::platform::keyfile_value(&text, "D-BUS Service", "Name")
+                {
                     if accept(&n) {
                         return Some(n);
                     }

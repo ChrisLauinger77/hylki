@@ -12,7 +12,7 @@ use crate::ui::preferences::PrefOutput;
 use super::attachments::prune_downloads;
 use super::model::AppModel;
 use super::theme::{apply_app_theme, refresh_scheme_css};
-use crate::icon_theme::apply_icon_theme;
+use crate::desktop::icon_theme::apply_icon_theme;
 
 impl AppModel {
     /// Push the date and clock preference into the formatter and redraw whatever
@@ -42,7 +42,7 @@ impl AppModel {
             PrefOutput::SetTextScale(percent) => {
                 if self.text_scale != percent {
                     self.text_scale = percent;
-                    crate::text_scale::apply(percent);
+                    crate::desktop::text_scale::apply(percent);
                     self.save_settings();
                 }
             }
@@ -55,7 +55,7 @@ impl AppModel {
                     // scheme-dependent CSS reads back are taken a main-loop
                     // pass later, as they are on a light/dark flip, so the
                     // lookups answer for the palette that just landed.
-                    crate::theme::set(&id);
+                    crate::desktop::theme::set(&id);
                     gtk::glib::idle_add_local_once(refresh_scheme_css);
                     self.save_settings();
                 }
@@ -138,8 +138,8 @@ impl AppModel {
 
             PrefOutput::SetMeteredSaveData(on) => {
                 if pref!(self.metered_save_data = on) {
-                    let was = crate::power::saving_data();
-                    crate::power::set_save_data(on);
+                    let was = crate::desktop::power::saving_data();
+                    crate::desktop::power::set_save_data(on);
                     self.saving_data_changed(was);
                 }
             }
@@ -170,16 +170,16 @@ impl AppModel {
                     // Ask the portal as the setting changes, so the permission
                     // dialog appears while the user is looking at the switch they
                     // just moved rather than at some later, unexplained moment.
-                    crate::background::request(on && self.autostart);
+                    crate::desktop::background::request(on && self.autostart);
                     if !on {
-                        crate::background::set_status("");
+                        crate::desktop::background::set_status("");
                     }
                 }
             }
 
             PrefOutput::SetAutostart(on) => {
                 if pref!(self.autostart = on) {
-                    crate::background::request(self.run_in_background.get() && on);
+                    crate::desktop::background::request(self.run_in_background.get() && on);
                 }
             }
 
@@ -209,12 +209,15 @@ impl AppModel {
             PrefOutput::SetAppIcon(id) => {
                 // Picking the stored choice again still changes the desktop
                 // when it replaces an icon set outside Hylki (#252).
-                let replaces_custom = crate::app_icon::custom_icon().is_some();
-                let id = crate::app_icon::set(&id);
+                let replaces_custom = crate::desktop::app_icon::custom_icon().is_some();
+                let id = crate::desktop::app_icon::set(&id);
                 if self.app_icon != id || replaces_custom {
                     self.app_icon = id;
                     if let Some(tray) = &self.tray {
-                        tray.set_icon(self.tray_icon, &crate::app_icon::tray_image(&self.app_icon));
+                        tray.set_icon(
+                            self.tray_icon,
+                            &crate::desktop::app_icon::tray_image(&self.app_icon),
+                        );
                     }
                     self.offer_restart_for_icon(&sender);
                 }

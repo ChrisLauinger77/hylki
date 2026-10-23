@@ -389,7 +389,7 @@ impl SimpleComponent for NotificationCenter {
             transient_error: false,
             transient_visible: false,
             status_text: String::new(),
-            offline: !crate::power::online(),
+            offline: !crate::desktop::power::online(),
             panel_open: false,
             console_enabled: false,
             console_open: false,

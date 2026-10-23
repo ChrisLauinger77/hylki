@@ -378,7 +378,7 @@ pub(crate) fn web_view_lines() -> Vec<String> {
             roles.join(", ")
         }
     )];
-    if crate::platform::is_flatpak() {
+    if crate::desktop::platform::is_flatpak() {
         lines.push(
             "  those web processes run outside the sandbox (started through flatpak-spawn, listed above only as its proxy), so their memory is NOT in the totals above: a system monitor shows them as WebKitWebProcess"
                 .to_string(),

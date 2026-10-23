@@ -247,7 +247,7 @@ impl AppModel {
             // The mail was read (or marked read) in the app — the desktop
             // notification for this account's new mail is answered, clear it
             // instead of leaving it stranded in the panel (issue #41).
-            crate::notify::withdraw_mail(m.account_id);
+            crate::desktop::notify::withdraw_mail(m.account_id);
         }
         self.message_list.emit(MessageListInput::SetRead {
             slot: (m.account_id, m.folder_id, m.id),

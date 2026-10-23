@@ -86,7 +86,9 @@ pub(crate) fn cache_stats() -> (usize, u64, usize) {
         let c = c.borrow();
         (
             c.len(),
-            c.values().map(crate::memory_report::texture_bytes).sum(),
+            c.values()
+                .map(crate::desktop::memory_report::texture_bytes)
+                .sum(),
         )
     });
     (n, bytes, MISSES.with(|m| m.borrow().len()))
@@ -209,7 +211,7 @@ pub(crate) fn cached(email: &str) -> Option<gtk::gdk::Texture> {
 /// doesn't fan out into a fetch per row.
 pub(crate) fn wants_refresh(email: &str) -> bool {
     // Spent offline, the session's one look would find nothing (#442).
-    if is_mailbox_host(email) || !crate::power::fetches_ahead() {
+    if is_mailbox_host(email) || !crate::desktop::power::fetches_ahead() {
         return false;
     }
     let Some(domain) = domain_of(email) else {
@@ -286,7 +288,7 @@ fn fetch_from(email: &str) -> Option<(Vec<u8>, String)> {
     let bimi_fresh = bimi.as_ref().is_some_and(fresh);
     // Offline or metered, only what is on disk answers, and no answer is
     // stored: a miss now says nothing about the domain (#442).
-    let online = crate::power::fetches_ahead();
+    let online = crate::desktop::power::fetches_ahead();
     if bimi_fresh || !online {
         if let Some(bytes) = stored_bimi(&domain) {
             return Some((bytes, "stored BIMI logo".into()));

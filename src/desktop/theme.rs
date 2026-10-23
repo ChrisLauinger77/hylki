@@ -9,7 +9,7 @@
 //! is on screen.
 //!
 //! The palettes themselves are T3 Code's theme library (MIT), converted to
-//! sRGB by `tools/gen-themes.py` into [`crate::theme_palettes`]. This module
+//! sRGB by `tools/gen-themes.py` into [`crate::desktop::theme_palettes`]. This module
 //! maps their product roles (canvas, surface, sidebar…) onto libadwaita's
 //! named colors and keeps a single CSS provider up to date with the active
 //! palette.
@@ -22,7 +22,7 @@
 
 use std::cell::RefCell;
 
-use crate::theme_palettes::THEMES;
+use crate::desktop::theme_palettes::THEMES;
 
 /// The stock GNOME look: no palette of our own, just libadwaita and the
 /// desktop's accent color. The default, and what "no theme" saves as.

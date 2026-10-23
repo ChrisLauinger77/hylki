@@ -41,7 +41,7 @@ pub(super) fn spawn_jmap_push(s: JmapSession, tx: mpsc::UnboundedSender<()>) {
                 }
                 // Offline: wait for the network rather than redial into
                 // nothing every 30 seconds (#442).
-                if !crate::power::reaches_url(&url) {
+                if !crate::desktop::power::reaches_url(&url) {
                     std::thread::sleep(Duration::from_secs(5));
                     continue;
                 }

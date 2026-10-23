@@ -40,9 +40,10 @@ impl AppModel {
                 // Nothing unread left where the notification points: it is
                 // answered, wherever the mail was read (#333).
                 if unread == 0
-                    && crate::notify::posted_for(account_id).is_some_and(|(f, _)| f == folder_id)
+                    && crate::desktop::notify::posted_for(account_id)
+                        .is_some_and(|(f, _)| f == folder_id)
                 {
-                    crate::notify::withdraw_mail(account_id);
+                    crate::desktop::notify::withdraw_mail(account_id);
                 }
                 // Likewise while mail is being taken out of the folder: each
                 // move changes the server's count before the app hears the
@@ -143,10 +144,10 @@ impl AppModel {
                 }
                 if let Some(folder_id) = id {
                     if unread == 0
-                        && crate::notify::posted_for(account_id)
+                        && crate::desktop::notify::posted_for(account_id)
                             .is_some_and(|(f, _)| f == folder_id)
                     {
-                        crate::notify::withdraw_mail(account_id);
+                        crate::desktop::notify::withdraw_mail(account_id);
                     }
                     let prev = self.folder_unread.insert((account_id, folder_id), unread);
                     if prev != Some(unread) {

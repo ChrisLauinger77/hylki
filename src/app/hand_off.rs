@@ -171,7 +171,7 @@ impl AppModel {
                 .any(|w| w.is_active());
             if !ours {
                 tracing::info!("hand-off: window did not get the focus, posting an alert");
-                crate::notify::compose_ready(attached as u32);
+                crate::desktop::notify::compose_ready(attached as u32);
             }
         });
     }

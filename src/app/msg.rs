@@ -1079,7 +1079,7 @@ pub(crate) enum AppMsg {
     /// keyring said after the save.
     ReconnectAccounts,
     /// The one-time notice that an earlier install's data was carried over.
-    ShowCarryOverNotice(&'static crate::legacy::Predecessor),
+    ShowCarryOverNotice(&'static crate::desktop::legacy::Predecessor),
     /// An account was switched on or off in Settings.
     AccountEnabledChanged { email: String, enabled: bool },
     /// The welcome wizard's privacy/personalize choices: fan out through the

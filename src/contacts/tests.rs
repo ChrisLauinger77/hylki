@@ -240,7 +240,7 @@ fn eds_sources_are_read_as_key_files() {
         &book.replace("Enabled=true", "Enabled=false")
     ));
     assert_eq!(
-        crate::platform::keyfile_value(book, "Address Book", "Missing"),
+        crate::desktop::platform::keyfile_value(book, "Address Book", "Missing"),
         None
     );
 }

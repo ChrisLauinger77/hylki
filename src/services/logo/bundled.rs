@@ -65,7 +65,7 @@ pub(super) fn has_bundled(email: &str) -> bool {
 /// over white, inset a little, since many are dark on transparent.
 pub(super) fn bundled_bytes(entry: &LogoEntry) -> Option<Vec<u8>> {
     match entry.source.as_str() {
-        "brand" => crate::brand::png(&entry.file).map(<[u8]>::to_vec),
+        "brand" => crate::desktop::brand::png(&entry.file).map(<[u8]>::to_vec),
         "simple" | "gilbarbara" => {
             let path = format!("/co/hyprlab/Hylki/logos/{}/{}", entry.source, entry.file);
             let data =

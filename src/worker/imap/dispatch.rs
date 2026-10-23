@@ -178,7 +178,7 @@ impl<E: Emit> ImapWorker<E> {
         let cache = &self.cache;
         let emit = &self.emit;
         let session = &mut self.session;
-        if session.is_some() && !crate::power::reaches(&account.imap_host) {
+        if session.is_some() && !crate::desktop::power::reaches(&account.imap_host) {
             *session = None;
         }
         if session.is_some() {
@@ -222,7 +222,7 @@ impl<E: Emit> ImapWorker<E> {
                     emit,
                 ),
                 None => {
-                    let e = if crate::power::reaches(&account.imap_host) {
+                    let e = if crate::desktop::power::reaches(&account.imap_host) {
                         i18n("could not reach the server")
                     } else {
                         offline_text()

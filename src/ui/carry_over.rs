@@ -4,8 +4,8 @@
 
 use adw::prelude::*;
 
+use crate::desktop::legacy::Predecessor;
 use crate::i18n::{i18n, i18n_f};
-use crate::legacy::Predecessor;
 
 #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(crate) fn show(parent: &impl IsA<gtk::Window>, from: &'static Predecessor) {
@@ -16,7 +16,7 @@ pub(crate) fn show(parent: &impl IsA<gtk::Window>, from: &'static Predecessor) {
          removed. Once everything is here, you can remove {old}.",
         &[("old", from.name)],
     );
-    if crate::legacy::default_mailer().is_some_and(|p| std::ptr::eq(p, from)) {
+    if crate::desktop::legacy::default_mailer().is_some_and(|p| std::ptr::eq(p, from)) {
         body.push_str("\n\n");
         body.push_str(&i18n_f(
             "{old} is still the app your desktop opens email links with. To hand \
@@ -53,7 +53,7 @@ pub(crate) fn show(parent: &impl IsA<gtk::Window>, from: &'static Predecessor) {
     text.set_justify(gtk::Justification::Center);
     content.append(&text);
 
-    if crate::platform::is_flatpak() {
+    if crate::desktop::platform::is_flatpak() {
         let caption = gtk::Label::new(Some(
             i18n_f("To remove {old}, run:", &[("old", from.name)]).as_str(),
         ));

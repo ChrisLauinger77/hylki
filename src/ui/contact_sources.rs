@@ -86,7 +86,7 @@ const ADD_KINDS: &[AddKind] = &[
 
 /// A brand mark, or the icon of that name when there is none.
 fn mark(id: &str, px: i32) -> gtk::Widget {
-    crate::brand::mark(id, px, id)
+    crate::desktop::brand::mark(id, px, id)
 }
 
 /// The editor page's Save, shared with the page's widgets (see

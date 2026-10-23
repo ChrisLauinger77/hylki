@@ -510,7 +510,7 @@ impl Preferences {
             body.append(&title);
             // An icon set outside Hylki stays until a pick here (#252): say
             // so, and ring no tile, since none of them is what shows.
-            let custom = crate::app_icon::custom_icon().is_some();
+            let custom = crate::desktop::app_icon::custom_icon().is_some();
             let note = gtk::Label::new(Some(
                 i18n("The launcher shows an icon set elsewhere. Picking one here replaces it.")
                     .as_str(),
@@ -700,7 +700,7 @@ impl Preferences {
             .appearance
             .app_theme_row
             .set_selected(app_theme_sel as u32);
-        let text_scale_labels_owned: Vec<String> = crate::text_scale::STEPS
+        let text_scale_labels_owned: Vec<String> = crate::desktop::text_scale::STEPS
             .iter()
             .map(|p| match p {
                 100 => i18n("Default"),
@@ -713,7 +713,7 @@ impl Preferences {
             .appearance
             .text_scale_row
             .set_model(Some(&gtk::StringList::new(&text_scale_labels)));
-        let text_scale_sel = crate::text_scale::STEPS
+        let text_scale_sel = crate::desktop::text_scale::STEPS
             .iter()
             .position(|p| *p == init.text_scale)
             .unwrap_or(1);
@@ -786,7 +786,7 @@ impl Preferences {
         // the desktop's monospace font until another is chosen.
         {
             let desc = if init.plain_font.trim().is_empty() {
-                crate::desktop::monospace_font()
+                crate::desktop::session::monospace_font()
             } else {
                 init.plain_font.clone()
             };

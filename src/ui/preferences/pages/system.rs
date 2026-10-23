@@ -206,7 +206,7 @@ impl SystemPage {
                             set_label: &i18n("Remove"),
                             set_valign: gtk::Align::Center,
                             // Kept current by update_view.
-                            set_visible: model.nautilus.status != crate::nautilus_ext::Status::NotInstalled,
+                            set_visible: model.nautilus.status != crate::desktop::nautilus_ext::Status::NotInstalled,
                             connect_clicked => PrefInput::NautilusRemove,
                         },
                         #[name = "nautilus_install_btn"]
@@ -216,7 +216,7 @@ impl SystemPage {
                             set_valign: gtk::Align::Center,
                             add_css_class: "suggested-action",
                             // Kept current by update_view.
-                            set_visible: model.nautilus.status != crate::nautilus_ext::Status::Installed,
+                            set_visible: model.nautilus.status != crate::desktop::nautilus_ext::Status::Installed,
                             connect_clicked => PrefInput::NautilusInstall,
                         },
                     },
@@ -342,12 +342,13 @@ impl SystemPage {
             .set_sensitive(model.storage.is_some_and(|(b, f, _)| b + f > 0));
         self.nautilus_row
             .set_subtitle(&nautilus_status_text(&model.nautilus));
-        self.nautilus_remove_btn
-            .set_visible(model.nautilus.status != crate::nautilus_ext::Status::NotInstalled);
+        self.nautilus_remove_btn.set_visible(
+            model.nautilus.status != crate::desktop::nautilus_ext::Status::NotInstalled,
+        );
         self.nautilus_install_btn
             .set_label(&nautilus_install_label(model));
         self.nautilus_install_btn
-            .set_visible(model.nautilus.status != crate::nautilus_ext::Status::Installed);
+            .set_visible(model.nautilus.status != crate::desktop::nautilus_ext::Status::Installed);
         self.nautilus_cmd_row
             .set_visible(nautilus_cmd_wanted(model));
     }
@@ -355,7 +356,7 @@ impl SystemPage {
 
 /// The Files extension's install button: Update over an older copy.
 fn nautilus_install_label(model: &Preferences) -> String {
-    if model.nautilus.status == crate::nautilus_ext::Status::Outdated {
+    if model.nautilus.status == crate::desktop::nautilus_ext::Status::Outdated {
         i18n("Update")
     } else {
         i18n("Install")

@@ -89,7 +89,7 @@ pub(super) fn watch_active_folder(
     }
     // A metered connection keeps to the Inbox's own watcher; the sweep still
     // covers the rest (#442).
-    if crate::power::saving_data() {
+    if crate::desktop::power::saving_data() {
         return false;
     }
     // Lapsed watchers exited on their own; drop their leftover entries.
@@ -158,13 +158,13 @@ pub(in crate::worker) async fn watch_folder(
         }
         // Offline: wait for the network, neither dialing nor growing the
         // backoff, so the watcher is back within moments of it (#442).
-        while !crate::power::reaches(&account.imap_host) {
+        while !crate::desktop::power::reaches(&account.imap_host) {
             tokio::time::sleep(NETWORK_WAIT).await;
             if lapsed(lease.as_ref()) {
                 return;
             }
         }
-        if lease.is_some() && crate::power::saving_data() {
+        if lease.is_some() && crate::desktop::power::saving_data() {
             tracing::info!("unwatching {path}: the connection is metered");
             return;
         }
@@ -237,12 +237,12 @@ async fn watch_session(
             let _ = sess.logout().await;
             return Watch::Retire;
         }
-        if lease.is_some() && crate::power::saving_data() {
+        if lease.is_some() && crate::desktop::power::saving_data() {
             tracing::info!("unwatching {path}: the connection is metered");
             let _ = sess.logout().await;
             return Watch::Retire;
         }
-        if !crate::power::reaches(&account.imap_host) {
+        if !crate::desktop::power::reaches(&account.imap_host) {
             return Watch::Redial; // the socket went with the network
         }
         // A short IDLE round: woken instantly where the server announces
