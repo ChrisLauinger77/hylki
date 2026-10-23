@@ -4,7 +4,6 @@ use super::types::MessageViewInput;
 use super::MessageView;
 use adw::prelude::*;
 use relm4::prelude::*;
-use webkit6::prelude::WebViewExt;
 
 impl MessageView {
     pub(super) fn on_open_find(&mut self, sender: &ComponentSender<Self>) {
@@ -54,11 +53,6 @@ impl MessageView {
 impl MessageView {
     /// Run one of the in-message find engine's calls (#103), logging failures.
     pub(super) fn eval_find(&self, js: &str) {
-        self.webview
-            .evaluate_javascript(js, None, None, None::<&gtk::gio::Cancellable>, |r| {
-                if let Err(e) = r {
-                    tracing::warn!("find js failed: {e}");
-                }
-            });
+        self.run_js_or_warn(js, "find js");
     }
 }

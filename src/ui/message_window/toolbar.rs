@@ -34,62 +34,36 @@ pub(super) fn build_toolbar(
         });
         b
     };
+    // The icons are the main toolbar's own (`ToolbarItem::icon`); the
+    // tooltips name the shortcut where the main window's menu would.
     let buttons = ToolbarItem::ALL
         .iter()
         .map(|item| {
-            let b = match item {
-                ToolbarItem::Reply => button("mail-reply-sender-symbolic", i18n("Reply"), || {
-                    MessageWindowInput::Reply
-                }),
-                ToolbarItem::ReplyAll => {
-                    button("mail-reply-all-symbolic", i18n("Reply All"), || {
-                        MessageWindowInput::ReplyAll
-                    })
-                }
-                ToolbarItem::Forward => button("mail-forward-symbolic", i18n("Forward"), || {
-                    MessageWindowInput::Forward
-                }),
+            let (tooltip, msg): (String, fn() -> MessageWindowInput) = match item {
+                ToolbarItem::Reply => (i18n("Reply"), || MessageWindowInput::Reply),
+                ToolbarItem::ReplyAll => (i18n("Reply All"), || MessageWindowInput::ReplyAll),
+                ToolbarItem::Forward => (i18n("Forward"), || MessageWindowInput::Forward),
                 // One glyph in both states, as in the main window; the
                 // starred state carries color only.
-                ToolbarItem::Star => button("hylki-non-starred-symbolic", i18n("Star"), || {
-                    MessageWindowInput::ToggleStar
-                }),
-                ToolbarItem::Archive => button("mail-archive-symbolic", i18n("Archive"), || {
-                    MessageWindowInput::Archive
-                }),
-                ToolbarItem::Delete => button("user-trash-symbolic", i18n("Delete"), || {
-                    MessageWindowInput::Delete
-                }),
-                ToolbarItem::Spam => {
-                    button("mail-mark-junk-symbolic", i18n("Mark as Spam"), || {
-                        MessageWindowInput::Spam
-                    })
-                }
+                ToolbarItem::Star => (i18n("Star"), || MessageWindowInput::ToggleStar),
+                ToolbarItem::Archive => (i18n("Archive"), || MessageWindowInput::Archive),
+                ToolbarItem::Delete => (i18n("Delete"), || MessageWindowInput::Delete),
+                ToolbarItem::Spam => (i18n("Mark as Spam"), || MessageWindowInput::Spam),
                 ToolbarItem::ReadUnread => {
-                    button("mail-unread-symbolic", i18n("Mark as Unread"), || {
-                        MessageWindowInput::ToggleRead
-                    })
+                    (i18n("Mark as Unread"), || MessageWindowInput::ToggleRead)
                 }
-                ToolbarItem::Tags => button("tag-outline-symbolic", i18n("Tags"), || {
-                    MessageWindowInput::TagMenu
+                ToolbarItem::Tags => (i18n("Tags"), || MessageWindowInput::TagMenu),
+                ToolbarItem::MoveTo => (i18n("Move To…"), || MessageWindowInput::MoveTo),
+                ToolbarItem::Find => (i18n("Find in message (Ctrl+F)"), || {
+                    MessageWindowInput::Find
                 }),
-                ToolbarItem::MoveTo => button("folder-symbolic", i18n("Move To…"), || {
-                    MessageWindowInput::MoveTo
-                }),
-                ToolbarItem::Find => button(
-                    "loupe-with-arrow-symbolic",
-                    i18n("Find in message (Ctrl+F)"),
-                    || MessageWindowInput::Find,
-                ),
                 // The preview, not the print dialog: it shows what will come
                 // out and prints from there (#359).
-                ToolbarItem::Print => button(
-                    "printer-symbolic",
-                    i18n("Print Preview (Ctrl+Shift+P)"),
-                    || MessageWindowInput::PrintPreview,
-                ),
+                ToolbarItem::Print => (i18n("Print Preview (Ctrl+Shift+P)"), || {
+                    MessageWindowInput::PrintPreview
+                }),
             };
-            (*item, b)
+            (*item, button(item.icon(), tooltip, msg))
         })
         .collect();
     // Rightmost, beside the window controls, as in the main window.

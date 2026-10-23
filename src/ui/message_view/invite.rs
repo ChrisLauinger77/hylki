@@ -6,8 +6,6 @@ use super::snippets::inline_icon_svg;
 use super::MessageView;
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::models::Message;
-use relm4::prelude::*;
-use webkit6::prelude::WebViewExt;
 
 /// A card's invitation banner (#223): the container, always emitted so a
 /// meeting read after the paint can be patched into it (empty, it is hidden
@@ -316,7 +314,6 @@ impl MessageView {
              if(d)d.innerHTML={};}})()",
             serde_json::to_string(&html).unwrap_or_else(|_| "''".into()),
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+        self.run_js(&js);
     }
 }

@@ -41,8 +41,7 @@ impl MessageView {
              if(d){{d.classList.remove('flash');void d.offsetWidth;d.classList.add('flash');\
              setTimeout(function(){{d.classList.remove('flash');}},1300);}}}})()"
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+        self.run_js(&js);
     }
 
     pub(super) fn on_attachment_action(
@@ -82,12 +81,7 @@ impl MessageView {
              var f=h.querySelector('.hylki-from');\
              if(f)f.parentNode.insertBefore(d,f);else h.appendChild(d);}})()"
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
-                if let Err(e) = r {
-                    tracing::warn!("unread-dot patch failed: {e}");
-                }
-            });
+        self.run_js_or_warn(&js, "unread-dot patch");
     }
 
     pub(super) fn on_clear_cards(&mut self, sender: &ComponentSender<Self>) {
@@ -218,8 +212,7 @@ impl MessageView {
              if(s)s.scrollIntoView({{behavior:'smooth',block:'start'}});}})()",
             key.0, key.1
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+        self.run_js(&js);
     }
 
     pub(super) fn on_focus_body(&mut self) {
@@ -305,12 +298,7 @@ impl MessageView {
              var s=document.querySelector('.hylki-msg[data-key=\"{account_id}:{id}\"]');\
              if(s)s.classList.remove('unread');}})()"
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
-                if let Err(e) = r {
-                    tracing::warn!("clear-dot patch failed: {e}");
-                }
-            });
+        self.run_js_or_warn(&js, "clear-dot patch");
     }
 
     pub(super) fn on_set_card_keywords(
@@ -339,12 +327,7 @@ impl MessageView {
              if(t)t.innerHTML={chips};}})()",
             chips = serde_json::to_string(&chips).unwrap_or_else(|_| "''".into()),
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
-                if let Err(e) = r {
-                    tracing::warn!("card tag patch failed: {e}");
-                }
-            });
+        self.run_js_or_warn(&js, "card tag patch");
     }
 
     pub(super) fn on_set_card_star(&mut self, account_id: u32, id: u32, starred: bool) {
@@ -359,12 +342,7 @@ impl MessageView {
              if(b)b.classList.{}('on');}})()",
             if starred { "add" } else { "remove" },
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
-                if let Err(e) = r {
-                    tracing::warn!("card star patch failed: {e}");
-                }
-            });
+        self.run_js_or_warn(&js, "card star patch");
     }
 
     pub(super) fn on_focus_card(&mut self, account_id: u32, id: u32) {

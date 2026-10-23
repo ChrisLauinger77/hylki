@@ -6,7 +6,6 @@ use super::MessageView;
 use crate::i18n::{i18n, i18n_f};
 use adw::prelude::*;
 use relm4::prelude::*;
-use webkit6::prelude::WebViewExt;
 
 /// Ask before vouching for a signing key: the fingerprint to compare, and
 /// Trust or Cancel.
@@ -117,8 +116,7 @@ impl MessageView {
             cls = check.trust.css_class(),
             title = check.trust.label(),
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+        self.run_js(&js);
     }
 
     /// The verdict-details popover, anchored where the seal was clicked.

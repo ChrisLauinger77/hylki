@@ -3,6 +3,7 @@
 
 use super::links::{decode_data_uri, default_image_name, is_launchable_uri};
 use super::menu::strip_navigation_items;
+use super::MessageView;
 use crate::i18n::i18n;
 use adw::prelude::*;
 use relm4::prelude::*;
@@ -202,4 +203,28 @@ fn build_webview(role: &'static str) -> webkit6::WebView {
     });
 
     webview
+}
+
+impl MessageView {
+    /// Run a script on the page, ignoring its result: a live patch whose
+    /// failure leaves the page as it was.
+    pub(super) fn run_js(&self, js: &str) {
+        self.webview
+            .evaluate_javascript(js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+    }
+
+    /// Run a script on the page and log a failure as `"{what} failed: …"`.
+    pub(super) fn run_js_or_warn(&self, js: &str, what: &'static str) {
+        self.webview.evaluate_javascript(
+            js,
+            None,
+            None,
+            None::<&gtk::gio::Cancellable>,
+            move |r| {
+                if let Err(e) = r {
+                    tracing::warn!("{what} failed: {e}");
+                }
+            },
+        );
+    }
 }

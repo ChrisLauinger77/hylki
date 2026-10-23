@@ -2,8 +2,6 @@
 
 use super::snippets::att_chips_html;
 use super::MessageView;
-use relm4::prelude::*;
-use webkit6::prelude::WebViewExt;
 
 impl MessageView {
     /// Outline the selected cards in the document already on screen. Rendering
@@ -22,8 +20,7 @@ impl MessageView {
             "(function(){{var s=[{}];             var els=document.querySelectorAll('.hylki-msg');             for(var i=0;i<els.length;i++){{var k=els[i].dataset.key;             els[i].classList.toggle('selected', s.indexOf(k)>=0);}}}})()",
             keys.join(",")
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+        self.run_js(&js);
     }
 
     /// Fill (or empty) the attachment rows of these cards in the live
@@ -52,11 +49,6 @@ impl MessageView {
             ));
         }
         js.push_str("})()");
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
-                if let Err(e) = r {
-                    tracing::warn!("attachment row patch failed: {e}");
-                }
-            });
+        self.run_js_or_warn(&js, "attachment row patch");
     }
 }

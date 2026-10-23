@@ -6,8 +6,6 @@ use super::types::TrState;
 use super::MessageView;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::Message;
-use relm4::prelude::*;
-use webkit6::prelude::WebViewExt;
 
 impl MessageView {
     /// A message's subject as shown: translated while its translation is
@@ -146,7 +144,6 @@ impl MessageView {
              if(d)d.innerHTML={};}})()",
             serde_json::to_string(&html).unwrap_or_else(|_| "''".into()),
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+        self.run_js(&js);
     }
 }

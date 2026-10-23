@@ -28,8 +28,7 @@ impl MessageView {
             "document.body&&document.body.toggleAttribute('data-hylki-pgpicons',{})",
             !on
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+        self.run_js(&js);
     }
 
     pub(super) fn on_set_card_attachments_shown(&mut self, on: bool) {

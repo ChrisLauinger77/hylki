@@ -5,8 +5,6 @@ use super::snippets::{fold_bar_date, inline_icon_svg, FOLD_BAR_FACE};
 use super::MessageView;
 use crate::i18n::i18n;
 use crate::models::Message;
-use relm4::prelude::*;
-use webkit6::prelude::WebViewExt;
 
 impl MessageView {
     /// The cards of the conversation on screen that show folded (#326):
@@ -120,7 +118,6 @@ impl MessageView {
              if(!on){{var f=ms[i].querySelector('iframe.hylki-frame');if(f){{f._h=0;s(f);}}}}}}}})({})",
             serde_json::to_string(&keys).unwrap_or_else(|_| "[]".into()),
         );
-        self.webview
-            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+        self.run_js(&js);
     }
 }
