@@ -44,37 +44,9 @@ pub(crate) fn show_folder_picker(
     column.add_css_class("context-menu-list");
     column.set_margin_top(10);
 
-    let whole = conversation.filter(|n| *n > 1).map(|n| {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        row.set_margin_start(6);
-        row.set_margin_end(6);
-        let text = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        text.set_hexpand(true);
-        let title = gtk::Label::new(Some(i18n("Whole conversation").as_str()));
-        title.set_xalign(0.0);
-        text.append(&title);
-        let count = gtk::Label::new(Some(
-            crate::i18n::ni18n_f(
-                "{n} message",
-                "{n} messages",
-                n as u32,
-                &[("n", &n.to_string())],
-            )
-            .as_str(),
-        ));
-        count.set_xalign(0.0);
-        count.add_css_class("dim-label");
-        count.add_css_class("caption");
-        text.append(&count);
-        row.append(&text);
-        let switch = gtk::Switch::new();
-        switch.set_active(true);
-        switch.set_valign(gtk::Align::Center);
-        row.append(&switch);
-        column.append(&row);
-        column.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-        switch
-    });
+    let whole = conversation
+        .filter(|n| *n > 1)
+        .map(|n| whole_conversation_switch(&column, n));
 
     let search = gtk::SearchEntry::new();
     search.set_placeholder_text(Some(i18n("Search folders").as_str()));
@@ -83,52 +55,7 @@ pub(crate) fn show_folder_picker(
     let list = gtk::ListBox::new();
     list.set_selection_mode(gtk::SelectionMode::None);
     list.add_css_class("navigation-sidebar");
-    // What each row stands for, at the row's index: rows are only ever
-    // appended, in this order.
-    let mut table: Vec<PickerRow> = Vec::new();
-    for account in &accounts {
-        if let Some(heading) = &account.heading {
-            let label = gtk::Label::new(Some(heading));
-            label.set_xalign(0.0);
-            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-            label.add_css_class("caption-heading");
-            label.add_css_class("dim-label");
-            label.set_margin_top(8);
-            label.set_margin_start(4);
-            let lbr = gtk::ListBoxRow::new();
-            lbr.set_child(Some(&label));
-            lbr.set_activatable(false);
-            lbr.set_selectable(false);
-            // The search keeps a heading while any of its folders match.
-            table.push(PickerRow::Heading);
-            list.append(&lbr);
-        }
-        let refs: Vec<&Folder> = account.folders.iter().collect();
-        for f in &account.folders {
-            if account.exclude.as_deref() == Some(f.path.as_str()) {
-                continue;
-            }
-            let depth = crate::ui::sidebar::folder_depth(f, &refs);
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-            row.set_margin_start(4 + 16 * depth as i32);
-            let icon = gtk::Image::from_icon_name(f.kind.icon());
-            icon.set_pixel_size(16);
-            row.append(&icon);
-            let label = gtk::Label::new(Some(&f.name));
-            label.set_xalign(0.0);
-            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-            row.append(&label);
-            let lbr = gtk::ListBoxRow::new();
-            lbr.set_child(Some(&row));
-            // The search filter reads the name back from here.
-            table.push(PickerRow::Folder {
-                name: f.name.to_lowercase(),
-                path: f.path.clone(),
-                account: account.account_id,
-            });
-            list.append(&lbr);
-        }
-    }
+    let table = fill_folder_list(&list, &accounts);
 
     let scroller = gtk::ScrolledWindow::new();
     scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
@@ -240,6 +167,91 @@ enum PickerRow {
 /// for a row in the list).
 fn row_entry(table: &[PickerRow], index: i32) -> Option<&PickerRow> {
     usize::try_from(index).ok().and_then(|i| table.get(i))
+}
+
+/// The "Whole conversation" switch at the top of the picker, for a
+/// conversation of `n` messages; on to start with.
+fn whole_conversation_switch(column: &gtk::Box, n: usize) -> gtk::Switch {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    row.set_margin_start(6);
+    row.set_margin_end(6);
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    text.set_hexpand(true);
+    let title = gtk::Label::new(Some(i18n("Whole conversation").as_str()));
+    title.set_xalign(0.0);
+    text.append(&title);
+    let count = gtk::Label::new(Some(
+        crate::i18n::ni18n_f(
+            "{n} message",
+            "{n} messages",
+            n as u32,
+            &[("n", &n.to_string())],
+        )
+        .as_str(),
+    ));
+    count.set_xalign(0.0);
+    count.add_css_class("dim-label");
+    count.add_css_class("caption");
+    text.append(&count);
+    row.append(&text);
+    let switch = gtk::Switch::new();
+    switch.set_active(true);
+    switch.set_valign(gtk::Align::Center);
+    row.append(&switch);
+    column.append(&row);
+    column.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+    switch
+}
+
+/// The accounts' headings and folders as rows of `list`, and what each row
+/// stands for, at the row's index: rows are only ever appended, in this
+/// order.
+fn fill_folder_list(list: &gtk::ListBox, accounts: &[PickerAccount]) -> Vec<PickerRow> {
+    let mut table: Vec<PickerRow> = Vec::new();
+    for account in accounts {
+        if let Some(heading) = &account.heading {
+            let label = gtk::Label::new(Some(heading));
+            label.set_xalign(0.0);
+            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            label.add_css_class("caption-heading");
+            label.add_css_class("dim-label");
+            label.set_margin_top(8);
+            label.set_margin_start(4);
+            let lbr = gtk::ListBoxRow::new();
+            lbr.set_child(Some(&label));
+            lbr.set_activatable(false);
+            lbr.set_selectable(false);
+            // The search keeps a heading while any of its folders match.
+            table.push(PickerRow::Heading);
+            list.append(&lbr);
+        }
+        let refs: Vec<&Folder> = account.folders.iter().collect();
+        for f in &account.folders {
+            if account.exclude.as_deref() == Some(f.path.as_str()) {
+                continue;
+            }
+            let depth = crate::ui::sidebar::folder_depth(f, &refs);
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+            row.set_margin_start(4 + 16 * depth as i32);
+            let icon = gtk::Image::from_icon_name(f.kind.icon());
+            icon.set_pixel_size(16);
+            row.append(&icon);
+            let label = gtk::Label::new(Some(&f.name));
+            label.set_xalign(0.0);
+            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            row.append(&label);
+            let lbr = gtk::ListBoxRow::new();
+            lbr.set_child(Some(&row));
+            // The search filter reads the name back from here.
+            table.push(PickerRow::Folder {
+                name: f.name.to_lowercase(),
+                path: f.path.clone(),
+                account: account.account_id,
+            });
+            list.append(&lbr);
+        }
+    }
+    table
 }
 
 #[cfg(test)]
