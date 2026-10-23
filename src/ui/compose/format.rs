@@ -112,9 +112,7 @@ impl Compose {
         })
         .collect()
     }
-}
 
-impl Compose {
     /// Handles [`ComposeInput::Zoom`].
     pub(super) fn on_zoom(&mut self, step: i8) {
         if !self.zoomable.get() {

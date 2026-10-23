@@ -3,6 +3,7 @@
 
 use super::messages::{ComposeInput, ComposeOutput};
 use super::types::Field;
+use super::types::{OwnMail, OwnOnly};
 use super::Compose;
 use super::ComposeWidgets;
 use crate::contacts::Suggestion;
@@ -226,9 +227,7 @@ impl Compose {
         self.completion.popup();
         self.completion_open.set(true);
     }
-}
 
-impl Compose {
     /// Handles [`ComposeInput::OpenContacts`].
     pub(super) fn on_open_contacts(
         &mut self,
@@ -460,4 +459,110 @@ impl Compose {
         self.completion_open.set(false);
         self.completion.popdown();
     }
+}
+
+/// Find out, off the main thread, which directories the accounts search
+/// and which addresses each account's own mail has (#410), then load the
+/// suggestions themselves.
+pub(super) fn load_suggestions(
+    own_addresses: Vec<(String, String)>,
+    sender: &ComponentSender<Compose>,
+) {
+    {
+        let s = sender.input_sender().clone();
+        std::thread::spawn(move || {
+            let graph = crate::graph_directory::accounts();
+            // An account's id is its place in the file, from 1.
+            let narrowed: Vec<(u32, crate::config::AccountConfig)> = crate::config::load()
+                .unwrap_or_default()
+                .into_iter()
+                .enumerate()
+                .filter(|(_, a)| a.graph_directory_only && crate::graph_directory::usable(a))
+                .map(|(i, a)| (i as u32 + 1, a))
+                .collect();
+            let own_mail = match crate::cache::Cache::open() {
+                Ok(cache) if !narrowed.is_empty() => narrowed
+                    .into_iter()
+                    .map(|(id, account)| {
+                        (
+                            id,
+                            OwnOnly {
+                                addresses: cache.account_addresses(id),
+                                account,
+                            },
+                        )
+                    })
+                    .collect(),
+                _ => OwnMail::new(),
+            };
+            let _ = s.send(ComposeInput::DirectoriesKnown { graph, own_mail });
+        });
+    }
+
+    {
+        // EDS can stop answering, and a large mail cache takes time to
+        // scan. Neither is a prerequisite for writing a message, and a
+        // slow keyring behind the directories above must not hold up
+        // autocomplete.
+        let s = sender.input_sender().clone();
+        std::thread::spawn(move || {
+            let suggestions = crate::contacts::suggestions(&own_addresses);
+            let _ = s.send(ComposeInput::SuggestionsLoaded(suggestions));
+        });
+    }
+}
+
+/// Autocomplete on the address rows, and pills moving between them.
+pub(super) fn wire_recipient_rows(widgets: &ComposeWidgets, sender: &ComponentSender<Compose>) {
+    // Wire autocomplete *after* prefilling, so the initial text doesn't pop it.
+    for (row, field) in [
+        (&widgets.to_row, Field::To),
+        (&widgets.cc_row, Field::Cc),
+        (&widgets.bcc_row, Field::Bcc),
+    ] {
+        let s = sender.clone();
+        row.connect_changed(move |row| {
+            row.remove_css_class("error");
+            s.input_sender().emit(ComposeInput::Suggest(field));
+            s.input_sender().emit(ComposeInput::MarkFieldsDirty);
+        });
+
+        // Close the popover when the field loses focus.
+        let focus = gtk::EventControllerFocus::new();
+        let s = sender.clone();
+        focus.connect_leave(move |_| s.input_sender().emit(ComposeInput::CompletionClose));
+        row.add_controller(focus);
+    }
+    // Pills are selected across these and move between them by drag
+    // or by their menu (#492). While some are dragged, the hidden Cc and
+    // Bcc show, to be dropped on; those still empty after hide again.
+    {
+        let rows = [
+            widgets.to_row.clone(),
+            widgets.cc_row.clone(),
+            widgets.bcc_row.clone(),
+        ];
+        let shown: std::rc::Rc<std::cell::RefCell<Vec<RecipientRow>>> = Default::default();
+        for row in &rows {
+            row.set_fields(&[&rows[0], &rows[1], &rows[2]]);
+            let (cc, bcc, shown) = (rows[1].clone(), rows[2].clone(), shown.clone());
+            row.connect_pill_drag(move |_, on| {
+                if on {
+                    for r in [&cc, &bcc].into_iter().filter(|r| !r.is_visible()) {
+                        r.set_visible(true);
+                        shown.borrow_mut().push(r.clone());
+                    }
+                } else {
+                    for r in shown.take() {
+                        if r.text().is_empty() {
+                            r.set_visible(false);
+                        }
+                    }
+                }
+            });
+        }
+    }
+    widgets
+        .reply_to_row
+        .connect_changed(|row| row.remove_css_class("error"));
 }

@@ -288,9 +288,7 @@ impl Compose {
         );
         let _ = widgets;
     }
-}
 
-impl Compose {
     /// Handles [`ComposeInput::BodyHistory`].
     pub(super) fn on_body_history(&mut self, can_undo: bool, sender: &ComponentSender<Self>) {
         // A fresh edit takes its place in the order — one marker

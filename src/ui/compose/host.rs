@@ -3,6 +3,7 @@
 
 use super::messages::ComposeInput;
 use super::messages::ComposeOutput;
+use super::types::ComposePrefill;
 use super::types::Field;
 use super::Compose;
 use super::ComposeWidgets;
@@ -136,9 +137,7 @@ impl Compose {
             self.editor.grab_focus();
         }
     }
-}
 
-impl Compose {
     /// Handles [`ComposeInput::Cancel`].
     pub(super) fn on_cancel(&mut self, sender: &ComponentSender<Self>) {
         if self.asking_discard {
@@ -356,4 +355,96 @@ impl Compose {
             .fields_list
             .set_visible(!(self.compact && !windowed) || self.fields_shown);
     }
+
+    pub(super) fn show_initial_rows(&self, widgets: &ComposeWidgets, prefill: &ComposePrefill) {
+        // Per-row visibility (#25): To always; Cc/Bcc only when prefilled (a
+        // reply-all carries Cc). The Subject is always shown — replies and
+        // forwards arrive with it prefilled, but it stays the user's to see
+        // and change (2026-08-31).
+        let cc_shown = !prefill.cc.trim().is_empty();
+        let bcc_shown = !prefill.bcc.trim().is_empty();
+        widgets.cc_row.set_visible(cc_shown);
+        widgets.bcc_row.set_visible(bcc_shown);
+        // Reply-To (#58) is rare enough to always start hidden behind "More".
+        widgets.reply_to_row.set_visible(false);
+        widgets.subject_row.set_visible(true);
+        // Compact split reply: only the editor shows; the full field rows
+        // return when the composer pops out to a window. Never for a pane
+        // that arrives unaddressed — a forward — which needs its To row
+        // (#139).
+        widgets
+            .fields_list
+            .set_visible(!self.compact || self.fields_shown);
+        widgets.fields_btn.set_active(self.fields_shown);
+        {
+            let more = gtk::Button::with_label(&i18n("More"));
+            more.add_css_class("flat");
+            more.set_valign(gtk::Align::Center);
+            more.set_tooltip_text(Some(i18n("Show Cc, Bcc and Reply-To").as_str()));
+            let cc = widgets.cc_row.clone();
+            let bcc = widgets.bcc_row.clone();
+            let reply_to = widgets.reply_to_row.clone();
+            let from = widgets.from_row.clone();
+            let custom = widgets.custom_from_row.clone();
+            let btn = more.clone();
+            more.connect_clicked(move |_| {
+                cc.set_visible(true);
+                bcc.set_visible(true);
+                reply_to.set_visible(true);
+                // With one address the From row is hidden; More brings it,
+                // with its pencil for typing another (#347).
+                if !custom.is_visible() {
+                    from.set_visible(true);
+                }
+                btn.set_visible(false);
+            });
+            widgets.to_row.add_suffix(&more);
+        }
+    }
+}
+
+pub(super) fn fold_on_first_map(
+    root: &adw::BreakpointBin,
+    widgets: &ComposeWidgets,
+    sender: &ComponentSender<Compose>,
+) {
+    // Fold the toolbar once the pane is narrower than the full row (as
+    // the reader's header does). Measured on the first map — before
+    // anything is hidden, and once the header has a window, since the
+    // window controls it carries inline only exist (and measure) with
+    // one. A later host move changes that by a few dozen pixels; the
+    // first host's threshold is kept, which only ever folds early.
+    let s = sender.clone();
+    let header: gtk::Widget = widgets.header.clone().upcast();
+    let measured = std::rc::Rc::new(std::cell::Cell::new(false));
+    root.connect_map(move |root| {
+        if measured.replace(true) {
+            return;
+        }
+        // Not the bar's own natural width: a header bar keeps its
+        // title centred, so it asks for twice its wider side, and
+        // this bar's end row is much wider than its start — every
+        // button added there counted double and the fold came far
+        // too soon. The centre box's rows, summed, are what has to
+        // fit.
+        let full = header.measure(gtk::Orientation::Horizontal, -1).1;
+        let rows = header_rows_width(&header);
+        tracing::debug!("compose fold: header natural {full}, rows {rows:?}");
+        let need = rows.unwrap_or(full);
+        let threshold = if need <= 0 {
+            COMPOSE_ACTIONS_BREAKPOINT
+        } else {
+            need as f64 + 24.0
+        };
+        let bp = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            threshold,
+            adw::LengthUnit::Px,
+        ));
+        let s1 = s.clone();
+        bp.connect_apply(move |_| s1.input_sender().emit(ComposeInput::SetNarrow(true)));
+        let s2 = s.clone();
+        bp.connect_unapply(move |_| s2.input_sender().emit(ComposeInput::SetNarrow(false)));
+        root.add_breakpoint(bp);
+    });
 }

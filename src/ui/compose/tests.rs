@@ -95,10 +95,16 @@ fn pinned_an_html_source_signature_is_the_rich_block() {
 
 #[test]
 fn pinned_froms_compare_by_name_and_address() {
-    assert!(super::same_from("Ann <ann@x.org>", "\"Ann\" <ANN@x.org>"));
-    assert!(super::same_from("Ann <ann@x.org>", "Ann  <ann@x.org>"));
-    assert!(!super::same_from("Ann <ann@x.org>", "ann@x.org"));
-    assert!(!super::same_from("", ""));
+    assert!(super::send::same_from(
+        "Ann <ann@x.org>",
+        "\"Ann\" <ANN@x.org>"
+    ));
+    assert!(super::send::same_from(
+        "Ann <ann@x.org>",
+        "Ann  <ann@x.org>"
+    ));
+    assert!(!super::send::same_from("Ann <ann@x.org>", "ann@x.org"));
+    assert!(!super::send::same_from("", ""));
 }
 
 #[test]
@@ -122,16 +128,19 @@ fn pinned_attachment_labels() {
 fn pinned_format_icons() {
     use crate::config::ComposeFormat;
     assert_eq!(
-        super::format_icon(ComposeFormat::Rich),
+        super::format::format_icon(ComposeFormat::Rich),
         "format-text-rich-symbolic"
     );
     assert_eq!(
-        super::format_icon(ComposeFormat::Markdown),
+        super::format::format_icon(ComposeFormat::Markdown),
         "markdown-symbolic"
     );
-    assert_eq!(super::format_icon(ComposeFormat::Html), "code-symbolic");
     assert_eq!(
-        super::format_icon(ComposeFormat::Plain),
+        super::format::format_icon(ComposeFormat::Html),
+        "code-symbolic"
+    );
+    assert_eq!(
+        super::format::format_icon(ComposeFormat::Plain),
         "text-x-generic-symbolic"
     );
 }
@@ -141,24 +150,24 @@ fn pinned_key_tables() {
     use gtk::gdk::{Key, ModifierType as M};
     let cs = M::CONTROL_MASK | M::SHIFT_MASK;
     assert!(matches!(
-        super::composer_key(Key::A, cs),
+        super::keys::composer_key(Key::A, cs),
         Some(super::ComposeInput::AttachFiles)
     ));
     assert!(matches!(
-        super::composer_key(Key::t, cs),
-        Some(super::ComposeInput::FocusField(super::Field::To))
+        super::keys::composer_key(Key::t, cs),
+        Some(super::ComposeInput::FocusField(super::types::Field::To))
     ));
     assert!(matches!(
-        super::composer_key(Key::c, cs),
-        Some(super::ComposeInput::FocusField(super::Field::Cc))
+        super::keys::composer_key(Key::c, cs),
+        Some(super::ComposeInput::FocusField(super::types::Field::Cc))
     ));
     assert!(matches!(
-        super::composer_key(Key::b, cs),
-        Some(super::ComposeInput::FocusField(super::Field::Bcc))
+        super::keys::composer_key(Key::b, cs),
+        Some(super::ComposeInput::FocusField(super::types::Field::Bcc))
     ));
-    assert!(super::composer_key(Key::a, M::CONTROL_MASK).is_none());
-    assert!(super::composer_key(Key::a, cs | M::ALT_MASK).is_none());
-    assert!(super::composer_key(Key::x, cs).is_none());
+    assert!(super::keys::composer_key(Key::a, M::CONTROL_MASK).is_none());
+    assert!(super::keys::composer_key(Key::a, cs | M::ALT_MASK).is_none());
+    assert!(super::keys::composer_key(Key::x, cs).is_none());
 
     let c = M::CONTROL_MASK;
     for (key, step) in [
@@ -170,12 +179,12 @@ fn pinned_key_tables() {
         (Key::_0, 0),
         (Key::KP_0, 0),
     ] {
-        assert_eq!(super::zoom_key(key, c), Some(step), "{key:?}");
-        assert_eq!(super::zoom_key(key, c | M::SHIFT_MASK), Some(step));
-        assert_eq!(super::zoom_key(key, c | M::ALT_MASK), None);
-        assert_eq!(super::zoom_key(key, M::empty()), None);
+        assert_eq!(super::keys::zoom_key(key, c), Some(step), "{key:?}");
+        assert_eq!(super::keys::zoom_key(key, c | M::SHIFT_MASK), Some(step));
+        assert_eq!(super::keys::zoom_key(key, c | M::ALT_MASK), None);
+        assert_eq!(super::keys::zoom_key(key, M::empty()), None);
     }
-    assert_eq!(super::zoom_key(Key::_1, c), None);
+    assert_eq!(super::keys::zoom_key(Key::_1, c), None);
 }
 
 /// The translate scripts are pasted into the page as they are: pin their

@@ -4,10 +4,12 @@ use super::messages::ComposeInput;
 use super::types::ComposeStep;
 use super::Compose;
 use super::ComposeWidgets;
+use crate::config::ComposeFormat;
 use crate::i18n::i18n_noop;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::is_image_name;
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
+use crate::ui::drop_zones::{DropChoice, DropContext, DropZones};
 use crate::ui::fade_label::FadeLabel;
 use adw::prelude::*;
 use relm4::prelude::*;
@@ -385,9 +387,7 @@ impl Compose {
             !self.attachments.is_empty() || !self.cloud_links.is_empty() || self.cloud_busy > 0,
         );
     }
-}
 
-impl Compose {
     /// Handles [`ComposeInput::AttachFiles`].
     pub(super) fn on_attach_files(
         &mut self,
@@ -460,6 +460,61 @@ impl Compose {
             );
             self.rebuild_attachments(&widgets.attach_box, sender);
             self.report_history(sender);
+        }
+    }
+
+    pub(super) fn install_drop_zones(
+        &mut self,
+        root: &adw::BreakpointBin,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        // Files dragged over the composer bring up cards for where they go:
+        // attached, in the text, or uploaded to the cloud (#293).
+        let s = sender.input_sender().clone();
+        let zones = DropZones::install(
+            DropContext::Composer,
+            root,
+            &widgets.drop_overlay,
+            move |choice, paths| {
+                s.emit(ComposeInput::DroppedFiles(choice, paths));
+            },
+        );
+        zones.set_allow_inline(self.format == ComposeFormat::Rich);
+        zones.set_cloud_names(self.cloud_accounts.iter().map(|a| a.name.clone()).collect());
+        // HYLKI_SHOWCASE_DROP_ZONES=<attach|inline|cloud|none>:<file>[:<file>…]
+        // raises the surfaces two seconds after the composer opens.
+        if let Ok(v) = std::env::var("HYLKI_SHOWCASE_DROP_ZONES") {
+            let mut parts = std::env::split_paths(&v);
+            let hover = match parts.next().as_deref().and_then(|p| p.to_str()) {
+                Some("attach") => Some(DropChoice::Attach),
+                Some("inline") => Some(DropChoice::Inline),
+                Some("cloud") => Some(DropChoice::Cloud),
+                _ => None,
+            };
+            let paths: Vec<_> = parts.collect();
+            let zones = zones.clone();
+            let host = root.clone().upcast::<gtk::Widget>();
+            gtk::glib::timeout_add_seconds_local_once(2, move || {
+                zones.showcase(&paths, &host, hover)
+            });
+        }
+        self.drop_zones = Some(zones);
+    }
+
+    /// Files dropped on one of the drop zones (#293).
+    pub(super) fn on_dropped_files(
+        &mut self,
+        choice: DropChoice,
+        paths: Vec<std::path::PathBuf>,
+        sender: &ComponentSender<Self>,
+    ) {
+        match choice {
+            DropChoice::Attach => sender
+                .input_sender()
+                .emit(ComposeInput::AddAttachments(paths)),
+            DropChoice::Inline => self.editor.insert_files(&paths),
+            DropChoice::Cloud => sender.input_sender().emit(ComposeInput::CloudPicked(paths)),
         }
     }
 }

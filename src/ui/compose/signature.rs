@@ -239,9 +239,7 @@ window.__hylkiDirty=true;})()"#
             widgets.sign_btn.set_active(on);
         }
     }
-}
 
-impl Compose {
     /// Handles [`ComposeInput::InsertSignature`].
     pub(super) fn on_insert_signature(&mut self, place: SigPlace, widgets: &ComposeWidgets) {
         let idx = widgets.from_row.selected() as usize;
