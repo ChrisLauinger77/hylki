@@ -16,6 +16,7 @@ use relm4::prelude::*;
 /// Which account to upload to, and how the links are made this time:
 /// the expiry and the password, seeded from the account's settings and
 /// changeable for this upload alone.
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(super) fn cloud_upload_dialog(
     parent: Option<&gtk::Window>,
     accounts: &[crate::cloud::CloudAccount],

@@ -164,6 +164,7 @@ impl AppModel {
     /// While a restart waits for the desktop to take the launcher in: a
     /// modal with a spinner, so the pause reads as progress rather than a
     /// stuck app. It has no way to close — the app quits from under it.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn show_restarting_dialog(&self) {
         let dialog = adw::MessageDialog::new(
             Some(&self.icon_dialog_parent()),
@@ -190,6 +191,7 @@ impl AppModel {
     /// own window icon, only switches once every window has closed: a
     /// restart. Offered, never forced, over whichever window the change
     /// came from.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     pub(super) fn offer_restart_for_icon(&self, sender: &ComponentSender<Self>) {
         let dialog = adw::MessageDialog::new(
             Some(&self.icon_dialog_parent()),

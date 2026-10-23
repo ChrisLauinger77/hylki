@@ -9,6 +9,7 @@ use relm4::prelude::*;
 
 /// Ask before vouching for a signing key: the fingerprint to compare, and
 /// Trust or Cancel.
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(super) fn confirm_trust(
     parent: Option<&gtk::Window>,
     signer: &str,

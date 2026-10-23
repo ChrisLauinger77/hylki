@@ -733,6 +733,7 @@ fn pick_pictures(webview: &webkit6::WebView, anchor: &gtk::Button, attach_cb: &A
 }
 
 /// Prompt for a URL and turn the current selection into a link.
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 fn prompt_link(webview: &webkit6::WebView, anchor: &gtk::Button) {
     let parent = anchor.root().and_downcast::<gtk::Window>();
     let dialog = adw::MessageDialog::new(parent.as_ref(), Some(i18n("Insert Link").as_str()), None);

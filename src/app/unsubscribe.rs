@@ -151,6 +151,7 @@ impl AppModel {
 
     /// Ask before leaving a list: what will happen depends on the route the
     /// list offers, and a mail sent in the user's name is said so up front.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn confirm_unsubscribe(
         &self,
         message: Message,

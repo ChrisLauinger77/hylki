@@ -239,6 +239,7 @@ impl AppModel {
     ///
     /// `problem` is true when this is shown because a save actually failed;
     /// false for the proactive one-time tip (which offers "Don't show again").
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn show_keyring_help(&self, problem: bool) {
         let mint = crate::platform::is_mint_cinnamon();
 

@@ -221,6 +221,7 @@ impl AppModel {
     /// Second stage of ImportSettings: the chosen file, applied on a clean
     /// main-loop turn (working inside the chooser's completion callback froze
     /// the app when the confirmation dialog presented there).
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn import_settings_from(&self, path: std::path::PathBuf) {
         let outcome = std::fs::read_to_string(&path)
             .map_err(|e| e.to_string())

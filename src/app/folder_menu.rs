@@ -16,6 +16,7 @@ use crate::ui::dialog::confirm_destructive;
 
 impl AppModel {
     /// Prompt for a new custom folder name and create it under `account_id`.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn prompt_new_folder(&self, account_id: u32, sender: &ComponentSender<Self>) {
         let dialog = adw::MessageDialog::new(
             Some(&self.window),
@@ -43,6 +44,7 @@ impl AppModel {
     }
 
     /// Prompt for a folder's new name and rename it in place.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn prompt_rename_folder(
         &self,
         account_id: u32,
@@ -112,6 +114,7 @@ impl AppModel {
     /// Confirm deleting a custom folder (contents moved to Trash). Deliberately
     /// outside the undo history (#200): the mailbox itself is gone from the
     /// server, so the dialog says as much instead of promising a way back.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn confirm_delete_folder(
         &self,
         account_id: u32,

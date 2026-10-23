@@ -121,6 +121,7 @@ impl AppModel {
         });
     }
 
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn add_contact_dialog(
         &self,
         name: &str,

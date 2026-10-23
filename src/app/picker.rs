@@ -14,6 +14,7 @@ use crate::models::Message;
 /// back with the choice, or `None` for "a new message instead"; Cancel
 /// drops it.
 #[allow(clippy::too_many_arguments)]
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(super) fn show_message_picker<T: 'static>(
     parent: &gtk::Window,
     heading: &str,

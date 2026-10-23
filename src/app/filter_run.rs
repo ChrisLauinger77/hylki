@@ -78,6 +78,7 @@ impl FilterRun {
 
 /// The widgets of a manual run's progress dialog, kept so its live text can be
 /// rewritten as folders report and so the finish can turn it into the report.
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(super) struct FilterRunDialog {
     pub(super) dialog: adw::MessageDialog,
     pub(super) spinner: gtk::Spinner,
@@ -165,6 +166,7 @@ impl AppModel {
     /// The dialog a manual run puts up: a spinner, a live count, and one
     /// button that sends the run to the background while it is working and
     /// closes the report once it is not.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn build_filter_run_dialog(&self, sender: &ComponentSender<Self>) -> FilterRunDialog {
         // Parented on Settings when the run was started there, so the dialog
         // is not stranded behind it.
@@ -318,6 +320,7 @@ impl AppModel {
     /// folders stop counting as manually swept; without it the scope stands,
     /// and the server's answer to the same load is filtered too. Reports once
     /// either way.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn report_filter_run(&mut self, end: bool) {
         let Some(run) = self.filter_run.as_mut() else {
             return;

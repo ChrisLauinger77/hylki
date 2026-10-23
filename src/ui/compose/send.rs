@@ -102,6 +102,7 @@ pub(super) fn next_monday(hour: u32) -> i64 {
 /// The Send Later picker (#145): a calendar and an hour/minute pair, starting
 /// from the scheduled time if there is one, else the next full hour. A time
 /// already past is refused rather than queued to go at once by surprise.
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(super) fn pick_send_time(
     parent: Option<&gtk::Window>,
     current: Option<i64>,

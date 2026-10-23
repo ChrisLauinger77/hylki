@@ -359,6 +359,7 @@ impl PgpKeys {
 
     /// The form for a new key: which identity, how long it lasts, and the
     /// passphrase that protects it.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn generate_dialog(&self, sender: &ComponentSender<Self>) {
         let parent = relm4::main_application().active_window();
         let dialog = adw::MessageDialog::new(
@@ -558,6 +559,7 @@ impl PgpKeys {
     }
 
     /// Ask before deleting a key.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn on_delete(&mut self, fingerprint: String, secret: bool, sender: &ComponentSender<Self>) {
         let Some(key) = self
             .own
@@ -629,6 +631,7 @@ impl PgpKeys {
     }
 
     /// Ask which address to look a key up for.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn on_fetch(&mut self, sender: &ComponentSender<Self>) {
         let parent = relm4::main_application().active_window();
         let dialog = adw::MessageDialog::new(
@@ -676,6 +679,7 @@ impl PgpKeys {
     }
 
     /// Ask before vouching for a key.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn on_trust(&mut self, fpr: String, sender: &ComponentSender<Self>) {
         let Some(key) = self.others.iter().find(|k| k.fingerprint == fpr).cloned() else {
             return;
