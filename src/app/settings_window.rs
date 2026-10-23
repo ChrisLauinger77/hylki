@@ -461,4 +461,109 @@ impl AppModel {
         });
         dialog.present();
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_settings_window(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::ShowSettingsPage(id) => {
+                if let Some(p) = &self.prefs {
+                    p.emit(PrefInput::ShowPageById(id));
+                }
+            }
+
+            AppMsg::OpenSettings => {
+                // The "opens to" preference decides the first open of the
+                // session; after that the window returns to where it was.
+                let on_accounts = self.settings_open_accounts && self.last_settings_page.is_none();
+                self.open_settings_window(&sender, on_accounts, false);
+            }
+
+            AppMsg::SettingsPageShown(id) => {
+                self.last_settings_page = Some(id);
+            }
+
+            AppMsg::OpenPreferences => self.open_settings_window(&sender, false, false),
+
+            // Closing the combined Settings window hides it (the window's
+            // own hide-on-close); both panels stay for the next open, which
+            // then only rebuilds the accounts panel.
+            AppMsg::ClosePreferences => {
+                // The window only hides; let the signature editor's web
+                // process go with it (#221).
+                if let Some(a) = &self.accounts_win {
+                    a.emit(crate::ui::accounts::AccountsInput::ReleaseSignatureEditor);
+                }
+            }
+
+            // Build the Settings window ahead of its first open, hidden and
+            // realized, a moment after startup: its first appearance is
+            // then a present() rather than a build, a layout and a paint.
+            AppMsg::DebugCloseSettings => {
+                if let Some(p) = &self.prefs {
+                    p.widget().close();
+                }
+            }
+
+            AppMsg::PrewarmSettings => {
+                if self.prefs.is_none() {
+                    self.build_settings_window(&sender, self.settings_open_accounts);
+                    if let Some(p) = &self.prefs {
+                        let w = p.widget();
+                        WidgetExt::realize(w);
+                        // Measuring runs the first CSS pass and Pango layouts
+                        // now, so the first frame after present has less to do.
+                        let _ = w.measure(gtk::Orientation::Horizontal, -1);
+                        let _ = w.measure(gtk::Orientation::Vertical, 920);
+                    }
+                }
+            }
+
+            AppMsg::SettingsEditorOpen(open) => {
+                if let Some(p) = &self.prefs {
+                    p.emit(PrefInput::EditorOpen(open));
+                }
+            }
+
+            AppMsg::SettingsLeaveEditor { page, ask } => {
+                if let Some(p) = &self.prefs {
+                    p.emit(if ask {
+                        PrefInput::LeaveEditorPrompt(page)
+                    } else {
+                        PrefInput::LeaveEditorTo(page)
+                    });
+                }
+            }
+
+            AppMsg::ServerIdentities {
+                account_id,
+                identities,
+            } => {
+                if let (Some(email), Some(a)) = (self.email_of(account_id), &self.accounts_win) {
+                    a.emit(crate::ui::accounts::AccountsInput::ServerIdentities {
+                        email,
+                        identities: identities.clone(),
+                    });
+                }
+                self.server_identities.insert(account_id, identities);
+            }
+            AppMsg::WantIdentities(email) => {
+                let Some(id) = self
+                    .accounts
+                    .iter()
+                    .find(|a| a.email.eq_ignore_ascii_case(&email))
+                    .map(|a| a.id)
+                else {
+                    return;
+                };
+                let identities = self.server_identities.get(&id).cloned().unwrap_or_default();
+                if let Some(a) = &self.accounts_win {
+                    a.emit(crate::ui::accounts::AccountsInput::ServerIdentities {
+                        email,
+                        identities,
+                    });
+                }
+            }
+            _ => unreachable!("not routed to on_settings_window"),
+        }
+    }
 }

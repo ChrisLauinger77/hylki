@@ -169,6 +169,61 @@ impl AppModel {
             })
             .collect()
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_search(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::SearchPoolLoaded { gen, lists } => {
+                if gen != self.search_gen {
+                    return;
+                }
+                let lists = lists
+                    .into_iter()
+                    .map(|((account_id, folder_id), messages)| {
+                        let messages = self.merge_local_tags(account_id, messages);
+                        let messages = self.drop_pending_moves(account_id, folder_id, messages);
+                        let messages = self.apply_pending_seen(account_id, folder_id, messages);
+                        let messages = self.apply_pending_answers(account_id, folder_id, messages);
+                        self.apply_pending_tags(account_id, folder_id, messages)
+                    })
+                    .collect();
+                self.build_search_pool(gen, lists, &sender);
+            }
+            AppMsg::SearchPoolBuilt { gen, pool, text } => {
+                if gen == self.search_gen {
+                    self.message_list.emit(MessageListInput::SetSearchPool(
+                        pool,
+                        self.pool_folders(),
+                        text,
+                    ));
+                }
+            }
+            AppMsg::SearchActive(active) => {
+                self.search_gen += 1;
+                if active {
+                    // Every folder's indexed messages, so the search can span
+                    // the whole mailbox: the folders opened this run and the
+                    // rest from disk, put together off the main loop (#515).
+                    self.load_search_pool(&sender);
+                    // Results span accounts; tint rows by account (as in the unified
+                    // inbox) so their origin is legible.
+                    if self.accounts.len() > 1 {
+                        self.message_list.emit(MessageListInput::SetColorize(true));
+                    }
+                } else {
+                    self.message_list.emit(MessageListInput::SetSearchPool(
+                        Vec::new(),
+                        HashMap::new(),
+                        Vec::new(),
+                    ));
+                    // Restore the tint state the underlying view wants.
+                    self.message_list
+                        .emit(MessageListInput::SetColorize(self.unified));
+                }
+            }
+            _ => unreachable!("not routed to on_search"),
+        }
+    }
 }
 
 #[cfg(test)]

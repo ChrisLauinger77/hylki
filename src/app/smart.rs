@@ -318,6 +318,104 @@ impl AppModel {
         });
         dialog.present(Some(&self.window));
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_smart(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::SmartSelected(id) => {
+                if !self.smart_folders.iter().any(|f| f.id == id) {
+                    return;
+                }
+                self.close_sidebar_peek();
+                self.mirror_selection(crate::ui::sidebar::Sel::Smart(id.clone()));
+                self.leave_gallery();
+                self.showing_contacts = false;
+                self.showing_outbox = false;
+                self.unified = false;
+                self.selected = None;
+                self.tag_view = None;
+                self.smart_view = Some(id);
+                self.current = None;
+                self.current_thread.clear();
+                self.attachments.clear();
+                self.attachments_loading = false;
+                self.sync_attachment_drawer();
+                self.show_message(None, false);
+                self.message_list.emit(MessageListInput::SetSelected(None));
+                self.message_list.emit(MessageListInput::ResetPaging);
+                self.message_list
+                    .emit(MessageListInput::SetScope(SearchScope::ThisFolder));
+                self.message_list.emit(MessageListInput::SetColorize(true));
+                // A folder held to Sent lists what you sent: name the
+                // recipients, as Sent does.
+                let sent = self
+                    .open_smart_folder()
+                    .is_some_and(|f| f.folder == Some(config::SmartFolderKind::Sent));
+                self.message_list
+                    .emit(MessageListInput::SetShowRecipient(sent));
+                self.message_list
+                    .emit(MessageListInput::SetRestorable(false));
+                self.message_list.emit(MessageListInput::SetInJunk(false));
+                self.message_list.emit(MessageListInput::SetInDrafts(false));
+                self.message_view
+                    .emit(MessageViewInput::SetDraftsView(false));
+                self.show_smart_view();
+                self.refresh_smart_view(&sender);
+                self.push_index_complete();
+            }
+
+            AppMsg::SmartViewLoaded { id, rows } => {
+                self.smart_view_loading = false;
+                if let Some(folder) = self.smart_folders.iter().find(|f| f.id == id).cloned() {
+                    let out = self.assemble_smart_view(&folder, rows);
+                    let changed = self.smart_view_cache.get(&id) != Some(&out);
+                    if changed {
+                        self.smart_view_cache.insert(id.clone(), out.clone());
+                    }
+                    if self.smart_view.as_ref() == Some(&id) && changed {
+                        self.message_list
+                            .emit(MessageListInput::SetMessages { messages: out });
+                    }
+                }
+                if std::mem::take(&mut self.smart_view_dirty) {
+                    self.refresh_smart_view(&sender);
+                }
+            }
+
+            AppMsg::CountSmartFolders => {
+                self.smart_counts_due = false;
+                self.count_smart_folders(&sender);
+            }
+
+            AppMsg::SmartCounts(counts) => {
+                self.smart_counts_running = false;
+                self.sidebars_emit(SidebarInput::SetSmartUnread(counts));
+            }
+
+            AppMsg::SetSmartFolders(folders) => {
+                config::save_smart_folders(&folders);
+                // What each one keeps may have changed with its conditions.
+                self.smart_view_cache.clear();
+                self.smart_folders = folders;
+                if let Some(acc) = &self.accounts_win {
+                    acc.emit(crate::ui::accounts::AccountsInput::SetSmartFolders(
+                        self.smart_folders.clone(),
+                    ));
+                }
+                self.rebuild_sidebar();
+                if self
+                    .smart_view
+                    .as_ref()
+                    .is_some_and(|id| self.smart_folders.iter().any(|f| &f.id == id))
+                {
+                    self.show_smart_view();
+                    self.refresh_smart_view(&sender);
+                }
+                self.schedule_smart_counts(&sender);
+            }
+            _ => unreachable!("not routed to on_smart"),
+        }
+    }
 }
 
 #[cfg(test)]

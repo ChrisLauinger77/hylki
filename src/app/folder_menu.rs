@@ -230,4 +230,265 @@ impl AppModel {
             }
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_folder_menu(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::SidebarContext(action) => match action {
+                CtxAction::MarkFolderRead {
+                    account_id,
+                    folder_id,
+                } => {
+                    self.mark_folder_read(account_id, folder_id);
+                }
+                CtxAction::RefreshFolder {
+                    account_id,
+                    folder_id,
+                } => {
+                    if let Some(path) = self
+                        .folders
+                        .get(&account_id)
+                        .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+                        .map(|f| f.path.clone())
+                    {
+                        self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
+                    }
+                }
+                CtxAction::MarkAllInboxesRead => {
+                    // The inboxes the row merges, as its chip counts them.
+                    let inboxes: Vec<(u32, u32)> = self
+                        .accounts
+                        .iter()
+                        .filter(|a| self.in_unified(a.id))
+                        .filter_map(|a| self.inbox_of(a.id).map(|f| (a.id, f.id)))
+                        .collect();
+                    for (account_id, folder_id) in inboxes {
+                        self.mark_folder_read(account_id, folder_id);
+                    }
+                }
+                CtxAction::RefreshAllInboxes => {
+                    let reqs: Vec<(u32, u32, String)> = self
+                        .accounts
+                        .iter()
+                        .filter(|a| self.in_unified(a.id))
+                        .filter_map(|a| self.inbox_of(a.id).map(|f| (a.id, f.id, f.path.clone())))
+                        .collect();
+                    for (account_id, folder_id, path) in reqs {
+                        self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
+                    }
+                }
+                CtxAction::EmptyAll(kind) => {
+                    self.confirm_empty_all(kind, &sender);
+                }
+                CtxAction::ApplyFilters {
+                    account_id,
+                    folder_id,
+                } => {
+                    self.start_filter_run(vec![(account_id, folder_id)], &sender);
+                }
+                CtxAction::EditFilter { account_id, path } => {
+                    // The first rule filing into this folder, in the
+                    // Filters page's editor.
+                    let email = self.email_of(account_id);
+                    let index = email.and_then(|email| {
+                        self.filters.iter().position(|r| {
+                            r.account_email.eq_ignore_ascii_case(&email) && r.dest_path == path
+                        })
+                    });
+                    if let Some(i) = index {
+                        self.open_settings_window(&sender, true, false);
+                        if let Some(p) = &self.prefs {
+                            p.emit(PrefInput::ShowPageById("filters".to_string()));
+                        }
+                        if let Some(acc) = &self.accounts_win {
+                            acc.emit(crate::ui::accounts::AccountsInput::EditFilter(i));
+                        }
+                    }
+                }
+                CtxAction::NewSmartFolder => {
+                    self.open_settings_window(&sender, true, false);
+                    if let Some(p) = &self.prefs {
+                        p.emit(PrefInput::ShowPageById("smart".to_string()));
+                    }
+                    if let Some(acc) = &self.accounts_win {
+                        acc.emit(crate::ui::accounts::AccountsInput::AddSmartFolder);
+                    }
+                }
+                CtxAction::EditSmartFolder(id) => {
+                    if let Some(i) = self.smart_folders.iter().position(|f| f.id == id) {
+                        self.open_settings_window(&sender, true, false);
+                        if let Some(p) = &self.prefs {
+                            p.emit(PrefInput::ShowPageById("smart".to_string()));
+                        }
+                        if let Some(acc) = &self.accounts_win {
+                            acc.emit(crate::ui::accounts::AccountsInput::EditSmartFolder(i));
+                        }
+                    }
+                }
+                CtxAction::DeleteSmartFolder(id) => {
+                    self.confirm_delete_smart_folder(id, &sender);
+                }
+                CtxAction::EditTag(keyword) => {
+                    if let Some(i) = self.tags.iter().position(|t| t.keyword == keyword) {
+                        self.open_settings_window(&sender, true, false);
+                        if let Some(p) = &self.prefs {
+                            p.emit(PrefInput::ShowPageById("tags".to_string()));
+                        }
+                        if let Some(acc) = &self.accounts_win {
+                            acc.emit(crate::ui::accounts::AccountsInput::EditTag(i));
+                        }
+                    }
+                }
+                CtxAction::OpenAccountSettings(account_id) => {
+                    // Straight to this account's editor, not the accounts list.
+                    let email = self
+                        .accounts
+                        .iter()
+                        .find(|a| a.id == account_id)
+                        .map(|a| a.email.clone());
+                    self.open_settings_window(&sender, true, false);
+                    if let (Some(email), Some(acc)) = (email, &self.accounts_win) {
+                        acc.emit(crate::ui::accounts::AccountsInput::EditAccountByEmail(
+                            email,
+                        ));
+                    }
+                }
+                CtxAction::RemoveAccount(account_id) => {
+                    self.confirm_remove_account(account_id, &sender);
+                }
+                CtxAction::NewFolder(account_id) => {
+                    self.prompt_new_folder(account_id, &sender);
+                }
+                CtxAction::DeleteFolder {
+                    account_id,
+                    name,
+                    path,
+                } => {
+                    self.confirm_delete_folder(account_id, name, path, &sender);
+                }
+                CtxAction::RenameFolder {
+                    account_id,
+                    name,
+                    path,
+                } => {
+                    self.prompt_rename_folder(account_id, name, path, &sender);
+                }
+                CtxAction::EmptyFolder {
+                    account_id,
+                    folder_id,
+                    name,
+                    path,
+                } => {
+                    self.confirm_empty_folder(account_id, folder_id, name, path, &sender);
+                }
+                CtxAction::HideFolder { account_id, path } => {
+                    self.hide_folders(account_id, vec![path]);
+                }
+                CtxAction::AddFavorite { account_id, path } => {
+                    if let Some(email) = self.email_of(account_id) {
+                        let key = format!("{email}\t{path}");
+                        if !self.favorites.contains(&key) {
+                            // The first favorite shows its list open.
+                            if self.favorites.is_empty() {
+                                self.favorites_expanded = true;
+                            }
+                            self.favorites.push(key);
+                            self.save_sidebar_state();
+                            self.rebuild_sidebar();
+                        }
+                    }
+                }
+                CtxAction::RemoveFavorite { account_id, path } => {
+                    if let Some(email) = self.email_of(account_id) {
+                        let key = format!("{email}\t{path}");
+                        self.favorites.retain(|k| *k != key);
+                        self.save_sidebar_state();
+                        self.rebuild_sidebar();
+                    }
+                }
+                CtxAction::ResetFolderOrder(account_id) => {
+                    if let Some(email) = self.email_of(account_id) {
+                        let prefix = format!("{email}\t");
+                        self.folder_order.retain(|k| !k.starts_with(&prefix));
+                        self.save_sidebar_state();
+                        self.rebuild_sidebar();
+                    }
+                }
+            },
+
+            AppMsg::DropMoveMessages {
+                dest_account,
+                dest,
+                items,
+            } => {
+                self.drop_move(dest_account, dest, items);
+            }
+
+            AppMsg::CreateFolder { account_id, name } => {
+                let name = name.trim();
+                if !name.is_empty() {
+                    // The server names mailboxes in modified UTF-7, so a name
+                    // with any non-ASCII character has to be encoded before it
+                    // becomes a path (issue #1, in the other direction).
+                    let path = format!(
+                        "{}{}",
+                        self.folder_namespace(account_id),
+                        crate::mutf7::encode(name)
+                    );
+                    self.create_folder(account_id, path.clone());
+                    self.push_undo(
+                        account_id,
+                        i18n("Create Folder"),
+                        UndoStep::DeleteFolder { path },
+                    );
+                }
+            }
+
+            AppMsg::MoveFolder {
+                account_id,
+                path,
+                dest,
+            } => {
+                let _ = self.move_folder(account_id, path, dest);
+            }
+
+            AppMsg::RenameFolderTo {
+                account_id,
+                path,
+                new_name,
+            } => {
+                self.rename_folder_to(account_id, path, new_name);
+            }
+
+            AppMsg::EmptyFolder {
+                account_id,
+                folder_id,
+                path,
+            } => {
+                // Gone locally at once; the worker's empty message list and
+                // zero count confirm it, or an error says why not.
+                self.message_cache.remove(&(account_id, folder_id));
+                self.folder_unread.insert((account_id, folder_id), 0);
+                if self
+                    .selected
+                    .as_ref()
+                    .is_some_and(|s| s.account_id == account_id && s.folder_id == folder_id)
+                {
+                    self.current = None;
+                    self.current_thread.clear();
+                    self.show_message(None, false);
+                    self.message_list.emit(MessageListInput::SetLoading);
+                }
+                self.push_unread_counts();
+                self.send_to(account_id, MailRequest::EmptyFolder { folder_id, path });
+            }
+
+            // Not recorded: deleting a folder cannot be taken back (#200).
+            // The confirmation says so before it happens.
+            AppMsg::DeleteFolder { account_id, path } => {
+                self.delete_folder(account_id, path);
+            }
+            _ => unreachable!("not routed to on_folder_menu"),
+        }
+    }
 }

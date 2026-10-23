@@ -288,4 +288,37 @@ impl AppModel {
     pub(super) fn list_show_subject(&self) -> bool {
         !self.focus.active(config::FocusPart::HideSubject)
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_list_header(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::ListOverflowMenu => self.show_list_overflow_menu(&sender),
+            AppMsg::ListPaneWidth(width) => {
+                // A margin each way, so a drag that rests near the line does
+                // not flick the rows back and forth.
+                let wide = if self.list_wide {
+                    width >= LIST_WIDE_OFF
+                } else {
+                    width >= LIST_WIDE_ON
+                };
+                if wide != self.list_wide {
+                    self.list_wide = wide;
+                    if self.list_layout == config::ListLayout::Automatic {
+                        self.push_single_line();
+                    }
+                }
+            }
+
+            AppMsg::ListCount(text) => self.list_count = text,
+            AppMsg::ListColumnWidths(widths) => {
+                pref!(self.list_column_widths = widths);
+            }
+            AppMsg::ListSortChanged(key) => {
+                if let Some(lh) = self.list_header_widgets.get() {
+                    lh.sort.set_state(&key.to_variant());
+                }
+            }
+            _ => unreachable!("not routed to on_list_header"),
+        }
+    }
 }

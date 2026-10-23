@@ -279,6 +279,327 @@ impl AppModel {
         }
         dialog.present();
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_accounts(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::OpenAccounts => self.open_settings_window(&sender, true, false),
+
+            AppMsg::AddFirstAccount => self.open_settings_window(&sender, true, true),
+            AppMsg::AccountSaved {
+                original_email,
+                account,
+            } => {
+                // Whether the account joined or left the unified section
+                // (#267): the merged views open now are redrawn without it.
+                let unified_changed = original_email
+                    .as_ref()
+                    .and_then(|orig| self.effective_config().iter().find(|c| &c.email == orig))
+                    .is_some_and(|old| old.in_unified != account.in_unified);
+                // Demo mode: the edit lands on the in-memory stand-in (so a
+                // new color, emoji or picture shows in the sidebar and the
+                // reader at once) and nothing is written or reconnected.
+                if self.config.is_empty() && demo_mode() {
+                    let slot = original_email
+                        .as_ref()
+                        .and_then(|orig| self.demo_config.iter_mut().find(|c| &c.email == orig));
+                    match slot {
+                        Some(slot) => *slot = *account,
+                        None => self.demo_config.push(*account),
+                    }
+                    if let Err(e) = config::save_demo_accounts(&self.demo_config) {
+                        tracing::warn!("could not save the demo accounts: {e}");
+                    }
+                    self.rebuild_sidebar();
+                    self.warm_own_gravatars(&sender);
+                    self.refresh_faces();
+                    if unified_changed {
+                        self.reload_unified_views(
+                            self.unified.then_some(self.unified_view),
+                            &sender,
+                        );
+                    }
+                    return;
+                }
+                let open_unified = self.unified.then_some(self.unified_view);
+                let new_email = account.email.clone();
+                // An edit that only changes how the account looks or signs
+                // (#382) is applied in place: reconnecting every account for
+                // it emptied the list and the reader until they had synced.
+                // Whether its secrets changed too is the keyring's to say,
+                // asked now, before the save below replaces them: the keyring
+                // thread answers in order. A changed one reconnects then.
+                let look_only = original_email
+                    .as_ref()
+                    .and_then(|orig| self.config.iter().find(|c| &c.email == orig))
+                    .filter(|old| look_only_change(old, &account))
+                    .cloned();
+                let display_only = look_only.is_some();
+                if let Some(old) = look_only {
+                    let (new, email, sender) =
+                        ((*account).clone(), new_email.clone(), sender.clone());
+                    config::keyring_then(
+                        move || secrets_kept(&old, &new),
+                        move |kept| {
+                            if kept {
+                                tracing::info!("{email}: saved without reconnecting, only its look or signature changed");
+                            } else {
+                                sender.input(AppMsg::ReconnectAccounts);
+                            }
+                        },
+                    );
+                }
+                // Remember the secret we expect to persist, so we can verify the
+                // keyring actually stored it (a silent keyring failure would
+                // otherwise leave the account unable to log in after a restart).
+                let expected_secret =
+                    (!account.password.is_empty()).then(|| account.password.clone());
+                // An alias dropped (or switched back to the account's SMTP) in
+                // this edit must not leave its SMTP password behind in the
+                // keyring — and an email rename re-keys every alias entry, so
+                // the old ones all go. config::save() below stores the current
+                // set fresh.
+                if let Some(orig) = &original_email {
+                    if let Some(old) = self.config.iter().find(|c| &c.email == orig) {
+                        for old_alias in &old.aliases {
+                            let kept = old.email == new_email
+                                && account.aliases.iter().any(|n| {
+                                    n.has_own_smtp()
+                                        && n.address().eq_ignore_ascii_case(&old_alias.address())
+                                });
+                            if !kept {
+                                let (email, address) = (old.email.clone(), old_alias.address());
+                                config::keyring_later(move || {
+                                    config::delete_alias_smtp_password(&email, &address)
+                                });
+                            }
+                        }
+                    }
+                }
+                match original_email {
+                    // Editing an existing account (matched by its previous email).
+                    Some(orig) => {
+                        if let Some(slot) = self.config.iter_mut().find(|c| c.email == orig) {
+                            *slot = *account;
+                        } else {
+                            self.config.push(*account);
+                        }
+                        // Track an email change in the display-order/collapsed lists.
+                        if orig != new_email {
+                            for e in self
+                                .account_order
+                                .iter_mut()
+                                .chain(self.collapsed.iter_mut())
+                            {
+                                if *e == orig {
+                                    *e = new_email.clone();
+                                }
+                            }
+                        }
+                    }
+                    // Adding a new account.
+                    None => self.config.push(*account),
+                }
+                match config::save(&self.config) {
+                    Ok(()) => {
+                        // config::save() only logs keyring errors, so confirm the
+                        // password can actually be read back. If not, the Secret
+                        // Service isn't persisting it — tell the user how to fix it
+                        // instead of silently "saving" an account that won't stay
+                        // logged in. Queued after the save's own writes.
+                        if let Some(secret) = expected_secret {
+                            let (email, sender) = (new_email.clone(), sender.clone());
+                            config::keyring_then(
+                                move || {
+                                    config::load_password(&email).as_deref()
+                                        == Some(secret.as_str())
+                                },
+                                move |stored| {
+                                    if !stored {
+                                        sender.input(AppMsg::ShowKeyringHelp { problem: true });
+                                    }
+                                },
+                            );
+                        }
+                        self.save_sidebar_state();
+                        // Changed Special Folders assignments (#82) land on the
+                        // live lists at once; the reconnect's fresh LIST then
+                        // confirms them (and restores auto-detection for any
+                        // role set back to Automatic).
+                        for (i, cfg) in self.config.iter().enumerate() {
+                            if let Some(folders) = self.folders.get_mut(&(i as u32 + 1)) {
+                                apply_folder_roles(&cfg.folder_roles, folders);
+                            }
+                        }
+                        self.rebuild_sidebar();
+                        // A picture, an emoji or the Gravatar switch may have
+                        // changed with this edit (#189).
+                        self.warm_own_gravatars(&sender);
+                        self.refresh_faces();
+                        if !display_only {
+                            self.reconnect_all(&sender);
+                        }
+                        if unified_changed {
+                            self.reload_unified_views(open_unified, &sender);
+                        }
+                    }
+                    Err(e) => self.notifications.emit(NotifyInput::Push {
+                        text: i18n_f("Could not save account: {e}", &[("e", &(e).to_string())]),
+                        error: true,
+                        connectivity: false,
+                    }),
+                }
+            }
+
+            AppMsg::ShowKeyringHelp { problem } => self.show_keyring_help(problem),
+            AppMsg::ReconnectAccounts => self.reconnect_all(&sender),
+            AppMsg::ShowCarryOverNotice(from) => crate::ui::carry_over::show(&self.window, from),
+
+            AppMsg::AccountEnabledChanged { email, enabled } => {
+                if let Some(slot) = self.config.iter_mut().find(|c| c.email == email) {
+                    if slot.enabled != enabled {
+                        slot.enabled = enabled;
+                        if let Err(e) = config::save(&self.config) {
+                            self.notifications.emit(NotifyInput::Push {
+                                text: i18n_f(
+                                    "Could not save account: {e}",
+                                    &[("e", &(e).to_string())],
+                                ),
+                                error: true,
+                                connectivity: false,
+                            });
+                        }
+                        // Respawn workers so the account starts/stops syncing.
+                        self.reconnect_all(&sender);
+                    }
+                }
+            }
+
+            AppMsg::ApplyWelcomePrefs(p) => {
+                config::mark_wizard_completed();
+                // Route every choice through its normal handler (each saves and
+                // updates the live UI); drop the wizard controller afterwards.
+                sender.input(AppMsg::Pref(PrefOutput::SetAutoRemoteContent(
+                    !p.block_remote,
+                )));
+                sender.input(AppMsg::Pref(PrefOutput::SetGravatar(p.gravatar)));
+                sender.input(AppMsg::Pref(PrefOutput::SetSenderLogos(p.sender_logos)));
+                sender.input(AppMsg::Pref(PrefOutput::SetNotificationContent(
+                    p.notification_content,
+                )));
+                sender.input(AppMsg::Pref(PrefOutput::SetPreviewLines(p.preview_lines)));
+                sender.input(AppMsg::Pref(PrefOutput::SetAvatars(p.avatars)));
+                sender.input(AppMsg::Pref(PrefOutput::SetThreading(p.threading)));
+                if !p.app_icon.is_empty() {
+                    sender.input(AppMsg::Pref(PrefOutput::SetAppIcon(p.app_icon)));
+                }
+                self.welcome = None;
+            }
+
+            AppMsg::ImportGoaAccount(account) => {
+                // Enable a GNOME Online Account in Hylki (or re-enable if already
+                // imported). Its password came from GOA and is stored in the keyring.
+                let email = account.email.clone();
+                if let Some(slot) = self.config.iter_mut().find(|c| c.email == email) {
+                    slot.enabled = true;
+                    // Re-importing refreshes the GOA-owned connection details in
+                    // place — e.g. a broken pre-#36 Microsoft 365 import (empty
+                    // hosts, IMAP) repairs into a Graph account — keeping the
+                    // slot (account ids are config indices) and the cosmetics.
+                    if account.goa_id.is_some() {
+                        slot.protocol = account.protocol;
+                        slot.imap_host = account.imap_host.clone();
+                        slot.imap_port = account.imap_port;
+                        slot.smtp_host = account.smtp_host.clone();
+                        slot.smtp_port = account.smtp_port;
+                        slot.username = account.username.clone();
+                        slot.smtp_separate = account.smtp_separate;
+                        slot.smtp_username = account.smtp_username.clone();
+                        slot.oauth = account.oauth;
+                        slot.oauth_settings = account.oauth_settings.clone();
+                        slot.oauth_refresh = account.oauth_refresh.clone();
+                        slot.goa_id = account.goa_id.clone();
+                    }
+                } else {
+                    self.config.push(*account);
+                }
+                match config::save(&self.config) {
+                    Ok(()) => self.reconnect_all(&sender),
+                    Err(e) => self.notifications.emit(NotifyInput::Push {
+                        text: i18n_f("Could not import account: {e}", &[("e", &(e).to_string())]),
+                        error: true,
+                        connectivity: false,
+                    }),
+                }
+            }
+
+            AppMsg::AccountRemoved { email } => {
+                // Drop the keyring entries while the config (which knows the
+                // alias addresses) is still around.
+                forget_account_secrets(std::slice::from_ref(&email), &self.config);
+                self.config.retain(|c| c.email != email);
+                self.account_order.retain(|e| *e != email);
+                self.collapsed.retain(|e| *e != email);
+                if let Err(e) = config::save(&self.config) {
+                    tracing::error!("could not save config: {e}");
+                }
+                self.save_sidebar_state();
+                self.reconnect_all(&sender);
+            }
+
+            AppMsg::GoaChanged(live) => {
+                // An account added there shows in Settings' import list.
+                if let Some(acc) = &self.accounts_win {
+                    acc.emit(crate::ui::accounts::AccountsInput::RefreshGoa);
+                }
+                // GOA changed in GNOME Settings. Drop any imported account that
+                // no longer exists there; pause/resume any whose Mail service
+                // was toggled. (Adding an account to GOA never auto-imports —
+                // that stays a manual choice.)
+                // Snapshot first: reconcile removes accounts from the config,
+                // and the alias-password keyring entries are keyed by data
+                // (the alias addresses) only the config holds.
+                let before = self.config.clone();
+                let outcome = reconcile_goa(&mut self.config, &live);
+                if !outcome.removed.is_empty() {
+                    forget_account_secrets(&outcome.removed, &before);
+                    for email in &outcome.removed {
+                        self.account_order.retain(|e| e != email);
+                        self.collapsed.retain(|e| e != email);
+                        self.folders_expanded.retain(|e| e != email);
+                        self.filtered_expanded_accounts.retain(|e| e != email);
+                        self.tags_expanded_accounts.retain(|e| e != email);
+                    }
+                    self.save_sidebar_state();
+                }
+                if !outcome.removed.is_empty() || outcome.paused_changed || outcome.servers_changed
+                {
+                    if let Err(e) = config::save(&self.config) {
+                        tracing::error!("could not save config after GOA change: {e}");
+                    }
+                    self.reconnect_all(&sender);
+                }
+            }
+
+            AppMsg::SetAccount(account) => {
+                if let Some(existing) = self.accounts.iter_mut().find(|a| a.id == account.id) {
+                    *existing = account;
+                } else {
+                    // Layout not remembered: an account starts folded up,
+                    // wherever it came from (config, GOA, the demo). Only
+                    // on arrival, so opening it by hand sticks for the
+                    // session.
+                    if !self.remember_sidebar && !self.collapsed.contains(&account.email) {
+                        self.collapsed.push(account.email.clone());
+                    }
+                    self.accounts.push(account);
+                    self.accounts.sort_by_key(|a| a.id);
+                }
+                self.rebuild_sidebar();
+            }
+            _ => unreachable!("not routed to on_accounts"),
+        }
+    }
 }
 
 #[cfg(test)]

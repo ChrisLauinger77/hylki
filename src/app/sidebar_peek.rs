@@ -170,4 +170,145 @@ impl AppModel {
             self.compact_sidebar_header(want);
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_sidebar_peek(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::SidebarCollapsed(collapsed) => {
+                tracing::info!(
+                    "peek: sidebar reports collapsed={collapsed} (peek={} auto_rail={} rail_active={})",
+                    self.sidebar_peek, self.auto_rail, self.rail_active
+                );
+                // The sidebar component has already switched its own rows; this
+                // is the app-side reaction (split widths, header, persistence).
+                // At a width that can host the full sidebar, the arrow inside a
+                // floating peek PINS it: the sidebar becomes the normal
+                // side-by-side pane (persisted) and hover-expand goes dormant
+                // until it is collapsed again. In the narrow window the toggle
+                // only opens/closes the overlay — there is no room to pin.
+                if self.sidebar_peek && !self.auto_rail && collapsed {
+                    self.pin_sidebar_from_peek();
+                } else if self.auto_rail {
+                    // Narrow window: the rail never expands in place — put
+                    // its rows straight back and float the peek panel out
+                    // (or fold it) instead. Only a showcase toggle gets here;
+                    // the header button goes through AppMsg::ToggleSidebar.
+                    self.sidebar.emit(SidebarInput::SetCollapsed(true));
+                    self.rail_active = true;
+                    self.set_sidebar_peek(!collapsed, true);
+                } else {
+                    // Focus Mode holding the rail borrows the sidebar's
+                    // layout: expanding it for a moment is a look, not a
+                    // choice, so only what is on screen moves.
+                    if !self.sidebar_layout_borrowed() {
+                        self.sidebar_collapsed = collapsed;
+                    }
+                    self.rail_active = collapsed;
+                    self.animate_sidebar(collapsed);
+                    self.compact_sidebar_header(collapsed);
+                    if !self.sidebar_layout_borrowed() {
+                        self.save_sidebar_state();
+                    }
+                }
+            }
+
+            AppMsg::AutoRail(on) => {
+                tracing::info!("peek: auto-rail {on} (peek={})", self.sidebar_peek);
+                self.auto_rail = on;
+                if !on && self.sidebar_peek {
+                    // Widened with the panel open: fold it back before the
+                    // split view returns to side-by-side.
+                    self.set_sidebar_peek(false, false);
+                    self.rail_active = true;
+                }
+                // The rail wins while the window is narrow; the user's own
+                // choice comes back the moment there is room again. Nothing is
+                // persisted here — this is the window's shape, not a preference.
+                let want = self.rail_wanted();
+                if want != self.rail_active {
+                    self.rail_active = want;
+                    self.sidebar.emit(SidebarInput::SetCollapsed(want));
+                    self.animate_sidebar(want);
+                    self.compact_sidebar_header(want);
+                }
+            }
+
+            AppMsg::ToggleSidebar => {
+                tracing::info!(
+                    "peek: toggle button (peek={} auto_rail={} rail_active={})",
+                    self.sidebar_peek,
+                    self.auto_rail,
+                    self.rail_active
+                );
+                // Self-healing: with no peek open, the split should always be
+                // un-collapsed and showing (rail or side-by-side). If it ended
+                // hidden — a lost race in the peek machinery left users with no
+                // sidebar and a dead button until relaunch (seen on 1.17.1) —
+                // the button's job is to bring the sidebar back, not to feed
+                // a toggle into state that already lost the plot: repair to
+                // the rail first, then toggle normally from there.
+                if self.sidebar_peek {
+                    if self.auto_rail {
+                        // Narrow window: the button folds the floating peek
+                        // back to the rail.
+                        self.rail_active = true;
+                        self.set_sidebar_peek(false, true);
+                    } else {
+                        // A hover peek at a width with room for the full
+                        // sidebar: the button pins it side by side.
+                        self.pin_sidebar_from_peek();
+                    }
+                } else {
+                    if let Some(split) = self.sidebar_split.clone() {
+                        if split.is_collapsed() || !split.shows_sidebar() {
+                            tracing::info!(
+                                "peek: toggle found split hidden (collapsed={} shown={}) — repairing",
+                                split.is_collapsed(),
+                                split.shows_sidebar()
+                            );
+                            self.rail_active = true;
+                            self.sidebar.emit(SidebarInput::SetCollapsed(true));
+                            self.compact_sidebar_header(true);
+                            self.peek_transition.set(true);
+                            split.set_min_sidebar_width(SIDEBAR_RAIL_WIDTH);
+                            split.set_max_sidebar_width(SIDEBAR_RAIL_WIDTH);
+                            split.set_collapsed(false);
+                            split.set_show_sidebar(true);
+                            self.peek_transition.set(false);
+                        }
+                    }
+                    if self.auto_rail {
+                        // Narrow window: the toggle floats the peek panel
+                        // out beside the rail; the rail itself never expands.
+                        self.rail_active = false;
+                        self.set_sidebar_peek(true, true);
+                    } else {
+                        self.sidebar.emit(SidebarInput::ToggleCollapsed);
+                    }
+                }
+            }
+
+            AppMsg::SidebarPeekDismissed => {
+                tracing::info!("peek: dismissed (peek={})", self.sidebar_peek);
+                if self.sidebar_peek {
+                    self.rail_active = true;
+                    self.set_sidebar_peek(false, true);
+                }
+            }
+
+            AppMsg::SidebarHoverEnter => {
+                // Hover-expand (preference): the icon rail floats the full
+                // sidebar out without a click — whether the rail comes from
+                // the narrow-window breakpoint or the user's own collapse.
+                // The same peek the expand button opens, dismissed the same
+                // ways (navigation, or a click outside the panel).
+                let rail_up = self.rail_wanted();
+                if self.sidebar_hover_expand && rail_up && !self.sidebar_peek {
+                    self.rail_active = false;
+                    self.set_sidebar_peek(true, true);
+                }
+            }
+            _ => unreachable!("not routed to on_sidebar_peek"),
+        }
+    }
 }

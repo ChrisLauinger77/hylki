@@ -246,4 +246,18 @@ impl AppModel {
                 .emit(MessageWindowInput::SetInviteAnswers(map.clone()));
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_invites(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::InviteAction {
+                message,
+                invite,
+                action,
+            } => {
+                self.invite_action(*message, *invite, action);
+            }
+            _ => unreachable!("not routed to on_invites"),
+        }
+    }
 }

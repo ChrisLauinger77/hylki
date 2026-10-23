@@ -472,4 +472,61 @@ impl AppModel {
             .emit(MessageListInput::RemoveMany(removed_ids));
         self.push_unread_counts();
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_transfer(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::RawExported { token, raw } => {
+                if let Some(name) = self.pending_saves.remove(&token) {
+                    match raw {
+                        Ok(raw) => self.save_message_file(name, raw),
+                        Err(e) => self.notifications.emit(NotifyInput::Push {
+                            text: i18n_f("Could not save the message: {e}", &[("e", &e)]),
+                            error: true,
+                            connectivity: false,
+                        }),
+                    }
+                    return;
+                }
+                if self.pending_draft_token == Some(token) {
+                    self.pending_draft_token = None;
+                    let Some((m, inline, extra)) = self.pending_draft.take() else {
+                        return;
+                    };
+                    match raw {
+                        Ok(raw) => self.compose_from_draft_raw(m, &raw, inline, extra, &sender),
+                        // Offline, say: the body the reader has is still
+                        // better than nothing.
+                        Err(e) => {
+                            tracing::warn!("draft {} could not be fetched whole: {e}", m.uid);
+                            self.open_draft_body(m, inline, extra, &sender);
+                        }
+                    }
+                    return;
+                }
+                let Some(t) = self.transfers.get(&token) else {
+                    return;
+                };
+                match raw {
+                    Ok(raw) => self.send_to(
+                        t.dest_account,
+                        MailRequest::ImportRaw {
+                            token,
+                            path: t.dest_path.clone(),
+                            raw,
+                            seen: t.seen,
+                            flagged: t.flagged,
+                        },
+                    ),
+                    Err(e) => self.transfer_failed(token, e),
+                }
+            }
+
+            AppMsg::RawImported { token, result } => match result {
+                Ok(()) => self.transfer_landed(token),
+                Err(e) => self.transfer_failed(token, e),
+            },
+            _ => unreachable!("not routed to on_transfer"),
+        }
+    }
 }

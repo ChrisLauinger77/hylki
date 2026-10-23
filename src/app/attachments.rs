@@ -302,6 +302,270 @@ impl AppModel {
         });
         dialog.present();
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_attachments(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::LoadAttachmentsFor(m) => {
+                let m = *m;
+                if let Some(path) = self.resolve_folder_path(&m) {
+                    self.send_to(
+                        m.account_id,
+                        MailRequest::LoadAttachments {
+                            message_id: m.id,
+                            path,
+                            uid: m.uid,
+                            download: true,
+                        },
+                    );
+                }
+            }
+
+            AppMsg::DeletePopoutAttachment {
+                key,
+                message,
+                attachment,
+            } => {
+                let Some(window) = self.popouts.get(&key).map(|p| p.window.clone()) else {
+                    return;
+                };
+                let Some(path) = self.resolve_folder_path(&message) else {
+                    return;
+                };
+                let target = AttachmentTarget {
+                    account_id: message.account_id,
+                    message_id: message.id,
+                    path,
+                    uid: message.uid,
+                    name: attachment.name.clone(),
+                    size: attachment.data.len() as u64,
+                };
+                self.confirm_delete_attachment(target, window.upcast_ref(), &sender);
+            }
+
+            AppMsg::ShowLightbox { items, start } => {
+                self.lightbox
+                    .emit(crate::ui::lightbox::LightboxInput::Show { items, start });
+            }
+            AppMsg::CardAttachment {
+                account_id,
+                id,
+                index,
+                save,
+            } => {
+                let Some(items) = self
+                    .member_key((account_id, id))
+                    .and_then(|k| self.attachment_cache.get(&k))
+                    .cloned()
+                else {
+                    return;
+                };
+                let Some(att) = items.get(index).cloned() else {
+                    return;
+                };
+                if save {
+                    save_attachment(att, Some(self.window.clone()));
+                } else if crate::ui::attachment_drawer::previewable(&att) {
+                    // The lightbox pages through this message's previewable
+                    // files, starting at the one clicked.
+                    let previewable: Vec<Attachment> = items
+                        .iter()
+                        .filter(|a| crate::ui::attachment_drawer::previewable(a))
+                        .cloned()
+                        .collect();
+                    let start = items
+                        .iter()
+                        .take(index + 1)
+                        .filter(|a| crate::ui::attachment_drawer::previewable(a))
+                        .count()
+                        .saturating_sub(1);
+                    sender.input(AppMsg::ShowLightbox {
+                        items: previewable,
+                        start,
+                    });
+                } else {
+                    crate::ui::attachments_gallery::open_bytes(
+                        &att.name,
+                        &att.data,
+                        Some(self.window.upcast_ref::<gtk::Window>()),
+                    );
+                }
+            }
+            AppMsg::ShowAttachmentInMessage(att) => {
+                // The drawer shows identical (name, size) pairs once, so the
+                // first message carrying this one is the one to find.
+                let owner = self.conversation_members().into_iter().find(|key| {
+                    self.member_key(*key)
+                        .and_then(|k| self.attachment_cache.get(&k))
+                        .is_some_and(|items| {
+                            items
+                                .iter()
+                                .any(|a| a.name == att.name && a.data.len() == att.data.len())
+                        })
+                });
+                if let Some((account_id, id)) = owner {
+                    self.message_view
+                        .emit(MessageViewInput::ScrollToAttachments { account_id, id });
+                }
+            }
+            AppMsg::DeleteDrawerAttachment(att) => {
+                if let Some(target) = self.attachment_target(&att.name, Some(att.data.len())) {
+                    sender.input(AppMsg::AskDeleteAttachment(target));
+                }
+            }
+            AppMsg::AskDeleteAttachment(target) => {
+                self.confirm_delete_attachment(target, self.window.upcast_ref(), &sender)
+            }
+            AppMsg::DeleteAttachment(t) => {
+                self.attachment_drawer
+                    .emit(AttachmentDrawerInput::MarkDeleting(
+                        t.name.clone(),
+                        t.size as usize,
+                    ));
+                if let Some(p) = self.popouts.get(&(t.account_id, t.message_id)) {
+                    p.controller.emit(MessageWindowInput::Drawer(
+                        AttachmentDrawerInput::MarkDeleting(t.name.clone(), t.size as usize),
+                    ));
+                }
+                self.gallery
+                    .emit(GalleryInput::SetDeleting(t.gallery_key(), true));
+                self.deleting_attachments.push(t.clone());
+                // HYLKI_SHOWCASE_DELETE_HOLD=<seconds> holds the request back,
+                // so the file can be captured while it is being deleted.
+                if let Some(secs) = std::env::var("HYLKI_SHOWCASE_DELETE_HOLD")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(secs, move || {
+                        s.input(AppMsg::SendDeleteAttachment(t));
+                    });
+                    return;
+                }
+                sender.input(AppMsg::SendDeleteAttachment(t));
+            }
+            AppMsg::SendDeleteAttachment(t) => {
+                self.send_to(
+                    t.account_id,
+                    MailRequest::DeleteAttachment {
+                        message_id: t.message_id,
+                        path: t.path,
+                        uid: t.uid,
+                        name: t.name,
+                        size: t.size,
+                    },
+                );
+            }
+            AppMsg::AttachmentNotDeleted {
+                account_id,
+                message_id,
+                name,
+                size,
+            } => {
+                if let Some(t) = self.take_deleting(account_id, message_id, &name) {
+                    self.gallery
+                        .emit(GalleryInput::SetDeleting(t.gallery_key(), false));
+                }
+                if let Some(p) = self.popouts.get(&(account_id, message_id)) {
+                    p.controller.emit(MessageWindowInput::Drawer(
+                        AttachmentDrawerInput::NotDeleted(name.clone(), size as usize),
+                    ));
+                }
+                self.attachment_drawer
+                    .emit(AttachmentDrawerInput::NotDeleted(name, size as usize));
+            }
+            AppMsg::AttachmentDeleted {
+                account_id,
+                message_id,
+                path,
+                uid,
+                new_uid,
+                name,
+                size,
+            } => {
+                // The file fades out where it is shown; the lists that
+                // follow wait for it.
+                let t = self.take_deleting(account_id, message_id, &name);
+                self.gallery.emit(GalleryInput::Removed((
+                    account_id,
+                    path.clone(),
+                    uid,
+                    name.clone(),
+                )));
+                let shown = t.map_or(size, |t| t.size) as usize;
+                self.attachment_drawer
+                    .emit(AttachmentDrawerInput::Deleted(name.clone(), shown));
+                if let Some(p) = self.popouts.get(&(account_id, message_id)) {
+                    p.controller
+                        .emit(MessageWindowInput::Drawer(AttachmentDrawerInput::Deleted(
+                            name.clone(),
+                            shown,
+                        )));
+                }
+                let key = (account_id, message_id);
+                let members = self.conversation_members();
+                self.thread_cache
+                    .retain(|_, members| !members.iter().any(|m| (m.account_id, m.id) == key));
+                let folder = self
+                    .folders
+                    .get(&account_id)
+                    .and_then(|fs| fs.iter().find(|f| f.path == path))
+                    .map(|f| f.id);
+                if let Some(fid) = folder {
+                    self.body_cache.remove(&(account_id, fid, uid));
+                }
+                let held = folder.map(|fid| (account_id, fid, uid));
+                if new_uid == Some(uid) {
+                    // The same message, one file fewer (Microsoft 365): the
+                    // reader drops the file where it stands.
+                    if let Some(mut items) = held.and_then(|k| self.attachment_cache.remove(&k)) {
+                        if let Some(at) = items
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, a)| a.name == name)
+                            .min_by_key(|(_, a)| (a.data.len() as u64).abs_diff(size))
+                            .map(|(i, _)| i)
+                        {
+                            items.remove(at);
+                        }
+                        sender.input(AppMsg::Attachments {
+                            account_id,
+                            path,
+                            message_id,
+                            items,
+                        });
+                    }
+                    return;
+                }
+                // A copy took the message's place under a new UID. The list,
+                // loaded again first, may already have carried the selection
+                // over to it by Message-ID, the files it held with it; if not,
+                // the copy is opened here.
+                if let Some(k) = held {
+                    self.attachment_cache.remove(&k);
+                }
+                let Some(new_uid) = new_uid else { return };
+                let now = (account_id, new_uid);
+                if let Some(fid) = folder {
+                    self.attachment_cache.remove(&(account_id, fid, new_uid));
+                }
+                if members.contains(&now) {
+                    self.send_to(
+                        account_id,
+                        MailRequest::LoadAttachments {
+                            message_id: new_uid,
+                            path,
+                            uid: new_uid,
+                            download: true,
+                        },
+                    );
+                } else if members.contains(&key) {
+                    self.message_list.emit(MessageListInput::SelectAndLoad(now));
+                }
+            }
+            _ => unreachable!("not routed to on_attachments"),
+        }
+    }
 }
 
 #[cfg(test)]

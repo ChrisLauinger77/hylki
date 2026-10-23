@@ -264,4 +264,32 @@ impl AppModel {
         }
         show_context_menu(&parent, x, y, sections);
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_card_menu(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::ReaderTagMenu => {
+                if let Some(entries) = self.reader_tag_entries(&sender) {
+                    let btn = &self.reader_tag_btn;
+                    crate::ui::context_menu::show_context_menu(
+                        btn,
+                        (btn.width() / 2) as f64,
+                        btn.height() as f64,
+                        vec![entries],
+                    );
+                }
+            }
+
+            AppMsg::CardMenu {
+                message,
+                x,
+                y,
+                hit,
+                popout,
+            } => {
+                self.show_card_menu(*message, x, y, hit, popout, &sender);
+            }
+            _ => unreachable!("not routed to on_card_menu"),
+        }
+    }
 }

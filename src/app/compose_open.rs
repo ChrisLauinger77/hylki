@@ -408,4 +408,170 @@ impl AppModel {
         prefill.block_remote_images = !self.remote_allowed(m);
         prefill
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_compose_open(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::Compose => {
+                let (account, prefill) =
+                    self.new_message_from(self.active_account(), ComposePrefill::default());
+                if self.compose_inline {
+                    // The new-message pane slides down over the reader,
+                    // exactly like an inline reply — same composer, same
+                    // pop-out-to-window toggle in its header.
+                    self.open_inline_reply(account, prefill, None, &sender);
+                } else {
+                    self.open_compose(account, prefill, &sender);
+                }
+            }
+
+            AppMsg::Reply => {
+                if let Some(m) = self.compose_target() {
+                    self.open_reply(
+                        m.account_id,
+                        self.reply_context(&m, reply_prefill(&m)),
+                        (m.account_id, m.id),
+                        &sender,
+                    );
+                }
+            }
+
+            AppMsg::ReplyAll => {
+                if let Some(m) = self.compose_target() {
+                    let own = self.own_identities(m.account_id);
+                    self.open_reply(
+                        m.account_id,
+                        self.reply_context(&m, reply_all_prefill(&m, &own)),
+                        (m.account_id, m.id),
+                        &sender,
+                    );
+                }
+            }
+
+            AppMsg::Forward => {
+                if let Some(m) = self.compose_target() {
+                    self.forward(m, true, &sender);
+                }
+            }
+
+            AppMsg::ComposeInWindow(what) => match what {
+                WindowCompose::New => {
+                    let (account, prefill) =
+                        self.new_message_from(self.active_account(), ComposePrefill::default());
+                    self.open_compose(account, prefill, &sender);
+                }
+                WindowCompose::Forward => {
+                    if let Some(m) = self.compose_target() {
+                        self.forward(m, false, &sender);
+                    }
+                }
+                WindowCompose::Reply | WindowCompose::ReplyAll => {
+                    if let Some(m) = self.compose_target() {
+                        let prefill = if what == WindowCompose::Reply {
+                            reply_prefill(&m)
+                        } else {
+                            reply_all_prefill(&m, &self.own_identities(m.account_id))
+                        };
+                        self.open_compose(m.account_id, self.reply_context(&m, prefill), &sender);
+                    }
+                }
+            },
+
+            AppMsg::EditAsNewCurrent => {
+                if let Some(m) = self.compose_target() {
+                    self.edit_as_new(m, &sender);
+                }
+            }
+
+            AppMsg::ComposeTo(to) => {
+                self.compose_addressed(
+                    ComposePrefill {
+                        to,
+                        ..Default::default()
+                    },
+                    &sender,
+                );
+            }
+
+            AppMsg::ComposeBcc(bcc) => {
+                self.compose_addressed(
+                    ComposePrefill {
+                        bcc,
+                        ..Default::default()
+                    },
+                    &sender,
+                );
+            }
+
+            AppMsg::OpenMailto(uri) => {
+                // A mailto: link from anywhere on the system (the desktop file
+                // registers the scheme). Same open-composer flow as ComposeTo,
+                // with the URI's subject/cc/bcc/body carried along.
+                let Some(mut prefill) = parse_mailto(&uri) else {
+                    return;
+                };
+                // attach= names files (#90): keep only the ones that really
+                // exist as regular files. Whatever attaches shows up as a
+                // normal removable chip in the composer, so nothing rides
+                // along invisibly if a web link (rather than Nautilus)
+                // carried the parameter. The ones that don't are reported,
+                // not dropped in silence: from inside the Flatpak sandbox a
+                // path the file manager can see may be one Hylki cannot.
+                let (attachments, dropped): (Vec<_>, Vec<_>) =
+                    std::mem::take(&mut prefill.attachments)
+                        .into_iter()
+                        .partition(|p| p.is_file());
+                for p in &dropped {
+                    tracing::warn!(
+                        "mailto attach ignored (not a readable file): {}",
+                        p.display()
+                    );
+                }
+                tracing::info!(
+                    "mailto hand-off: {} attachment(s) named, {} readable",
+                    attachments.len() + dropped.len(),
+                    attachments.len()
+                );
+                if !attachments.is_empty() {
+                    // Files came along (Files' own "Email…" entry): the same
+                    // choice of destination as "Send with Hylki".
+                    self.begin_hand_off(
+                        FileHandOff {
+                            base: prefill,
+                            files: attachments,
+                            dropped,
+                        },
+                        &sender,
+                    );
+                    return;
+                }
+                // None of the named files could be read (#339): asking where
+                // no files should go helps nobody, so the message opens with
+                // the error beside it.
+                self.leave_gallery();
+                let account = self
+                    .current
+                    .as_ref()
+                    .map(|m| m.account_id)
+                    .unwrap_or_else(|| self.active_account());
+                let (account, prefill) = self.new_message_from(account, prefill);
+                if self.compose_inline {
+                    self.open_inline_reply(account, prefill, None, &sender);
+                } else {
+                    self.open_compose(account, prefill, &sender);
+                }
+                self.after_hand_off(0, dropped);
+            }
+
+            AppMsg::PresentComposers => {
+                crate::desktop::present_window(&self.window);
+                // The newest standalone composer is the one the alert was
+                // about; transient for the main window, it sits above it.
+                if let Some(h) = self.composers.last() {
+                    crate::desktop::present_window(&h.window);
+                }
+            }
+            _ => unreachable!("not routed to on_compose_open"),
+        }
+    }
 }

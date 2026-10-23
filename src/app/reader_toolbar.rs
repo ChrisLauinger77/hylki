@@ -386,4 +386,48 @@ impl AppModel {
             _ => i18n("Delete"),
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_reader_toolbar(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::SetReaderActionsCollapsed(on) => {
+                self.reader_actions_collapsed = on;
+                self.reader_overflow_btn
+                    .set_visible(self.reader_overflow_wanted());
+            }
+
+            AppMsg::ReaderControlsChanged(controls) => {
+                if let Some(tb) = self.reader_toolbar_widgets.get() {
+                    tb.controls.set(controls);
+                }
+                self.refresh_reader_breakpoint();
+            }
+
+            AppMsg::ReaderOverflowMenu => self.show_reader_overflow_menu(&sender),
+            AppMsg::ReaderToolbarMenu { x, y } => {
+                use crate::ui::context_menu::{show_context_menu, MenuEntry};
+                if let Some(header) = self.reader_header.get() {
+                    let s = sender.input_sender().clone();
+                    let entry = MenuEntry::new(i18n("Customize Toolbar…"), move || {
+                        let _ = s.send(AppMsg::CustomizeToolbar);
+                    })
+                    .icon("preferences-desktop-appearance-symbolic");
+                    show_context_menu(header, x, y, vec![vec![entry]]);
+                }
+            }
+            AppMsg::CustomizeToolbar => {
+                self.open_settings_window(&sender, false, false);
+                if let Some(p) = &self.prefs {
+                    p.emit(PrefInput::ShowPageById("appearance".to_string()));
+                }
+            }
+            AppMsg::CustomizeColumns => {
+                self.open_settings_window(&sender, false, false);
+                if let Some(p) = &self.prefs {
+                    p.emit(PrefInput::RevealColumns);
+                }
+            }
+            _ => unreachable!("not routed to on_reader_toolbar"),
+        }
+    }
 }

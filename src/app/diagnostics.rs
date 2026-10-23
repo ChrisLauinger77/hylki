@@ -210,4 +210,30 @@ impl AppModel {
         ));
         out
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_diagnostics(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::OpenConsole => {
+                if self.console_mode {
+                    self.notifications.emit(NotifyInput::ShowConsole);
+                } else {
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n("Enable Console mode in Settings → System & Appearance"),
+                        error: false,
+                        connectivity: false,
+                    });
+                }
+            }
+
+            AppMsg::ExportLogTo(path) => {
+                let text = crate::console_log::export_text(&self.memory_report());
+                match std::fs::write(&path, text) {
+                    Ok(()) => tracing::info!("log exported to {}", path.display()),
+                    Err(e) => tracing::warn!("log export to {} failed: {e}", path.display()),
+                }
+            }
+            _ => unreachable!("not routed to on_diagnostics"),
+        }
+    }
 }

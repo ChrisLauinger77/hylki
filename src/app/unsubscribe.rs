@@ -362,4 +362,53 @@ impl AppModel {
             result: Ok(true),
         });
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_unsubscribe(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::Unsubscribe { message, info } => {
+                if std::env::var("HYLKI_SHOWCASE_UNSUB").is_ok_and(|v| v == "go" || v == "fail") {
+                    self.unsubscribe_go(*message, *info, &sender);
+                } else {
+                    self.confirm_unsubscribe(*message, *info, &sender);
+                }
+            }
+            AppMsg::UnsubscribeGo { message, info } => {
+                self.unsubscribe_go(*message, *info, &sender);
+            }
+            AppMsg::UnsubscribeByMail { message, info } => {
+                self.unsubscribe_by_mail(*message, &info, &sender);
+            }
+            AppMsg::UnsubscribeDone { message, result } => {
+                let key = (message.account_id, message.id);
+                match result {
+                    Ok(left) => {
+                        if left {
+                            self.record_unsubscribed(&message);
+                            self.notifications.emit(NotifyInput::Push {
+                                text: i18n_f(
+                                    "Unsubscribed from {name}.",
+                                    &[("name", &sender_label(&message))],
+                                ),
+                                error: false,
+                                connectivity: false,
+                            });
+                        } else {
+                            self.notifications.emit(NotifyInput::Push {
+                                text: i18n("The list's unsubscribe page is open in your browser."),
+                                error: false,
+                                connectivity: false,
+                            });
+                        }
+                        self.push_unsubscribe_state(key, None);
+                    }
+                    Err(why) => {
+                        tracing::warn!("unsubscribe failed for {}: {why}", message.from_addr);
+                        self.push_unsubscribe_state(key, Some(UnsubState::Failed(why)));
+                    }
+                }
+            }
+            _ => unreachable!("not routed to on_unsubscribe"),
+        }
+    }
 }

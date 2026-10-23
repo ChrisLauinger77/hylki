@@ -475,6 +475,146 @@ impl AppModel {
             self.open_compose(m.account_id, prefill, sender);
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_hand_off(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::HandOffAction {
+                hand_off,
+                action,
+                remember,
+            } => {
+                if remember && self.files_prefs.action != action {
+                    self.files_prefs.action = action;
+                    self.save_settings();
+                    self.push_files_prefs();
+                }
+                self.hand_off_action(hand_off, action, &sender);
+            }
+
+            AppMsg::HandOffDraftPickNow => {
+                if let Some((hand_off, _)) = self.pending_draft_pick.take() {
+                    self.show_draft_picker(hand_off, &sender);
+                }
+            }
+
+            AppMsg::HandOffDraft { hand_off, draft } => {
+                let target = match draft {
+                    Some(m) => HandOffTarget::Draft(m),
+                    None => HandOffTarget::New,
+                };
+                self.hand_off_size_check(hand_off, target, &sender);
+            }
+
+            AppMsg::HandOffReply { hand_off, message } => {
+                let target = match message {
+                    Some(m) => HandOffTarget::Reply(m),
+                    None => HandOffTarget::New,
+                };
+                self.hand_off_size_check(hand_off, target, &sender);
+            }
+
+            AppMsg::HandOffOpen {
+                hand_off,
+                target,
+                cloud,
+                remember,
+            } => {
+                if remember {
+                    let large = if cloud {
+                        config::FilesLarge::Cloud
+                    } else {
+                        config::FilesLarge::Attach
+                    };
+                    if pref!(self.files_prefs.large = large) {
+                        self.push_files_prefs();
+                    }
+                }
+                self.hand_off_open(hand_off, target, cloud, &sender);
+            }
+
+            AppMsg::OpenWithFiles(mut paths) => {
+                // Same open-composer flow as OpenMailto, with the handed-in
+                // files pre-attached. The relay normalizes every stray
+                // command-line argument into a file URI, so keep only the
+                // ones that name a real file.
+                let named = paths.len();
+                paths.retain(|p| {
+                    let ok = p.is_file();
+                    if !ok {
+                        tracing::warn!(
+                            "file hand-off ignored (not a readable file): {}",
+                            p.display()
+                        );
+                    }
+                    ok
+                });
+                tracing::info!("file hand-off: {named} named, {} readable", paths.len());
+                if paths.is_empty() {
+                    return;
+                }
+                self.begin_hand_off(
+                    FileHandOff {
+                        base: ComposePrefill::default(),
+                        files: paths,
+                        dropped: Vec::new(),
+                    },
+                    &sender,
+                );
+            }
+
+            AppMsg::DropFilesAs(choice, paths) => {
+                use crate::ui::drop_zones::DropChoice;
+                tracing::info!(
+                    "file drop: {} file(s) for a new message ({choice:?})",
+                    paths.len()
+                );
+                let mut prefill = ComposePrefill::default();
+                match choice {
+                    // The route a drop always took: the size check first.
+                    DropChoice::Attach => {
+                        sender.input(AppMsg::DropFiles(paths));
+                        return;
+                    }
+                    DropChoice::Inline => prefill.inline_files = paths,
+                    DropChoice::Cloud => prefill.cloud_uploads = paths,
+                }
+                self.leave_gallery();
+                let account = self
+                    .current
+                    .as_ref()
+                    .map(|m| m.account_id)
+                    .unwrap_or_else(|| self.active_account());
+                let (account, prefill) = self.new_message_from(account, prefill);
+                if self.compose_inline {
+                    self.open_inline_reply(account, prefill, None, &sender);
+                } else {
+                    self.open_compose(account, prefill, &sender);
+                }
+            }
+
+            AppMsg::DropFiles(paths) => {
+                tracing::info!("file drop: {} file(s)", paths.len());
+                // A composer open in the window is what the files are for,
+                // wherever in the window they were let go.
+                if let Some(r) = self.reader_compose.as_ref().filter(|r| r.window.is_none()) {
+                    r.controller.emit(ComposeInput::AddAttachments(paths));
+                    return;
+                }
+                self.leave_gallery();
+                self.hand_off_size_check(
+                    FileHandOff {
+                        base: ComposePrefill::default(),
+                        files: paths,
+                        dropped: Vec::new(),
+                    },
+                    HandOffTarget::New,
+                    &sender,
+                );
+            }
+            _ => unreachable!("not routed to on_hand_off"),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -413,4 +413,96 @@ impl AppModel {
             }
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_shortcuts(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::ShowShortcuts => self.show_shortcuts(),
+            AppMsg::CommandPalette(actions) => {
+                let entries = self.command_palette_entries(&sender);
+                let typed = if actions { ">" } else { "" };
+                // Over the window it was asked from: a composer of its own
+                // window would otherwise hide it behind.
+                let tops = gtk::Window::toplevels();
+                let active = (0..tops.n_items())
+                    .filter_map(|i| tops.item(i))
+                    .filter_map(|o| o.downcast::<gtk::Window>().ok())
+                    .find(|w| w.is_active() && w.is_visible());
+                match active {
+                    Some(w) => crate::ui::command_palette::show(&w, entries, typed),
+                    None => crate::ui::command_palette::show(&self.window, entries, typed),
+                }
+            }
+
+            AppMsg::PrintPreview | AppMsg::PrintMessage => {
+                // Only the reader can print: it holds the rendered message, and
+                // printing from an empty reader would offer a blank page. Say so
+                // rather than appearing to do nothing, which is indistinguishable
+                // from a broken menu item.
+                let preview = matches!(msg, AppMsg::PrintPreview);
+                tracing::info!(preview, open = self.current.is_some(), "print requested");
+                if self.current.is_none() {
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n("Open a message first, then print it."),
+                        error: false,
+                        connectivity: false,
+                    });
+                    return;
+                }
+                self.message_view.emit(if preview {
+                    MessageViewInput::PrintPreview
+                } else {
+                    MessageViewInput::Print
+                });
+            }
+
+            AppMsg::Shortcut(action) => self.run_shortcut(action, &sender),
+            AppMsg::ZoomKey(step) => {
+                // The keys are the application's, so they reach the main
+                // window before the composer in it could take them.
+                let compose = self.reader_compose.as_ref().filter(|r| {
+                    r.window.is_none()
+                        && focus_in_compose(&self.window)
+                        && r.controller.model().zooms()
+                });
+                match compose {
+                    Some(r) => r.controller.emit(ComposeInput::Zoom(step)),
+                    None => sender.input(AppMsg::ZoomMessage(step)),
+                }
+            }
+            AppMsg::ComposerKey(keyval) => {
+                let compose = self
+                    .reader_compose
+                    .as_ref()
+                    .filter(|r| r.window.is_none() && focus_in_compose(&self.window));
+                let shift_ctrl =
+                    gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::SHIFT_MASK;
+                match compose.zip(crate::ui::compose::composer_key(keyval, shift_ctrl)) {
+                    Some((r, input)) => r.controller.emit(input),
+                    // Activated without a value, the stateful action toggles.
+                    None if keyval == gtk::gdk::Key::a => {
+                        relm4::main_application().activate_action("show-accounts", None)
+                    }
+                    None => sender.input(AppMsg::OpenConsole),
+                }
+            }
+            AppMsg::ZoomMessage(step) => {
+                use config::READER_ZOOM_STEPS as STEPS;
+                let at = STEPS.iter().position(|&z| z == self.zoom).unwrap_or(5) as i32;
+                let zoom = match step {
+                    0 => self.zoom_default,
+                    s => {
+                        STEPS
+                            [(at + i32::from(s.signum())).clamp(0, STEPS.len() as i32 - 1) as usize]
+                    }
+                };
+                self.set_zoom(zoom);
+            }
+
+            AppMsg::CopyReaderSelection => {
+                self.message_view.emit(MessageViewInput::CopySelection);
+            }
+            _ => unreachable!("not routed to on_shortcuts"),
+        }
+    }
 }

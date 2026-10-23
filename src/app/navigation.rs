@@ -380,4 +380,32 @@ impl AppModel {
         self.shed_large_folders();
         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_navigation(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::UnifiedSelected(view) => {
+                self.open_unified(view, &sender);
+            }
+
+            AppMsg::AccountStarredSelected(account_id) => {
+                self.open_unified_in(
+                    UnifiedView::Kind(FolderKind::Starred),
+                    Some(account_id),
+                    &sender,
+                );
+            }
+
+            AppMsg::FolderSelected {
+                account_id,
+                folder_id,
+                name,
+                path,
+            } => {
+                self.close_sidebar_peek();
+                self.select_folder(account_id, folder_id, name, path);
+            }
+            _ => unreachable!("not routed to on_navigation"),
+        }
+    }
 }

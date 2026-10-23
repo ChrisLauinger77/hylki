@@ -680,6 +680,48 @@ impl AppModel {
             );
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_undo(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::Undo => self.undo_redo(false),
+
+            AppMsg::Redo => self.undo_redo(true),
+
+            AppMsg::UndoRestored {
+                account_id,
+                folder_id,
+                message_ids,
+            } => {
+                // The undone move landed and the folder's reload has already
+                // been processed (the worker sends Messages first): put the
+                // user on the restored message — selected, loaded in the
+                // reader, and scrolled into view — instead of wherever the
+                // reload left the list. If the restored message isn't in the
+                // current view (folder switched meanwhile), SelectAndLoad
+                // finds no row and nothing moves.
+                // Unless the reader is already on it, which it will be when
+                // the undo put the row back itself (#200): selecting it again
+                // would tear the message down and render it a second time for
+                // no change the reader can see.
+                let already_open = self.current.as_ref().is_some_and(|c| {
+                    !c.message_id.is_empty() && message_ids.contains(&c.message_id)
+                });
+                if already_open {
+                    return;
+                }
+                let restored = self
+                    .message_cache
+                    .get(&(account_id, folder_id))
+                    .and_then(|msgs| msgs.iter().find(|m| message_ids.contains(&m.message_id)))
+                    .map(|m| (m.account_id, m.id));
+                if let Some(key) = restored {
+                    self.message_list.emit(MessageListInput::SelectAndLoad(key));
+                }
+            }
+            _ => unreachable!("not routed to on_undo"),
+        }
+    }
 }
 
 #[cfg(test)]

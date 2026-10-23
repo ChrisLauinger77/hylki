@@ -350,4 +350,34 @@ impl AppModel {
         }
         self.draining_composers.retain(|(cid, _)| *cid != id);
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_compose_host(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::ComposeClosed(id) => {
+                self.close_compose(id);
+                self.message_list.emit(MessageListInput::ReclaimFocus);
+            }
+
+            AppMsg::ComposeCloseRequested(id) => {
+                let controller = self
+                    .composers
+                    .iter()
+                    .find(|h| h.id == id)
+                    .map(|h| &h.controller)
+                    .or(self
+                        .reader_compose
+                        .as_ref()
+                        .filter(|r| r.id == id)
+                        .map(|r| &r.controller));
+                match controller {
+                    Some(c) => c.emit(ComposeInput::Cancel),
+                    None => self.close_compose(id),
+                }
+            }
+
+            AppMsg::ComposeToggleWindow(id) => self.toggle_compose_window(id, &sender),
+            _ => unreachable!("not routed to on_compose_host"),
+        }
+    }
 }

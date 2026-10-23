@@ -75,6 +75,329 @@ impl AppModel {
                 hover_auto: self.card_actions_auto,
             });
     }
+
+    /// The settings changes the router sends here (see `AppModel::route`).
+    pub(super) fn on_prefs_reader_pref(&mut self, pref: PrefOutput) {
+        match pref {
+            PrefOutput::SetReaderToolbar(layout) => {
+                if self.reader_toolbar != layout {
+                    self.reader_toolbar = layout;
+                    config::save_reader_toolbar(&self.reader_toolbar);
+                    self.relayout_reader_toolbar();
+                    for p in self.popouts.values() {
+                        p.controller
+                            .emit(MessageWindowInput::SetToolbar(self.reader_toolbar.clone()));
+                    }
+                    // Not while the inline composer covers the header: that
+                    // path hides the ⋯ by hand and restores it on close.
+                    if !self
+                        .reader_compose
+                        .as_ref()
+                        .is_some_and(|r| r.window.is_none())
+                    {
+                        self.reader_overflow_btn
+                            .set_visible(self.reader_overflow_wanted());
+                    }
+                }
+            }
+
+            PrefOutput::SetShowRemoteBanner(on) => {
+                if pref!(self.show_remote_banner = on) {
+                    self.message_view.emit(MessageViewInput::SetBannerShown(on));
+                }
+            }
+
+            PrefOutput::SetShowSpoofBanner(on) => {
+                if pref!(self.show_spoof_banner = on) {
+                    self.message_view
+                        .emit(MessageViewInput::SetSpoofBannerShown(on));
+                    for p in self.popouts.values() {
+                        p.controller
+                            .emit(MessageWindowInput::SetSpoofBannerShown(on));
+                    }
+                }
+            }
+
+            PrefOutput::SetAutoRemoteContent(on) => {
+                if pref!(self.auto_remote_content = on) {
+                    // Re-render what is open so the change takes effect there too:
+                    // on, the blocked content loads; off, it is stripped again.
+                    if self.current_thread.len() > 1 {
+                        self.show_thread();
+                    } else {
+                        let current = self.current.clone();
+                        self.show_message(current, false);
+                    }
+                }
+            }
+
+            PrefOutput::SetThreading(on) => {
+                if pref!(self.threading = on) {
+                    self.message_list.emit(MessageListInput::SetThreading(on));
+                }
+            }
+
+            PrefOutput::SetThreadExpansion(on) => {
+                if pref!(self.thread_expansion = on) {
+                    self.message_list
+                        .emit(MessageListInput::SetThreadExpansion(on));
+                }
+            }
+
+            PrefOutput::SetThreadRowNewest(on) => {
+                if pref!(self.thread_row_newest = on) {
+                    self.message_list
+                        .emit(MessageListInput::SetThreadRowNewest(on));
+                }
+            }
+
+            PrefOutput::SetConfirmThreadDelete(on) => {
+                pref!(self.confirm_thread_delete = on);
+            }
+
+            PrefOutput::SetCardActionsMode {
+                hover_toggle,
+                hover_auto,
+            } => {
+                if self.card_actions_hover != hover_toggle || self.card_actions_auto != hover_auto {
+                    self.card_actions_hover = hover_toggle;
+                    self.card_actions_auto = hover_auto;
+                    self.save_settings();
+                    self.push_card_actions_mode();
+                }
+            }
+
+            PrefOutput::SetThreadsExpanded(on) => {
+                if pref!(self.threads_expanded = on) {
+                    self.message_list
+                        .emit(MessageListInput::SetThreadsExpanded(on));
+                }
+            }
+
+            PrefOutput::SetThreadNewestFirst(on) => {
+                if pref!(self.thread_newest_first = on) {
+                    // Re-render an open conversation in the new order.
+                    if self.current_thread.len() > 1 {
+                        self.show_thread();
+                    }
+                }
+            }
+
+            PrefOutput::SetFoldMessages(fold) => {
+                if pref!(self.fold_messages = fold) {
+                    self.message_view
+                        .emit(MessageViewInput::SetFoldMessages(fold));
+                }
+            }
+
+            PrefOutput::SetAlwaysShowRecipients(on) => {
+                if pref!(self.always_show_recipients = on) {
+                    self.message_view
+                        .emit(MessageViewInput::SetAlwaysShowRecipients(on));
+                    // Re-render whatever is open so the header reflects it.
+                    if self.current_thread.len() > 1 {
+                        self.show_thread();
+                    } else if let Some(current) = self.current.clone() {
+                        let m = self.with_cached_body(current);
+                        self.show_message(Some(m), false);
+                    }
+                }
+            }
+
+            PrefOutput::SetCardAttachments(on) => {
+                if pref!(self.card_attachments = on) {
+                    self.message_view
+                        .emit(MessageViewInput::SetCardAttachmentsShown(on));
+                    for p in self.popouts.values() {
+                        p.controller
+                            .emit(MessageWindowInput::SetCardAttachmentsShown(on));
+                    }
+                }
+            }
+            PrefOutput::SetAttachmentDrawer(on) => {
+                if pref!(self.drawer_enabled = on) {
+                    self.sync_attachment_drawer();
+                    self.message_view
+                        .emit(MessageViewInput::SetAttachmentDrawer(on));
+                    for p in self.popouts.values() {
+                        p.controller
+                            .emit(MessageWindowInput::SetAttachmentDrawer(on));
+                    }
+                }
+            }
+            PrefOutput::SetReaderDefault(policy) => {
+                if pref!(self.reader_default = policy) {
+                    // Focus Mode's Reader View outranks it while on.
+                    let policy = self.effective_reader_default();
+                    self.message_view
+                        .emit(MessageViewInput::SetReaderDefault(policy));
+                    for p in self.popouts.values() {
+                        p.controller
+                            .emit(MessageWindowInput::SetReaderDefault(policy));
+                    }
+                }
+            }
+            PrefOutput::SetPgpLabels(on) => {
+                if pref!(self.pgp_labels = on) {
+                    self.message_view.emit(MessageViewInput::SetPgpLabels(on));
+                    for p in self.popouts.values() {
+                        p.controller.emit(MessageWindowInput::SetPgpLabels(on));
+                    }
+                }
+            }
+            PrefOutput::SetSingleMessageCard(on) => {
+                if pref!(self.single_message_card = on) {
+                    self.message_view
+                        .emit(MessageViewInput::SetSingleMessageCard(on));
+                    // Only lone messages change; re-render one if it's open.
+                    if self.current_thread.len() <= 1 {
+                        if let Some(current) = self.current.clone() {
+                            let m = self.with_cached_body(current);
+                            self.show_message(Some(m), false);
+                        }
+                    }
+                }
+            }
+
+            PrefOutput::SetCardPaletteCollapse(secs) => {
+                if pref!(self.card_palette_collapse_secs = secs) {
+                    self.message_view
+                        .emit(MessageViewInput::SetPaletteCollapse(secs));
+                }
+            }
+
+            PrefOutput::SetCardPaletteMenu(on) => {
+                if pref!(self.card_palette_menu = on) {
+                    self.message_view
+                        .emit(MessageViewInput::SetCardPaletteMenu(on));
+                }
+            }
+
+            PrefOutput::SetMessageTheme(theme) => {
+                if pref!(self.message_theme = theme) {
+                    let dark = theme.dark_override();
+                    // Message content only — the reader and any popped-out windows.
+                    self.message_view
+                        .emit(MessageViewInput::SetContentTheme(dark));
+                    for p in self.popouts.values() {
+                        p.controller.emit(MessageWindowInput::SetContentTheme(dark));
+                    }
+                }
+            }
+            PrefOutput::SetOverrideFonts(on) => {
+                if pref!(self.override_fonts = on) {
+                    self.push_reader_style();
+                }
+            }
+            PrefOutput::SetReaderFont(font) => {
+                if pref!(self.reader_font = font) {
+                    self.push_reader_style();
+                }
+            }
+            PrefOutput::SetPlainMonospace(on) => {
+                if pref!(self.plain_monospace = on) {
+                    self.push_reader_style();
+                }
+            }
+            PrefOutput::SetPlainFont(font) => {
+                if pref!(self.plain_font = font) {
+                    self.push_reader_style();
+                }
+            }
+            PrefOutput::SetOverrideColors(on) => {
+                if pref!(self.override_colors = on) {
+                    self.push_reader_style();
+                }
+            }
+            _ => unreachable!("not routed to on_prefs_reader_pref"),
+        }
+    }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_prefs_reader(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::SetZoomDefault(zoom) => {
+                if pref!(self.zoom_default = zoom) {
+                    self.message_view
+                        .emit(MessageViewInput::SetZoomDefault(zoom));
+                    for p in self.popouts.values() {
+                        p.controller.emit(MessageWindowInput::SetZoomDefault(zoom));
+                    }
+                }
+                // The setting is also what the user wants to see now.
+                self.set_zoom(zoom);
+            }
+            AppMsg::SetReaderMode(on) => {
+                // In Focus Mode with Reader View on, the switch changes the
+                // message on screen alone: the saved choice is the ordinary
+                // one, and it comes back with the rest of the layout.
+                if self.focus.active(config::FocusPart::ReaderView) {
+                    // Nothing to remember.
+                } else if self.reader_mode != on {
+                    self.reader_mode = on;
+                    self.save_settings();
+                }
+                // Always pushed, equal or not: with a per-message default the
+                // readers reset themselves on each open, so what they show
+                // can differ from the saved state — and a switch flipped in
+                // one of them must land there regardless.
+                self.message_view.emit(MessageViewInput::SetReaderMode(on));
+                for p in self.popouts.values() {
+                    p.controller.emit(MessageWindowInput::SetReaderMode(on));
+                }
+            }
+            AppMsg::SetReaderSwitchShown(on) => {
+                if pref!(self.reader_switch = on) {
+                    self.message_view
+                        .emit(MessageViewInput::SetReaderSwitchShown(on));
+                    for p in self.popouts.values() {
+                        p.controller
+                            .emit(MessageWindowInput::SetReaderSwitchShown(on));
+                    }
+                }
+            }
+            AppMsg::SetThemeSwitchShown(on) => {
+                if pref!(self.theme_switch = on) {
+                    self.message_view
+                        .emit(MessageViewInput::SetThemeSwitchShown(on));
+                    for p in self.popouts.values() {
+                        p.controller
+                            .emit(MessageWindowInput::SetThemeSwitchShown(on));
+                    }
+                }
+            }
+
+            AppMsg::SetRemoteContent {
+                account_id,
+                id,
+                show,
+            } => {
+                self.remote_override.insert((account_id, id), show);
+                // Re-show whatever is open so the decision takes effect now.
+                // The reader re-reads `remote_allowed` for every message it
+                // paints, so a conversation gets it for the card it applies to.
+                if self.current_thread.len() > 1 {
+                    self.show_thread();
+                } else {
+                    let current = self.current.clone();
+                    self.show_message(current, false);
+                }
+            }
+            AppMsg::ReloadBody(m) => {
+                if let Some(path) = self.resolve_folder_path(&m) {
+                    self.send_to(
+                        m.account_id,
+                        MailRequest::LoadBody {
+                            message_id: m.id,
+                            path,
+                            uid: m.uid,
+                        },
+                    );
+                }
+            }
+            _ => unreachable!("not routed to on_prefs_reader"),
+        }
+    }
 }
 
 /// The desktop's interface font ("Adwaita Sans 11") as a Pango description:

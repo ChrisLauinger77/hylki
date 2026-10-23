@@ -428,6 +428,31 @@ impl AppModel {
             a.emit(crate::ui::accounts::AccountsInput::FiltersApplying(on));
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_filter_run(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::ApplyFilters(targets) => {
+                self.start_filter_run(targets, &sender);
+            }
+
+            AppMsg::FilterRunTimeout => {
+                self.report_filter_run(true);
+            }
+
+            AppMsg::FilterRunToBackground => {
+                self.filter_run_dismissed();
+            }
+
+            AppMsg::FolderSynced {
+                account_id,
+                folder_id,
+            } => {
+                self.filter_run_folder_synced(account_id, folder_id);
+            }
+            _ => unreachable!("not routed to on_filter_run"),
+        }
+    }
 }
 
 #[cfg(test)]

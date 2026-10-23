@@ -331,6 +331,103 @@ impl AppModel {
         tracing::info!("open: {} as a message", path.display());
         self.open_message_window(m, Vec::new(), sender);
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_uri_queue(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::OpenMessageFile(path) => self.open_message_file(&path, &sender),
+            AppMsg::PickMessageFile => self.pick_message_file(&sender),
+
+            AppMsg::OpenMid(uri) => {
+                // The cache first: it holds every message Hylki has listed,
+                // across accounts, and answers at once. Only a miss asks the
+                // servers, one HEADER search per folder per account.
+                let Some(id) = parse_mid(&uri) else {
+                    tracing::warn!("mid: link not understood: {uri}");
+                    return;
+                };
+                let hits: Vec<(u32, String, u32)> = crate::cache::Cache::open()
+                    .map(|c| c.locate_by_message_id(&id))
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|(acc, path, _)| {
+                        self.folders
+                            .get(acc)
+                            .is_some_and(|fs| fs.iter().any(|f| f.path == *path))
+                    })
+                    .collect();
+                // The copy in the account currently in view wins when several
+                // accounts hold the message (a mail sent to two of them).
+                let preferred = self.current.as_ref().map(|m| m.account_id);
+                if let Some((account_id, folder_path, uid)) = hits
+                    .iter()
+                    .find(|(acc, _, _)| Some(*acc) == preferred)
+                    .or_else(|| hits.first())
+                    .cloned()
+                {
+                    tracing::info!(
+                        "mid: {id} is cached in account {account_id}, {folder_path} uid {uid}"
+                    );
+                    sender.input(AppMsg::OpenAttachmentMessage {
+                        account_id,
+                        folder_path,
+                        uid,
+                    });
+                    return;
+                }
+                if self.workers.is_empty() {
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n_f("No message with the ID {id} was found", &[("id", &id)]),
+                        error: true,
+                        connectivity: false,
+                    });
+                    return;
+                }
+                self.mid_searches.insert(id.clone(), self.workers.len());
+                for w in self.workers.values() {
+                    let _ = w.send(MailRequest::Locate {
+                        message_id: id.clone(),
+                    });
+                }
+            }
+
+            AppMsg::MidLocated {
+                account_id,
+                message_id,
+                hit,
+            } => {
+                let Some(remaining) = self.mid_searches.get_mut(&message_id) else {
+                    return;
+                };
+                if let Some((folder_path, uid)) = hit {
+                    tracing::info!(
+                        "mid: {message_id} found on account {account_id}, {folder_path} uid {uid}"
+                    );
+                    self.mid_searches.remove(&message_id);
+                    sender.input(AppMsg::OpenAttachmentMessage {
+                        account_id,
+                        folder_path,
+                        uid,
+                    });
+                    return;
+                }
+                *remaining = remaining.saturating_sub(1);
+                if *remaining == 0 {
+                    tracing::info!("mid: {message_id} not found on any account");
+                    self.mid_searches.remove(&message_id);
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n_f(
+                            "No message with the ID {id} was found",
+                            &[("id", &message_id)],
+                        ),
+                        error: true,
+                        connectivity: false,
+                    });
+                }
+            }
+            _ => unreachable!("not routed to on_uri_queue"),
+        }
+    }
 }
 
 #[cfg(test)]

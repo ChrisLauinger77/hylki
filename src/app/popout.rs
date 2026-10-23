@@ -314,4 +314,89 @@ impl AppModel {
             },
         );
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_popout(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::OpenMessageWindow { message: m, thread } => {
+                // Drafts open in the editor rather than a read-only window,
+                // and a template opens a new message made from it (#360).
+                if self.is_drafts_folder(m.account_id, m.folder_id) {
+                    self.open_draft(m, false, HandOffFiles::default(), &sender);
+                } else if self.folder_kind(m.account_id, m.folder_id) == Some(FolderKind::Templates)
+                {
+                    self.edit_as_new(m, &sender);
+                } else {
+                    // Popouts follow the reading pane's display order (#70).
+                    let mut thread = thread;
+                    if self.thread_newest_first {
+                        thread.reverse();
+                    }
+                    self.open_message_window(m, thread, &sender);
+                }
+            }
+
+            AppMsg::PopoutClosed(key) => {
+                self.popouts.remove(&key);
+            }
+
+            AppMsg::AddContactFrom { name, email } => {
+                self.show_add_contact_dialog(&name, &email, &sender);
+            }
+
+            AppMsg::PopoutMoveTo { key, message, x, y } => {
+                let Some(window) = self.popouts.get(&key).map(|p| p.window.clone()) else {
+                    return;
+                };
+                let accounts =
+                    self.picker_accounts(message.account_id, self.resolve_folder_path(&message));
+                if accounts.is_empty() {
+                    return;
+                }
+                let s = sender.input_sender().clone();
+                let picked = (*message).clone();
+                let closing = window.clone();
+                crate::ui::folder_picker::show_folder_picker(
+                    &window,
+                    x,
+                    y,
+                    accounts,
+                    None,
+                    move |account_id, dest, _| {
+                        let _ = s.send(AppMsg::MoveMessagesTo {
+                            account_id,
+                            dest,
+                            messages: vec![picked.clone()],
+                        });
+                        // As Archive and Delete do: the message has left.
+                        closing.close();
+                    },
+                );
+            }
+
+            AppMsg::PopoutShortcut {
+                action,
+                message,
+                thread,
+            } => {
+                self.run_popout_shortcut(action, *message, thread, &sender);
+            }
+
+            AppMsg::ViewSource => {
+                if let Some(m) = self.current.clone() {
+                    if let Some(path) = self.resolve_folder_path(&m) {
+                        self.send_to(
+                            m.account_id,
+                            MailRequest::LoadSource {
+                                message_id: m.id,
+                                path,
+                                uid: m.uid,
+                            },
+                        );
+                    }
+                }
+            }
+            _ => unreachable!("not routed to on_popout"),
+        }
+    }
 }

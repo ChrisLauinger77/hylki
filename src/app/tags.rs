@@ -330,4 +330,182 @@ impl AppModel {
             a.emit(crate::ui::accounts::AccountsInput::TagFindings(proposals));
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_tags(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::FindTags => {
+                if self.tag_scan.is_some() {
+                    return;
+                }
+                if self.workers.is_empty() {
+                    if let Some(a) = &self.accounts_win {
+                        a.emit(crate::ui::accounts::AccountsInput::TagFindings(Vec::new()));
+                    }
+                    return;
+                }
+                self.tag_scan_gen = self.tag_scan_gen.wrapping_add(1);
+                let gen = self.tag_scan_gen;
+                self.tag_scan = Some(TagScan {
+                    gen,
+                    remaining: self.workers.len(),
+                    found: Vec::new(),
+                });
+                for w in self.workers.values() {
+                    let _ = w.send(MailRequest::FindKeywords);
+                }
+                if let Some(a) = &self.accounts_win {
+                    a.emit(crate::ui::accounts::AccountsInput::TagScanning(true));
+                }
+                // An account that is offline never answers: report what the
+                // others found rather than searching forever.
+                let s = sender.clone();
+                gtk::glib::timeout_add_seconds_local_once(120, move || {
+                    s.input(AppMsg::TagScanTimeout(gen));
+                });
+            }
+
+            AppMsg::WantQuota(email) => {
+                let worker = self
+                    .accounts
+                    .iter()
+                    .find(|a| a.email.eq_ignore_ascii_case(&email))
+                    .and_then(|a| self.workers.get(&a.id));
+                if let Some(w) = worker {
+                    let _ = w.send(MailRequest::Quota);
+                }
+            }
+
+            AppMsg::QuotaFound { account_id, quota } => {
+                if let (Some(email), Some(a)) = (self.email_of(account_id), &self.accounts_win) {
+                    a.emit(crate::ui::accounts::AccountsInput::Quota { email, quota });
+                }
+            }
+
+            AppMsg::KeywordsFound {
+                account_id,
+                findings,
+            } => {
+                let Some(scan) = self.tag_scan.as_mut() else {
+                    return;
+                };
+                scan.found.push((account_id, findings));
+                scan.remaining = scan.remaining.saturating_sub(1);
+                if scan.remaining == 0 {
+                    self.finish_tag_scan(&sender);
+                }
+            }
+
+            AppMsg::TagScanTimeout(gen) => {
+                if self.tag_scan.as_ref().is_some_and(|s| s.gen == gen) {
+                    tracing::warn!("find tags: not every account answered in time");
+                    self.finish_tag_scan(&sender);
+                }
+            }
+
+            AppMsg::SetTags(tags) => {
+                config::save_tags(&tags);
+                self.tags = tags;
+                // The unified Tags view spans every tag: what it holds is
+                // stale once the set changes.
+                self.tag_view_cache.retain(|(_, kw), _| kw.is_some());
+                self.refresh_tag_css();
+                self.message_list
+                    .emit(MessageListInput::SetTags(self.tags.clone()));
+                self.message_view
+                    .emit(MessageViewInput::SetTags(self.tags.clone()));
+                for p in self.popouts.values() {
+                    p.controller
+                        .emit(MessageWindowInput::SetTags(self.tags.clone()));
+                }
+                // The sidebar lists the tags; a removed one that was the open
+                // view falls back to All Inboxes there (SetContents).
+                self.rebuild_sidebar();
+                // Rules may name a tag that now exists: tag what already sits
+                // in the inboxes, through the same sweep the filters use.
+                self.sweep_blacklisted();
+            }
+
+            AppMsg::TagSelected { keyword, account } => {
+                self.close_sidebar_peek();
+                self.mirror_selection(match keyword.clone() {
+                    Some(k) => crate::ui::sidebar::Sel::Tag(account, k),
+                    None => crate::ui::sidebar::Sel::UnifiedTags,
+                });
+                self.leave_gallery();
+                self.showing_contacts = false;
+                self.showing_outbox = false;
+                self.unified = false;
+                self.selected = None;
+                self.smart_view = None;
+                self.tag_view = Some((account, keyword));
+                self.current = None;
+                self.current_thread.clear();
+                self.attachments.clear();
+                self.attachments_loading = false;
+                self.sync_attachment_drawer();
+                self.show_message(None, false);
+                self.message_list.emit(MessageListInput::SetSelected(None));
+                self.message_list.emit(MessageListInput::ResetPaging);
+                self.message_list
+                    .emit(MessageListInput::SetScope(SearchScope::ThisFolder));
+                self.message_list.emit(MessageListInput::SetColorize(true));
+                self.message_list
+                    .emit(MessageListInput::SetShowRecipient(false));
+                self.message_list
+                    .emit(MessageListInput::SetRestorable(false));
+                self.message_list.emit(MessageListInput::SetInJunk(false));
+                self.message_list.emit(MessageListInput::SetInDrafts(false));
+                self.message_view
+                    .emit(MessageViewInput::SetDraftsView(false));
+                self.show_tag_view();
+                self.refresh_tag_view(&sender);
+                self.sync_tag_keywords();
+                self.push_index_complete();
+            }
+
+            AppMsg::KeywordsSynced { account_id, paths } => {
+                if paths.is_empty() {
+                    return;
+                }
+                // The index changed under the open views: the tag view
+                // re-reads it, and an open folder among the changed ones
+                // re-syncs so its rows' chips follow.
+                if self.tag_view.is_some() {
+                    self.refresh_tag_view(&sender);
+                }
+                if self.smart_view.is_some() {
+                    self.refresh_smart_view(&sender);
+                }
+                if let Some(sel) = self.selected.clone() {
+                    if sel.account_id == account_id && paths.contains(&sel.path) {
+                        self.send_to(
+                            account_id,
+                            MailRequest::LoadMessages {
+                                folder_id: sel.folder_id,
+                                path: sel.path,
+                            },
+                        );
+                    }
+                }
+            }
+
+            AppMsg::TagViewLoaded { key, rows } => {
+                self.tag_view_loading = false;
+                let out = self.assemble_tag_view(&key, rows);
+                let changed = self.tag_view_cache.get(&key) != Some(&out);
+                if changed {
+                    self.tag_view_cache.insert(key.clone(), out.clone());
+                }
+                if self.tag_view.as_ref() == Some(&key) && changed {
+                    self.message_list
+                        .emit(MessageListInput::SetMessages { messages: out });
+                }
+                if std::mem::take(&mut self.tag_view_dirty) {
+                    self.refresh_tag_view(&sender);
+                }
+            }
+            _ => unreachable!("not routed to on_tags"),
+        }
+    }
 }

@@ -76,4 +76,134 @@ impl AppModel {
             });
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_gallery(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::ShowAttachments => {
+                self.close_sidebar_peek();
+                self.mirror_selection(crate::ui::sidebar::Sel::Attachments);
+                self.showing_outbox = false;
+                self.showing_gallery = true;
+                self.showing_contacts = false;
+                self.gallery.emit(GalleryInput::SetLoading(true));
+                // Handing over the folder list is what starts the load: the
+                // gallery asks for its first page once it knows the scope, so
+                // the query is never run against an empty one.
+                self.gallery
+                    .emit(GalleryInput::SetAccounts(self.gallery_scope()));
+                // Keep the scan working through whatever is still unindexed, so
+                // the archive fills in behind the user as they browse.
+                self.start_attachment_scan();
+            }
+
+            AppMsg::GalleryFetch {
+                account_id,
+                folder_path,
+                uid,
+            } => {
+                // The gallery knows this file exists because the scan described
+                // it, but its bytes were never downloaded. Reuse the reader's
+                // own fetch: it stores what comes back, so the next visit finds
+                // it cached and the thumbnail appears.
+                self.send_to(
+                    account_id,
+                    MailRequest::LoadAttachments {
+                        message_id: uid,
+                        path: folder_path,
+                        uid,
+                        download: true,
+                    },
+                );
+                self.gallery.emit(GalleryInput::SetFetching(true));
+            }
+
+            AppMsg::AttachmentsScanned {
+                account_id,
+                folder_path,
+                added,
+                remaining,
+            } => {
+                let folder_path_key = folder_path.clone();
+                // Keep going while this folder has more to describe. The reply
+                // to each chunk is what asks for the next, so the scan runs at
+                // whatever pace the server answers and never piles up requests.
+                if remaining > 0 && self.showing_gallery {
+                    self.send_to(account_id, MailRequest::ScanAttachments { folder_path });
+                }
+                // Only refresh when the scan actually found something, and only
+                // while the gallery is on screen — a chunk of mail with no
+                // attachments after all should not reshuffle what's on show.
+                if added > 0 && self.showing_gallery {
+                    self.gallery.emit(GalleryInput::ScanProgress);
+                }
+                self.gallery_scan_left
+                    .insert((account_id, folder_path_key), remaining);
+                let left: u32 = self.gallery_scan_left.values().sum();
+                self.gallery.emit(GalleryInput::ScanStatus(left));
+            }
+
+            AppMsg::GalleryLoad(req) => {
+                let Some(cache) = self.cache.as_ref() else {
+                    self.gallery.emit(GalleryInput::Page {
+                        items: Vec::new(),
+                        total: 0,
+                        offset: req.offset,
+                    });
+                    return;
+                };
+                let q = crate::cache::GalleryQuery {
+                    folders: &req.folders,
+                    account_id: req.account_id,
+                    tokens: &req.tokens,
+                    bucket: req.bucket,
+                    sort: req.sort,
+                    limit: req.limit,
+                    offset: req.offset,
+                    data_cap: GALLERY_DATA_CAP,
+                };
+                let items = cache.gallery_page(&q);
+                // Only worth counting for the first page: the total cannot
+                // change while the user scrolls one set of results.
+                let total = if req.offset == 0 {
+                    cache.gallery_total(&q)
+                } else {
+                    self.gallery_total
+                };
+                self.gallery_total = total;
+                self.gallery.emit(GalleryInput::Page {
+                    items,
+                    total,
+                    offset: req.offset,
+                });
+            }
+
+            AppMsg::OpenAttachmentMessage {
+                account_id,
+                folder_path,
+                uid,
+            } => {
+                self.leave_gallery();
+                self.showing_contacts = false;
+                self.showing_outbox = false;
+                if let Some(folder) = self
+                    .folders
+                    .get(&account_id)
+                    .and_then(|fs| fs.iter().find(|f| f.path == folder_path))
+                    .cloned()
+                {
+                    self.select_folder(
+                        account_id,
+                        folder.id,
+                        folder.name.clone(),
+                        folder.path.clone(),
+                    );
+                    // Messages use their UID as id, so select by (account, uid).
+                    self.message_list
+                        .emit(MessageListInput::SelectAndLoad((account_id, uid)));
+                }
+            }
+            _ => unreachable!("not routed to on_gallery"),
+        }
+    }
 }

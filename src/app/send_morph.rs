@@ -343,6 +343,15 @@ impl AppModel {
             self.show_thread();
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_send_morph(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::SendMorphMeasured => self.send_morph_swap(),
+            AppMsg::SendMorphFailed => self.send_morph_failed(),
+            _ => unreachable!("not routed to on_send_morph"),
+        }
+    }
 }
 
 #[cfg(test)]

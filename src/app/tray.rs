@@ -270,4 +270,115 @@ impl AppModel {
             })
             .collect()
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_tray(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::WizardLanguage(code) => {
+                // The drop-down also notifies as it is set up; only a real
+                // change counts. Saved, then Hylki restarts through the same
+                // helper the icon change uses, so every window — the wizard
+                // first, since it is not completed yet — comes up in the
+                // chosen language. Should the helper fail, the wizard alone
+                // is rebuilt in it (gettext reads LANGUAGE on every lookup).
+                if config::load_language() == code {
+                    return;
+                }
+                config::save_language(&code);
+                tracing::info!("wizard: language {code:?} saved, restarting");
+                // The instance that comes back must open the wizard again,
+                // review mode or not: the helper drops the review switch on
+                // purpose, so a one-shot flag of its own goes along (init
+                // takes it and clears it, so it never outlives that start).
+                std::env::set_var(crate::WIZARD_AGAIN_VAR, "1");
+                match crate::app_icon::launch_restart_helper() {
+                    Ok(()) => {
+                        // The quit action's own teardown, inline: nothing to
+                        // look up, nothing to wait for.
+                        tracing::info!("wizard: restart helper up, exiting");
+                        let (w, h, maximized) = crate::config::load_window_state();
+                        crate::config::save_window_state(w, h, maximized);
+                        crate::outgoing::park_held(&self.outgoing);
+                        finish_keyring_writes();
+                        std::process::exit(0);
+                    }
+                    Err(e) => {
+                        std::env::remove_var(crate::WIZARD_AGAIN_VAR);
+                        tracing::warn!("restart for the wizard's language failed: {e}");
+                        crate::i18n::apply_language(&code);
+                        if let Some(old) = self.welcome.take() {
+                            old.widget().set_visible(false);
+                        }
+                        self.open_wizard(&sender);
+                    }
+                }
+            }
+
+            AppMsg::RestartApp => {
+                if self.restart_pending {
+                    return;
+                }
+                self.restart_pending = true;
+                // GNOME Shell only replaces a launcher's app object some
+                // seconds after the launcher changed; quitting before that
+                // brings the new window up under the old one, old icon and
+                // all. Wait it out with the window still up.
+                let wait = crate::app_icon::launcher_settle_remaining();
+                self.show_restarting_dialog();
+                if wait.is_zero() {
+                    sender.input(AppMsg::RestartNow);
+                } else {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_local_once(wait, move || s.input(AppMsg::RestartNow));
+                }
+            }
+
+            AppMsg::RestartNow => match crate::app_icon::launch_restart_helper() {
+                Ok(()) => relm4::main_application().activate_action("quit", None),
+                Err(e) => {
+                    tracing::warn!("restart helper failed: {e}");
+                    self.restart_pending = false;
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n(
+                            "Couldn't restart automatically — quit and reopen Hylki \
+                               to finish switching the icon.",
+                        ),
+                        error: true,
+                        connectivity: false,
+                    });
+                }
+            },
+
+            AppMsg::QuitFromTray => {
+                // The same teardown as Ctrl+Q: geometry saved, then exit.
+                relm4::main_application().activate_action("quit", None);
+            }
+
+            AppMsg::TrayViewUnread => {
+                // The tray counts every inbox (#267): when all of its unread
+                // mail is in accounts left out of All Inboxes, that view
+                // would show none of it.
+                let unified = self.unified_inboxes_shown()
+                    && (self.unified_inboxes_unread() > 0 || self.inboxes_unread() == 0);
+                if unified {
+                    // Through the sidebar, so its highlight moves too; it
+                    // answers with UnifiedSelected.
+                    self.sidebar.emit(SidebarInput::SelectUnifiedRow);
+                } else if let Some((account_id, folder_id, name, path)) = self
+                    .accounts
+                    .iter()
+                    .filter_map(|a| self.inbox_of(a.id))
+                    .find(|f| self.folder_unread_of(f) > 0)
+                    .map(|f| (f.account_id, f.id, f.name.clone(), f.path.clone()))
+                {
+                    self.select_folder(account_id, folder_id, name, path);
+                }
+            }
+
+            AppMsg::PresentWindow => {
+                crate::desktop::present_window(&self.window);
+            }
+            _ => unreachable!("not routed to on_tray"),
+        }
+    }
 }

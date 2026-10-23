@@ -162,4 +162,194 @@ impl AppModel {
         out.extend(rest);
         out
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_drafts(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::NewFromTemplate => {
+                // As the draft picker does: Templates folders not listed this
+                // run are fetched first, and a silent worker gets three
+                // seconds.
+                let mut waiting = HashSet::new();
+                for (account_id, folder) in self.templates_folders() {
+                    if !self.message_cache.contains_key(&(account_id, folder.id)) {
+                        waiting.insert((account_id, folder.id));
+                        self.send_to(
+                            account_id,
+                            MailRequest::SyncFolder {
+                                folder_id: folder.id,
+                                path: folder.path.clone(),
+                            },
+                        );
+                    }
+                }
+                if waiting.is_empty() {
+                    self.show_template_picker(&sender);
+                } else {
+                    self.pending_template_pick = Some(waiting);
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(3, move || {
+                        s.input(AppMsg::TemplatePickNow)
+                    });
+                }
+            }
+
+            AppMsg::TemplatePickNow => {
+                if self.pending_template_pick.take().is_some() {
+                    self.show_template_picker(&sender);
+                }
+            }
+
+            AppMsg::TemplatePicked(picked) => match picked {
+                Some(m) => self.edit_as_new(m, &sender),
+                None => sender.input(AppMsg::Compose),
+            },
+
+            AppMsg::SaveDraftMessage(out) => {
+                let account_id = out.from_account_id;
+                let Some((folder_id, path)) = self.drafts_target(account_id) else {
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n("No Drafts folder available for this account"),
+                        error: true,
+                        connectivity: false,
+                    });
+                    return;
+                };
+                self.send_to(
+                    account_id,
+                    MailRequest::SaveDraft {
+                        message: out,
+                        folder_id,
+                        path,
+                        autosave: None,
+                        template: false,
+                    },
+                );
+            }
+
+            AppMsg::SaveTemplateMessage(out) => {
+                let account_id = out.from_account_id;
+                // An edited template goes back to the folder it was kept in;
+                // a new one, or one now sent from another account, to the
+                // account's Templates folder, which saving makes if need be.
+                let target = out
+                    .draft_origin
+                    .as_ref()
+                    .filter(|o| o.account_id == account_id)
+                    .map(|o| (o.folder_id, o.path.clone()))
+                    .or_else(|| self.templates_target(account_id));
+                let Some((folder_id, path)) = target else {
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n("No Templates folder available for this account"),
+                        error: true,
+                        connectivity: false,
+                    });
+                    return;
+                };
+                self.send_to(
+                    account_id,
+                    MailRequest::SaveDraft {
+                        message: out,
+                        folder_id,
+                        path,
+                        autosave: None,
+                        template: true,
+                    },
+                );
+            }
+
+            AppMsg::AutoSaveDraft { id, message } => {
+                let account_id = message.from_account_id;
+                match self.drafts_target(account_id) {
+                    Some((folder_id, path)) => self.send_to(
+                        account_id,
+                        MailRequest::SaveDraft {
+                            message,
+                            folder_id,
+                            path,
+                            autosave: Some(id),
+                            template: false,
+                        },
+                    ),
+                    None => self.emit_to_composer(
+                        id,
+                        ComposeInput::Autosaved {
+                            saved: false,
+                            origin: None,
+                        },
+                    ),
+                }
+            }
+
+            AppMsg::DiscardAutosave { id, origin } => {
+                self.purge_draft(&origin);
+                self.close_compose(id);
+                self.message_list.emit(MessageListInput::ReclaimFocus);
+            }
+
+            AppMsg::DeleteDraft { id, origin } => {
+                // The same move the list's trash button makes for a draft, so
+                // it is undoable and the Drafts list updates in place. A draft
+                // the list no longer holds (a stale window) is erased by uid.
+                let cached = self
+                    .message_cache
+                    .get(&(origin.account_id, origin.folder_id))
+                    .and_then(|msgs| msgs.iter().find(|m| m.uid == origin.uid).cloned());
+                match cached {
+                    Some(m) => self.move_to(m, FolderKind::Trash),
+                    None => {
+                        self.send_to(
+                            origin.account_id,
+                            MailRequest::PurgeMessages {
+                                path: origin.path.clone(),
+                                uids: vec![origin.uid],
+                            },
+                        );
+                        self.send_to(
+                            origin.account_id,
+                            MailRequest::LoadMessages {
+                                folder_id: origin.folder_id,
+                                path: origin.path,
+                            },
+                        );
+                    }
+                }
+                self.pending_draft = None;
+                self.pending_draft_token = None;
+                self.close_compose(id);
+                self.message_list.emit(MessageListInput::ReclaimFocus);
+            }
+
+            AppMsg::DraftSaved {
+                account_id,
+                autosave,
+                message_id,
+            } => {
+                // The Drafts folder reload already reflects the saved draft; an
+                // explicit save's composer has closed. No notification (mirrors
+                // silent send). An automatic save tells its composer where the
+                // copy is now, so the next save replaces it (#340).
+                let Some(id) = autosave else { return };
+                let origin = message_id
+                    .as_deref()
+                    .and_then(|mid| self.find_draft(account_id, mid));
+                if !self.composer_exists(id) {
+                    // Sent, saved or closed while this save was on its way:
+                    // the copy it left is not wanted.
+                    if let Some(origin) = &origin {
+                        self.purge_draft(origin);
+                    }
+                    return;
+                }
+                self.emit_to_composer(
+                    id,
+                    ComposeInput::Autosaved {
+                        saved: message_id.is_some(),
+                        origin,
+                    },
+                );
+            }
+            _ => unreachable!("not routed to on_drafts"),
+        }
+    }
 }

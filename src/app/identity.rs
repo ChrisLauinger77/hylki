@@ -221,4 +221,18 @@ impl AppModel {
             .filter(|a| !a.trim().is_empty())
             .collect()
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_identity(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::OwnGravatarFetched { email, outcome } => {
+                // Nothing to redraw unless the address turned out to have one.
+                if crate::avatar::cache_own_gravatar(&email, outcome) {
+                    self.rebuild_sidebar();
+                    self.refresh_faces();
+                }
+            }
+            _ => unreachable!("not routed to on_identity"),
+        }
+    }
 }

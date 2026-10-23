@@ -414,6 +414,120 @@ impl AppModel {
                 .any(|r| r.account_id == account_id && r.folder.id == folder_id),
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_unified(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::FillUnifiedSlices => self.fill_unified_slices(),
+
+            AppMsg::Preload => {
+                self.preload_due = false;
+                self.preload(&sender);
+            }
+
+            AppMsg::PrebuildViews => {
+                self.prebuild_due = false;
+                let mut views: Vec<UnifiedView> = Vec::new();
+                if self.multi_account() {
+                    if self.unified_inboxes_shown() {
+                        views.push(UnifiedView::Kind(FolderKind::Inbox));
+                    }
+                    // Starred is built from the flags of every folder, and
+                    // is small: its first visit builds it.
+                    views.extend(
+                        self.unified_kinds
+                            .listed()
+                            .into_iter()
+                            .filter(|k| *k != FolderKind::Starred)
+                            .map(UnifiedView::Kind),
+                    );
+                }
+                // Taken from the end: the Inboxes first.
+                views.reverse();
+                self.prebuild_queue = views;
+                self.prebuild_next(&sender);
+            }
+
+            AppMsg::PrebuildNext => self.prebuild_next(&sender),
+
+            AppMsg::UnifiedFoldersLoaded { lists } => {
+                let open = self.unified;
+                let mut landed = false;
+                for ((account_id, folder_id), messages) in lists {
+                    // The worker's own answer may have come first. An empty
+                    // folder is recorded as read too: building a unified row
+                    // ahead waits on all of its folders.
+                    if self
+                        .message_cache
+                        .get(&(account_id, folder_id))
+                        .is_some_and(|c| !c.is_empty())
+                    {
+                        continue;
+                    }
+                    if messages.is_empty() {
+                        self.message_cache
+                            .entry((account_id, folder_id))
+                            .or_default();
+                        continue;
+                    }
+                    let messages = self.merge_local_tags(account_id, messages);
+                    let messages = self.apply_pending_seen(account_id, folder_id, messages);
+                    let messages = self.apply_pending_answers(account_id, folder_id, messages);
+                    let messages = self.apply_pending_tags(account_id, folder_id, messages);
+                    if open && self.is_unified_target(account_id, folder_id) {
+                        if self.unified_reads_through() {
+                            self.unified_slices.remove(&(account_id, folder_id));
+                            self.unified_unfilled.insert((account_id, folder_id));
+                        } else {
+                            self.unified_unfilled.remove(&(account_id, folder_id));
+                            self.unified_slices
+                                .insert((account_id, folder_id), messages.clone());
+                        }
+                        landed = true;
+                    } else if !open
+                        && self
+                            .selected
+                            .as_ref()
+                            .is_some_and(|s| (s.account_id, s.folder_id) == (account_id, folder_id))
+                    {
+                        // The folder on show had only its newest so far.
+                        self.message_list.emit(MessageListInput::SetMessages {
+                            messages: messages.clone(),
+                        });
+                    }
+                    self.message_cache
+                        .insert((account_id, folder_id), messages.into());
+                }
+                // A view left before its folders landed.
+                self.shed_large_folders();
+                if landed {
+                    self.emit_unified();
+                    self.push_index_complete();
+                }
+                self.schedule_prebuild(&sender);
+            }
+
+            AppMsg::PushUnreadCounts => self.push_unread_counts(),
+
+            AppMsg::EmitUnifiedNow => {
+                self.list_fp.set(None);
+                if self.unified {
+                    self.emit_unified();
+                }
+            }
+
+            AppMsg::EmitUnified => {
+                self.unified_emit_queued.set(false);
+                if self.thread_links_due.replace(false) {
+                    self.push_thread_links();
+                }
+                if self.unified && self.unified_dirty.replace(false) {
+                    self.emit_unified();
+                }
+            }
+            _ => unreachable!("not routed to on_unified"),
+        }
+    }
 }
 
 #[cfg(test)]

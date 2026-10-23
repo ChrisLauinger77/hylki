@@ -330,4 +330,186 @@ impl AppModel {
         }
         result
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_sidebar(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::AccountFolded { id, folded } => {
+                // The sidebar already animated it; just record the state (a
+                // rebuild here would interrupt the animation).
+                if let Some(email) = self.email_of(id) {
+                    let was = self.collapsed.contains(&email);
+                    if was != folded {
+                        if folded {
+                            self.collapsed.push(email);
+                        } else {
+                            self.collapsed.retain(|e| *e != email);
+                        }
+                        self.save_sidebar_state();
+                    }
+                }
+            }
+
+            AppMsg::ToggleCustomFolders(account_id) => {
+                // The sidebar animated the toggle locally; record the new state
+                // (the "folders_expanded" list holds accounts whose custom
+                // folders are revealed; absence means hidden, the default).
+                if let Some(email) = self.email_of(account_id) {
+                    if let Some(pos) = self.folders_expanded.iter().position(|e| *e == email) {
+                        self.folders_expanded.remove(pos);
+                    } else {
+                        self.folders_expanded.push(email);
+                    }
+                    self.save_sidebar_state();
+                }
+            }
+
+            AppMsg::ReorderFolders { account_id, paths } => {
+                let custom = self.folders.get(&account_id).is_some_and(|fs| {
+                    fs.iter()
+                        .any(|f| f.kind == FolderKind::Custom && paths.contains(&f.path))
+                });
+                if custom {
+                    self.adopt_custom_order(account_id);
+                }
+                self.keep_folder_order(account_id, &paths);
+            }
+
+            AppMsg::PlaceFolder {
+                account_id,
+                path,
+                dest,
+                target,
+                after,
+            } => {
+                self.adopt_custom_order(account_id);
+                // Moved on the server first (the same move as a drop on a
+                // folder, with its checks and its undo); only once that has
+                // gone ahead does it take its place beside `target`.
+                let Some(new_path) = self.move_folder(account_id, path, dest) else {
+                    return;
+                };
+                let shown = self.shown_folders(account_id);
+                let hierarchy = crate::ui::sidebar::Hierarchy {
+                    delimiter: self.folder_delimiter(account_id),
+                    namespace: self.folder_namespace(account_id),
+                };
+                if let Some(paths) =
+                    crate::ui::sidebar::placed_run(&shown, &hierarchy, &new_path, &target, after)
+                {
+                    self.keep_folder_order(account_id, &paths);
+                }
+            }
+
+            AppMsg::SetAccountFolderSort { account_id, sort } => {
+                self.set_account_folder_sort(account_id, sort);
+                self.rebuild_sidebar();
+            }
+
+            AppMsg::FolderNodeCollapsed {
+                account_id,
+                path,
+                collapsed,
+            } => {
+                // The sidebar already reshaped its rows; just remember it.
+                if let Some(email) = self
+                    .accounts
+                    .iter()
+                    .find(|a| a.id == account_id)
+                    .map(|a| a.email.clone())
+                {
+                    let key = format!("{email}\t{path}");
+                    if collapsed {
+                        if !self.tree_collapsed.contains(&key) {
+                            self.tree_collapsed.push(key);
+                        }
+                    } else {
+                        self.tree_collapsed.retain(|k| *k != key);
+                    }
+                    self.save_sidebar_state();
+                }
+            }
+
+            AppMsg::SidebarSectionsOpen {
+                all_inboxes,
+                filtered,
+                tags,
+                starred,
+                sent,
+                drafts,
+                archive,
+                junk,
+                trash,
+                favorites,
+                smart,
+                contacts,
+            } => {
+                let now = (
+                    all_inboxes,
+                    filtered,
+                    tags,
+                    starred,
+                    sent,
+                    drafts,
+                    archive,
+                    junk,
+                    trash,
+                    favorites,
+                    smart,
+                    contacts,
+                );
+                let was = (
+                    self.unified_expanded,
+                    self.filtered_expanded,
+                    self.tags_expanded,
+                    self.starred_expanded,
+                    self.sent_expanded,
+                    self.drafts_expanded,
+                    self.archive_expanded,
+                    self.junk_expanded,
+                    self.trash_expanded,
+                    self.favorites_expanded,
+                    self.smart_expanded,
+                    self.contacts_expanded,
+                );
+                if now != was {
+                    self.unified_expanded = all_inboxes;
+                    self.filtered_expanded = filtered;
+                    self.tags_expanded = tags;
+                    self.starred_expanded = starred;
+                    self.sent_expanded = sent;
+                    self.drafts_expanded = drafts;
+                    self.archive_expanded = archive;
+                    self.junk_expanded = junk;
+                    self.trash_expanded = trash;
+                    self.favorites_expanded = favorites;
+                    self.smart_expanded = smart;
+                    self.contacts_expanded = contacts;
+                    self.save_sidebar_state();
+                }
+            }
+
+            AppMsg::AccountsReordered(emails) => {
+                // Display order only (by email) — no reconnect needed.
+                if !emails.is_empty() {
+                    self.account_order = emails;
+                    self.save_sidebar_state();
+                    self.rebuild_sidebar();
+                }
+            }
+
+            AppMsg::ToggleAccountTags(account_id) => {
+                if let Some(email) = self.email_of(account_id) {
+                    if let Some(pos) = self.tags_expanded_accounts.iter().position(|e| *e == email)
+                    {
+                        self.tags_expanded_accounts.remove(pos);
+                    } else {
+                        self.tags_expanded_accounts.push(email);
+                    }
+                    self.save_sidebar_state();
+                }
+            }
+            _ => unreachable!("not routed to on_sidebar"),
+        }
+    }
 }

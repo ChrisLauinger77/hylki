@@ -176,4 +176,27 @@ impl AppModel {
         self.unified_slices.extend(fresh);
         true
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_unified_starred(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::RefreshUnifiedStarred => {
+                self.unified_starred_due = false;
+                self.refresh_unified_starred(&sender);
+            }
+
+            AppMsg::UnifiedStarredLoaded { rows } => {
+                self.unified_starred_loading = false;
+                self.unified_starred_rows.extend(rows);
+                if self.fill_unified_starred() {
+                    self.unified_dirty.set(true);
+                    self.queue_unified_emit(&sender);
+                }
+                if std::mem::take(&mut self.unified_starred_dirty) {
+                    self.refresh_unified_starred(&sender);
+                }
+            }
+            _ => unreachable!("not routed to on_unified_starred"),
+        }
+    }
 }

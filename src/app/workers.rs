@@ -521,6 +521,121 @@ impl AppModel {
         self.sidebars_emit(SidebarInput::SetBusy(busy));
         self.set_header_refresh_busy(busy);
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_workers(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::Refresh => {
+                self.resend_launcher_count();
+                // The monitor can be wrong about the network (one with no
+                // default route): a Refresh asked for while it says offline
+                // tries the servers anyway (#442).
+                if !crate::power::online() {
+                    crate::power::try_anyway();
+                }
+                if self.unified {
+                    let reqs = self.unified_targets();
+                    for (account_id, folder_id, path) in reqs {
+                        self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
+                    }
+                    self.refresh_unified_starred(&sender);
+                } else {
+                    match self.selected.clone() {
+                        Some(sel) => self.send_to(
+                            sel.account_id,
+                            MailRequest::LoadMessages {
+                                folder_id: sel.folder_id,
+                                path: sel.path,
+                            },
+                        ),
+                        None => {
+                            for w in self.workers.values() {
+                                let _ = w.send(MailRequest::Reconnect);
+                            }
+                        }
+                    }
+                }
+                // Only the visible folder (and the IDLE-watched inbox) re-synced
+                // above; every other folder's unread chip would drift until it
+                // was selected. Have each account re-check them all.
+                for w in self.workers.values() {
+                    let _ = w.send(MailRequest::RefreshUnread);
+                }
+                // A tag view lists what the index holds, and the index only
+                // learns a folder's flags when that folder syncs: have the
+                // accounts in scope re-read their keywords (#166).
+                self.sync_tag_keywords();
+            }
+
+            AppMsg::SystemResumed => {
+                // The dock may have come back from the lock screen without
+                // the badge; nothing else would send it again.
+                self.resend_launcher_count();
+                // logind and the clock check both report the same wake.
+                let now = std::time::Instant::now();
+                if self
+                    .last_wake
+                    .is_some_and(|t| now - t < std::time::Duration::from_secs(30))
+                {
+                    return;
+                }
+                self.last_wake = Some(now);
+                // Realign the auto-fetch timer to now; its monotonic countdown
+                // did not advance during sleep.
+                self.arm_auto_fetch(&sender);
+                // Still rejoining the Wi-Fi: a reconnect now would fail and
+                // leave the account offline until the next auto-fetch.
+                // NetworkBack does it once the network is up.
+                if !crate::power::online() {
+                    return;
+                }
+                self.reconnect_workers(&sender);
+                // The network monitor can lag the wake by a moment and call a
+                // dead network up; one more pass shortly after catches that.
+                let input = sender.input_sender().clone();
+                gtk::glib::timeout_add_seconds_local_once(20, move || {
+                    let _ = input.send(AppMsg::Refresh);
+                });
+            }
+
+            AppMsg::NetworkBack => {
+                self.show_network_state();
+                // Errors from while it was down say nothing about now.
+                self.notifications.emit(NotifyInput::ClearConnectivity);
+                self.reconnect_workers(&sender);
+                // What waited in the Outbox goes now. An IMAP account sends
+                // it as its session comes back, but JMAP, Graph and POP3 only
+                // send when asked, so their mail sat there until a manual
+                // retry (#442).
+                let queued: Vec<u32> = self
+                    .outbox_by_account
+                    .iter()
+                    .filter(|(_, items)| !items.is_empty())
+                    .map(|(id, _)| *id)
+                    .collect();
+                for account_id in queued {
+                    self.send_to(account_id, MailRequest::FlushOutbox { id: None });
+                }
+            }
+
+            AppMsg::NetworkLost => self.show_network_state(),
+
+            AppMsg::MeteredChanged => {
+                // The flag has already flipped, so before it the connection
+                // was the other way.
+                let was = self.metered_save_data && !crate::power::metered();
+                self.saving_data_changed(was);
+            }
+
+            AppMsg::LauncherCountLost => self.resend_launcher_count(),
+
+            AppMsg::WindowInFront => {
+                self.arrivals.clear();
+                self.resend_launcher_count();
+            }
+            _ => unreachable!("not routed to on_workers"),
+        }
+    }
 }
 
 #[cfg(test)]

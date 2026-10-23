@@ -264,4 +264,148 @@ impl AppModel {
             _ => self.open_compose(account_id, prefill, sender),
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_send(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::SendMessage { from, out } => {
+                // A reply sent from the split pane becomes its own card in
+                // the conversation, instead of sliding away (send_morph.rs):
+                // its card is built now, for the composer's close to carry
+                // the editor to.
+                self.arriving = None;
+                if self.reply_joins(from, &out) {
+                    match self.provisional_message(&out) {
+                        Some(m) => self.arriving = Some((from, m, motion_wanted())),
+                        None => {
+                            tracing::info!(target: "hylki::morph", "no send morph: the reply's card could not be built")
+                        }
+                    }
+                }
+                let account_id = out.from_account_id;
+                // Remember who this went to, now, whatever route it takes
+                // from here (straight out, the Outbox, Send Later): the next
+                // composer suggests them, and so do the ones already open.
+                let recipients: Vec<(String, String)> = [&out.to, &out.cc, &out.bcc]
+                    .into_iter()
+                    .flat_map(|f| crate::worker::parse_recipients(f))
+                    .collect();
+                if let Some(c) = self.cache.as_ref() {
+                    c.record_addresses(&recipients);
+                }
+                let own: HashSet<String> =
+                    self.config.iter().map(|c| c.email.to_lowercase()).collect();
+                let fresh: Vec<crate::contacts::Suggestion> = recipients
+                    .into_iter()
+                    .filter(|(_, e)| e.contains('@'))
+                    .map(|(name, email)| crate::contacts::Suggestion {
+                        name: if name.is_empty() { email.clone() } else { name },
+                        own: own.contains(&email.to_lowercase()),
+                        email,
+                        from_contacts: false,
+                        from_directory: false,
+                        score: 1,
+                        group: None,
+                    })
+                    .collect();
+                if !fresh.is_empty() {
+                    for host in &self.composers {
+                        host.controller.emit(ComposeInput::AddSuggestions {
+                            account_id,
+                            new: fresh.clone(),
+                        });
+                    }
+                    if let Some(rc) = &self.reader_compose {
+                        rc.controller.emit(ComposeInput::AddSuggestions {
+                            account_id,
+                            new: fresh.clone(),
+                        });
+                    }
+                }
+                let sent_path = self.sent_copy_path(account_id);
+                if out.send_at.is_some() {
+                    // Send Later has its own way back: the message waits in
+                    // the Outbox, where it can be edited or dropped.
+                    self.send_to(
+                        account_id,
+                        MailRequest::Send {
+                            message: out,
+                            sent_path,
+                            ticket: 0,
+                        },
+                    );
+                } else {
+                    let origin = match self.reader_compose.as_ref().filter(|r| r.id == from) {
+                        Some(r) if r.window.is_none() => r.answering.map_or(
+                            crate::outgoing::Origin::Pane,
+                            crate::outgoing::Origin::Split,
+                        ),
+                        _ => crate::outgoing::Origin::Window,
+                    };
+                    self.queue_send(origin, out, sent_path, &sender);
+                }
+            }
+
+            AppMsg::DispatchSend(ticket) => self.dispatch_send(ticket),
+
+            AppMsg::UndoSend(ticket) => self.undo_send(ticket, &sender),
+
+            AppMsg::SendDone { ticket, sent } => {
+                // A failure has said so already, in the status bar, and the
+                // message is in the Outbox or back in a composer. Its
+                // original is answered once it goes, not before (#454).
+                if sent {
+                    self.pending_answers.remove(&ticket);
+                } else {
+                    self.unmark_answered(ticket);
+                }
+                let done = {
+                    let mut list = self.outgoing.borrow_mut();
+                    list.iter()
+                        .position(|o| o.ticket == ticket)
+                        .map(|i| list.remove(i))
+                };
+                if done.is_some() {
+                    self.push_outbox();
+                }
+            }
+
+            AppMsg::Sent { account_id } => {
+                // No success notification: only send failures are surfaced
+                // (via WorkerEvent::Error). Just refresh the folder the copy
+                // landed in, if that folder is the open one, which is
+                // wherever the account files its copies (#199), not always
+                // Sent.
+                if let Some(sel) = self.selected.clone() {
+                    let copied_to = self.sent_copy_path(account_id);
+                    let viewing_sent = sel.account_id == account_id
+                        && copied_to.is_some_and(|path| path == sel.path);
+                    if viewing_sent {
+                        self.send_to(
+                            account_id,
+                            MailRequest::LoadMessages {
+                                folder_id: sel.folder_id,
+                                path: sel.path,
+                            },
+                        );
+                    }
+                }
+                // The reply just sent answers the conversation on screen, and
+                // its copy is in the cache by now (the worker lists the copy's
+                // folder before it says Sent): ask for the rest of the thread
+                // again so the reply joins it here, not after the next visit
+                // to the Sent folder (#199).
+                self.reload_related(account_id);
+            }
+
+            AppMsg::Unsent {
+                account_id,
+                message,
+            } => {
+                self.drop_provisional(&message.in_reply_to);
+                self.compose_unsent(account_id, *message, &sender);
+            }
+            _ => unreachable!("not routed to on_send"),
+        }
+    }
 }

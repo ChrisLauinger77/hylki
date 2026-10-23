@@ -200,4 +200,113 @@ impl AppModel {
     ) {
         self.open_compose(account_id, unsent_prefill(m), sender);
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_outbox(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::ShowOutbox => {
+                self.close_sidebar_peek();
+                self.mirror_selection(crate::ui::sidebar::Sel::Outbox);
+                // Treated as a folder: same list, same reader, nothing swapped
+                // out from under the user. `selected` stays None so no sync or
+                // server request is ever aimed at it.
+                self.showing_outbox = true;
+                self.leave_gallery();
+                self.showing_contacts = false;
+                self.unified = false;
+                self.tag_view = None;
+                self.smart_view = None;
+                self.selected = None;
+                self.current = None;
+                self.current_thread.clear();
+                self.attachments.clear();
+                self.attachments_loading = false;
+                self.sync_attachment_drawer();
+                self.message_list.emit(MessageListInput::SetSelected(None));
+                self.message_list.emit(MessageListInput::ResetPaging);
+                self.message_list
+                    .emit(MessageListInput::SetScope(SearchScope::ThisFolder));
+                self.message_list
+                    .emit(MessageListInput::SetColorize(self.accounts.len() > 1));
+                self.show_message(None, false);
+                self.push_outbox();
+            }
+
+            AppMsg::OutboxItems { account_id, items } => {
+                self.outbox_by_account.insert(account_id, items);
+                self.push_outbox();
+            }
+
+            AppMsg::EditCurrentOutbox => {
+                if let Some(m) = self.current.clone() {
+                    match self.outgoing_ticket(m.id) {
+                        Some(ticket) => self.undo_send(ticket, &sender),
+                        None => self.compose_from_outbox(m.account_id, m.id, &sender),
+                    }
+                }
+            }
+
+            AppMsg::SendCurrentOutbox => {
+                if let Some(m) = self.current.clone() {
+                    let in_flight = self
+                        .outgoing
+                        .borrow()
+                        .iter()
+                        .any(|o| crate::outgoing::row_id(o.ticket) == m.id);
+                    match self.outgoing_ticket(m.id) {
+                        Some(ticket) => self.dispatch_send(ticket),
+                        None if in_flight => {}
+                        None => {
+                            self.send_to(m.account_id, MailRequest::FlushOutbox { id: Some(m.id) })
+                        }
+                    }
+                }
+            }
+
+            AppMsg::SendDueScheduled => {
+                // Its one try would be spent on no network; the time is
+                // still past when the network is back (#442).
+                if !crate::power::reaches_internet() {
+                    return;
+                }
+                let now = crate::datefmt::now();
+                let due: Vec<(u32, u32)> = self
+                    .outbox_by_account
+                    .iter()
+                    .flat_map(|(account_id, items)| {
+                        items
+                            .iter()
+                            .filter(|i| i.send_at.is_some_and(|t| t <= now) && i.attempts <= 1)
+                            .map(move |i| (*account_id, i.id))
+                    })
+                    .collect();
+                for (account_id, id) in due {
+                    self.send_to(account_id, MailRequest::FlushOutbox { id: Some(id) });
+                }
+            }
+
+            AppMsg::RetryAllOutbox => {
+                let held: Vec<u64> = self
+                    .outgoing
+                    .borrow()
+                    .iter()
+                    .filter(|o| o.held)
+                    .map(|o| o.ticket)
+                    .collect();
+                for ticket in held {
+                    self.dispatch_send(ticket);
+                }
+                let accounts: Vec<u32> = self
+                    .outbox_by_account
+                    .iter()
+                    .filter(|(_, items)| !items.is_empty())
+                    .map(|(id, _)| *id)
+                    .collect();
+                for account_id in accounts {
+                    self.send_to(account_id, MailRequest::FlushOutbox { id: None });
+                }
+            }
+            _ => unreachable!("not routed to on_outbox"),
+        }
+    }
 }

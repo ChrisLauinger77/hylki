@@ -290,6 +290,16 @@ impl AppModel {
             });
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_about(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::OpenAbout => {
+                self.open_about(&sender);
+            }
+            _ => unreachable!("not routed to on_about"),
+        }
+    }
 }
 
 #[cfg(test)]

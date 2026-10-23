@@ -329,6 +329,65 @@ impl AppModel {
             self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
         }
     }
+
+    /// The messages the router sends here (see `AppModel::route`).
+    pub(super) fn on_filters(&mut self, msg: AppMsg) {
+        match msg {
+            AppMsg::AllowSender(addr) | AppMsg::AddSender(addr) => {
+                let addr = addr.trim().to_lowercase();
+                if !addr.is_empty() && !self.allowed_senders.contains(&addr) {
+                    self.allowed_senders.push(addr);
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::RemoveSender(addr) => {
+                let addr = addr.to_lowercase();
+                self.allowed_senders.retain(|s| *s != addr);
+                self.save_settings();
+            }
+
+            AppMsg::AddBlacklist(addr) => {
+                let addr = addr.trim().trim_start_matches('@').to_lowercase();
+                if !addr.is_empty() && !self.blacklist.contains(&addr) {
+                    self.blacklist.push(addr);
+                    self.save_settings();
+                    // Sweep mail already in view from the newly-blocked sender.
+                    self.sweep_blacklisted();
+                }
+            }
+
+            AppMsg::RemoveBlacklist(addr) => {
+                let addr = addr.to_lowercase();
+                self.blacklist.retain(|s| *s != addr);
+                self.save_settings();
+            }
+
+            AppMsg::SetFilters(rules) => {
+                config::save_filters(&rules);
+                let listed_before = self.unified_folder_keys();
+                if rules.iter().any(|r| r.needs_contacts()) {
+                    self.saved_addresses.refresh();
+                }
+                self.filters = rules;
+                // A rule opting its folder in or out of All Inboxes changes
+                // the sidebar's Filtered Folders section; nothing else
+                // about the rules is drawn there.
+                if self.unified_folder_keys() != listed_before {
+                    self.rebuild_sidebar();
+                }
+                // File whatever already sits in the inboxes under the new
+                // rules; reuses the blacklist's re-sync sweep.
+                self.sweep_blacklisted();
+                // The counted folders may have changed with the rules (#116):
+                // the total follows at once, and a newly counted folder's
+                // list is fetched for the tray menu.
+                self.push_unread_counts();
+                self.sync_unloaded_counted_folders();
+            }
+            _ => unreachable!("not routed to on_filters"),
+        }
+    }
 }
 
 #[cfg(test)]
