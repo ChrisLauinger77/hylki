@@ -2,6 +2,28 @@
 
 use super::*;
 
+/// Reads folders not seen since launch whole from the on-disk index, off
+/// the main thread: an Archive is tens of thousands of rows.
+fn read_unseen_folders(unseen: Vec<(u32, u32, String)>, sender: &ComponentSender<AppModel>) {
+    let s = sender.input_sender().clone();
+    std::thread::spawn(move || {
+        let t = std::time::Instant::now();
+        let lists: Vec<((u32, u32), Vec<Message>)> = match crate::cache::Cache::open() {
+            Ok(cache) => unseen
+                .into_iter()
+                .map(|(a, f, path)| ((a, f), cache.load_messages(a, &path, f)))
+                .collect(),
+            Err(_) => Vec::new(),
+        };
+        tracing::debug!(
+            "unified: {} folders read from the index in {:?}",
+            lists.len(),
+            t.elapsed()
+        );
+        let _ = s.send(AppMsg::UnifiedFoldersLoaded { lists });
+    });
+}
+
 impl AppModel {
     /// More than one switched-on account takes part in the unified section:
     /// with one, or none (every other account left out of it, #267), its
@@ -112,6 +134,35 @@ impl AppModel {
             self.push_unread_counts_later(sender);
         }
         self.blank_reader();
+        self.reset_list_for_unified(view, account);
+        let reqs = self.unified_targets();
+        let unseen = self.seed_unified_slices(&reqs);
+        self.fill_unified_starred();
+        self.show_unified_view(sender);
+        // Request every account's inbox; each result replaces that
+        // account's slice as it arrives.
+        for (account_id, folder_id, path) in reqs {
+            self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
+        }
+        if view == UnifiedView::Kind(FolderKind::Starred) {
+            self.refresh_unified_starred(sender);
+        }
+        if !unseen.is_empty() && self.cache.is_some() {
+            read_unseen_folders(unseen, sender);
+        }
+        self.push_index_complete();
+        self.shed_large_folders();
+        tracing::info!(
+            "unified {view:?}: opened in {:?} with {} cached messages",
+            t_open.elapsed(),
+            self.unified_slices.values().map(Vec::len).sum::<usize>()
+        );
+    }
+
+    /// The list and the reader set up for a merged view: nothing selected,
+    /// the scope, colors, recipient names and what rows can do as that
+    /// kind of folder has them.
+    fn reset_list_for_unified(&mut self, view: UnifiedView, account: Option<u32>) {
         self.message_list.emit(MessageListInput::SetSelected(None));
         self.message_list.emit(MessageListInput::ResetPaging);
         self.message_list
@@ -143,16 +194,21 @@ impl AppModel {
         self.message_view.emit(MessageViewInput::SetDraftsView(
             view == UnifiedView::Kind(FolderKind::Drafts),
         ));
-        let reqs = self.unified_targets();
-        // Keep every account's last known slice and top it up from the
-        // folder caches, the way opening a single folder does. This used
-        // to clear the lot and wait: an account whose worker was slow to
-        // answer — busy backfilling a large mailbox, reconnecting, or
-        // offline — was simply absent from "All Inboxes", while its own
-        // Inbox, served from cache, still listed its mail. Each account's
-        // slice is replaced when its load lands.
+    }
+
+    /// Keep every account's last known slice and top it up from the
+    /// folder caches, the way opening a single folder does. This used
+    /// to clear the lot and wait: an account whose worker was slow to
+    /// answer — busy backfilling a large mailbox, reconnecting, or
+    /// offline — was simply absent from "All Inboxes", while its own
+    /// Inbox, served from cache, still listed its mail. Each account's
+    /// slice is replaced when its load lands.
+    ///
+    /// Returns the folders not seen since launch, read whole off the main
+    /// thread afterwards.
+    fn seed_unified_slices(&mut self, reqs: &[(u32, u32, String)]) -> Vec<(u32, u32, String)> {
         let mut unseen: Vec<(u32, u32, String)> = Vec::new();
-        for (account_id, folder_id, path) in &reqs {
+        for (account_id, folder_id, path) in reqs {
             // A folder not seen since launch (only inboxes are primed
             // at startup): the on-disk index has it as last synced,
             // so the view opens at once — and after a restart — rather
@@ -190,9 +246,12 @@ impl AppModel {
         self.unified_slices.retain(|k, _| live.contains(k));
         self.unified_unfilled
             .retain(|k| self.message_cache.get(k).is_some_and(|c| !c.is_empty()));
-        self.fill_unified_starred();
-        // The list keeps the views it showed as built: one whose content is
-        // the same as then comes back at once, without a merge or a regroup.
+        unseen
+    }
+
+    /// The list keeps the views it showed as built: one whose content is
+    /// the same as then comes back at once, without a merge or a regroup.
+    fn show_unified_view(&mut self, sender: &ComponentSender<Self>) {
         let key = self.unified_view_key();
         self.list_fp.set(None);
         if self.unified_slices.is_empty() && self.unified_unfilled.is_empty() {
@@ -227,40 +286,6 @@ impl AppModel {
                 self.emit_unified();
             }
         }
-        // Request every account's inbox; each result replaces that
-        // account's slice as it arrives.
-        for (account_id, folder_id, path) in reqs {
-            self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
-        }
-        if view == UnifiedView::Kind(FolderKind::Starred) {
-            self.refresh_unified_starred(sender);
-        }
-        if !unseen.is_empty() && self.cache.is_some() {
-            let s = sender.input_sender().clone();
-            std::thread::spawn(move || {
-                let t = std::time::Instant::now();
-                let lists: Vec<((u32, u32), Vec<Message>)> = match crate::cache::Cache::open() {
-                    Ok(cache) => unseen
-                        .into_iter()
-                        .map(|(a, f, path)| ((a, f), cache.load_messages(a, &path, f)))
-                        .collect(),
-                    Err(_) => Vec::new(),
-                };
-                tracing::debug!(
-                    "unified: {} folders read from the index in {:?}",
-                    lists.len(),
-                    t.elapsed()
-                );
-                let _ = s.send(AppMsg::UnifiedFoldersLoaded { lists });
-            });
-        }
-        self.push_index_complete();
-        self.shed_large_folders();
-        tracing::info!(
-            "unified {view:?}: opened in {:?} with {} cached messages",
-            t_open.elapsed(),
-            self.unified_slices.values().map(Vec::len).sum::<usize>()
-        );
     }
 
     /// Switch the message list to a folder: reset the view, show its cached
