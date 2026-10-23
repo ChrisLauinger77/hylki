@@ -252,7 +252,7 @@ impl AppModel {
     /// its card in the reader, opened and scrolled to, which is what actions
     /// then apply to. Selecting the message in the list instead landed on
     /// the conversation's row again, so the keys went nowhere (#392).
-    fn step_thread(&mut self, delta: i32) {
+    fn step_thread(&self, delta: i32) {
         if self.current.is_none() {
             return;
         }
@@ -535,7 +535,7 @@ impl AppModel {
     /// `focus_takes_keys` covers the rest — chiefly the reader's web view,
     /// which handles keys without consuming them.
     pub(super) fn install_key_controller(
-        &mut self,
+        &self,
         root: &adw::ApplicationWindow,
         sender: &ComponentSender<Self>,
     ) {

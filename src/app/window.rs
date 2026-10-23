@@ -45,7 +45,7 @@ impl AppModel {
     /// Restore the last window size + maximized state (Wayland can't restore
     /// position/monitor).
     pub(super) fn init_window_size(
-        &mut self,
+        &self,
         root: &adw::ApplicationWindow,
         widgets: &AppModelWidgets,
         sender: &ComponentSender<Self>,
@@ -99,7 +99,7 @@ impl AppModel {
     /// action over D-Bus, falling back to `flatpak kill` if nothing answers
     /// within five seconds. Without this the ✕ there would be a hard kill.
     pub(super) fn install_app_actions(
-        &mut self,
+        &self,
         root: &adw::ApplicationWindow,
         sender: &ComponentSender<Self>,
     ) {

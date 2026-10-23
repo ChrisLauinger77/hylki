@@ -212,7 +212,7 @@ impl AppModel {
 
     /// Showcase only (HYLKI_SHOWCASE_SEND): write `text` in the split
     /// reply's editor and send it, to watch the send morph.
-    fn showcase_send(&mut self, text: String) {
+    fn showcase_send(&self, text: String) {
         // Every frame interval for a second and a half, to compare
         // the send morph with the slide it replaces.
         if let Some(clock) = self.window.frame_clock() {

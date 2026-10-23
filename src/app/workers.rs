@@ -668,7 +668,7 @@ impl AppModel {
 
     /// The header Refresh's icon/spinner faces, and its click.
     pub(super) fn init_refresh_buttons(
-        &mut self,
+        &self,
         widgets: &AppModelWidgets,
         sender: &ComponentSender<Self>,
     ) {

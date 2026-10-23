@@ -211,7 +211,7 @@ impl AppModel {
     }
 
     /// The messages the router sends here (see `AppModel::route`).
-    pub(super) fn on_prefs_data(&mut self, msg: AppMsg) {
+    pub(super) fn on_prefs_data(&self, msg: AppMsg) {
         match msg {
             AppMsg::ImportSettingsFrom(path) => self.import_settings_from(path),
             _ => unreachable!("not routed to on_prefs_data"),
@@ -221,7 +221,7 @@ impl AppModel {
     /// Second stage of ImportSettings: the chosen file, applied on a clean
     /// main-loop turn (working inside the chooser's completion callback froze
     /// the app when the confirmation dialog presented there).
-    fn import_settings_from(&mut self, path: std::path::PathBuf) {
+    fn import_settings_from(&self, path: std::path::PathBuf) {
         let outcome = std::fs::read_to_string(&path)
             .map_err(|e| e.to_string())
             .and_then(|t| crate::config::import_bundle(&t));

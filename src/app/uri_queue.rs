@@ -422,7 +422,7 @@ impl AppModel {
 
     /// mailto: URIs can arrive (via GApplication `open`) before this init
     /// ran — install the live sender and drain anything that queued early.
-    pub(super) fn drain_hand_off_queues(&mut self, sender: &ComponentSender<Self>) {
+    pub(super) fn drain_hand_off_queues(&self, sender: &ComponentSender<Self>) {
         let _ = MAILTO_SENDER.set(sender.input_sender().clone());
         for uri in MAILTO_PENDING.lock().unwrap().drain(..) {
             sender.input(AppMsg::OpenMailto(uri));

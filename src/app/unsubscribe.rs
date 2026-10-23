@@ -239,7 +239,7 @@ impl AppModel {
     /// (RFC 8058), falling back to its `mailto:` handle when that fails or
     /// is not there, and only then the web page in the browser.
     pub(super) fn unsubscribe_go(
-        &mut self,
+        &self,
         message: Message,
         info: crate::models::Unsubscribe,
         sender: &ComponentSender<Self>,
@@ -320,7 +320,7 @@ impl AppModel {
     /// addressed to, when it was one). No copy is filed in Sent. A send that
     /// fails is reported and queued in the Outbox like any other.
     pub(super) fn unsubscribe_by_mail(
-        &mut self,
+        &self,
         message: Message,
         info: &crate::models::Unsubscribe,
         sender: &ComponentSender<Self>,

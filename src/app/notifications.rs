@@ -323,7 +323,7 @@ impl AppModel {
     /// Desktop-notification click actions: raise the window (error alerts) and
     /// raise + open a specific message (new-mail alerts). Registered here rather
     /// than in `notify` because opening a message needs the app's channel.
-    pub(super) fn install_notification_actions(&mut self, sender: &ComponentSender<Self>) {
+    pub(super) fn install_notification_actions(&self, sender: &ComponentSender<Self>) {
         use gtk::prelude::*;
         let app = relm4::main_application();
         let present = gtk::gio::SimpleAction::new(crate::notify::PRESENT_ACTION, None);
@@ -466,7 +466,7 @@ impl AppModel {
     /// GNOME keeps a notification after the app that posted it has quit,
     /// and a new instance knows nothing of what it pointed at, so it
     /// could only linger (#333). New mail since is notified afresh.
-    pub(super) fn withdraw_stale_notifications(&mut self) {
+    pub(super) fn withdraw_stale_notifications(&self) {
         for a in &self.accounts {
             crate::notify::withdraw_mail(a.id);
         }

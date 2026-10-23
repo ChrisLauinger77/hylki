@@ -176,7 +176,7 @@ impl AppModel {
     /// The list and the reader set up for a merged view: nothing selected,
     /// the scope, colors, recipient names and what rows can do as that
     /// kind of folder has them.
-    fn reset_list_for_unified(&mut self, view: UnifiedView, account: Option<u32>) {
+    fn reset_list_for_unified(&self, view: UnifiedView, account: Option<u32>) {
         self.message_list.emit(MessageListInput::SetSelected(None));
         self.message_list.emit(MessageListInput::ResetPaging);
         self.message_list

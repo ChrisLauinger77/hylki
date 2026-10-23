@@ -649,7 +649,7 @@ impl AppModel {
     /// keyring auto-unlocks at login. Only shown once the user actually has an
     /// account (so it isn't the very first thing a new user sees), and never
     /// again after "Don't show again".
-    pub(super) fn show_startup_notices(&mut self, sender: &ComponentSender<Self>) {
+    pub(super) fn show_startup_notices(&self, sender: &ComponentSender<Self>) {
         if !self.config.is_empty()
             && crate::platform::is_mint_cinnamon()
             && !config::mint_keyring_help_dismissed()

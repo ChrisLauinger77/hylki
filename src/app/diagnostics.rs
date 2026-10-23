@@ -239,7 +239,7 @@ impl AppModel {
     }
 
     /// The messages the router sends here (see `AppModel::route`).
-    pub(super) fn on_diagnostics(&mut self, msg: AppMsg) {
+    pub(super) fn on_diagnostics(&self, msg: AppMsg) {
         match msg {
             AppMsg::OpenConsole => {
                 if self.console_mode {

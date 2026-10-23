@@ -343,7 +343,7 @@ impl AppModel {
     /// With the window in front, the sound alone, when Settings asks
     /// for it there (#337): see announce_new_mail.
     fn notify_new_mail(
-        &mut self,
+        &self,
         account_id: u32,
         folder_id: u32,
         messages: &[Message],

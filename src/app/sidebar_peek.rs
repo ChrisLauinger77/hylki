@@ -337,7 +337,7 @@ impl AppModel {
     /// The handler fires in every mode — the guards in the AppMsg handler
     /// keep it meaningless outside a rail.
     pub(super) fn init_hover_peek(
-        &mut self,
+        &self,
         widgets: &AppModelWidgets,
         sender: &ComponentSender<Self>,
     ) {

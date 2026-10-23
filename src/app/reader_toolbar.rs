@@ -497,7 +497,7 @@ impl AppModel {
     /// Right-click on the header's empty space (not a button) offers
     /// the way to the toolbar editor.
     pub(super) fn init_reader_header_menu(
-        &mut self,
+        &self,
         widgets: &AppModelWidgets,
         sender: &ComponentSender<Self>,
     ) {
@@ -537,7 +537,7 @@ impl AppModel {
     /// action is still visible, before the breakpoint could hide any — and
     /// the controls' share is re-derived if the decoration layout changes.
     pub(super) fn init_reader_toolbar_fold(
-        &mut self,
+        &self,
         widgets: &AppModelWidgets,
         sender: &ComponentSender<Self>,
     ) {

@@ -27,7 +27,7 @@ use capture::{input_after, showcase_at, showcase_log_focus};
 
 impl AppModel {
     /// Arms the probes that work on real profiles as much as the demo.
-    pub(super) fn install_showcase_probes(&mut self, sender: &ComponentSender<Self>) {
+    pub(super) fn install_showcase_probes(&self, sender: &ComponentSender<Self>) {
         probes::probe_memory(sender);
         probes::probe_zoom(sender);
         probes::probe_delete_attachment(sender);
@@ -45,7 +45,7 @@ impl AppModel {
     /// one mid-thread card highlighted — then render the window to a PNG.
     /// Timers leave room for the WebViews to load and settle between steps.
     pub(super) fn stage_showcase(
-        &mut self,
+        &self,
         root: &adw::ApplicationWindow,
         widgets: &AppModelWidgets,
         sender: &ComponentSender<Self>,
@@ -122,7 +122,7 @@ impl AppModel {
     /// HYLKI_SHOWCASE_ABOUT=1 opens the About window a beat after
     /// launch; pair it with HYLKI_SHOWCASE_TOP=1 to capture that window
     /// instead of the main one.
-    pub(super) fn install_showcase_overlays(&mut self, sender: &ComponentSender<Self>) {
+    pub(super) fn install_showcase_overlays(&self, sender: &ComponentSender<Self>) {
         if std::env::var("HYLKI_SHOWCASE_ABOUT").is_ok() {
             input_after(sender, 3, AppMsg::OpenAbout);
         }

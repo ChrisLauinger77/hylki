@@ -386,7 +386,7 @@ impl AppModel {
     /// window decorations meanwhile). While closed it must not eat the
     /// reader's clicks. Wrapping happens here because the view macro's
     /// deep nesting makes an in-place Overlay unwieldy.
-    pub(super) fn init_compose_overlay(&mut self, widgets: &AppModelWidgets) {
+    pub(super) fn init_compose_overlay(&self, widgets: &AppModelWidgets) {
         self.reader_compose_revealer.set_can_target(false);
         {
             let pane = widgets.reader_bin.child().expect("reader pane");

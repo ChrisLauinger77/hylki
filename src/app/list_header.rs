@@ -335,7 +335,7 @@ impl AppModel {
     /// The list header's sort menu (moved out of the message list's own
     /// toolbar): a stateful radio action feeding the list's SetSort.
     pub(super) fn init_list_sort_menu(
-        &mut self,
+        &self,
         widgets: &AppModelWidgets,
         sender: &ComponentSender<Self>,
     ) {

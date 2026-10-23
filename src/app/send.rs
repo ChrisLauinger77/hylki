@@ -251,7 +251,7 @@ impl AppModel {
 
     /// The delay is over, or Send now was asked for: hand the message to its
     /// worker. Undo is no longer possible.
-    pub(super) fn dispatch_send(&mut self, ticket: u64) {
+    pub(super) fn dispatch_send(&self, ticket: u64) {
         let request = {
             let mut list = self.outgoing.borrow_mut();
             let Some(o) = list.iter_mut().find(|o| o.ticket == ticket && o.held) else {

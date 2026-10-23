@@ -148,7 +148,7 @@ impl AppModel {
         });
     }
 
-    pub(super) fn push_settings_to_children(&mut self) {
+    pub(super) fn push_settings_to_children(&self) {
         self.message_view
             .emit(MessageViewInput::SetReadMark(self.read_mark));
         self.message_list

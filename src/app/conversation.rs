@@ -582,7 +582,7 @@ impl AppModel {
     ///
     /// Nothing here blocks the page: the answers arrive as
     /// [`AppMsg::ThreadSummaries`] and settle the rows a beat later.
-    pub(super) fn request_thread_summaries(&mut self, groups: Vec<(u32, String, Vec<String>)>) {
+    pub(super) fn request_thread_summaries(&self, groups: Vec<(u32, String, Vec<String>)>) {
         if !self.threading || groups.is_empty() {
             return;
         }

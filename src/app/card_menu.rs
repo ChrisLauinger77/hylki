@@ -338,7 +338,7 @@ impl AppModel {
     }
 
     /// The messages the router sends here (see `AppModel::route`).
-    pub(super) fn on_card_menu(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+    pub(super) fn on_card_menu(&self, msg: AppMsg, sender: ComponentSender<Self>) {
         match msg {
             AppMsg::ReaderTagMenu => {
                 if let Some(entries) = self.reader_tag_entries(&sender) {

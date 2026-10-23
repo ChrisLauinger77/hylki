@@ -322,7 +322,7 @@ impl AppModel {
     /// though the ordinary flush leaves scheduled mail alone. One try per
     /// scheduling: a failure shows in the Outbox with Send Now to retry,
     /// rather than a loud attempt every tick.
-    pub(super) fn start_outbox_clocks(&mut self, sender: &ComponentSender<Self>) {
+    pub(super) fn start_outbox_clocks(&self, sender: &ComponentSender<Self>) {
         {
             let s = sender.clone();
             gtk::glib::timeout_add_seconds_local(30, move || {

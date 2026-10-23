@@ -21,7 +21,7 @@ impl AppModel {
     /// newest mail first. One chunk per folder per pass; each answer asks for
     /// the next, so the archive fills in behind the user while they browse and
     /// stops as soon as a folder is fully described.
-    pub(super) fn start_attachment_scan(&mut self) {
+    pub(super) fn start_attachment_scan(&self) {
         let folders: Vec<(u32, String)> = self
             .gallery_scope()
             .iter()
@@ -216,7 +216,7 @@ impl AppModel {
     /// ToolbarView + HeaderBar so it keeps the window controls (close/minimize)
     /// that otherwise live only on the reader pane's header.
     pub(super) fn init_gallery_page(
-        &mut self,
+        &self,
         widgets: &AppModelWidgets,
         sender: &ComponentSender<Self>,
     ) {
