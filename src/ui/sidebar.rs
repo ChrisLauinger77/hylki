@@ -7036,4 +7036,148 @@ mod tests {
             ["Archive", "INBOX", "Sent"]
         );
     }
+
+    #[test]
+    fn a_selection_knows_its_account_and_moves_to_a_renumbered_one() {
+        use super::Sel;
+        let k = FolderKind::Sent;
+        let cases = [
+            (
+                Sel::Folder(3, "a".into()),
+                Some(3),
+                Sel::Folder(9, "a".into()),
+            ),
+            (Sel::UnifiedInbox(3), Some(3), Sel::UnifiedInbox(9)),
+            (
+                Sel::UnifiedFolder(3, "a".into()),
+                Some(3),
+                Sel::UnifiedFolder(9, "a".into()),
+            ),
+            (
+                Sel::AccountFiltered(3, "a".into()),
+                Some(3),
+                Sel::AccountFiltered(9, "a".into()),
+            ),
+            (
+                Sel::Tag(Some(3), "t".into()),
+                Some(3),
+                Sel::Tag(Some(9), "t".into()),
+            ),
+            (
+                Sel::Favorite(3, "a".into()),
+                Some(3),
+                Sel::Favorite(9, "a".into()),
+            ),
+            (
+                Sel::UnifiedKindRow(k, 3),
+                Some(3),
+                Sel::UnifiedKindRow(k, 9),
+            ),
+            (Sel::Tag(None, "t".into()), None, Sel::Tag(None, "t".into())),
+            (Sel::None, None, Sel::None),
+            (Sel::Unified, None, Sel::Unified),
+            (Sel::Outbox, None, Sel::Outbox),
+            (Sel::UnifiedKind(k), None, Sel::UnifiedKind(k)),
+            (Sel::Smart("s".into()), None, Sel::Smart("s".into())),
+        ];
+        for (sel, account, moved) in cases {
+            assert_eq!(sel.account(), account, "{sel:?}");
+            assert_eq!(sel.with_account(9), moved);
+        }
+    }
+
+    #[test]
+    fn unified_rows_have_titles_icons_and_messages() {
+        use super::{
+            chevron_icon, kind_label, row_icon, row_title, select_msg, toggle_msg, Slot, UnifiedRow,
+        };
+        let dbg = |m: super::SidebarInput| format!("{m:?}");
+        let inbox = UnifiedRow::Kind(FolderKind::Inbox);
+        let sent = UnifiedRow::Kind(FolderKind::Sent);
+        assert_eq!(row_title(inbox), "Inboxes");
+        assert_eq!(row_title(sent), "Sent");
+        assert_eq!(row_title(UnifiedRow::Filtered), "Filters");
+        assert_eq!(row_title(UnifiedRow::Smart), "Smart Folders");
+        assert_eq!(row_icon(inbox), "mail-inbox-symbolic");
+        assert_eq!(row_icon(UnifiedRow::Favorites), "user-bookmarks-symbolic");
+        assert_eq!(
+            row_icon(UnifiedRow::Contacts),
+            "x-office-address-book-symbolic"
+        );
+        assert_eq!(dbg(select_msg(inbox)), "UnifiedRowSelected");
+        assert_eq!(dbg(select_msg(sent)), "UnifiedKindRowSelected(Sent)");
+        assert_eq!(dbg(select_msg(UnifiedRow::Smart)), "ToggleSmartExpand");
+        assert_eq!(dbg(select_msg(UnifiedRow::Contacts)), "ContactsRowClicked");
+        assert_eq!(dbg(toggle_msg(inbox)), "ToggleUnifiedExpand");
+        assert_eq!(dbg(toggle_msg(sent)), "ToggleKindExpand(Sent)");
+        assert_eq!(
+            dbg(toggle_msg(UnifiedRow::Filtered)),
+            "ToggleFilteredExpand(Unified)"
+        );
+        assert_eq!(
+            dbg(toggle_msg(UnifiedRow::Tags)),
+            "ToggleTagsExpand(Unified)"
+        );
+        assert_eq!(chevron_icon(true), "pan-down-symbolic");
+        assert_eq!(chevron_icon(false), "pan-end-symbolic");
+        assert_eq!(kind_label(FolderKind::Custom), "Folder");
+        assert_eq!(kind_label(FolderKind::Templates), "Folder");
+        assert_eq!(Slot::Unified.account(), None);
+        assert_eq!(Slot::Account(4).account(), Some(4));
+    }
+
+    #[test]
+    fn account_initials_take_two_words_then_the_address() {
+        use super::account_initials;
+        assert_eq!(account_initials("jane doe smith", "x@y"), "JD");
+        assert_eq!(account_initials("  émile  ", "x@y"), "É");
+        assert_eq!(account_initials("", "work@example.org"), "W");
+        assert_eq!(account_initials("   ", ""), "?");
+    }
+
+    #[test]
+    fn a_namespace_prefix_counts_as_the_top_level() {
+        let dovecot = Hierarchy {
+            delimiter: '.',
+            namespace: "INBOX.".into(),
+        };
+        assert_eq!(dovecot.parent("INBOX.Foo"), "");
+        assert_eq!(dovecot.parent("INBOX.Foo.Bar"), "INBOX.Foo");
+        assert_eq!(dovecot.parent("Top"), "");
+    }
+
+    #[test]
+    fn custom_parents_and_dragged_folder_payloads() {
+        use super::{custom_parent, dragged_folder};
+        let custom = ["A", "A/B", "AB", "C.D"];
+        assert_eq!(custom_parent("A/B/C", custom), Some("A/B".to_string()));
+        assert_eq!(custom_parent("AB/C", custom), Some("AB".to_string()));
+        assert_eq!(custom_parent("C.D.E", custom), Some("C.D".to_string()));
+        assert_eq!(custom_parent("A", custom), None);
+        assert_eq!(
+            dragged_folder("vireo-folder\t3\tA/B"),
+            Some((3, "A/B", false))
+        );
+        assert_eq!(
+            dragged_folder("vireo-folder-main\t2\tINBOX"),
+            Some((2, "INBOX", true))
+        );
+        assert_eq!(dragged_folder("vireo-folder\tx\tA"), None);
+        assert_eq!(dragged_folder("vireo-folder\t3"), None);
+        assert_eq!(dragged_folder("other"), None);
+    }
+
+    #[test]
+    fn arrange_keeps_ranked_items_and_slots_the_rest_after_their_predecessor() {
+        use super::arrange;
+        // 3 and 1 were placed, in that order; each other item follows the
+        // placed item with the nearest smaller key (4 after 3).
+        let rank = |i: usize| match i {
+            3 => Some(0),
+            1 => Some(1),
+            _ => None,
+        };
+        assert_eq!(arrange(vec![0, 1, 2, 3, 4], rank, |i| i), [0, 3, 4, 1, 2]);
+        assert_eq!(arrange(vec![2, 0], |_| None, |i| i), [0, 2]);
+    }
 }

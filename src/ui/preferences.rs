@@ -6390,3 +6390,180 @@ fn compose_font_setup(row: &adw::ComboRow, current: &str, sender: ComponentSende
         });
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::SectionPlacement;
+
+    #[test]
+    fn language_choices_start_with_system_and_english_then_linguas() {
+        let choices = language_choices();
+        assert_eq!(choices[0], ("System".to_string(), String::new()));
+        assert_eq!(choices[1], ("English".to_string(), "en".to_string()));
+        let codes: Vec<&str> = include_str!("../../po/LINGUAS")
+            .lines()
+            .map(str::trim)
+            .filter(|c| !c.is_empty() && !c.starts_with('#') && *c != "en")
+            .collect();
+        let listed: Vec<&str> = choices[2..].iter().map(|(_, c)| c.as_str()).collect();
+        assert_eq!(listed, codes);
+        for (name, code) in &choices[2..] {
+            assert_eq!(name, native_language_name(code));
+        }
+    }
+
+    #[test]
+    fn languages_are_named_in_themselves() {
+        assert_eq!(native_language_name("fr"), "Français");
+        assert_eq!(native_language_name("pt_BR"), "Português (Brasil)");
+        assert_eq!(native_language_name("nb"), "Norsk");
+        assert_eq!(native_language_name("no"), "Norsk");
+        assert_eq!(native_language_name("xx"), "xx");
+    }
+
+    #[test]
+    fn section_placements_map_to_combo_rows_lossily() {
+        use SectionPlacement::*;
+        assert_eq!(placement_index(AllInboxes), 0);
+        assert_eq!(placement_index(AboveAccounts), 0);
+        assert_eq!(placement_index(Footer), 0);
+        assert_eq!(placement_index(BelowAccounts), 1);
+        assert_eq!(placement_index(Off), 2);
+        assert_eq!(placement_from_index(0), AboveAccounts);
+        assert_eq!(placement_from_index(1), BelowAccounts);
+        assert_eq!(placement_from_index(2), Off);
+        assert_eq!(placement_from_index(9), AboveAccounts);
+        assert_eq!(contacts_placement_index(Footer), 0);
+        assert_eq!(contacts_placement_index(AllInboxes), 1);
+        assert_eq!(contacts_placement_index(AboveAccounts), 1);
+        assert_eq!(contacts_placement_index(BelowAccounts), 2);
+        assert_eq!(contacts_placement_index(Off), 3);
+        assert_eq!(contacts_placement_from_index(0), Footer);
+        assert_eq!(contacts_placement_from_index(1), AboveAccounts);
+        assert_eq!(contacts_placement_from_index(2), BelowAccounts);
+        assert_eq!(contacts_placement_from_index(3), Off);
+        assert_eq!(contacts_placement_from_index(7), AboveAccounts);
+    }
+
+    #[test]
+    fn link_browser_rows_are_default_ask_then_the_browsers() {
+        let browsers = vec![
+            crate::ui::launch::Browser {
+                id: "firefox.desktop".into(),
+                name: "Firefox".into(),
+            },
+            crate::ui::launch::Browser {
+                id: "chromium.desktop".into(),
+                name: "Chromium".into(),
+            },
+        ];
+        assert_eq!(link_browser_index(&browsers, ""), 0);
+        assert_eq!(link_browser_index(&browsers, crate::ui::launch::ASK), 1);
+        assert_eq!(link_browser_index(&browsers, "firefox.desktop"), 2);
+        assert_eq!(link_browser_index(&browsers, "chromium.desktop"), 3);
+        assert_eq!(link_browser_index(&browsers, "gone.desktop"), 0);
+        assert_eq!(link_browser_index(&[], "firefox.desktop"), 0);
+        assert!(link_group_description(&[]).starts_with("Inside the Flatpak sandbox"));
+        assert!(link_group_description(&browsers).starts_with("\"Ask each time\""));
+    }
+
+    #[test]
+    fn files_choices_map_to_combo_rows() {
+        use crate::config::{FilesAction, FilesLarge};
+        assert_eq!(files_action_index(FilesAction::Ask), 0);
+        assert_eq!(files_action_index(FilesAction::New), 1);
+        assert_eq!(files_action_index(FilesAction::Draft), 2);
+        assert_eq!(files_action_index(FilesAction::Reply), 3);
+        assert_eq!(files_large_index(FilesLarge::Ask), 0);
+        assert_eq!(files_large_index(FilesLarge::Attach), 1);
+        assert_eq!(files_large_index(FilesLarge::Cloud), 2);
+    }
+
+    #[test]
+    fn sounds_map_to_rows_with_custom_last() {
+        assert_eq!(
+            sound_labels(),
+            ["Click", "Hum", "String", "Swing", "Custom File"]
+        );
+        assert_eq!(sound_index("click"), 0);
+        assert_eq!(sound_index("swing"), 3);
+        assert_eq!(sound_index(crate::config::CUSTOM_SOUND), 4);
+        assert_eq!(sound_index("unknown"), 0);
+        assert_eq!(sound_index(""), 0);
+    }
+
+    #[test]
+    fn system_page_choices() {
+        assert_eq!(RENDERERS, ["", "vulkan", "gl", "cairo"]);
+        assert_eq!(KEEP_DOWNLOADS_DAYS, [0, 365, 90, 30]);
+        assert_eq!(storage_text(None), "Measuring…");
+        assert_eq!(
+            storage_text(Some((1000, 2000, 3000))),
+            "Messages 1.0\u{a0}kB, attachments 2.0\u{a0}kB. 3.0\u{a0}kB in all, with the message list."
+        );
+    }
+
+    #[test]
+    fn side_pages_have_unique_ids_and_are_found_by_id() {
+        let mut ids: Vec<&str> = SIDE_PAGES
+            .iter()
+            .flat_map(|(_, pages)| pages.iter().map(|p| p.id))
+            .collect();
+        let n = ids.len();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), n, "side page ids must be unique");
+        for id in ids {
+            assert_eq!(side_page(id).map(|p| p.id), Some(id));
+        }
+        assert!(side_page("nope").is_none());
+    }
+
+    #[test]
+    fn choice_tables_keep_their_order() {
+        let tray: Vec<_> = TRAY_ICONS.iter().map(|(_, v)| *v).collect();
+        assert_eq!(tray, [TrayIcon::Hylki, TrayIcon::Symbolic]);
+        let badges: Vec<_> = LAUNCHER_BADGES.iter().map(|(_, v)| *v).collect();
+        assert_eq!(
+            badges,
+            [
+                LauncherBadge::Off,
+                LauncherBadge::AllUnread,
+                LauncherBadge::NewSinceFront
+            ]
+        );
+        let themes: Vec<_> = APP_THEMES.iter().map(|(_, v)| *v).collect();
+        assert_eq!(themes, [AppTheme::System, AppTheme::Light, AppTheme::Dark]);
+        let msg: Vec<_> = MESSAGE_THEMES.iter().map(|(_, v)| *v).collect();
+        assert_eq!(
+            msg,
+            [
+                MessageTheme::System,
+                MessageTheme::Light,
+                MessageTheme::Dark
+            ]
+        );
+        let dates: Vec<_> = DATE_STYLES.iter().map(|(_, v)| *v).collect();
+        assert_eq!(
+            dates,
+            [
+                DateStyle::System,
+                DateStyle::MonthFirst,
+                DateStyle::DayFirst,
+                DateStyle::YearFirst
+            ]
+        );
+        let clocks: Vec<_> = CLOCK_STYLES.iter().map(|(_, v)| *v).collect();
+        assert_eq!(
+            clocks,
+            [
+                ClockStyle::System,
+                ClockStyle::Twelve,
+                ClockStyle::TwentyFour
+            ]
+        );
+        let secs: Vec<u64> = FETCH_INTERVALS.iter().map(|(_, s)| *s).collect();
+        assert_eq!(secs, [0, 60, 300, 900, 1800]);
+    }
+}

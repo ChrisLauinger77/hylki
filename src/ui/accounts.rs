@@ -5926,8 +5926,11 @@ fn parse_color(hex: &str) -> gtk::gdk::RGBA {
 #[cfg(test)]
 mod tests {
     use super::{
-        brand_for_account, manual_index, preset_index_for_host, protocol_at, protocol_index,
-        provider_at, provider_index_for_account, AccountConfig, Protocol, ProviderKind, PROVIDERS,
+        age_labels, auto_empty_index, auto_empty_labels, brand_for_account, brand_for_goa, hue_rgb,
+        importable_of, kind_index, manual_brand, manual_index, preset_index_for_host, protocol_at,
+        protocol_index, provider_at, provider_index_for_account, provider_name, signature_is_empty,
+        signature_label, AccountConfig, AccountSecrets, AliasConfig, NamedSignature, OAuthSettings,
+        Protocol, ProviderKind, AUTO_EMPTY_DAYS, CLEAN_LISTS_DAYS, PROVIDERS,
     };
 
     #[test]
@@ -6040,6 +6043,303 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn goa(
+        email: &str,
+        imap_host: &str,
+        oauth2: bool,
+        provider_type: &str,
+    ) -> crate::goa::GoaMailAccount {
+        crate::goa::GoaMailAccount {
+            id: format!("account_{email}"),
+            email: email.into(),
+            name: String::new(),
+            provider: String::new(),
+            imap_host: imap_host.into(),
+            imap_port: 993,
+            imap_user: String::new(),
+            smtp_host: String::new(),
+            smtp_port: 587,
+            smtp_user: String::new(),
+            smtp_separate: false,
+            password_based: !oauth2,
+            oauth2,
+            provider_type: provider_type.into(),
+            security: Default::default(),
+        }
+    }
+
+    #[test]
+    fn importable_goa_accounts_skip_configured_and_unconnectable_ones() {
+        let listed = vec![
+            goa("a@example.org", "imap.example.org", false, "imap_smtp"),
+            goa("b@example.org", "imap.example.org", false, "imap_smtp"),
+            goa("c@example.org", "", true, "ms_graph"),
+            goa("d@example.org", "", true, "google"),
+            goa("e@example.org", "imap.example.org", false, "imap_smtp"),
+        ];
+        let configured = vec![
+            // Configured, case aside: not offered again.
+            AccountConfig {
+                email: "A@Example.org".into(),
+                imap_host: "imap.example.org".into(),
+                ..crate::ui::welcome::blank_account()
+            },
+            // A broken import with neither an IMAP host nor Graph: offered again.
+            AccountConfig {
+                email: "b@example.org".into(),
+                imap_host: "  ".into(),
+                ..crate::ui::welcome::blank_account()
+            },
+            // Over Graph with no IMAP host: configured.
+            AccountConfig {
+                email: "e@example.org".into(),
+                protocol: Protocol::Graph,
+                ..crate::ui::welcome::blank_account()
+            },
+        ];
+        let emails: Vec<String> = importable_of(listed, &configured)
+            .into_iter()
+            .map(|g| g.email)
+            .collect();
+        assert_eq!(emails, ["b@example.org", "c@example.org"]);
+    }
+
+    #[test]
+    fn secrets_are_needed_only_for_what_the_account_lacks() {
+        let blank = crate::ui::welcome::blank_account();
+        assert!(AccountSecrets::needed(&blank));
+        let with_pw = AccountConfig {
+            password: "pw".into(),
+            ..blank.clone()
+        };
+        assert!(!AccountSecrets::needed(&with_pw));
+        let oauth = AccountConfig {
+            oauth: true,
+            ..blank.clone()
+        };
+        assert!(!AccountSecrets::needed(&oauth));
+        let separate = AccountConfig {
+            smtp_separate: true,
+            ..with_pw.clone()
+        };
+        assert!(AccountSecrets::needed(&separate));
+        let alias = AccountConfig {
+            aliases: vec![AliasConfig {
+                identity: "Me <me@example.org>".into(),
+                smtp_host: "smtp.example.org".into(),
+                ..Default::default()
+            }],
+            ..with_pw.clone()
+        };
+        assert!(AccountSecrets::needed(&alias));
+        let alias_without_smtp = AccountConfig {
+            aliases: vec![AliasConfig {
+                identity: "me@example.org".into(),
+                ..Default::default()
+            }],
+            ..with_pw
+        };
+        assert!(!AccountSecrets::needed(&alias_without_smtp));
+    }
+
+    #[test]
+    fn secrets_fill_only_the_empty_fields() {
+        let secrets = AccountSecrets {
+            email: "x@example.org".into(),
+            password: "kept-pw".into(),
+            smtp_password: "kept-smtp".into(),
+            aliases: vec![("me@example.org".into(), "alias-pw".into())],
+        };
+        let mut acc = AccountConfig {
+            password: "own".into(),
+            aliases: vec![
+                AliasConfig {
+                    identity: "Me <me@example.org>".into(),
+                    ..Default::default()
+                },
+                AliasConfig {
+                    identity: "other@example.org".into(),
+                    ..Default::default()
+                },
+                AliasConfig {
+                    identity: "me@example.org".into(),
+                    smtp_password: "set".into(),
+                    ..Default::default()
+                },
+            ],
+            ..crate::ui::welcome::blank_account()
+        };
+        secrets.apply(&mut acc);
+        assert_eq!(acc.password, "own");
+        assert_eq!(acc.smtp_password, "kept-smtp");
+        assert_eq!(acc.aliases[0].smtp_password, "alias-pw");
+        assert_eq!(acc.aliases[1].smtp_password, "");
+        assert_eq!(acc.aliases[2].smtp_password, "set");
+    }
+
+    #[test]
+    fn signature_emptiness_ignores_tags_and_spaces_but_also_images() {
+        assert!(signature_is_empty(""));
+        assert!(signature_is_empty("<p></p>"));
+        assert!(signature_is_empty("<p> &nbsp; </p><br>"));
+        // An image-only signature counts as empty (see Suspected bugs).
+        assert!(signature_is_empty("<img src=\"cid:logo\">"));
+        assert!(!signature_is_empty("<b>Jo</b>"));
+        assert!(!signature_is_empty("a < b"));
+    }
+
+    #[test]
+    fn a_signature_without_a_name_is_called_by_its_place() {
+        let sigs = vec![
+            NamedSignature {
+                name: " Work ".into(),
+                html: String::new(),
+            },
+            NamedSignature {
+                name: "  ".into(),
+                html: String::new(),
+            },
+        ];
+        assert_eq!(signature_label(&sigs, 0), "Work");
+        assert_eq!(signature_label(&sigs, 1), "Signature 2");
+        assert_eq!(signature_label(&sigs, 4), "Signature 5");
+    }
+
+    #[test]
+    fn age_choices_map_to_combo_indices_and_labels() {
+        assert_eq!(auto_empty_index(0), 0);
+        assert_eq!(auto_empty_index(7), 1);
+        assert_eq!(auto_empty_index(30), 3);
+        assert_eq!(auto_empty_index(5), 0);
+        assert_eq!(
+            age_labels(&[0, 1, 30]),
+            ["Never", "After 1 day", "After 30 days"]
+        );
+        assert_eq!(auto_empty_labels().len(), AUTO_EMPTY_DAYS.len());
+        assert_eq!(CLEAN_LISTS_DAYS, [0, 30, 60, 90, 180]);
+    }
+
+    #[test]
+    fn hue_rgb_walks_the_colour_wheel() {
+        assert_eq!(hue_rgb(0.0), (1.0, 0.0, 0.0));
+        assert_eq!(hue_rgb(0.25), (0.5, 1.0, 0.0));
+        assert_eq!(hue_rgb(0.5), (0.0, 1.0, 1.0));
+        assert_eq!(hue_rgb(1.0), (1.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn brands_for_accounts_and_goa_providers() {
+        let blank = crate::ui::welcome::blank_account();
+        let with = |f: &dyn Fn(&mut AccountConfig)| {
+            let mut a = blank.clone();
+            f(&mut a);
+            brand_for_account(&a)
+        };
+        assert_eq!(with(&|a| a.protocol = Protocol::Graph), "outlook");
+        let oauth = |url: &str| OAuthSettings {
+            auth_url: String::new(),
+            token_url: url.into(),
+            client_id: String::new(),
+            client_secret: String::new(),
+            scopes: String::new(),
+            redirect_uri: String::new(),
+        };
+        assert_eq!(
+            with(&|a| {
+                a.oauth = true;
+                a.oauth_settings = Some(oauth("https://oauth2.googleapis.com/token"));
+            }),
+            "gmail"
+        );
+        assert_eq!(
+            with(&|a| {
+                a.oauth = true;
+                a.oauth_settings = Some(oauth("https://login.microsoftonline.com/x"));
+            }),
+            "outlook"
+        );
+        assert_eq!(with(&|a| a.oauth = true), "mail-oauth");
+        // A GOA OAuth account goes by its host.
+        assert_eq!(
+            with(&|a| {
+                a.oauth = true;
+                a.goa_id = Some("g".into());
+                a.imap_host = "imap.gmail.com".into();
+            }),
+            "gmail"
+        );
+        assert_eq!(
+            with(&|a| a.imap_host = "outlook.office365.com".into()),
+            "outlook"
+        );
+        assert_eq!(with(&|a| a.imap_host = "imap.live.com".into()), "outlook");
+        assert_eq!(with(&|a| a.imap_host = "proton.local".into()), "proton");
+        assert_eq!(
+            with(&|a| a.imap_host = " IMAP.mail.me.com ".into()),
+            "icloud"
+        );
+        assert_eq!(with(&|a| a.imap_host = "mail.example.org".into()), "mail");
+        assert_eq!(
+            with(&|a| {
+                a.imap_host = "mail.example.org".into();
+                a.protocol = Protocol::Pop3;
+            }),
+            "mail-pop3"
+        );
+        assert_eq!(manual_brand(Protocol::Jmap), "mail-jmap");
+        assert_eq!(brand_for_goa("Google"), "gmail");
+        assert_eq!(brand_for_goa("Microsoft 365"), "outlook");
+        assert_eq!(brand_for_goa("Outlook.com"), "outlook");
+        assert_eq!(brand_for_goa("IMAP and SMTP"), "mail");
+    }
+
+    #[test]
+    fn provider_names_for_the_account_list() {
+        let blank = crate::ui::welcome::blank_account();
+        assert_eq!(provider_name("gmail", &blank), "Google (Gmail)");
+        assert_eq!(provider_name("mail", &blank), "IMAP/POP3 account");
+        let hosted = AccountConfig {
+            imap_host: " mail.example.org ".into(),
+            ..blank.clone()
+        };
+        assert_eq!(
+            provider_name("mail-pop3", &hosted),
+            "IMAP/POP3 account on mail.example.org"
+        );
+        assert_eq!(provider_name("icloud", &blank), "iCloud");
+        // The first entry with the brand wins, so a JMAP Fastmail account is
+        // named after the IMAP entry (see Suspected bugs).
+        assert_eq!(provider_name("fastmail", &blank), "Fastmail");
+        assert_eq!(provider_name("nope", &blank), "Mail account");
+    }
+
+    #[test]
+    fn provider_kinds_and_oauth_accounts_find_their_entries() {
+        assert_eq!(kind_index(ProviderKind::Manual), manual_index());
+        assert_eq!(
+            provider_at(kind_index(ProviderKind::Jmap)).label,
+            "JMAP Server"
+        );
+        assert_eq!(provider_at(999).kind, ProviderKind::Manual);
+        let oauth = AccountConfig {
+            oauth: true,
+            ..crate::ui::welcome::blank_account()
+        };
+        assert_eq!(
+            provider_at(provider_index_for_account(&oauth)).kind,
+            ProviderKind::CustomOAuth
+        );
+        let goa = AccountConfig {
+            goa_id: Some("g".into()),
+            imap_host: "imap.mail.yahoo.com".into(),
+            ..oauth
+        };
+        assert_eq!(
+            provider_at(provider_index_for_account(&goa)).label,
+            "Yahoo Mail"
+        );
     }
 }
 

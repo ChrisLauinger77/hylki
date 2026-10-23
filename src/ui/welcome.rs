@@ -1506,3 +1506,43 @@ pub(crate) fn blank_account() -> AccountConfig {
         graph_label_names: false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{blank_account, wizard_provider, wizard_providers, PROVIDERS};
+
+    #[test]
+    fn a_blank_account_has_the_form_defaults() {
+        let a = blank_account();
+        assert_eq!((a.imap_port, a.smtp_port), (993, 587));
+        assert_eq!(a.protocol, crate::config::Protocol::Imap);
+        assert!(a.enabled && a.in_unified && a.goa_enabled_before_mail_disabled);
+        assert!(!a.smtp_separate && !a.oauth && !a.gravatar && !a.server_saves_sent);
+        assert!(!a.jmap_token && !a.jmap_generic && !a.tls_accept_hostname_mismatch);
+        assert!(!a.sign_by_default && !a.plain_subject && !a.folders_seeded);
+        assert!(!a.graph_directory && !a.graph_directory_only && !a.graph_label_names);
+        assert!(!a.goa_mail_disabled && !a.signature_html);
+        assert!(a.name.is_empty() && a.email.is_empty() && a.username.is_empty());
+        assert!(a.imap_host.is_empty() && a.smtp_host.is_empty());
+        assert!(a.password.is_empty() && a.smtp_password.is_empty());
+        assert!(a.smtp_username.is_empty() && a.oauth_refresh.is_empty());
+        assert!(a.goa_id.is_none() && a.push.is_none() && a.security.is_none());
+        assert!(a.color.is_none() && a.emoji.is_none() && a.avatar.is_none());
+        assert!(a.signature.is_none() && a.default_signature.is_none());
+        assert!(a.label.is_none() && a.oauth_settings.is_none() && a.pgp_key.is_none());
+        assert!(a.sent_copy_path.is_none() && a.folder_sort.is_none());
+        assert!(a.signatures.is_empty() && a.aliases.is_empty() && a.hidden_folders.is_empty());
+        assert_eq!(
+            (a.empty_junk_days, a.empty_trash_days, a.clean_lists_days),
+            (0, 0, 0)
+        );
+    }
+
+    #[test]
+    fn the_wizard_lists_every_provider_but_google() {
+        assert_eq!(wizard_providers().count(), PROVIDERS.len() - 1);
+        assert!(wizard_providers().all(|p| p.wizard_label() != "Google (Gmail)"));
+        assert!(wizard_provider(0).is_some_and(|p| p.wizard_is_manual()));
+        assert!(wizard_provider(PROVIDERS.len() as u32).is_none());
+    }
+}
