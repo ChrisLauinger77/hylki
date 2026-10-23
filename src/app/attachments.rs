@@ -35,22 +35,6 @@ fn save_attachment(att: Attachment, parent: Option<adw::ApplicationWindow>) {
     });
 }
 
-/// Ask for a folder and write every attachment into it.
-fn save_all_attachments(atts: Vec<Attachment>, parent: Option<adw::ApplicationWindow>) {
-    let dialog = gtk::FileDialog::new();
-    dialog.set_title(&i18n("Save All Attachments"));
-    dialog.select_folder(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-        if let Ok(folder) = res {
-            if let Some(dir) = folder.path() {
-                for att in &atts {
-                    let safe = att.name.replace(['/', '\\'], "_");
-                    let _ = std::fs::write(dir.join(&safe), &att.data);
-                }
-            }
-        }
-    });
-}
-
 /// Remove downloaded mail older than `days` (#394), off the main thread;
 /// 0 keeps it all.
 pub(super) fn prune_downloads(days: u32) {
