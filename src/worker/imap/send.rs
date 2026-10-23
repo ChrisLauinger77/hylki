@@ -16,7 +16,8 @@ use crate::worker::imap::wire::{
 };
 use crate::worker::imap::ImapSession;
 use crate::worker::outbox::{
-    current_sent_copy_path, due_outbox_items, emit_outbox, outbox_envelope, raw_in_reply_to,
+    current_sent_copy_path, due_outbox_items, emit_outbox, note_answered, outbox_envelope,
+    raw_in_reply_to,
 };
 use crate::worker::smtp::send_raw_smtp;
 use crate::worker::{answered_copies, reply_copy_path, WorkerEvent};
@@ -26,7 +27,7 @@ use crate::worker::{answered_copies, reply_copy_path, WorkerEvent};
 /// keywords has nowhere to keep `$Forwarded`, and the arrow then lasts until
 /// the folder syncs. A failure is only logged: the message went, and that
 /// is what the user asked about.
-pub(in crate::worker) async fn mark_answered(
+pub(super) async fn mark_answered(
     session: &mut Option<ImapSession>,
     cache: Option<&Cache>,
     account_id: u32,
@@ -47,14 +48,7 @@ pub(in crate::worker) async fn mark_answered(
                 tracing::warn!("[account {account_id}] could not mark {path}/{uid} answered: {e}");
             }
         }
-        if let Some(c) = cache {
-            c.set_answered(account_id, &path, uid, forwarded);
-        }
-        emit(WorkerEvent::Answered {
-            path,
-            uid,
-            forwarded,
-        });
+        note_answered(cache, account_id, path, uid, forwarded, emit);
     }
 }
 

@@ -287,6 +287,26 @@ pub(crate) fn answered_copies(
         .collect()
 }
 
+/// An answered mark the server has taken (or, on POP3, which keeps no
+/// flags, one kept here only): into the cache, and the views told (#454).
+pub(super) fn note_answered(
+    cache: Option<&Cache>,
+    account_id: u32,
+    path: String,
+    uid: u32,
+    forwarded: bool,
+    emit: &impl Fn(WorkerEvent),
+) {
+    if let Some(c) = cache {
+        c.set_answered(account_id, &path, uid, forwarded);
+    }
+    emit(WorkerEvent::Answered {
+        path,
+        uid,
+        forwarded,
+    });
+}
+
 /// Where the copy of a reply is filed when the account keeps replies
 /// beside what they answer (#468): the folder its original is in now,
 /// found by Message-ID in the cache, so a message moved or deleted while

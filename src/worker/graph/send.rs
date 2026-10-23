@@ -10,7 +10,7 @@ use crate::worker::graph::http::{graph_post_mime, graph_token, GRAPH_BASE};
 use crate::worker::graph::index::GraphState;
 use crate::worker::graph::messages::{ICON_INDEX, LAST_VERB};
 use crate::worker::graph::ops::graph_patch_message;
-use crate::worker::outbox::{due_outbox_items, emit_outbox, raw_in_reply_to};
+use crate::worker::outbox::{due_outbox_items, emit_outbox, note_answered, raw_in_reply_to};
 use crate::worker::{answered_copies, blocking, offline_text, OutgoingMessage, WorkerEvent};
 
 /// Send over Graph: `sendMail` takes the same raw MIME `build_email` produces
@@ -58,14 +58,7 @@ pub(super) async fn graph_mark_answered(
             { "id": ICON_INDEX, "value": icon },
         ] });
         graph_patch_message(account, state, &path, uid, body, emit).await;
-        if let Some(c) = cache {
-            c.set_answered(account_id, &path, uid, forwarded);
-        }
-        emit(WorkerEvent::Answered {
-            path,
-            uid,
-            forwarded,
-        });
+        note_answered(cache, account_id, path, uid, forwarded, emit);
     }
 }
 
