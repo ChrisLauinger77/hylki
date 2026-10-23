@@ -12,9 +12,9 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::carddav::{self, Account, Status};
-use crate::contact_sources::{self as sources, Source};
-use crate::directory::Directory;
+use crate::contacts::carddav::{self, Account, Status};
+use crate::contacts::contact_sources::{self as sources, Source};
+use crate::contacts::directory::Directory;
 use crate::i18n::{i18n, i18n_f, i18n_noop};
 
 mod forms;

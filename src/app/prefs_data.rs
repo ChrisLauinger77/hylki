@@ -70,7 +70,7 @@ impl AppModel {
                 std::thread::spawn(move || {
                     s.input(AppMsg::ContactBooksLoaded {
                         books: crate::contacts::writable_books(),
-                        local_count: crate::local_contacts::count(),
+                        local_count: crate::contacts::local::count(),
                     });
                 });
             }
@@ -97,7 +97,7 @@ impl AppModel {
                         let Some(path) = file.path() else { return };
                         let notif = notif.clone();
                         std::thread::spawn(move || {
-                            let _ = notif.send(match crate::local_contacts::export_to(&path) {
+                            let _ = notif.send(match crate::contacts::local::export_to(&path) {
                                 Ok(n) => NotifyInput::SetStatus(ni18n_f(
                                     "{n} contact exported to {path}",
                                     "{n} contacts exported to {path}",
@@ -115,7 +115,7 @@ impl AppModel {
                 );
             }
             PrefOutput::DeleteAllLocalContacts => {
-                let n = crate::local_contacts::count();
+                let n = crate::contacts::local::count();
                 let s = sender.clone();
                 confirm_destructive(
                     self.dialog_parent().as_ref(),
@@ -130,7 +130,7 @@ impl AppModel {
                     &i18n("Delete All"),
                     move || {
                         std::thread::spawn(move || {
-                            let err = crate::local_contacts::delete_all().err();
+                            let err = crate::contacts::local::delete_all().err();
                             crate::contacts::local_changed();
                             s.input(AppMsg::ContactWriteDone(err));
                         });

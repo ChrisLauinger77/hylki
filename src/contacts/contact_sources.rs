@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// The ID of the Hylki book in the switches, and its book UID.
-const HYLKI: &str = crate::local_contacts::LOCAL_BOOK_UID;
+const HYLKI: &str = crate::contacts::local::LOCAL_BOOK_UID;
 /// The ID that stands for the EDS books on this computer, which no source
 /// of their own groups.
 const THIS_COMPUTER: &str = "eds-local";
@@ -153,8 +153,8 @@ pub(crate) enum Kind {
     /// An account in GNOME Online Accounts: changed in GNOME Settings.
     Online,
     /// A CardDAV collection made in Hylki or Evolution.
-    CardDav(crate::carddav::Account),
-    Ldap(crate::directory::Directory),
+    CardDav(crate::contacts::carddav::Account),
+    Ldap(crate::contacts::directory::Directory),
     /// Any other EDS account or book (Evolution's Exchange, a lone CardDAV
     /// book): shown and switched, changed in the app that made it.
     Other,
@@ -196,7 +196,7 @@ pub(crate) struct Source {
     /// Why the switch cannot be turned on here, when it cannot.
     pub(crate) paused: Option<String>,
     /// A CardDAV account's sign-in, for its row.
-    pub(crate) status: Option<crate::carddav::Status>,
+    pub(crate) status: Option<crate::contacts::carddav::Status>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -221,7 +221,7 @@ fn online_mark(provider_type: &str, host: &str) -> &'static str {
 
 /// The mark of a CardDAV account, by its server.
 fn carddav_mark(url: &str) -> &'static str {
-    let host = crate::carddav::parse_url(url)
+    let host = crate::contacts::carddav::parse_url(url)
         .map(|u| u.host.to_ascii_lowercase())
         .unwrap_or_default();
     if host.ends_with("icloud.com") {
@@ -305,11 +305,12 @@ fn list_own() -> Vec<Source> {
         .map(|(_, uid, data)| (uid.clone(), data.clone()))
         .collect();
     let online = crate::goa::contacts_accounts();
-    let carddav: HashMap<String, crate::carddav::Account> = crate::carddav::list()
-        .unwrap_or_default()
-        .into_iter()
-        .map(|a| (a.uid.clone(), a))
-        .collect();
+    let carddav: HashMap<String, crate::contacts::carddav::Account> =
+        crate::contacts::carddav::list()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|a| (a.uid.clone(), a))
+            .collect();
 
     let mut accounts = Vec::new();
     for (id, books) in books_by_group(&sources, &carddav, &off) {
@@ -358,7 +359,7 @@ fn list_own() -> Vec<Source> {
 
 /// The Hylki book's row.
 fn hylki_source(off: &HashSet<String>) -> Source {
-    let count = crate::local_contacts::count();
+    let count = crate::contacts::local::count();
     Source {
         own_title: String::new(),
         given: None,
@@ -385,7 +386,7 @@ fn hylki_source(off: &HashSet<String>) -> Source {
 /// its books is listed all the same.
 fn books_by_group(
     sources: &HashMap<String, String>,
-    carddav: &HashMap<String, crate::carddav::Account>,
+    carddav: &HashMap<String, crate::contacts::carddav::Account>,
     off: &HashSet<String>,
 ) -> HashMap<String, Vec<(Book, bool)>> {
     let mut groups: HashMap<String, Vec<(Book, bool)>> = HashMap::new();
@@ -520,10 +521,10 @@ fn carddav_source(
     id: String,
     books: Vec<Book>,
     on: bool,
-    account: &crate::carddav::Account,
+    account: &crate::contacts::carddav::Account,
     data: &str,
 ) -> Source {
-    let status = crate::carddav::status(account);
+    let status = crate::contacts::carddav::status(account);
     let detail = match status.problem() {
         Some(problem) if account.enabled => problem,
         _ if books.is_empty() => i18n("Looking for address books…"),
@@ -581,12 +582,12 @@ fn other_source(
 
 /// A row for each LDAP directory.
 fn ldap_sources(off: &HashSet<String>) -> Vec<Source> {
-    crate::directory::list()
+    crate::contacts::directory::list()
         .unwrap_or_default()
         .into_iter()
         .map(|dir| {
             let failed = if dir.enabled {
-                crate::directory::last_error(&dir.uid)
+                crate::contacts::directory::last_error(&dir.uid)
             } else {
                 None
             };
@@ -627,8 +628,8 @@ fn is_hylki_made(data: &str) -> bool {
 }
 
 /// A directory Hylki set up keeps its password in Hylki's keyring entry.
-fn is_hylki_made_ldap(dir: &crate::directory::Directory) -> bool {
-    crate::directory::has_password(dir)
+fn is_hylki_made_ldap(dir: &crate::contacts::directory::Directory) -> bool {
+    crate::contacts::directory::has_password(dir)
 }
 
 /// Switch a source on or off for Hylki. Turning on one EDS itself has off
@@ -638,12 +639,12 @@ pub(crate) fn switch_source(source: &Source, on: bool) -> Result<(), String> {
     set_off(&source.id, !on)?;
     if on {
         match &source.kind {
-            Kind::CardDav(a) if !a.enabled => crate::carddav::set_enabled(a, true)?,
-            Kind::Ldap(d) if !d.enabled => crate::directory::set_enabled(d, true)?,
+            Kind::CardDav(a) if !a.enabled => crate::contacts::carddav::set_enabled(a, true)?,
+            Kind::Ldap(d) if !d.enabled => crate::contacts::directory::set_enabled(d, true)?,
             _ => {}
         }
     }
-    crate::directory::list_changed();
+    crate::contacts::directory::list_changed();
     Ok(())
 }
 
@@ -728,13 +729,14 @@ mod tests {
         };
         let mut f = spec.splitn(3, '|').map(str::to_string);
         let (url, user, pw) = (f.next().unwrap(), f.next().unwrap(), f.next().unwrap());
-        let mut a = crate::carddav::Account::empty();
+        let mut a = crate::contacts::carddav::Account::empty();
         a.url = url;
         a.user = user;
-        let uid = crate::carddav::save(&a, Some(&pw)).unwrap();
+        let uid = crate::contacts::carddav::save(&a, Some(&pw)).unwrap();
         let got =
-            crate::carddav::await_books(&uid, std::time::Duration::from_secs(30), true).unwrap();
-        crate::carddav::sync_books(true);
+            crate::contacts::carddav::await_books(&uid, std::time::Duration::from_secs(30), true)
+                .unwrap();
+        crate::contacts::carddav::sync_books(true);
         std::thread::sleep(std::time::Duration::from_secs(2));
         let from_server = || {
             crate::contacts::read_contact_details()
@@ -763,6 +765,6 @@ mod tests {
         assert_eq!(from_server(), 0, "book off");
         super::set_off(&book, false).unwrap();
         assert_eq!(from_server(), shown, "both on");
-        crate::carddav::remove(&got).unwrap();
+        crate::contacts::carddav::remove(&got).unwrap();
     }
 }

@@ -24,8 +24,8 @@ pub(super) fn registry_books() -> Option<HashMap<String, String>> {
         .map(|(_, uid, data)| (uid, data))
         .collect();
     let mut books = HashMap::new();
-    let off = crate::contact_sources::off();
-    let names = crate::contact_sources::names();
+    let off = crate::contacts::contact_sources::off();
+    let names = crate::contacts::contact_sources::names();
     for (uid, data) in &sources {
         // An address book, and not switched off (GOA sets the book source's
         // [Data Source] Enabled=false when Contacts is toggled off for the
@@ -34,10 +34,10 @@ pub(super) fn registry_books() -> Option<HashMap<String, String>> {
         // for Hylki in Settings → Contacts, it or its account.
         if data.contains("[Address Book]")
             && !data_source_disabled(data)
-            && crate::contact_sources::book_used(uid, &sources, &off)
+            && crate::contacts::contact_sources::book_used(uid, &sources, &off)
         {
             let name = book_display_name(data, &sources);
-            let account = names.get(&crate::contact_sources::group_of(uid, &sources));
+            let account = names.get(&crate::contacts::contact_sources::group_of(uid, &sources));
             books.insert(
                 uid.clone(),
                 with_given_name(&with_account_name(&name, account), names.get(uid)),
@@ -241,7 +241,7 @@ fn sources_dest_from_files() -> Option<String> {
 /// but for a book switched off for Hylki by its own UID).
 pub(super) fn book_uid_active(uid: &str, books: &Option<HashMap<String, String>>) -> bool {
     books.as_ref().map_or_else(
-        || !crate::contact_sources::off().contains(uid),
+        || !crate::contacts::contact_sources::off().contains(uid),
         |map| map.contains_key(uid),
     )
 }

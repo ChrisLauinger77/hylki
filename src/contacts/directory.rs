@@ -580,7 +580,7 @@ fn enabled() -> Vec<Directory> {
             return dirs;
         }
     }
-    let off = crate::contact_sources::off();
+    let off = crate::contacts::contact_sources::off();
     let dirs: Vec<Directory> = match list() {
         Ok(d) => d
             .into_iter()

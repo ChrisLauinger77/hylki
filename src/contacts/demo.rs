@@ -35,7 +35,7 @@ pub(crate) fn demo_contacts() -> Vec<ContactDetails> {
         name: name.into(),
         book_name: book.into(),
         book_uid: if book == "Hylki Address Book" {
-            crate::local_contacts::LOCAL_BOOK_UID.into()
+            crate::contacts::local::LOCAL_BOOK_UID.into()
         } else {
             book.into()
         },
@@ -154,7 +154,7 @@ fn demo_group(name: &str, hide_addresses: bool, people: &[(&str, &str)]) -> Cont
     ContactDetails {
         name: name.into(),
         book_name: i18n("Hylki Address Book"),
-        book_uid: crate::local_contacts::LOCAL_BOOK_UID.into(),
+        book_uid: crate::contacts::local::LOCAL_BOOK_UID.into(),
         group: Some(GroupFormat::Evolution),
         members,
         hide_addresses,

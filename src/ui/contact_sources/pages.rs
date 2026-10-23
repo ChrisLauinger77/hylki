@@ -6,10 +6,10 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::carddav::{self, Account, Status};
-use crate::contact_sources as sources;
-use crate::contact_sources::{Kind, Origin};
-use crate::directory::{self, Directory};
+use crate::contacts::carddav::{self, Account, Status};
+use crate::contacts::contact_sources as sources;
+use crate::contacts::contact_sources::{Kind, Origin};
+use crate::contacts::directory::{self, Directory};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 use super::forms::{

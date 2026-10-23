@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 
 use crate::i18n::{i18n, i18n_f};
 
-use crate::directory::eds_source::{
+use crate::contacts::directory::eds_source::{
     bus, create_source, invoke_authenticate, new_source_uid, not_available, registry,
     remove_source, write_source, SOURCE_IFACE,
 };
@@ -356,7 +356,7 @@ fn server_books() -> Vec<String> {
         .iter()
         .map(|(_, uid, data)| (uid.clone(), data.clone()))
         .collect();
-    let off = crate::contact_sources::off();
+    let off = crate::contacts::contact_sources::off();
     let disabled: HashSet<String> = sources
         .iter()
         .filter(|(_, _, data)| {
@@ -377,7 +377,7 @@ fn server_books() -> Vec<String> {
             let wanted = !matches!(backend.as_str(), "local" | "ldap" | "")
                 && !disabled.contains(uid)
                 && !disabled.contains(&parent)
-                && crate::contact_sources::book_used(uid, &by_uid, &off);
+                && crate::contacts::contact_sources::book_used(uid, &by_uid, &off);
             wanted.then(|| uid.clone())
         })
         .collect()
@@ -524,14 +524,14 @@ mod tests {
         a.url = "dav.example.org".into();
         a.user = " ann ".into();
         let new = a.to_source(&parse_url(&a.url).unwrap());
-        assert_golden("carddav/testdata/source-new.ini", &new);
+        assert_golden("contacts/carddav/testdata/source-new.ini", &new);
         a.data = "[Data Source]\nDisplayName=Old\nEnabled=true\nParent=\n\n\
                   [Collection]\nBackendName=webdav\nCalendarEnabled=true\nX-Kept=1\n"
             .into();
         a.name = "Work".into();
         a.enabled = false;
         let again = a.to_source(&parse_url("http://127.0.0.1:5232/dav/").unwrap());
-        assert_golden("carddav/testdata/source-rewritten.ini", &again);
+        assert_golden("contacts/carddav/testdata/source-rewritten.ini", &again);
     }
 
     /// Against a real server, in a session with EDS and a keyring:

@@ -664,7 +664,7 @@ pub(crate) enum AppMsg {
     /// `.vcf` files chosen in the Contacts page, to import into the Hylki book.
     ImportContacts(Vec<std::path::PathBuf>),
     /// The import finished.
-    ContactsImported(Result<crate::local_contacts::ImportOutcome, String>),
+    ContactsImported(Result<crate::contacts::local::ImportOutcome, String>),
 
     // ---- on_about (about.rs) ----
     /// Open the About window.

@@ -255,7 +255,7 @@ fn the_source_key_files_as_written() {
     let mut d = Directory::empty();
     d.host = "ldap.example.org".into();
     d.base_dn = "dc=example,dc=org".into();
-    assert_golden("directory/testdata/source-new.ini", &d.to_source());
+    assert_golden("contacts/directory/testdata/source-new.ini", &d.to_source());
     let data = "[Data Source]\nDisplayName=Work\nEnabled=true\nParent=ldap-stub\n\n\
                 [Address Book]\nBackendName=ldap\n\n\
                 [Authentication]\nHost=ldap.example.org\nPort=636\nUser=cn=me,dc=example,dc=org\nMethod=ldap/simple-binddn\n\n\
@@ -264,5 +264,8 @@ fn the_source_key_files_as_written() {
     let mut d = Directory::from_source("abc", "/p", data).unwrap();
     d.subtree = true;
     d.enabled = false;
-    assert_golden("directory/testdata/source-rewritten.ini", &d.to_source());
+    assert_golden(
+        "contacts/directory/testdata/source-rewritten.ini",
+        &d.to_source(),
+    );
 }

@@ -301,7 +301,7 @@ fn get(token: &str, endpoint: Endpoint, typed: &str) -> Result<serde_json::Value
 /// the main thread. A failure is logged and costs only the suggestions.
 pub(crate) fn search(typed: &str, accounts: &[AccountConfig]) -> Vec<Suggestion> {
     let typed = typed.trim();
-    if typed.chars().count() < crate::directory::MIN_QUERY || typed.len() > 128 {
+    if typed.chars().count() < crate::contacts::directory::MIN_QUERY || typed.len() > 128 {
         return Vec::new();
     }
     let query = typed.to_lowercase();

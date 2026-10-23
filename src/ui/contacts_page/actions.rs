@@ -157,7 +157,7 @@ impl ContactsPage {
             .split_once(" · ")
             .map_or(name.as_str(), |(_, own)| own)
             .to_string();
-        let given = crate::contact_sources::names().contains_key(&uid);
+        let given = crate::contacts::contact_sources::names().contains_key(&uid);
         let entry = gtk::Entry::new();
         entry.set_text(&own);
         entry.set_activates_default(true);

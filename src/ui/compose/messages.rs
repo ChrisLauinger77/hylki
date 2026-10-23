@@ -198,7 +198,7 @@ pub(crate) enum ComposeInput {
         token: String,
         generation: u64,
         matches: Vec<Suggestion>,
-        failed: Vec<crate::directory::DirectoryFailure>,
+        failed: Vec<crate::contacts::directory::DirectoryFailure>,
     },
     /// Addresses just sent to from another composer: into this one's
     /// suggestions at once, without waiting for a reopen.

@@ -198,18 +198,18 @@ pub(crate) fn add_or_merge(book_uid: &str, name: &str, email: &str) -> Result<Ad
 /// [`add_or_merge`] for the local book: merge into the contact with the same
 /// name, else create one.
 fn add_or_merge_local(name: &str, email: &str) -> Result<AddOutcome, String> {
-    let vcards = if crate::local_contacts::exists() {
-        crate::local_contacts::list_vcards()?
+    let vcards = if crate::contacts::local::exists() {
+        crate::contacts::local::list_vcards()?
     } else {
         Vec::new()
     };
     let result = match merge_target(&vcards, name) {
         Some(vcard) => {
-            crate::local_contacts::modify(&add_email_to_vcard(&vcard, email.trim()))?;
+            crate::contacts::local::modify(&add_email_to_vcard(&vcard, email.trim()))?;
             AddOutcome::Merged(name.trim().to_string())
         }
         None => {
-            crate::local_contacts::create(&vcard_for(name, email))?;
+            crate::contacts::local::create(&vcard_for(name, email))?;
             AddOutcome::Created
         }
     };

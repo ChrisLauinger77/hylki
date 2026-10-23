@@ -208,7 +208,8 @@ impl ContactsPage {
             _ => false,
         };
         if directory_picked && !groups && no_people && lines.is_empty() {
-            let text = if self.query.trim().chars().count() < crate::directory::MIN_QUERY {
+            let text = if self.query.trim().chars().count() < crate::contacts::directory::MIN_QUERY
+            {
                 i18n("Type three letters or more to search the directory.")
             } else {
                 i18n("Nobody in the directory matches.")

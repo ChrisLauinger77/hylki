@@ -36,7 +36,7 @@ pub(crate) struct Compose {
     /// The Microsoft 365 accounts whose organization directory is searched
     /// too (#410), found once the composer opens. The LDAP directories are
     /// not: one switched on in Evolution while the composer is open counts
-    /// as well (#307), and [`crate::directory::search`] keeps the list.
+    /// as well (#307), and [`crate::contacts::directory::search`] keeps the list.
     pub(super) graph_directories: std::sync::Arc<Vec<crate::config::AccountConfig>>,
     /// The accounts that suggest only from their directory and their own
     /// mail (#410), with the addresses in that mail.
