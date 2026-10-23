@@ -125,7 +125,7 @@ pub(crate) struct AppModel {
     pub(super) toasts: std::cell::OnceCell<adw::ToastOverlay>,
     /// Messages on their way out (#434), shared with the quit paths, which
     /// park any still waiting out the Undo Send delay in the Outbox.
-    pub(super) outgoing: crate::outgoing::OutgoingList,
+    pub(super) outgoing: super::outgoing::OutgoingList,
     /// The last ticket handed to a send; 0 is never used.
     pub(super) send_ticket: u64,
     /// Same idea over the contacts view's detail pane: composing from a

@@ -74,6 +74,7 @@ mod msg;
 mod navigation;
 mod notifications;
 mod outbox;
+mod outgoing;
 mod palette;
 mod pending;
 mod picker;

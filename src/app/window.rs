@@ -35,8 +35,8 @@ pub(super) fn save_window_geometry(w: &adw::ApplicationWindow) {
 /// the Flatpak surfaces as a crash notification. Nothing else needs
 /// persisting on quit: accounts and settings are written as they change,
 /// held sends are parked, the keyring's share once its thread is done.
-pub(super) fn exit_now(outgoing: &crate::outgoing::OutgoingList) -> ! {
-    crate::outgoing::park_held(outgoing);
+pub(super) fn exit_now(outgoing: &super::outgoing::OutgoingList) -> ! {
+    super::outgoing::park_held(outgoing);
     finish_keyring_writes();
     std::process::exit(0)
 }

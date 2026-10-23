@@ -36,7 +36,6 @@ mod mutf7;
 mod nautilus_ext;
 mod notify;
 mod oauth;
-mod outgoing;
 mod outlook_msg;
 mod percent;
 mod pgp;

@@ -50,7 +50,7 @@ impl AppModel {
             .outgoing
             .borrow()
             .iter()
-            .find(|o| crate::outgoing::row_id(o.ticket) == id)
+            .find(|o| super::outgoing::row_id(o.ticket) == id)
         {
             return Some(o.as_outbox_item());
         }
@@ -67,7 +67,7 @@ impl AppModel {
         self.outgoing
             .borrow()
             .iter()
-            .find(|o| o.held && crate::outgoing::row_id(o.ticket) == row)
+            .find(|o| o.held && super::outgoing::row_id(o.ticket) == row)
             .map(|o| o.ticket)
     }
 
@@ -85,7 +85,7 @@ impl AppModel {
             .outgoing
             .borrow()
             .iter()
-            .any(|o| crate::outgoing::row_id(o.ticket) == id)
+            .any(|o| super::outgoing::row_id(o.ticket) == id)
         {
             if let Some(ticket) = self.outgoing_ticket(id) {
                 self.undo_send(ticket, sender);
@@ -105,7 +105,7 @@ impl AppModel {
             .outgoing
             .borrow()
             .iter()
-            .find(|o| crate::outgoing::row_id(o.ticket) == item.id)
+            .find(|o| super::outgoing::row_id(o.ticket) == item.id)
             .map(|o| {
                 let body = crate::worker::sent_body_preview(&o.account, &o.message)
                     .unwrap_or_else(|| crate::worker::wrap_plain(&o.message.body));
@@ -254,7 +254,7 @@ impl AppModel {
                         .outgoing
                         .borrow()
                         .iter()
-                        .any(|o| crate::outgoing::row_id(o.ticket) == m.id);
+                        .any(|o| super::outgoing::row_id(o.ticket) == m.id);
                     match self.outgoing_ticket(m.id) {
                         Some(ticket) => self.dispatch_send(ticket),
                         None if in_flight => {}
