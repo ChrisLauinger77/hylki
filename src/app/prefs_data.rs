@@ -4,6 +4,41 @@
 use super::*;
 
 impl AppModel {
+    /// Asks where to save, writes the file there with `write` and says in
+    /// the status bar how it went: `saved` names the place, a failure is an
+    /// error card.
+    fn export_to_chosen_file(
+        &self,
+        title: &str,
+        initial_name: &str,
+        write: impl FnOnce(&std::path::Path) -> Result<(), String> + 'static,
+        saved: impl FnOnce(&std::path::Path) -> String + 'static,
+    ) {
+        let dialog = gtk::FileDialog::builder()
+            .title(title)
+            .initial_name(initial_name)
+            .build();
+        let win = self.window.clone();
+        let notif = self.notifications.sender().clone();
+        dialog.save(Some(&win), gtk::gio::Cancellable::NONE, move |res| {
+            let Ok(file) = res else { return };
+            let Some(path) = file.path() else { return };
+            let outcome = write(&path);
+            let _ = notif.send(match outcome {
+                Ok(()) => NotifyInput::Push {
+                    text: saved(&path),
+                    error: false,
+                    connectivity: false,
+                },
+                Err(e) => NotifyInput::Push {
+                    text: i18n_f("Export failed: {e}", &[("e", &(e).to_string())]),
+                    error: true,
+                    connectivity: false,
+                },
+            });
+        });
+    }
+
     /// The settings changes the router sends here (see `AppModel::route`).
     pub(super) fn on_prefs_data_pref(&mut self, pref: PrefOutput, sender: ComponentSender<Self>) {
         match pref {
@@ -100,70 +135,44 @@ impl AppModel {
                 dialog.present();
             }
 
-            PrefOutput::ExportSettings => {
-                let dialog = gtk::FileDialog::builder()
-                    .title(&i18n("Export Settings"))
-                    .initial_name("hylki-settings.toml")
-                    .build();
-                let win = self.window.clone();
-                let notif = self.notifications.sender().clone();
-                dialog.save(Some(&win), gtk::gio::Cancellable::NONE, move |res| {
-                    let Ok(file) = res else { return };
-                    let Some(path) = file.path() else { return };
-                    let outcome = crate::config::export_bundle()
-                        .and_then(|t| std::fs::write(&path, t).map_err(|e| e.to_string()));
-                    let _ = notif.send(match outcome {
-                        Ok(()) => NotifyInput::Push {
-                            text: i18n_f(
-                                "Settings exported to {display}",
-                                &[("display", &(path.display()).to_string())],
-                            ),
-                            error: false,
-                            connectivity: false,
-                        },
-                        Err(e) => NotifyInput::Push {
-                            text: i18n_f("Export failed: {e}", &[("e", &(e).to_string())]),
-                            error: true,
-                            connectivity: false,
-                        },
-                    });
-                });
-            }
+            PrefOutput::ExportSettings => self.export_to_chosen_file(
+                &i18n("Export Settings"),
+                "hylki-settings.toml",
+                |path| {
+                    crate::config::export_bundle()
+                        .and_then(|t| std::fs::write(path, t).map_err(|e| e.to_string()))
+                },
+                |path| {
+                    i18n_f(
+                        "Settings exported to {display}",
+                        &[("display", &(path.display()).to_string())],
+                    )
+                },
+            ),
 
             PrefOutput::ExportLog => {
-                let dialog = gtk::FileDialog::builder()
-                    .title(&i18n("Export Log"))
-                    .initial_name(&format!(
-                        "hylki-log-{}.txt",
-                        chrono::Local::now().format("%Y%m%d-%H%M")
-                    ))
-                    .build();
-                let win = self.window.clone();
-                let notif = self.notifications.sender().clone();
+                let title = i18n("Export Log");
+                let name = format!(
+                    "hylki-log-{}.txt",
+                    chrono::Local::now().format("%Y%m%d-%H%M")
+                );
                 // Measured now, while the model is at hand: the chooser's
                 // callback runs later, without it.
                 let memory = self.memory_report();
-                dialog.save(Some(&win), gtk::gio::Cancellable::NONE, move |res| {
-                    let Ok(file) = res else { return };
-                    let Some(path) = file.path() else { return };
-                    let outcome = std::fs::write(&path, crate::console_log::export_text(&memory))
-                        .map_err(|e| e.to_string());
-                    let _ = notif.send(match outcome {
-                        Ok(()) => NotifyInput::Push {
-                            text: i18n_f(
-                                "Log exported to {display}",
-                                &[("display", &(path.display()).to_string())],
-                            ),
-                            error: false,
-                            connectivity: false,
-                        },
-                        Err(e) => NotifyInput::Push {
-                            text: i18n_f("Export failed: {e}", &[("e", &(e).to_string())]),
-                            error: true,
-                            connectivity: false,
-                        },
-                    });
-                });
+                self.export_to_chosen_file(
+                    &title,
+                    &name,
+                    move |path| {
+                        std::fs::write(path, crate::console_log::export_text(&memory))
+                            .map_err(|e| e.to_string())
+                    },
+                    |path| {
+                        i18n_f(
+                            "Log exported to {display}",
+                            &[("display", &(path.display()).to_string())],
+                        )
+                    },
+                );
             }
 
             PrefOutput::ImportSettings => {

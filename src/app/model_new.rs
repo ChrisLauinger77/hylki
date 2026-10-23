@@ -206,7 +206,7 @@ impl AppModel {
             link_browser: {
                 // The launcher reads its choice from here, not from disk, so
                 // it is handed over before the first link can be clicked.
-                let choice = config::load_privacy().link_browser;
+                let choice = prefs.link_browser;
                 crate::ui::launch::set_browser(&choice);
                 choice
             },
@@ -329,20 +329,18 @@ impl AppModel {
             preview_lines: config::load_preview_lines(),
             list_layout: config::load_list_layout(),
             list_columns: config::load_list_columns(),
-            list_headings: config::load_privacy().list_headings,
-            list_column_scroll: config::load_privacy().list_column_scroll,
-            list_group_by_date: config::load_privacy().list_group_by_date,
-            list_pills_below: config::load_privacy().list_pills_below,
-            list_search_open: config::load_privacy().list_search_open,
-            contacts_search_open: config::load_privacy().contacts_search_open,
-            list_search_bottom: config::load_privacy().list_search_bottom,
-            list_bulk_bar_bottom: config::load_privacy().list_bulk_bar_bottom,
+            list_headings: prefs.list_headings,
+            list_column_scroll: prefs.list_column_scroll,
+            list_group_by_date: prefs.list_group_by_date,
+            list_pills_below: prefs.list_pills_below,
+            list_search_open: prefs.list_search_open,
+            contacts_search_open: prefs.contacts_search_open,
+            list_search_bottom: prefs.list_search_bottom,
+            list_bulk_bar_bottom: prefs.list_bulk_bar_bottom,
             list_column_widths: config::load_list_column_widths(),
             list_wide: config::load_list_pane_width() >= LIST_WIDE_ON,
             shortcuts_win: None,
-            run_in_background: std::rc::Rc::new(std::cell::Cell::new(
-                config::load_privacy().run_in_background,
-            )),
+            run_in_background: std::rc::Rc::new(std::cell::Cell::new(prefs.run_in_background)),
             autostart: config::load_autostart(),
             tray_enabled: prefs.tray,
             tray_icon: prefs.tray_icon,
@@ -353,11 +351,9 @@ impl AppModel {
             restart_pending: false,
             tray: None,
             tray_mail_key: std::cell::RefCell::new(None),
-            single_key: std::rc::Rc::new(std::cell::Cell::new(
-                config::load_privacy().single_key_shortcuts,
-            )),
-            gmail_keys: std::rc::Rc::new(std::cell::Cell::new(config::load_privacy().gmail_keys)),
-            keep_downloads_days: config::load_privacy().keep_downloads_days,
+            single_key: std::rc::Rc::new(std::cell::Cell::new(prefs.single_key_shortcuts)),
+            gmail_keys: std::rc::Rc::new(std::cell::Cell::new(prefs.gmail_keys)),
+            keep_downloads_days: prefs.keep_downloads_days,
             threading: prefs.threading,
             thread_render_queued: false,
             thread_opened_at: None,

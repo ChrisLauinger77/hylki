@@ -127,6 +127,16 @@ pub(super) struct UndoEntry {
 pub(super) const INSTANT_UNDO: std::time::Duration = std::time::Duration::from_secs(10);
 
 impl AppModel {
+    /// Sets or clears one kind of flag on a message, through the setter
+    /// for that kind.
+    fn set_flag(&mut self, m: &Message, kind: &FlagKind, value: bool) {
+        match kind {
+            FlagKind::Read => self.set_read(m, value),
+            FlagKind::Star => self.set_star(m, value),
+            FlagKind::Tag(keyword) => self.set_tag(m, keyword, value),
+        }
+    }
+
     /// Record a just-issued move so Ctrl+Z can bring it back. Skips silently
     /// when nothing identifies the messages (no Message-ID) — an unrecordable
     /// move simply isn't undoable.
@@ -516,11 +526,7 @@ impl AppModel {
                             continue;
                         };
                         touched += 1;
-                        match &change.kind {
-                            FlagKind::Read => self.set_read(&m, change.value),
-                            FlagKind::Star => self.set_star(&m, change.value),
-                            FlagKind::Tag(keyword) => self.set_tag(&m, keyword, change.value),
-                        }
+                        self.set_flag(&m, &change.kind, change.value);
                     }
                 }
                 if touched == 0 {
@@ -648,11 +654,7 @@ impl AppModel {
                 uid: m.uid,
                 id: m.id,
             });
-            match &kind {
-                FlagKind::Read => self.set_read(m, value),
-                FlagKind::Star => self.set_star(m, value),
-                FlagKind::Tag(keyword) => self.set_tag(m, keyword, value),
-            }
+            self.set_flag(m, &kind, value);
         }
         // One entry per account: undo sends its requests to one worker.
         for (account_id, items) in by_account {

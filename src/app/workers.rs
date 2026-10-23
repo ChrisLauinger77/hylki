@@ -236,6 +236,15 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
     }
 }
 
+/// A Refresh button's two faces: the icon, and the spinner shown while
+/// any account is busy.
+fn fill_refresh_faces(stack: &gtk::Stack, spinner: &gtk::Spinner) {
+    let icon = gtk::Image::from_icon_name("view-refresh-symbolic");
+    stack.add_named(&icon, Some("icon"));
+    stack.add_named(spinner, Some("spinner"));
+    stack.set_visible_child_name("icon");
+}
+
 impl AppModel {
     /// Tell the message list whether the folder(s) currently shown are fully
     /// indexed, so it knows whether to expect more rows while scrolling.
@@ -506,10 +515,13 @@ impl AppModel {
     /// refresh button mirrors this via `SidebarInput::SetBusy`).
     fn set_header_refresh_busy(&self, busy: bool) {
         let face = if busy { "spinner" } else { "icon" };
-        self.sidebar_refresh_spinner.set_spinning(busy);
-        self.sidebar_refresh_stack.set_visible_child_name(face);
-        self.peek_refresh_spinner.set_spinning(busy);
-        self.peek_refresh_stack.set_visible_child_name(face);
+        for (spinner, stack) in [
+            (&self.sidebar_refresh_spinner, &self.sidebar_refresh_stack),
+            (&self.peek_refresh_spinner, &self.peek_refresh_stack),
+        ] {
+            spinner.set_spinning(busy);
+            stack.set_visible_child_name(face);
+        }
     }
 
     /// Spin the refresh button (header and rail) while anything is happening
@@ -644,11 +656,7 @@ impl AppModel {
         sender: &ComponentSender<Self>,
     ) {
         {
-            let icon = gtk::Image::from_icon_name("view-refresh-symbolic");
-            self.sidebar_refresh_stack.add_named(&icon, Some("icon"));
-            self.sidebar_refresh_stack
-                .add_named(&self.sidebar_refresh_spinner, Some("spinner"));
-            self.sidebar_refresh_stack.set_visible_child_name("icon");
+            fill_refresh_faces(&self.sidebar_refresh_stack, &self.sidebar_refresh_spinner);
             self.sidebar_refresh
                 .set_child(Some(&self.sidebar_refresh_stack));
             let s = sender.input_sender().clone();
@@ -667,13 +675,7 @@ impl AppModel {
             self.sidebar_refresh.add_controller(long);
         }
         // The peek panel's Refresh: the same icon/spinner faces.
-        {
-            let icon = gtk::Image::from_icon_name("view-refresh-symbolic");
-            self.peek_refresh_stack.add_named(&icon, Some("icon"));
-            self.peek_refresh_stack
-                .add_named(&self.peek_refresh_spinner, Some("spinner"));
-            self.peek_refresh_stack.set_visible_child_name("icon");
-        }
+        fill_refresh_faces(&self.peek_refresh_stack, &self.peek_refresh_spinner);
         // Started with no network: orange from the first frame (#442).
         if !crate::power::online() {
             self.show_network_state();
