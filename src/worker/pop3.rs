@@ -17,13 +17,17 @@ use crate::worker::render::attachments::{attachments_of, extract_attachments};
 use crate::worker::render::body_cacheable;
 use crate::worker::smtp::{send_smtp, smtp_refused};
 use crate::worker::strip::strip_refused;
-use crate::worker::{render_raw, summary_from_raw, MailRequest, WorkerEvent};
+use crate::worker::{render_raw, summary_from_raw, MailRequest, OutgoingMessage, WorkerEvent};
 
 pub(super) mod client;
 
 /// Cap on how many messages a POP3 sync downloads in full (POP3 has no partial
 /// fetch; mailboxes are usually small). Older messages aren't indexed.
 const POP3_LIMIT: usize = 200;
+
+/// The one folder a POP3 account has, and its id.
+const INBOX: &str = "INBOX";
+const INBOX_ID: u32 = 1;
 
 /// The folder list for a POP3 account: just the inbox.
 fn pop3_folders(account_id: u32) -> Vec<Folder> {
@@ -37,6 +41,7 @@ fn pop3_folders(account_id: u32) -> Vec<Folder> {
     }]
 }
 
+/// Run a POP3 account until the UI drops its sender.
 pub(super) async fn run_pop3(
     account_id: u32,
     mut account: AccountConfig,
@@ -50,8 +55,6 @@ pub(super) async fn run_pop3(
     let cache = Cache::open()
         .map_err(|e| tracing::warn!("cache unavailable: {e}"))
         .ok();
-    const INBOX: &str = "INBOX";
-    let inbox_id = 1u32;
 
     emit(WorkerEvent::account(account_id, &account));
     let folders = pop3_folders(account_id);
@@ -60,7 +63,33 @@ pub(super) async fn run_pop3(
     }
     emit(WorkerEvent::Folders(folders));
 
+    let mut worker = Pop3Worker {
+        account_id,
+        account,
+        cache,
+        emit,
+    };
     while let Some(req) = rx.recv().await {
+        worker.handle(req).await;
+    }
+}
+
+/// A POP3 account's worker: there is no session to keep, every request
+/// that needs the server opens its own connection.
+struct Pop3Worker<E> {
+    account_id: u32,
+    account: AccountConfig,
+    cache: Option<Cache>,
+    emit: E,
+}
+
+impl<E: Fn(WorkerEvent)> Pop3Worker<E> {
+    /// The answer to each kind of request; most have nothing to do on POP3.
+    async fn handle(&mut self, req: MailRequest) {
+        let account_id = self.account_id;
+        let account = &self.account;
+        let cache = &self.cache;
+        let emit = &self.emit;
         match req {
             MailRequest::Locate { message_id } => {
                 // No folders to search here beyond what the cache already
@@ -104,154 +133,20 @@ pub(super) async fn run_pop3(
             }
             MailRequest::LoadMessages { folder_id, path }
             | MailRequest::SyncFolder { folder_id, path } => {
-                if path != INBOX {
-                    emit(WorkerEvent::Messages {
-                        folder_id,
-                        messages: Vec::new(),
-                    });
-                    emit(WorkerEvent::BackfillDone { folder_id });
-                    continue;
-                }
-                // Serve cache first for instant display.
-                if let Some(c) = cache.as_ref() {
-                    let cached = c.load_messages(account_id, INBOX, inbox_id);
-                    if !cached.is_empty() {
-                        emit(WorkerEvent::Messages {
-                            folder_id,
-                            messages: cached,
-                        });
-                    }
-                }
-                emit(WorkerEvent::Status(i18n("Syncing…")));
-                match pop3_sync(account_id, &account, inbox_id, cache.as_ref()).await {
-                    Ok(messages) => {
-                        let unread = messages.iter().filter(|m| m.unread).count() as u32;
-                        emit(WorkerEvent::Messages {
-                            folder_id,
-                            messages,
-                        });
-                        emit(WorkerEvent::FolderUnread {
-                            folder_id: inbox_id,
-                            unread,
-                        });
-                        // POP3 syncs the whole mailbox in one pass; no backfill
-                        // follows, so the index is complete (see the Graph path).
-                        emit(WorkerEvent::BackfillDone { folder_id });
-                    }
-                    Err(e) => {
-                        emit(WorkerEvent::net_error(i18n_f(
-                            "Could not fetch mail: {e}",
-                            &[("e", &(e).to_string())],
-                        )));
-                        emit(WorkerEvent::BackfillDone { folder_id });
-                    }
-                }
-                emit(WorkerEvent::Status(String::new()));
+                self.on_load_messages(folder_id, path).await
             }
 
             MailRequest::LoadBody {
                 message_id,
                 path: _,
                 uid,
-            } => {
-                if let Some(body) = cache
-                    .as_ref()
-                    .and_then(|c| c.load_body(account_id, INBOX, uid))
-                {
-                    emit(WorkerEvent::Body {
-                        message_id,
-                        path: INBOX.to_string(),
-                        body,
-                    });
-                    if let Some(check) = cache
-                        .as_ref()
-                        .and_then(|c| c.load_sender_check(account_id, INBOX, uid))
-                    {
-                        emit(WorkerEvent::SenderChecked {
-                            path: INBOX.to_string(),
-                            message_id,
-                            check,
-                        });
-                    }
-                    continue;
-                }
-                match pop3_fetch_raw(&account, uid).await {
-                    Ok(raw) => {
-                        let (body, check, _) = render_raw(&raw);
-                        if let Some(c) = cache.as_ref() {
-                            if body_cacheable(&check) {
-                                c.save_body(account_id, INBOX, uid, &body);
-                            }
-                            c.save_sender_check(account_id, INBOX, uid, &check);
-                        }
-                        emit(WorkerEvent::Body {
-                            message_id,
-                            path: INBOX.to_string(),
-                            body,
-                        });
-                        emit(WorkerEvent::SenderChecked {
-                            path: INBOX.to_string(),
-                            message_id,
-                            check,
-                        });
-                    }
-                    Err(e) => emit(WorkerEvent::net_error(i18n_f(
-                        "Could not load message: {e}",
-                        &[("e", &(e).to_string())],
-                    ))),
-                }
-            }
+            } => self.load_body(message_id, uid).await,
 
             // POP3 has no set fetch — RETR is one message at a time — so a batch
             // is the same work in a loop, saving only the per-message request hop.
             MailRequest::LoadBodies { items, path: _ } => {
                 for (message_id, uid) in items {
-                    if let Some(body) = cache
-                        .as_ref()
-                        .and_then(|c| c.load_body(account_id, INBOX, uid))
-                    {
-                        emit(WorkerEvent::Body {
-                            message_id,
-                            path: INBOX.to_string(),
-                            body,
-                        });
-                        if let Some(check) = cache
-                            .as_ref()
-                            .and_then(|c| c.load_sender_check(account_id, INBOX, uid))
-                        {
-                            emit(WorkerEvent::SenderChecked {
-                                path: INBOX.to_string(),
-                                message_id,
-                                check,
-                            });
-                        }
-                        continue;
-                    }
-                    match pop3_fetch_raw(&account, uid).await {
-                        Ok(raw) => {
-                            let (body, check, _) = render_raw(&raw);
-                            if let Some(c) = cache.as_ref() {
-                                if body_cacheable(&check) {
-                                    c.save_body(account_id, INBOX, uid, &body);
-                                }
-                                c.save_sender_check(account_id, INBOX, uid, &check);
-                            }
-                            emit(WorkerEvent::Body {
-                                message_id,
-                                path: INBOX.to_string(),
-                                body,
-                            });
-                            emit(WorkerEvent::SenderChecked {
-                                path: INBOX.to_string(),
-                                message_id,
-                                check,
-                            });
-                        }
-                        Err(e) => emit(WorkerEvent::net_error(i18n_f(
-                            "Could not load message: {e}",
-                            &[("e", &(e).to_string())],
-                        ))),
-                    }
+                    self.load_body(message_id, uid).await;
                 }
             }
 
@@ -259,7 +154,7 @@ pub(super) async fn run_pop3(
                 message_id: _,
                 path: _,
                 uid,
-            } => match pop3_fetch_raw(&account, uid).await {
+            } => match pop3_fetch_raw(account, uid).await {
                 Ok(raw) => emit(WorkerEvent::Source {
                     text: String::from_utf8_lossy(&raw).into_owned(),
                 }),
@@ -274,43 +169,7 @@ pub(super) async fn run_pop3(
                 path: _,
                 uid,
                 download,
-            } => {
-                if let Some(c) = cache.as_ref() {
-                    let items = c.load_attachments(account_id, INBOX, uid);
-                    if !items.is_empty() {
-                        emit(WorkerEvent::Attachments {
-                            path: INBOX.to_string(),
-                            message_id,
-                            items,
-                        });
-                        continue;
-                    }
-                }
-                if !download {
-                    emit(WorkerEvent::AttachmentsPending {
-                        path: INBOX.to_string(),
-                        message_id,
-                    });
-                    continue;
-                }
-                match pop3_fetch_raw(&account, uid).await {
-                    Ok(raw) => {
-                        let items = extract_attachments(&raw);
-                        if let Some(c) = cache.as_ref() {
-                            c.save_attachments(account_id, INBOX, uid, &items);
-                        }
-                        emit(WorkerEvent::Attachments {
-                            path: INBOX.to_string(),
-                            message_id,
-                            items,
-                        });
-                    }
-                    Err(e) => emit(WorkerEvent::net_error(i18n_f(
-                        "Could not load attachments: {e}",
-                        &[("e", &(e).to_string())],
-                    ))),
-                }
-            }
+            } => self.on_load_attachments(message_id, uid, download).await,
 
             MailRequest::SetSeen { uid, seen, .. } => {
                 if let Some(c) = cache.as_ref() {
@@ -359,7 +218,7 @@ pub(super) async fn run_pop3(
             MailRequest::MarkHam { .. } => {}
             MailRequest::MarkHamMany { .. } => emit(WorkerEvent::BulkComplete),
             MailRequest::MoveMessage { uid, .. } | MailRequest::MarkSpam { uid, .. } => {
-                match pop3_delete(&account, uid).await {
+                match pop3_delete(account, uid).await {
                     Ok(()) => {
                         if let Some(c) = cache.as_ref() {
                             c.delete_message(account_id, INBOX, uid);
@@ -375,7 +234,7 @@ pub(super) async fn run_pop3(
             MailRequest::EmptyFolder { .. } => {}
             MailRequest::MoveMessages { uids, .. } | MailRequest::PurgeMessages { uids, .. } => {
                 for uid in uids {
-                    if pop3_delete(&account, uid).await.is_ok() {
+                    if pop3_delete(account, uid).await.is_ok() {
                         if let Some(c) = cache.as_ref() {
                             c.delete_message(account_id, INBOX, uid);
                         }
@@ -406,68 +265,14 @@ pub(super) async fn run_pop3(
             }
 
             MailRequest::Send {
-                mut message,
-                ticket,
-                ..
-            } => {
-                restore_msgid_case(cache.as_ref(), &mut message);
-                match send_smtp(&account, &message).await {
-                    Ok(_) => {
-                        // Kept in the cache only: POP3 has no flags.
-                        mark_answered(
-                            &mut None,
-                            cache.as_ref(),
-                            account_id,
-                            &message.in_reply_to,
-                            &message.forwards,
-                            &emit,
-                        )
-                        .await;
-                        drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
-                        emit(WorkerEvent::Sent);
-                        emit(WorkerEvent::SendDone { ticket, sent: true });
-                    }
-                    Err(e) => {
-                        // POP3 has no Sent folder to copy to, but the message is held
-                        // exactly as it is for IMAP accounts.
-                        send_failed(
-                            cache.as_ref(),
-                            account_id,
-                            &account,
-                            &message,
-                            None,
-                            &e.to_string(),
-                            smtp_refused(&e),
-                            &emit,
-                        );
-                        emit(WorkerEvent::SendDone {
-                            ticket,
-                            sent: false,
-                        });
-                    }
-                }
-            }
+                message, ticket, ..
+            } => self.on_send(message, ticket).await,
 
-            MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
+            MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, emit),
 
-            MailRequest::DeleteOutbox { id } => {
-                delete_queued(cache.as_ref(), account_id, id, &emit)
-            }
+            MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, emit),
 
-            MailRequest::FlushOutbox { id } => {
-                let mut no_session = None;
-                flush_outbox(
-                    cache.as_ref(),
-                    account_id,
-                    &account,
-                    id,
-                    &mut no_session,
-                    &mut true,
-                    &emit,
-                    true,
-                )
-                .await;
-            }
+            MailRequest::FlushOutbox { id } => self.on_flush_outbox(id).await,
 
             // POP3 has only the inbox, whose count every sync refreshes.
             MailRequest::RefreshUnread => {}
@@ -479,7 +284,7 @@ pub(super) async fn run_pop3(
             MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
 
             MailRequest::ExportRaw { token, uid, .. } => {
-                let raw = pop3_fetch_raw(&account, uid).await;
+                let raw = pop3_fetch_raw(account, uid).await;
                 emit(WorkerEvent::RawExported { token, raw });
             }
 
@@ -496,7 +301,7 @@ pub(super) async fn run_pop3(
                 size,
                 ..
             } => strip_refused(
-                &emit,
+                emit,
                 i18n(
                     "POP3 cannot change a message on the server, so the attachment was not removed",
                 ),
@@ -505,6 +310,222 @@ pub(super) async fn run_pop3(
                 size,
             ),
         }
+    }
+
+    /// The inbox list: the cache at once, then the whole mailbox from the
+    /// server. Other folders do not exist on POP3.
+    async fn on_load_messages(&mut self, folder_id: u32, path: String) {
+        let account_id = self.account_id;
+        let account = &self.account;
+        let cache = &self.cache;
+        let emit = &self.emit;
+        if path != INBOX {
+            emit(WorkerEvent::Messages {
+                folder_id,
+                messages: Vec::new(),
+            });
+            emit(WorkerEvent::BackfillDone { folder_id });
+            return;
+        }
+        // Serve cache first for instant display.
+        if let Some(c) = cache.as_ref() {
+            let cached = c.load_messages(account_id, INBOX, INBOX_ID);
+            if !cached.is_empty() {
+                emit(WorkerEvent::Messages {
+                    folder_id,
+                    messages: cached,
+                });
+            }
+        }
+        emit(WorkerEvent::Status(i18n("Syncing…")));
+        match pop3_sync(account_id, account, INBOX_ID, cache.as_ref()).await {
+            Ok(messages) => {
+                let unread = messages.iter().filter(|m| m.unread).count() as u32;
+                emit(WorkerEvent::Messages {
+                    folder_id,
+                    messages,
+                });
+                emit(WorkerEvent::FolderUnread {
+                    folder_id: INBOX_ID,
+                    unread,
+                });
+                // POP3 syncs the whole mailbox in one pass; no backfill
+                // follows, so the index is complete (see the Graph path).
+                emit(WorkerEvent::BackfillDone { folder_id });
+            }
+            Err(e) => {
+                emit(WorkerEvent::net_error(i18n_f(
+                    "Could not fetch mail: {e}",
+                    &[("e", &(e).to_string())],
+                )));
+                emit(WorkerEvent::BackfillDone { folder_id });
+            }
+        }
+        emit(WorkerEvent::Status(String::new()));
+    }
+
+    /// One message's body: from the cache, or downloaded in full, rendered
+    /// and cached.
+    async fn load_body(&mut self, message_id: u32, uid: u32) {
+        let account_id = self.account_id;
+        let account = &self.account;
+        let cache = &self.cache;
+        let emit = &self.emit;
+        if let Some(body) = cache
+            .as_ref()
+            .and_then(|c| c.load_body(account_id, INBOX, uid))
+        {
+            emit(WorkerEvent::Body {
+                message_id,
+                path: INBOX.to_string(),
+                body,
+            });
+            if let Some(check) = cache
+                .as_ref()
+                .and_then(|c| c.load_sender_check(account_id, INBOX, uid))
+            {
+                emit(WorkerEvent::SenderChecked {
+                    path: INBOX.to_string(),
+                    message_id,
+                    check,
+                });
+            }
+            return;
+        }
+        match pop3_fetch_raw(account, uid).await {
+            Ok(raw) => {
+                let (body, check, _) = render_raw(&raw);
+                if let Some(c) = cache.as_ref() {
+                    if body_cacheable(&check) {
+                        c.save_body(account_id, INBOX, uid, &body);
+                    }
+                    c.save_sender_check(account_id, INBOX, uid, &check);
+                }
+                emit(WorkerEvent::Body {
+                    message_id,
+                    path: INBOX.to_string(),
+                    body,
+                });
+                emit(WorkerEvent::SenderChecked {
+                    path: INBOX.to_string(),
+                    message_id,
+                    check,
+                });
+            }
+            Err(e) => emit(WorkerEvent::net_error(i18n_f(
+                "Could not load message: {e}",
+                &[("e", &(e).to_string())],
+            ))),
+        }
+    }
+
+    /// A message's attachments, from the cache or, when the user asked, the
+    /// server.
+    async fn on_load_attachments(&mut self, message_id: u32, uid: u32, download: bool) {
+        let account_id = self.account_id;
+        let account = &self.account;
+        let cache = &self.cache;
+        let emit = &self.emit;
+        if let Some(c) = cache.as_ref() {
+            let items = c.load_attachments(account_id, INBOX, uid);
+            if !items.is_empty() {
+                emit(WorkerEvent::Attachments {
+                    path: INBOX.to_string(),
+                    message_id,
+                    items,
+                });
+                return;
+            }
+        }
+        if !download {
+            emit(WorkerEvent::AttachmentsPending {
+                path: INBOX.to_string(),
+                message_id,
+            });
+            return;
+        }
+        match pop3_fetch_raw(account, uid).await {
+            Ok(raw) => {
+                let items = extract_attachments(&raw);
+                if let Some(c) = cache.as_ref() {
+                    c.save_attachments(account_id, INBOX, uid, &items);
+                }
+                emit(WorkerEvent::Attachments {
+                    path: INBOX.to_string(),
+                    message_id,
+                    items,
+                });
+            }
+            Err(e) => emit(WorkerEvent::net_error(i18n_f(
+                "Could not load attachments: {e}",
+                &[("e", &(e).to_string())],
+            ))),
+        }
+    }
+
+    /// Send through SMTP; POP3 has no Sent folder, and an answered mark
+    /// is kept in the cache only.
+    async fn on_send(&mut self, mut message: Box<OutgoingMessage>, ticket: u64) {
+        let account_id = self.account_id;
+        let account = &self.account;
+        let cache = &self.cache;
+        let emit = &self.emit;
+        restore_msgid_case(cache.as_ref(), &mut message);
+        match send_smtp(account, &message).await {
+            Ok(_) => {
+                // Kept in the cache only: POP3 has no flags.
+                mark_answered(
+                    &mut None,
+                    cache.as_ref(),
+                    account_id,
+                    &message.in_reply_to,
+                    &message.forwards,
+                    emit,
+                )
+                .await;
+                drop_superseded_outbox(cache.as_ref(), account_id, &message, emit);
+                emit(WorkerEvent::Sent);
+                emit(WorkerEvent::SendDone { ticket, sent: true });
+            }
+            Err(e) => {
+                // POP3 has no Sent folder to copy to, but the message is held
+                // exactly as it is for IMAP accounts.
+                send_failed(
+                    cache.as_ref(),
+                    account_id,
+                    account,
+                    &message,
+                    None,
+                    &e.to_string(),
+                    smtp_refused(&e),
+                    emit,
+                );
+                emit(WorkerEvent::SendDone {
+                    ticket,
+                    sent: false,
+                });
+            }
+        }
+    }
+
+    /// Try the Outbox now, one message or all of them.
+    async fn on_flush_outbox(&mut self, id: Option<u32>) {
+        let account_id = self.account_id;
+        let account = &self.account;
+        let cache = &self.cache;
+        let emit = &self.emit;
+        let mut no_session = None;
+        flush_outbox(
+            cache.as_ref(),
+            account_id,
+            account,
+            id,
+            &mut no_session,
+            &mut true,
+            emit,
+            true,
+        )
+        .await;
     }
 }
 
@@ -516,7 +537,6 @@ async fn pop3_sync(
     inbox_id: u32,
     cache: Option<&Cache>,
 ) -> Result<Vec<Message>, String> {
-    const INBOX: &str = "INBOX";
     let mut pop = Pop3::connect(account).await?;
     pop.login(&account.username, &sign_in_password(account, false).await?)
         .await?;
