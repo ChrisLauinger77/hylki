@@ -150,7 +150,7 @@ pub(crate) struct Compose {
     pub(super) send_at: Option<i64>,
     /// Cloud attachments (#144): the accounts files can be uploaded to, the
     /// links already placed in the body, and how many uploads are running.
-    pub(super) cloud_accounts: Vec<crate::cloud::CloudAccount>,
+    pub(super) cloud_accounts: Vec<crate::services::cloud::CloudAccount>,
     pub(super) cloud_links: Vec<CloudLink>,
     pub(super) cloud_busy: u32,
     /// Download passwords made for this message's links, to pass on

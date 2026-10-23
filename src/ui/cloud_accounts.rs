@@ -9,8 +9,8 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::cloud::{self, CloudAccount, CloudKind};
 use crate::i18n::{i18n, i18n_f};
+use crate::services::cloud::{self, CloudAccount, CloudKind};
 
 mod editor;
 

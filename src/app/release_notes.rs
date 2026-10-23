@@ -221,7 +221,7 @@ fn md_label(text: &str, classes: &[&str]) -> gtk::Label {
         label.add_css_class(class);
     }
     label.connect_activate_link(|_, uri| {
-        crate::oauth::open_uri(uri);
+        crate::services::oauth::open_uri(uri);
         gtk::glib::Propagation::Stop
     });
     label

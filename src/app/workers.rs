@@ -738,7 +738,7 @@ impl AppModel {
 /// debounces signal bursts and snapshots GOA on its own thread;
 /// reconciliation happens on GoaChanged.
 pub(super) fn watch_system_events(sender: &ComponentSender<AppModel>) {
-    crate::goa::watch_changes({
+    crate::services::goa::watch_changes({
         let s = sender.input_sender().clone();
         move |state| {
             let _ = s.send(AppMsg::GoaChanged(state));

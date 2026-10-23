@@ -304,7 +304,7 @@ fn list_own() -> Vec<Source> {
         .iter()
         .map(|(_, uid, data)| (uid.clone(), data.clone()))
         .collect();
-    let online = crate::goa::contacts_accounts();
+    let online = crate::services::goa::contacts_accounts();
     let carddav: HashMap<String, crate::contacts::carddav::Account> =
         crate::contacts::carddav::list()
             .unwrap_or_default()
@@ -465,7 +465,7 @@ fn online_source(
     books: Vec<Book>,
     on: bool,
     all_eds_off: bool,
-    goa: Option<&crate::goa::GoaContactsAccount>,
+    goa: Option<&crate::services::goa::GoaContactsAccount>,
     names: [String; 2],
     sources: &HashMap<String, String>,
 ) -> Source {

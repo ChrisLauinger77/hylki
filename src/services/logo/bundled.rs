@@ -30,7 +30,7 @@ pub(super) struct LogoEntry {
 fn bundled_map() -> &'static HashMap<String, LogoEntry> {
     static MAP: OnceLock<HashMap<String, LogoEntry>> = OnceLock::new();
     MAP.get_or_init(|| {
-        let file: LogoFile = match toml::from_str(include_str!("../../data/logos/logos.toml")) {
+        let file: LogoFile = match toml::from_str(include_str!("../../../data/logos/logos.toml")) {
             Ok(f) => f,
             Err(e) => {
                 tracing::warn!("bundled logo map unreadable: {e}");
@@ -216,7 +216,7 @@ pub(super) fn looks_like_svg(bytes: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logo::known_missing;
+    use crate::services::logo::known_missing;
 
     #[test]
     fn an_svg_is_reframed_to_a_square_and_keeps_its_root_attributes() {

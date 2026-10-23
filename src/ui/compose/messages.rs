@@ -41,21 +41,21 @@ pub(crate) enum ComposeInput {
     /// file.
     CloudUpload {
         paths: Vec<std::path::PathBuf>,
-        account: crate::cloud::CloudAccount,
+        account: crate::services::cloud::CloudAccount,
         link_password: Option<String>,
     },
     /// [`ComposeInput::CloudUpload`] with the account's sign-in read from the
     /// keyring (`None`: not there).
     CloudUploadSignedIn {
         paths: Vec<std::path::PathBuf>,
-        account: crate::cloud::CloudAccount,
+        account: crate::services::cloud::CloudAccount,
         link_password: Option<String>,
         password: Option<String>,
     },
     /// One upload finished (in a thread): the link, or why not.
     CloudUploaded {
         name: String,
-        result: Result<crate::cloud::ShareResult, String>,
+        result: Result<crate::services::cloud::ShareResult, String>,
     },
     /// Take a link back out of the body.
     RemoveCloudLink(usize),

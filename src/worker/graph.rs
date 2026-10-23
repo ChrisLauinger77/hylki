@@ -45,7 +45,7 @@ use crate::worker::outbox::{delete_queued, emit_outbox};
 fn name_labels(account: &AccountConfig, emit: &impl Fn(WorkerEvent), mut ev: WorkerEvent) {
     if let WorkerEvent::SenderChecked { check, .. } = &mut ev {
         if let Some(label) = check.label.as_mut() {
-            crate::graph_labels::fill(account, label);
+            crate::services::graph_labels::fill(account, label);
         }
     }
     emit(ev)

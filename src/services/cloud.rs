@@ -181,7 +181,7 @@ fn generate_password() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cloud::onedrive::onedrive_item;
+    use crate::services::cloud::onedrive::onedrive_item;
 
     #[test]
     fn sizes_read_well() {

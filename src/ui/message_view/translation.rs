@@ -33,7 +33,7 @@ impl MessageView {
     pub(super) fn translate_inner_html(
         &self,
         m: &Message,
-        settings: &crate::translate::Settings,
+        settings: &crate::services::translate::Settings,
     ) -> String {
         let key = (m.account_id, m.id);
         let button = |label: &str| {
@@ -50,7 +50,7 @@ impl MessageView {
                 escape_html(text)
             )
         };
-        let name = crate::translate::language_name;
+        let name = crate::services::translate::language_name;
         match self.translations.get(&key) {
             Some(TrState::Working) => line(&i18n("Translating…"), String::new()),
             Some(TrState::Failed(why)) => line(
@@ -82,7 +82,12 @@ impl MessageView {
                     return String::new();
                 }
                 match self.detected_language(m) {
-                    Some(lang) if crate::translate::differs(&lang, &settings.target_language()) => {
+                    Some(lang)
+                        if crate::services::translate::differs(
+                            &lang,
+                            &settings.target_language(),
+                        ) =>
+                    {
                         line(
                             &i18n_f(
                                 "This message is in {language}.",
@@ -105,7 +110,7 @@ impl MessageView {
                 return lang.clone();
             }
         }
-        let lang = crate::translate::detect(&crate::mail::reader::extract(&m.body));
+        let lang = crate::services::translate::detect(&crate::mail::reader::extract(&m.body));
         self.detected
             .borrow_mut()
             .insert(key, (m.body.len(), lang.clone()));
@@ -138,7 +143,7 @@ impl MessageView {
         else {
             return;
         };
-        let html = self.translate_inner_html(m, &crate::translate::load());
+        let html = self.translate_inner_html(m, &crate::services::translate::load());
         let js = format!(
             "(function(){{var d=document.querySelector('.hylki-tr[data-key=\"{account_id}:{id}\"]');\
              if(d)d.innerHTML={};}})()",

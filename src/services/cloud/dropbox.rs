@@ -24,7 +24,7 @@ pub(crate) fn dropbox_client_id(account: &CloudAccount) -> String {
     if !own.is_empty() {
         return own.to_string();
     }
-    crate::oauth::provider_credentials("dropbox").0
+    crate::services::oauth::provider_credentials("dropbox").0
 }
 
 fn dropbox_settings(account: &CloudAccount) -> crate::config::OAuthSettings {
@@ -46,9 +46,9 @@ pub(crate) fn dropbox_connect(account: &CloudAccount) -> Result<(String, String,
     if settings.client_id.is_empty() {
         return Err("Enter the app key of a Dropbox app first.".to_string());
     }
-    let flow =
-        crate::oauth::run_flow(&settings).map_err(|e| format!("Dropbox sign-in failed: {e}"))?;
-    let access = crate::oauth::refresh_access_token(&settings, &flow.refresh_token)
+    let flow = crate::services::oauth::run_flow(&settings)
+        .map_err(|e| format!("Dropbox sign-in failed: {e}"))?;
+    let access = crate::services::oauth::refresh_access_token(&settings, &flow.refresh_token)
         .map_err(|e| format!("Dropbox sign-in failed: {e}"))?
         .access_token;
     let (email, name) = dropbox_whoami(&access)?;
@@ -72,7 +72,7 @@ pub(super) fn dropbox_access(account: &CloudAccount, refresh: &str) -> Result<St
             "The Dropbox app key is missing: open the account's settings and enter it.".to_string(),
         );
     }
-    let tok = crate::oauth::refresh_access_token(&settings, refresh)
+    let tok = crate::services::oauth::refresh_access_token(&settings, refresh)
         .map_err(|e| format!("Dropbox refused the sign-in ({e}). Open Settings, Cloud Storage, and connect the account again."))?
         .access_token;
     if let Ok(mut g) = DROPBOX_ACCESS.lock() {

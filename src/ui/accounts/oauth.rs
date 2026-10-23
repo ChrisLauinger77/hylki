@@ -31,9 +31,13 @@ fn sign_in(
                     let r = tokio::task::spawn_blocking(move || {
                         let (request, code) = answer?;
                         let refresh =
-                            crate::oauth::exchange_code(&settings, &request, &code)?.refresh_token;
-                        let (name, address, refresh) =
-                            crate::oauth::microsoft_whoami(&settings, &refresh, user.as_deref())?;
+                            crate::services::oauth::exchange_code(&settings, &request, &code)?
+                                .refresh_token;
+                        let (name, address, refresh) = crate::services::oauth::microsoft_whoami(
+                            &settings,
+                            &refresh,
+                            user.as_deref(),
+                        )?;
                         Ok((refresh, Some((name, address))))
                     })
                     .await
@@ -47,12 +51,12 @@ fn sign_in(
     sender.oneshot_command(async move {
         let r = tokio::task::spawn_blocking(move || {
             let hint = user.as_deref().filter(|_| hint);
-            let refresh = crate::oauth::run_flow_as(&settings, hint)?.refresh_token;
+            let refresh = crate::services::oauth::run_flow_as(&settings, hint)?.refresh_token;
             // Microsoft says who signed in, so the account is named
             // for the mailbox reached (#329).
             if settings.token_url.contains("microsoftonline") {
                 let (name, address, refresh) =
-                    crate::oauth::microsoft_whoami(&settings, &refresh, None)?;
+                    crate::services::oauth::microsoft_whoami(&settings, &refresh, None)?;
                 return Ok((refresh, Some((name, address))));
             }
             Ok((refresh, None))
@@ -145,9 +149,9 @@ impl AccountsWindow {
     ) -> OAuthSettings {
         let provider = provider_at(widgets.form.provider_row.selected()).oauth_name();
         if let Some(name) = provider {
-            let p = crate::oauth::preset(name)
+            let p = crate::services::oauth::preset(name)
                 .expect("oauth_name only names providers oauth has a preset for");
-            let (client_id, client_secret) = crate::oauth::provider_credentials(name);
+            let (client_id, client_secret) = crate::services::oauth::provider_credentials(name);
             let mut settings = OAuthSettings {
                 auth_url: p.auth_url.to_string(),
                 token_url: p.token_url.to_string(),
@@ -157,7 +161,7 @@ impl AccountsWindow {
                 redirect_uri: String::new(),
             };
             if name == "microsoft" {
-                crate::oauth::microsoft_advanced(
+                crate::services::oauth::microsoft_advanced(
                     &mut settings,
                     &trimmed(&widgets.form.ms_client_row),
                     &trimmed(&widgets.form.ms_tenant_row),
@@ -167,12 +171,13 @@ impl AccountsWindow {
                 // Built from the preset, the scopes would lose the
                 // directory's at the next sign-in or refresh (#410).
                 if self.directory_granted {
-                    settings.scopes = crate::oauth::with_directory_scopes(&settings.scopes);
+                    settings.scopes =
+                        crate::services::oauth::with_directory_scopes(&settings.scopes);
                 }
                 if self.labels_granted {
-                    settings.scopes = crate::oauth::with_scopes(
+                    settings.scopes = crate::services::oauth::with_scopes(
                         &settings.scopes,
-                        &crate::oauth::MICROSOFT_LABEL_SCOPES,
+                        &crate::services::oauth::MICROSOFT_LABEL_SCOPES,
                     );
                 }
             }
@@ -245,7 +250,7 @@ impl AccountsWindow {
         if settings.client_id.trim().is_empty() || !settings.token_url.contains("microsoftonline") {
             return;
         }
-        settings.scopes = crate::oauth::with_directory_scopes(&settings.scopes);
+        settings.scopes = crate::services::oauth::with_directory_scopes(&settings.scopes);
         widgets.form.graph_directory_row.set_sensitive(false);
         widgets.form.oauth_signin_btn.set_sensitive(false);
         widgets.form.graph_status.set_visible(true);
@@ -291,8 +296,10 @@ impl AccountsWindow {
         if settings.client_id.trim().is_empty() || !settings.token_url.contains("microsoftonline") {
             return;
         }
-        settings.scopes =
-            crate::oauth::with_scopes(&settings.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES);
+        settings.scopes = crate::services::oauth::with_scopes(
+            &settings.scopes,
+            &crate::services::oauth::MICROSOFT_LABEL_SCOPES,
+        );
         widgets.form.graph_labels_row.set_sensitive(false);
         widgets.form.oauth_signin_btn.set_sensitive(false);
         widgets.form.graph_status.set_visible(true);

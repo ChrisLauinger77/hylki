@@ -13,7 +13,7 @@ use crate::encoding::base64_encode;
 
 /// The Hylki app icon, embedded so the success page needs no external resources.
 const ICON_PNG: &[u8] =
-    include_bytes!("../../data/icons/hicolor/256x256/apps/co.hyprlab.Hylki.png");
+    include_bytes!("../../../data/icons/hicolor/256x256/apps/co.hyprlab.Hylki.png");
 
 /// Branded sign-in success page. `__ICON__` is replaced with the app icon (as a
 /// data URI) at runtime by [`success_page`]. Self-contained (inline CSS/SVG,

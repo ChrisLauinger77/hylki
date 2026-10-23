@@ -17,7 +17,7 @@ struct EditorRows {
     code: adw::EntryRow,
     seafile_hint: gtk::Label,
     /// GNOME Online Accounts' file accounts (OneDrive).
-    goa_accounts: Vec<crate::goa::GoaFilesAccount>,
+    goa_accounts: Vec<crate::services::goa::GoaFilesAccount>,
     goa_row: adw::ComboRow,
     goa_hint: gtk::Label,
     app_key: adw::EntryRow,
@@ -116,7 +116,7 @@ impl EditorRows {
         seafile_hint.set_margin_start(12);
         seafile_hint.set_margin_end(12);
         // OneDrive: which GNOME Online Accounts account.
-        let goa_accounts = crate::goa::list_files_accounts();
+        let goa_accounts = crate::services::goa::list_files_accounts();
         let goa_row = adw::ComboRow::new();
         goa_row.set_title(&i18n("Online account"));
         let goa_hint = gtk::Label::new(None);
@@ -293,7 +293,7 @@ pub(super) fn build_editor(
 
     // The GOA accounts the picker currently lists (those of the kind's
     // provider), in row order.
-    let goa_listed: Rc<RefCell<Vec<crate::goa::GoaFilesAccount>>> =
+    let goa_listed: Rc<RefCell<Vec<crate::services::goa::GoaFilesAccount>>> =
         Rc::new(RefCell::new(Vec::new()));
     let fill_goa = {
         let (goa_row, goa_hint, goa_accounts, goa_listed) = (
@@ -307,7 +307,7 @@ pub(super) fn build_editor(
             let Some(provider) = k.goa_provider() else {
                 return;
             };
-            let listed: Vec<crate::goa::GoaFilesAccount> = goa_accounts
+            let listed: Vec<crate::services::goa::GoaFilesAccount> = goa_accounts
                 .iter()
                 .filter(|a| a.provider_type == provider)
                 .cloned()
@@ -465,7 +465,7 @@ pub(super) fn build_editor(
                     check.set_label(&i18n("Connect with Dropbox…"));
                     app_key_hint.set_label(&i18n_f(
                         "Dropbox needs an app registered to you:\n1. At dropbox.com/developers/apps, press Create app.\n2. Choose Scoped access, then App folder or Full Dropbox.\n3. Give it a name no one else has used and press Create app.\n4. On Permissions, tick account_info.read, files.content.write and sharing.write, then press Submit.\n5. On Settings, under OAuth 2, add the redirect URI {uri} and press Add.\n6. Copy the App key into the field above.\nDevelopment status is enough. Leave the field empty to use this build's own key, if it has one.",
-                        &[("uri", &format!("http://localhost:{}/", crate::oauth::DROPBOX_REDIRECT_PORT))],
+                        &[("uri", &format!("http://localhost:{}/", crate::services::oauth::DROPBOX_REDIRECT_PORT))],
                     ));
                 }
             }

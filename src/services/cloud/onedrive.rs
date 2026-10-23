@@ -5,7 +5,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use crate::graph_api::{bearer, GRAPH_BASE};
+use crate::services::graph_api::{bearer, GRAPH_BASE};
 
 use super::http::{read_chunk, short_error, status_error, Wording};
 use super::{expiry, local_file, share_password, CloudAccount, LinkTerms, ShareResult};
@@ -54,7 +54,7 @@ pub(super) fn goa_token(account: &CloudAccount) -> Result<String, String> {
     if id.is_empty() {
         return Err("The account is not linked to a GNOME Online Accounts account: open its settings and choose one.".to_string());
     }
-    crate::goa::oauth_token(id).ok_or_else(|| {
+    crate::services::goa::oauth_token(id).ok_or_else(|| {
         "GNOME Online Accounts gave no token for the account. Check it under Settings, Online Accounts; it may need signing in again.".to_string()
     })
 }

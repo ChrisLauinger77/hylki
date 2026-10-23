@@ -1,6 +1,6 @@
 //! Sender-avatar loading and caching. Local GNOME Contacts / CardDAV photos are
 //! preferred. Gravatar is an optional fallback and is only queried when enabled.
-//! Below both sit the sender's domain icon (`crate::logo`, also opt-in) and the
+//! Below both sit the sender's domain icon (`crate::services::logo`, also opt-in) and the
 //! UI's colored-initials fallback; `message_row::find_face` walks the chain.
 //!
 //! Privacy note: local contact photos are read from Evolution Data Server's

@@ -56,7 +56,9 @@ pub(super) fn reload_contacts(sender: &ComponentSender<AppModel>, delay_ms: u64)
             return;
         }
         let contacts = crate::contacts::read_contact_details();
-        crate::avatar::retain_photo_thumbnails(&contacts.iter().map(|c| c.photo_key).collect());
+        crate::services::avatar::retain_photo_thumbnails(
+            &contacts.iter().map(|c| c.photo_key).collect(),
+        );
         s.input(AppMsg::ContactsLoaded(contacts));
         s.input(AppMsg::ContactBooksLoaded {
             books: crate::contacts::writable_books(),

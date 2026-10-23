@@ -19,7 +19,7 @@ use relm4::prelude::*;
 #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 fn cloud_upload_dialog(
     parent: Option<&gtk::Window>,
-    accounts: &[crate::cloud::CloudAccount],
+    accounts: &[crate::services::cloud::CloudAccount],
     paths: Vec<std::path::PathBuf>,
     sender: relm4::Sender<ComposeInput>,
 ) {
@@ -179,7 +179,7 @@ impl Compose {
     pub(super) fn on_cloud_upload(
         &mut self,
         paths: Vec<std::path::PathBuf>,
-        account: crate::cloud::CloudAccount,
+        account: crate::services::cloud::CloudAccount,
         link_password: Option<String>,
         sender: &ComponentSender<Self>,
     ) {
@@ -214,7 +214,7 @@ impl Compose {
     pub(super) fn on_cloud_upload_signed_in(
         &mut self,
         paths: Vec<std::path::PathBuf>,
-        account: crate::cloud::CloudAccount,
+        account: crate::services::cloud::CloudAccount,
         link_password: Option<String>,
         password: String,
         widgets: &ComposeWidgets,
@@ -230,7 +230,8 @@ impl Compose {
             let s = sender.input_sender().clone();
             let (a, pw, lp) = (account.clone(), password.clone(), link_password.clone());
             std::thread::spawn(move || {
-                let result = crate::cloud::upload_and_share(&a, &pw, &path, lp.as_deref());
+                let result =
+                    crate::services::cloud::upload_and_share(&a, &pw, &path, lp.as_deref());
                 let _ = s.send(ComposeInput::CloudUploaded { name, result });
             });
         }
@@ -240,7 +241,7 @@ impl Compose {
     pub(super) fn on_cloud_uploaded(
         &mut self,
         name: String,
-        result: Result<crate::cloud::ShareResult, String>,
+        result: Result<crate::services::cloud::ShareResult, String>,
         widgets: &ComposeWidgets,
         sender: &ComponentSender<Self>,
         root: &adw::BreakpointBin,

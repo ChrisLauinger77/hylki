@@ -108,10 +108,10 @@ impl AppModel {
     /// not only in the sidebar. Refreshed with the sidebar, which is rebuilt
     /// whenever the accounts change.
     pub(super) fn refresh_own_faces(&self) {
-        crate::avatar::set_faces_on_own_mail(self.own_mailbox_face);
-        let mut faces: Vec<(String, crate::avatar::OwnFace)> = Vec::new();
+        crate::services::avatar::set_faces_on_own_mail(self.own_mailbox_face);
+        let mut faces: Vec<(String, crate::services::avatar::OwnFace)> = Vec::new();
         for (i, cfg) in self.effective_config().iter().enumerate() {
-            let face = crate::avatar::OwnFace {
+            let face = crate::services::avatar::OwnFace {
                 gravatar: cfg.gravatar,
                 picture: cfg.avatar.as_deref().and_then(config::avatar_path),
                 emoji: cfg.emoji.clone().filter(|e| !e.trim().is_empty()),
@@ -134,7 +134,7 @@ impl AppModel {
                     .map(|address| (address, face.clone())),
             );
         }
-        crate::avatar::set_own_faces(faces);
+        crate::services::avatar::set_own_faces(faces);
     }
 
     /// Redraw the faces on screen after what a mailbox shows has changed
@@ -164,12 +164,12 @@ impl AppModel {
                     .map(|al| config::split_identity(&al.identity).1),
             );
             for address in addresses.filter(|a| !a.trim().is_empty()) {
-                if !crate::avatar::wants_own_gravatar(&address) {
+                if !crate::services::avatar::wants_own_gravatar(&address) {
                     continue;
                 }
                 let back = sender.input_sender().clone();
                 std::thread::spawn(move || {
-                    let outcome = crate::avatar::fetch_own_gravatar(&address);
+                    let outcome = crate::services::avatar::fetch_own_gravatar(&address);
                     let _ = back.send(AppMsg::OwnGravatarFetched {
                         email: address,
                         outcome,
@@ -241,7 +241,7 @@ impl AppModel {
         match msg {
             AppMsg::OwnGravatarFetched { email, outcome } => {
                 // Nothing to redraw unless the address turned out to have one.
-                if crate::avatar::cache_own_gravatar(&email, outcome) {
+                if crate::services::avatar::cache_own_gravatar(&email, outcome) {
                     self.rebuild_sidebar();
                     self.refresh_faces();
                 }

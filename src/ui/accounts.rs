@@ -149,7 +149,7 @@ pub(crate) struct AccountsWindow {
     /// from the email until the user customizes it.
     label_synced: String,
     /// GNOME Online Accounts mail accounts available to import (not yet in Hylki).
-    goa: Vec<crate::goa::GoaMailAccount>,
+    goa: Vec<crate::services::goa::GoaMailAccount>,
     /// Refresh token captured from a successful OAuth sign-in, applied on save.
     pending_oauth_refresh: Option<String>,
     /// Counts the times the editor opened, so a keyring answer for an

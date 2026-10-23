@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::config::OAuthSettings;
-use crate::graph_api::{bearer, GRAPH_BASE};
+use crate::services::graph_api::{bearer, GRAPH_BASE};
 
 use super::flow::Authorization;
 
@@ -123,7 +123,7 @@ pub(crate) fn refresh_access_token_as(
         form.push(("client_secret", &settings.client_secret));
     }
     let mut post = ureq::post(&settings.token_url);
-    if let Some(cookie) = crate::ms_broker::sso_cookie(settings, user) {
+    if let Some(cookie) = crate::services::ms_broker::sso_cookie(settings, user) {
         post = post.set(&cookie.name, &cookie.value);
     }
     let token: TokenResponse = post

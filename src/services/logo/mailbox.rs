@@ -171,8 +171,8 @@ pub(crate) fn is_mailbox_domain(domain: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logo::bundled::has_bundled;
-    use crate::logo::{known_missing, wants_refresh};
+    use crate::services::logo::bundled::has_bundled;
+    use crate::services::logo::{known_missing, wants_refresh};
 
     /// A person on a freemail provider is a person, not the provider: no
     /// mark from any source, and nothing to fetch or refresh.

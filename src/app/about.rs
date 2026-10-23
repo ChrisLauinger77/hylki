@@ -159,7 +159,7 @@ fn about_links(page: &gtk::Box) {
         row.set_tooltip_text(Some(url));
         row.add_suffix(&gtk::Image::from_icon_name("adw-external-link-symbolic"));
         let u = url.to_string();
-        row.connect_activated(move |_| crate::oauth::open_uri(&u));
+        row.connect_activated(move |_| crate::services::oauth::open_uri(&u));
         row
     };
     links.append(&mk_row(&i18n("Website"), "https://hylki.hyprlab.co"));
@@ -188,7 +188,9 @@ fn about_links(page: &gtk::Box) {
     cup.add_css_class("about-coffee");
     coffee.add_prefix(&cup);
     coffee.add_suffix(&gtk::Image::from_icon_name("adw-external-link-symbolic"));
-    coffee.connect_activated(move |_| crate::oauth::open_uri("https://buymeacoffee.com/hyprlab"));
+    coffee.connect_activated(move |_| {
+        crate::services::oauth::open_uri("https://buymeacoffee.com/hyprlab")
+    });
     links.append(&coffee);
     page.append(&links);
 }
@@ -218,7 +220,7 @@ fn about_thanks(page: &gtk::Box) {
             let url = format!("https://github.com/{handle}");
             row.set_tooltip_text(Some(&url));
             row.add_suffix(&gtk::Image::from_icon_name("adw-external-link-symbolic"));
-            row.connect_activated(move |_| crate::oauth::open_uri(&url));
+            row.connect_activated(move |_| crate::services::oauth::open_uri(&url));
             list.append(&row);
         }
         list

@@ -6,12 +6,10 @@
 
 mod app;
 mod app_icon;
-mod avatar;
 mod backend;
 mod background;
 mod brand;
 mod cache;
-mod cloud;
 mod color;
 mod config;
 mod console_log;
@@ -19,32 +17,26 @@ mod contacts;
 mod datefmt;
 mod desktop;
 mod encoding;
-mod goa;
-mod graph_api;
-mod graph_labels;
 mod i18n;
 mod icon_theme;
 mod launcher_badge;
 mod legacy;
-mod logo;
 mod mail;
 mod memory_report;
 mod models;
-mod ms_broker;
 mod nautilus_ext;
 mod notify;
-mod oauth;
 mod platform;
 mod power;
 mod ram_cache;
 mod rng;
+mod services;
 mod single_instance;
 mod spell;
 mod startup;
 mod text_scale;
 mod theme;
 mod theme_palettes;
-mod translate;
 mod ui;
 mod web_fonts;
 mod worker;
@@ -201,7 +193,7 @@ fn start_logo_probe() {
     if let Ok(list) = std::env::var("HYLKI_LOGO_PROBE") {
         std::thread::spawn(move || {
             for email in list.split(',').map(str::trim).filter(|e| !e.is_empty()) {
-                tracing::info!("logo probe {email}: {}", logo::probe(email));
+                tracing::info!("logo probe {email}: {}", services::logo::probe(email));
             }
         });
     }
@@ -337,7 +329,7 @@ fn register_resources() {
         Ok(resource) => gio::resources_register(&resource),
         Err(e) => tracing::error!("failed to register bundled icon resources: {e}"),
     }
-    // The bundled sender logos (see src/logo.rs), under
+    // The bundled sender logos (see src/services/logo.rs), under
     // /co/hyprlab/Hylki/logos/<source>/<file>.
     let logos =
         glib::Bytes::from_static(include_bytes!(concat!(env!("OUT_DIR"), "/logos.gresource")));

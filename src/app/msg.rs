@@ -737,7 +737,7 @@ pub(crate) enum AppMsg {
     /// A Gravatar one of the accounts asked for came back (#189).
     OwnGravatarFetched {
         email: String,
-        outcome: crate::avatar::FetchOutcome,
+        outcome: crate::services::avatar::FetchOutcome,
     },
 
     // ---- on_reader_toolbar (reader_toolbar.rs) ----
@@ -1092,7 +1092,7 @@ pub(crate) enum AppMsg {
     /// GNOME Online Accounts changed on the session bus. Carries the fresh live
     /// state, already fetched (debounced) on the watcher thread so the GTK main
     /// thread never does D-Bus I/O — re-reconcile against it.
-    GoaChanged(crate::goa::GoaLiveState),
+    GoaChanged(crate::services::goa::GoaLiveState),
     /// A worker reported its account: add it, or update the one listed.
     SetAccount(Account),
 

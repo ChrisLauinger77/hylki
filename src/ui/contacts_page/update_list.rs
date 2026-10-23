@@ -437,7 +437,7 @@ impl ContactsPage {
             row.show_photo();
         }
         self.decoding
-            .retain(|key| crate::avatar::photo_thumbnail(*key).is_none());
+            .retain(|key| crate::services::avatar::photo_thumbnail(*key).is_none());
         Flow::Continue(())
     }
 }

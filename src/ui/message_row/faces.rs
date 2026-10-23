@@ -21,8 +21,8 @@ enum FaceCmd {
     Avatar {
         email: String,
         generation: u64,
-        mode: crate::avatar::FetchMode,
-        outcome: crate::avatar::FetchOutcome,
+        mode: crate::services::avatar::FetchMode,
+        outcome: crate::services::avatar::FetchOutcome,
         logo: Option<Option<Vec<u8>>>,
     },
     /// A logo-only lookup — the avatar tiers had already answered from cache.
@@ -34,23 +34,24 @@ enum FaceCmd {
 
 /// Run the avatar tiers off the main thread, falling through to the domain icon
 /// when they come up empty and `want_logo` says the switch is on. `generation`
-/// and `mode` come from [`crate::avatar::lookup`] and ride along so the result
+/// and `mode` come from [`crate::services::avatar::lookup`] and ride along so the result
 /// can be cached against the EDS state that was actually queried.
 async fn find_face(
     email: String,
     generation: u64,
-    mode: crate::avatar::FetchMode,
+    mode: crate::services::avatar::FetchMode,
     want_logo: bool,
 ) -> FaceCmd {
     let lookup_email = email.clone();
     let result = tokio::task::spawn_blocking(move || {
-        let outcome = crate::avatar::fetch(&lookup_email, mode);
-        let logo = (want_logo && !matches!(outcome, crate::avatar::FetchOutcome::Found(_)))
-            .then(|| crate::logo::fetch(&lookup_email));
+        let outcome = crate::services::avatar::fetch(&lookup_email, mode);
+        let logo = (want_logo
+            && !matches!(outcome, crate::services::avatar::FetchOutcome::Found(_)))
+        .then(|| crate::services::logo::fetch(&lookup_email));
         (outcome, logo)
     })
     .await;
-    let (outcome, logo) = result.unwrap_or((crate::avatar::FetchOutcome::Retry, None));
+    let (outcome, logo) = result.unwrap_or((crate::services::avatar::FetchOutcome::Retry, None));
     FaceCmd::Avatar {
         email,
         generation,
@@ -63,7 +64,7 @@ async fn find_face(
 /// Fetch just the domain icon, off the main thread.
 async fn find_logo(email: String) -> FaceCmd {
     let lookup_email = email.clone();
-    let bytes = tokio::task::spawn_blocking(move || crate::logo::fetch(&lookup_email))
+    let bytes = tokio::task::spawn_blocking(move || crate::services::logo::fetch(&lookup_email))
         .await
         .ok()
         .flatten();
@@ -168,8 +169,9 @@ impl Row {
         // A message from one of your own mailboxes wears that mailbox's emoji
         // on its color (#189), the same face the sidebar circle shows. It
         // shares the slot with the initials, keyed by what it draws.
-        if let Some((emoji, color)) = crate::avatar::own_face(&self.face_email(data, look))
-            .and_then(|face| face.emoji.map(|emoji| (emoji, face.color)))
+        if let Some((emoji, color)) =
+            crate::services::avatar::own_face(&self.face_email(data, look))
+                .and_then(|face| face.emoji.map(|emoji| (emoji, face.color)))
         {
             let key = format!("{emoji}\u{1}{color}");
             if st.initials.as_ref().is_none_or(|(n, _)| *n != key) {
@@ -197,10 +199,10 @@ impl Row {
         if email.is_empty() {
             return;
         }
-        if let Some(face) = crate::avatar::own_face(email) {
+        if let Some(face) = crate::services::avatar::own_face(email) {
             let tex = face
                 .gravatar
-                .then(|| crate::avatar::own_gravatar(email))
+                .then(|| crate::services::avatar::own_gravatar(email))
                 .flatten()
                 .or_else(|| {
                     face.picture
@@ -210,15 +212,15 @@ impl Row {
             self.st.borrow_mut().avatar_texture = tex;
             return;
         }
-        match crate::avatar::lookup(email, look.gravatar) {
-            crate::avatar::CacheLookup::Texture(texture) => {
+        match crate::services::avatar::lookup(email, look.gravatar) {
+            crate::services::avatar::CacheLookup::Texture(texture) => {
                 self.st.borrow_mut().avatar_texture = Some(texture);
             }
             // Contact and Gravatar are definitively absent — the logo tier is
             // all that's left before initials.
-            crate::avatar::CacheLookup::Missing => self.load_logo(email, look),
-            crate::avatar::CacheLookup::Fetch { generation, mode } => {
-                let want_logo = look.sender_logos && !crate::logo::known_missing(email);
+            crate::services::avatar::CacheLookup::Missing => self.load_logo(email, look),
+            crate::services::avatar::CacheLookup::Fetch { generation, mode } => {
+                let want_logo = look.sender_logos && !crate::services::logo::known_missing(email);
                 self.look_up(find_face(email.to_string(), generation, mode, want_logo));
             }
         }
@@ -232,17 +234,17 @@ impl Row {
             self.st.borrow_mut().avatar_texture = None;
             return;
         }
-        if let Some(tex) = crate::logo::cached(email) {
+        if let Some(tex) = crate::services::logo::cached(email) {
             self.st.borrow_mut().avatar_texture = Some(tex);
             // A week-old stored icon still shows, but this new message from
             // the sender is the cue to look for a fresh one.
-            if crate::logo::wants_refresh(email) {
+            if crate::services::logo::wants_refresh(email) {
                 self.look_up(find_logo(email.to_string()));
             }
             return;
         }
         self.st.borrow_mut().avatar_texture = None;
-        if !crate::logo::known_missing(email) {
+        if !crate::services::logo::known_missing(email) {
             self.look_up(find_logo(email.to_string()));
         }
     }
@@ -276,29 +278,30 @@ impl Row {
                 // Record what came back before deciding what to draw — the
                 // caches are shared, so the sender's other rows benefit even
                 // when this row now shows a different message.
-                let retry_stale = crate::avatar::cache_result(&email, generation, mode, outcome);
+                let retry_stale =
+                    crate::services::avatar::cache_result(&email, generation, mode, outcome);
                 match logo {
                     Some(Some(bytes)) => {
-                        crate::logo::decode_and_cache(&email, &bytes);
+                        crate::services::logo::decode_and_cache(&email, &bytes);
                     }
-                    Some(None) => crate::logo::remember_missing(&email),
+                    Some(None) => crate::services::logo::remember_missing(&email),
                     None => {}
                 }
                 if !current.is_some_and(|c| c.eq_ignore_ascii_case(&email)) {
                     return;
                 }
-                match crate::avatar::lookup(&email, look.gravatar) {
-                    crate::avatar::CacheLookup::Texture(texture) => {
+                match crate::services::avatar::lookup(&email, look.gravatar) {
+                    crate::services::avatar::CacheLookup::Texture(texture) => {
                         self.st.borrow_mut().avatar_texture = Some(texture);
                     }
-                    crate::avatar::CacheLookup::Missing => self.load_logo(&email, &look),
-                    crate::avatar::CacheLookup::Fetch { generation, mode } => {
+                    crate::services::avatar::CacheLookup::Missing => self.load_logo(&email, &look),
+                    crate::services::avatar::CacheLookup::Fetch { generation, mode } => {
                         self.st.borrow_mut().avatar_texture = None;
                         // Only chase a result the EDS generation invalidated;
                         // a transient Gravatar failure waits for a later bind.
                         if retry_stale {
                             let want_logo =
-                                look.sender_logos && !crate::logo::known_missing(&email);
+                                look.sender_logos && !crate::services::logo::known_missing(&email);
                             self.look_up(find_face(email, generation, mode, want_logo));
                         }
                     }
@@ -306,11 +309,11 @@ impl Row {
             }
             FaceCmd::Logo { email, bytes } => {
                 let texture = match bytes {
-                    Some(bytes) => crate::logo::decode_and_cache(&email, &bytes),
+                    Some(bytes) => crate::services::logo::decode_and_cache(&email, &bytes),
                     None => {
                         // Remember the miss, so the sender's other rows and
                         // the next sync don't ask the same domain again.
-                        crate::logo::remember_missing(&email);
+                        crate::services::logo::remember_missing(&email);
                         None
                     }
                 };

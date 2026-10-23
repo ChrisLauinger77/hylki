@@ -81,7 +81,7 @@ pub(crate) fn one_click_post(url: &str) -> Result<(), String> {
     let agent = ureq::AgentBuilder::new().redirects(0).build();
     match agent
         .post(url)
-        .set("User-Agent", crate::logo::USER_AGENT)
+        .set("User-Agent", crate::services::logo::USER_AGENT)
         .timeout(std::time::Duration::from_secs(20))
         .send_form(&[("List-Unsubscribe", "One-Click")])
     {

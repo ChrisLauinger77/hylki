@@ -188,9 +188,9 @@ pub(super) fn short_error(body: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cloud::dropbox::dropbox_err;
-    use crate::cloud::onedrive::{api_err, api_message};
-    use crate::cloud::seafile::seafile_err;
+    use crate::services::cloud::dropbox::dropbox_err;
+    use crate::services::cloud::onedrive::{api_err, api_message};
+    use crate::services::cloud::seafile::seafile_err;
 
     #[test]
     fn chunk_ranges_cover_the_file_exactly() {

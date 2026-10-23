@@ -148,7 +148,7 @@ async fn resolve_passwords(account: &mut AccountConfig, emit: &impl Fn(WorkerEve
     if !account.oauth {
         if let Some(goa_id) = account.goa_id.clone() {
             let (imap, smtp) =
-                tokio::task::spawn_blocking(move || crate::goa::mail_passwords(&goa_id))
+                tokio::task::spawn_blocking(move || crate::services::goa::mail_passwords(&goa_id))
                     .await
                     .unwrap_or((None, None));
             if let Some(pw) = imap.filter(|pw| *pw != account.password) {

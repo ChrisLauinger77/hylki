@@ -136,7 +136,7 @@ pub(super) struct GoaReconcile {
 /// entirely, so a momentarily-unavailable GOA never wipes imported accounts.
 pub(super) fn reconcile_goa(
     config: &mut Vec<AccountConfig>,
-    live: &crate::goa::GoaLiveState,
+    live: &crate::services::goa::GoaLiveState,
 ) -> GoaReconcile {
     let mut outcome = GoaReconcile::default();
     config.retain(|c| match &c.goa_id {
@@ -746,7 +746,7 @@ mod tests {
         config[1].enabled = true;
         config[2].goa_id = None;
         let removed_email = config[0].email.clone();
-        let mut live = crate::goa::GoaLiveState {
+        let mut live = crate::services::goa::GoaLiveState {
             account_ids: ["paused".to_string()].into(),
             disabled_mail_ids: ["paused".to_string()].into(),
             mail: Default::default(),

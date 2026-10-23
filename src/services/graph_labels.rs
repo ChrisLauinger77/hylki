@@ -14,8 +14,8 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use crate::config::{AccountConfig, Protocol};
-use crate::graph_api::bearer;
 use crate::mail::sensitivity::SensitivityLabel;
+use crate::services::graph_api::bearer;
 
 const URL: &str =
     "https://graph.microsoft.com/beta/me/security/informationProtection/sensitivityLabels";

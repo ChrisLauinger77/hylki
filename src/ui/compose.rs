@@ -638,7 +638,7 @@ impl Component for Compose {
             pgp_checking: false,
             pgp_cleared: None,
             send_at,
-            cloud_accounts: crate::cloud::load_enabled_accounts(),
+            cloud_accounts: crate::services::cloud::load_enabled_accounts(),
             drop_zones: None,
             cloud_links: Vec::new(),
             cloud_busy: 0,

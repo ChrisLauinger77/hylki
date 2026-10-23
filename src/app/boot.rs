@@ -122,7 +122,7 @@ fn load_accounts(sidebar_state: &mut config::SidebarState) -> Vec<AccountConfig>
     // Snapshot before reconciling: a removed account's alias-password
     // keyring entries are keyed by addresses only its config knows.
     let config_before_goa = config.clone();
-    let goa_outcome = match crate::goa::live_state() {
+    let goa_outcome = match crate::services::goa::live_state() {
         Some(live) => reconcile_goa(&mut config, &live),
         None => GoaReconcile::default(),
     };

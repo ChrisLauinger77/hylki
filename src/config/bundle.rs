@@ -41,7 +41,7 @@ pub(super) struct SettingsBundle {
     /// Cloud storage accounts (#144 onward); their sign-ins stay in the
     /// keyring.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) cloud: Option<Vec<crate::cloud::CloudAccount>>,
+    pub(super) cloud: Option<Vec<crate::services::cloud::CloudAccount>>,
     /// The spell checker's personal words, per language (#114).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) spell_words: Option<std::collections::BTreeMap<String, Vec<String>>>,
@@ -70,7 +70,7 @@ pub(crate) fn export_bundle() -> Result<String, String> {
         sidebar: read_toml(sidebar_path()),
         window: read_toml(window_path()),
         state: read_toml(state_path()),
-        cloud: Some(crate::cloud::load_accounts()),
+        cloud: Some(crate::services::cloud::load_accounts()),
         spell_words: Some(crate::spell::all_personal_words()),
     };
     toml::to_string_pretty(&bundle).map_err(|e| e.to_string())
@@ -94,7 +94,7 @@ pub(crate) fn import_bundle(text: &str) -> Result<usize, String> {
     write_file_struct(window_path(), &bundle.window)?;
     write_file_struct(state_path(), &bundle.state)?;
     if let Some(cloud) = &bundle.cloud {
-        crate::cloud::save_accounts(cloud);
+        crate::services::cloud::save_accounts(cloud);
     }
     // Words are merged, never removed: a backup can only teach the
     // checker more.

@@ -272,8 +272,8 @@ impl AppModel {
                     heading.push_str(" · ");
                     heading.push_str(&m.date);
                 }
-                let texture = match crate::avatar::lookup(&m.from_addr, self.gravatar) {
-                    crate::avatar::CacheLookup::Texture(t) => Some(t),
+                let texture = match crate::services::avatar::lookup(&m.from_addr, self.gravatar) {
+                    crate::services::avatar::CacheLookup::Texture(t) => Some(t),
                     _ => None,
                 };
                 indicator::TrayMail {

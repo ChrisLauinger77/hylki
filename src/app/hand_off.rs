@@ -328,7 +328,7 @@ impl AppModel {
     ) {
         let total = hand_off_size(&hand_off.files);
         let limit = self.files_prefs.limit_bytes();
-        let cloud_ready = !crate::cloud::load_enabled_accounts().is_empty();
+        let cloud_ready = !crate::services::cloud::load_enabled_accounts().is_empty();
         if total <= limit || !cloud_ready {
             if total > limit {
                 tracing::info!("file hand-off: {total} bytes over the {limit} limit, but no cloud storage is set up");
@@ -666,7 +666,7 @@ impl AppModel {
                 zones
                     .set_allow_inline(config::load_compose_format() == config::ComposeFormat::Rich);
                 zones.set_cloud_names(
-                    crate::cloud::load_enabled_accounts()
+                    crate::services::cloud::load_enabled_accounts()
                         .into_iter()
                         .map(|a| a.name)
                         .collect(),
@@ -689,7 +689,7 @@ impl AppModel {
                         config::load_compose_format() == config::ComposeFormat::Rich,
                     );
                     zones.set_cloud_names(
-                        crate::cloud::load_enabled_accounts()
+                        crate::services::cloud::load_enabled_accounts()
                             .into_iter()
                             .map(|a| a.name)
                             .collect(),

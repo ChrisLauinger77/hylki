@@ -141,7 +141,7 @@ pub(super) fn correspondents(msgs: &[&Message]) -> String {
     let mut names: Vec<String> = Vec::new();
     let mut others = false;
     for m in &sorted {
-        let own = crate::avatar::account_face(&m.from_addr).is_some();
+        let own = crate::services::avatar::account_face(&m.from_addr).is_some();
         let key = if own {
             String::new()
         } else {

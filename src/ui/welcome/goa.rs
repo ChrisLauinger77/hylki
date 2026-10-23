@@ -4,7 +4,7 @@ use super::*;
 
 pub(super) fn rebuild_goa_rows(
     list: &gtk::ListBox,
-    goa: &[crate::goa::GoaMailAccount],
+    goa: &[crate::services::goa::GoaMailAccount],
     sender: &ComponentSender<Welcome>,
 ) {
     while let Some(row) = list.first_child() {
@@ -39,7 +39,9 @@ impl Welcome {
         if let Some(g) = self.goa.get(index).cloned() {
             let (password, oauth) = if g.password_based {
                 (
-                    crate::goa::mail_passwords(&g.id).0.unwrap_or_default(),
+                    crate::services::goa::mail_passwords(&g.id)
+                        .0
+                        .unwrap_or_default(),
                     false,
                 )
             } else {
@@ -72,7 +74,7 @@ impl Welcome {
         widgets: &WelcomeWidgets,
         sender: ComponentSender<Self>,
     ) {
-        self.goa = crate::goa::list_mail_accounts();
+        self.goa = crate::services::goa::list_mail_accounts();
         self.goa
             .retain(|g| g.can_connect() && !self.added.contains(&g.email));
         rebuild_goa_rows(&widgets.goa_list, &self.goa, &sender);

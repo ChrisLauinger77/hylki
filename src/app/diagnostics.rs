@@ -197,14 +197,15 @@ impl AppModel {
             human_count(pdfs_rendered),
             human_bytes(pdf_bytes)
         ));
-        let (logos, logo_bytes, logo_misses) = crate::logo::cache_stats();
+        let (logos, logo_bytes, logo_misses) = crate::services::logo::cache_stats();
         out.push_str(&format!(
             "  sender logos: {} ({} of pixels), {} domains without (unbounded)\n",
             human_count(logos),
             human_bytes(logo_bytes),
             human_count(logo_misses)
         ));
-        let (contacts, contact_bytes, gravatars, gravatar_bytes) = crate::avatar::cache_stats();
+        let (contacts, contact_bytes, gravatars, gravatar_bytes) =
+            crate::services::avatar::cache_stats();
         out.push_str(&format!(
             "  contact photos: {} ({} of pixels); gravatars: {} ({} of pixels) (unbounded)\n",
             human_count(contacts),
@@ -213,7 +214,7 @@ impl AppModel {
             human_bytes(gravatar_bytes)
         ));
         let (entries, entry_bytes, photo_bytes) = self.contacts_page.model().memory_stats();
-        let (thumbs, thumb_bytes) = crate::avatar::photo_thumb_stats();
+        let (thumbs, thumb_bytes) = crate::services::avatar::photo_thumb_stats();
         out.push_str(&format!(
             "  Contacts list: {} entries, {} (of which photos {}); list photos {} ({} of pixels)\n",
             human_count(entries),

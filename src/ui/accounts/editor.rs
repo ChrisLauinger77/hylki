@@ -325,7 +325,12 @@ impl AccountsWindow {
         let needs_goa = p
             .oauth_name()
             .filter(|_| matches!(p.kind, ProviderKind::Google | ProviderKind::Microsoft))
-            .is_some_and(|n| crate::oauth::provider_credentials(n).0.trim().is_empty());
+            .is_some_and(|n| {
+                crate::services::oauth::provider_credentials(n)
+                    .0
+                    .trim()
+                    .is_empty()
+            });
         // Google/Microsoft servers come from the built-in preset (hidden). Custom
         // OAuth still needs its server addresses and client details entered.
         let show_servers = is_password || is_custom;
@@ -385,7 +390,7 @@ impl AccountsWindow {
             ProviderKind::Preset => Some((p.imap_host, p.imap_port, p.smtp_host, p.smtp_port)),
             ProviderKind::Google | ProviderKind::Microsoft => p
                 .oauth_name()
-                .and_then(crate::oauth::preset)
+                .and_then(crate::services::oauth::preset)
                 .map(|o| (o.imap_host, o.imap_port, o.smtp_host, o.smtp_port)),
             ProviderKind::Manual | ProviderKind::CustomOAuth | ProviderKind::Jmap => None,
         };
@@ -504,7 +509,7 @@ impl AccountsWindow {
             .form
             .gravatar_row
             .is_active()
-            .then(|| crate::avatar::own_gravatar(&trimmed(&widgets.form.email_row)))
+            .then(|| crate::services::avatar::own_gravatar(&trimmed(&widgets.form.email_row)))
             .flatten();
         let glyph: gtk::Widget = match (&gravatar, &picture, &emoji) {
             (Some(texture), ..) => crate::ui::initials::picture_from_texture(texture, 72).upcast(),
@@ -642,7 +647,7 @@ impl AccountsWindow {
             && acc
                 .oauth_settings
                 .as_ref()
-                .is_some_and(|s| crate::oauth::has_directory_scopes(&s.scopes));
+                .is_some_and(|s| crate::services::oauth::has_directory_scopes(&s.scopes));
         self.directory_on = acc.graph_directory && self.directory_granted;
         widgets
             .form
@@ -655,7 +660,10 @@ impl AccountsWindow {
         self.labels_granted = acc.goa_id.is_none()
             && acc.oauth
             && acc.oauth_settings.as_ref().is_some_and(|s| {
-                crate::oauth::has_scopes(&s.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES)
+                crate::services::oauth::has_scopes(
+                    &s.scopes,
+                    &crate::services::oauth::MICROSOFT_LABEL_SCOPES,
+                )
             });
         self.labels_on = acc.graph_label_names && self.labels_granted;
         widgets.form.graph_labels_row.set_active(self.labels_on);

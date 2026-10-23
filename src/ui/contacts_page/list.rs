@@ -238,7 +238,8 @@ impl ContactsPage {
                 _ => None,
             })
             .filter(|key| {
-                !self.decoding.contains(key) && crate::avatar::photo_thumbnail(*key).is_none()
+                !self.decoding.contains(key)
+                    && crate::services::avatar::photo_thumbnail(*key).is_none()
             })
             .collect();
         // Unselected first: the selection would otherwise follow the old
@@ -337,7 +338,7 @@ impl ContactsPage {
                     .iter()
                     .filter_map(|c| Some((c.photo_key, c.photo_bytes()?))),
             );
-            crate::avatar::decode_photo_thumbnails(photos, || {
+            crate::services::avatar::decode_photo_thumbnails(photos, || {
                 let _ = s.send(ContactsPageInput::PhotosDecoded);
             });
         });

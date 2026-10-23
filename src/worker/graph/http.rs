@@ -4,11 +4,11 @@
 use std::time::Duration;
 
 use crate::config::AccountConfig;
-use crate::graph_api::bearer;
+use crate::services::graph_api::bearer;
 use crate::worker::auth::fetch_oauth_token;
 use crate::worker::WorkerEvent;
 
-pub(super) use crate::graph_api::GRAPH_BASE;
+pub(super) use crate::services::graph_api::GRAPH_BASE;
 
 /// How many times a throttled request waits and tries again.
 const GRAPH_THROTTLE_TRIES: u32 = 4;

@@ -368,8 +368,8 @@ fn check_addressing(
             // so, the verdict stands. What the verdict is for is the
             // verified sender whose replies go to a mailbox anyone can
             // open, the way a taken-over account diverts an invoice.
-            let diverted = crate::logo::is_mailbox_domain(reply)
-                && !crate::logo::is_mailbox_domain(&ev.from_domain);
+            let diverted = crate::services::logo::is_mailbox_domain(reply)
+                && !crate::services::logo::is_mailbox_domain(&ev.from_domain);
             if diverted && *trust == SenderTrust::Pass {
                 *trust = SenderTrust::Suspicious;
                 downgraded = true;
@@ -475,7 +475,7 @@ mod tests {
     /// see REFACTOR_NOTES.md, suspected bug B6.
     #[test]
     fn registrable_domain_rules_agree_and_differ_as_recorded() {
-        let logo = |d: &str| crate::logo::domain_of(&format!("someone@{d}"));
+        let logo = |d: &str| crate::services::logo::domain_of(&format!("someone@{d}"));
         for (domain, here, there) in [
             ("example.com", "example.com", "example.com"),
             ("a.b.example.org", "example.org", "example.org"),
@@ -493,7 +493,7 @@ mod tests {
         assert_eq!(logo("localhost"), None);
         assert_eq!(logo("127.0.0.1"), None);
         assert_eq!(
-            crate::logo::domain_of("someone@Mail.Example.COM."),
+            crate::services::logo::domain_of("someone@Mail.Example.COM."),
             Some("example.com".into())
         );
     }

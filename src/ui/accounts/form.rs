@@ -554,7 +554,7 @@ pub(super) fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) 
         .set_text(s.map(|s| s.scopes.as_str()).unwrap_or(""));
     // What a Microsoft account was set up with beyond Hylki's own app (#329).
     let adv = s
-        .map(crate::oauth::microsoft_advanced_of)
+        .map(crate::services::oauth::microsoft_advanced_of)
         .unwrap_or_default();
     widgets.form.ms_client_row.set_text(&adv.0);
     widgets.form.ms_tenant_row.set_text(&adv.1);

@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 
 use crate::config::{AccountConfig, Protocol};
 use crate::contacts::Suggestion;
-use crate::graph_api::{bearer, GRAPH_BASE};
+use crate::services::graph_api::{bearer, GRAPH_BASE};
 
 /// As many as the composer's list shows, and the point below which the
 /// tenant's whole list is asked as well.
