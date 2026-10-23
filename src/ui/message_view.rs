@@ -8678,6 +8678,9 @@ fn sanitize_filename(subject: &str) -> String {
 }
 
 #[cfg(test)]
+mod characterization_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

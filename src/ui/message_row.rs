@@ -4055,3 +4055,6 @@ fn build_widgets() -> RowWidgets {
         preview,
     }
 }
+
+#[cfg(test)]
+mod characterization_tests;

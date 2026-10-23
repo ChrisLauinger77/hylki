@@ -6867,6 +6867,9 @@ impl MessageList {
 }
 
 #[cfg(test)]
+mod characterization_tests;
+
+#[cfg(test)]
 mod tests {
     use super::{
         column_sort, compute_thread_keys, correspondents, heads_its_row, latest_elsewhere,
