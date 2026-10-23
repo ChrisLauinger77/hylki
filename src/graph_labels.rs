@@ -294,7 +294,7 @@ mod tests {
             protocol: Protocol::Graph,
             oauth: true,
             graph_label_names: true,
-            ..crate::ui::welcome::blank_account()
+            ..crate::config::blank_account()
         };
         assert!(usable(&acc));
         assert!(!usable(&AccountConfig {

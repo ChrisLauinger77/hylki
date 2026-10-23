@@ -452,7 +452,7 @@ mod tests {
         let acc = AccountConfig {
             protocol: Protocol::Jmap,
             imap_host: "mail.example.org".into(),
-            ..crate::ui::welcome::blank_account()
+            ..crate::config::blank_account()
         };
         assert_eq!(provider_at(provider_index_for_account(&acc)).label, p.label);
         assert_eq!(brand_for_account(&acc), "stalwart");
@@ -511,7 +511,7 @@ mod tests {
 
     #[test]
     fn brands_for_accounts_and_goa_providers() {
-        let blank = crate::ui::welcome::blank_account();
+        let blank = crate::config::blank_account();
         let with = |f: &dyn Fn(&mut AccountConfig)| {
             let mut a = blank.clone();
             f(&mut a);
@@ -577,7 +577,7 @@ mod tests {
 
     #[test]
     fn provider_names_for_the_account_list() {
-        let blank = crate::ui::welcome::blank_account();
+        let blank = crate::config::blank_account();
         assert_eq!(provider_name("gmail", &blank), "Google (Gmail)");
         assert_eq!(provider_name("mail", &blank), "IMAP/POP3 account");
         let hosted = AccountConfig {
@@ -605,7 +605,7 @@ mod tests {
         assert_eq!(provider_at(999).kind, ProviderKind::Manual);
         let oauth = AccountConfig {
             oauth: true,
-            ..crate::ui::welcome::blank_account()
+            ..crate::config::blank_account()
         };
         assert_eq!(
             provider_at(provider_index_for_account(&oauth)).kind,
