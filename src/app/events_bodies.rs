@@ -56,114 +56,7 @@ impl AppModel {
                 message_id,
                 path,
                 body,
-            } => {
-                // Interior NULs abort glib string conversion (labels and the
-                // WebView document alike); decoded mail bodies can carry them.
-                let body = if body.contains('\0') {
-                    body.replace('\0', " ")
-                } else {
-                    body
-                };
-                // A UID is unique only within its folder, and the background
-                // prefetch pushes bodies from every folder it syncs, so the
-                // body is filed by folder and UID. A folder the app does not
-                // know yet has no key; the body is still on disk for when it
-                // does.
-                let key = self.event_key(account_id, &path, message_id);
-                if let Some(k) = key {
-                    self.body_cache.insert(k, body.clone());
-                }
-                // If this body was fetched to open a draft, open the editor now.
-                // One waiting for its bytes ignores a body the prefetch sent.
-                if let Some((pd, inline, extra)) = self
-                    .pending_draft
-                    .take_if(|_| self.pending_draft_token.is_none())
-                {
-                    if pd.account_id == account_id && pd.id == message_id {
-                        self.compose_from_draft(pd, body, inline, extra, &sender);
-                        return;
-                    }
-                    self.pending_draft = Some((pd, inline, extra));
-                }
-                // Likewise a copy being edited as a new message: the body is
-                // in the cache now, so the second pass finds it there.
-                if let Some(pending) = self.pending_edit_as_new.take() {
-                    if pending.account_id == account_id && pending.id == message_id {
-                        self.edit_as_new(pending, &sender);
-                        return;
-                    }
-                    self.pending_edit_as_new = Some(pending);
-                }
-                // And a forward waiting on the body it quotes.
-                if let Some((pending, inline)) = self.pending_forward.take() {
-                    if pending.account_id == account_id && pending.id == message_id {
-                        self.forward(pending, inline, &sender);
-                        return;
-                    }
-                    self.pending_forward = Some((pending, inline));
-                }
-                // A reply from a notification's button (#244): the message
-                // is opening in the reader too, so the body goes on to be
-                // shown as usual.
-                if let Some(mut m) = self.pending_notified_reply.take() {
-                    if m.account_id == account_id && m.id == message_id {
-                        m.body = body.clone();
-                        self.open_reply(
-                            m.account_id,
-                            self.reply_context(&m, reply_prefill(&m)),
-                            (m.account_id, m.id),
-                            &sender,
-                        );
-                    } else {
-                        self.pending_notified_reply = Some(m);
-                    }
-                }
-                // Likewise a reply picked for handed-in files.
-                if let Some((mut m, extra)) = self.pending_reply.take() {
-                    if m.account_id == account_id && m.id == message_id {
-                        m.body = body.clone();
-                        self.open_hand_off_reply(m, extra, &sender);
-                        return;
-                    }
-                    self.pending_reply = Some((m, extra));
-                }
-                let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
-                // Keep the primary's body up to date in either mode.
-                if let Some(current) = self.current.as_mut() {
-                    if is_target(current) {
-                        current.body = body.clone();
-                    }
-                }
-                if self.current_thread.len() > 1 {
-                    // Conversation mode: fill the matching message's body. The
-                    // whole conversation renders as one document holding every
-                    // body, so a burst of arrivals is coalesced into a single
-                    // re-render rather than one per body.
-                    let mut changed = false;
-                    for tm in self.current_thread.iter_mut() {
-                        if is_target(tm) {
-                            tm.body = body.clone();
-                            changed = true;
-                        }
-                    }
-                    if changed {
-                        self.queue_thread_render(&sender);
-                    }
-                } else if self.current.as_ref().is_some_and(is_target) {
-                    let current = self.current.clone();
-                    self.show_message(current, false);
-                }
-                // Re-render any popped-out window showing this message — a
-                // conversation window may hold it as any member of its thread,
-                // so every popout gets the offer (non-members ignore it).
-                for p in self.popouts.values() {
-                    p.controller.emit(MessageWindowInput::SetBody {
-                        account_id,
-                        id: message_id,
-                        body: body.clone(),
-                    });
-                }
-            }
+            } => self.on_body(account_id, message_id, path, body, sender),
 
             AppMsg::Source { text } => {
                 // Source is only fetched on explicit request (toolbar or context
@@ -358,6 +251,151 @@ impl AppModel {
                 }
             }
             _ => unreachable!("not routed to on_events_bodies"),
+        }
+    }
+
+    /// A message body, fetched for the reader or by the prefetch.
+    fn on_body(
+        &mut self,
+        account_id: u32,
+        message_id: u32,
+        path: String,
+        body: String,
+        sender: ComponentSender<Self>,
+    ) {
+        // Interior NULs abort glib string conversion (labels and the
+        // WebView document alike); decoded mail bodies can carry them.
+        let body = if body.contains('\0') {
+            body.replace('\0', " ")
+        } else {
+            body
+        };
+        // A UID is unique only within its folder, and the background
+        // prefetch pushes bodies from every folder it syncs, so the
+        // body is filed by folder and UID. A folder the app does not
+        // know yet has no key; the body is still on disk for when it
+        // does.
+        let key = self.event_key(account_id, &path, message_id);
+        if let Some(k) = key {
+            self.body_cache.insert(k, body.clone());
+        }
+        if self.hand_body_to_waiter(account_id, message_id, &body, &sender) {
+            return;
+        }
+        self.show_arrived_body(key, account_id, message_id, &body, &sender);
+        // Re-render any popped-out window showing this message — a
+        // conversation window may hold it as any member of its thread,
+        // so every popout gets the offer (non-members ignore it).
+        self.popouts_emit(|| MessageWindowInput::SetBody {
+            account_id,
+            id: message_id,
+            body: body.clone(),
+        });
+    }
+
+    /// Hands an arrived body to whatever was waiting for it: a draft to
+    /// open, a copy to edit as new, a forward, a reply from a notification
+    /// button or one picked for handed-in files. True when one took it and
+    /// the reader has nothing more to do with it.
+    fn hand_body_to_waiter(
+        &mut self,
+        account_id: u32,
+        message_id: u32,
+        body: &str,
+        sender: &ComponentSender<Self>,
+    ) -> bool {
+        // If this body was fetched to open a draft, open the editor now.
+        // One waiting for its bytes ignores a body the prefetch sent.
+        if let Some((pd, inline, extra)) = self
+            .pending_draft
+            .take_if(|_| self.pending_draft_token.is_none())
+        {
+            if pd.account_id == account_id && pd.id == message_id {
+                self.compose_from_draft(pd, body.to_string(), inline, extra, sender);
+                return true;
+            }
+            self.pending_draft = Some((pd, inline, extra));
+        }
+        // Likewise a copy being edited as a new message: the body is
+        // in the cache now, so the second pass finds it there.
+        if let Some(pending) = self.pending_edit_as_new.take() {
+            if pending.account_id == account_id && pending.id == message_id {
+                self.edit_as_new(pending, sender);
+                return true;
+            }
+            self.pending_edit_as_new = Some(pending);
+        }
+        // And a forward waiting on the body it quotes.
+        if let Some((pending, inline)) = self.pending_forward.take() {
+            if pending.account_id == account_id && pending.id == message_id {
+                self.forward(pending, inline, sender);
+                return true;
+            }
+            self.pending_forward = Some((pending, inline));
+        }
+        // A reply from a notification's button (#244): the message
+        // is opening in the reader too, so the body goes on to be
+        // shown as usual.
+        if let Some(mut m) = self.pending_notified_reply.take() {
+            if m.account_id == account_id && m.id == message_id {
+                m.body = body.to_string();
+                self.open_reply(
+                    m.account_id,
+                    self.reply_context(&m, reply_prefill(&m)),
+                    (m.account_id, m.id),
+                    sender,
+                );
+            } else {
+                self.pending_notified_reply = Some(m);
+            }
+        }
+        // Likewise a reply picked for handed-in files.
+        if let Some((mut m, extra)) = self.pending_reply.take() {
+            if m.account_id == account_id && m.id == message_id {
+                m.body = body.to_string();
+                self.open_hand_off_reply(m, extra, sender);
+                return true;
+            }
+            self.pending_reply = Some((m, extra));
+        }
+        false
+    }
+
+    /// The reader takes an arrived body: the lone message re-renders, a
+    /// conversation queues one render for a burst of them.
+    fn show_arrived_body(
+        &mut self,
+        key: Option<BodyKey>,
+        account_id: u32,
+        message_id: u32,
+        body: &str,
+        sender: &ComponentSender<Self>,
+    ) {
+        let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
+        // Keep the primary's body up to date in either mode.
+        if let Some(current) = self.current.as_mut() {
+            if is_target(current) {
+                current.body = body.to_string();
+            }
+        }
+        if self.current_thread.len() > 1 {
+            // Conversation mode: fill the matching message's body. The
+            // whole conversation renders as one document holding every
+            // body, so a burst of arrivals is coalesced into a single
+            // re-render rather than one per body.
+            let mut changed = false;
+            for tm in self.current_thread.iter_mut() {
+                if is_target(tm) {
+                    tm.body = body.to_string();
+                    changed = true;
+                }
+            }
+            if changed {
+                self.queue_thread_render(sender);
+            }
+        } else if self.current.as_ref().is_some_and(is_target) {
+            let current = self.current.clone();
+            self.show_message(current, false);
         }
     }
 }
