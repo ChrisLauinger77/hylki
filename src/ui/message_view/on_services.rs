@@ -286,7 +286,7 @@ impl MessageView {
         let s = sender.clone();
         gtk::glib::spawn_future_local(async move {
             let key = gtk::gio::spawn_blocking(move || {
-                crate::pgp::key_by_fingerprint(&crate::pgp::Gpg::system(), &key_id)
+                crate::mail::pgp::key_by_fingerprint(&crate::mail::pgp::Gpg::system(), &key_id)
             })
             .await
             .ok()
@@ -310,7 +310,7 @@ impl MessageView {
     ) {
         let input = sender.input_sender().clone();
         sender.oneshot_command(async move {
-            let result = tokio::task::spawn_blocking(move || crate::pgp::trust_key(&crate::pgp::Gpg::system(), &fingerprint, None))
+            let result = tokio::task::spawn_blocking(move || crate::mail::pgp::trust_key(&crate::mail::pgp::Gpg::system(), &fingerprint, None))
                 .await
                 .unwrap_or_else(|_| Err("task failed".into()))
                 .map(|()| i18n("Key trusted."))

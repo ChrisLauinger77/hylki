@@ -13,7 +13,7 @@ use super::{base, generation, translate, Service, Settings, BATCH, CHUNK, DONE};
 /// first: sent as markup, its newlines would otherwise be read as spaces.
 pub(super) fn prepare_blocks(body: &str) -> Vec<String> {
     let mut out = Vec::new();
-    for block in crate::reader::extract_blocks(body) {
+    for block in crate::mail::reader::extract_blocks(body) {
         match block
             .strip_prefix("<div class=\"hylki-plain\">")
             .and_then(|b| b.strip_suffix("</div>"))

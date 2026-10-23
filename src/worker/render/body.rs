@@ -32,7 +32,7 @@ pub(crate) fn extract_body(raw: &[u8]) -> String {
     };
 
     // The protected-headers stand-in that only repeats the Subject (#493).
-    let legacy = crate::pgp::legacy_display_part(&parsed);
+    let legacy = crate::mail::pgp::legacy_display_part(&parsed);
     let bodies: Vec<_> = parsed
         .html_body
         .iter()

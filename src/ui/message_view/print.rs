@@ -318,7 +318,7 @@ impl MessageView {
             .map(|(n, m)| {
                 // Reader View prints what it shows: the content alone.
                 let doc = if self.reader_mode {
-                    crate::reader::render(&m.body, false, &self.accent_hex())
+                    crate::mail::reader::render(&m.body, false, &self.accent_hex())
                 } else {
                     body_html(&m.body)
                 };

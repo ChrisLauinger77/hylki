@@ -136,7 +136,7 @@ pub(super) fn message_frame(
     // and needs none of the reader's color override over it; the reader's
     // font choice (#56) still applies, below.
     let doc = if reader {
-        crate::reader::render(body, dark, accent)
+        crate::mail::reader::render(body, dark, accent)
     } else {
         body_html(body)
     };

@@ -48,10 +48,10 @@ fn pgp_send_check(
     fields: &[&str],
     encrypt: bool,
 ) -> Result<(), String> {
-    let gpg = crate::pgp::Gpg::system();
+    let gpg = crate::mail::pgp::Gpg::system();
     let own = chosen_key
-        .and_then(|f| crate::pgp::secret_key_by_fingerprint(&gpg, f))
-        .or_else(|| crate::pgp::secret_key_for(&gpg, from));
+        .and_then(|f| crate::mail::pgp::secret_key_by_fingerprint(&gpg, f))
+        .or_else(|| crate::mail::pgp::secret_key_for(&gpg, from));
     if own.is_none() {
         return Err(crate::i18n::i18n_f(
             "There is no OpenPGP key of your own for {addr}. Generate one under Settings, OpenPGP, \
@@ -66,7 +66,7 @@ fn pgp_send_check(
                 if addr.is_empty() {
                     continue;
                 }
-                if crate::pgp::public_key_for(&gpg, addr).is_none() {
+                if crate::mail::pgp::public_key_for(&gpg, addr).is_none() {
                     return Err(crate::i18n::i18n_f(
                         "There is no OpenPGP key for {addr}. Ask them for their public key, or fetch it \
                          under Settings, OpenPGP.",
@@ -251,12 +251,14 @@ impl Compose {
             ComposeFormat::Rich => (body, text),
             ComposeFormat::Plain => (String::new(), text),
             ComposeFormat::Markdown => {
-                let html = crate::markdown::sanitize_outgoing(&crate::markdown::to_html(&body));
+                let html = crate::mail::markdown::sanitize_outgoing(
+                    &crate::mail::markdown::to_html(&body),
+                );
                 (html, body)
             }
             ComposeFormat::Html => {
-                let text = crate::markdown::html_to_text(&body);
-                (crate::markdown::sanitize_outgoing(&body), text)
+                let text = crate::mail::markdown::html_to_text(&body);
+                (crate::mail::markdown::sanitize_outgoing(&body), text)
             }
         }
     }

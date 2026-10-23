@@ -16,7 +16,7 @@ use relm4::prelude::*;
 /// left the caret at the start of the "On … wrote:" line, so whatever was
 /// typed joined it.
 pub(super) fn markdown_body(html: &str) -> String {
-    let md = crate::markdown::from_html(html);
+    let md = crate::mail::markdown::from_html(html);
     let top = html.trim_start();
     if !md.is_empty() && (top.starts_with("<p><br></p>") || top.starts_with("<div><br></div>")) {
         format!("\n\n{md}")
@@ -242,7 +242,7 @@ impl Compose {
         // Every conversion goes through HTML: it is the one form
         // all four formats can be written to and read back from.
         let html = match from {
-            ComposeFormat::Markdown => crate::markdown::to_html(&body),
+            ComposeFormat::Markdown => crate::mail::markdown::to_html(&body),
             _ => body,
         };
         self.editor.set_plain(to == ComposeFormat::Plain);
@@ -252,7 +252,7 @@ impl Compose {
                 .set_source(SourceKind::Markdown, &markdown_body(&html)),
             ComposeFormat::Html => self
                 .editor
-                .set_source(SourceKind::Html, &crate::markdown::pretty_html(&html)),
+                .set_source(SourceKind::Html, &crate::mail::markdown::pretty_html(&html)),
             ComposeFormat::Rich | ComposeFormat::Plain => self.editor.set_html(&html),
         }
         self.editor.grab_focus();

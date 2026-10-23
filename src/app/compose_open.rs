@@ -16,7 +16,7 @@ use super::prefill::{
     stage_attachments,
 };
 use super::uri_queue::parse_mailto;
-use crate::quote::editable_copy_html;
+use crate::mail::quote::editable_copy_html;
 use crate::ui::keymap::WindowCompose;
 
 impl AppModel {

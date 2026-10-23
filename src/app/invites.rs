@@ -103,7 +103,7 @@ impl AppModel {
             return;
         };
         let (from_alias, name, address) = self.invite_identity(message, invite);
-        let ics = crate::invite::reply_ics(invite, &name, &address, rsvp.partstat());
+        let ics = crate::mail::invite::reply_ics(invite, &name, &address, rsvp.partstat());
         let subject = match rsvp {
             crate::models::Rsvp::Accepted => {
                 i18n_f("Accepted: {subject}", &[("subject", &invite.summary)])

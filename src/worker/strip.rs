@@ -61,7 +61,7 @@ pub(super) fn without_attachment(
     size: u64,
     date: &str,
 ) -> Result<Vec<u8>, StripError> {
-    if crate::pgp::detect(raw).is_some() {
+    if crate::mail::pgp::detect(raw).is_some() {
         return Err(StripError::Protected);
     }
     let parsed = MessageParser::default()

@@ -101,7 +101,7 @@ impl Cache {
         let label = |s: &str| {
             format!(
                 "{sep}{}{sep}",
-                crate::mutf7::encode(s).to_lowercase(),
+                crate::mail::mutf7::encode(s).to_lowercase(),
                 sep = LABEL_SEP
             )
         };

@@ -784,7 +784,7 @@ fn live_signed_send() {
     let Ok(spec) = std::env::var("JMAP_LIVE") else {
         return;
     };
-    if !crate::pgp::available() {
+    if !crate::mail::pgp::available() {
         return;
     }
     let mut parts = spec.splitn(3, ',');
@@ -810,7 +810,8 @@ fn live_signed_send() {
         email: me.clone(),
         ..acc.clone()
     };
-    crate::pgp::generate_key(&crate::pgp::Gpg::system(), "Me", &me, "never", "").expect("own key");
+    crate::mail::pgp::generate_key(&crate::mail::pgp::Gpg::system(), "Me", &me, "never", "")
+        .expect("own key");
     let file = home.join("notes.txt");
     std::fs::write(&file, b"one\ntwo\n").unwrap();
     let msg = OutgoingMessage {

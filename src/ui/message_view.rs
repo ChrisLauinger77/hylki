@@ -106,7 +106,7 @@ pub(crate) struct MessageView {
     /// Kept for the session, so a thread reopened keeps the choice.
     sender_style: std::collections::HashSet<(u32, u32)>,
     /// Reader View: every message on screen stripped to its content and set
-    /// in the reader's own uniform sheet (see `crate::reader`). The header's
+    /// in the reader's own uniform sheet (see `crate::mail::reader`). The header's
     /// toggle; applies to the whole conversation at once.
     reader_mode: bool,
     /// Whether the header's Reader View switch is shown (Settings).

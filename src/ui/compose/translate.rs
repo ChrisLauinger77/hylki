@@ -327,7 +327,7 @@ impl Compose {
                 self.tr_subject = None;
                 if let Some(original) = subject {
                     let translated = parts.pop().map(|t| {
-                        crate::markdown::plain_text(&t)
+                        crate::mail::markdown::plain_text(&t)
                             .split_whitespace()
                             .collect::<Vec<_>>()
                             .join(" ")

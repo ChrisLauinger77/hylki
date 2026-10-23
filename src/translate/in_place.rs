@@ -117,7 +117,7 @@ fn element_name(node: &markup5ever_rcdom::Handle) -> Option<String> {
 fn is_hidden_node(node: &markup5ever_rcdom::Handle) -> bool {
     match &node.data {
         markup5ever_rcdom::NodeData::Element { attrs, .. } => {
-            crate::reader::is_hidden(&attrs.borrow())
+            crate::mail::reader::is_hidden(&attrs.borrow())
         }
         _ => false,
     }

@@ -9,7 +9,7 @@
 //! is a separate matter the label only names.
 
 use crate::i18n::{i18n, i18n_f};
-use crate::mail_header::unfold;
+use crate::mail::mail_header::unfold;
 
 /// The label a message carries.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -169,7 +169,7 @@ fn looks_like_guid(s: &str) -> bool {
 mod tests {
     use super::*;
 
-    /// Header unfolding (`crate::mail_header::unfold`), on the corpus both
+    /// Header unfolding (`crate::mail::mail_header::unfold`), on the corpus both
     /// header readers were pinned with before their copies were merged.
     #[test]
     fn folded_header_values_become_one_line() {

@@ -97,17 +97,17 @@ impl AppModel {
     /// when the message offers neither.
     fn unsubscribe_mail_target(
         info: &crate::models::Unsubscribe,
-    ) -> Option<crate::unsubscribe::MailtoTarget> {
+    ) -> Option<crate::mail::unsubscribe::MailtoTarget> {
         if let Some(t) = info
             .mailto
             .as_deref()
-            .and_then(crate::unsubscribe::parse_mailto)
+            .and_then(crate::mail::unsubscribe::parse_mailto)
         {
             return Some(t);
         }
         info.reply
             .as_ref()
-            .map(|r| crate::unsubscribe::MailtoTarget {
+            .map(|r| crate::mail::unsubscribe::MailtoTarget {
                 to: r.to.clone(),
                 subject: r.subject.clone(),
                 body: r.subject.clone(),
@@ -266,35 +266,37 @@ impl AppModel {
         if let Some(url) = info.one_click.clone() {
             let s = sender.clone();
             let info = Box::new(info);
-            std::thread::spawn(move || match crate::unsubscribe::one_click_post(&url) {
-                Ok(()) => s.input(AppMsg::UnsubscribeDone {
-                    message,
-                    result: Ok(true),
-                }),
-                Err(why) if info.mailto.is_some() || info.reply.is_some() => {
-                    tracing::warn!(
-                        "one-click unsubscribe failed ({why}); writing to the list instead"
-                    );
-                    s.input(AppMsg::UnsubscribeByMail { message, info });
-                }
-                // The one-click handle is the list's web page as well: a
-                // POST it refused (a redirect, most often) may still work
-                // in the browser, which is the last route anyway.
-                Err(why) if info.web.is_some() => {
-                    tracing::warn!(
-                        "one-click unsubscribe failed ({why}); opening the list's page instead"
-                    );
-                    let info = Box::new(crate::models::Unsubscribe {
-                        one_click: None,
-                        ..*info
-                    });
-                    s.input(AppMsg::UnsubscribeGo { message, info });
-                }
-                Err(why) => s.input(AppMsg::UnsubscribeDone {
-                    message,
-                    result: Err(why),
-                }),
-            });
+            std::thread::spawn(
+                move || match crate::mail::unsubscribe::one_click_post(&url) {
+                    Ok(()) => s.input(AppMsg::UnsubscribeDone {
+                        message,
+                        result: Ok(true),
+                    }),
+                    Err(why) if info.mailto.is_some() || info.reply.is_some() => {
+                        tracing::warn!(
+                            "one-click unsubscribe failed ({why}); writing to the list instead"
+                        );
+                        s.input(AppMsg::UnsubscribeByMail { message, info });
+                    }
+                    // The one-click handle is the list's web page as well: a
+                    // POST it refused (a redirect, most often) may still work
+                    // in the browser, which is the last route anyway.
+                    Err(why) if info.web.is_some() => {
+                        tracing::warn!(
+                            "one-click unsubscribe failed ({why}); opening the list's page instead"
+                        );
+                        let info = Box::new(crate::models::Unsubscribe {
+                            one_click: None,
+                            ..*info
+                        });
+                        s.input(AppMsg::UnsubscribeGo { message, info });
+                    }
+                    Err(why) => s.input(AppMsg::UnsubscribeDone {
+                        message,
+                        result: Err(why),
+                    }),
+                },
+            );
             return;
         }
         if info.mailto.is_some() || info.reply.is_some() {

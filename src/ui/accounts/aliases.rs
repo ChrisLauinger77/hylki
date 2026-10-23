@@ -37,7 +37,9 @@ impl AccountsWindow {
             .set_visible(self.hidden_edits.is_empty());
         for (i, path) in self.hidden_edits.iter().enumerate() {
             let row = adw::ActionRow::new();
-            row.set_title(&gtk::glib::markup_escape_text(&crate::mutf7::decode(path)));
+            row.set_title(&gtk::glib::markup_escape_text(&crate::mail::mutf7::decode(
+                path,
+            )));
             let show = gtk::Button::with_label(&i18n("Show"));
             show.set_valign(gtk::Align::Center);
             show.add_css_class("flat");

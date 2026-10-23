@@ -15,8 +15,8 @@ mod tests;
 /// here, which may raise the agent's passphrase prompt — so this runs only
 /// for an explicit open, never for the background prefetch.
 pub(crate) fn render_raw(raw: &[u8]) -> (String, crate::models::SenderCheck, bool) {
-    let mut check = crate::verify::check_sender(raw);
-    match crate::pgp::unwrap_message(raw, &crate::pgp::Gpg::system()) {
+    let mut check = crate::mail::verify::check_sender(raw);
+    match crate::mail::pgp::unwrap_message(raw, &crate::mail::pgp::Gpg::system()) {
         Some(u) => {
             let body = match &u.inner {
                 Some(inner) => extract_body(inner),

@@ -34,7 +34,7 @@ pub(super) fn folder_label(path: &str) -> String {
         "Inbox".to_string()
     } else {
         // Paths are stored as the server names them, in modified UTF-7.
-        crate::mutf7::decode(name)
+        crate::mail::mutf7::decode(name)
     }
 }
 

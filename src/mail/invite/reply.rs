@@ -72,8 +72,8 @@ fn stamp_utc(ts: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::invite::parse;
-    use crate::invite::tests::ZIMBRA;
+    use crate::mail::invite::parse;
+    use crate::mail::invite::tests::ZIMBRA;
 
     #[test]
     fn the_reply_carries_the_events_identity_and_one_attendee() {

@@ -336,7 +336,7 @@ pub(super) fn build_folder_row(
         let pretty = folder
             .path
             .split(['/', '.', '\\'])
-            .map(crate::mutf7::decode)
+            .map(crate::mail::mutf7::decode)
             .collect::<Vec<_>>()
             .join(" › ");
         row.set_tooltip_text(Some(&pretty));

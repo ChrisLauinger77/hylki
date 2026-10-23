@@ -76,14 +76,14 @@ pub(super) fn protect_headers(
 
 /// The user's key for an outgoing message: the account's chosen key, else
 /// the key whose address matches the From, else the account's own address.
-fn signing_key(account: &AccountConfig, from_addr: &str) -> Option<crate::pgp::KeyInfo> {
-    let gpg = crate::pgp::Gpg::system();
+fn signing_key(account: &AccountConfig, from_addr: &str) -> Option<crate::mail::pgp::KeyInfo> {
+    let gpg = crate::mail::pgp::Gpg::system();
     account
         .pgp_key
         .as_deref()
-        .and_then(|f| crate::pgp::secret_key_by_fingerprint(&gpg, f))
-        .or_else(|| crate::pgp::secret_key_for(&gpg, from_addr))
-        .or_else(|| crate::pgp::secret_key_for(&gpg, &account.email))
+        .and_then(|f| crate::mail::pgp::secret_key_by_fingerprint(&gpg, f))
+        .or_else(|| crate::mail::pgp::secret_key_for(&gpg, from_addr))
+        .or_else(|| crate::mail::pgp::secret_key_for(&gpg, &account.email))
 }
 
 /// Sign and/or encrypt an outgoing entity into PGP/MIME (RFC 3156).
@@ -94,7 +94,7 @@ pub(super) fn pgp_wrap(
     entity: PgpEntity,
 ) -> Result<lettre::message::MultiPart, SmtpError> {
     use lettre::message::{header::ContentType, MultiPart, SinglePart};
-    let gpg = crate::pgp::Gpg::system();
+    let gpg = crate::mail::pgp::Gpg::system();
     let key = signing_key(account, from_addr);
     let inner = entity.formatted();
     let no_key = || {
@@ -115,7 +115,7 @@ pub(super) fn pgp_wrap(
         recipients.sort();
         recipients.dedup();
         for r in &recipients {
-            if crate::pgp::public_key_for(&gpg, r).is_none() {
+            if crate::mail::pgp::public_key_for(&gpg, r).is_none() {
                 return Err(i18n_f("no OpenPGP key for {addr}", &[("addr", r)]).into());
             }
         }
@@ -125,7 +125,7 @@ pub(super) fn pgp_wrap(
         match &key {
             Some(k) => recipients.push(k.fingerprint.clone()),
             None => {
-                if crate::pgp::public_key_for(&gpg, from_addr).is_none() {
+                if crate::mail::pgp::public_key_for(&gpg, from_addr).is_none() {
                     return Err(no_key().into());
                 }
                 recipients.push(from_addr.to_ascii_lowercase());
@@ -136,7 +136,7 @@ pub(super) fn pgp_wrap(
         } else {
             None
         };
-        let ciphertext = crate::pgp::encrypt(&gpg, &inner, &recipients, signer.as_deref())?;
+        let ciphertext = crate::mail::pgp::encrypt(&gpg, &inner, &recipients, signer.as_deref())?;
         let control = SinglePart::builder()
             .header(ContentType::parse("application/pgp-encrypted").expect("static content type"))
             .body(String::from("Version: 1\r\n"));
@@ -155,7 +155,8 @@ pub(super) fn pgp_wrap(
     // boundary delimiter straight after; RFC 3156 counts that CRLF as part
     // of the boundary, so the signature covers everything before it.
     let signed_bytes = inner.strip_suffix(b"\r\n").unwrap_or(&inner);
-    let (signature, micalg) = crate::pgp::sign_detached(&gpg, signed_bytes, &key.fingerprint)?;
+    let (signature, micalg) =
+        crate::mail::pgp::sign_detached(&gpg, signed_bytes, &key.fingerprint)?;
     let signed = MultiPart::signed("application/pgp-signature".into(), micalg);
     let signed = match entity {
         PgpEntity::Multi(m) => signed.multipart(m),

@@ -630,11 +630,11 @@ fn open_timing() {
             parsed = mail_parser::MessageParser::default().parse(&raw[..])
         });
         if let Some(m) = parsed.as_ref() {
-            lap(1, &mut || drop(crate::unsubscribe::detect(m)));
-            lap(2, &mut || drop(crate::invite::detect(m)));
+            lap(1, &mut || drop(crate::mail::unsubscribe::detect(m)));
+            lap(2, &mut || drop(crate::mail::invite::detect(m)));
         }
-        lap(3, &mut || drop(crate::verify::check_sender(&raw)));
-        lap(4, &mut || drop(crate::pgp::detect(&raw)));
+        lap(3, &mut || drop(crate::mail::verify::check_sender(&raw)));
+        lap(4, &mut || drop(crate::mail::pgp::detect(&raw)));
         lap(5, &mut || drop(extract_body(&raw)));
         lap(6, &mut || drop(extract_attachments(&raw)));
         for i in 0..7 {

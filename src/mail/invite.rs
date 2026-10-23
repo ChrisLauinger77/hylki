@@ -31,7 +31,7 @@
 //!
 //! Nothing here touches the network or the clock beyond formatting: the
 //! part is read once, when the message's body is fetched, and rides with
-//! the sender check into the cache (see [`crate::verify`]).
+//! the sender check into the cache (see [`crate::mail::verify`]).
 
 use gtk::glib;
 

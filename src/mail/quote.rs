@@ -80,7 +80,7 @@ pub(crate) fn message_text(body: &str) -> String {
     if !body.contains('<') {
         return body.trim().to_string();
     }
-    crate::markdown::plain_text(body)
+    crate::mail::markdown::plain_text(body)
 }
 
 /// Drop the empty blocks a quoted body opens or closes with. Every message

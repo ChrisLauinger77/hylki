@@ -278,7 +278,7 @@ pub(crate) fn pills<'a>(
     // A decoded name can hold a NUL (`&AAA-`), which a GTK label aborts on.
     let shown: Vec<String> = labels
         .iter()
-        .map(|l| crate::mutf7::decode(l).replace('\0', " "))
+        .map(|l| crate::mail::mutf7::decode(l).replace('\0', " "))
         .collect();
     let names_label = |t: &crate::config::Tag, i: usize| {
         t.keyword.eq_ignore_ascii_case(&labels[i]) || t.name.eq_ignore_ascii_case(&shown[i])
@@ -315,7 +315,9 @@ pub(crate) fn label_hue(name: &str) -> usize {
 /// a tag: named like its keyword, or like its name.
 fn label_names_tag(label: &str, tag: &crate::config::Tag) -> bool {
     tag.keyword.eq_ignore_ascii_case(label)
-        || tag.name.eq_ignore_ascii_case(&crate::mutf7::decode(label))
+        || tag
+            .name
+            .eq_ignore_ascii_case(&crate::mail::mutf7::decode(label))
 }
 
 /// A short date for a single line: the time for today, the day and month

@@ -75,7 +75,7 @@ struct Evidence {
     /// over the same parse, for the same reason.
     invite: Option<Box<crate::models::Invite>>,
     /// The sensitivity label (#411), likewise.
-    label: Option<crate::sensitivity::SensitivityLabel>,
+    label: Option<crate::mail::sensitivity::SensitivityLabel>,
 }
 
 impl Evidence {
@@ -110,9 +110,9 @@ fn gather(raw: &[u8]) -> Evidence {
     let Some(parsed) = MessageParser::default().parse(raw) else {
         return ev;
     };
-    ev.unsubscribe = crate::unsubscribe::detect(&parsed);
-    ev.invite = crate::invite::detect(&parsed).map(Box::new);
-    ev.label = crate::sensitivity::detect(&parsed);
+    ev.unsubscribe = crate::mail::unsubscribe::detect(&parsed);
+    ev.invite = crate::mail::invite::detect(&parsed).map(Box::new);
+    ev.label = crate::mail::sensitivity::detect(&parsed);
 
     let first_addr = |a: Option<&mail_parser::Address>| -> Option<String> {
         a.and_then(|a| a.first())

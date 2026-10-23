@@ -105,7 +105,7 @@ impl MessageView {
                 return lang.clone();
             }
         }
-        let lang = crate::translate::detect(&crate::reader::extract(&m.body));
+        let lang = crate::translate::detect(&crate::mail::reader::extract(&m.body));
         self.detected
             .borrow_mut()
             .insert(key, (m.body.len(), lang.clone()));

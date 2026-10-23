@@ -645,7 +645,7 @@ pub(crate) struct AppModel {
     /// Settings → Reading: the zoom every launch starts at, in percent.
     pub(super) zoom_default: u32,
     /// Reader View: every message in the reader shown as its content alone,
-    /// in the reader's own sheet (see `crate::reader`). The toggle sits in
+    /// in the reader's own sheet (see `crate::mail::reader`). The toggle sits in
     /// the reader's subject block; the choice is remembered across runs.
     pub(super) reader_mode: bool,
     /// The Reader View switch is shown in the reader header.

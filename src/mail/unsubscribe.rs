@@ -28,10 +28,10 @@
 //! user to the browser, and the button says so.
 //!
 //! The handles are read once, when the message's body is fetched, and ride
-//! with the sender check into the cache (see [`crate::verify`]); nothing here
+//! with the sender check into the cache (see [`crate::mail::verify`]); nothing here
 //! touches the network until the user asks.
 
-use crate::mail_header::unfold;
+use crate::mail::mail_header::unfold;
 use crate::models::Unsubscribe;
 
 mod action;
@@ -307,7 +307,7 @@ mod tests {
     use super::*;
     use crate::models::ReplyRoute;
 
-    /// Header unfolding (`crate::mail_header::unfold`), on the corpus both
+    /// Header unfolding (`crate::mail::mail_header::unfold`), on the corpus both
     /// header readers were pinned with before their copies were merged.
     #[test]
     fn folded_header_values_become_one_line() {
@@ -474,7 +474,7 @@ Content-Type: text/plain\r\nList-Unsubscribe: <mailto:leave@x.example>\r\n\r\nhi
         assert!(u.one_click.is_some() && u.mailto.is_some() && u.direct());
         assert_eq!(u.list_id, "digest.this-week-in-rust.org");
         assert_eq!(
-            crate::verify::check_sender(raw.as_bytes()).trust,
+            crate::mail::verify::check_sender(raw.as_bytes()).trust,
             crate::models::SenderTrust::Pass
         );
     }
@@ -863,7 +863,7 @@ Subject: Hello\r\n\r\nBody\r\n";
             return;
         };
         let raw = std::fs::read(&path).expect("readable file");
-        let check = crate::verify::check_sender(&raw);
+        let check = crate::mail::verify::check_sender(&raw);
         eprintln!(
             "{path}: trust {:?}, unsubscribe {:#?}",
             check.trust,

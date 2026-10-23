@@ -198,7 +198,7 @@ impl AppModel {
             self.folders.entry(account_id).or_default().push(Folder {
                 id: 0,
                 account_id,
-                name: crate::mutf7::decode(&leaf),
+                name: crate::mail::mutf7::decode(&leaf),
                 path: path.clone(),
                 kind: FolderKind::Custom,
                 unread: 0,
@@ -441,7 +441,7 @@ impl AppModel {
                 if f.path == path {
                     f.path = new_path.to_string();
                     let leaf = f.path.rsplit(delim).next().unwrap_or(&f.path);
-                    f.name = crate::mutf7::decode(leaf);
+                    f.name = crate::mail::mutf7::decode(leaf);
                 } else if let Some(rest) = f.path.strip_prefix(&old_prefix) {
                     f.path = format!("{new_prefix}{rest}");
                 }

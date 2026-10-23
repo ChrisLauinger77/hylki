@@ -50,7 +50,7 @@ fn demo_attachment_files(message_id: u32) -> Vec<crate::models::Attachment> {
 /// Unsubscribe banner appear as they would for fetched mail.
 fn mock_sender_check(path: &str, message_id: u32, emit: &impl Fn(WorkerEvent)) {
     if let Some(raw) = crate::backend::demo_raw(message_id) {
-        let check = crate::verify::check_sender(raw.as_bytes());
+        let check = crate::mail::verify::check_sender(raw.as_bytes());
         emit(WorkerEvent::SenderChecked {
             path: path.to_string(),
             message_id,
@@ -233,7 +233,7 @@ pub(super) async fn run_mock(
                 // A meeting request carries its own calendar part and
                 // nothing else (#223).
                 let invite = crate::backend::demo_raw(message_id)
-                    .and_then(|raw| crate::invite::detect_raw(raw.as_bytes()));
+                    .and_then(|raw| crate::mail::invite::detect_raw(raw.as_bytes()));
                 let items = if let Some(inv) = invite {
                     vec![crate::models::Attachment {
                         name: "invite.ics".to_string(),

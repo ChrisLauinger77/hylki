@@ -268,7 +268,7 @@ impl Compose {
         // The OpenPGP toggles go through their buttons so the
         // toggled handlers keep the model and the buttons agreeing.
         let mut pgp = Vec::new();
-        if crate::pgp::available() {
+        if crate::mail::pgp::available() {
             let check =
                 |on: bool, icon: &str| if on { "verified-checkmark" } else { icon }.to_string();
             let sign = widgets.sign_btn.clone();
