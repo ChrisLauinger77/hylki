@@ -26,6 +26,7 @@ mod launcher_badge;
 mod legacy;
 mod local_contacts;
 mod logo;
+mod mail_header;
 mod markdown;
 mod memory_report;
 mod models;

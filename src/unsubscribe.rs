@@ -31,6 +31,7 @@
 //! with the sender check into the cache (see [`crate::verify`]); nothing here
 //! touches the network until the user asks.
 
+use crate::mail_header::unfold;
 use crate::models::Unsubscribe;
 
 mod action;
@@ -169,16 +170,6 @@ fn raw_header_values(parsed: &mail_parser::Message, name: &str) -> Vec<String> {
         .map(|b| unfold(&String::from_utf8_lossy(b)))
         .filter(|v| !v.is_empty())
         .collect()
-}
-
-/// A folded header value as one line.
-fn unfold(value: &str) -> String {
-    value
-        .split(['\r', '\n'])
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 /// Build the handles from header values: every `List-Unsubscribe`-like

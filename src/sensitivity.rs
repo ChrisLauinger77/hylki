@@ -9,6 +9,7 @@
 //! is a separate matter the label only names.
 
 use crate::i18n::{i18n, i18n_f};
+use crate::mail_header::unfold;
 
 /// The label a message carries.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -90,16 +91,6 @@ pub fn detect(parsed: &mail_parser::Message) -> Option<SensitivityLabel> {
     value("msip_labels")
         .and_then(|v| from_msip(&v))
         .or_else(|| value("Sensitivity").and_then(|v| from_sensitivity(&v)))
-}
-
-/// A folded header value as one line.
-fn unfold(value: &str) -> String {
-    value
-        .split(['\r', '\n'])
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 /// The enabled label of an `msip_labels` value. A message relabeled keeps
