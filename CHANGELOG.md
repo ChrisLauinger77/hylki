@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Changed: the source is split into smaller files.** The 102 source
+  files, the largest 29,364 lines, are now 608 grouped by area under `src/`,
+  none longer than 1,360 lines. Behaviour is unchanged, and 204 new tests pin
+  it. The unused `relm4-components` dependency is gone.
+
 ## 1.45.1 — 2026-10-22
 
 A folder with a backslash in its name opens, typing in the search field no
