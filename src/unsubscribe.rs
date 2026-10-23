@@ -1120,6 +1120,25 @@ fn post_status(code: u16) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    /// Header unfolding, on the corpus shared with the other copy of
+    /// `unfold` (sensitivity.rs and unsubscribe.rs).
+    #[test]
+    fn folded_header_values_become_one_line() {
+        let corpus = [
+            ("a\r\n b", "a b"),
+            ("a\r\n\tb\r\n  c", "a b c"),
+            ("  padded  ", "padded"),
+            ("a\n\n\nb", "a b"),
+            ("a\rb", "a b"),
+            ("<x>,\r\n <y>", "<x>, <y>"),
+            ("", ""),
+            ("\r\n", ""),
+        ];
+        for (raw, one) in corpus {
+            assert_eq!(unfold(raw), one, "{raw:?}");
+        }
+    }
+
     fn s(v: &[&str]) -> Vec<String> {
         v.iter().map(|x| x.to_string()).collect()
     }

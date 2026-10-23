@@ -871,6 +871,84 @@ mod tests {
         END:VEVENT\r\n\
         END:VCALENDAR\r\n";
 
+    /// The TEXT escapes both ways, on a corpus shared with the vCard reader
+    /// (RFC 5545 3.3.11 and RFC 6350 3.4 are the same rule).
+    #[test]
+    fn text_escapes_read_and_write_as_they_always_have() {
+        let read = [
+            ("a\\,b\\;c\\\\d\\ne\\Nf", "a,b;c\\d\ne\nf"),
+            ("trailing\\", "trailing\\"),
+            ("\\x\\:", "x:"),
+            ("plain", "plain"),
+            ("", ""),
+        ];
+        for (raw, text) in read {
+            assert_eq!(unescape(raw), text, "{raw:?}");
+            assert_eq!(crate::contacts::unescape_vcard_text(raw), text, "{raw:?}");
+        }
+        assert_eq!(escape("a,b;c\\d\ne\r\nf"), "a\\,b\\;c\\\\d\\ne\\nf");
+        assert_eq!(escape("é: ok"), "é: ok");
+        let text = "Room 2, floor 3; bring \\ notes\nthanks";
+        assert_eq!(unescape(&escape(text)), text);
+    }
+
+    /// Lines break before 74 octets, continuations carry one space, and a
+    /// multi-byte character is never split.
+    #[test]
+    fn folding_breaks_at_73_octets_between_characters() {
+        let a = |n: usize| "a".repeat(n);
+        assert_eq!(fold(&a(73)), a(73));
+        assert_eq!(fold(&a(74)), format!("{}\r\n a", a(73)));
+        assert_eq!(fold(&a(146)), format!("{}\r\n {}\r\n a", a(73), a(72)));
+        let e = "é".repeat(37);
+        assert_eq!(fold(&e), format!("{}\r\n é", "é".repeat(36)));
+        assert_eq!(fold(""), "");
+    }
+
+    #[test]
+    fn content_lines_split_at_the_first_unquoted_colon() {
+        let line = split_line("ATTENDEE;CN=\"Doe; Jane\";ROLE=REQ:mailto:j@x.org").unwrap();
+        assert_eq!(line.name, "ATTENDEE");
+        assert_eq!(
+            line.params,
+            vec![
+                ("CN".to_string(), "Doe; Jane".to_string()),
+                ("ROLE".to_string(), "REQ".to_string())
+            ]
+        );
+        assert_eq!(line.value, "mailto:j@x.org");
+        let line = split_line("DTSTART;TZID=\"America/New_York\":20261102T090000").unwrap();
+        assert_eq!(line.param("tzid"), Some("America/New_York"));
+        assert_eq!(line.raw, "20261102T090000");
+        // A parameter without `=` is dropped.
+        let line = split_line("X-THING;bad; K = V :v").unwrap();
+        assert_eq!(line.params, vec![("K".to_string(), "V".to_string())]);
+        // The value is unescaped; the raw form keeps the escapes.
+        let line = split_line("SUMMARY:a\\,b").unwrap();
+        assert_eq!((line.value.as_str(), line.raw.as_str()), ("a,b", "a\\,b"));
+        // No colon: a name with an empty value.
+        let line = split_line("NOCOLON").unwrap();
+        assert_eq!((line.name.as_str(), line.value.as_str()), ("NOCOLON", ""));
+        assert!(split_line(":value").is_none());
+        assert!(split_line("   ").is_none());
+    }
+
+    #[test]
+    fn unfolding_joins_continuations_and_drops_blank_lines() {
+        let lines = unfold("A:1\r\n B\r\n\tC\n\r\nD;X=y:2\n ");
+        let got: Vec<(&str, &str)> = lines
+            .iter()
+            .map(|l| (l.name.as_str(), l.value.as_str()))
+            .collect();
+        assert_eq!(got, vec![("A", "1BC"), ("D", "2")]);
+        // A continuation with nothing before it starts a line of its own.
+        let lines = unfold(" X:1");
+        assert_eq!(
+            (lines[0].name.as_str(), lines[0].value.as_str()),
+            ("X", "1")
+        );
+    }
+
     #[test]
     fn a_zimbra_request_reads_whole() {
         let inv = parse(ZIMBRA).expect("an invitation");

@@ -1287,6 +1287,43 @@ mod tests {
     }
 
     #[test]
+    fn locale_edge_cases_normalize_as_they_always_have() {
+        assert_eq!(normalize("C.UTF-8"), "c");
+        assert_eq!(normalize(""), "");
+        assert_eq!(normalize("zh_HK"), "zh-Hant");
+        assert_eq!(normalize("zh_Hant_TW"), "zh-Hant");
+        // The region test for Chinese is case-sensitive, Portuguese's is not.
+        assert_eq!(normalize("zh_tw"), "zh-Hans");
+        assert_eq!(normalize("PT_pt"), "pt-PT");
+        assert_eq!(normalize("iw_IL"), "he");
+        assert_eq!(normalize("in"), "id");
+        assert_eq!(normalize("no_NO"), "nb");
+        assert_eq!(normalize("sr@latin"), "sr");
+    }
+
+    /// A block over [`CHUNK`] is never split: it goes as a piece of its own
+    /// (see REFACTOR_NOTES.md, suspected bug B12).
+    #[test]
+    fn pieces_fill_up_to_the_limit_and_an_oversized_block_goes_whole() {
+        let x = |n: usize| "x".repeat(n);
+        assert_eq!(chunk(&[x(2000), x(2500)]), vec![x(4500)]);
+        assert_eq!(chunk(&[x(3000), x(3000)]), vec![x(3000), x(3000)]);
+        assert_eq!(chunk(&[x(10_000)]), vec![x(10_000)]);
+        assert_eq!(
+            chunk(&[x(10), x(10_000), x(10)]),
+            vec![x(10), x(10_000), x(10)]
+        );
+        assert!(chunk(&[]).is_empty());
+        // At most fifty pieces to a request.
+        let many: Vec<String> = (0..51).map(|_| x(1)).collect();
+        let sizes: Vec<usize> = batches(&many, Service::Google)
+            .iter()
+            .map(Vec::len)
+            .collect();
+        assert_eq!(sizes, vec![50, 1]);
+    }
+
+    #[test]
     fn long_messages_go_in_pieces() {
         let blocks: Vec<String> = (0..30)
             .map(|i| format!("<p>{}</p>", "x".repeat(400 + i)))

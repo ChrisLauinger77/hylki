@@ -1775,6 +1775,114 @@ fn generate_password() -> Result<String, String> {
 mod tests {
     use super::*;
 
+    fn status(code: u16, body: &str) -> ureq::Error {
+        ureq::Error::Status(code, ureq::Response::new(code, "Status", body).unwrap())
+    }
+
+    fn transport() -> ureq::Error {
+        ureq::get("not a url").call().unwrap_err()
+    }
+
+    /// The four `ureq::Error` mappers, pinned before they are merged: each
+    /// has its own refusal wording, its own set of codes and its own order
+    /// of message and status.
+    #[test]
+    fn each_service_maps_http_errors_in_its_own_words() {
+        let login = "Upload: the server refused the login. Check the user name and the password.";
+        assert_eq!(http_err("Upload", status(401, "x")), login);
+        assert_eq!(http_err("Upload", status(403, "x")), login);
+        assert_eq!(
+            http_err("Upload", status(404, "x")),
+            "Upload: not found. Check the server URL."
+        );
+        assert_eq!(
+            http_err("Upload", status(500, r#"{"message":"  boom  "}"#)),
+            "Upload: HTTP 500 boom"
+        );
+        assert_eq!(http_err("Upload", status(502, "")), "Upload: HTTP 502 ");
+
+        assert_eq!(
+            dropbox_err("Upload", status(401, "x")),
+            "Upload: Dropbox refused the sign-in. Open Settings, Cloud Storage, and connect the account again."
+        );
+        assert_eq!(
+            dropbox_err(
+                "Upload",
+                status(409, r#"{"error_summary":"path/conflict/.."}"#)
+            ),
+            "Upload: path/conflict/.. (HTTP 409)"
+        );
+        assert_eq!(
+            dropbox_err("Upload", status(403, "")),
+            "Upload:  (HTTP 403)"
+        );
+        assert_eq!(
+            dropbox_err("Upload", status(404, "gone")),
+            "Upload: gone (HTTP 404)"
+        );
+
+        let sign_in = "Upload: the server refused the sign-in. Check the e-mail and the password or API token.";
+        assert_eq!(seafile_err("Upload", status(401, "x")), sign_in);
+        assert_eq!(seafile_err("Upload", status(403, "x")), sign_in);
+        assert_eq!(
+            seafile_err("Upload", status(404, "x")),
+            "Upload: not found. Check the server URL."
+        );
+        assert_eq!(
+            seafile_err("Upload", status(500, r#"{"error_msg":"quota"}"#)),
+            "Upload: quota (HTTP 500)"
+        );
+
+        assert_eq!(
+            api_err("Upload", status(401, "x")),
+            "Upload: the service refused the sign-in. Check the account under Settings, Online Accounts."
+        );
+        assert_eq!(
+            api_err("Upload", status(403, r#"{"error":{"message":"denied"}}"#)),
+            "Upload: denied (HTTP 403)"
+        );
+        assert_eq!(
+            api_err("Upload", status(404, "oops")),
+            "Upload: oops (HTTP 404)"
+        );
+
+        // A transport failure reads the same from all four.
+        let t = match transport() {
+            ureq::Error::Transport(t) => t.to_string(),
+            other => panic!("expected a transport error, got {other}"),
+        };
+        let expected = format!("Upload: {t}");
+        assert_eq!(http_err("Upload", transport()), expected);
+        assert_eq!(dropbox_err("Upload", transport()), expected);
+        assert_eq!(seafile_err("Upload", transport()), expected);
+        assert_eq!(api_err("Upload", transport()), expected);
+    }
+
+    #[test]
+    fn error_bodies_are_cut_to_their_message() {
+        assert_eq!(
+            short_error(r#"{"detail":"d","message":"m"}"#),
+            "d",
+            "the first key in the list wins"
+        );
+        assert_eq!(
+            short_error(r#"{"ocs":{"meta":{"message":"ocs says"}}}"#),
+            "ocs says"
+        );
+        assert_eq!(
+            short_error(&format!(r#"{{"error":"{}"}}"#, "e".repeat(250))),
+            "e".repeat(200)
+        );
+        assert_eq!(short_error(&"t".repeat(300)), "t".repeat(160));
+        // JSON without a string message falls back to the text itself.
+        assert_eq!(
+            short_error(r#"{"error":{"code":5}}"#),
+            r#"{"error":{"code":5}}"#
+        );
+        assert_eq!(api_message(r#"{"error":{"message":"graph"}}"#), "graph");
+        assert_eq!(api_message(r#"{"error":"plain"}"#), "plain");
+    }
+
     #[test]
     fn base_url_gets_a_scheme_and_loses_its_slash() {
         let mut a = CloudAccount::empty();

@@ -1049,6 +1049,62 @@ pub fn run_restart_helper() -> ! {
 mod tests {
     use super::*;
 
+    /// The whole launcher copy, byte for byte: the keys Hylki adds go at
+    /// the end of the main group, before its blank line, and an action's
+    /// command keeps its own arguments.
+    #[test]
+    fn a_launcher_copy_is_written_exactly() {
+        let base = "[Desktop Entry]\nName=Hylki\nExec=hylki %U\nIcon=co.hyprlab.Hylki\nActions=new-message;\n\n[Desktop Action new-message]\nName=New Message\nExec=hylki mailto:\n";
+        let host = format!(
+            "flatpak run --branch=stable --arch=x86_64 --command=hylki --file-forwarding {} @@u %U @@",
+            crate::APP_ID
+        );
+        let id = crate::APP_ID;
+        assert_eq!(
+            shadow_text(base, "/icons/x.png", Some(&host), "/exports/bin/x", true),
+            format!(
+                "[Desktop Entry]\nName=Hylki\nExec={host}\nIcon=/icons/x.png\nActions=new-message;\nTryExec=/exports/bin/x\nX-Flatpak={id}\n{LAUNCHER_MARK}=1\n\n[Desktop Action new-message]\nName=New Message\nExec=flatpak run --branch=stable --arch=x86_64 --command=hylki {id} mailto:\n"
+            )
+        );
+        // Keys from an earlier copy are dropped and written once; an action
+        // group's own Icon and Exec are left alone without a host command.
+        let old = format!("[Desktop Entry]\nTryExec=old\nIcon=a\nX-Flatpak=old\n{LAUNCHER_MARK}=1\nExec=hylki %U\n[Desktop Action x]\nIcon=b\nExec=hylki --x\n");
+        assert_eq!(
+            shadow_text(&old, "NEW", None, "", false),
+            format!("[Desktop Entry]\nIcon=NEW\nExec=hylki %U\n{LAUNCHER_MARK}=1\n[Desktop Action x]\nIcon=b\nExec=hylki --x\n")
+        );
+    }
+
+    #[test]
+    fn an_action_runs_the_host_command_with_its_own_arguments() {
+        assert_eq!(
+            action_exec(
+                "flatpak run --command=hylki --file-forwarding co.x @@u %U @@",
+                "mailto:"
+            ),
+            "flatpak run --command=hylki co.x mailto:"
+        );
+        assert_eq!(action_exec("hylki", ""), "hylki");
+        assert_eq!(action_exec("x --file-forwarding y", ""), "x y");
+    }
+
+    #[test]
+    fn mime_types_come_from_the_main_group_unless_hidden() {
+        assert_eq!(
+            desktop_mime_types(
+                "[Desktop Entry]\nName=H\nMimeType=x-scheme-handler/mailto; message/rfc822 ;;\n"
+            ),
+            vec!["x-scheme-handler/mailto", "message/rfc822"]
+        );
+        assert!(desktop_mime_types(
+            "[Desktop Entry]\nHidden=true\nMimeType=x-scheme-handler/mailto;\n"
+        )
+        .is_empty());
+        assert!(desktop_mime_types("[Desktop Entry]\nName=H\n").is_empty());
+        assert!(desktop_mime_types("[Other]\nMimeType=a/b;\n").is_empty());
+        assert!(desktop_mime_types("not a key file").is_empty());
+    }
+
     /// A launcher's actions have `Exec` lines of their own; only the main
     /// entry's counts, and a hidden entry claims no types.
     #[test]

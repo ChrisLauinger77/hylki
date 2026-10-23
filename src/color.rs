@@ -51,3 +51,40 @@ pub fn darken(hex: &str, amount: f64) -> String {
     let dim = |c: u8| (c as f64 * keep).round() as u8;
     format!("#{:02x}{:02x}{:02x}", dim(r), dim(g), dim(b))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pale_is_the_color_at_an_alpha_or_transparent() {
+        assert_eq!(pale("#ff8000", 0.5), "rgba(255,128,0,0.5)");
+        assert_eq!(pale("rgb(1,2,3)", 1.0), "rgba(1,2,3,1)");
+        assert_eq!(pale("no color", 0.2), "transparent");
+    }
+
+    #[test]
+    fn readable_text_is_dark_only_on_a_light_ground() {
+        assert_eq!(readable_text("#ffffff"), "rgba(0,0,0,0.85)");
+        assert_eq!(readable_text("#ffff00"), "rgba(0,0,0,0.85)");
+        assert_eq!(readable_text("#808080"), "#ffffff");
+        assert_eq!(readable_text("#000000"), "#ffffff");
+        assert_eq!(readable_text("no color"), "#ffffff");
+    }
+
+    #[test]
+    fn darken_scales_each_channel_and_clamps_the_amount() {
+        assert_eq!(darken("#ff8000", 0.5), "#804000");
+        assert_eq!(darken("#102030", 2.0), "#000000");
+        assert_eq!(darken("#102030", -1.0), "#102030");
+        assert_eq!(darken("#102030", 0.0), "#102030");
+        // Unparseable input comes back as it was.
+        assert_eq!(darken("no color", 0.5), "no color");
+    }
+
+    #[test]
+    fn to_hex_rounds_each_channel() {
+        assert_eq!(to_hex(&gtk::gdk::RGBA::new(1.0, 0.5, 0.0, 0.3)), "#ff8000");
+        assert_eq!(to_hex(&gtk::gdk::RGBA::new(0.0, 0.0, 0.0, 1.0)), "#000000");
+    }
+}

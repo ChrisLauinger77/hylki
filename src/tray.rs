@@ -663,6 +663,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn menu_lines_are_collapsed_and_clipped_with_an_ellipsis() {
+        assert_eq!(clip("  a\n b\t c ", 10), "a b c");
+        assert_eq!(clip("abcdef", 6), "abcdef");
+        assert_eq!(clip("abcdef", 4), "abc…");
+        assert_eq!(clip("äöüß", 3), "äö…");
+        assert_eq!(clip("abc", 0), "…");
+        assert_eq!(clip("", 0), "");
+    }
+
+    #[test]
+    fn the_status_line_counts_unread_inbox_mail() {
+        assert_eq!(inbox_status_text(0), "No unread mail in Inboxes");
+        assert_eq!(inbox_status_text(1), "1 unread in Inboxes");
+        assert_eq!(inbox_status_text(12), "12 unread in Inboxes");
+    }
+
+    #[test]
     fn unpremultiplies_into_network_order() {
         // One half-transparent pure-red pixel, premultiplied, native-endian.
         let native = (0x80u32 << 24) | (0x80 << 16);

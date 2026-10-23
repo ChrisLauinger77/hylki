@@ -3067,6 +3067,93 @@ mod tests {
     }
 
     #[test]
+    fn a_caption_names_sender_subject_folder_and_size() {
+        assert_eq!(
+            caption(&item("a.pdf", "  ", "  Hi ", "INBOX", 0, 2048)),
+            "Unknown · Hi · Inbox · 2.0\u{a0}kB"
+        );
+        assert_eq!(
+            caption(&item("a.pdf", " Ann ", "", "[Gmail]/Sent Mail", -5, 10)),
+            format!("Ann · Sent Mail · {}", crate::models::human_size(10))
+        );
+    }
+
+    #[test]
+    fn folder_labels_are_the_last_segment_decoded() {
+        assert_eq!(folder_label("INBOX"), "Inbox");
+        assert_eq!(folder_label("inbox"), "Inbox");
+        assert_eq!(folder_label("INBOX/Work"), "Work");
+        assert_eq!(folder_label("INBOX.Inbox"), "Inbox");
+        assert_eq!(folder_label("Archives.2024"), "2024");
+        assert_eq!(folder_label("Entw&APw-rfe"), "Entwürfe");
+        assert_eq!(folder_label(""), "");
+    }
+
+    #[test]
+    fn the_footer_says_what_the_network_is_doing() {
+        assert_eq!(scan_text(false, 0), "");
+        assert_eq!(scan_text(true, 0), "Loading more…");
+        assert_eq!(scan_text(true, 5), "Indexing 5 messages…");
+        assert_eq!(scan_text(false, 1), "Indexing 1 messages…");
+    }
+
+    /// The table's date ignores the date-style setting (REFACTOR_NOTES.md,
+    /// suspected bug B5).
+    #[test]
+    fn table_dates_use_a_fixed_pattern() {
+        assert_eq!(date_text(1_787_745_600), "Aug 26, 2026");
+    }
+
+    #[test]
+    fn type_icons_follow_the_extension() {
+        assert_eq!(icon_for("report.PDF"), "x-office-document-symbolic");
+        assert_eq!(icon_for("notes.md"), "x-office-document-symbolic");
+        assert_eq!(icon_for("budget.csv"), "x-office-spreadsheet-symbolic");
+        assert_eq!(icon_for("deck.odp"), "x-office-presentation-symbolic");
+        assert_eq!(icon_for("a.tar.gz"), "package-x-generic-symbolic");
+        assert_eq!(icon_for("song.flac"), "audio-x-generic-symbolic");
+        assert_eq!(icon_for("clip.webm"), "video-x-generic-symbolic");
+        assert_eq!(icon_for("photo.HEIC"), "image-x-generic-symbolic");
+        assert_eq!(icon_for("invite.ics"), "x-office-calendar-symbolic");
+        assert_eq!(icon_for("data.bin"), "text-x-generic-symbolic");
+        // No dot: the whole name is taken as the extension.
+        assert_eq!(icon_for("pdf"), "x-office-document-symbolic");
+        assert_eq!(icon_for("README"), "text-x-generic-symbolic");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn staged_files_are_new_private_and_never_written_through() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("hylki-stage-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let name = |base: &str| {
+            let (_, path) = create_private(&dir, base).expect("a file");
+            path.file_name().unwrap().to_string_lossy().into_owned()
+        };
+        assert_eq!(name("a.txt"), "a.txt");
+        assert_eq!(name("a.txt"), "a-1.txt");
+        assert_eq!(name("a.txt"), "a-2.txt");
+        assert_eq!(name(".bashrc"), ".bashrc");
+        assert_eq!(name(".bashrc"), ".bashrc-1");
+        assert_eq!(name("noext"), "noext");
+        assert_eq!(name("noext"), "noext-1");
+        let mode = std::fs::metadata(dir.join("a.txt"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+        // A symlink planted at the name is skipped, not followed.
+        let target = dir.join("target");
+        std::fs::write(&target, b"keep").unwrap();
+        std::os::unix::fs::symlink(&target, dir.join("b.txt")).unwrap();
+        assert_eq!(name("b.txt"), "b-1.txt");
+        assert_eq!(std::fs::read(&target).unwrap(), b"keep");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn sort_index_roundtrips_every_criterion() {
         for i in 0..10 {
             assert_eq!(GallerySort::from_index(i).index(), i);

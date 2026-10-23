@@ -451,6 +451,35 @@ fn domain_in_display_name(name: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    /// The two registrable-domain rules in the crate, side by side: this
+    /// one (a fixed list of second-level labels) and the logo cache's (any
+    /// short label under a two-letter TLD). They disagree on some domains;
+    /// see REFACTOR_NOTES.md, suspected bug B6.
+    #[test]
+    fn registrable_domain_rules_agree_and_differ_as_recorded() {
+        let logo = |d: &str| crate::logo::domain_of(&format!("someone@{d}"));
+        for (domain, here, there) in [
+            ("example.com", "example.com", "example.com"),
+            ("a.b.example.org", "example.org", "example.org"),
+            ("mail.amazon.co.uk", "amazon.co.uk", "amazon.co.uk"),
+            ("em.example.com.au", "example.com.au", "example.com.au"),
+            ("news.ikea.com", "ikea.com", "ikea.com"),
+            ("mail.abc.xyz", "abc.xyz", "abc.xyz"),
+            ("mail.bmw.de", "bmw.de", "mail.bmw.de"),
+            ("x.gouv.fr", "x.gouv.fr", "gouv.fr"),
+        ] {
+            assert_eq!(registrable(domain), here, "verify: {domain}");
+            assert_eq!(logo(domain).as_deref(), Some(there), "logo: {domain}");
+        }
+        assert_eq!(registrable("localhost"), "localhost");
+        assert_eq!(logo("localhost"), None);
+        assert_eq!(logo("127.0.0.1"), None);
+        assert_eq!(
+            crate::logo::domain_of("someone@Mail.Example.COM."),
+            Some("example.com".into())
+        );
+    }
+
     fn msg(headers: &str) -> Vec<u8> {
         format!("{headers}\r\n\r\nbody\r\n").into_bytes()
     }

@@ -942,6 +942,67 @@ fn pkce_challenge(verifier: &str) -> String {
 #[cfg(test)]
 mod tests {
 
+    use super::*;
+
+    #[test]
+    fn the_redirect_line_yields_code_and_state() {
+        assert_eq!(
+            parse_redirect("GET /?code=a%2Fb&state=s+1&x=y HTTP/1.1"),
+            (Some("a/b".to_string()), Some("s 1".to_string()))
+        );
+        assert_eq!(
+            parse_redirect("GET /cb?code=1&code=2 HTTP/1.1")
+                .0
+                .as_deref(),
+            Some("2"),
+            "the last one wins"
+        );
+        assert_eq!(parse_redirect("GET / HTTP/1.1"), (None, None));
+        assert_eq!(parse_redirect(""), (None, None));
+        assert_eq!(parse_redirect("GET /?code HTTP/1.1"), (None, None));
+    }
+
+    #[test]
+    fn a_navigation_is_answered_only_at_the_redirect() {
+        let request = Authorization {
+            url: String::new(),
+            redirect: "http://localhost/cb".into(),
+            state: "st".into(),
+            verifier: "v".into(),
+        };
+        let settings = OAuthSettings {
+            client_id: "abc".into(),
+            ..Default::default()
+        };
+        let answer = |uri: &str| request.answer(uri, &settings);
+        assert_eq!(answer("https://elsewhere/"), None);
+        assert_eq!(answer("http://localhost/cbx"), None);
+        assert_eq!(
+            answer("http://localhost/cb?code=c1&state=st"),
+            Some(Ok("c1".into()))
+        );
+        assert_eq!(
+            answer("http://localhost/cb?code=c1&state=zz"),
+            Some(Err("sign-in state mismatch (possible CSRF)".into()))
+        );
+        let none = Some(Err("no authorization code returned".to_string()));
+        assert_eq!(answer("http://localhost/cb"), none);
+        // A code in the fragment is not read.
+        assert_eq!(answer("http://localhost/cb#code=c1&state=st"), none);
+        assert_eq!(
+            answer("http://localhost/cb?error=access_denied&error_description=Line+one%0Aline+two"),
+            Some(Err("Line one".into()))
+        );
+        let consent = answer("http://localhost/cb?error=consent_required")
+            .unwrap()
+            .unwrap_err();
+        assert!(
+            consent.starts_with("consent_required If your organization")
+                && consent.contains("adminconsent?client_id=abc"),
+            "{consent}"
+        );
+    }
+
     /// #329: Evolution's app registration, typed into the Advanced rows.
     #[test]
     fn microsoft_advanced_rows_make_the_sign_in() {
@@ -1066,8 +1127,6 @@ mod tests {
             "sign-in timed out"
         );
     }
-
-    use super::*;
 
     #[test]
     fn base64_is_as_forgiving_as_a_mail_body_needs() {
