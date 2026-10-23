@@ -14,12 +14,18 @@ use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
 use crate::ui::chip_flow::ChipFlow;
 use std::rc::Rc;
 
+mod alerts;
+mod appearance;
 mod chips;
 mod choices;
+mod composing;
+mod contacts;
 mod messages;
 mod navigation;
+mod reading;
 mod rows;
 mod search;
+mod sidebar_page;
 mod spelling;
 mod system;
 
@@ -37,9 +43,9 @@ pub use messages::{PrefInit, PrefInput, PrefOutput};
 use navigation::{side_page, SIDE_PAGES};
 use rows::{compose_font_setup, middle_ellipsize, widen_combo_value, widen_page};
 pub use search::NOT_SEARCHED;
-use search::{reveal, scroll_to, SettingsSearch};
+use search::{scroll_to, SettingsSearch};
 use spelling::{rebuild_personal_words, SpellLangRows};
-use system::{hide_edit_icon, link_group_description, nautilus_status_text, report, storage_text};
+use system::{hide_edit_icon, link_group_description, nautilus_status_text, storage_text};
 
 // ---- Preferences window -----------------------------------------------------
 
@@ -3412,450 +3418,96 @@ impl Component for Preferences {
 
     fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>, root: &Self::Root) {
         match message {
-            PrefInput::ChangeDateStyle(i) => {
-                if let Some((_, style)) = DATE_STYLES.get(i as usize) {
-                    let _ = sender.output(PrefOutput::SetDateStyle(*style));
-                }
-            }
-            PrefInput::ChangeClockStyle(i) => {
-                if let Some((_, style)) = CLOCK_STYLES.get(i as usize) {
-                    let _ = sender.output(PrefOutput::SetClockStyle(*style));
-                }
-            }
-            PrefInput::ChangeRenderer(i) => {
-                if let Some(r) = RENDERERS.get(i as usize) {
-                    let _ = sender.output(PrefOutput::SetRenderer((*r).to_string()));
-                }
-            }
-            PrefInput::ChangeLanguage(i) => {
-                if let Some((_, code)) = language_choices().get(i as usize) {
-                    let _ = sender.output(PrefOutput::SetLanguage(code.clone()));
-                }
-            }
-            PrefInput::NautilusInstall => {
-                if let Err(e) = crate::nautilus_ext::install() {
-                    report(root, &i18n("Could not install the extension"), &e);
-                }
-                self.nautilus = crate::nautilus_ext::State::read();
-            }
-            PrefInput::MeasureStorage => {
-                let s = sender.input_sender().clone();
-                gtk::glib::spawn_future_local(async move {
-                    let measured = gtk::gio::spawn_blocking(|| {
-                        let (bodies, files) = crate::cache::Cache::open()
-                            .map(|c| c.downloaded_size())
-                            .unwrap_or((0, 0));
-                        (bodies, files, crate::cache::Cache::file_size())
-                    })
-                    .await;
-                    if let Ok((bodies, files, total)) = measured {
-                        let _ = s.send(PrefInput::StorageMeasured {
-                            bodies,
-                            files,
-                            total,
-                        });
-                    }
-                });
-            }
+            PrefInput::ChangeDateStyle(i) => self.on_change_date_style(i, sender),
+            PrefInput::ChangeClockStyle(i) => self.on_change_clock_style(i, sender),
+            PrefInput::ChangeRenderer(i) => self.on_change_renderer(i, sender),
+            PrefInput::ChangeLanguage(i) => self.on_change_language(i, sender),
+            PrefInput::NautilusInstall => self.on_nautilus_install(root),
+            PrefInput::MeasureStorage => self.on_measure_storage(sender),
             PrefInput::StorageMeasured {
                 bodies,
                 files,
                 total,
-            } => self.storage = Some((bodies, files, total)),
-            PrefInput::RemoveDownloads => {
-                let dialog = adw::AlertDialog::new(
-                    Some(&i18n("Remove downloaded mail?")),
-                    Some(&i18n("Mail and attachments on this computer are removed and fetched again when opened. Nothing on the server changes.")),
-                );
-                dialog.add_response("cancel", &i18n("Cancel"));
-                dialog.add_response("remove", &i18n("Remove"));
-                dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
-                dialog.set_default_response(Some("cancel"));
-                dialog.set_close_response("cancel");
-                let s = sender.input_sender().clone();
-                dialog.connect_response(None, move |_, resp| {
-                    if resp == "remove" {
-                        let _ = s.send(PrefInput::RemoveDownloadsNow);
-                    }
-                });
-                dialog.present(Some(root));
-            }
-            PrefInput::RemoveDownloadsNow => {
-                self.storage = None;
-                let s = sender.input_sender().clone();
-                gtk::glib::spawn_future_local(async move {
-                    let _ = gtk::gio::spawn_blocking(|| {
-                        match crate::cache::Cache::open().and_then(|c| {
-                            let n = c.remove_downloaded(None)?;
-                            let _ = c.compact();
-                            Ok(n)
-                        }) {
-                            Ok(n) => tracing::info!("storage: removed {n} downloaded message(s)"),
-                            Err(e) => {
-                                tracing::warn!("storage: could not remove downloaded mail: {e}")
-                            }
-                        }
-                    })
-                    .await;
-                    let _ = s.send(PrefInput::MeasureStorage);
-                });
-            }
-            PrefInput::ChangeKeepDownloads(idx) => {
-                let days = KEEP_DOWNLOADS_DAYS.get(idx as usize).copied().unwrap_or(0);
-                let _ = sender.output(PrefOutput::SetKeepDownloads(days));
-            }
-            PrefInput::NautilusRemove => {
-                if let Err(e) = crate::nautilus_ext::remove() {
-                    report(root, &i18n("Could not remove the extension"), &e);
-                }
-                self.nautilus = crate::nautilus_ext::State::read();
-            }
-            PrefInput::ChangeFilesAction(idx) => {
-                use crate::config::FilesAction as A;
-                let action = match idx {
-                    1 => A::New,
-                    2 => A::Draft,
-                    3 => A::Reply,
-                    _ => A::Ask,
-                };
-                if self.files.action != action {
-                    self.files.action = action;
-                    let _ = sender.output(PrefOutput::SetFilesPrefs(self.files));
-                }
-            }
-            PrefInput::ChangeFilesLarge(idx) => {
-                use crate::config::FilesLarge as L;
-                let large = match idx {
-                    1 => L::Attach,
-                    2 => L::Cloud,
-                    _ => L::Ask,
-                };
-                if self.files.large != large {
-                    self.files.large = large;
-                    let _ = sender.output(PrefOutput::SetFilesPrefs(self.files));
-                }
-            }
-            PrefInput::ChangeLinkBrowser(idx) => {
-                let choice = match idx {
-                    0 => String::new(),
-                    1 => crate::ui::launch::ASK.to_string(),
-                    n => self
-                        .browsers
-                        .get(n as usize - 2)
-                        .map(|b| b.id.clone())
-                        .unwrap_or_default(),
-                };
-                let _ = sender.output(PrefOutput::SetLinkBrowser(choice));
-            }
-            PrefInput::ChangeFilesLimit(mb) => {
-                let mb = mb.max(1);
-                if self.files.limit_mb != mb {
-                    self.files.limit_mb = mb;
-                    let _ = sender.output(PrefOutput::SetFilesPrefs(self.files));
-                }
-            }
-            PrefInput::SetFilesPrefs(p) => {
-                self.files = p;
-                if let Some((action, large, limit)) = self.files_rows.as_ref() {
-                    if action.selected() != files_action_index(p.action) {
-                        action.set_selected(files_action_index(p.action));
-                    }
-                    if large.selected() != files_large_index(p.large) {
-                        large.set_selected(files_large_index(p.large));
-                    }
-                    if limit.value().round() as u32 != p.limit_mb {
-                        limit.set_value(p.limit_mb as f64);
-                    }
-                }
-            }
-            PrefInput::SetSpellcheckLangs(langs) => {
-                if let Some(rows) = self.spell_langs.as_ref() {
-                    if *rows.setting.borrow() != langs {
-                        rows.show(&langs);
-                    }
-                }
-            }
-            PrefInput::NautilusRestartFiles => {
-                if let Err(e) = crate::nautilus_ext::quit_files() {
-                    report(root, &i18n("Could not restart Files"), &e);
-                }
-                self.nautilus = crate::nautilus_ext::State::read();
-            }
+            } => self.on_storage_measured(bodies, files, total),
+            PrefInput::RemoveDownloads => self.on_remove_downloads(sender, root),
+            PrefInput::RemoveDownloadsNow => self.on_remove_downloads_now(sender),
+            PrefInput::ChangeKeepDownloads(idx) => self.on_change_keep_downloads(idx, sender),
+            PrefInput::NautilusRemove => self.on_nautilus_remove(root),
+            PrefInput::ChangeFilesAction(idx) => self.on_change_files_action(idx, sender),
+            PrefInput::ChangeFilesLarge(idx) => self.on_change_files_large(idx, sender),
+            PrefInput::ChangeLinkBrowser(idx) => self.on_change_link_browser(idx, sender),
+            PrefInput::ChangeFilesLimit(mb) => self.on_change_files_limit(mb, sender),
+            PrefInput::SetFilesPrefs(p) => self.on_set_files_prefs(p),
+            PrefInput::SetSpellcheckLangs(langs) => self.on_set_spellcheck_langs(langs),
+            PrefInput::NautilusRestartFiles => self.on_nautilus_restart_files(root),
             PrefInput::NautilusRefresh => {
                 self.nautilus = crate::nautilus_ext::State::read();
             }
-            PrefInput::ToggleAvatars(on) => {
-                self.avatars = on;
-                let _ = sender.output(PrefOutput::SetAvatars(on));
-            }
-            PrefInput::ToggleThreading(on) => {
-                self.threading = on;
-                let _ = sender.output(PrefOutput::SetThreading(on));
-            }
-            PrefInput::ToggleThreadExpansion(on) => {
-                self.thread_expansion = on;
-                let _ = sender.output(PrefOutput::SetThreadExpansion(on));
-            }
-            PrefInput::ChangeReaderDefault(idx) => {
-                let policy = match idx {
-                    1 => crate::config::ReaderDefault::On,
-                    2 => crate::config::ReaderDefault::Off,
-                    _ => crate::config::ReaderDefault::Remember,
-                };
-                let _ = sender.output(PrefOutput::SetReaderDefault(policy));
-            }
-            PrefInput::ChangeReaderZoom(idx) => {
-                if let Some(&z) = crate::config::READER_ZOOM_STEPS.get(idx as usize) {
-                    let _ = sender.output(PrefOutput::SetReaderZoom(z));
-                }
-            }
+            PrefInput::ToggleAvatars(on) => self.on_toggle_avatars(on, sender),
+            PrefInput::ToggleThreading(on) => self.on_toggle_threading(on, sender),
+            PrefInput::ToggleThreadExpansion(on) => self.on_toggle_thread_expansion(on, sender),
+            PrefInput::ChangeReaderDefault(idx) => self.on_change_reader_default(idx, sender),
+            PrefInput::ChangeReaderZoom(idx) => self.on_change_reader_zoom(idx, sender),
             PrefInput::ChangeCardActionsMode(index) => {
-                self.card_actions_hover = index == 0;
-                let (hover_toggle, hover_auto) = match index {
-                    0 => (true, false),
-                    1 => (false, true),
-                    _ => (false, false),
-                };
-                let _ = sender.output(PrefOutput::SetCardActionsMode {
-                    hover_toggle,
-                    hover_auto,
-                });
+                self.on_change_card_actions_mode(index, sender)
             }
-            PrefInput::ToggleListPalette(on) => {
-                self.list_palette = on;
-                let _ = sender.output(PrefOutput::SetListPalette(on));
-            }
-            PrefInput::ToggleSwipeEnabled(on) => {
-                self.swipe_enabled = on;
-                let _ = sender.output(PrefOutput::SetSwipeEnabled(on));
-            }
+            PrefInput::ToggleListPalette(on) => self.on_toggle_list_palette(on, sender),
+            PrefInput::ToggleSwipeEnabled(on) => self.on_toggle_swipe_enabled(on, sender),
             PrefInput::ChangeComposeDefaultFrom(index) => {
-                let addr = (index > 0)
-                    .then(|| self.identities.get(index as usize - 1))
-                    .flatten()
-                    .map(|(_, addr)| addr.clone())
-                    .unwrap_or_default();
-                let _ = sender.output(PrefOutput::SetComposeDefaultFrom(addr));
+                self.on_change_compose_default_from(index, sender)
             }
-            PrefInput::ChangeFetchInterval(index) => {
-                let secs = FETCH_INTERVALS
-                    .get(index as usize)
-                    .map(|(_, s)| *s)
-                    .unwrap_or(0);
-                let _ = sender.output(PrefOutput::SetFetchInterval(secs));
-            }
-            PrefInput::ToggleNotifications(on) => {
-                self.notifications = on;
-                let _ = sender.output(PrefOutput::SetNotifications(on));
-            }
+            PrefInput::ChangeFetchInterval(index) => self.on_change_fetch_interval(index, sender),
+            PrefInput::ToggleNotifications(on) => self.on_toggle_notifications(on, sender),
             PrefInput::ToggleNotificationButton(button, on) => {
-                // A greyed-out row cannot be switched, so a fourth never
-                // arrives here; the guard is for the belt and braces.
-                if on && !self.notification_buttons.get(button) && self.notification_buttons.full()
-                {
-                    return;
-                }
-                self.notification_buttons.set(button, on);
-                let _ = sender.output(PrefOutput::SetNotificationButtons(
-                    self.notification_buttons,
-                ));
+                self.on_toggle_notification_button(button, on, sender)
             }
-            PrefInput::ChooseSound => {
-                let dialog = gtk::FileDialog::builder()
-                    .title(&i18n("Choose a Sound"))
-                    .build();
-                let filter = gtk::FileFilter::new();
-                filter.set_name(Some(&i18n("Sounds")));
-                filter.add_mime_type("audio/*");
-                let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
-                filters.append(&filter);
-                dialog.set_filters(Some(&filters));
-                dialog.set_default_filter(Some(&filter));
-                let s = sender.clone();
-                dialog.open(Some(root), gtk::gio::Cancellable::NONE, move |res| {
-                    let Ok(file) = res else { return };
-                    let Some(path) = file.path() else { return };
-                    s.input(PrefInput::SoundChosen(path));
-                });
-            }
-            PrefInput::SoundChosen(path) => match crate::config::set_custom_sound(&path) {
-                Ok(copy) => {
-                    crate::notify::play_sound(
-                        &crate::config::SoundSource::File(copy.clone()),
-                        true,
-                    );
-                    self.custom_sound = Some(copy);
-                }
-                Err(e) => tracing::warn!(
-                    "could not keep {} as the new-mail sound: {e}",
-                    path.display()
-                ),
-            },
-            PrefInput::PlaySound => {
-                if let Some(source) = self.sound.source() {
-                    crate::notify::play_sound(&source, true);
-                }
-            }
-            PrefInput::ToggleSound(on) => {
-                if self.sound.enabled != on {
-                    self.sound.enabled = on;
-                    crate::config::save_new_mail_sound(&self.sound);
-                }
-            }
-            PrefInput::ToggleSoundFocused(on) => {
-                if self.sound.when_focused != on {
-                    self.sound.when_focused = on;
-                    crate::config::save_new_mail_sound(&self.sound);
-                }
-            }
-            PrefInput::ChangeSound(index) => {
-                let name = crate::config::BUILTIN_SOUNDS
-                    .get(index as usize)
-                    .copied()
-                    .unwrap_or(crate::config::CUSTOM_SOUND);
-                if self.sound.sound == name {
-                    return;
-                }
-                self.sound.sound = name.to_string();
-                crate::config::save_new_mail_sound(&self.sound);
-                // Picking a sound plays it; Custom File with no file yet
-                // goes straight to the file chooser.
-                match self.sound.source() {
-                    Some(source) => crate::notify::play_sound(&source, true),
-                    None => sender.input(PrefInput::ChooseSound),
-                }
-            }
-            PrefInput::ToggleShowUnified(on) => {
-                self.show_unified = on;
-                let _ = sender.output(PrefOutput::SetShowUnified(on));
-            }
-            PrefInput::TogglePrintPageNumbers(on) => {
-                self.print_options.page_numbers = on;
-                let _ = sender.output(PrefOutput::SetPrintOptions(self.print_options));
-            }
-            PrefInput::TogglePrintDate(on) => {
-                self.print_options.date = on;
-                let _ = sender.output(PrefOutput::SetPrintOptions(self.print_options));
-            }
-            PrefInput::TogglePrintPunchMargin(on) => {
-                self.print_options.punch_margin = on;
-                let _ = sender.output(PrefOutput::SetPrintOptions(self.print_options));
-            }
+            PrefInput::ChooseSound => self.on_choose_sound(sender, root),
+            PrefInput::SoundChosen(path) => self.on_sound_chosen(path),
+            PrefInput::PlaySound => self.on_play_sound(),
+            PrefInput::ToggleSound(on) => self.on_toggle_sound(on),
+            PrefInput::ToggleSoundFocused(on) => self.on_toggle_sound_focused(on),
+            PrefInput::ChangeSound(index) => self.on_change_sound(index, sender),
+            PrefInput::ToggleShowUnified(on) => self.on_toggle_show_unified(on, sender),
+            PrefInput::TogglePrintPageNumbers(on) => self.on_toggle_print_page_numbers(on, sender),
+            PrefInput::TogglePrintDate(on) => self.on_toggle_print_date(on, sender),
+            PrefInput::TogglePrintPunchMargin(on) => self.on_toggle_print_punch_margin(on, sender),
             PrefInput::ToggleUnifiedChipAllInboxes(on) => {
-                self.unified_chips.all_inboxes = on;
-                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
+                self.on_toggle_unified_chip_all_inboxes(on, sender)
             }
             PrefInput::ToggleUnifiedChipStarred(on) => {
-                self.unified_chips.starred = on;
-                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
+                self.on_toggle_unified_chip_starred(on, sender)
             }
             PrefInput::ToggleUnifiedChipDrafts(on) => {
-                self.unified_chips.drafts = on;
-                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
+                self.on_toggle_unified_chip_drafts(on, sender)
             }
             PrefInput::ToggleUnifiedChipArchive(on) => {
-                self.unified_chips.archive = on;
-                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
+                self.on_toggle_unified_chip_archive(on, sender)
             }
-            PrefInput::ToggleUnifiedChipJunk(on) => {
-                self.unified_chips.junk = on;
-                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
-            }
-            PrefInput::ToggleUnifiedChipTrash(on) => {
-                self.unified_chips.trash = on;
-                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
-            }
-            PrefInput::ToggleUnifiedStarred(on) => {
-                self.unified_kinds.starred = on;
-                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-            }
-            PrefInput::ToggleUnifiedSent(on) => {
-                self.unified_kinds.sent = on;
-                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-            }
-            PrefInput::ToggleUnifiedDrafts(on) => {
-                self.unified_kinds.drafts = on;
-                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-            }
-            PrefInput::ToggleUnifiedArchive(on) => {
-                self.unified_kinds.archive = on;
-                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-            }
-            PrefInput::ToggleUnifiedJunk(on) => {
-                self.unified_kinds.junk = on;
-                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-            }
-            PrefInput::ToggleUnifiedTrash(on) => {
-                self.unified_kinds.trash = on;
-                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-            }
+            PrefInput::ToggleUnifiedChipJunk(on) => self.on_toggle_unified_chip_junk(on, sender),
+            PrefInput::ToggleUnifiedChipTrash(on) => self.on_toggle_unified_chip_trash(on, sender),
+            PrefInput::ToggleUnifiedStarred(on) => self.on_toggle_unified_starred(on, sender),
+            PrefInput::ToggleUnifiedSent(on) => self.on_toggle_unified_sent(on, sender),
+            PrefInput::ToggleUnifiedDrafts(on) => self.on_toggle_unified_drafts(on, sender),
+            PrefInput::ToggleUnifiedArchive(on) => self.on_toggle_unified_archive(on, sender),
+            PrefInput::ToggleUnifiedJunk(on) => self.on_toggle_unified_junk(on, sender),
+            PrefInput::ToggleUnifiedTrash(on) => self.on_toggle_unified_trash(on, sender),
             PrefInput::MountPages => self.mount_pages(),
-            PrefInput::Search(text) => {
-                // Every page has to be in the stack to be searched.
-                self.mount_pages();
-                if let (Some(search), Some(stack)) = (&self.search, &self.panels_stack) {
-                    search.show(&text, stack);
-                }
-            }
-            PrefInput::SearchPick(i) => {
-                let Some(hit) = self.search.as_ref().and_then(|s| s.hit(i)) else {
-                    return;
-                };
-                // The same way a click on the category goes, so an open
-                // editor still asks before it is left.
-                self.select_row(hit.page);
-                sender.input(PrefInput::SelectPage(hit.page.to_string()));
-                if let Some(widget) = hit.widget.upgrade() {
-                    // After the page has been laid out: until then the row
-                    // has no place to scroll to.
-                    gtk::glib::timeout_add_local_once(
-                        std::time::Duration::from_millis(80),
-                        move || {
-                            reveal(&widget);
-                        },
-                    );
-                }
-            }
-            PrefInput::ToggleSearch => {
-                if let Some(search) = &self.search {
-                    search.toggle();
-                }
-            }
+            PrefInput::Search(text) => self.on_search(text),
+            PrefInput::SearchPick(i) => self.on_search_pick(i, sender),
+            PrefInput::ToggleSearch => self.on_toggle_search(),
             PrefInput::SetAccountsPanel {
                 panel,
                 sender: accounts,
-            } => {
-                self.accounts_sender = accounts;
-                if let Some(slot) = &self.accounts_slot {
-                    slot.set_child(Some(&panel));
-                }
-            }
-            PrefInput::ToggleShowAccounts(on) => {
-                if self.show_accounts != on {
-                    self.show_accounts = on;
-                    let _ = sender.output(PrefOutput::SetShowAccounts(on));
-                }
-            }
-            PrefInput::ToggleFocus(part, on) => {
-                if self.focus.get(part) != on {
-                    self.focus.set(part, on);
-                    let _ = sender.output(PrefOutput::SetFocusMode(self.focus));
-                }
-            }
+            } => self.on_set_accounts_panel(panel, accounts),
+            PrefInput::ToggleShowAccounts(on) => self.on_toggle_show_accounts(on, sender),
+            PrefInput::ToggleFocus(part, on) => self.on_toggle_focus(part, on, sender),
             PrefInput::SetFocusMode(focus) => {
                 self.focus = focus;
             }
             PrefInput::SetShowAccounts(on) => {
                 self.show_accounts = on;
             }
-            PrefInput::ChangeSectionStyle(idx) => {
-                let style = if idx == 1 {
-                    crate::config::SectionStyle::Tree
-                } else {
-                    crate::config::SectionStyle::Unified
-                };
-                let _ = sender.output(PrefOutput::SetSectionStyle(style));
-            }
+            PrefInput::ChangeSectionStyle(idx) => self.on_change_section_style(idx, sender),
             PrefInput::ChangeFilteredPlacement(idx) => {
                 let _ = sender.output(PrefOutput::SetFilteredPlacement(placement_from_index(idx)));
             }
@@ -3866,362 +3518,76 @@ impl Component for Preferences {
                 let _ = sender.output(PrefOutput::SetFavoritesPlacement(placement_from_index(idx)));
             }
             PrefInput::ChangeContactsPlacement(idx) => {
-                let placement = contacts_placement_from_index(idx);
-                if let Some(c) = &self.contacts {
-                    c.emit(
-                        crate::ui::contact_sources::ContactSourcesInput::SetPlacement(placement),
-                    );
-                }
-                let _ = sender.output(PrefOutput::SetContactsPlacement(placement));
+                self.on_change_contacts_placement(idx, sender)
             }
-            PrefInput::ChangeStartView(idx) => {
-                use crate::config::StartView;
-                let view = match idx {
-                    1 => StartView::AccountInbox,
-                    2 => StartView::LastFolder,
-                    _ => StartView::AllInboxes,
-                };
-                let _ = sender.output(PrefOutput::SetStartView(view));
-            }
-            PrefInput::ChangeFolderSort(idx) => {
-                let sort = crate::config::FolderSort::ALL
-                    .get(idx as usize)
-                    .copied()
-                    .unwrap_or_default();
-                let _ = sender.output(PrefOutput::SetFolderSort(sort));
-            }
+            PrefInput::ChangeStartView(idx) => self.on_change_start_view(idx, sender),
+            PrefInput::ChangeFolderSort(idx) => self.on_change_folder_sort(idx, sender),
             PrefInput::ChangeChevronSide(idx) => {
                 let _ = sender.output(PrefOutput::SetChevronsLeft(idx == 0));
             }
             PrefInput::ToolbarDrop { key, side, index } => {
-                if let Some(item) = ToolbarItem::from_key(&key) {
-                    self.toolbar.place(item, side, index);
-                    self.rebuild_toolbar_chips();
-                    let _ = sender.output(PrefOutput::SetReaderToolbar(self.toolbar.clone()));
-                }
+                self.on_toolbar_drop(key, side, index, sender)
             }
             PrefInput::ToolbarGapPreview { zone, index } => {
-                if let Some(editor) = &self.toolbar_editor {
-                    // A gap the size of the first chip found, as a drag of
-                    // it would open.
-                    let zones = &editor.zones;
-                    if let Some(chip) = zones.zones.iter().find_map(|(flow, _)| flow.first_child())
-                    {
-                        zones.drag_size.set((chip.width(), chip.height()));
-                    }
-                    if let Some((flow, _)) = zones.zones.get(zone) {
-                        flow.add_css_class("drop-active");
-                        flow.set_gap(Some(index));
-                    }
-                }
+                self.on_toolbar_gap_preview(zone, index)
             }
             PrefInput::ColumnDrop { key, shown, index } => {
-                if let Some(column) = crate::config::ListColumn::from_key(&key) {
-                    // The slot counts the chips still on screen, the dragged
-                    // one hidden: the same list with it taken out.
-                    let mut columns = self.list_columns.clone();
-                    columns.retain(|c| *c != column);
-                    if shown {
-                        columns.insert(index.min(columns.len()), column);
-                    }
-                    self.list_columns = crate::config::ListColumn::from_keys(
-                        &crate::config::ListColumn::to_keys(&columns),
-                    );
-                    self.rebuild_column_chips();
-                    let _ = sender.output(PrefOutput::SetListColumns(self.list_columns.clone()));
-                }
+                self.on_column_drop(key, shown, index, sender)
             }
-            PrefInput::ColumnRestore => {
-                let _ = sender.output(PrefOutput::ResetColumnWidths);
-                let default = crate::config::ListColumn::DEFAULT.to_vec();
-                if self.list_columns != default {
-                    self.list_columns = default;
-                    self.rebuild_column_chips();
-                    let _ = sender.output(PrefOutput::SetListColumns(self.list_columns.clone()));
-                }
-            }
-            PrefInput::ToolbarRestore => {
-                if self.toolbar != ReaderToolbar::default() {
-                    self.toolbar = ReaderToolbar::default();
-                    self.rebuild_toolbar_chips();
-                    let _ = sender.output(PrefOutput::SetReaderToolbar(self.toolbar.clone()));
-                }
-            }
-            PrefInput::ToggleRailFoldEnabled(on) => {
-                self.rail_fold.enabled = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
-            PrefInput::ToggleRailFoldAccounts(on) => {
-                self.rail_fold.accounts = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
+            PrefInput::ColumnRestore => self.on_column_restore(sender),
+            PrefInput::ToolbarRestore => self.on_toolbar_restore(sender),
+            PrefInput::ToggleRailFoldEnabled(on) => self.on_toggle_rail_fold_enabled(on, sender),
+            PrefInput::ToggleRailFoldAccounts(on) => self.on_toggle_rail_fold_accounts(on, sender),
             PrefInput::ToggleRailFoldAllInboxes(on) => {
-                self.rail_fold.all_inboxes = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+                self.on_toggle_rail_fold_all_inboxes(on, sender)
             }
-            PrefInput::ToggleRailFoldStarred(on) => {
-                self.rail_fold.starred = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
-            PrefInput::ToggleRailFoldSent(on) => {
-                self.rail_fold.sent = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
-            PrefInput::ToggleRailFoldDrafts(on) => {
-                self.rail_fold.drafts = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
-            PrefInput::ToggleRailFoldArchive(on) => {
-                self.rail_fold.archive = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
-            PrefInput::ToggleRailFoldJunk(on) => {
-                self.rail_fold.junk = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
-            PrefInput::ToggleRailFoldTrash(on) => {
-                self.rail_fold.trash = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
-            PrefInput::ToggleRailFoldFiltered(on) => {
-                self.rail_fold.filtered = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
-            PrefInput::ToggleRailFoldTags(on) => {
-                self.rail_fold.tags = on;
-                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-            }
-            PrefInput::ChangeReadMark(idx) => {
-                let policy = match idx {
-                    1 => crate::config::ReadMark::Delay,
-                    2 => crate::config::ReadMark::Manual,
-                    _ => crate::config::ReadMark::Shown,
-                };
-                let _ = sender.output(PrefOutput::SetReadMark(policy));
-            }
+            PrefInput::ToggleRailFoldStarred(on) => self.on_toggle_rail_fold_starred(on, sender),
+            PrefInput::ToggleRailFoldSent(on) => self.on_toggle_rail_fold_sent(on, sender),
+            PrefInput::ToggleRailFoldDrafts(on) => self.on_toggle_rail_fold_drafts(on, sender),
+            PrefInput::ToggleRailFoldArchive(on) => self.on_toggle_rail_fold_archive(on, sender),
+            PrefInput::ToggleRailFoldJunk(on) => self.on_toggle_rail_fold_junk(on, sender),
+            PrefInput::ToggleRailFoldTrash(on) => self.on_toggle_rail_fold_trash(on, sender),
+            PrefInput::ToggleRailFoldFiltered(on) => self.on_toggle_rail_fold_filtered(on, sender),
+            PrefInput::ToggleRailFoldTags(on) => self.on_toggle_rail_fold_tags(on, sender),
+            PrefInput::ChangeReadMark(idx) => self.on_change_read_mark(idx, sender),
             PrefInput::ExportLog => {
                 let _ = sender.output(PrefOutput::ExportLog);
             }
-            PrefInput::SetContactBooks(books) => {
-                if let Some(c) = &self.contacts {
-                    c.emit(crate::ui::contact_sources::ContactSourcesInput::SetBooks(
-                        books,
-                    ));
-                }
-            }
-            PrefInput::SetLocalContactCount(n) => {
-                if let Some(c) = &self.contacts {
-                    c.emit(crate::ui::contact_sources::ContactSourcesInput::SetLocalCount(n));
-                }
-            }
+            PrefInput::SetContactBooks(books) => self.on_set_contact_books(books),
+            PrefInput::SetLocalContactCount(n) => self.on_set_local_contact_count(n),
             PrefInput::ExportSettings => {
                 let _ = sender.output(PrefOutput::ExportSettings);
             }
             PrefInput::ImportSettings => {
                 let _ = sender.output(PrefOutput::ImportSettings);
             }
-            PrefInput::ChangeTrayIcon(index) => {
-                let icon = TRAY_ICONS
-                    .get(index as usize)
-                    .map(|(_, t)| *t)
-                    .unwrap_or_default();
-                let _ = sender.output(PrefOutput::SetTrayIcon(icon));
-            }
-            PrefInput::ChangeLauncherBadge(index) => {
-                let badge = LAUNCHER_BADGES
-                    .get(index as usize)
-                    .map(|(_, b)| *b)
-                    .unwrap_or_default();
-                let _ = sender.output(PrefOutput::SetLauncherBadge(badge));
-            }
-            PrefInput::ChangeListLayout(index) => {
-                let layout = match index {
-                    1 => crate::config::ListLayout::SingleLine,
-                    2 => crate::config::ListLayout::Automatic,
-                    _ => crate::config::ListLayout::Cards,
-                };
-                self.list_single_possible = layout != crate::config::ListLayout::Cards;
-                let _ = sender.output(PrefOutput::SetListLayout(layout));
-            }
-            PrefInput::ChangePreviewLines(index) => {
-                // The combo lists Off, then 1, 2 and 3 lines — so the row index is
-                // the number of lines.
-                let _ = sender.output(PrefOutput::SetPreviewLines(index));
-            }
-            PrefInput::ChangeAppTheme(index) => {
-                let theme = APP_THEMES
-                    .get(index as usize)
-                    .map(|(_, t)| *t)
-                    .unwrap_or_default();
-                let _ = sender.output(PrefOutput::SetAppTheme(theme));
-            }
-            PrefInput::ChangeTextScale(index) => {
-                let percent = crate::text_scale::STEPS
-                    .get(index as usize)
-                    .copied()
-                    .unwrap_or(100);
-                let _ = sender.output(PrefOutput::SetTextScale(percent));
-            }
+            PrefInput::ChangeTrayIcon(index) => self.on_change_tray_icon(index, sender),
+            PrefInput::ChangeLauncherBadge(index) => self.on_change_launcher_badge(index, sender),
+            PrefInput::ChangeListLayout(index) => self.on_change_list_layout(index, sender),
+            PrefInput::ChangePreviewLines(index) => self.on_change_preview_lines(index, sender),
+            PrefInput::ChangeAppTheme(index) => self.on_change_app_theme(index, sender),
+            PrefInput::ChangeTextScale(index) => self.on_change_text_scale(index, sender),
             PrefInput::ChangeSettingsOpen(index) => {
                 let _ = sender.output(PrefOutput::SetSettingsOpenAccounts(index == 1));
             }
             PrefInput::ShowAccounts(accounts) => {
                 self.select_row(if accounts { "accounts" } else { "general" });
             }
-            PrefInput::SelectPage(id) => {
-                if self.contacts_open && !self.editor_open && id != "contacts" {
-                    // A Contacts page with nothing to save closes on its
-                    // own, so the window's header comes back for the next.
-                    if let Some(c) = &self.contacts {
-                        c.emit(crate::ui::contact_sources::ContactSourcesInput::CloseEditor);
-                    }
-                }
-                if self.editor_open && id != self.editor_page {
-                    // The accounts panel's editors can tell whether anything
-                    // was actually changed, and answer with either
-                    // LeaveEditorTo or LeaveEditorPrompt. The cloud and
-                    // contacts editors keep no such record, so they are
-                    // always asked about.
-                    if self.editor_page == "cloud" || self.editor_page == "contacts" {
-                        self.ask_to_leave_editor(&id, &sender);
-                    } else {
-                        let _ = self
-                            .accounts_sender
-                            .send(crate::ui::accounts::AccountsInput::LeaveRequest(id));
-                    }
-                } else {
-                    self.show_page(&id);
-                    if id == "system" {
-                        sender.input(PrefInput::NautilusRefresh);
-                        sender.input(PrefInput::MeasureStorage);
-                    }
-                    let _ = sender.output(PrefOutput::PageShown(id));
-                }
-            }
+            PrefInput::SelectPage(id) => self.on_select_page(id, sender),
             PrefInput::ShowPageById(id) => self.select_row(&id),
-            PrefInput::RevealColumns => {
-                self.select_row("list");
-                // Once the page is shown and laid out, which the selection
-                // sets going, can the group be scrolled to.
-                if let Some(group) = self.columns_group.clone() {
-                    gtk::glib::timeout_add_local_once(
-                        std::time::Duration::from_millis(200),
-                        move || scroll_to(&group),
-                    );
-                }
-            }
+            PrefInput::RevealColumns => self.on_reveal_columns(),
             PrefInput::LeaveEditorPrompt(id) => self.ask_to_leave_editor(&id, &sender),
-            PrefInput::LeaveEditorTo(id) => {
-                // The row the user clicked is already the selected one — the
-                // click selected it before any of this — so re-selecting it
-                // emits nothing and the page has to be shown outright.
-                self.select_row(&id);
-                self.show_page(&id);
-                if id == "system" {
-                    sender.input(PrefInput::NautilusRefresh);
-                }
-                let _ = sender.output(PrefOutput::PageShown(id));
-            }
-            PrefInput::EditorOpen(page) => {
-                self.editor_open = page.is_some();
-                self.editor_page = page.unwrap_or("accounts");
-                if let Some(header) = &self.host_header {
-                    header.set_visible(page.is_none());
-                }
-            }
-            PrefInput::CloudEditorOpen(open) => {
-                self.editor_open = open;
-                self.editor_page = "cloud";
-                if let Some(header) = &self.host_header {
-                    header.set_visible(!open);
-                }
-            }
-            PrefInput::Contacts(out) => {
-                use crate::ui::contact_sources::ContactSourcesOutput as Out;
-                match out {
-                    Out::PageOpen { open, form } => {
-                        self.contacts_open = open;
-                        self.editor_open = form;
-                        self.editor_page = "contacts";
-                        if let Some(header) = &self.host_header {
-                            header.set_visible(!open);
-                        }
-                    }
-                    Out::Changed => {
-                        let _ = sender.output(PrefOutput::ContactSourcesChanged);
-                    }
-                    Out::ImportLocal => {
-                        let _ = sender.output(PrefOutput::ImportLocalContacts);
-                    }
-                    Out::ExportLocal => {
-                        let _ = sender.output(PrefOutput::ExportLocalContacts);
-                    }
-                    Out::DeleteAllLocal => {
-                        let _ = sender.output(PrefOutput::DeleteAllLocalContacts);
-                    }
-                    Out::SetSearchOpen(on) => {
-                        let _ = sender.output(PrefOutput::SetContactsSearchOpen(on));
-                    }
-                    // Through the Sidebar page's row, which tells the app.
-                    Out::SetPlacement(placement) => {
-                        if let Some(row) = &self.contacts_placement_row {
-                            let idx = contacts_placement_index(placement);
-                            if row.selected() != idx {
-                                row.set_selected(idx);
-                            }
-                        }
-                    }
-                    Out::SetContactBook(uid) => {
-                        let _ = sender.output(PrefOutput::SetContactBook(uid));
-                    }
-                    Out::LoadBooks => {
-                        let _ = sender.output(PrefOutput::LoadContactBooks);
-                    }
-                }
-            }
-            PrefInput::ChangeMessageTheme(index) => {
-                let theme = MESSAGE_THEMES
-                    .get(index as usize)
-                    .map(|(_, t)| *t)
-                    .unwrap_or_default();
-                let _ = sender.output(PrefOutput::SetMessageTheme(theme));
-            }
-            PrefInput::ChangeComposeFormat(idx) => {
-                let format = match idx {
-                    1 => crate::config::ComposeFormat::Markdown,
-                    2 => crate::config::ComposeFormat::Html,
-                    3 => crate::config::ComposeFormat::Plain,
-                    _ => crate::config::ComposeFormat::Rich,
-                };
-                let _ = sender.output(PrefOutput::SetComposeFormat(format));
-            }
-            PrefInput::ChangeFoldMessages(idx) => {
-                let fold = match idx {
-                    1 => crate::config::FoldMessages::Read,
-                    2 => crate::config::FoldMessages::AllButNewest,
-                    _ => crate::config::FoldMessages::Never,
-                };
-                let _ = sender.output(PrefOutput::SetFoldMessages(fold));
-            }
-            PrefInput::ChangeReplyPosition(idx) => {
-                let position = match idx {
-                    1 => crate::config::ReplyPosition::Bottom,
-                    2 => crate::config::ReplyPosition::Follow,
-                    _ => crate::config::ReplyPosition::Top,
-                };
-                let _ = sender.output(PrefOutput::SetReplyPosition(position));
-            }
-            PrefInput::ChangeUndoSend(idx) => {
-                if let Some(&secs) = crate::config::UNDO_SEND_CHOICES.get(idx as usize) {
-                    let _ = sender.output(PrefOutput::SetUndoSend(secs));
-                }
-            }
+            PrefInput::LeaveEditorTo(id) => self.on_leave_editor_to(id, sender),
+            PrefInput::EditorOpen(page) => self.on_editor_open(page),
+            PrefInput::CloudEditorOpen(open) => self.on_cloud_editor_open(open),
+            PrefInput::Contacts(out) => self.on_contacts(out, sender),
+            PrefInput::ChangeMessageTheme(index) => self.on_change_message_theme(index, sender),
+            PrefInput::ChangeComposeFormat(idx) => self.on_change_compose_format(idx, sender),
+            PrefInput::ChangeFoldMessages(idx) => self.on_change_fold_messages(idx, sender),
+            PrefInput::ChangeReplyPosition(idx) => self.on_change_reply_position(idx, sender),
+            PrefInput::ChangeUndoSend(idx) => self.on_change_undo_send(idx, sender),
             PrefInput::ChangeSignaturePosition(idx) => {
-                let position = match idx {
-                    1 => crate::config::SignaturePosition::BelowQuote,
-                    _ => crate::config::SignaturePosition::AboveQuote,
-                };
-                let _ = sender.output(PrefOutput::SetSignaturePosition(position));
+                self.on_change_signature_position(idx, sender)
             }
         }
     }

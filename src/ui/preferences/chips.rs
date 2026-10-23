@@ -331,3 +331,74 @@ impl Preferences {
         editor.zones.fill(1, &hidden);
     }
 }
+
+impl Preferences {
+    pub(super) fn on_toolbar_drop(
+        &mut self,
+        key: String,
+        side: Option<ToolbarSide>,
+        index: usize,
+        sender: ComponentSender<Self>,
+    ) {
+        if let Some(item) = ToolbarItem::from_key(&key) {
+            self.toolbar.place(item, side, index);
+            self.rebuild_toolbar_chips();
+            let _ = sender.output(PrefOutput::SetReaderToolbar(self.toolbar.clone()));
+        }
+    }
+
+    pub(super) fn on_toolbar_gap_preview(&mut self, zone: usize, index: usize) {
+        if let Some(editor) = &self.toolbar_editor {
+            // A gap the size of the first chip found, as a drag of
+            // it would open.
+            let zones = &editor.zones;
+            if let Some(chip) = zones.zones.iter().find_map(|(flow, _)| flow.first_child()) {
+                zones.drag_size.set((chip.width(), chip.height()));
+            }
+            if let Some((flow, _)) = zones.zones.get(zone) {
+                flow.add_css_class("drop-active");
+                flow.set_gap(Some(index));
+            }
+        }
+    }
+
+    pub(super) fn on_column_drop(
+        &mut self,
+        key: String,
+        shown: bool,
+        index: usize,
+        sender: ComponentSender<Self>,
+    ) {
+        if let Some(column) = crate::config::ListColumn::from_key(&key) {
+            // The slot counts the chips still on screen, the dragged
+            // one hidden: the same list with it taken out.
+            let mut columns = self.list_columns.clone();
+            columns.retain(|c| *c != column);
+            if shown {
+                columns.insert(index.min(columns.len()), column);
+            }
+            self.list_columns =
+                crate::config::ListColumn::from_keys(&crate::config::ListColumn::to_keys(&columns));
+            self.rebuild_column_chips();
+            let _ = sender.output(PrefOutput::SetListColumns(self.list_columns.clone()));
+        }
+    }
+
+    pub(super) fn on_column_restore(&mut self, sender: ComponentSender<Self>) {
+        let _ = sender.output(PrefOutput::ResetColumnWidths);
+        let default = crate::config::ListColumn::DEFAULT.to_vec();
+        if self.list_columns != default {
+            self.list_columns = default;
+            self.rebuild_column_chips();
+            let _ = sender.output(PrefOutput::SetListColumns(self.list_columns.clone()));
+        }
+    }
+
+    pub(super) fn on_toolbar_restore(&mut self, sender: ComponentSender<Self>) {
+        if self.toolbar != ReaderToolbar::default() {
+            self.toolbar = ReaderToolbar::default();
+            self.rebuild_toolbar_chips();
+            let _ = sender.output(PrefOutput::SetReaderToolbar(self.toolbar.clone()));
+        }
+    }
+}

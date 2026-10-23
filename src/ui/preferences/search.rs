@@ -138,7 +138,7 @@ impl SettingsSearch {
         }
     }
 
-    pub(super) fn toggle(&self) {
+    fn toggle(&self) {
         let open = !self.bar.is_search_mode();
         self.bar.set_search_mode(open);
         if open {
@@ -146,7 +146,7 @@ impl SettingsSearch {
         }
     }
 
-    pub(super) fn hit(&self, i: usize) -> Option<SearchHit> {
+    fn hit(&self, i: usize) -> Option<SearchHit> {
         self.shown.borrow().get(i).cloned()
     }
 
@@ -339,7 +339,7 @@ fn shown_in_page(w: &gtk::Widget) -> bool {
 }
 
 /// Scroll a found row or group into view and mark it for a moment.
-pub(super) fn reveal(w: &gtk::Widget) {
+fn reveal(w: &gtk::Widget) {
     scroll_to(w);
     w.add_css_class("settings-search-hit");
     let w = w.clone();
@@ -369,6 +369,39 @@ pub(super) fn scroll_to(w: &gtk::Widget) {
                 );
                 adj.set_value(top);
             }
+        }
+    }
+}
+
+impl Preferences {
+    pub(super) fn on_search(&mut self, text: String) {
+        // Every page has to be in the stack to be searched.
+        self.mount_pages();
+        if let (Some(search), Some(stack)) = (&self.search, &self.panels_stack) {
+            search.show(&text, stack);
+        }
+    }
+
+    pub(super) fn on_search_pick(&mut self, i: usize, sender: ComponentSender<Self>) {
+        let Some(hit) = self.search.as_ref().and_then(|s| s.hit(i)) else {
+            return;
+        };
+        // The same way a click on the category goes, so an open
+        // editor still asks before it is left.
+        self.select_row(hit.page);
+        sender.input(PrefInput::SelectPage(hit.page.to_string()));
+        if let Some(widget) = hit.widget.upgrade() {
+            // After the page has been laid out: until then the row
+            // has no place to scroll to.
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(80), move || {
+                reveal(&widget);
+            });
+        }
+    }
+
+    pub(super) fn on_toggle_search(&mut self) {
+        if let Some(search) = &self.search {
+            search.toggle();
         }
     }
 }

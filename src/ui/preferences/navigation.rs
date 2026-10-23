@@ -262,7 +262,7 @@ impl Preferences {
     }
 
     /// Show a category: the accounts component's page, or one of ours.
-    pub(super) fn show_page(&self, id: &str) {
+    fn show_page(&self, id: &str) {
         let Some(page) = side_page(id) else { return };
         self.mount_pages();
         if let Some(stack) = &self.panels_stack {
@@ -282,6 +282,89 @@ impl Preferences {
             if split.is_collapsed() {
                 split.set_show_content(true);
             }
+        }
+    }
+}
+
+impl Preferences {
+    pub(super) fn on_set_accounts_panel(
+        &mut self,
+        panel: gtk::Widget,
+        accounts: relm4::Sender<crate::ui::accounts::AccountsInput>,
+    ) {
+        self.accounts_sender = accounts;
+        if let Some(slot) = &self.accounts_slot {
+            slot.set_child(Some(&panel));
+        }
+    }
+
+    pub(super) fn on_select_page(&mut self, id: String, sender: ComponentSender<Self>) {
+        if self.contacts_open && !self.editor_open && id != "contacts" {
+            // A Contacts page with nothing to save closes on its
+            // own, so the window's header comes back for the next.
+            if let Some(c) = &self.contacts {
+                c.emit(crate::ui::contact_sources::ContactSourcesInput::CloseEditor);
+            }
+        }
+        if self.editor_open && id != self.editor_page {
+            // The accounts panel's editors can tell whether anything
+            // was actually changed, and answer with either
+            // LeaveEditorTo or LeaveEditorPrompt. The cloud and
+            // contacts editors keep no such record, so they are
+            // always asked about.
+            if self.editor_page == "cloud" || self.editor_page == "contacts" {
+                self.ask_to_leave_editor(&id, &sender);
+            } else {
+                let _ = self
+                    .accounts_sender
+                    .send(crate::ui::accounts::AccountsInput::LeaveRequest(id));
+            }
+        } else {
+            self.show_page(&id);
+            if id == "system" {
+                sender.input(PrefInput::NautilusRefresh);
+                sender.input(PrefInput::MeasureStorage);
+            }
+            let _ = sender.output(PrefOutput::PageShown(id));
+        }
+    }
+
+    pub(super) fn on_reveal_columns(&mut self) {
+        self.select_row("list");
+        // Once the page is shown and laid out, which the selection
+        // sets going, can the group be scrolled to.
+        if let Some(group) = self.columns_group.clone() {
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(200), move || {
+                scroll_to(&group)
+            });
+        }
+    }
+
+    pub(super) fn on_leave_editor_to(&mut self, id: String, sender: ComponentSender<Self>) {
+        // The row the user clicked is already the selected one — the
+        // click selected it before any of this — so re-selecting it
+        // emits nothing and the page has to be shown outright.
+        self.select_row(&id);
+        self.show_page(&id);
+        if id == "system" {
+            sender.input(PrefInput::NautilusRefresh);
+        }
+        let _ = sender.output(PrefOutput::PageShown(id));
+    }
+
+    pub(super) fn on_editor_open(&mut self, page: Option<&'static str>) {
+        self.editor_open = page.is_some();
+        self.editor_page = page.unwrap_or("accounts");
+        if let Some(header) = &self.host_header {
+            header.set_visible(page.is_none());
+        }
+    }
+
+    pub(super) fn on_cloud_editor_open(&mut self, open: bool) {
+        self.editor_open = open;
+        self.editor_page = "cloud";
+        if let Some(header) = &self.host_header {
+            header.set_visible(!open);
         }
     }
 }

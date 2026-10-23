@@ -115,3 +115,13 @@ pub(super) fn rebuild_personal_words(exp: &adw::ExpanderRow) {
         exp.add_row(&row);
     }
 }
+
+impl Preferences {
+    pub(super) fn on_set_spellcheck_langs(&mut self, langs: String) {
+        if let Some(rows) = self.spell_langs.as_ref() {
+            if *rows.setting.borrow() != langs {
+                rows.show(&langs);
+            }
+        }
+    }
+}
