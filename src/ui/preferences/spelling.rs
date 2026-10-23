@@ -46,13 +46,11 @@ impl SpellLangRows {
                 "System language — {language}",
                 &[(
                     "language",
-                    &crate::ui::rich_editor::spell_language_names(
-                        &crate::ui::rich_editor::system_spell_languages(),
-                    ),
+                    &crate::spell::spell_language_names(&crate::spell::system_spell_languages()),
                 )],
             )
         } else {
-            crate::ui::rich_editor::spell_language_names(&chosen)
+            crate::spell::spell_language_names(&chosen)
         };
         self.expander
             .set_subtitle(&gtk::glib::markup_escape_text(&subtitle));
@@ -69,7 +67,7 @@ impl SpellLangRows {
             &current,
             code,
             on,
-            &crate::ui::rich_editor::system_spell_languages(),
+            &crate::spell::system_spell_languages(),
         );
         self.show(&next);
         (next != current).then_some(next)

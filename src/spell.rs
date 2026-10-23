@@ -12,6 +12,12 @@ use std::cell::RefCell;
 use std::ffi::{c_char, c_int, c_void, CString};
 use std::rc::Rc;
 
+mod dictionaries;
+
+pub use dictionaries::{
+    installed_dictionaries, resolved_spell_languages, spell_language_names, system_spell_languages,
+};
+
 extern "C" {
     // From glibc itself (libdl merged into libc since 2.34) — no crate, no
     // link flag needed beyond what every binary already has.
@@ -380,7 +386,7 @@ pub fn word_is_misspelled(word: &str) -> bool {
     if !crate::config::load_privacy().spellcheck {
         return false;
     }
-    let checkers = checkers_for(&crate::ui::rich_editor::resolved_spell_languages());
+    let checkers = checkers_for(&resolved_spell_languages());
     misspelled_in_all(&checkers, word, |c, w| c.is_misspelled(w))
 }
 
@@ -394,7 +400,7 @@ pub fn error_attrs(text: &str, cursor: Option<usize>) -> Option<gtk::pango::Attr
     if !crate::config::load_privacy().spellcheck {
         return None;
     }
-    let checkers = checkers_for(&crate::ui::rich_editor::resolved_spell_languages());
+    let checkers = checkers_for(&resolved_spell_languages());
     if checkers.is_empty() {
         return None;
     }
@@ -435,7 +441,7 @@ fn list_words(text: &str) -> impl Iterator<Item = &str> {
 /// list the body's "Learn Spelling" menu item feeds.
 fn personal_dict_paths() -> Vec<std::path::PathBuf> {
     let dir = enchant_dir();
-    crate::ui::rich_editor::resolved_spell_languages()
+    resolved_spell_languages()
         .iter()
         .map(|lang| dir.join(format!("{lang}.dic")))
         .collect()
@@ -518,7 +524,7 @@ pub fn add_personal_word(word: &str) {
     if word.is_empty() {
         return;
     }
-    let langs = crate::ui::rich_editor::resolved_spell_languages();
+    let langs = resolved_spell_languages();
     if let Some(c) = checkers_for(&langs[..langs.len().min(1)]).first() {
         c.learn(word);
     }
