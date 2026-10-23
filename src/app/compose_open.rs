@@ -9,7 +9,6 @@ use crate::worker::MailRequest;
 
 use super::conversation::body_key;
 use super::hand_off::{FileHandOff, HandOffFiles};
-use super::keymap::WindowCompose;
 use super::model::AppModel;
 use super::msg::AppMsg;
 use super::prefill::{
@@ -18,6 +17,7 @@ use super::prefill::{
 };
 use super::uri_queue::parse_mailto;
 use crate::quote::editable_copy_html;
+use crate::ui::keymap::WindowCompose;
 
 impl AppModel {
     /// Where a just-saved draft is, by its Message-ID, among the Drafts

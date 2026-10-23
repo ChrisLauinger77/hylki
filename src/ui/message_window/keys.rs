@@ -3,7 +3,7 @@
 
 use super::types::{MessageWindowInput, MessageWindowOutput};
 use super::MessageWindow;
-use crate::app::Shortcut;
+use crate::ui::keymap::Shortcut;
 use crate::ui::message_view::MessageViewInput;
 use adw::prelude::*;
 use relm4::prelude::*;
@@ -107,7 +107,7 @@ pub(super) fn key_controller(
     let sequence: std::rc::Rc<std::cell::Cell<Option<std::time::Instant>>> = Default::default();
     keys.connect_key_pressed(move |_, keyval, _, state| {
         use gtk::gdk::Key;
-        let keyval = crate::app::without_caps_lock(keyval, state);
+        let keyval = crate::ui::keymap::without_caps_lock(keyval, state);
         let key = |action| {
             s.input_sender().emit(MessageWindowInput::Key(action));
             gtk::glib::Propagation::Stop
@@ -127,12 +127,14 @@ pub(super) fn key_controller(
                 s.input_sender().emit(MessageWindowInput::Find);
                 return gtk::glib::Propagation::Stop;
             }
-            if keyval == Key::z && !shift && !crate::app::focus_is_text(&window) {
+            if keyval == Key::z && !shift && !crate::ui::keymap::focus_is_text(&window) {
                 return key(Shortcut::Undo);
             }
             return gtk::glib::Propagation::Proceed;
         }
-        if state.contains(gtk::gdk::ModifierType::ALT_MASK) || crate::app::focus_is_text(&window) {
+        if state.contains(gtk::gdk::ModifierType::ALT_MASK)
+            || crate::ui::keymap::focus_is_text(&window)
+        {
             return gtk::glib::Propagation::Proceed;
         }
         // Escape closes the window, as it backs out of a message in
@@ -151,7 +153,7 @@ pub(super) fn key_controller(
         if !single_key.get() || matches!(keyval, Key::Shift_L | Key::Shift_R) {
             return gtk::glib::Propagation::Proceed;
         }
-        if crate::app::focus_takes_keys(&window) && crate::app::reader_keeps(keyval) {
+        if crate::ui::keymap::focus_takes_keys(&window) && crate::ui::keymap::reader_keeps(keyval) {
             return gtk::glib::Propagation::Proceed;
         }
         if gmail.get() {
@@ -167,9 +169,9 @@ pub(super) fn key_controller(
             }
         }
         let action = if gmail.get() {
-            crate::app::gmail_shortcut_for(keyval, shift)
+            crate::ui::keymap::gmail_shortcut_for(keyval, shift)
         } else {
-            crate::app::shortcut_for(keyval, shift)
+            crate::ui::keymap::shortcut_for(keyval, shift)
         };
         match action {
             Some(action) => key(action),

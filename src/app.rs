@@ -119,10 +119,6 @@ mod window;
 mod workers;
 
 pub(crate) use accounts::finish_keyring_writes;
-pub(crate) use keymap::{
-    focus_is_text, focus_takes_keys, gmail_shortcut_for, reader_keeps, shortcut_for,
-    without_caps_lock, Shortcut,
-};
 pub(crate) use model::AppModel;
 pub(crate) use msg::AppMsg;
 // The worker reads `crate::app::message_text` (until the worker branch is merged).
