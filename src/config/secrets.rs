@@ -177,6 +177,8 @@ pub fn store_password(email: &str, password: &str) -> keyring::Result<()> {
 }
 
 /// Cloud attachments (#144): an account's app password, by `CloudAccount::key`.
+/// The LDAP directories keep theirs through the same three functions, under
+/// `ldap:<source uid>` (see `crate::directory`).
 pub fn store_cloud_password(key: &str, password: &str) -> keyring::Result<()> {
     set_secret(key, password)
 }

@@ -5,8 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use super::config_base;
-use super::default_on;
+use super::{config_file, default_on, read_toml, save_plain_toml};
 
 // ---------------------------------------------------------------------------
 // Keyring health check + one-time setup-help flag
@@ -161,7 +160,7 @@ pub(super) fn default_gallery_thumb_width() -> i32 {
 }
 
 pub(super) fn state_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("state.toml"))
+    config_file("state.toml")
 }
 
 /// Read the remembered UI state. A missing or unreadable file falls back to
@@ -171,9 +170,7 @@ pub(super) fn state_path() -> Option<PathBuf> {
 /// width of 0, a gallery that pulls from nothing). Every field carries a serde
 /// default, so the empty document always parses.
 fn load_state() -> StateFile {
-    state_path()
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .and_then(|t| toml::from_str::<StateFile>(&t).ok())
+    read_toml::<StateFile>(state_path())
         .or_else(|| toml::from_str::<StateFile>("").ok())
         .unwrap_or_default()
 }
@@ -195,15 +192,7 @@ fn update_state(change: impl FnOnce(&mut StateFile)) {
 }
 
 fn save_state(state: &StateFile) {
-    let Some(path) = state_path() else {
-        return;
-    };
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    if let Ok(toml) = toml::to_string_pretty(state) {
-        let _ = std::fs::write(&path, toml);
-    }
+    save_plain_toml(state_path(), state);
 }
 
 /// A mail view to reopen at launch (#256).

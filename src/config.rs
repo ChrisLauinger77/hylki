@@ -143,6 +143,56 @@ pub fn write_private_file(path: &std::path::Path, contents: &str) -> std::io::Re
     write_private(path, contents)
 }
 
+/// A file in Hylki's own config directory, `~/.config/hylki/`.
+fn config_file(name: &str) -> Option<PathBuf> {
+    Some(config_base()?.join("hylki").join(name))
+}
+
+/// A settings file parsed, or `None` when it is missing, unreadable or does
+/// not parse.
+fn read_toml<T: serde::de::DeserializeOwned>(path: Option<PathBuf>) -> Option<T> {
+    let text = std::fs::read_to_string(path?).ok()?;
+    toml::from_str(&text).ok()
+}
+
+/// Writes a settings file only its owner can read, logging a failure as
+/// "could not save `what`". `make_dir` creates the config directory first;
+/// filters.toml, smart_folders.toml and tags.toml are written without it.
+fn save_private_toml<T: serde::Serialize>(
+    path: Option<PathBuf>,
+    value: &T,
+    what: &str,
+    make_dir: bool,
+) {
+    let Some(path) = path else { return };
+    if make_dir {
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+    }
+    match toml::to_string_pretty(value) {
+        Ok(toml) => {
+            if let Err(e) = write_private(&path, &toml) {
+                tracing::warn!("could not save {what}: {e}");
+            }
+        }
+        Err(e) => tracing::warn!("could not serialize {what}: {e}"),
+    }
+}
+
+/// Writes a settings file with the mode the umask gives, quietly: these
+/// files (window size, pane sizes, toolbar layout and the like) are best
+/// effort.
+fn save_plain_toml<T: serde::Serialize>(path: Option<PathBuf>, value: &T) {
+    let Some(path) = path else { return };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(toml) = toml::to_string_pretty(value) {
+        let _ = std::fs::write(&path, toml);
+    }
+}
+
 // serde helpers shared by the files' structs.
 
 fn is_false(b: &bool) -> bool {

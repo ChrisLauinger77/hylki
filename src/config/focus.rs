@@ -3,8 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use super::config_base;
-use super::default_on;
+use super::{config_file, default_on, read_toml, save_plain_toml};
 
 // ---- Focus Mode -----------------------------------------------------------
 
@@ -144,27 +143,16 @@ impl FocusMode {
 }
 
 fn focus_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("focus.toml"))
+    config_file("focus.toml")
 }
 
 /// The saved Focus Mode settings, or the defaults (off) when there are none.
 pub fn load_focus_mode() -> FocusMode {
-    let Some(text) = focus_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
-        return FocusMode::default();
-    };
-    toml::from_str::<FocusMode>(&text).unwrap_or_default()
+    read_toml::<FocusMode>(focus_path()).unwrap_or_default()
 }
 
 pub fn save_focus_mode(focus: &FocusMode) {
-    let Some(path) = focus_path() else {
-        return;
-    };
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    if let Ok(toml) = toml::to_string_pretty(focus) {
-        let _ = std::fs::write(&path, toml);
-    }
+    save_plain_toml(focus_path(), focus);
 }
 
 #[cfg(test)]

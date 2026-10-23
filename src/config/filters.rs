@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use super::{config_base, is_false, write_private};
+use super::{config_file, is_false, read_toml, save_private_toml};
 
 /// A mail filter rule (#47): file matching inbox arrivals into a folder,
 /// Evolution-style, applied client-side whenever Hylki syncs the inbox.
@@ -510,32 +510,18 @@ pub(super) struct FiltersFile {
 }
 
 fn filters_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("filters.toml"))
+    config_file("filters.toml")
 }
 
 pub fn load_filters() -> Vec<FilterRule> {
-    let Some(path) = filters_path() else {
-        return Vec::new();
-    };
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return Vec::new();
-    };
-    toml::from_str::<FiltersFile>(&text)
+    read_toml::<FiltersFile>(filters_path())
         .map(|f| f.rules)
         .unwrap_or_default()
 }
 
 pub fn save_filters(rules: &[FilterRule]) {
-    let Some(path) = filters_path() else { return };
     let file = FiltersFile {
         rules: rules.to_vec(),
     };
-    match toml::to_string_pretty(&file) {
-        Ok(toml) => {
-            if let Err(e) = write_private(&path, &toml) {
-                tracing::warn!("could not save filters: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("could not serialize filters: {e}"),
-    }
+    save_private_toml(filters_path(), &file, "filters", false);
 }

@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-use super::{config_base, data_base};
+use super::{config_file, data_base, read_toml, save_plain_toml};
 
 /// Where the custom new-mail sound is kept (#292). It is a copy, so the
 /// original can be moved or deleted, and inside the Flatpak it stays readable
@@ -152,16 +152,13 @@ impl NewMailSound {
 }
 
 fn sound_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("sound.toml"))
+    config_file("sound.toml")
 }
 
 /// The saved new-mail sound settings. Without sound.toml the sound is off,
 /// unless a custom file was chosen before the switch existed: that stays on.
 pub fn load_new_mail_sound() -> NewMailSound {
-    if let Some(saved) = sound_path()
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .and_then(|t| toml::from_str::<NewMailSound>(&t).ok())
-    {
+    if let Some(saved) = read_toml::<NewMailSound>(sound_path()) {
         return saved;
     }
     let custom = custom_sound().is_some();
@@ -178,15 +175,7 @@ pub fn load_new_mail_sound() -> NewMailSound {
 }
 
 pub fn save_new_mail_sound(sound: &NewMailSound) {
-    let Some(path) = sound_path() else {
-        return;
-    };
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    if let Ok(toml) = toml::to_string_pretty(sound) {
-        let _ = std::fs::write(&path, toml);
-    }
+    save_plain_toml(sound_path(), sound);
 }
 
 /// What to play for new mail, if anything.

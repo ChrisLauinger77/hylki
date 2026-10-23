@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use super::{config_base, write_private};
+use super::{config_file, read_toml, save_private_toml};
 
 /// A tag (#71): a name and a color for one IMAP keyword. Keywords are the
 /// standard's own per-message user flags, kept on the server beside `\Seen`
@@ -138,32 +138,18 @@ pub(super) struct TagsFile {
 }
 
 fn tags_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("tags.toml"))
+    config_file("tags.toml")
 }
 
 pub fn load_tags() -> Vec<Tag> {
-    let Some(path) = tags_path() else {
-        return Vec::new();
-    };
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return Vec::new();
-    };
-    toml::from_str::<TagsFile>(&text)
+    read_toml::<TagsFile>(tags_path())
         .map(|f| f.tags)
         .unwrap_or_default()
 }
 
 pub fn save_tags(tags: &[Tag]) {
-    let Some(path) = tags_path() else { return };
     let file = TagsFile {
         tags: tags.to_vec(),
     };
-    match toml::to_string_pretty(&file) {
-        Ok(toml) => {
-            if let Err(e) = write_private(&path, &toml) {
-                tracing::warn!("could not save tags: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("could not serialize tags: {e}"),
-    }
+    save_private_toml(tags_path(), &file, "tags", false);
 }

@@ -10,14 +10,13 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use super::prefs::ReplyCopies;
 use super::secrets::{
     keyring_later, store_alias_smtp_password, store_oauth_refresh, store_password,
     store_smtp_password,
 };
-use super::{
-    config_base, data_base, default_on, is_false, is_true, is_zero, write_private, FolderSort,
-    ReplyCopies,
-};
+use super::sections::FolderSort;
+use super::{config_file, data_base, default_on, is_false, is_true, is_zero, write_private};
 
 /// Where the accounts' avatar pictures live (#162).
 pub fn avatars_dir() -> Option<PathBuf> {
@@ -544,12 +543,12 @@ pub fn save_demo_accounts(accounts: &[AccountConfig]) -> std::io::Result<()> {
 }
 
 fn demo_accounts_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("demo-accounts.toml"))
+    config_file("demo-accounts.toml")
 }
 
 /// Path to the accounts config file (`~/.config/hylki/accounts.toml`).
 pub fn path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("accounts.toml"))
+    config_file("accounts.toml")
 }
 
 /// Returns the configured accounts, or `None` if there is no usable config

@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use super::filters::{FilterCondition, FilterField, FilterInput, FilterMatch};
-use super::{config_base, is_false, write_private};
+use super::{config_file, is_false, save_private_toml};
 
 /// A smart folder (#417): a saved search over the mail already on this
 /// computer, listed in the sidebar's unified section. It looks in one
@@ -260,7 +260,7 @@ pub(super) struct SmartFoldersFile {
 }
 
 fn smart_folders_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("smart_folders.toml"))
+    config_file("smart_folders.toml")
 }
 
 pub fn load_smart_folders() -> Vec<SmartFolder> {
@@ -279,18 +279,8 @@ pub fn load_smart_folders() -> Vec<SmartFolder> {
 }
 
 pub fn save_smart_folders(folders: &[SmartFolder]) {
-    let Some(path) = smart_folders_path() else {
-        return;
-    };
     let file = SmartFoldersFile {
         folders: folders.to_vec(),
     };
-    match toml::to_string_pretty(&file) {
-        Ok(toml) => {
-            if let Err(e) = write_private(&path, &toml) {
-                tracing::warn!("could not save smart folders: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("could not serialize smart folders: {e}"),
-    }
+    save_private_toml(smart_folders_path(), &file, "smart folders", false);
 }

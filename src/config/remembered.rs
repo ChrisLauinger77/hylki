@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use super::config_base;
+use super::{config_file, read_toml, save_plain_toml};
 
 /// A mailing list the user has unsubscribed from through the reader's
 /// button, so a later message from the same list can say so.
@@ -28,32 +28,21 @@ pub(super) struct UnsubscribedFile {
 }
 
 fn unsubscribed_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("unsubscribed.toml"))
+    config_file("unsubscribed.toml")
 }
 
 /// The lists left through the reader's Unsubscribe button, newest last.
 pub fn load_unsubscribed() -> Vec<UnsubscribedList> {
-    let Some(text) = unsubscribed_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
-        return Vec::new();
-    };
-    toml::from_str::<UnsubscribedFile>(&text)
+    read_toml::<UnsubscribedFile>(unsubscribed_path())
         .unwrap_or_default()
         .lists
 }
 
 pub fn save_unsubscribed(lists: &[UnsubscribedList]) {
-    let Some(path) = unsubscribed_path() else {
-        return;
-    };
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
     let file = UnsubscribedFile {
         lists: lists.to_vec(),
     };
-    if let Ok(toml) = toml::to_string_pretty(&file) {
-        let _ = std::fs::write(&path, toml);
-    }
+    save_plain_toml(unsubscribed_path(), &file);
 }
 
 /// How many answered invitations are remembered. An invitation is
@@ -88,31 +77,20 @@ pub(super) struct InviteAnswerFile {
 }
 
 fn invites_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("invites.toml"))
+    config_file("invites.toml")
 }
 
 /// The invitations answered through the reader, newest last.
 pub fn load_invite_answers() -> Vec<InviteAnswer> {
-    let Some(text) = invites_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
-        return Vec::new();
-    };
-    toml::from_str::<InviteAnswerFile>(&text)
+    read_toml::<InviteAnswerFile>(invites_path())
         .unwrap_or_default()
         .answers
 }
 
 pub fn save_invite_answers(answers: &[InviteAnswer]) {
-    let Some(path) = invites_path() else {
-        return;
-    };
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
     let kept = answers.len().saturating_sub(INVITE_ANSWER_LIMIT);
     let file = InviteAnswerFile {
         answers: answers[kept..].to_vec(),
     };
-    if let Ok(toml) = toml::to_string_pretty(&file) {
-        let _ = std::fs::write(&path, toml);
-    }
+    save_plain_toml(invites_path(), &file);
 }

@@ -5,10 +5,10 @@ use std::path::PathBuf;
 use super::accounts::{load, save, AccountConfig};
 use super::filters::{load_filters, save_filters, FilterRule};
 use super::privacy::{load_privacy, privacy_path, PrivacyFile};
+use super::state::{state_path, StateFile};
 use super::tags::{load_tags, save_tags, Tag};
-use super::{
-    sidebar_path, state_path, window_path, write_private, SidebarFile, StateFile, WindowFile,
-};
+use super::window::{sidebar_path, window_path, SidebarFile, WindowFile};
+use super::{read_toml, write_private};
 
 /// A portable settings bundle (#50): every configuration file Hylki keeps —
 /// preferences, accounts (colors, emoji, labels, aliases, folder roles and
@@ -47,13 +47,6 @@ pub(super) struct SettingsBundle {
     pub(super) spell_words: Option<std::collections::BTreeMap<String, Vec<String>>>,
 }
 
-/// Parse one of the config directory's TOML files into its struct (None when
-/// absent or unreadable — the bundle simply omits it).
-fn read_file_struct<T: serde::de::DeserializeOwned>(path: Option<PathBuf>) -> Option<T> {
-    let text = std::fs::read_to_string(path?).ok()?;
-    toml::from_str(&text).ok()
-}
-
 /// Serialize a bundle section back to its config file.
 fn write_file_struct<T: serde::Serialize>(
     path: Option<PathBuf>,
@@ -74,9 +67,9 @@ pub fn export_bundle() -> Result<String, String> {
         accounts: load().unwrap_or_default(),
         filters: load_filters(),
         tags: load_tags(),
-        sidebar: read_file_struct(sidebar_path()),
-        window: read_file_struct(window_path()),
-        state: read_file_struct(state_path()),
+        sidebar: read_toml(sidebar_path()),
+        window: read_toml(window_path()),
+        state: read_toml(state_path()),
         cloud: Some(crate::cloud::load_accounts()),
         spell_words: Some(crate::spell::all_personal_words()),
     };

@@ -17,7 +17,7 @@ use super::prefs::{
 use super::sections::{
     FolderSort, RailFold, SectionPlacement, SectionStyle, StartView, UnifiedChips, UnifiedKinds,
 };
-use super::{config_base, default_on, is_zero, write_private};
+use super::{config_file, default_on, is_zero, save_private_toml, write_private};
 
 /// Every preference privacy.toml holds. The name is historical: the file
 /// began as the remote-content allowlist (`allowed_senders`).
@@ -726,7 +726,7 @@ impl Default for PrivacyFile {
 }
 
 pub(super) fn privacy_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("privacy.toml"))
+    config_file("privacy.toml")
 }
 
 pub(crate) fn load_privacy() -> PrivacyFile {
@@ -829,18 +829,5 @@ impl PrivacyFile {
 
 /// Persist all app settings together (so no field is clobbered).
 pub fn save_privacy(file: PrivacyFile) {
-    let Some(path) = privacy_path() else {
-        return;
-    };
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    match toml::to_string_pretty(&file) {
-        Ok(toml) => {
-            if let Err(e) = write_private(&path, &toml) {
-                tracing::warn!("could not save privacy settings: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("could not serialize privacy settings: {e}"),
-    }
+    save_private_toml(privacy_path(), &file, "privacy settings", true);
 }

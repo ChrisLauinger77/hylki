@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use super::config_base;
+use super::{config_file, read_toml, save_plain_toml};
 
 // ---------------------------------------------------------------------------
 // Reader toolbar layout: which buttons the reading pane's header shows, on
@@ -214,16 +214,13 @@ pub(super) struct ToolbarFile {
 }
 
 fn toolbar_path() -> Option<PathBuf> {
-    Some(config_base()?.join("hylki").join("toolbar.toml"))
+    config_file("toolbar.toml")
 }
 
 /// The saved reader toolbar layout, or the default when there is none.
 /// Unknown names (a newer Hylki's buttons) are skipped, not fatal.
 pub fn load_reader_toolbar() -> ReaderToolbar {
-    let Some(text) = toolbar_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
-        return ReaderToolbar::default();
-    };
-    let Ok(file) = toml::from_str::<ToolbarFile>(&text) else {
+    let Some(file) = read_toml::<ToolbarFile>(toolbar_path()) else {
         return ReaderToolbar::default();
     };
     let mut layout = ReaderToolbar {
@@ -243,19 +240,11 @@ pub fn load_reader_toolbar() -> ReaderToolbar {
 }
 
 pub fn save_reader_toolbar(layout: &ReaderToolbar) {
-    let Some(path) = toolbar_path() else {
-        return;
-    };
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
     let file = ToolbarFile {
         left: layout.left.iter().map(|i| i.key().to_string()).collect(),
         right: layout.right.iter().map(|i| i.key().to_string()).collect(),
     };
-    if let Ok(toml) = toml::to_string_pretty(&file) {
-        let _ = std::fs::write(&path, toml);
-    }
+    save_plain_toml(toolbar_path(), &file);
 }
 
 #[cfg(test)]
