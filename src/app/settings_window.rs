@@ -2,6 +2,19 @@
 
 use super::*;
 
+/// What the Settings window reports, as the message it means here.
+fn prefs_output_msg(out: PrefOutput) -> AppMsg {
+    match out {
+        PrefOutput::SetReaderSwitch(on) => AppMsg::SetReaderSwitchShown(on),
+        PrefOutput::SetThemeSwitch(on) => AppMsg::SetThemeSwitchShown(on),
+        PrefOutput::SetReaderZoom(z) => AppMsg::SetZoomDefault(z),
+        PrefOutput::PageShown(id) => AppMsg::SettingsPageShown(id),
+        PrefOutput::Closed => AppMsg::ClosePreferences,
+        // Every other output is a setting, which AppMsg::Pref applies.
+        other => AppMsg::Pref(other),
+    }
+}
+
 impl AppModel {
     /// Build the Settings window and its accounts panel, hidden. It is
     /// kept for the life of the app once built: `open_settings_window`
@@ -21,7 +34,23 @@ impl AppModel {
         let init = self.accounts_panel_init();
         self.accounts_seed = Some(format!("{init:?}"));
         let accounts = Self::launch_accounts_panel(init, sender);
-        let init = PrefInit {
+        let init = self.pref_init(&accounts, on_accounts);
+        let prefs = Preferences::builder()
+            .transient_for(&self.window)
+            .launch(init)
+            .forward(sender.input_sender(), prefs_output_msg);
+        accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
+            self.folder_choice_map(),
+        ));
+        self.arm_settings_showcase(&accounts, sender);
+        self.accounts_win = Some(accounts);
+        tracing::debug!("settings window: built in {:?}", t_open.elapsed());
+        self.prefs = Some(prefs);
+    }
+
+    /// The Settings window's first values: every setting as it stands.
+    fn pref_init(&self, accounts: &Controller<AccountsWindow>, on_accounts: bool) -> PrefInit {
+        PrefInit {
             auto_remote_content: self.auto_remote_content,
             show_remote_banner: self.show_remote_banner,
             show_spoof_banner: self.show_spoof_banner,
@@ -145,17 +174,28 @@ impl AppModel {
             accounts_panel: accounts.widget().clone().upcast::<gtk::Widget>(),
             accounts_sender: accounts.sender().clone(),
             // Sidebar order, so the list reads like the accounts do (#261).
-            identities: {
-                let mut enabled: Vec<&AccountConfig> =
-                    self.config.iter().filter(|a| a.enabled).collect();
-                enabled.sort_by_key(|a| {
-                    self.account_order
-                        .iter()
-                        .position(|e| *e == a.email)
-                        .unwrap_or(usize::MAX)
-                });
-                enabled
-            }
+            identities: self.identities_in_sidebar_order(),
+            start_on_accounts: on_accounts,
+            start_page: if on_accounts {
+                Some("accounts".to_string())
+            } else {
+                self.last_settings_page.clone()
+            },
+        }
+    }
+
+    /// Every enabled account's identities, its own address and then its
+    /// aliases, in sidebar order so the list reads like the accounts do
+    /// (#261). An alias without a name of its own takes the account's.
+    fn identities_in_sidebar_order(&self) -> Vec<(String, String)> {
+        let mut enabled: Vec<&AccountConfig> = self.config.iter().filter(|a| a.enabled).collect();
+        enabled.sort_by_key(|a| {
+            self.account_order
+                .iter()
+                .position(|e| *e == a.email)
+                .unwrap_or(usize::MAX)
+        });
+        enabled
             .into_iter()
             .flat_map(|a| {
                 std::iter::once((a.name.clone(), a.email.clone())).chain(a.aliases.iter().map(
@@ -172,29 +212,16 @@ impl AppModel {
                     },
                 ))
             })
-            .collect(),
-            start_on_accounts: on_accounts,
-            start_page: if on_accounts {
-                Some("accounts".to_string())
-            } else {
-                self.last_settings_page.clone()
-            },
-        };
-        let prefs = Preferences::builder()
-            .transient_for(&self.window)
-            .launch(init)
-            .forward(sender.input_sender(), |out| match out {
-                PrefOutput::SetReaderSwitch(on) => AppMsg::SetReaderSwitchShown(on),
-                PrefOutput::SetThemeSwitch(on) => AppMsg::SetThemeSwitchShown(on),
-                PrefOutput::SetReaderZoom(z) => AppMsg::SetZoomDefault(z),
-                PrefOutput::PageShown(id) => AppMsg::SettingsPageShown(id),
-                PrefOutput::Closed => AppMsg::ClosePreferences,
-                // Every other output is a setting, which AppMsg::Pref applies.
-                other => AppMsg::Pref(other),
-            });
-        accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
-            self.folder_choice_map(),
-        ));
+            .collect()
+    }
+
+    /// Showcase hooks for the Settings window (demo only), each a beat
+    /// after the panel is up.
+    fn arm_settings_showcase(
+        &self,
+        accounts: &Controller<AccountsWindow>,
+        sender: &ComponentSender<Self>,
+    ) {
         // Showcase hook: HYLKI_SHOWCASE_EDIT_FILTER=<index> opens that
         // filter rule's editor once the panel is up, for a capture.
         // Sent through the app so it reaches whichever panel is current
@@ -254,9 +281,6 @@ impl AppModel {
                 });
             }
         }
-        self.accounts_win = Some(accounts);
-        tracing::debug!("settings window: built in {:?}", t_open.elapsed());
-        self.prefs = Some(prefs);
     }
 
     /// A fresh accounts panel over the current accounts (in display
