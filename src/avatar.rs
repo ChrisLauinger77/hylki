@@ -86,7 +86,11 @@ pub fn cache_stats() -> (usize, u64, usize, u64) {
     });
     let (gravatars, gravatar_bytes) = GRAVATAR_CACHE.with(|c| {
         let c = c.borrow();
-        let bytes = c.values().flatten().map(crate::memory_report::texture_bytes).sum();
+        let bytes = c
+            .values()
+            .flatten()
+            .map(crate::memory_report::texture_bytes)
+            .sum();
         (c.len(), bytes)
     });
     (contacts, contact_bytes, gravatars, gravatar_bytes)
@@ -135,8 +139,10 @@ thread_local! {
 /// accounts that asked for something belong here: one showing its initials
 /// has nothing to add to the circle a sender already gets.
 pub fn set_own_faces(faces: impl IntoIterator<Item = (String, OwnFace)>) {
-    let faces: HashMap<String, OwnFace> =
-        faces.into_iter().map(|(address, face)| (key(&address), face)).collect();
+    let faces: HashMap<String, OwnFace> = faces
+        .into_iter()
+        .map(|(address, face)| (key(&address), face))
+        .collect();
     OWN_FACES.with(|current| {
         if *current.borrow() == faces {
             return;
@@ -189,7 +195,6 @@ pub fn own_faces_generation() -> u64 {
     OWN_FACES_GENERATION.with(Cell::get)
 }
 
-
 thread_local! {
     /// Own addresses whose Gravatar has been asked about this session. A miss
     /// or a network failure must not become a request on every render.
@@ -234,7 +239,12 @@ pub fn cache_own_gravatar(email: &str, outcome: FetchOutcome) -> bool {
     if matches!(outcome, FetchOutcome::Retry) {
         OWN_GRAVATAR_ASKED.with(|asked| asked.borrow_mut().remove(&key(email)));
     }
-    cache_result(email, crate::contacts::photo_generation(), FetchMode::GravatarOnly, outcome);
+    cache_result(
+        email,
+        crate::contacts::photo_generation(),
+        FetchMode::GravatarOnly,
+        outcome,
+    );
     let key = key(email);
     OWN_GRAVATAR_URIS.with(|cache| cache.borrow_mut().retain(|(address, _), _| address != &key));
     if found {
@@ -266,7 +276,10 @@ pub fn own_gravatar_data_uri(email: &str, size: i32) -> Option<String> {
     )
     .ok()?;
     let scaled = pixbuf.save_to_bufferv("png", &[]).ok()?;
-    let uri = format!("data:image/png;base64,{}", gtk::glib::base64_encode(&scaled));
+    let uri = format!(
+        "data:image/png;base64,{}",
+        gtk::glib::base64_encode(&scaled)
+    );
     OWN_GRAVATAR_URIS.with(|cache| {
         cache.borrow_mut().insert(cache_key, uri.clone());
     });
@@ -364,12 +377,7 @@ pub fn fetch(email: &str, mode: FetchMode) -> FetchOutcome {
 /// Record a completed request. Contact results are stamped with the generation
 /// that was actually queried; stale results are discarded rather than masking a
 /// newly synchronized vCard photo.
-pub fn cache_result(
-    email: &str,
-    generation: u64,
-    mode: FetchMode,
-    outcome: FetchOutcome,
-) -> bool {
+pub fn cache_result(email: &str, generation: u64, mode: FetchMode, outcome: FetchOutcome) -> bool {
     let key = key(email);
     let generation_current = crate::contacts::photo_generation() == generation;
     match outcome {
@@ -572,9 +580,7 @@ fn cache_gravatar_retry(key: String) {
         .unwrap_or_else(|p| p.into_inner())
         .insert(
             key,
-            RawGravatar::RetryAfter(
-                std::time::Instant::now() + std::time::Duration::from_secs(30),
-            ),
+            RawGravatar::RetryAfter(std::time::Instant::now() + std::time::Duration::from_secs(30)),
         );
 }
 
@@ -601,8 +607,16 @@ const PHOTO_THUMB_EDGE: i32 = 96;
 
 /// The list photos decoded, and their pixel bytes, for the memory report.
 pub fn photo_thumb_stats() -> (usize, u64) {
-    let Some(Ok(map)) = PHOTO_THUMBS.get().map(Mutex::lock) else { return (0, 0) };
-    (map.len(), map.values().flatten().map(crate::memory_report::texture_bytes).sum())
+    let Some(Ok(map)) = PHOTO_THUMBS.get().map(Mutex::lock) else {
+        return (0, 0);
+    };
+    (
+        map.len(),
+        map.values()
+            .flatten()
+            .map(crate::memory_report::texture_bytes)
+            .sum(),
+    )
 }
 
 /// A photo's list avatar, if [`decode_photo_thumbnails`] has been at it.
@@ -622,7 +636,9 @@ pub fn decode_photo_thumbnails(photos: Vec<(u64, Vec<u8>)>, progress: impl Fn() 
                 let mut done = 0;
                 loop {
                     let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    let Some((key, bytes)) = photos.get(i) else { break };
+                    let Some((key, bytes)) = photos.get(i) else {
+                        break;
+                    };
                     if photo_thumbnail(*key).is_none() {
                         let texture = shrink_photo(bytes);
                         if let Ok(mut map) = cache.lock() {
@@ -666,10 +682,22 @@ fn shrink_photo(bytes: &[u8]) -> Option<gtk::gdk::Texture> {
     let (pixels, stride) = downloader.download_bytes();
     // The middle square: the list shows faces in a circle.
     let side = width.min(height);
-    let mut pixbuf = Pixbuf::from_bytes(&pixels, Colorspace::Rgb, true, 8, width, height, stride as i32)
-        .new_subpixbuf((width - side) / 2, (height - side) / 2, side, side);
+    let mut pixbuf = Pixbuf::from_bytes(
+        &pixels,
+        Colorspace::Rgb,
+        true,
+        8,
+        width,
+        height,
+        stride as i32,
+    )
+    .new_subpixbuf((width - side) / 2, (height - side) / 2, side, side);
     if side > PHOTO_THUMB_EDGE * 4 {
-        pixbuf = pixbuf.scale_simple(PHOTO_THUMB_EDGE * 4, PHOTO_THUMB_EDGE * 4, InterpType::Nearest)?;
+        pixbuf = pixbuf.scale_simple(
+            PHOTO_THUMB_EDGE * 4,
+            PHOTO_THUMB_EDGE * 4,
+            InterpType::Nearest,
+        )?;
     }
     let edge = side.min(PHOTO_THUMB_EDGE);
     let small = pixbuf.scale_simple(edge, edge, InterpType::Tiles)?;
@@ -733,7 +761,11 @@ fn decode_image(bytes: &[u8]) -> Option<DecodedImage> {
         for x in 0..width as usize {
             let offset = y * rowstride + x * channels;
             pixels.extend_from_slice(&source[offset..offset + 3]);
-            pixels.push(if channels >= 4 { source[offset + 3] } else { 255 });
+            pixels.push(if channels >= 4 {
+                source[offset + 3]
+            } else {
+                255
+            });
         }
     }
     Some(DecodedImage {
@@ -758,20 +790,39 @@ mod tests {
     fn contact_photos_are_shrunk_once_and_kept() {
         let (width, height) = (500, 300);
         let pixels = gtk::glib::Bytes::from_owned(vec![200u8; (width * height * 4) as usize]);
-        let png = gtk::gdk::MemoryTexture::new(width, height, gtk::gdk::MemoryFormat::R8g8b8a8, &pixels, width as usize * 4)
-            .save_to_png_bytes()
-            .to_vec();
+        let png = gtk::gdk::MemoryTexture::new(
+            width,
+            height,
+            gtk::gdk::MemoryFormat::R8g8b8a8,
+            &pixels,
+            width as usize * 4,
+        )
+        .save_to_png_bytes()
+        .to_vec();
         let svg = b"<svg xmlns='http://www.w3.org/2000/svg'/>".to_vec();
-        let (photo, broken) = (crate::contacts::photo_key(&png), crate::contacts::photo_key(&svg));
-        assert!(photo_thumbnail(photo).is_none(), "nothing is cached before it is decoded");
+        let (photo, broken) = (
+            crate::contacts::photo_key(&png),
+            crate::contacts::photo_key(&svg),
+        );
+        assert!(
+            photo_thumbnail(photo).is_none(),
+            "nothing is cached before it is decoded"
+        );
 
         let reports = std::sync::atomic::AtomicUsize::new(0);
         decode_photo_thumbnails(vec![(photo, png), (broken, svg)], || {
             reports.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         });
-        assert!(reports.into_inner() >= 1, "the last photo is always reported");
+        assert!(
+            reports.into_inner() >= 1,
+            "the last photo is always reported"
+        );
         let small = photo_thumbnail(photo).flatten().expect("decoded");
-        assert_eq!((small.width(), small.height()), (PHOTO_THUMB_EDGE, PHOTO_THUMB_EDGE), "cut square");
+        assert_eq!(
+            (small.width(), small.height()),
+            (PHOTO_THUMB_EDGE, PHOTO_THUMB_EDGE),
+            "cut square"
+        );
         assert!(matches!(photo_thumbnail(broken), Some(None)));
     }
 
@@ -779,7 +830,9 @@ mod tests {
     fn accepts_common_rasters_but_not_svg() {
         assert!(supported_raster(b"\x89PNG\r\n\x1a\nrest"));
         assert!(supported_raster(b"\xff\xd8\xffrest"));
-        assert!(!supported_raster(b"<svg xmlns='http://www.w3.org/2000/svg'/>"));
+        assert!(!supported_raster(
+            b"<svg xmlns='http://www.w3.org/2000/svg'/>"
+        ));
     }
 
     /// The user's own addresses are matched however they were typed, and a
@@ -799,7 +852,11 @@ mod tests {
 
         let generation = own_faces_generation();
         set_own_faces([("ada@example.com".to_string(), face.clone())]);
-        assert_eq!(own_faces_generation(), generation, "the same faces are not a change");
+        assert_eq!(
+            own_faces_generation(),
+            generation,
+            "the same faces are not a change"
+        );
 
         set_own_faces(std::iter::empty());
         assert_eq!(own_face("ada@example.com"), None);
@@ -817,12 +874,19 @@ mod tests {
             emoji: None,
             color: "#3584e4".to_string(),
         };
-        assert!(face.is_set(), "asking for a Gravatar is asking for something");
+        assert!(
+            face.is_set(),
+            "asking for a Gravatar is asking for something"
+        );
         set_own_faces([("ada@example.com".to_string(), face.clone())]);
 
         set_faces_on_own_mail(false);
         let generation = own_faces_generation();
-        assert_eq!(own_face("ada@example.com"), None, "her mail is like anyone's");
+        assert_eq!(
+            own_face("ada@example.com"),
+            None,
+            "her mail is like anyone's"
+        );
         assert_eq!(
             account_face("ada@example.com").as_ref(),
             Some(&face),
@@ -833,7 +897,10 @@ mod tests {
         assert_eq!(own_faces_generation(), generation, "no change, no redraw");
         set_faces_on_own_mail(true);
         assert_eq!(own_face("ada@example.com").as_ref(), Some(&face));
-        assert!(own_faces_generation() > generation, "back on, draw it again");
+        assert!(
+            own_faces_generation() > generation,
+            "back on, draw it again"
+        );
 
         set_own_faces(std::iter::empty());
     }

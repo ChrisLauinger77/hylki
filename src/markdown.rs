@@ -132,17 +132,27 @@ fn own_tag(t: Tag) -> Tag<'static> {
     use pulldown_cmark::Tag::*;
     match t {
         Paragraph => Paragraph,
-        Heading { level, id, classes, attrs } => Heading {
+        Heading {
+            level,
+            id,
+            classes,
+            attrs,
+        } => Heading {
             level,
             id: id.map(|s| s.into_string().into()),
-            classes: classes.into_iter().map(|s| s.into_string().into()).collect(),
+            classes: classes
+                .into_iter()
+                .map(|s| s.into_string().into())
+                .collect(),
             attrs: attrs
                 .into_iter()
                 .map(|(k, v)| (k.into_string().into(), v.map(|v| v.into_string().into())))
                 .collect(),
         },
         BlockQuote(k) => BlockQuote(k),
-        CodeBlock(CodeBlockKind::Fenced(s)) => CodeBlock(CodeBlockKind::Fenced(s.into_string().into())),
+        CodeBlock(CodeBlockKind::Fenced(s)) => {
+            CodeBlock(CodeBlockKind::Fenced(s.into_string().into()))
+        }
         CodeBlock(CodeBlockKind::Indented) => CodeBlock(CodeBlockKind::Indented),
         HtmlBlock => HtmlBlock,
         List(n) => List(n),
@@ -160,13 +170,23 @@ fn own_tag(t: Tag) -> Tag<'static> {
         Strikethrough => Strikethrough,
         Superscript => Superscript,
         Subscript => Subscript,
-        Link { link_type, dest_url, title, id } => Link {
+        Link {
+            link_type,
+            dest_url,
+            title,
+            id,
+        } => Link {
             link_type,
             dest_url: dest_url.into_string().into(),
             title: title.into_string().into(),
             id: id.into_string().into(),
         },
-        Image { link_type, dest_url, title, id } => Image {
+        Image {
+            link_type,
+            dest_url,
+            title,
+            id,
+        } => Image {
             link_type,
             dest_url: dest_url.into_string().into(),
             title: title.into_string().into(),
@@ -359,7 +379,11 @@ fn is_break(c: char) -> bool {
 }
 
 fn is_break_char(c: char) -> bool {
-    c.is_whitespace() || matches!(c, '(' | ')' | '[' | ']' | '<' | '>' | '"' | '\'' | ',' | ';')
+    c.is_whitespace()
+        || matches!(
+            c,
+            '(' | ')' | '[' | ']' | '<' | '>' | '"' | '\'' | ',' | ';'
+        )
 }
 
 /// Pull sentence punctuation (and an unbalanced closing bracket) back off
@@ -367,8 +391,11 @@ fn is_break_char(c: char) -> bool {
 fn trim_trailing(text: &str, start: usize, mut end: usize) -> usize {
     while end > start {
         let c = text[..end].chars().next_back().unwrap_or(' ');
-        let drop = matches!(c, '.' | ',' | ';' | ':' | '!' | '?' | '"' | '\'' | '*' | '_')
-            || (c == ')' && text[start..end].matches('(').count() < text[start..end].matches(')').count());
+        let drop = matches!(
+            c,
+            '.' | ',' | ';' | ':' | '!' | '?' | '"' | '\'' | '*' | '_'
+        ) || (c == ')'
+            && text[start..end].matches('(').count() < text[start..end].matches(')').count());
         if !drop {
             break;
         }
@@ -416,70 +443,192 @@ fn emoji(text: &str) -> String {
 
 /// Shortcode table (GitHub's names, which are what the guide documents).
 const EMOJI: &[(&str, &str)] = &[
-    ("smile", "\u{1F604}"), ("smiley", "\u{1F603}"), ("grin", "\u{1F601}"),
-    ("grinning", "\u{1F600}"), ("joy", "\u{1F602}"), ("rofl", "\u{1F923}"),
-    ("sweat_smile", "\u{1F605}"), ("wink", "\u{1F609}"), ("blush", "\u{1F60A}"),
-    ("slightly_smiling_face", "\u{1F642}"), ("upside_down_face", "\u{1F643}"),
-    ("relaxed", "\u{263A}\u{FE0F}"), ("yum", "\u{1F60B}"), ("sunglasses", "\u{1F60E}"),
-    ("heart_eyes", "\u{1F60D}"), ("kissing_heart", "\u{1F618}"), ("thinking", "\u{1F914}"),
-    ("neutral_face", "\u{1F610}"), ("expressionless", "\u{1F611}"), ("no_mouth", "\u{1F636}"),
-    ("smirk", "\u{1F60F}"), ("unamused", "\u{1F612}"), ("roll_eyes", "\u{1F644}"),
-    ("grimacing", "\u{1F62C}"), ("lying_face", "\u{1F925}"), ("relieved", "\u{1F60C}"),
-    ("pensive", "\u{1F614}"), ("sleepy", "\u{1F62A}"), ("sleeping", "\u{1F634}"),
-    ("mask", "\u{1F637}"), ("nauseated_face", "\u{1F922}"), ("sneezing_face", "\u{1F927}"),
-    ("dizzy_face", "\u{1F635}"), ("cowboy_hat_face", "\u{1F920}"), ("confused", "\u{1F615}"),
-    ("worried", "\u{1F61F}"), ("frowning_face", "\u{2639}\u{FE0F}"), ("open_mouth", "\u{1F62E}"),
-    ("hushed", "\u{1F62F}"), ("astonished", "\u{1F632}"), ("flushed", "\u{1F633}"),
-    ("fearful", "\u{1F628}"), ("cold_sweat", "\u{1F630}"), ("cry", "\u{1F622}"),
-    ("sob", "\u{1F62D}"), ("scream", "\u{1F631}"), ("confounded", "\u{1F616}"),
-    ("persevere", "\u{1F623}"), ("disappointed", "\u{1F61E}"), ("sweat", "\u{1F613}"),
-    ("weary", "\u{1F629}"), ("tired_face", "\u{1F62B}"), ("triumph", "\u{1F624}"),
-    ("rage", "\u{1F621}"), ("angry", "\u{1F620}"), ("innocent", "\u{1F607}"),
-    ("imp", "\u{1F47F}"), ("skull", "\u{1F480}"), ("ghost", "\u{1F47B}"),
-    ("alien", "\u{1F47D}"), ("robot", "\u{1F916}"), ("clown_face", "\u{1F921}"),
-    ("heart", "\u{2764}\u{FE0F}"), ("orange_heart", "\u{1F9E1}"), ("yellow_heart", "\u{1F49B}"),
-    ("green_heart", "\u{1F49A}"), ("blue_heart", "\u{1F499}"), ("purple_heart", "\u{1F49C}"),
-    ("black_heart", "\u{1F5A4}"), ("broken_heart", "\u{1F494}"), ("sparkling_heart", "\u{1F496}"),
-    ("thumbsup", "\u{1F44D}"), ("+1", "\u{1F44D}"), ("thumbsdown", "\u{1F44E}"), ("-1", "\u{1F44E}"),
-    ("ok_hand", "\u{1F44C}"), ("clap", "\u{1F44F}"), ("raised_hands", "\u{1F64C}"),
-    ("pray", "\u{1F64F}"), ("muscle", "\u{1F4AA}"), ("point_right", "\u{1F449}"),
-    ("point_left", "\u{1F448}"), ("point_up", "\u{261D}\u{FE0F}"), ("point_down", "\u{1F447}"),
-    ("wave", "\u{1F44B}"), ("handshake", "\u{1F91D}"), ("writing_hand", "\u{270D}\u{FE0F}"),
-    ("eyes", "\u{1F440}"), ("brain", "\u{1F9E0}"), ("tada", "\u{1F389}"),
-    ("confetti_ball", "\u{1F38A}"), ("balloon", "\u{1F388}"), ("gift", "\u{1F381}"),
-    ("trophy", "\u{1F3C6}"), ("medal", "\u{1F3C5}"), ("crown", "\u{1F451}"),
-    ("fire", "\u{1F525}"), ("star", "\u{2B50}"), ("star2", "\u{1F31F}"),
-    ("sparkles", "\u{2728}"), ("zap", "\u{26A1}"), ("boom", "\u{1F4A5}"),
-    ("rainbow", "\u{1F308}"), ("sunny", "\u{2600}\u{FE0F}"), ("cloud", "\u{2601}\u{FE0F}"),
-    ("umbrella", "\u{2614}"), ("snowflake", "\u{2744}\u{FE0F}"), ("moon", "\u{1F314}"),
-    ("earth_africa", "\u{1F30D}"), ("rocket", "\u{1F680}"), ("airplane", "\u{2708}\u{FE0F}"),
-    ("car", "\u{1F697}"), ("bike", "\u{1F6B2}"), ("house", "\u{1F3E0}"),
-    ("office", "\u{1F3E2}"), ("coffee", "\u{2615}"), ("tea", "\u{1F375}"),
-    ("beer", "\u{1F37A}"), ("wine_glass", "\u{1F377}"), ("cake", "\u{1F370}"),
-    ("pizza", "\u{1F355}"), ("apple", "\u{1F34E}"), ("bread", "\u{1F35E}"),
-    ("dog", "\u{1F436}"), ("cat", "\u{1F431}"), ("bird", "\u{1F426}"),
-    ("fish", "\u{1F41F}"), ("bug", "\u{1F41B}"), ("bee", "\u{1F41D}"),
-    ("seedling", "\u{1F331}"), ("evergreen_tree", "\u{1F332}"), ("four_leaf_clover", "\u{1F340}"),
-    ("rose", "\u{1F339}"), ("sunflower", "\u{1F33B}"), ("mushroom", "\u{1F344}"),
-    ("email", "\u{1F4E7}"), ("envelope", "\u{2709}\u{FE0F}"), ("inbox_tray", "\u{1F4E5}"),
-    ("outbox_tray", "\u{1F4E4}"), ("package", "\u{1F4E6}"), ("paperclip", "\u{1F4CE}"),
-    ("pushpin", "\u{1F4CC}"), ("calendar", "\u{1F4C5}"), ("clock", "\u{1F551}"),
-    ("hourglass", "\u{231B}"), ("alarm_clock", "\u{23F0}"), ("bell", "\u{1F514}"),
-    ("mag", "\u{1F50D}"), ("key", "\u{1F511}"), ("lock", "\u{1F512}"),
-    ("unlock", "\u{1F513}"), ("wrench", "\u{1F527}"), ("hammer", "\u{1F528}"),
-    ("gear", "\u{2699}\u{FE0F}"), ("bulb", "\u{1F4A1}"), ("book", "\u{1F4D6}"),
-    ("books", "\u{1F4DA}"), ("memo", "\u{1F4DD}"), ("pencil2", "\u{270F}\u{FE0F}"),
-    ("clipboard", "\u{1F4CB}"), ("chart_with_upwards_trend", "\u{1F4C8}"),
-    ("chart_with_downwards_trend", "\u{1F4C9}"), ("bar_chart", "\u{1F4CA}"),
-    ("computer", "\u{1F4BB}"), ("iphone", "\u{1F4F1}"), ("printer", "\u{1F5A8}\u{FE0F}"),
-    ("bulb_off", "\u{1F4A1}"), ("moneybag", "\u{1F4B0}"), ("credit_card", "\u{1F4B3}"),
-    ("warning", "\u{26A0}\u{FE0F}"), ("no_entry", "\u{26D4}"), ("x", "\u{274C}"),
-    ("white_check_mark", "\u{2705}"), ("heavy_check_mark", "\u{2714}\u{FE0F}"),
-    ("ballot_box_with_check", "\u{2611}\u{FE0F}"), ("question", "\u{2753}"),
-    ("exclamation", "\u{2757}"), ("bangbang", "\u{203C}\u{FE0F}"), ("100", "\u{1F4AF}"),
-    ("recycle", "\u{267B}\u{FE0F}"), ("arrow_right", "\u{27A1}\u{FE0F}"),
-    ("arrow_left", "\u{2B05}\u{FE0F}"), ("arrow_up", "\u{2B06}\u{FE0F}"),
-    ("arrow_down", "\u{2B07}\u{FE0F}"), ("link", "\u{1F517}"), ("bookmark", "\u{1F516}"),
+    ("smile", "\u{1F604}"),
+    ("smiley", "\u{1F603}"),
+    ("grin", "\u{1F601}"),
+    ("grinning", "\u{1F600}"),
+    ("joy", "\u{1F602}"),
+    ("rofl", "\u{1F923}"),
+    ("sweat_smile", "\u{1F605}"),
+    ("wink", "\u{1F609}"),
+    ("blush", "\u{1F60A}"),
+    ("slightly_smiling_face", "\u{1F642}"),
+    ("upside_down_face", "\u{1F643}"),
+    ("relaxed", "\u{263A}\u{FE0F}"),
+    ("yum", "\u{1F60B}"),
+    ("sunglasses", "\u{1F60E}"),
+    ("heart_eyes", "\u{1F60D}"),
+    ("kissing_heart", "\u{1F618}"),
+    ("thinking", "\u{1F914}"),
+    ("neutral_face", "\u{1F610}"),
+    ("expressionless", "\u{1F611}"),
+    ("no_mouth", "\u{1F636}"),
+    ("smirk", "\u{1F60F}"),
+    ("unamused", "\u{1F612}"),
+    ("roll_eyes", "\u{1F644}"),
+    ("grimacing", "\u{1F62C}"),
+    ("lying_face", "\u{1F925}"),
+    ("relieved", "\u{1F60C}"),
+    ("pensive", "\u{1F614}"),
+    ("sleepy", "\u{1F62A}"),
+    ("sleeping", "\u{1F634}"),
+    ("mask", "\u{1F637}"),
+    ("nauseated_face", "\u{1F922}"),
+    ("sneezing_face", "\u{1F927}"),
+    ("dizzy_face", "\u{1F635}"),
+    ("cowboy_hat_face", "\u{1F920}"),
+    ("confused", "\u{1F615}"),
+    ("worried", "\u{1F61F}"),
+    ("frowning_face", "\u{2639}\u{FE0F}"),
+    ("open_mouth", "\u{1F62E}"),
+    ("hushed", "\u{1F62F}"),
+    ("astonished", "\u{1F632}"),
+    ("flushed", "\u{1F633}"),
+    ("fearful", "\u{1F628}"),
+    ("cold_sweat", "\u{1F630}"),
+    ("cry", "\u{1F622}"),
+    ("sob", "\u{1F62D}"),
+    ("scream", "\u{1F631}"),
+    ("confounded", "\u{1F616}"),
+    ("persevere", "\u{1F623}"),
+    ("disappointed", "\u{1F61E}"),
+    ("sweat", "\u{1F613}"),
+    ("weary", "\u{1F629}"),
+    ("tired_face", "\u{1F62B}"),
+    ("triumph", "\u{1F624}"),
+    ("rage", "\u{1F621}"),
+    ("angry", "\u{1F620}"),
+    ("innocent", "\u{1F607}"),
+    ("imp", "\u{1F47F}"),
+    ("skull", "\u{1F480}"),
+    ("ghost", "\u{1F47B}"),
+    ("alien", "\u{1F47D}"),
+    ("robot", "\u{1F916}"),
+    ("clown_face", "\u{1F921}"),
+    ("heart", "\u{2764}\u{FE0F}"),
+    ("orange_heart", "\u{1F9E1}"),
+    ("yellow_heart", "\u{1F49B}"),
+    ("green_heart", "\u{1F49A}"),
+    ("blue_heart", "\u{1F499}"),
+    ("purple_heart", "\u{1F49C}"),
+    ("black_heart", "\u{1F5A4}"),
+    ("broken_heart", "\u{1F494}"),
+    ("sparkling_heart", "\u{1F496}"),
+    ("thumbsup", "\u{1F44D}"),
+    ("+1", "\u{1F44D}"),
+    ("thumbsdown", "\u{1F44E}"),
+    ("-1", "\u{1F44E}"),
+    ("ok_hand", "\u{1F44C}"),
+    ("clap", "\u{1F44F}"),
+    ("raised_hands", "\u{1F64C}"),
+    ("pray", "\u{1F64F}"),
+    ("muscle", "\u{1F4AA}"),
+    ("point_right", "\u{1F449}"),
+    ("point_left", "\u{1F448}"),
+    ("point_up", "\u{261D}\u{FE0F}"),
+    ("point_down", "\u{1F447}"),
+    ("wave", "\u{1F44B}"),
+    ("handshake", "\u{1F91D}"),
+    ("writing_hand", "\u{270D}\u{FE0F}"),
+    ("eyes", "\u{1F440}"),
+    ("brain", "\u{1F9E0}"),
+    ("tada", "\u{1F389}"),
+    ("confetti_ball", "\u{1F38A}"),
+    ("balloon", "\u{1F388}"),
+    ("gift", "\u{1F381}"),
+    ("trophy", "\u{1F3C6}"),
+    ("medal", "\u{1F3C5}"),
+    ("crown", "\u{1F451}"),
+    ("fire", "\u{1F525}"),
+    ("star", "\u{2B50}"),
+    ("star2", "\u{1F31F}"),
+    ("sparkles", "\u{2728}"),
+    ("zap", "\u{26A1}"),
+    ("boom", "\u{1F4A5}"),
+    ("rainbow", "\u{1F308}"),
+    ("sunny", "\u{2600}\u{FE0F}"),
+    ("cloud", "\u{2601}\u{FE0F}"),
+    ("umbrella", "\u{2614}"),
+    ("snowflake", "\u{2744}\u{FE0F}"),
+    ("moon", "\u{1F314}"),
+    ("earth_africa", "\u{1F30D}"),
+    ("rocket", "\u{1F680}"),
+    ("airplane", "\u{2708}\u{FE0F}"),
+    ("car", "\u{1F697}"),
+    ("bike", "\u{1F6B2}"),
+    ("house", "\u{1F3E0}"),
+    ("office", "\u{1F3E2}"),
+    ("coffee", "\u{2615}"),
+    ("tea", "\u{1F375}"),
+    ("beer", "\u{1F37A}"),
+    ("wine_glass", "\u{1F377}"),
+    ("cake", "\u{1F370}"),
+    ("pizza", "\u{1F355}"),
+    ("apple", "\u{1F34E}"),
+    ("bread", "\u{1F35E}"),
+    ("dog", "\u{1F436}"),
+    ("cat", "\u{1F431}"),
+    ("bird", "\u{1F426}"),
+    ("fish", "\u{1F41F}"),
+    ("bug", "\u{1F41B}"),
+    ("bee", "\u{1F41D}"),
+    ("seedling", "\u{1F331}"),
+    ("evergreen_tree", "\u{1F332}"),
+    ("four_leaf_clover", "\u{1F340}"),
+    ("rose", "\u{1F339}"),
+    ("sunflower", "\u{1F33B}"),
+    ("mushroom", "\u{1F344}"),
+    ("email", "\u{1F4E7}"),
+    ("envelope", "\u{2709}\u{FE0F}"),
+    ("inbox_tray", "\u{1F4E5}"),
+    ("outbox_tray", "\u{1F4E4}"),
+    ("package", "\u{1F4E6}"),
+    ("paperclip", "\u{1F4CE}"),
+    ("pushpin", "\u{1F4CC}"),
+    ("calendar", "\u{1F4C5}"),
+    ("clock", "\u{1F551}"),
+    ("hourglass", "\u{231B}"),
+    ("alarm_clock", "\u{23F0}"),
+    ("bell", "\u{1F514}"),
+    ("mag", "\u{1F50D}"),
+    ("key", "\u{1F511}"),
+    ("lock", "\u{1F512}"),
+    ("unlock", "\u{1F513}"),
+    ("wrench", "\u{1F527}"),
+    ("hammer", "\u{1F528}"),
+    ("gear", "\u{2699}\u{FE0F}"),
+    ("bulb", "\u{1F4A1}"),
+    ("book", "\u{1F4D6}"),
+    ("books", "\u{1F4DA}"),
+    ("memo", "\u{1F4DD}"),
+    ("pencil2", "\u{270F}\u{FE0F}"),
+    ("clipboard", "\u{1F4CB}"),
+    ("chart_with_upwards_trend", "\u{1F4C8}"),
+    ("chart_with_downwards_trend", "\u{1F4C9}"),
+    ("bar_chart", "\u{1F4CA}"),
+    ("computer", "\u{1F4BB}"),
+    ("iphone", "\u{1F4F1}"),
+    ("printer", "\u{1F5A8}\u{FE0F}"),
+    ("bulb_off", "\u{1F4A1}"),
+    ("moneybag", "\u{1F4B0}"),
+    ("credit_card", "\u{1F4B3}"),
+    ("warning", "\u{26A0}\u{FE0F}"),
+    ("no_entry", "\u{26D4}"),
+    ("x", "\u{274C}"),
+    ("white_check_mark", "\u{2705}"),
+    ("heavy_check_mark", "\u{2714}\u{FE0F}"),
+    ("ballot_box_with_check", "\u{2611}\u{FE0F}"),
+    ("question", "\u{2753}"),
+    ("exclamation", "\u{2757}"),
+    ("bangbang", "\u{203C}\u{FE0F}"),
+    ("100", "\u{1F4AF}"),
+    ("recycle", "\u{267B}\u{FE0F}"),
+    ("arrow_right", "\u{27A1}\u{FE0F}"),
+    ("arrow_left", "\u{2B05}\u{FE0F}"),
+    ("arrow_up", "\u{2B06}\u{FE0F}"),
+    ("arrow_down", "\u{2B07}\u{FE0F}"),
+    ("link", "\u{1F517}"),
+    ("bookmark", "\u{1F516}"),
 ];
 
 /// The look of what Markdown produces, written onto each element with
@@ -529,7 +678,10 @@ enum Node {
 
 impl Elem {
     fn attr(&self, name: &str) -> Option<&str> {
-        self.attrs.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str())
+        self.attrs
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.as_str())
     }
 }
 
@@ -543,12 +695,22 @@ fn parse(html: &str) -> Vec<Node> {
     use markup5ever_rcdom::{Handle, NodeData, RcDom};
 
     fn element_named(parent: &Handle, tag: &str) -> Option<Handle> {
-        parent.children.borrow().iter().find(|c| {
-            matches!(&c.data, NodeData::Element { name, .. } if name.local.as_ref() == tag)
-        }).cloned()
+        parent
+            .children
+            .borrow()
+            .iter()
+            .find(
+                |c| matches!(&c.data, NodeData::Element { name, .. } if name.local.as_ref() == tag),
+            )
+            .cloned()
     }
     fn children(parent: &Handle) -> Vec<Node> {
-        parent.children.borrow().iter().filter_map(convert).collect()
+        parent
+            .children
+            .borrow()
+            .iter()
+            .filter_map(convert)
+            .collect()
     }
     fn convert(handle: &Handle) -> Option<Node> {
         match &handle.data {
@@ -558,8 +720,16 @@ fn parse(html: &str) -> Vec<Node> {
                 if tag == "script" || tag == "style" {
                     return None;
                 }
-                let attrs = attrs.borrow().iter().map(|a| (a.name.local.to_string(), a.value.to_string())).collect();
-                Some(Node::Elem(Elem { name: tag, attrs, children: children(handle) }))
+                let attrs = attrs
+                    .borrow()
+                    .iter()
+                    .map(|a| (a.name.local.to_string(), a.value.to_string()))
+                    .collect();
+                Some(Node::Elem(Elem {
+                    name: tag,
+                    attrs,
+                    children: children(handle),
+                }))
             }
             _ => None,
         }
@@ -622,7 +792,10 @@ pub fn plain_text(html: &str) -> String {
     walk(&parse(html), false, &mut text);
     let mut out = String::new();
     let mut blank = false;
-    for line in text.lines().map(|l| l.trim_matches(|c: char| c == ' ' || c == '\u{a0}')) {
+    for line in text
+        .lines()
+        .map(|l| l.trim_matches(|c: char| c == ' ' || c == '\u{a0}'))
+    {
         if line.is_empty() {
             if !blank && !out.is_empty() {
                 out.push('\n');
@@ -641,10 +814,39 @@ pub fn plain_text(html: &str) -> String {
 fn is_block(name: &str) -> bool {
     matches!(
         name,
-        "p" | "div" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "ul" | "ol" | "li" | "blockquote"
-            | "pre" | "hr" | "table" | "dl" | "dt" | "dd" | "section" | "article" | "header"
-            | "footer" | "main" | "aside" | "figure" | "figcaption" | "body" | "html" | "form"
-            | "nav" | "tr" | "thead" | "tbody" | "tfoot"
+        "p" | "div"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+            | "ul"
+            | "ol"
+            | "li"
+            | "blockquote"
+            | "pre"
+            | "hr"
+            | "table"
+            | "dl"
+            | "dt"
+            | "dd"
+            | "section"
+            | "article"
+            | "header"
+            | "footer"
+            | "main"
+            | "aside"
+            | "figure"
+            | "figcaption"
+            | "body"
+            | "html"
+            | "form"
+            | "nav"
+            | "tr"
+            | "thead"
+            | "tbody"
+            | "tfoot"
     )
 }
 
@@ -698,7 +900,11 @@ fn push_block(out: &mut String, text: &str) {
 /// Whether a blockquote is WebKit's Indent rather than a quote: it styles
 /// its own as `margin: 0 0 0 40px; border: none; padding: 0px;`.
 fn is_indent(e: &Elem) -> bool {
-    e.attr("style").is_some_and(|s| s.replace(' ', "").to_ascii_lowercase().contains("border:none"))
+    e.attr("style").is_some_and(|s| {
+        s.replace(' ', "")
+            .to_ascii_lowercase()
+            .contains("border:none")
+    })
 }
 
 /// One block element as Markdown.
@@ -707,7 +913,11 @@ fn block(e: &Elem) -> String {
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             let level = e.name[1..].parse::<usize>().unwrap_or(1);
             let text = inlines(e.children.iter()).trim().to_string();
-            let id = e.attr("id").filter(|s| !s.is_empty()).map(|s| format!(" {{#{s}}}")).unwrap_or_default();
+            let id = e
+                .attr("id")
+                .filter(|s| !s.is_empty())
+                .map(|s| format!(" {{#{s}}}"))
+                .unwrap_or_default();
             format!("{} {text}{id}", "#".repeat(level))
         }
         "hr" => "---".to_string(),
@@ -781,7 +991,11 @@ fn task_marker(li: &Elem) -> (String, Vec<&Node>) {
     for child in &li.children {
         match child {
             Node::Elem(e) if e.name == "input" && e.attr("type") == Some("checkbox") => {
-                mark = if e.attrs.iter().any(|(k, _)| k == "checked") { "[x] ".into() } else { "[ ] ".into() };
+                mark = if e.attrs.iter().any(|(k, _)| k == "checked") {
+                    "[x] ".into()
+                } else {
+                    "[ ] ".into()
+                };
             }
             other => rest.push(other),
         }
@@ -844,7 +1058,12 @@ fn table(e: &Elem) -> String {
     // it a table instead of collapsing into prose.
     if header == 0 {
         let empty: Vec<String> = (0..cols).map(|_| String::new()).collect();
-        out = format!("| {} |\n| {} |\n{}", empty.join(" | "), vec!["---"; cols].join(" | "), out);
+        out = format!(
+            "| {} |\n| {} |\n{}",
+            empty.join(" | "),
+            vec!["---"; cols].join(" | "),
+            out
+        );
     }
     out.trim_end().to_string()
 }
@@ -875,7 +1094,12 @@ fn collect_rows(
                         aligns.push(alignment(c));
                     }
                     // A newline inside a cell would end the table row.
-                    row.push(inlines(c.children.iter()).trim().replace('\n', " ").replace('|', "\\|"));
+                    row.push(
+                        inlines(c.children.iter())
+                            .trim()
+                            .replace('\n', " ")
+                            .replace('|', "\\|"),
+                    );
                 }
                 rows.push(row);
             }
@@ -908,7 +1132,10 @@ fn find_code_language(nodes: &[Node]) -> Option<String> {
         if let Node::Elem(e) = node {
             if e.name == "code" {
                 if let Some(class) = e.attr("class") {
-                    if let Some(lang) = class.split_whitespace().find_map(|c| c.strip_prefix("language-")) {
+                    if let Some(lang) = class
+                        .split_whitespace()
+                        .find_map(|c| c.strip_prefix("language-"))
+                    {
                         return Some(lang.to_string());
                     }
                 }
@@ -937,7 +1164,13 @@ fn raw_text(nodes: &[Node]) -> String {
 
 fn prefix_lines(text: &str, prefix: &str) -> String {
     text.lines()
-        .map(|l| if l.is_empty() { prefix.trim_end().to_string() } else { format!("{prefix}{l}") })
+        .map(|l| {
+            if l.is_empty() {
+                prefix.trim_end().to_string()
+            } else {
+                format!("{prefix}{l}")
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -1061,20 +1294,67 @@ pub fn sanitize_outgoing(html: &str) -> String {
     use std::collections::HashSet;
     let mut b = ammonia::Builder::default();
     b.add_tags([
-        "table", "thead", "tbody", "tfoot", "tr", "td", "th", "font", "center", "u", "span", "img",
-        "mark", "sup", "sub", "del", "ins", "kbd", "samp", "var", "dl", "dt", "dd", "figure",
-        "figcaption", "input", "section", "article", "details", "summary", "small", "big",
+        "table",
+        "thead",
+        "tbody",
+        "tfoot",
+        "tr",
+        "td",
+        "th",
+        "font",
+        "center",
+        "u",
+        "span",
+        "img",
+        "mark",
+        "sup",
+        "sub",
+        "del",
+        "ins",
+        "kbd",
+        "samp",
+        "var",
+        "dl",
+        "dt",
+        "dd",
+        "figure",
+        "figcaption",
+        "input",
+        "section",
+        "article",
+        "details",
+        "summary",
+        "small",
+        "big",
     ])
     .add_generic_attributes([
-        "style", "class", "id", "align", "valign", "width", "height", "bgcolor", "border",
-        "cellpadding", "cellspacing", "color", "face", "size", "colspan", "rowspan", "start",
-        "dir", "lang",
+        "style",
+        "class",
+        "id",
+        "align",
+        "valign",
+        "width",
+        "height",
+        "bgcolor",
+        "border",
+        "cellpadding",
+        "cellspacing",
+        "color",
+        "face",
+        "size",
+        "colspan",
+        "rowspan",
+        "start",
+        "dir",
+        "lang",
     ])
     .add_tag_attributes("img", ["src", "alt", "width", "height", "title"])
     // Task lists: the box is an <input>, and a disabled one carries no
     // behaviour of any kind.
     .add_tag_attributes("input", ["type", "checked", "disabled"])
-    .url_schemes(HashSet::from(["http", "https", "mailto", "tel", "data", "cid"]))
+    .url_schemes(HashSet::from([
+        "http", "https", "mailto", "tel", "data", "cid",
+    ]))
     .link_rel(None);
     b.clean(html).to_string()
 }
@@ -1085,8 +1365,30 @@ pub fn sanitize_outgoing(html: &str) -> String {
 /// break would change the message.
 pub fn pretty_html(html: &str) -> String {
     const BLOCKS: &[&str] = &[
-        "p", "div", "table", "thead", "tbody", "tfoot", "tr", "ul", "ol", "li", "blockquote", "h1",
-        "h2", "h3", "h4", "h5", "h6", "hr", "pre", "dl", "dt", "dd", "section", "article",
+        "p",
+        "div",
+        "table",
+        "thead",
+        "tbody",
+        "tfoot",
+        "tr",
+        "ul",
+        "ol",
+        "li",
+        "blockquote",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "hr",
+        "pre",
+        "dl",
+        "dt",
+        "dd",
+        "section",
+        "article",
     ];
     let mut out = String::with_capacity(html.len() + 64);
     let mut rest = html;
@@ -1148,7 +1450,10 @@ mod tests {
         let html = "<html><head><title>T</title><style>p{}</style></head><body>\
                     <header>Hello   <b>there</b></header><p>One<br>two &amp; three</p>\
                     <p></p><p></p><div>After</div><pre>a  b\n c</pre></body></html>";
-        assert_eq!(plain_text(html), "Hello there\nOne\ntwo & three\n\nAfter\na  b\nc");
+        assert_eq!(
+            plain_text(html),
+            "Hello there\nOne\ntwo & three\n\nAfter\na  b\nc"
+        );
     }
 
     /// Outlook nests a link in a link; a browser closes the first, leaving
@@ -1157,7 +1462,10 @@ mod tests {
     fn nested_links_leave_no_empty_link() {
         let html = r#"<p>Em: <a href="mailto:j@x.example"><a href="mailto:j@x.example">j@x.example</a></a></p>"#;
         assert_eq!(from_html(html), "Em: j@x.example");
-        assert_eq!(from_html(r#"<p><a href="https://x.example/"></a>text</p>"#), "text");
+        assert_eq!(
+            from_html(r#"<p><a href="https://x.example/"></a>text</p>"#),
+            "text"
+        );
     }
 
     /// Assert `html` contains `needle`, with the whole rendering in the
@@ -1199,11 +1507,23 @@ mod tests {
     fn code_links_and_images() {
         has(&to_html("`inline`"), "<code");
         has(&to_html("    indented block"), "<pre");
-        has(&to_html("[text](https://example.com)"), "href=\"https://example.com\"");
-        has(&to_html("[text](https://example.com \"Title\")"), "title=\"Title\"");
-        has(&to_html("<https://example.com>"), "href=\"https://example.com\"");
+        has(
+            &to_html("[text](https://example.com)"),
+            "href=\"https://example.com\"",
+        );
+        has(
+            &to_html("[text](https://example.com \"Title\")"),
+            "title=\"Title\"",
+        );
+        has(
+            &to_html("<https://example.com>"),
+            "href=\"https://example.com\"",
+        );
         has(&to_html("![alt](cid:pic)"), "<img");
-        has(&to_html("[ref][1]\n\n[1]: https://example.com"), "href=\"https://example.com\"");
+        has(
+            &to_html("[ref][1]\n\n[1]: https://example.com"),
+            "href=\"https://example.com\"",
+        );
     }
 
     #[test]
@@ -1263,9 +1583,18 @@ mod tests {
         has(&to_html("==**both**=="), "<mark");
         has(&to_html("ship it :rocket:"), "\u{1F680}");
         has(&to_html("unknown :nonsense: stays"), ":nonsense:");
-        has(&to_html("see https://example.com/x today"), "href=\"https://example.com/x\"");
-        has(&to_html("see www.example.com."), "href=\"https://www.example.com\"");
-        has(&to_html("mail ada@example.com now"), "href=\"mailto:ada@example.com\"");
+        has(
+            &to_html("see https://example.com/x today"),
+            "href=\"https://example.com/x\"",
+        );
+        has(
+            &to_html("see www.example.com."),
+            "href=\"https://www.example.com\"",
+        );
+        has(
+            &to_html("mail ada@example.com now"),
+            "href=\"mailto:ada@example.com\"",
+        );
     }
 
     #[test]
@@ -1279,8 +1608,14 @@ mod tests {
     fn links_after_multibyte_whitespace_and_symbols() {
         // A no-break space right before an address used to slice
         // mid-character (#479).
-        has(&to_html("mail\u{a0}ada@example.com"), "href=\"mailto:ada@example.com\"");
-        has(&to_html("svp\u{a0}www.example.com"), "href=\"https://www.example.com\"");
+        has(
+            &to_html("mail\u{a0}ada@example.com"),
+            "href=\"mailto:ada@example.com\"",
+        );
+        has(
+            &to_html("svp\u{a0}www.example.com"),
+            "href=\"https://www.example.com\"",
+        );
         // `†` ends in the byte 0xA0, which is not a word break.
         assert!(!to_html("\u{2020}www.example.com").contains("href"));
     }
@@ -1301,7 +1636,10 @@ mod tests {
         // — two `style`s on a tag and the second is thrown away.
         let aligned = to_html("| a |\n| ---: |\n| 1 |");
         has(&aligned, "padding: 6px 10px;text-align: right");
-        assert!(!aligned.contains("text-align: left"), "the sheet's left gave way: {aligned}");
+        assert!(
+            !aligned.contains("text-align: left"),
+            "the sheet's left gave way: {aligned}"
+        );
         for tag in ["<th ", "<td "] {
             let at = aligned.find(tag).unwrap();
             let open = &aligned[at..at + aligned[at..].find('>').unwrap()];
@@ -1316,15 +1654,24 @@ mod tests {
         let html = to_html("```\nlet a = 1;\n```\n\nand `b`");
         let pre = &html[html.find("<pre").unwrap()..html.find("</pre>").unwrap()];
         let inner = &pre[pre.find("<code").unwrap()..];
-        assert!(pre.starts_with("<pre style=\"background: rgba(128,128,128,0.12)"), "{html}");
-        assert!(inner.contains("background: none") && inner.contains("padding: 0"), "{html}");
+        assert!(
+            pre.starts_with("<pre style=\"background: rgba(128,128,128,0.12)"),
+            "{html}"
+        );
+        assert!(
+            inner.contains("background: none") && inner.contains("padding: 0"),
+            "{html}"
+        );
         let inline = &html[html.rfind("<code").unwrap()..];
         assert!(inline.contains("padding: 1px 4px"), "{html}");
     }
 
     #[test]
     fn raw_html_passes_through() {
-        has(&to_html("<span class=\"x\">kept</span>"), "<span class=\"x\">kept</span>");
+        has(
+            &to_html("<span class=\"x\">kept</span>"),
+            "<span class=\"x\">kept</span>",
+        );
     }
 
     // -- HTML back to Markdown -------------------------------------------
@@ -1389,8 +1736,14 @@ mod tests {
 
     #[test]
     fn a_bare_link_reads_as_itself() {
-        assert_eq!(from_html("<p><a href=\"https://example.com\">https://example.com</a></p>"), "https://example.com");
-        assert_eq!(from_html("<p><a href=\"mailto:ada@example.com\">ada@example.com</a></p>"), "ada@example.com");
+        assert_eq!(
+            from_html("<p><a href=\"https://example.com\">https://example.com</a></p>"),
+            "https://example.com"
+        );
+        assert_eq!(
+            from_html("<p><a href=\"mailto:ada@example.com\">ada@example.com</a></p>"),
+            "ada@example.com"
+        );
     }
 
     #[test]
@@ -1403,7 +1756,9 @@ mod tests {
 
     #[test]
     fn scripts_and_styles_are_not_text() {
-        let md = from_html("<p>before</p><script>alert('x')</script><style>p{color:red}</style><p>after</p>");
+        let md = from_html(
+            "<p>before</p><script>alert('x')</script><style>p{color:red}</style><p>after</p>",
+        );
         assert!(!md.contains("alert"), "{md}");
         assert!(!md.contains("color:red"), "{md}");
         has(&md, "before");

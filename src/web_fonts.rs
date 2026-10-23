@@ -109,7 +109,9 @@ fn simulated_hang() -> bool {
 }
 
 fn fallback_active() -> bool {
-    let Some(conf) = CONF.with(|c| c.borrow().clone()) else { return false };
+    let Some(conf) = CONF.with(|c| c.borrow().clone()) else {
+        return false;
+    };
     std::env::var("FONTCONFIG_FILE").is_ok_and(|v| v == conf)
 }
 
@@ -185,7 +187,9 @@ pub fn load_html(view: &webkit6::WebView, html: &str, base: Option<&str>) {
     glib::timeout_add_local_once(STALL, move || {
         let Some(view) = weak.upgrade() else { return };
         let still = PENDING.with(|p| {
-            p.borrow().iter().any(|e| e.generation == generation && e.view.upgrade().is_some_and(|v| v == view))
+            p.borrow()
+                .iter()
+                .any(|e| e.generation == generation && e.view.upgrade().is_some_and(|v| v == view))
         });
         if still && STATE.with(Cell::get) == State::Watching {
             suspect();
@@ -227,15 +231,22 @@ fn watch(view: &webkit6::WebView) {
 /// with the fallback.
 fn suspect() {
     STATE.with(|s| s.set(State::Probing));
-    tracing::warn!("web fonts: a document has not loaded in {} s; checking whether WebKit can load its fonts", STALL.as_secs());
+    tracing::warn!(
+        "web fonts: a document has not loaded in {} s; checking whether WebKit can load its fonts",
+        STALL.as_secs()
+    );
     probe(|loaded| {
         if loaded {
             tracing::info!("web fonts: the probe loaded, so the late document is slow on its own");
             settle();
             return;
         }
-        let Some(conf) = CONF.with(|c| c.borrow().clone()) else { return settle() };
-        tracing::warn!("web fonts: WebKit hangs on the fonts it is given; trying the runtime's fonts only");
+        let Some(conf) = CONF.with(|c| c.borrow().clone()) else {
+            return settle();
+        };
+        tracing::warn!(
+            "web fonts: WebKit hangs on the fonts it is given; trying the runtime's fonts only"
+        );
         std::env::set_var("FONTCONFIG_FILE", &conf);
         probe(move |loaded| {
             if !loaded {
@@ -249,7 +260,9 @@ fn suspect() {
             let stuck = PENDING.with(|p| std::mem::take(&mut *p.borrow_mut()));
             STATE.with(|s| s.set(State::Settled));
             for e in stuck {
-                let Some(view) = e.view.upgrade() else { continue };
+                let Some(view) = e.view.upgrade() else {
+                    continue;
+                };
                 // A closed composer's view outlives it (#221); it must not
                 // be handed a new web process.
                 if view.root().is_none() {
@@ -279,14 +292,17 @@ fn probe(done: impl FnOnce(bool) + 'static) {
         .web_context(&webkit6::WebContext::new())
         .settings(&settings)
         .build();
-    let done: Rc<RefCell<Option<Box<dyn FnOnce(bool)>>>> = Rc::new(RefCell::new(Some(Box::new(done))));
+    let done: Rc<RefCell<Option<Box<dyn FnOnce(bool)>>>> =
+        Rc::new(RefCell::new(Some(Box::new(done))));
     {
         let done = done.clone();
         view.connect_load_changed(move |view, event| {
             if event != webkit6::LoadEvent::Finished {
                 return;
             }
-            let Some(f) = done.borrow_mut().take() else { return };
+            let Some(f) = done.borrow_mut().take() else {
+                return;
+            };
             let view = view.clone();
             glib::idle_add_local_once(move || view.terminate_web_process());
             f(true);

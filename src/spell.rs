@@ -72,7 +72,9 @@ impl SpellChecker {
     /// Whether enchant knows no such word. Errors (and interior NULs) count
     /// as correctly spelled — a checker must never cry wolf.
     fn is_misspelled(&self, word: &str) -> bool {
-        let Ok(w) = CString::new(word) else { return false };
+        let Ok(w) = CString::new(word) else {
+            return false;
+        };
         unsafe { (self.check)(self.dict, w.as_ptr(), word.len() as isize) > 0 }
     }
 
@@ -127,7 +129,11 @@ fn misspelled_in_all<C>(checkers: &[C], word: &str, rejects: impl Fn(&C, &str) -
 /// too, for a hand-edited file.
 pub fn parse_languages(setting: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    for code in setting.split([',', ';', ' ']).map(str::trim).filter(|s| !s.is_empty()) {
+    for code in setting
+        .split([',', ';', ' '])
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         if !out.iter().any(|c| c == code) {
             out.push(code.to_string());
         }
@@ -345,7 +351,10 @@ fn checkable_words(text: &str) -> Vec<(usize, usize, &str)> {
         }
         let mut word_start: Option<usize> = None;
         // One past the end so a trailing word closes like an interior one.
-        for (i, ch) in token.char_indices().chain(std::iter::once((token.len(), ' '))) {
+        for (i, ch) in token
+            .char_indices()
+            .chain(std::iter::once((token.len(), ' ')))
+        {
             let wordish = ch.is_alphabetic() || ch == '\'' || ch == '\u{2019}';
             match (word_start, wordish) {
                 (None, true) => word_start = Some(i),
@@ -426,7 +435,11 @@ fn personal_dict_paths() -> Vec<std::path::PathBuf> {
 pub fn personal_words() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for path in personal_dict_paths() {
-        for word in std::fs::read_to_string(path).unwrap_or_default().lines().map(str::trim) {
+        for word in std::fs::read_to_string(path)
+            .unwrap_or_default()
+            .lines()
+            .map(str::trim)
+        {
             if !word.is_empty() && !out.iter().any(|w| w == word) {
                 out.push(word.to_string());
             }
@@ -440,13 +453,17 @@ pub fn personal_words() -> Vec<String> {
 pub fn all_personal_words() -> std::collections::BTreeMap<String, Vec<String>> {
     let mut out = std::collections::BTreeMap::new();
     let dir = gtk::glib::user_config_dir().join("enchant");
-    let Ok(entries) = std::fs::read_dir(dir) else { return out };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return out;
+    };
     for e in entries.flatten() {
         let path = e.path();
         if path.extension().and_then(|x| x.to_str()) != Some("dic") {
             continue;
         }
-        let Some(lang) = path.file_stem().and_then(|x| x.to_str()) else { continue };
+        let Some(lang) = path.file_stem().and_then(|x| x.to_str()) else {
+            continue;
+        };
         let words: Vec<String> = std::fs::read_to_string(&path)
             .unwrap_or_default()
             .lines()
@@ -472,8 +489,12 @@ pub fn merge_personal_words(lang: &str, words: &[String]) {
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join(format!("{lang}.dic"));
     let existing = std::fs::read_to_string(&path).unwrap_or_default();
-    let mut have: std::collections::BTreeSet<String> =
-        existing.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect();
+    let mut have: std::collections::BTreeSet<String> = existing
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(String::from)
+        .collect();
     let mut out = existing;
     if !out.is_empty() && !out.ends_with('\n') {
         out.push('\n');
@@ -512,9 +533,13 @@ pub fn add_personal_word(word: &str) {
 /// The message body applies the change at the next launch.
 pub fn remove_personal_word(word: &str) {
     for path in personal_dict_paths() {
-        let Ok(content) = std::fs::read_to_string(&path) else { continue };
-        let kept: Vec<&str> =
-            content.lines().filter(|l| l.trim() != word && !l.trim().is_empty()).collect();
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let kept: Vec<&str> = content
+            .lines()
+            .filter(|l| l.trim() != word && !l.trim().is_empty())
+            .collect();
         let mut out = kept.join("\n");
         if !out.is_empty() {
             out.push('\n');
@@ -570,19 +595,28 @@ mod tests {
     fn a_missing_dictionary_falls_back_or_drops_out() {
         let dicts = codes(&["de_DE", "en_GB"]);
         // Same language, other region.
-        assert_eq!(resolve_languages("en_US, de_DE", None, &dicts), ["en_GB", "de_DE"]);
+        assert_eq!(
+            resolve_languages("en_US, de_DE", None, &dicts),
+            ["en_GB", "de_DE"]
+        );
         // No dictionary in that language: left out while another is there.
         assert_eq!(resolve_languages("fi_FI, de_DE", None, &dicts), ["de_DE"]);
         // Nothing usable at all: any dictionary beats checking nothing.
         assert_eq!(resolve_languages("fi_FI", None, &dicts), ["de_DE"]);
         // No dictionaries visible: the codes go through as written.
-        assert_eq!(resolve_languages("fi_FI, sv_SE", None, &[]), ["fi_FI", "sv_SE"]);
+        assert_eq!(
+            resolve_languages("fi_FI, sv_SE", None, &[]),
+            ["fi_FI", "sv_SE"]
+        );
     }
 
     #[test]
     fn an_empty_setting_follows_the_locale() {
         let dicts = codes(&["de_DE", "en_US"]);
-        assert_eq!(resolve_languages("", Some("de_AT".into()), &dicts), ["de_DE"]);
+        assert_eq!(
+            resolve_languages("", Some("de_AT".into()), &dicts),
+            ["de_DE"]
+        );
         assert_eq!(resolve_languages(" , ", None, &dicts), ["en_US"]);
     }
 
@@ -590,9 +624,18 @@ mod tests {
     fn toggling_moves_between_the_system_language_and_a_list() {
         let system = codes(&["en_US"]);
         assert_eq!(toggle_language("", "de_DE", true, &system), "de_DE");
-        assert_eq!(toggle_language("de_DE", "fr_FR", true, &system), "de_DE, fr_FR");
-        assert_eq!(toggle_language("de_DE, fr_FR", "fr_FR", true, &system), "de_DE, fr_FR");
-        assert_eq!(toggle_language("de_DE, fr_FR", "de_DE", false, &system), "fr_FR");
+        assert_eq!(
+            toggle_language("de_DE", "fr_FR", true, &system),
+            "de_DE, fr_FR"
+        );
+        assert_eq!(
+            toggle_language("de_DE, fr_FR", "fr_FR", true, &system),
+            "de_DE, fr_FR"
+        );
+        assert_eq!(
+            toggle_language("de_DE, fr_FR", "de_DE", false, &system),
+            "fr_FR"
+        );
         // The last one off is the system language again.
         assert_eq!(toggle_language("fr_FR", "fr_FR", false, &system), "");
         // The system language on clears the list; off keeps what it checked.

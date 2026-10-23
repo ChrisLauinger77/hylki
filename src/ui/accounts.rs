@@ -8,11 +8,13 @@
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::config::{split_identity, AccountConfig, AliasConfig, NamedSignature, OAuthSettings, Protocol};
-use crate::ui::rich_editor::{self, RichEditor};
-use crate::ui::preferences::{SenderRow, SenderRowOutput};
-use crate::worker::{self, ConnTest};
+use crate::config::{
+    split_identity, AccountConfig, AliasConfig, NamedSignature, OAuthSettings, Protocol,
+};
 use crate::i18n::{i18n, i18n_f, i18n_noop};
+use crate::ui::preferences::{SenderRow, SenderRowOutput};
+use crate::ui::rich_editor::{self, RichEditor};
+use crate::worker::{self, ConnTest};
 
 const DEFAULT_COLOR: &str = "#3584e4";
 
@@ -65,7 +67,10 @@ impl Provider {
     /// The entries the wizard's form signs in to in the browser: Custom
     /// OAuth, and Microsoft.
     pub(crate) fn wizard_is_oauth(&self) -> bool {
-        matches!(self.kind, ProviderKind::CustomOAuth | ProviderKind::Microsoft)
+        matches!(
+            self.kind,
+            ProviderKind::CustomOAuth | ProviderKind::Microsoft
+        )
     }
     /// Custom OAuth: its endpoints and client are typed into the form.
     pub(crate) fn wizard_is_custom_oauth(&self) -> bool {
@@ -74,7 +79,9 @@ impl Provider {
     /// A built-in provider's OAuth client and endpoints, for the wizard's
     /// sign-in (Microsoft).
     pub(crate) fn wizard_builtin_oauth(&self) -> Option<crate::config::OAuthSettings> {
-        let name = self.oauth_name().filter(|_| self.kind == ProviderKind::Microsoft)?;
+        let name = self
+            .oauth_name()
+            .filter(|_| self.kind == ProviderKind::Microsoft)?;
         let p = crate::oauth::preset(name)?;
         let (client_id, client_secret) = crate::oauth::provider_credentials(name);
         Some(crate::config::OAuthSettings {
@@ -94,7 +101,12 @@ impl Provider {
         self.kind == ProviderKind::Manual
     }
     pub(crate) fn wizard_servers(&self) -> (&'static str, u16, &'static str, u16) {
-        (self.imap_host, self.imap_port, self.smtp_host, self.smtp_port)
+        (
+            self.imap_host,
+            self.imap_port,
+            self.smtp_host,
+            self.smtp_port,
+        )
     }
     pub(crate) fn wizard_hint(&self) -> &'static str {
         self.hint
@@ -111,7 +123,10 @@ impl Provider {
     }
 
     fn is_password(&self) -> bool {
-        matches!(self.kind, ProviderKind::Manual | ProviderKind::Preset | ProviderKind::Jmap)
+        matches!(
+            self.kind,
+            ProviderKind::Manual | ProviderKind::Preset | ProviderKind::Jmap
+        )
     }
     /// The incoming protocol the entry stands for; the manual entry and the
     /// presets leave it to the Incoming Protocol row.
@@ -332,7 +347,10 @@ pub enum AccountsInput {
     /// An account's folder order was changed from the sidebar: this copy of
     /// the account, and its editor if open, follow, so saving the editor
     /// later doesn't put the old order back.
-    SetFolderSort { email: String, sort: Option<crate::config::FolderSort> },
+    SetFolderSort {
+        email: String,
+        sort: Option<crate::config::FolderSort>,
+    },
     /// The editor's "Use my Gravatar" switch moved (#189).
     SetOwnGravatar(bool),
     /// The "Server saves its own copy of sent mail" switch: with it on there is
@@ -348,7 +366,10 @@ pub enum AccountsInput {
     /// is open. The answer (below) says whether anything would be lost.
     LeaveRequest(String),
     /// What the open editor answered: leave quietly, or ask the user first.
-    LeaveVerdict { page: String, touched: bool },
+    LeaveVerdict {
+        page: String,
+        touched: bool,
+    },
     /// The settings sidebar chose one of this component's pages (#141):
     /// "accounts", "tags", "filters" or "senders".
     ShowPage(String),
@@ -372,9 +393,15 @@ pub enum AccountsInput {
     EditAccountByEmail(String),
     /// The email field changed — mirror it into the (auto-filled) label field.
     EmailChanged,
-    MoveRow { from: usize, to: usize },
+    MoveRow {
+        from: usize,
+        to: usize,
+    },
     /// Enable/disable an account from the list toggle.
-    ToggleEnabled { index: usize, enabled: bool },
+    ToggleEnabled {
+        index: usize,
+        enabled: bool,
+    },
     /// Enable/disable the account currently open in the editor (GOA group toggle).
     ToggleCurrentEnabled(bool),
     /// Import a GNOME Online Account (by index into `goa`) into Hylki.
@@ -432,7 +459,10 @@ pub enum AccountsInput {
     SigTextTouched(bool),
     /// The shown signature's HTML, read back as it is left; `add` puts a
     /// new one up next, otherwise the chooser's says which.
-    SigStored { html: String, add: bool },
+    SigStored {
+        html: String,
+        add: bool,
+    },
     /// Clicked "Remove Account" — ask for confirmation first.
     RemoveCurrent,
     /// Confirmed in the dialog — actually remove the account being edited.
@@ -480,7 +510,10 @@ pub enum AccountsInput {
     RemoveTag(usize),
     /// A tag row was dragged onto another: reorder (#157). The order is the
     /// sidebar's, and the 1–9 shortcuts'.
-    MoveTag { from: usize, to: usize },
+    MoveTag {
+        from: usize,
+        to: usize,
+    },
     TagAdded(crate::config::Tag),
     TagEdited(usize, crate::config::Tag),
     /// Smart folders (#417): the editor, what it hands back, and the list
@@ -501,10 +534,16 @@ pub enum AccountsInput {
     ImportTags(Vec<crate::config::Tag>),
     /// How much storage an account's server says is in use (#298); shown
     /// when that account's page is the one open.
-    Quota { email: String, quota: Option<crate::models::MailboxQuota> },
+    Quota {
+        email: String,
+        quota: Option<crate::models::MailboxQuota>,
+    },
     /// The sending identities an account's JMAP server keeps (#346), as
     /// (name, address): listed under its aliases, read-only.
-    ServerIdentities { email: String, identities: Vec<(String, String)> },
+    ServerIdentities {
+        email: String,
+        identities: Vec<(String, String)>,
+    },
 }
 
 /// One keyword the tag finder proposes as a tag: the tag as it would be
@@ -525,11 +564,16 @@ pub enum AccountsOutput {
         original_email: Option<String>,
         account: Box<AccountConfig>,
     },
-    Removed { email: String },
+    Removed {
+        email: String,
+    },
     /// New display order, as account emails.
     Reordered(Vec<String>),
     /// An account was enabled/disabled from the list.
-    EnabledChanged { email: String, enabled: bool },
+    EnabledChanged {
+        email: String,
+        enabled: bool,
+    },
     /// Import a GNOME Online Account into Hylki (with its credentials).
     ImportGoa(Box<AccountConfig>),
     /// An editor subpage opened (the settings page it belongs to: accounts,
@@ -617,7 +661,10 @@ fn importable_goa_accounts(configured: &[AccountConfig]) -> Vec<crate::goa::GoaM
 }
 
 /// The importable ones among `listed` (see [`importable_goa_accounts`]).
-fn importable_of(listed: Vec<crate::goa::GoaMailAccount>, configured: &[AccountConfig]) -> Vec<crate::goa::GoaMailAccount> {
+fn importable_of(
+    listed: Vec<crate::goa::GoaMailAccount>,
+    configured: &[AccountConfig],
+) -> Vec<crate::goa::GoaMailAccount> {
     listed
         .into_iter()
         .filter(|g| {
@@ -690,19 +737,27 @@ impl AccountSecrets {
             .filter(|al| al.has_own_smtp() && al.smtp_password.is_empty())
             .map(|al| {
                 let addr = al.address();
-                let pw = crate::config::load_alias_smtp_password(&acc.email, &addr)
-                    .unwrap_or_default();
+                let pw =
+                    crate::config::load_alias_smtp_password(&acc.email, &addr).unwrap_or_default();
                 (addr, pw)
             })
             .collect();
-        AccountSecrets { email: acc.email.clone(), password, smtp_password, aliases }
+        AccountSecrets {
+            email: acc.email.clone(),
+            password,
+            smtp_password,
+            aliases,
+        }
     }
 
     /// Whether `acc` still needs anything from the keyring.
     fn needed(acc: &AccountConfig) -> bool {
         (!acc.oauth && acc.password.is_empty())
             || (acc.smtp_separate && acc.smtp_password.is_empty())
-            || acc.aliases.iter().any(|al| al.has_own_smtp() && al.smtp_password.is_empty())
+            || acc
+                .aliases
+                .iter()
+                .any(|al| al.has_own_smtp() && al.smtp_password.is_empty())
     }
 
     /// Write the secrets into `acc` where it has none.
@@ -1989,11 +2044,16 @@ impl Component for AccountsWindow {
                 }
             });
         }
-        tracing::debug!("settings window: accounts view built in {:?}", t_init.elapsed());
+        tracing::debug!(
+            "settings window: accounts view built in {:?}",
+            t_init.elapsed()
+        );
         model.filters_list = Some(widgets.filters_list.clone());
         {
             let q = model.filters_query.clone();
-            widgets.filters_list.set_filter_func(move |row| row_matches(row, &q.borrow()));
+            widgets
+                .filters_list
+                .set_filter_func(move |row| row_matches(row, &q.borrow()));
             let q = model.senders_query.clone();
             senders_box.set_filter_func(move |row| row_matches(row, &q.borrow()));
             let q = model.senders_query.clone();
@@ -2010,7 +2070,10 @@ impl Component for AccountsWindow {
         model.rebuild_smart_rows(&sender);
         let t_list = std::time::Instant::now();
         model.rebuild_account_list(&widgets.accounts_list, &sender);
-        tracing::debug!("settings window: accounts list built in {:?}", t_list.elapsed());
+        tracing::debug!(
+            "settings window: accounts list built in {:?}",
+            t_list.elapsed()
+        );
         model.rebuild_goa_list(&widgets.goa_list, &sender);
         widgets.goa_group.set_visible(!model.goa.is_empty());
         widgets
@@ -2028,18 +2091,28 @@ impl Component for AccountsWindow {
 
         // Push override choices mirror AccountConfig::push (None / Some(true)
         // / Some(false), in that order).
+        widgets.push_row.set_model(Some(&gtk::StringList::new(&[
+            i18n("Follow Settings").as_str(),
+            i18n("On").as_str(),
+            i18n("Off").as_str(),
+        ])));
         widgets
             .push_row
-            .set_model(Some(&gtk::StringList::new(&[i18n("Follow Settings").as_str(), i18n("On").as_str(), i18n("Off").as_str()])));
-        widgets.push_row.set_list_factory(Some(&non_ellipsizing_factory()));
+            .set_list_factory(Some(&non_ellipsizing_factory()));
         let sort_labels: Vec<String> = std::iter::once(i18n("Follow Settings"))
             .chain(crate::config::FolderSort::ALL.iter().map(|s| s.label()))
             .collect();
         let sort_labels: Vec<&str> = sort_labels.iter().map(String::as_str).collect();
-        widgets.folder_sort_row.set_model(Some(&gtk::StringList::new(&sort_labels)));
-        widgets.folder_sort_row.set_list_factory(Some(&non_ellipsizing_factory()));
+        widgets
+            .folder_sort_row
+            .set_model(Some(&gtk::StringList::new(&sort_labels)));
+        widgets
+            .folder_sort_row
+            .set_list_factory(Some(&non_ellipsizing_factory()));
         // The chosen value whole: "Follow Settings" cut to "Follow …" says nothing.
-        widgets.folder_sort_row.set_factory(Some(&non_ellipsizing_factory()));
+        widgets
+            .folder_sort_row
+            .set_factory(Some(&non_ellipsizing_factory()));
         let empty_labels = auto_empty_labels();
         let empty_labels: Vec<&str> = empty_labels.iter().map(String::as_str).collect();
         for row in [&widgets.empty_junk_row, &widgets.empty_trash_row] {
@@ -2048,13 +2121,26 @@ impl Component for AccountsWindow {
         }
         let list_labels = age_labels(CLEAN_LISTS_DAYS);
         let list_labels: Vec<&str> = list_labels.iter().map(String::as_str).collect();
-        widgets.clean_lists_row.set_model(Some(&gtk::StringList::new(&list_labels)));
-        widgets.clean_lists_row.set_list_factory(Some(&non_ellipsizing_factory()));
-        let reply_labels: Vec<String> = crate::config::ReplyCopies::ALL.iter().map(|c| c.label()).collect();
+        widgets
+            .clean_lists_row
+            .set_model(Some(&gtk::StringList::new(&list_labels)));
+        widgets
+            .clean_lists_row
+            .set_list_factory(Some(&non_ellipsizing_factory()));
+        let reply_labels: Vec<String> = crate::config::ReplyCopies::ALL
+            .iter()
+            .map(|c| c.label())
+            .collect();
         let reply_labels: Vec<&str> = reply_labels.iter().map(String::as_str).collect();
-        widgets.reply_copies_row.set_model(Some(&gtk::StringList::new(&reply_labels)));
-        widgets.reply_copies_row.set_list_factory(Some(&non_ellipsizing_factory()));
-        widgets.reply_copies_row.set_factory(Some(&non_ellipsizing_factory()));
+        widgets
+            .reply_copies_row
+            .set_model(Some(&gtk::StringList::new(&reply_labels)));
+        widgets
+            .reply_copies_row
+            .set_list_factory(Some(&non_ellipsizing_factory()));
+        widgets
+            .reply_copies_row
+            .set_factory(Some(&non_ellipsizing_factory()));
 
         // Show the SMTP credential fields only when the toggle is on.
         widgets
@@ -2070,7 +2156,9 @@ impl Component for AccountsWindow {
 
         // Auto-fill the label from the email as it's typed (until customized).
         let es = sender.clone();
-        widgets.email_row.connect_changed(move |_| es.input_sender().emit(AccountsInput::EmailChanged));
+        widgets
+            .email_row
+            .connect_changed(move |_| es.input_sender().emit(AccountsInput::EmailChanged));
 
         // The preview circle follows the name, label and email (its
         // initials) as they are typed; its color is a stylesheet.
@@ -2112,7 +2200,10 @@ impl Component for AccountsWindow {
             });
         }
 
-        tracing::debug!("settings window: accounts panel init {:?}", t_init.elapsed());
+        tracing::debug!(
+            "settings window: accounts panel init {:?}",
+            t_init.elapsed()
+        );
         ComponentParts { model, widgets }
     }
 
@@ -2132,7 +2223,9 @@ impl Component for AccountsWindow {
                 // goa-daemon is slow to.
                 widgets.goa_refresh_btn.set_sensitive(false);
                 sender.oneshot_command(async move {
-                    let listed = tokio::task::spawn_blocking(crate::goa::list_mail_accounts).await.unwrap_or_default();
+                    let listed = tokio::task::spawn_blocking(crate::goa::list_mail_accounts)
+                        .await
+                        .unwrap_or_default();
                     AccountsCmd::GoaListed(listed)
                 });
             }
@@ -2147,7 +2240,11 @@ impl Component for AccountsWindow {
                 }
             }
             AccountsInput::ReleaseSignatureEditor => {
-                let editing = widgets.nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor");
+                let editing = widgets
+                    .nav
+                    .visible_page()
+                    .and_then(|p| p.tag())
+                    .is_some_and(|t| t == "editor");
                 if !editing {
                     if let Some(editor) = self.sig_editor.take() {
                         // Kept for the next editor, which takes it in.
@@ -2171,20 +2268,30 @@ impl Component for AccountsWindow {
                     // asked, so that answer arrives separately.
                     Some("editor") => {
                         if self.editor_touched(widgets) {
-                            sender.input_sender().emit(AccountsInput::LeaveVerdict { page, touched: true });
+                            sender.input_sender().emit(AccountsInput::LeaveVerdict {
+                                page,
+                                touched: true,
+                            });
                         } else {
                             let s = sender.clone();
                             self.sig_editor(widgets).is_dirty(move |touched| {
-                                s.input_sender().emit(AccountsInput::LeaveVerdict { page, touched });
+                                s.input_sender()
+                                    .emit(AccountsInput::LeaveVerdict { page, touched });
                             });
                         }
                     }
                     // Nothing records what a filter or a tag was opened with,
                     // so those are always worth asking about.
                     Some("filter") | Some("tag") => {
-                        sender.input_sender().emit(AccountsInput::LeaveVerdict { page, touched: true })
+                        sender.input_sender().emit(AccountsInput::LeaveVerdict {
+                            page,
+                            touched: true,
+                        })
                     }
-                    _ => sender.input_sender().emit(AccountsInput::LeaveVerdict { page, touched: false }),
+                    _ => sender.input_sender().emit(AccountsInput::LeaveVerdict {
+                        page,
+                        touched: false,
+                    }),
                 }
             }
 
@@ -2291,7 +2398,9 @@ impl Component for AccountsWindow {
                 // On without the scopes would only be refused.
                 self.directory_on = acc.graph_directory && self.directory_granted;
                 widgets.graph_directory_row.set_active(self.directory_on);
-                widgets.directory_only_row.set_active(acc.graph_directory_only);
+                widgets
+                    .directory_only_row
+                    .set_active(acc.graph_directory_only);
                 self.labels_granted = acc.goa_id.is_none()
                     && acc.oauth
                     && acc.oauth_settings.as_ref().is_some_and(|s| {
@@ -2380,7 +2489,9 @@ impl Component for AccountsWindow {
                 widgets.goa_enabled_row.set_active(acc.enabled);
                 // While Mail is switched off in GNOME Settings the account is
                 // paused from there, not from here — say so where the toggle is.
-                widgets.goa_enabled_row.set_sensitive(!acc.goa_mail_disabled);
+                widgets
+                    .goa_enabled_row
+                    .set_sensitive(!acc.goa_mail_disabled);
                 widgets.goa_enabled_row.set_subtitle(if acc.goa_mail_disabled {
                     "Paused: Mail is switched off for this account in GNOME Settings \u{2192} Online Accounts."
                 } else {
@@ -2446,7 +2557,8 @@ impl Component for AccountsWindow {
                         if acc.enabled != enabled {
                             acc.enabled = enabled;
                             let email = acc.email.clone();
-                            let _ = sender.output(AccountsOutput::EnabledChanged { email, enabled });
+                            let _ =
+                                sender.output(AccountsOutput::EnabledChanged { email, enabled });
                             self.rebuild_account_list(&widgets.accounts_list, &sender);
                         }
                     }
@@ -2460,7 +2572,10 @@ impl Component for AccountsWindow {
                     // Either way the worker asks GOA again when it connects, so an
                     // account still works if this read comes back empty.
                     let (password, oauth) = if g.password_based {
-                        (crate::goa::mail_passwords(&g.id).0.unwrap_or_default(), false)
+                        (
+                            crate::goa::mail_passwords(&g.id).0.unwrap_or_default(),
+                            false,
+                        )
                     } else {
                         (String::new(), true)
                     };
@@ -2497,7 +2612,9 @@ impl Component for AccountsWindow {
                 if let Some(i) = self.accounts.iter().position(|a| a.email == email) {
                     self.accounts[i].folder_sort = sort;
                     if self.editing == Some(i) {
-                        widgets.folder_sort_row.set_selected(sort.map_or(0, |s| s.index() + 1));
+                        widgets
+                            .folder_sort_row
+                            .set_selected(sort.map_or(0, |s| s.index() + 1));
                     }
                 }
             }
@@ -2514,7 +2631,10 @@ impl Component for AccountsWindow {
                         })
                         .await
                         .unwrap_or(crate::avatar::FetchOutcome::Retry);
-                        AccountsCmd::OwnGravatar { email: address, outcome }
+                        AccountsCmd::OwnGravatar {
+                            email: address,
+                            outcome,
+                        }
                     });
                 }
                 self.refresh_preview(widgets);
@@ -2530,7 +2650,9 @@ impl Component for AccountsWindow {
             AccountsInput::RefreshPreview => self.refresh_preview(widgets),
 
             AccountsInput::PickAvatar => {
-                let dialog = gtk::FileDialog::builder().title(&i18n("Choose a Picture")).build();
+                let dialog = gtk::FileDialog::builder()
+                    .title(&i18n("Choose a Picture"))
+                    .build();
                 let filter = gtk::FileFilter::new();
                 filter.set_name(Some(&i18n("Images")));
                 filter.add_pixbuf_formats();
@@ -2605,9 +2727,9 @@ impl Component for AccountsWindow {
                 {
                     widgets.oauth_status.set_visible(true);
                     widgets.oauth_status.set_css_classes(&["error"]);
-                    widgets
-                        .oauth_status
-                        .set_label(&i18n("Enter a client ID (and endpoints for a custom provider) first"));
+                    widgets.oauth_status.set_label(&i18n(
+                        "Enter a client ID (and endpoints for a custom provider) first",
+                    ));
                     return;
                 }
                 widgets.oauth_signin_btn.set_sensitive(false);
@@ -2621,7 +2743,8 @@ impl Component for AccountsWindow {
                 });
                 // The address typed so far names the identity broker's
                 // account, where one is in charge of sign-ins.
-                let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+                let user =
+                    Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
                 sign_in(root, &sender, settings, user, false, AccountsCmd::OAuth);
             }
 
@@ -2637,7 +2760,9 @@ impl Component for AccountsWindow {
                     return;
                 }
                 let mut settings = self.oauth_settings_from_form(widgets);
-                if settings.client_id.trim().is_empty() || !settings.token_url.contains("microsoftonline") {
+                if settings.client_id.trim().is_empty()
+                    || !settings.token_url.contains("microsoftonline")
+                {
                     return;
                 }
                 settings.scopes = crate::oauth::with_directory_scopes(&settings.scopes);
@@ -2645,15 +2770,25 @@ impl Component for AccountsWindow {
                 widgets.oauth_signin_btn.set_sensitive(false);
                 widgets.graph_status.set_visible(true);
                 widgets.graph_status.set_css_classes(&["dim-label"]);
-                widgets.graph_status.set_label(&if settings.redirect_uri.trim().is_empty() {
-                    i18n("Opening browser… approve access to the directory there.")
-                } else {
-                    i18n("Approve access to the directory in the window that opened.")
-                });
+                widgets
+                    .graph_status
+                    .set_label(&if settings.redirect_uri.trim().is_empty() {
+                        i18n("Opening browser… approve access to the directory there.")
+                    } else {
+                        i18n("Approve access to the directory in the window that opened.")
+                    });
                 // Straight to the account being edited: Microsoft then asks
                 // only for what it has not approved yet.
-                let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
-                sign_in(root, &sender, settings, user, true, AccountsCmd::DirectoryConsent);
+                let user =
+                    Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+                sign_in(
+                    root,
+                    &sender,
+                    settings,
+                    user,
+                    true,
+                    AccountsCmd::DirectoryConsent,
+                );
             }
 
             AccountsInput::SetGraphLabels(on) => {
@@ -2667,21 +2802,36 @@ impl Component for AccountsWindow {
                     return;
                 }
                 let mut settings = self.oauth_settings_from_form(widgets);
-                if settings.client_id.trim().is_empty() || !settings.token_url.contains("microsoftonline") {
+                if settings.client_id.trim().is_empty()
+                    || !settings.token_url.contains("microsoftonline")
+                {
                     return;
                 }
-                settings.scopes = crate::oauth::with_scopes(&settings.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES);
+                settings.scopes = crate::oauth::with_scopes(
+                    &settings.scopes,
+                    &crate::oauth::MICROSOFT_LABEL_SCOPES,
+                );
                 widgets.graph_labels_row.set_sensitive(false);
                 widgets.oauth_signin_btn.set_sensitive(false);
                 widgets.graph_status.set_visible(true);
                 widgets.graph_status.set_css_classes(&["dim-label"]);
-                widgets.graph_status.set_label(&if settings.redirect_uri.trim().is_empty() {
-                    i18n("Opening browser… approve access to the sensitivity labels there.")
-                } else {
-                    i18n("Approve access to the sensitivity labels in the window that opened.")
-                });
-                let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
-                sign_in(root, &sender, settings, user, true, AccountsCmd::LabelsConsent);
+                widgets
+                    .graph_status
+                    .set_label(&if settings.redirect_uri.trim().is_empty() {
+                        i18n("Opening browser… approve access to the sensitivity labels there.")
+                    } else {
+                        i18n("Approve access to the sensitivity labels in the window that opened.")
+                    });
+                let user =
+                    Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+                sign_in(
+                    root,
+                    &sender,
+                    settings,
+                    user,
+                    true,
+                    AccountsCmd::LabelsConsent,
+                );
             }
 
             AccountsInput::OpenOnlineAccounts => open_online_accounts(),
@@ -2690,7 +2840,9 @@ impl Component for AccountsWindow {
                 // Pull the signature HTML out of the editor first (async), then
                 // finish saving in SaveWithSig.
                 let s = sender.clone();
-                self.read_signature(widgets, move |html| s.input_sender().emit(AccountsInput::SaveWithSig(html)));
+                self.read_signature(widgets, move |html| {
+                    s.input_sender().emit(AccountsInput::SaveWithSig(html))
+                });
             }
 
             AccountsInput::SetFolderChoices(map) => {
@@ -2704,20 +2856,29 @@ impl Component for AccountsWindow {
                 // The view loads a new document either way, which forgets
                 // that the old one was edited.
                 let s = sender.clone();
-                self.sig_editor(widgets).is_dirty(move |dirty| s.input_sender().emit(AccountsInput::SigTextTouched(dirty)));
+                self.sig_editor(widgets).is_dirty(move |dirty| {
+                    s.input_sender().emit(AccountsInput::SigTextTouched(dirty))
+                });
                 let s = sender.clone();
                 if self.sig_editor(widgets).source_kind().is_some() {
-                    self.sig_editor(widgets).extract_source(move |text| s.input_sender().emit(AccountsInput::SignatureToRich(text)));
+                    self.sig_editor(widgets).extract_source(move |text| {
+                        s.input_sender().emit(AccountsInput::SignatureToRich(text))
+                    });
                 } else {
-                    self.sig_editor(widgets).extract_html(move |html| s.input_sender().emit(AccountsInput::SignatureToSource(html)));
+                    self.sig_editor(widgets).extract_html(move |html| {
+                        s.input_sender()
+                            .emit(AccountsInput::SignatureToSource(html))
+                    });
                 }
             }
             AccountsInput::SignatureToSource(html) => {
-                self.sig_editor(widgets).set_source(rich_editor::SourceKind::Html, &html);
+                self.sig_editor(widgets)
+                    .set_source(rich_editor::SourceKind::Html, &html);
                 self.sync_source_button(widgets);
             }
             AccountsInput::SignatureToRich(text) => {
-                self.sig_editor(widgets).set_html(&rich_editor::signature_from_source(&text, None));
+                self.sig_editor(widgets)
+                    .set_html(&rich_editor::signature_from_source(&text, None));
                 self.sync_source_button(widgets);
             }
             AccountsInput::SignatureImport => {
@@ -2790,7 +2951,9 @@ impl Component for AccountsWindow {
             AccountsInput::SigRename => {
                 let name = widgets.sig_name_row.text().to_string();
                 let shown = self.sig_shown;
-                let Some(sig) = self.sig_edits.get_mut(shown) else { return };
+                let Some(sig) = self.sig_edits.get_mut(shown) else {
+                    return;
+                };
                 if sig.name == name {
                     return;
                 }
@@ -2799,7 +2962,11 @@ impl Component for AccountsWindow {
                 // Setting the model's entry moves the chooser off it; its
                 // notify finds it back on the shown one and does nothing.
                 let label = signature_label(&self.sig_edits, shown);
-                if let Some(list) = widgets.sig_choice_row.model().and_downcast::<gtk::StringList>() {
+                if let Some(list) = widgets
+                    .sig_choice_row
+                    .model()
+                    .and_downcast::<gtk::StringList>()
+                {
                     list.splice(shown as u32, 1, &[label.as_str()]);
                     widgets.sig_choice_row.set_selected(shown as u32);
                 }
@@ -2984,7 +3151,9 @@ impl Component for AccountsWindow {
             AccountsInput::RemoveCurrent => {
                 // Confirm before this destructive, keyring-clearing action.
                 let Some(i) = self.editing else { return };
-                let Some(account) = self.accounts.get(i) else { return };
+                let Some(account) = self.accounts.get(i) else {
+                    return;
+                };
                 let name = if account.name.trim().is_empty() {
                     account.email.clone()
                 } else {
@@ -3005,8 +3174,11 @@ impl Component for AccountsWindow {
                 // The panel is embedded — dialogs parent to whatever window
                 // it currently sits in (the combined settings window).
                 let host = root.root().and_downcast::<gtk::Window>();
-                let dialog =
-                    adw::MessageDialog::new(host.as_ref(), Some(i18n("Remove Account?").as_str()), Some(&body));
+                let dialog = adw::MessageDialog::new(
+                    host.as_ref(),
+                    Some(i18n("Remove Account?").as_str()),
+                    Some(&body),
+                );
                 dialog.add_response("cancel", &i18n("Cancel"));
                 dialog.add_response("remove", &i18n("Remove"));
                 dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
@@ -3068,7 +3240,9 @@ impl Component for AccountsWindow {
             }
 
             AccountsInput::AliasDialogSave => {
-                let Some(d) = self.alias_dialog.as_ref() else { return };
+                let Some(d) = self.alias_dialog.as_ref() else {
+                    return;
+                };
                 for row in [&d.addr_row, &d.host_row, &d.user_row] {
                     row.remove_css_class("error");
                 }
@@ -3089,8 +3263,7 @@ impl Component for AccountsWindow {
                 let account_email = trimmed(&widgets.email_row);
                 let duplicate = addr.eq_ignore_ascii_case(&account_email)
                     || self.alias_edits.iter().enumerate().any(|(i, a)| {
-                        Some(i) != self.alias_editing
-                            && a.address().eq_ignore_ascii_case(&addr)
+                        Some(i) != self.alias_editing && a.address().eq_ignore_ascii_case(&addr)
                     });
                 let mut bad = false;
                 if addr.is_empty() || !addr.contains('@') || duplicate {
@@ -3136,7 +3309,9 @@ impl Component for AccountsWindow {
             }
 
             AccountsInput::AliasDialogTest => {
-                let Some(d) = self.alias_dialog.as_ref() else { return };
+                let Some(d) = self.alias_dialog.as_ref() else {
+                    return;
+                };
                 let alias = AliasConfig {
                     identity: trimmed(&d.addr_row),
                     smtp_host: trimmed(&d.host_row),
@@ -3163,7 +3338,11 @@ impl Component for AccountsWindow {
                 // The notification is queued behind the close, so by the time it
                 // arrives a replacement dialog may already be open — only clear
                 // state when the dialog we track is really the one that closed.
-                if self.alias_dialog.as_ref().is_none_or(|d| !d.window.is_visible()) {
+                if self
+                    .alias_dialog
+                    .as_ref()
+                    .is_none_or(|d| !d.window.is_visible())
+                {
                     self.alias_dialog = None;
                     self.alias_editing = None;
                 }
@@ -3182,7 +3361,9 @@ impl Component for AccountsWindow {
                 if let Some(pos) = self.sender_addrs.iter().position(|a| *a == addr) {
                     self.sender_addrs.remove(pos);
                     self.senders.guard().remove(pos);
-                    self.senders.widget().set_visible(!self.sender_addrs.is_empty());
+                    self.senders
+                        .widget()
+                        .set_visible(!self.sender_addrs.is_empty());
                     let _ = sender.output(AccountsOutput::RemoveSender(addr));
                 }
             }
@@ -3199,7 +3380,9 @@ impl Component for AccountsWindow {
                 if let Some(pos) = self.blacklist_addrs.iter().position(|a| *a == addr) {
                     self.blacklist_addrs.remove(pos);
                     self.blacklist.guard().remove(pos);
-                    self.blacklist.widget().set_visible(!self.blacklist_addrs.is_empty());
+                    self.blacklist
+                        .widget()
+                        .set_visible(!self.blacklist_addrs.is_empty());
                     let _ = sender.output(AccountsOutput::RemoveBlacklist(addr));
                 }
             }
@@ -3226,8 +3409,8 @@ impl Component for AccountsWindow {
                     if *slot != rule {
                         *slot = rule;
                         self.rebuild_filter_rows(&sender);
-                        let _ = sender
-                            .output(AccountsOutput::SetFilters(self.filter_rules.clone()));
+                        let _ =
+                            sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
                     }
                 }
             }
@@ -3235,8 +3418,7 @@ impl Component for AccountsWindow {
                 if i < self.filter_rules.len() {
                     self.filter_rules.remove(i);
                     self.rebuild_filter_rows(&sender);
-                    let _ =
-                        sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
+                    let _ = sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
                 }
             }
             AccountsInput::FilterAdded(rule) => {
@@ -3254,7 +3436,8 @@ impl Component for AccountsWindow {
                 if i < self.smart_folders.len() {
                     self.smart_folders.remove(i);
                     self.rebuild_smart_rows(&sender);
-                    let _ = sender.output(AccountsOutput::SetSmartFolders(self.smart_folders.clone()));
+                    let _ =
+                        sender.output(AccountsOutput::SetSmartFolders(self.smart_folders.clone()));
                 }
             }
             AccountsInput::SmartFolderSaved(at, folder) => {
@@ -3318,14 +3501,20 @@ impl Component for AccountsWindow {
                 }
             }
             AccountsInput::ServerIdentities { email, identities } => {
-                let open = self.editing.and_then(|i| self.accounts.get(i)).is_some_and(|a| a.email.eq_ignore_ascii_case(&email));
+                let open = self
+                    .editing
+                    .and_then(|i| self.accounts.get(i))
+                    .is_some_and(|a| a.email.eq_ignore_ascii_case(&email));
                 if open && self.server_identities != identities {
                     self.server_identities = identities;
                     self.rebuild_alias_list(&widgets.aliases_list, &sender);
                 }
             }
             AccountsInput::Quota { email, quota } => {
-                let open = self.editing.and_then(|i| self.accounts.get(i)).is_some_and(|a| a.email.eq_ignore_ascii_case(&email));
+                let open = self
+                    .editing
+                    .and_then(|i| self.accounts.get(i))
+                    .is_some_and(|a| a.email.eq_ignore_ascii_case(&email));
                 if open {
                     show_quota(widgets, quota);
                 }
@@ -3339,7 +3528,11 @@ impl Component for AccountsWindow {
             AccountsInput::ImportTags(tags) => {
                 let mut added = 0;
                 for t in tags {
-                    if !self.tags.iter().any(|x| x.keyword.eq_ignore_ascii_case(&t.keyword)) {
+                    if !self
+                        .tags
+                        .iter()
+                        .any(|x| x.keyword.eq_ignore_ascii_case(&t.keyword))
+                    {
                         self.tags.push(t);
                         added += 1;
                     }
@@ -3400,7 +3593,11 @@ impl Component for AccountsWindow {
                 // Still editing that account: fill in what the user hasn't
                 // typed over meanwhile.
                 let Some(i) = self.editing else { return };
-                if self.accounts.get(i).is_none_or(|a| a.email != secrets.email) {
+                if self
+                    .accounts
+                    .get(i)
+                    .is_none_or(|a| a.email != secrets.email)
+                {
                     return;
                 }
                 // The passwords arrive after the editor opened, so they would
@@ -3418,7 +3615,9 @@ impl Component for AccountsWindow {
                 }
                 for al in self.alias_edits.iter_mut() {
                     if al.smtp_password.is_empty() {
-                        if let Some((_, pw)) = secrets.aliases.iter().find(|(a, _)| *a == al.address()) {
+                        if let Some((_, pw)) =
+                            secrets.aliases.iter().find(|(a, _)| *a == al.address())
+                        {
                             al.smtp_password = pw.clone();
                         }
                     }
@@ -3428,13 +3627,15 @@ impl Component for AccountsWindow {
                 }
             }
             AccountsCmd::Test(result) => {
-                let line = |label: &str, r: &Result<(), String>| match r {
+                let line = |label: &str, r: &Result<(), String>| {
+                    match r {
                     Ok(()) => format!("✓ {label}: connected"),
                     Err(e) if crate::worker::is_hostname_mismatch(e) => format!(
                         "✗ {label}: {e}\n   {}",
                         i18n("The certificate is for another name. If this server is the right one, turn on “Accept a certificate for another name” above and test again.")
                     ),
                     Err(e) => format!("✗ {label}: {e}"),
+                }
                 };
                 let protocol = form_protocol(widgets);
                 let incoming_label = match protocol {
@@ -3476,11 +3677,15 @@ impl Component for AccountsWindow {
                             }
                         }
                         widgets.oauth_status.set_css_classes(&["success"]);
-                        widgets.oauth_status.set_label(&i18n("✓ Signed in. Save the account to finish."));
+                        widgets
+                            .oauth_status
+                            .set_label(&i18n("✓ Signed in. Save the account to finish."));
                     }
                     Err(e) => {
                         widgets.oauth_status.set_css_classes(&["error"]);
-                        widgets.oauth_status.set_label(&i18n_f("Sign-in failed: {e}", &[("e", &(e).to_string())]));
+                        widgets
+                            .oauth_status
+                            .set_label(&i18n_f("Sign-in failed: {e}", &[("e", &(e).to_string())]));
                     }
                 }
             }
@@ -3492,9 +3697,9 @@ impl Component for AccountsWindow {
                     Ok(()) => {
                         self.directory_granted = true;
                         widgets.graph_status.set_css_classes(&["success"]);
-                        widgets
-                            .graph_status
-                            .set_label(&i18n("Access to the directory approved. Save the account to finish."));
+                        widgets.graph_status.set_label(&i18n(
+                            "Access to the directory approved. Save the account to finish.",
+                        ));
                     }
                     Err(e) => {
                         self.directory_on = false;
@@ -3531,7 +3736,9 @@ impl Component for AccountsWindow {
                 }
             }
             AccountsCmd::AliasTested(result) => {
-                let Some(d) = self.alias_dialog.as_ref() else { return };
+                let Some(d) = self.alias_dialog.as_ref() else {
+                    return;
+                };
                 d.test_btn.set_sensitive(true);
                 d.test_result.set_visible(true);
                 match result {
@@ -3541,7 +3748,8 @@ impl Component for AccountsWindow {
                     }
                     Err(e) => {
                         d.test_result.set_css_classes(&["error"]);
-                        d.test_result.set_label(&i18n_f("✗ SMTP: {e}", &[("e", &(e).to_string())]));
+                        d.test_result
+                            .set_label(&i18n_f("✗ SMTP: {e}", &[("e", &(e).to_string())]));
                     }
                 }
             }
@@ -3573,12 +3781,20 @@ impl AccountsWindow {
     fn sync_source_button(&mut self, widgets: &AccountsWindowWidgets) {
         let source = self.sig_editor(widgets).source_kind().is_some();
         self.sig_editor(widgets).set_formatting_visible(!source);
-        self.sig_source_btn.set_label(&if source { i18n("Preview") } else { i18n("Edit HTML") });
+        self.sig_source_btn.set_label(&if source {
+            i18n("Preview")
+        } else {
+            i18n("Edit HTML")
+        });
     }
 
     /// The shown signature as HTML, from the rich editor or, while it is
     /// shown as source, from that source, cleaned as an imported one is.
-    fn read_signature(&mut self, widgets: &AccountsWindowWidgets, cb: impl FnOnce(String) + 'static) {
+    fn read_signature(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        cb: impl FnOnce(String) + 'static,
+    ) {
         let editor = self.sig_editor(widgets);
         if editor.source_kind().is_some() {
             editor.extract_source(move |text| cb(rich_editor::signature_from_source(&text, None)));
@@ -3598,7 +3814,10 @@ impl AccountsWindow {
         mut default: Option<usize>,
     ) {
         if signatures.is_empty() {
-            signatures.push(NamedSignature { name: i18n("Signature"), html: String::new() });
+            signatures.push(NamedSignature {
+                name: i18n("Signature"),
+                html: String::new(),
+            });
             default = Some(0);
         }
         self.sig_edits = signatures;
@@ -3612,15 +3831,30 @@ impl AccountsWindow {
     /// Their notifies arrive after this and find nothing changed.
     fn show_signature(&mut self, widgets: &AccountsWindowWidgets, i: usize) {
         self.sig_shown = i;
-        let html = self.sig_edits.get(i).map(|s| rich_editor::signature_to_html(&s.html)).unwrap_or_default();
+        let html = self
+            .sig_edits
+            .get(i)
+            .map(|s| rich_editor::signature_to_html(&s.html))
+            .unwrap_or_default();
         self.sig_editor(widgets).set_html(&html);
         self.sync_source_button(widgets);
-        let labels: Vec<String> = (0..self.sig_edits.len()).map(|n| signature_label(&self.sig_edits, n)).collect();
+        let labels: Vec<String> = (0..self.sig_edits.len())
+            .map(|n| signature_label(&self.sig_edits, n))
+            .collect();
         let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
-        widgets.sig_choice_row.set_model(Some(&gtk::StringList::new(&labels)));
+        widgets
+            .sig_choice_row
+            .set_model(Some(&gtk::StringList::new(&labels)));
         widgets.sig_choice_row.set_selected(i as u32);
-        widgets.sig_name_row.set_text(self.sig_edits.get(i).map(|s| s.name.as_str()).unwrap_or_default());
-        widgets.sig_default_row.set_active(self.sig_default == Some(i));
+        widgets.sig_name_row.set_text(
+            self.sig_edits
+                .get(i)
+                .map(|s| s.name.as_str())
+                .unwrap_or_default(),
+        );
+        widgets
+            .sig_default_row
+            .set_active(self.sig_default == Some(i));
         let several = self.sig_edits.len() > 1;
         widgets.sig_choice_row.set_visible(several);
         widgets.sig_name_row.set_visible(several);
@@ -3629,12 +3863,21 @@ impl AccountsWindow {
     /// Read the shown signature's text back out of the editor before
     /// another is shown (`add` makes a new one); the answer is
     /// [`AccountsInput::SigStored`].
-    fn read_back_signature(&mut self, widgets: &AccountsWindowWidgets, sender: &ComponentSender<Self>, add: bool) {
+    fn read_back_signature(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: &ComponentSender<Self>,
+        add: bool,
+    ) {
         self.sig_reading = true;
         let s = sender.clone();
-        self.sig_editor(widgets).is_dirty(move |dirty| s.input_sender().emit(AccountsInput::SigTextTouched(dirty)));
+        self.sig_editor(widgets)
+            .is_dirty(move |dirty| s.input_sender().emit(AccountsInput::SigTextTouched(dirty)));
         let s = sender.clone();
-        self.read_signature(widgets, move |html| s.input_sender().emit(AccountsInput::SigStored { html, add }));
+        self.read_signature(widgets, move |html| {
+            s.input_sender()
+                .emit(AccountsInput::SigStored { html, add })
+        });
     }
 
     /// The signatures Save writes: the empty ones left out, a missing name
@@ -3649,7 +3892,10 @@ impl AccountsWindow {
             if self.sig_default == Some(i) {
                 default = Some(kept.len());
             }
-            kept.push(NamedSignature { name: signature_label(&self.sig_edits, i), html: sig.html.clone() });
+            kept.push(NamedSignature {
+                name: signature_label(&self.sig_edits, i),
+                html: sig.html.clone(),
+            });
         }
         (kept, default)
     }
@@ -3663,7 +3909,9 @@ impl AccountsWindow {
         }
         // An empty boxed-list draws as a bare frame; say "none" instead.
         list.set_visible(!self.hidden_edits.is_empty());
-        widgets.hidden_empty.set_visible(self.hidden_edits.is_empty());
+        widgets
+            .hidden_empty
+            .set_visible(self.hidden_edits.is_empty());
         for (i, path) in self.hidden_edits.iter().enumerate() {
             let row = adw::ActionRow::new();
             row.set_title(&gtk::glib::markup_escape_text(&crate::mutf7::decode(path)));
@@ -3700,7 +3948,10 @@ impl AccountsWindow {
                     && (name.is_empty() || name.eq_ignore_ascii_case(addr) || *name == own_name))
             })
             .filter(|(_, addr)| {
-                !self.alias_edits.iter().any(|a| split_identity(&a.identity).1.eq_ignore_ascii_case(addr))
+                !self
+                    .alias_edits
+                    .iter()
+                    .any(|a| split_identity(&a.identity).1.eq_ignore_ascii_case(addr))
             })
             .collect();
         // An empty boxed-list draws as a bare frame; hide it until there is a row.
@@ -3742,7 +3993,9 @@ impl AccountsWindow {
                 format!("{name} <{addr}>")
             };
             row.set_title(&gtk::glib::markup_escape_text(&title));
-            row.set_subtitle(&i18n("Kept on the server; change it in your provider's webmail."));
+            row.set_subtitle(&i18n(
+                "Kept on the server; change it in your provider's webmail.",
+            ));
             list.append(&row);
         }
     }
@@ -3769,7 +4022,11 @@ impl AccountsWindow {
         let window = adw::Window::builder()
             .modal(true)
             .default_width(440)
-            .title(if self.alias_editing.is_some() { i18n("Edit Alias") } else { i18n("Add Alias") })
+            .title(if self.alias_editing.is_some() {
+                i18n("Edit Alias")
+            } else {
+                i18n("Add Alias")
+            })
             .build();
         // Parent to whatever window the embedded panel currently sits in.
         window.set_transient_for(root.root().and_downcast::<gtk::Window>().as_ref());
@@ -3790,9 +4047,13 @@ impl AccountsWindow {
             "The composer's From menu offers this address, and replies to \
              mail sent to it answer from it.",
         ));
-        let name_row = adw::EntryRow::builder().title(&i18n("Display name (optional)")).build();
+        let name_row = adw::EntryRow::builder()
+            .title(&i18n("Display name (optional)"))
+            .build();
         name_row.set_text(&name);
-        let addr_row = adw::EntryRow::builder().title(&i18n("Email address")).build();
+        let addr_row = adw::EntryRow::builder()
+            .title(&i18n("Email address"))
+            .build();
         addr_row.set_text(&addr);
         identity_group.add(&name_row);
         identity_group.add(&addr_row);
@@ -3812,9 +4073,13 @@ impl AccountsWindow {
         host_row.set_text(&alias.smtp_host);
         let port_row = adw::EntryRow::builder().title(&i18n("SMTP port")).build();
         port_row.set_text(&alias.smtp_port.to_string());
-        let user_row = adw::EntryRow::builder().title(&i18n("SMTP username")).build();
+        let user_row = adw::EntryRow::builder()
+            .title(&i18n("SMTP username"))
+            .build();
         user_row.set_text(&alias.smtp_username);
-        let pass_row = adw::PasswordEntryRow::builder().title(&i18n("SMTP password")).build();
+        let pass_row = adw::PasswordEntryRow::builder()
+            .title(&i18n("SMTP password"))
+            .build();
         pass_row.set_text(&alias.smtp_password);
         smtp_group.add(&smtp_switch);
         smtp_group.add(&host_row);
@@ -3904,7 +4169,11 @@ impl AccountsWindow {
     /// Fill the editor's Special Folders combos (#82) for `acc` (None = a new
     /// account, whose folders aren't known yet): "Automatic" plus the account's
     /// live folder list, with any saved assignment selected.
-    fn populate_folder_combos(&mut self, widgets: &AccountsWindowWidgets, acc: Option<&AccountConfig>) {
+    fn populate_folder_combos(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        acc: Option<&AccountConfig>,
+    ) {
         let all: Vec<(String, String)> = acc
             .and_then(|a| self.folders_by_email.get(&a.email))
             .cloned()
@@ -4103,7 +4372,10 @@ impl AccountsWindow {
                 .filter(|p| p.exists());
             // The Gravatar this address asked for and has (#189) comes first,
             // as in the sidebar circle and the editor preview.
-            let gravatar = acc.gravatar.then(|| crate::avatar::own_gravatar(&acc.email)).flatten();
+            let gravatar = acc
+                .gravatar
+                .then(|| crate::avatar::own_gravatar(&acc.email))
+                .flatten();
             let glyph: gtk::Widget = match (&gravatar, &picture, acc.emoji.as_deref()) {
                 (Some(texture), ..) => {
                     circle.set_overflow(gtk::Overflow::Hidden);
@@ -4163,7 +4435,9 @@ impl AccountsWindow {
             // Source badge: is this account from GNOME Online Accounts, or added
             // directly in Hylki?
             let from_goa = acc.goa_id.is_some();
-            let badge = gtk::Label::new(Some(if from_goa { i18n("GOA") } else { i18n("Hylki") }.as_str()));
+            let badge = gtk::Label::new(Some(
+                if from_goa { i18n("GOA") } else { i18n("Hylki") }.as_str(),
+            ));
             badge.set_valign(gtk::Align::Center);
             badge.add_css_class("account-source-badge");
             if from_goa {
@@ -4190,7 +4464,10 @@ impl AccountsWindow {
             let ti = sender.input_sender().clone();
             let tpos = pos;
             toggle.connect_state_set(move |_, state| {
-                let _ = ti.send(AccountsInput::ToggleEnabled { index: tpos, enabled: state });
+                let _ = ti.send(AccountsInput::ToggleEnabled {
+                    index: tpos,
+                    enabled: state,
+                });
                 gtk::glib::Propagation::Proceed
             });
             hbox.append(&toggle);
@@ -4261,7 +4538,11 @@ impl AccountsWindow {
         for (pos, g) in self.goa.iter().enumerate() {
             let row = adw::ActionRow::new();
             row.set_title(&g.email);
-            row.add_prefix(&crate::brand::mark(brand_for_goa(&g.provider), 24, crate::brand::GENERIC_MAIL));
+            row.add_prefix(&crate::brand::mark(
+                brand_for_goa(&g.provider),
+                24,
+                crate::brand::GENERIC_MAIL,
+            ));
             let mut subtitle = if g.provider.is_empty() {
                 i18n("Mail")
             } else {
@@ -4301,7 +4582,10 @@ impl AccountsWindow {
     /// a manual account's tile naming the protocol chosen below it.
     fn refresh_provider_mark(&self, widgets: &AccountsWindowWidgets) {
         let p = provider_at(widgets.provider_row.selected());
-        let editing_goa = self.editing.and_then(|i| self.accounts.get(i)).filter(|a| a.goa_id.is_some());
+        let editing_goa = self
+            .editing
+            .and_then(|i| self.accounts.get(i))
+            .filter(|a| a.goa_id.is_some());
         let brand = editing_goa.map(brand_for_account).unwrap_or_else(|| {
             if p.kind == ProviderKind::Manual {
                 manual_brand(form_protocol(widgets))
@@ -4312,7 +4596,9 @@ impl AccountsWindow {
         while let Some(child) = widgets.provider_mark.first_child() {
             widgets.provider_mark.remove(&child);
         }
-        widgets.provider_mark.append(&crate::brand::mark(brand, 56, crate::brand::GENERIC_MAIL));
+        widgets
+            .provider_mark
+            .append(&crate::brand::mark(brand, 56, crate::brand::GENERIC_MAIL));
     }
 
     /// Push is IMAP IDLE or a JMAP event stream. Microsoft 365 polls and
@@ -4324,14 +4610,23 @@ impl AccountsWindow {
             Some(a) if a.goa_id.is_some() => a.protocol,
             _ => form_protocol(widgets),
         };
-        widgets.push_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
+        widgets
+            .push_row
+            .set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
         // The list-mail search is a server search for a header, which
         // Microsoft 365 does not offer and POP3 has no folders for.
-        widgets.clean_lists_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
-        widgets.reply_copies_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
+        widgets
+            .clean_lists_row
+            .set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
+        widgets
+            .reply_copies_row
+            .set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
         // GNOME Online Accounts asked Microsoft for its own scopes, and
         // Hylki cannot add the directory's to a token GNOME holds.
-        let from_goa = self.editing.and_then(|i| self.accounts.get(i)).is_some_and(|a| a.goa_id.is_some());
+        let from_goa = self
+            .editing
+            .and_then(|i| self.accounts.get(i))
+            .is_some_and(|a| a.goa_id.is_some());
         widgets.graph_group.set_visible(protocol == Protocol::Graph);
         widgets.graph_directory_row.set_sensitive(!from_goa);
         widgets.graph_labels_row.set_sensitive(!from_goa);
@@ -4388,12 +4683,18 @@ impl AccountsWindow {
         // OAuth still needs its server addresses and client details entered.
         let show_servers = is_password || is_custom;
 
-        let hint = if p.hint.is_empty() { String::new() } else { i18n(p.hint) };
+        let hint = if p.hint.is_empty() {
+            String::new()
+        } else {
+            i18n(p.hint)
+        };
         widgets.provider_row.set_subtitle(&hint);
 
         // Server/credential fields (password or Custom-OAuth manual servers).
         // JMAP is the JMAP entries' own protocol, not a choice.
-        widgets.protocol_row.set_visible(is_password && p.kind != ProviderKind::Jmap);
+        widgets
+            .protocol_row
+            .set_visible(is_password && p.kind != ProviderKind::Jmap);
         widgets.host_row.set_visible(show_servers);
         widgets.port_row.set_visible(show_servers);
         widgets.smtp_row.set_visible(show_servers);
@@ -4418,7 +4719,9 @@ impl AccountsWindow {
         widgets.oauth_auth_url_row.set_visible(is_custom);
         widgets.oauth_token_url_row.set_visible(is_custom);
         widgets.oauth_scope_row.set_visible(is_custom);
-        widgets.ms_advanced.set_visible(p.kind == ProviderKind::Microsoft && !needs_goa);
+        widgets
+            .ms_advanced
+            .set_visible(p.kind == ProviderKind::Microsoft && !needs_goa);
         if !is_oauth || needs_goa {
             widgets.oauth_status.set_visible(false);
         }
@@ -4428,8 +4731,10 @@ impl AccountsWindow {
         // account still carries the right servers). Manual/Custom are left alone.
         let servers = match p.kind {
             ProviderKind::Preset => Some((p.imap_host, p.imap_port, p.smtp_host, p.smtp_port)),
-            ProviderKind::Google | ProviderKind::Microsoft => crate::oauth::preset(p.oauth_name().unwrap())
-                .map(|o| (o.imap_host, o.imap_port, o.smtp_host, o.smtp_port)),
+            ProviderKind::Google | ProviderKind::Microsoft => {
+                crate::oauth::preset(p.oauth_name().unwrap())
+                    .map(|o| (o.imap_host, o.imap_port, o.smtp_host, o.smtp_port))
+            }
             ProviderKind::Manual | ProviderKind::CustomOAuth | ProviderKind::Jmap => None,
         };
         if let Some((ih, ip, sh, sp)) = servers {
@@ -4445,7 +4750,9 @@ impl AccountsWindow {
             let host = widgets.host_row.text();
             if !p.imap_host.is_empty() {
                 widgets.host_row.set_text(p.imap_host);
-            } else if PROVIDERS.iter().any(|q| q.kind == ProviderKind::Jmap && !q.imap_host.is_empty() && q.imap_host == host) {
+            } else if PROVIDERS.iter().any(|q| {
+                q.kind == ProviderKind::Jmap && !q.imap_host.is_empty() && q.imap_host == host
+            }) {
                 widgets.host_row.set_text("");
             }
             widgets.port_row.set_text("443");
@@ -4473,8 +4780,13 @@ impl AccountsWindow {
             .filter(|a| a.oauth && a.goa_id.is_none())
             .map(|a| a.email.clone());
         let (refresh, who) = result.and_then(|(refresh, who)| match (&saved, &who) {
-            (Some(email), Some((_, address))) if !address.is_empty() && !address.eq_ignore_ascii_case(email) => {
-                Err(i18n_f("Signed in as {address}, not {email}.", &[("address", address), ("email", email)]))
+            (Some(email), Some((_, address)))
+                if !address.is_empty() && !address.eq_ignore_ascii_case(email) =>
+            {
+                Err(i18n_f(
+                    "Signed in as {address}, not {email}.",
+                    &[("address", address), ("email", email)],
+                ))
             }
             _ => Ok((refresh, who)),
         })?;
@@ -4518,7 +4830,10 @@ impl AccountsWindow {
                     settings.scopes = crate::oauth::with_directory_scopes(&settings.scopes);
                 }
                 if self.labels_granted {
-                    settings.scopes = crate::oauth::with_scopes(&settings.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES);
+                    settings.scopes = crate::oauth::with_scopes(
+                        &settings.scopes,
+                        &crate::oauth::MICROSOFT_LABEL_SCOPES,
+                    );
                 }
             }
             settings
@@ -4550,20 +4865,27 @@ fn sign_in(
     if !settings.redirect_uri.trim().is_empty() {
         let parent = root.root().and_downcast::<gtk::Window>();
         let s = sender.clone();
-        crate::ui::web_signin::run(parent.as_ref(), &settings.clone(), user.clone(), hint, move |answer| {
-            s.oneshot_command(async move {
-                let r = tokio::task::spawn_blocking(move || {
-                    let (request, code) = answer?;
-                    let refresh = crate::oauth::exchange_code(&settings, &request, &code)?.refresh_token;
-                    let (name, address, refresh) =
-                        crate::oauth::microsoft_whoami(&settings, &refresh, user.as_deref())?;
-                    Ok((refresh, Some((name, address))))
-                })
-                .await
-                .unwrap_or_else(|_| Err("sign-in task failed".into()));
-                wrap(r)
-            });
-        });
+        crate::ui::web_signin::run(
+            parent.as_ref(),
+            &settings.clone(),
+            user.clone(),
+            hint,
+            move |answer| {
+                s.oneshot_command(async move {
+                    let r = tokio::task::spawn_blocking(move || {
+                        let (request, code) = answer?;
+                        let refresh =
+                            crate::oauth::exchange_code(&settings, &request, &code)?.refresh_token;
+                        let (name, address, refresh) =
+                            crate::oauth::microsoft_whoami(&settings, &refresh, user.as_deref())?;
+                        Ok((refresh, Some((name, address))))
+                    })
+                    .await
+                    .unwrap_or_else(|_| Err("sign-in task failed".into()));
+                    wrap(r)
+                });
+            },
+        );
         return;
     }
     sender.oneshot_command(async move {
@@ -4573,7 +4895,8 @@ fn sign_in(
             // Microsoft says who signed in, so the account is named
             // for the mailbox reached (#329).
             if settings.token_url.contains("microsoftonline") {
-                let (name, address, refresh) = crate::oauth::microsoft_whoami(&settings, &refresh, None)?;
+                let (name, address, refresh) =
+                    crate::oauth::microsoft_whoami(&settings, &refresh, None)?;
                 return Ok((refresh, Some((name, address))));
             }
             Ok((refresh, None))
@@ -4652,16 +4975,30 @@ pub(crate) fn provider_factory() -> gtk::SignalListItemFactory {
         }
     });
     factory.connect_bind(|_, item| {
-        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
         // By name, not position: the row's own selected-value slot is a
         // list item with no position.
-        let name = item.item().and_downcast::<gtk::StringObject>().map(|o| o.string().to_string()).unwrap_or_default();
-        let Some(provider) = PROVIDERS.iter().find(|p| p.label == name) else { return };
-        let Some(bx) = item.child().and_downcast::<gtk::Box>() else { return };
+        let name = item
+            .item()
+            .and_downcast::<gtk::StringObject>()
+            .map(|o| o.string().to_string())
+            .unwrap_or_default();
+        let Some(provider) = PROVIDERS.iter().find(|p| p.label == name) else {
+            return;
+        };
+        let Some(bx) = item.child().and_downcast::<gtk::Box>() else {
+            return;
+        };
         let Some(old) = bx.first_child() else { return };
         let label = old.next_sibling().and_downcast::<gtk::Label>();
         bx.remove(&old);
-        bx.prepend(&crate::brand::mark(provider.brand, 20, crate::brand::GENERIC_MAIL));
+        bx.prepend(&crate::brand::mark(
+            provider.brand,
+            20,
+            crate::brand::GENERIC_MAIL,
+        ));
         if let Some(label) = label {
             label.set_label(&name);
         }
@@ -4786,7 +5123,9 @@ impl AccountsWindow {
                 72,
             )
         };
-        let picture = self.saved_avatar().and_then(|n| crate::config::avatar_path(&n));
+        let picture = self
+            .saved_avatar()
+            .and_then(|n| crate::config::avatar_path(&n));
         let emoji = self.saved_emoji();
         // The Gravatar this address has, when it was asked for and found
         // (#189) — the same order the sidebar circle and the cards use.
@@ -4796,9 +5135,7 @@ impl AccountsWindow {
             .then(|| crate::avatar::own_gravatar(&trimmed(&widgets.email_row)))
             .flatten();
         let glyph: gtk::Widget = match (&gravatar, &picture, &emoji) {
-            (Some(texture), ..) => {
-                crate::ui::initials::picture_from_texture(texture, 72).upcast()
-            }
+            (Some(texture), ..) => crate::ui::initials::picture_from_texture(texture, 72).upcast(),
             (None, Some(path), _) => crate::ui::initials::avatar_picture(path, 72).upcast(),
             (None, None, Some(em)) => {
                 crate::ui::initials::glyph_picture(em, &color, 0.55, 72).upcast()
@@ -4831,18 +5168,28 @@ fn import_avatar_file(src: &std::path::Path) -> Result<String, String> {
     // is left at its size), then cut the longer side down to a square.
     let side = AVATAR_PX.min(w.min(h));
     let (sw, sh) = if w <= h {
-        (side, (h as f64 * side as f64 / w as f64).round().max(side as f64) as i32)
+        (
+            side,
+            (h as f64 * side as f64 / w as f64).round().max(side as f64) as i32,
+        )
     } else {
-        ((w as f64 * side as f64 / h as f64).round().max(side as f64) as i32, side)
+        (
+            (w as f64 * side as f64 / h as f64).round().max(side as f64) as i32,
+            side,
+        )
     };
-    let scaled = pb.scale_simple(sw, sh, InterpType::Bilinear).ok_or("could not scale the image")?;
+    let scaled = pb
+        .scale_simple(sw, sh, InterpType::Bilinear)
+        .ok_or("could not scale the image")?;
     let square = scaled.new_subpixbuf((sw - side) / 2, (sh - side) / 2, side, side);
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
     let name = format!("avatar-{stamp}.png");
-    square.savev(dir.join(&name), "png", &[]).map_err(|e| e.to_string())?;
+    square
+        .savev(dir.join(&name), "png", &[])
+        .map_err(|e| e.to_string())?;
     Ok(name)
 }
 
@@ -4948,7 +5295,8 @@ fn read_account(
                 return c.chosen.clone();
             }
             let sel = widgets.pgp_key_row.selected() as usize;
-            sel.checked_sub(1).and_then(|i| c.fingerprints.get(i).cloned())
+            sel.checked_sub(1)
+                .and_then(|i| c.fingerprints.get(i).cloned())
         }),
         in_unified: widgets.in_unified_row.is_active(),
         // Row 0 follows Settings; the rest follow FolderSort::ALL.
@@ -5022,7 +5370,11 @@ fn fill_pgp_key_row(widgets: &AccountsWindowWidgets, chosen: Option<&str>) {
         let mut labels = vec![i18n("Automatic")];
         let mut fingerprints: Vec<String> = Vec::new();
         for k in &keys {
-            labels.push(format!("{} ({})", k.primary_uid(), crate::pgp::key_display(&k.key_id)));
+            labels.push(format!(
+                "{} ({})",
+                k.primary_uid(),
+                crate::pgp::key_display(&k.key_id)
+            ));
             fingerprints.push(k.fingerprint.clone());
         }
         // A chosen key gpg did not list (it failed, or the key went) stays
@@ -5068,13 +5420,17 @@ fn auto_empty_labels() -> Vec<String> {
 
 /// "Never", then "After N days" for each age.
 fn age_labels(days: &[u32]) -> Vec<String> {
-    days
-        .iter()
+    days.iter()
         .map(|d| {
             if *d == 0 {
                 i18n("Never")
             } else {
-                crate::i18n::ni18n_f("After {n} day", "After {n} days", *d, &[("n", &d.to_string())])
+                crate::i18n::ni18n_f(
+                    "After {n} day",
+                    "After {n} days",
+                    *d,
+                    &[("n", &d.to_string())],
+                )
             }
         })
         .collect()
@@ -5138,11 +5494,20 @@ fn show_quota(widgets: &AccountsWindowWidgets, quota: Option<crate::models::Mail
         widgets.quota_group.set_visible(false);
         return;
     };
-    widgets.quota_row.set_subtitle(&format!("{} \u{b7} {}", q.used_line(), q.free_line()));
+    widgets
+        .quota_row
+        .set_subtitle(&format!("{} \u{b7} {}", q.used_line(), q.free_line()));
     // GTK's own offsets mark a *low* value as the warning, which is a fuel
     // gauge's sense, not a mailbox's: here the warning is a full one.
     let bar = &widgets.quota_bar;
-    for name in ["low", "high", "full", "quota-ok", "quota-warn", "quota-full"] {
+    for name in [
+        "low",
+        "high",
+        "full",
+        "quota-ok",
+        "quota-warn",
+        "quota-full",
+    ] {
         bar.remove_offset_value(Some(name));
     }
     bar.add_offset_value("quota-ok", 0.9);
@@ -5157,8 +5522,12 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     widgets.email_row.set_text(&acc.email);
     // Reflect the account's provider in the dropdown (OAuth by endpoint, known
     // password providers by server, otherwise "IMAP/POP3 Account").
-    widgets.provider_row.set_selected(provider_index_for_account(acc));
-    widgets.protocol_row.set_selected(protocol_index(acc.protocol));
+    widgets
+        .provider_row
+        .set_selected(provider_index_for_account(acc));
+    widgets
+        .protocol_row
+        .set_selected(protocol_index(acc.protocol));
     widgets.jmap_token_row.set_active(acc.jmap_token);
     widgets.host_row.set_text(&acc.imap_host);
     widgets.port_row.set_text(&acc.imap_port.to_string());
@@ -5167,7 +5536,9 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     widgets.user_row.set_text(&acc.username);
     widgets.pass_row.set_text(&acc.password);
     widgets.smtp_separate_row.set_active(acc.smtp_separate);
-    widgets.tls_mismatch_row.set_active(acc.tls_accept_hostname_mismatch);
+    widgets
+        .tls_mismatch_row
+        .set_active(acc.tls_accept_hostname_mismatch);
     widgets.smtp_user_row.set_text(&acc.smtp_username);
     widgets.smtp_pass_row.set_text(&acc.smtp_password);
     widgets.push_row.set_selected(match acc.push {
@@ -5175,17 +5546,28 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
         Some(true) => 1,
         Some(false) => 2,
     });
-    widgets.empty_junk_row.set_selected(auto_empty_index(acc.empty_junk_days));
-    widgets.empty_trash_row.set_selected(auto_empty_index(acc.empty_trash_days));
     widgets
-        .clean_lists_row
-        .set_selected(CLEAN_LISTS_DAYS.iter().position(|d| *d == acc.clean_lists_days).unwrap_or(0) as u32);
+        .empty_junk_row
+        .set_selected(auto_empty_index(acc.empty_junk_days));
+    widgets
+        .empty_trash_row
+        .set_selected(auto_empty_index(acc.empty_trash_days));
+    widgets.clean_lists_row.set_selected(
+        CLEAN_LISTS_DAYS
+            .iter()
+            .position(|d| *d == acc.clean_lists_days)
+            .unwrap_or(0) as u32,
+    );
     fill_pgp_key_row(widgets, acc.pgp_key.as_deref());
     widgets.in_unified_row.set_active(acc.in_unified);
-    widgets.folder_sort_row.set_selected(acc.folder_sort.map_or(0, |s| s.index() + 1));
+    widgets
+        .folder_sort_row
+        .set_selected(acc.folder_sort.map_or(0, |s| s.index() + 1));
     widgets.sign_default_row.set_active(acc.sign_by_default);
     widgets.hide_subject_row.set_active(!acc.plain_subject);
-    widgets.reply_copies_row.set_selected(acc.reply_copies.index());
+    widgets
+        .reply_copies_row
+        .set_selected(acc.reply_copies.index());
     // Show the effective label (custom, or the email address).
     widgets
         .label_row
@@ -5197,18 +5579,32 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     let s = (acc.goa_id.is_none() && acc.oauth)
         .then_some(acc.oauth_settings.as_ref())
         .flatten();
-    widgets.oauth_client_id_row.set_text(s.map(|s| s.client_id.as_str()).unwrap_or(""));
-    widgets.oauth_secret_row.set_text(s.map(|s| s.client_secret.as_str()).unwrap_or(""));
-    widgets.oauth_auth_url_row.set_text(s.map(|s| s.auth_url.as_str()).unwrap_or(""));
-    widgets.oauth_token_url_row.set_text(s.map(|s| s.token_url.as_str()).unwrap_or(""));
-    widgets.oauth_scope_row.set_text(s.map(|s| s.scopes.as_str()).unwrap_or(""));
+    widgets
+        .oauth_client_id_row
+        .set_text(s.map(|s| s.client_id.as_str()).unwrap_or(""));
+    widgets
+        .oauth_secret_row
+        .set_text(s.map(|s| s.client_secret.as_str()).unwrap_or(""));
+    widgets
+        .oauth_auth_url_row
+        .set_text(s.map(|s| s.auth_url.as_str()).unwrap_or(""));
+    widgets
+        .oauth_token_url_row
+        .set_text(s.map(|s| s.token_url.as_str()).unwrap_or(""));
+    widgets
+        .oauth_scope_row
+        .set_text(s.map(|s| s.scopes.as_str()).unwrap_or(""));
     // What a Microsoft account was set up with beyond Hylki's own app (#329).
-    let adv = s.map(crate::oauth::microsoft_advanced_of).unwrap_or_default();
+    let adv = s
+        .map(crate::oauth::microsoft_advanced_of)
+        .unwrap_or_default();
     widgets.ms_client_row.set_text(&adv.0);
     widgets.ms_tenant_row.set_text(&adv.1);
     widgets.ms_scopes_row.set_text(&adv.2);
     widgets.ms_redirect_row.set_text(&adv.3);
-    widgets.ms_advanced.set_expanded(!(adv.0.is_empty() && adv.1.is_empty() && adv.2.is_empty() && adv.3.is_empty()));
+    widgets.ms_advanced.set_expanded(
+        !(adv.0.is_empty() && adv.1.is_empty() && adv.2.is_empty() && adv.3.is_empty()),
+    );
     widgets.oauth_status.set_visible(false);
     widgets.oauth_signin_btn.set_sensitive(true);
 
@@ -5295,7 +5691,12 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.oauth_auth_url_row.set_text("");
     widgets.oauth_token_url_row.set_text("");
     widgets.oauth_scope_row.set_text("");
-    for row in [&widgets.ms_client_row, &widgets.ms_tenant_row, &widgets.ms_scopes_row, &widgets.ms_redirect_row] {
+    for row in [
+        &widgets.ms_client_row,
+        &widgets.ms_tenant_row,
+        &widgets.ms_scopes_row,
+        &widgets.ms_redirect_row,
+    ] {
         row.set_text("");
     }
     widgets.ms_advanced.set_expanded(false);
@@ -5404,25 +5805,39 @@ fn apply_protocol(widgets: &AccountsWindowWidgets) {
     let servers_shown = widgets.host_row.is_visible();
     widgets.smtp_row.set_visible(servers_shown && !jmap);
     widgets.smtp_port_row.set_visible(servers_shown && !jmap);
-    widgets.smtp_separate_row.set_visible(widgets.protocol_row.is_visible() && !jmap);
+    widgets
+        .smtp_separate_row
+        .set_visible(widgets.protocol_row.is_visible() && !jmap);
     // JMAP runs over a different TLS stack (rustls), which offers no such waiver.
-    widgets.tls_mismatch_row.set_visible(widgets.protocol_row.is_visible() && !jmap);
+    widgets
+        .tls_mismatch_row
+        .set_visible(widgets.protocol_row.is_visible() && !jmap);
     // A token stands in for the username and password (#356); the rows
     // only change where the password is asked for at all.
     let password_shown = widgets.pass_row.is_visible();
-    widgets.jmap_token_row.set_visible(servers_shown && jmap && password_shown);
+    widgets
+        .jmap_token_row
+        .set_visible(servers_shown && jmap && password_shown);
     let token = jmap && widgets.jmap_token_row.is_active();
     if password_shown {
         widgets.user_row.set_visible(!token);
-        widgets.pass_row.set_title(&if token { i18n("API Token") } else { i18n("Password") });
+        widgets.pass_row.set_title(&if token {
+            i18n("API Token")
+        } else {
+            i18n("Password")
+        });
     }
     if jmap {
         widgets.smtp_separate_row.set_active(false);
-        widgets.host_row.set_title(&i18n("Server (host name or URL)"));
+        widgets
+            .host_row
+            .set_title(&i18n("Server (host name or URL)"));
         widgets.port_row.set_title(&i18n("Port (default 443)"));
     } else {
         widgets.host_row.set_title(&i18n("Incoming Server"));
-        widgets.port_row.set_title(&i18n("Port (IMAP 993 / POP3 995)"));
+        widgets
+            .port_row
+            .set_title(&i18n("Port (IMAP 993 / POP3 995)"));
     }
 }
 
@@ -5453,7 +5868,11 @@ fn brand_for_account(acc: &AccountConfig) -> &'static str {
     if host.contains("gmail") || host.contains("googlemail") {
         return "gmail";
     }
-    if host.contains("outlook") || host.contains("office365") || host.contains("hotmail") || host.contains("live.com") {
+    if host.contains("outlook")
+        || host.contains("office365")
+        || host.contains("hotmail")
+        || host.contains("live.com")
+    {
         return "outlook";
     }
     if host.contains("proton") {
@@ -5507,8 +5926,8 @@ fn parse_color(hex: &str) -> gtk::gdk::RGBA {
 #[cfg(test)]
 mod tests {
     use super::{
-        brand_for_account, manual_index, preset_index_for_host, protocol_at, protocol_index, provider_at,
-        provider_index_for_account, AccountConfig, Protocol, ProviderKind, PROVIDERS,
+        brand_for_account, manual_index, preset_index_for_host, protocol_at, protocol_index,
+        provider_at, provider_index_for_account, AccountConfig, Protocol, ProviderKind, PROVIDERS,
     };
 
     #[test]
@@ -5516,8 +5935,14 @@ mod tests {
         let idx = preset_index_for_host("imap.mail.me.com");
         assert_eq!(provider_at(idx).label, "iCloud");
         // Case-insensitive.
-        assert_eq!(preset_index_for_host("IMAP.FASTMAIL.COM"), preset_index_for_host("imap.fastmail.com"));
-        assert_eq!(provider_at(preset_index_for_host("imap.fastmail.com")).label, "Fastmail");
+        assert_eq!(
+            preset_index_for_host("IMAP.FASTMAIL.COM"),
+            preset_index_for_host("imap.fastmail.com")
+        );
+        assert_eq!(
+            provider_at(preset_index_for_host("imap.fastmail.com")).label,
+            "Fastmail"
+        );
     }
 
     #[test]
@@ -5541,25 +5966,41 @@ mod tests {
 
     #[test]
     fn jmap_provider_sets_the_protocol() {
-        let p = PROVIDERS.iter().find(|p| p.kind == ProviderKind::Jmap && p.brand == "stalwart").expect("a JMAP entry");
+        let p = PROVIDERS
+            .iter()
+            .find(|p| p.kind == ProviderKind::Jmap && p.brand == "stalwart")
+            .expect("a JMAP entry");
         assert!(p.is_password());
         assert!(!p.wizard_token());
         assert_eq!(p.wizard_protocol(), Protocol::Jmap);
-        assert!(p.imap_host.is_empty(), "a self-hosted server has no preset host");
+        assert!(
+            p.imap_host.is_empty(),
+            "a self-hosted server has no preset host"
+        );
         // The Incoming Protocol row offers IMAP and POP3 only; a JMAP
         // account's comes from its provider.
         assert_eq!(protocol_at(protocol_index(Protocol::Pop3)), Protocol::Pop3);
         assert_eq!(protocol_index(Protocol::Jmap), 0);
         assert_eq!(protocol_at(99), Protocol::Imap);
-        let acc = AccountConfig { protocol: Protocol::Jmap, imap_host: "mail.example.org".into(), ..crate::ui::welcome::blank_account() };
+        let acc = AccountConfig {
+            protocol: Protocol::Jmap,
+            imap_host: "mail.example.org".into(),
+            ..crate::ui::welcome::blank_account()
+        };
         assert_eq!(provider_at(provider_index_for_account(&acc)).label, p.label);
         assert_eq!(brand_for_account(&acc), "stalwart");
         // One made from the generic entry keeps to it, under the JMAP tile.
-        let generic = AccountConfig { jmap_generic: true, ..acc.clone() };
+        let generic = AccountConfig {
+            jmap_generic: true,
+            ..acc.clone()
+        };
         let gp = provider_at(provider_index_for_account(&generic));
         assert!(gp.wizard_jmap_generic());
         assert_eq!(brand_for_account(&generic), "mail-jmap");
-        let fm = AccountConfig { imap_host: "api.fastmail.com".into(), ..acc };
+        let fm = AccountConfig {
+            imap_host: "api.fastmail.com".into(),
+            ..acc
+        };
         assert_eq!(brand_for_account(&fm), "fastmail");
         // Fastmail's own entry: its session URL, and a token sign-in (#356).
         let fp = provider_at(provider_index_for_account(&fm));
@@ -5577,13 +6018,26 @@ mod tests {
         labels.sort_unstable();
         labels.dedup();
         assert_eq!(labels.len(), n, "provider labels must be unique");
-        assert_eq!(PROVIDERS.iter().filter(|p| p.kind == ProviderKind::Manual).count(), 1);
+        assert_eq!(
+            PROVIDERS
+                .iter()
+                .filter(|p| p.kind == ProviderKind::Manual)
+                .count(),
+            1
+        );
         for p in PROVIDERS {
             if p.kind == ProviderKind::Preset {
-                assert!(!p.imap_host.is_empty() && !p.smtp_host.is_empty(), "{}", p.label);
+                assert!(
+                    !p.imap_host.is_empty() && !p.smtp_host.is_empty(),
+                    "{}",
+                    p.label
+                );
                 assert!(p.imap_port > 0 && p.smtp_port > 0, "{}", p.label);
                 // Each preset's host round-trips to its own entry.
-                assert_eq!(provider_at(preset_index_for_host(p.imap_host)).label, p.label);
+                assert_eq!(
+                    provider_at(preset_index_for_host(p.imap_host)).label,
+                    p.label
+                );
             }
         }
     }
@@ -5627,12 +6081,19 @@ impl AccountsWindow {
         } else {
             c.matcher
         };
-        format!("{} {} \u{201c}{}\u{201d}", Self::field_label(c.field), Self::match_label(matcher), c.value)
+        format!(
+            "{} {} \u{201c}{}\u{201d}",
+            Self::field_label(c.field),
+            Self::match_label(matcher),
+            c.value
+        )
     }
 
     /// Re-render the Filters group's rule rows.
     fn rebuild_filter_rows(&self, sender: &ComponentSender<Self>) {
-        let Some(list) = &self.filters_list else { return };
+        let Some(list) = &self.filters_list else {
+            return;
+        };
         while let Some(row) = list.first_child() {
             list.remove(&row);
         }
@@ -5649,13 +6110,18 @@ impl AccountsWindow {
             row.connect_activated(move |_| s.input_sender().emit(AccountsInput::EditFilter(i)));
             // Every condition, joined the way the rule combines them (#192).
             let joiner = if r.any { i18n(" or ") } else { i18n(" and ") };
-            let conditions: Vec<String> = r.conditions().iter().map(Self::condition_label).collect();
+            let conditions: Vec<String> =
+                r.conditions().iter().map(Self::condition_label).collect();
             let conditions = conditions.join(&joiner);
             // A named rule (#197) is listed by its name, with the conditions
             // moved down beside what it does; an unnamed one reads exactly
             // as it always did.
             let named = !r.name.trim().is_empty();
-            row.set_title(if named { r.name.trim() } else { conditions.as_str() });
+            row.set_title(if named {
+                r.name.trim()
+            } else {
+                conditions.as_str()
+            });
             // "account → folder", "account, tagged Work", or both (#71).
             let mut subtitle = String::new();
             if named {
@@ -5711,7 +6177,11 @@ impl AccountsWindow {
             spinner.set_spinning(on);
         }
         if let Some(label) = &self.apply_filters_label {
-            label.set_label(&if on { i18n("Applying…") } else { i18n("Apply Now") });
+            label.set_label(&if on {
+                i18n("Applying…")
+            } else {
+                i18n("Apply Now")
+            });
         }
     }
 
@@ -5724,7 +6194,11 @@ impl AccountsWindow {
             spinner.set_spinning(on);
         }
         if let Some(label) = &self.find_tags_label {
-            label.set_label(&if on { i18n("Searching…") } else { i18n("Find Tags…") });
+            label.set_label(&if on {
+                i18n("Searching…")
+            } else {
+                i18n("Find Tags…")
+            });
         }
     }
 
@@ -5841,11 +6315,21 @@ impl AccountsWindow {
             let row = adw::ActionRow::new();
             row.set_activatable(true);
             let s = sender.clone();
-            row.connect_activated(move |_| s.input_sender().emit(AccountsInput::EditSmartFolder(i)));
+            row.connect_activated(move |_| {
+                s.input_sender().emit(AccountsInput::EditSmartFolder(i))
+            });
             row.set_title(&gtk::glib::markup_escape_text(&f.name));
-            let account = if f.account_email.is_empty() { i18n("All accounts") } else { f.account_email.clone() };
-            let folder = f.folder.map_or_else(|| i18n("All but Trash and Junk"), Self::smart_kind_label);
-            row.set_subtitle(&gtk::glib::markup_escape_text(&format!("{account} · {folder}")));
+            let account = if f.account_email.is_empty() {
+                i18n("All accounts")
+            } else {
+                f.account_email.clone()
+            };
+            let folder = f
+                .folder
+                .map_or_else(|| i18n("All but Trash and Junk"), Self::smart_kind_label);
+            row.set_subtitle(&gtk::glib::markup_escape_text(&format!(
+                "{account} · {folder}"
+            )));
             row.add_prefix(&gtk::Image::from_icon_name("folder-saved-search-symbolic"));
             let rm = gtk::Button::from_icon_name("user-trash-symbolic");
             rm.add_css_class("flat");
@@ -5880,7 +6364,10 @@ impl AccountsWindow {
             Attachment => i18n("Has attachments"),
             Tagged => i18n("Tagged"),
             Body => i18n("Message preview"),
-            other => other.filter_field().map(Self::field_label).unwrap_or_default(),
+            other => other
+                .filter_field()
+                .map(Self::field_label)
+                .unwrap_or_default(),
         }
     }
 
@@ -5893,7 +6380,9 @@ impl AccountsWindow {
         sender: &ComponentSender<Self>,
         edit: Option<(usize, crate::config::SmartFolder)>,
     ) {
-        use crate::config::{FilterMatch, SmartCondition, SmartField, SmartFolder, SmartFolderKind};
+        use crate::config::{
+            FilterMatch, SmartCondition, SmartField, SmartFolder, SmartFolderKind,
+        };
         let (title, verb) = if edit.is_some() {
             (i18n("Edit Smart Folder"), i18n("Save"))
         } else {
@@ -5933,7 +6422,11 @@ impl AccountsWindow {
         folder_row.set_title(&i18n("Folders"));
         {
             let mut names = vec![i18n("All but Trash and Junk")];
-            names.extend(SmartFolderKind::ALL.iter().map(|k| Self::smart_kind_label(*k)));
+            names.extend(
+                SmartFolderKind::ALL
+                    .iter()
+                    .map(|k| Self::smart_kind_label(*k)),
+            );
             let refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
             folder_row.set_model(Some(&gtk::StringList::new(&refs)));
         }
@@ -5942,11 +6435,18 @@ impl AccountsWindow {
         // The conditions: Where, then Match and Text for the fields that
         // look at text, or the tag for Tagged.
         let conds: std::rc::Rc<std::cell::RefCell<Vec<SmartCondRows>>> = Default::default();
-        let field_names: Vec<String> = SmartField::ALL.iter().map(|f| Self::smart_field_label(*f)).collect();
-        let match_names: Vec<String> = FilterMatch::ALL.iter().map(|m| Self::match_label(*m)).collect();
+        let field_names: Vec<String> = SmartField::ALL
+            .iter()
+            .map(|f| Self::smart_field_label(*f))
+            .collect();
+        let match_names: Vec<String> = FilterMatch::ALL
+            .iter()
+            .map(|m| Self::match_label(*m))
+            .collect();
         let tags = self.tags.clone();
-        let tag_names: Vec<String> =
-            std::iter::once(i18n("Any tag")).chain(tags.iter().map(|t| t.name.clone())).collect();
+        let tag_names: Vec<String> = std::iter::once(i18n("Any tag"))
+            .chain(tags.iter().map(|t| t.name.clone()))
+            .collect();
         let make_cond = {
             let tags = tags.clone();
             move |init: Option<&SmartCondition>| -> SmartCondRows {
@@ -5979,7 +6479,10 @@ impl AccountsWindow {
                         matcher.set_selected(i as u32);
                     }
                     if c.field == SmartField::Tagged {
-                        if let Some(i) = tags.iter().position(|t| t.keyword.eq_ignore_ascii_case(&c.value)) {
+                        if let Some(i) = tags
+                            .iter()
+                            .position(|t| t.keyword.eq_ignore_ascii_case(&c.value))
+                        {
                             tag.set_selected(i as u32 + 1);
                         }
                     } else {
@@ -6000,8 +6503,12 @@ impl AccountsWindow {
                         value.set_visible(text);
                         tag.set_visible(chosen == Some(SmartField::Tagged));
                         field.set_subtitle(&match chosen {
-                            Some(SmartField::Body) => i18n("The preview each message has in the list"),
-                            Some(SmartField::ReplyTo) => i18n("From address when no Reply-To is set"),
+                            Some(SmartField::Body) => {
+                                i18n("The preview each message has in the list")
+                            }
+                            Some(SmartField::ReplyTo) => {
+                                i18n("From address when no Reply-To is set")
+                            }
                             Some(SmartField::FromInContacts | SmartField::FromNotInContacts) => {
                                 i18n("Looks in the system address books and the Hylki book")
                             }
@@ -6015,7 +6522,14 @@ impl AccountsWindow {
                 group.add(&matcher);
                 group.add(&value);
                 group.add(&tag);
-                SmartCondRows { group, remove, field, matcher, value, tag }
+                SmartCondRows {
+                    group,
+                    remove,
+                    field,
+                    matcher,
+                    value,
+                    tag,
+                }
             }
         };
 
@@ -6036,13 +6550,15 @@ impl AccountsWindow {
         combine_group.set_visible(false);
 
         let relabel = {
-            let (conds, combine_row, combine_group) = (conds.clone(), combine_row.clone(), combine_group.clone());
+            let (conds, combine_row, combine_group) =
+                (conds.clone(), combine_row.clone(), combine_group.clone());
             move || {
                 let conds = conds.borrow();
                 let any = combine_row.selected() == 1;
                 let several = conds.len() > 1;
                 for (i, c) in conds.iter().enumerate() {
-                    c.group.set_title(&i18n_f("Condition {n}", &[("n", &(i + 1).to_string())]));
+                    c.group
+                        .set_title(&i18n_f("Condition {n}", &[("n", &(i + 1).to_string())]));
                     c.field.set_title(&if i == 0 {
                         i18n("Where")
                     } else if any {
@@ -6060,8 +6576,12 @@ impl AccountsWindow {
             combine_row.connect_selected_notify(move |_| relabel());
         }
         let add_cond = {
-            let (conds, page_box, where_group, relabel) =
-                (conds.clone(), page_box.clone(), where_group.clone(), relabel.clone());
+            let (conds, page_box, where_group, relabel) = (
+                conds.clone(),
+                page_box.clone(),
+                where_group.clone(),
+                relabel.clone(),
+            );
             let (form_save, nav) = (self.form_save.clone(), nav.clone());
             move |init: Option<&SmartCondition>| {
                 let c = make_cond(init);
@@ -6072,15 +6592,22 @@ impl AccountsWindow {
                     .unwrap_or_else(|| where_group.clone().upcast());
                 page_box.insert_child_after(&c.group, Some(&after));
                 {
-                    let (conds, page_box, relabel, group) =
-                        (conds.clone(), page_box.clone(), relabel.clone(), c.group.clone());
+                    let (conds, page_box, relabel, group) = (
+                        conds.clone(),
+                        page_box.clone(),
+                        relabel.clone(),
+                        c.group.clone(),
+                    );
                     c.remove.connect_clicked(move |_| {
                         let gone = {
                             let mut conds = conds.borrow_mut();
                             if conds.len() < 2 {
                                 return;
                             }
-                            conds.iter().position(|c| c.group == group).map(|i| conds.remove(i))
+                            conds
+                                .iter()
+                                .position(|c| c.group == group)
+                                .map(|i| conds.remove(i))
                         };
                         if let Some(gone) = gone {
                             page_box.remove(&gone.group);
@@ -6106,13 +6633,21 @@ impl AccountsWindow {
         }
 
         let edit_index = edit.as_ref().map(|(i, _)| *i);
-        let id = edit.as_ref().map_or_else(crate::config::new_smart_folder_id, |(_, f)| f.id.clone());
+        let id = edit
+            .as_ref()
+            .map_or_else(crate::config::new_smart_folder_id, |(_, f)| f.id.clone());
         if let Some((_, f)) = &edit {
             name_row.set_text(&f.name);
-            if let Some(i) = emails.iter().position(|e| e.eq_ignore_ascii_case(&f.account_email)) {
+            if let Some(i) = emails
+                .iter()
+                .position(|e| e.eq_ignore_ascii_case(&f.account_email))
+            {
                 account_row.set_selected(i as u32 + 1);
             }
-            if let Some(i) = f.folder.and_then(|k| SmartFolderKind::ALL.iter().position(|x| *x == k)) {
+            if let Some(i) = f
+                .folder
+                .and_then(|k| SmartFolderKind::ALL.iter().position(|x| *x == k))
+            {
                 folder_row.set_selected(i as u32 + 1);
             }
             combine_row.set_selected(u32::from(f.any));
@@ -6131,58 +6666,72 @@ impl AccountsWindow {
         }
 
         let s = sender.clone();
-        self.push_form_content(nav, "smart", &title, &verb, scrolled.upcast_ref(), vec![name_row.clone()], move || {
-            let name = name_row.text().trim().to_string();
-            // A text condition with no text says nothing and is dropped;
-            // the others need none.
-            let conditions: Vec<SmartCondition> = conds
-                .borrow()
-                .iter()
-                .filter_map(|c| {
-                    let field = SmartField::ALL[c.field.selected() as usize % SmartField::ALL.len()];
-                    let value = if field == SmartField::Tagged {
-                        match c.tag.selected() {
-                            0 => String::new(),
-                            i => tags.get(i as usize - 1).map(|t| t.keyword.clone()).unwrap_or_default(),
-                        }
-                    } else if field.takes_text() {
-                        let v = c.value.text().trim().to_string();
-                        if v.is_empty() {
-                            return None;
-                        }
-                        v
-                    } else {
-                        String::new()
-                    };
-                    Some(SmartCondition {
-                        field,
-                        matcher: FilterMatch::ALL[c.matcher.selected() as usize % FilterMatch::ALL.len()],
-                        value,
+        self.push_form_content(
+            nav,
+            "smart",
+            &title,
+            &verb,
+            scrolled.upcast_ref(),
+            vec![name_row.clone()],
+            move || {
+                let name = name_row.text().trim().to_string();
+                // A text condition with no text says nothing and is dropped;
+                // the others need none.
+                let conditions: Vec<SmartCondition> = conds
+                    .borrow()
+                    .iter()
+                    .filter_map(|c| {
+                        let field =
+                            SmartField::ALL[c.field.selected() as usize % SmartField::ALL.len()];
+                        let value = if field == SmartField::Tagged {
+                            match c.tag.selected() {
+                                0 => String::new(),
+                                i => tags
+                                    .get(i as usize - 1)
+                                    .map(|t| t.keyword.clone())
+                                    .unwrap_or_default(),
+                            }
+                        } else if field.takes_text() {
+                            let v = c.value.text().trim().to_string();
+                            if v.is_empty() {
+                                return None;
+                            }
+                            v
+                        } else {
+                            String::new()
+                        };
+                        Some(SmartCondition {
+                            field,
+                            matcher: FilterMatch::ALL
+                                [c.matcher.selected() as usize % FilterMatch::ALL.len()],
+                            value,
+                        })
                     })
-                })
-                .collect();
-            if name.is_empty() || conditions.is_empty() {
-                return false;
-            }
-            let account_email = match account_row.selected() {
-                0 => String::new(),
-                i => emails.get(i as usize - 1).cloned().unwrap_or_default(),
-            };
-            let folder = match folder_row.selected() {
-                0 => None,
-                i => SmartFolderKind::ALL.get(i as usize - 1).copied(),
-            };
-            let folder = SmartFolder {
-                id: id.clone(),
-                name,
-                account_email,
-                folder,
-                any: combine_row.selected() == 1,
-                conditions,
-            };
-            s.input_sender().emit(AccountsInput::SmartFolderSaved(edit_index, folder));
-            true
-        });
+                    .collect();
+                if name.is_empty() || conditions.is_empty() {
+                    return false;
+                }
+                let account_email = match account_row.selected() {
+                    0 => String::new(),
+                    i => emails.get(i as usize - 1).cloned().unwrap_or_default(),
+                };
+                let folder = match folder_row.selected() {
+                    0 => None,
+                    i => SmartFolderKind::ALL.get(i as usize - 1).copied(),
+                };
+                let folder = SmartFolder {
+                    id: id.clone(),
+                    name,
+                    account_email,
+                    folder,
+                    any: combine_row.selected() == 1,
+                    conditions,
+                };
+                s.input_sender()
+                    .emit(AccountsInput::SmartFolderSaved(edit_index, folder));
+                true
+            },
+        );
     }
 
     /// The Tags list (#71): a row per tag — its color as a disc, its name,
@@ -6228,7 +6777,10 @@ impl AccountsWindow {
             let input = sender.input_sender().clone();
             drop.connect_drop(move |_, value, _, _| {
                 if let Ok(from) = value.get::<u32>() {
-                    let _ = input.send(AccountsInput::MoveTag { from: from as usize, to });
+                    let _ = input.send(AccountsInput::MoveTag {
+                        from: from as usize,
+                        to,
+                    });
                     true
                 } else {
                     false
@@ -6338,7 +6890,9 @@ impl AccountsWindow {
         swatches.set_row_spacing(4);
         swatches.set_halign(gtk::Align::Start);
         let chosen = std::rc::Rc::new(std::cell::RefCell::new(
-            edit.as_ref().map(|(_, t)| t.color.clone()).unwrap_or_else(|| TAG_COLORS[0].to_string()),
+            edit.as_ref()
+                .map(|(_, t)| t.color.clone())
+                .unwrap_or_else(|| TAG_COLORS[0].to_string()),
         ));
         let mut first: Option<gtk::ToggleButton> = None;
         for color in TAG_COLORS {
@@ -6410,10 +6964,18 @@ impl AccountsWindow {
                             // one picked earlier stays on this disc.
                             if custom.borrow().is_none() {
                                 let back = chosen.borrow().clone();
-                                let mut child = t.parent().and_then(|p| p.parent()).and_then(|b| b.first_child());
+                                let mut child = t
+                                    .parent()
+                                    .and_then(|p| p.parent())
+                                    .and_then(|b| b.first_child());
                                 while let Some(c) = child {
-                                    if let Some(tb) = c.first_child().and_downcast::<gtk::ToggleButton>() {
-                                        if tb.tooltip_text().is_some_and(|tip| tip.eq_ignore_ascii_case(&back)) {
+                                    if let Some(tb) =
+                                        c.first_child().and_downcast::<gtk::ToggleButton>()
+                                    {
+                                        if tb
+                                            .tooltip_text()
+                                            .is_some_and(|tip| tip.eq_ignore_ascii_case(&back))
+                                        {
                                             tb.set_active(true);
                                             break;
                                         }
@@ -6448,11 +7010,19 @@ impl AccountsWindow {
             }
             // A keyword the server would refuse falls back to the derived one.
             let typed = keyword_row.text().trim().to_string();
-            let mut keyword = if Tag::valid_keyword(&typed) { typed } else { Tag::keyword_for(&name) };
+            let mut keyword = if Tag::valid_keyword(&typed) {
+                typed
+            } else {
+                Tag::keyword_for(&name)
+            };
             if keyword.is_empty() {
                 keyword = "Tag".to_string();
             }
-            let tag = Tag { name, keyword, color: chosen.borrow().clone() };
+            let tag = Tag {
+                name,
+                keyword,
+                color: chosen.borrow().clone(),
+            };
             s.input_sender().emit(match edit_index {
                 Some(i) => AccountsInput::TagEdited(i, tag),
                 None => AccountsInput::TagAdded(tag),
@@ -6609,8 +7179,14 @@ impl AccountsWindow {
                 }
             }
         };
-        let field_names: Vec<String> = FilterField::ALL.iter().map(|f| Self::field_label(*f)).collect();
-        let match_names: Vec<String> = FilterMatch::ALL.iter().map(|m| Self::match_label(*m)).collect();
+        let field_names: Vec<String> = FilterField::ALL
+            .iter()
+            .map(|f| Self::field_label(*f))
+            .collect();
+        let match_names: Vec<String> = FilterMatch::ALL
+            .iter()
+            .map(|m| Self::match_label(*m))
+            .collect();
         let make_cond = {
             let field_names = field_names.clone();
             let match_names = match_names.clone();
@@ -6673,7 +7249,13 @@ impl AccountsWindow {
                 group.add(&field);
                 group.add(&matcher);
                 group.add(&value);
-                CondRows { group, remove, field, matcher, value }
+                CondRows {
+                    group,
+                    remove,
+                    field,
+                    matcher,
+                    value,
+                }
             }
         };
 
@@ -6707,7 +7289,8 @@ impl AccountsWindow {
                 let any = combine_row.selected() == 1;
                 let several = conds.len() > 1;
                 for (i, c) in conds.iter().enumerate() {
-                    c.group.set_title(&i18n_f("Condition {n}", &[("n", &(i + 1).to_string())]));
+                    c.group
+                        .set_title(&i18n_f("Condition {n}", &[("n", &(i + 1).to_string())]));
                     c.field.set_title(&if i == 0 {
                         i18n("Where")
                     } else if any {
@@ -6763,7 +7346,10 @@ impl AccountsWindow {
                             if conds.len() < 2 {
                                 return;
                             }
-                            conds.iter().position(|c| c.group == group).map(|i| conds.remove(i))
+                            conds
+                                .iter()
+                                .position(|c| c.group == group)
+                                .map(|i| conds.remove(i))
                         };
                         if let Some(gone) = gone {
                             page_box.remove(&gone.group);
@@ -6812,8 +7398,10 @@ impl AccountsWindow {
             let dest_paths = dest_paths.clone();
             move |idx: usize| {
                 let empty = Vec::new();
-                let list =
-                    emails_rc.get(idx).and_then(|e| folders.get(e)).unwrap_or(&empty);
+                let list = emails_rc
+                    .get(idx)
+                    .and_then(|e| folders.get(e))
+                    .unwrap_or(&empty);
                 // Entry 0 files nowhere (a tag-only rule, #71): its path is "".
                 let stay = i18n("Leave in Inbox");
                 let mut names: Vec<&str> = vec![stay.as_str()];
@@ -6854,7 +7442,9 @@ impl AccountsWindow {
         // can opt its folder out (#116).
         let count_row = adw::SwitchRow::new();
         count_row.set_title(&i18n("Count unread mail"));
-        count_row.set_subtitle(&i18n("Include the folder's unread mail in the tray icon's unread count"));
+        count_row.set_subtitle(&i18n(
+            "Include the folder's unread mail in the tray icon's unread count",
+        ));
         count_row.set_active(true);
         action_group.add(&dest_row);
         action_group.add(&tag_row);
@@ -6875,10 +7465,17 @@ impl AccountsWindow {
                 fill_dest(idx);
             }
             combine_row.set_selected(if rule.any { 1 } else { 0 });
-            if let Some(idx) = dest_paths.borrow().iter().position(|p| *p == rule.dest_path) {
+            if let Some(idx) = dest_paths
+                .borrow()
+                .iter()
+                .position(|p| *p == rule.dest_path)
+            {
                 dest_row.set_selected(idx as u32);
             }
-            if let Some(idx) = tags.iter().position(|t| t.keyword.eq_ignore_ascii_case(&rule.tag)) {
+            if let Some(idx) = tags
+                .iter()
+                .position(|t| t.keyword.eq_ignore_ascii_case(&rule.tag))
+            {
                 tag_row.set_selected(idx as u32 + 1);
             }
             count_row.set_active(rule.count_unread);
@@ -6937,7 +7534,10 @@ impl AccountsWindow {
         }
         // HYLKI_SHOWCASE_ADD_CONDITION=<n> adds that many blank conditions
         // once the page is up, for a capture of the stacked groups.
-        if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_ADD_CONDITION").ok().map(|v| v.parse::<usize>()) {
+        if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_ADD_CONDITION")
+            .ok()
+            .map(|v| v.parse::<usize>())
+        {
             let add_cond = add_cond.clone();
             gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(1), move || {
                 for _ in 0..n {
@@ -6955,14 +7555,16 @@ impl AccountsWindow {
                 .borrow()
                 .iter()
                 .filter_map(|c| {
-                    let field = FilterField::ALL[c.field.selected() as usize % FilterField::ALL.len()];
+                    let field =
+                        FilterField::ALL[c.field.selected() as usize % FilterField::ALL.len()];
                     let value = c.value.text().trim().to_string();
                     if value.is_empty() && !field.is_contact_check() {
                         return None;
                     }
                     Some(crate::config::FilterCondition {
                         field,
-                        matcher: FilterMatch::ALL[c.matcher.selected() as usize % FilterMatch::ALL.len()],
+                        matcher: FilterMatch::ALL
+                            [c.matcher.selected() as usize % FilterMatch::ALL.len()],
                         value,
                     })
                 })
@@ -6972,7 +7574,10 @@ impl AccountsWindow {
             let dest = paths.get(dest_row.selected() as usize)?;
             let tag = match tag_row.selected() {
                 0 => String::new(),
-                i => tags.get(i as usize - 1).map(|t| t.keyword.clone()).unwrap_or_default(),
+                i => tags
+                    .get(i as usize - 1)
+                    .map(|t| t.keyword.clone())
+                    .unwrap_or_default(),
             };
             // A rule needs something to match and something to do.
             if conditions.is_empty() || (dest.is_empty() && tag.is_empty()) {
@@ -6998,16 +7603,24 @@ impl AccountsWindow {
         let s = sender.clone();
         let save_btn = {
             let build = build.clone();
-            self.push_form_content(nav, "filter", &title, &verb, scrolled.upcast_ref(), entries, move || {
-                let Some(rule) = build() else {
-                    return false;
-                };
-                s.input_sender().emit(match edit_index {
-                    Some(i) => AccountsInput::FilterEdited(i, rule),
-                    None => AccountsInput::FilterAdded(rule),
-                });
-                true
-            })
+            self.push_form_content(
+                nav,
+                "filter",
+                &title,
+                &verb,
+                scrolled.upcast_ref(),
+                entries,
+                move || {
+                    let Some(rule) = build() else {
+                        return false;
+                    };
+                    s.input_sender().emit(match edit_index {
+                        Some(i) => AccountsInput::FilterEdited(i, rule),
+                        None => AccountsInput::FilterAdded(rule),
+                    });
+                    true
+                },
+            )
         };
         // Grey, not a faded blue, while it cannot save.
         *revalidate.borrow_mut() = Some(Box::new(move || {

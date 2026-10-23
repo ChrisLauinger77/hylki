@@ -105,7 +105,10 @@ pub fn resizable(column: ListColumn) -> bool {
 
 /// The width a column takes in `look`.
 fn column_width(look: &RowLook, column: ListColumn) -> i32 {
-    look.widths.get(&column).copied().unwrap_or_else(|| default_width(column))
+    look.widths
+        .get(&column)
+        .copied()
+        .unwrap_or_else(|| default_width(column))
 }
 
 /// Distance past which the indicator reads as "armed" (full color) — purely
@@ -280,7 +283,11 @@ impl RowItem {
     }
 
     pub fn data(&self) -> Rc<RowData> {
-        self.imp().data.borrow().clone().expect("a row item always holds its data")
+        self.imp()
+            .data
+            .borrow()
+            .clone()
+            .expect("a row item always holds its data")
     }
 
     /// Data for another message: the row showing this item, if any, starts
@@ -303,7 +310,9 @@ impl RowItem {
             // key. A row is not bound again for that, so its size is asked
             // for here, as binding would, or the badge never comes (#351).
             let moved = old.is_some_and(|o| o.meta.group != data.meta.group);
-            if let (true, Some(group), Some(shared)) = (moved, data.meta.group.clone(), row.shared()) {
+            if let (true, Some(group), Some(shared)) =
+                (moved, data.meta.group.clone(), row.shared())
+            {
                 shared.want(group);
             }
         }
@@ -424,7 +433,9 @@ pub enum RowEdit {
 /// The edits that turn `old` into `new`, as far as `old` goes, and the
 /// first of `new` left to add after them.
 pub fn row_edits<K: std::hash::Hash + Eq + Copy>(old: &[K], new: &[K]) -> (Vec<RowEdit>, usize) {
-    let at = |keys: &[K]| -> HashMap<K, usize> { keys.iter().enumerate().map(|(n, k)| (*k, n)).collect() };
+    let at = |keys: &[K]| -> HashMap<K, usize> {
+        keys.iter().enumerate().map(|(n, k)| (*k, n)).collect()
+    };
     let (old_at, new_at) = (at(old), at(new));
     let mut edits = Vec::new();
     let (mut i, mut j) = (0, 0);
@@ -467,7 +478,8 @@ const SWAP_RUNS: usize = 8;
 pub fn swap_wanted(edits: &[RowEdit], old_len: usize, tail: usize, new_len: usize) -> bool {
     old_len > 0
         && new_len > 0
-        && (!edits.contains(&RowEdit::Keep) || change_runs(edits, old_len, tail, new_len) > SWAP_RUNS)
+        && (!edits.contains(&RowEdit::Keep)
+            || change_runs(edits, old_len, tail, new_len) > SWAP_RUNS)
 }
 
 /// The separate changes `edits` come to, as `MessageModel::replace` tells
@@ -592,7 +604,10 @@ impl MessageModel {
         added.extend(new[tail..].iter().cloned());
         removed = left;
         flush(pos, &mut removed, &mut added);
-        self.imp().items.borrow_mut().retain(|_, w| w.upgrade().is_some());
+        self.imp()
+            .items
+            .borrow_mut()
+            .retain(|_, w| w.upgrade().is_some());
         if moved_section {
             self.resection();
         }
@@ -613,7 +628,9 @@ impl MessageModel {
         let moved;
         {
             let mut rows = self.imp().rows.borrow_mut();
-            let Some(row) = rows.get_mut(pos) else { return false };
+            let Some(row) = rows.get_mut(pos) else {
+                return false;
+            };
             // A rebuild makes new data for every row; one that says the same
             // as before is not drawn again (#330).
             if Rc::ptr_eq(row, &data) || **row == *data {
@@ -625,7 +642,12 @@ impl MessageModel {
         if moved {
             self.imp().touch();
         }
-        let live = self.imp().items.borrow().get(&slot).and_then(|w| w.upgrade());
+        let live = self
+            .imp()
+            .items
+            .borrow()
+            .get(&slot)
+            .and_then(|w| w.upgrade());
         if let Some(item) = live {
             item.set_data(data);
         }
@@ -653,7 +675,10 @@ impl MessageModel {
         let imp = self.imp();
         let old = imp.rows.replace(new.clone());
         imp.touch();
-        let moved_section = old.iter().zip(&new).any(|(was, now)| was.section != now.section);
+        let moved_section = old
+            .iter()
+            .zip(&new)
+            .any(|(was, now)| was.section != now.section);
         let held = imp.items.take();
         let mut moved = Vec::new();
         {
@@ -697,7 +722,10 @@ impl MessageModel {
 
     pub fn splice(&self, pos: usize, removed: usize, added: Vec<Rc<RowData>>) {
         let n = added.len();
-        self.imp().rows.borrow_mut().splice(pos..pos + removed, added);
+        self.imp()
+            .rows
+            .borrow_mut()
+            .splice(pos..pos + removed, added);
         self.imp().touch();
         self.items_changed(pos as u32, removed as u32, n as u32);
     }
@@ -875,12 +903,19 @@ impl RowShared {
 
     /// The rows showing a message right now.
     pub fn bound_rows(&self) -> Vec<Rc<Row>> {
-        self.rows.borrow().values().filter(|r| r.st.borrow().item.is_some()).cloned().collect()
+        self.rows
+            .borrow()
+            .values()
+            .filter(|r| r.st.borrow().item.is_some())
+            .cloned()
+            .collect()
     }
 
     /// The row showing the list's position `pos`, if it is on screen.
     pub fn row_at(&self, pos: usize) -> Option<Rc<Row>> {
-        self.bound_rows().into_iter().find(|r| r.position() == Some(pos))
+        self.bound_rows()
+            .into_iter()
+            .find(|r| r.position() == Some(pos))
     }
 
     /// The row the keyboard cursor is on, if any.
@@ -926,13 +961,21 @@ impl RowShared {
     fn selected_rows(&self) -> Vec<Rc<RowData>> {
         let set = self.selection.selection();
         let rows = self.model.imp().rows.borrow();
-        let Some((iter, first)) = gtk::BitsetIter::init_first(&set) else { return Vec::new() };
-        std::iter::once(first).chain(iter).filter_map(|pos| rows.get(pos as usize).cloned()).collect()
+        let Some((iter, first)) = gtk::BitsetIter::init_first(&set) else {
+            return Vec::new();
+        };
+        std::iter::once(first)
+            .chain(iter)
+            .filter_map(|pos| rows.get(pos as usize).cloned())
+            .collect()
     }
 
     /// The keys of the selected rows, in list order, for a drag.
     fn selected_drag_keys(&self) -> Vec<(u32, u32, u32, u32)> {
-        self.selected_rows().iter().map(|r| (r.msg.account_id, r.msg.folder_id, r.msg.uid, r.msg.id)).collect()
+        self.selected_rows()
+            .iter()
+            .map(|r| (r.msg.account_id, r.msg.folder_id, r.msg.uid, r.msg.id))
+            .collect()
     }
 }
 
@@ -956,7 +999,9 @@ const SPARE_AHEAD: usize = 210;
 pub fn make_spare_rows(shared: &Rc<RowShared>) {
     let weak = Rc::downgrade(shared);
     glib::idle_add_local(move || {
-        let Some(shared) = weak.upgrade() else { return glib::ControlFlow::Break };
+        let Some(shared) = weak.upgrade() else {
+            return glib::ControlFlow::Break;
+        };
         let made = shared.rows.borrow().len() + shared.spare.borrow().len();
         if made >= SPARE_AHEAD {
             return glib::ControlFlow::Break;
@@ -976,7 +1021,9 @@ pub fn factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
     {
         let shared = Rc::downgrade(shared);
         factory.connect_setup(move |_, obj| {
-            let (Some(shared), Some(item)) = (shared.upgrade(), obj.downcast_ref::<gtk::ListItem>()) else {
+            let (Some(shared), Some(item)) =
+                (shared.upgrade(), obj.downcast_ref::<gtk::ListItem>())
+            else {
                 return;
             };
             let spare = shared.spare.borrow_mut().pop();
@@ -989,9 +1036,14 @@ pub fn factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
     {
         let shared = Rc::downgrade(shared);
         factory.connect_bind(move |_, obj| {
-            let Some(shared) = shared.upgrade() else { return };
+            let Some(shared) = shared.upgrade() else {
+                return;
+            };
             let row = shared.rows.borrow().get(&key(obj)).cloned();
-            let item = obj.downcast_ref::<gtk::ListItem>().and_then(|li| li.item()).and_downcast::<RowItem>();
+            let item = obj
+                .downcast_ref::<gtk::ListItem>()
+                .and_then(|li| li.item())
+                .and_downcast::<RowItem>();
             if let (Some(row), Some(item)) = (row, item) {
                 row.bind(&item);
             }
@@ -1000,7 +1052,9 @@ pub fn factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
     {
         let shared = Rc::downgrade(shared);
         factory.connect_unbind(move |_, obj| {
-            let Some(shared) = shared.upgrade() else { return };
+            let Some(shared) = shared.upgrade() else {
+                return;
+            };
             let row = shared.rows.borrow().get(&key(obj)).cloned();
             if let Some(row) = row {
                 row.unbind();
@@ -1010,7 +1064,9 @@ pub fn factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
     {
         let shared = Rc::downgrade(shared);
         factory.connect_teardown(move |_, obj| {
-            let Some(shared) = shared.upgrade() else { return };
+            let Some(shared) = shared.upgrade() else {
+                return;
+            };
             let row = shared.rows.borrow_mut().remove(&key(obj));
             if let Some(row) = row {
                 row.unbind();
@@ -1034,7 +1090,9 @@ pub fn header_factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     let weak = Rc::downgrade(shared);
     factory.connect_setup(move |_, obj| {
-        let Some(header) = obj.downcast_ref::<gtk::ListHeader>() else { return };
+        let Some(header) = obj.downcast_ref::<gtk::ListHeader>() else {
+            return;
+        };
         let label = gtk::Label::new(None);
         label.set_xalign(0.0);
         label.set_ellipsize(gtk::pango::EllipsizeMode::End);
@@ -1056,8 +1114,14 @@ pub fn header_factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
 
 /// A heading names the section of the row it stands over.
 fn fill_header(header: &gtk::ListHeader) {
-    let Some(label) = header.child().and_downcast::<gtk::Label>() else { return };
-    let text = header.item().and_downcast::<RowItem>().map(|i| i.data().section.label()).unwrap_or_default();
+    let Some(label) = header.child().and_downcast::<gtk::Label>() else {
+        return;
+    };
+    let text = header
+        .item()
+        .and_downcast::<RowItem>()
+        .map(|i| i.data().section.label())
+        .unwrap_or_default();
     if label.label() != text {
         label.set_label(&text);
     }
@@ -1082,7 +1146,10 @@ pub enum FaceCmd {
         logo: Option<Option<Vec<u8>>>,
     },
     /// A logo-only lookup — the avatar tiers had already answered from cache.
-    Logo { email: String, bytes: Option<Vec<u8>> },
+    Logo {
+        email: String,
+        bytes: Option<Vec<u8>>,
+    },
 }
 
 /// Run the avatar tiers off the main thread, falling through to the domain icon
@@ -1104,7 +1171,13 @@ pub async fn find_face(
     })
     .await;
     let (outcome, logo) = result.unwrap_or((crate::avatar::FetchOutcome::Retry, None));
-    FaceCmd::Avatar { email, generation, mode, outcome, logo }
+    FaceCmd::Avatar {
+        email,
+        generation,
+        mode,
+        outcome,
+        logo,
+    }
 }
 
 /// Fetch just the domain icon, off the main thread.
@@ -1126,7 +1199,9 @@ pub fn recipient_names(to: &str) -> String {
             continue;
         }
         let name = match part.split_once('<') {
-            Some((n, _)) if !n.trim().trim_matches('"').is_empty() => n.trim().trim_matches('"').to_string(),
+            Some((n, _)) if !n.trim().trim_matches('"').is_empty() => {
+                n.trim().trim_matches('"').to_string()
+            }
             Some((_, rest)) => rest.trim_end_matches('>').trim().to_string(),
             None => part.to_string(),
         };
@@ -1183,9 +1258,16 @@ pub fn fill_headings(
     line.set_hexpand(true);
     bar.append(&line);
 
-    let subject_at = look.columns.iter().position(|c| *c == ListColumn::Subject).unwrap_or(0);
+    let subject_at = look
+        .columns
+        .iter()
+        .position(|c| *c == ListColumn::Subject)
+        .unwrap_or(0);
     for (at, &column) in look.columns.iter().enumerate() {
-        let arrow = sorted.filter(|(c, _)| *c == column).map(|(_, down)| if down { " \u{25BE}" } else { " \u{25B4}" });
+        let arrow =
+            sorted
+                .filter(|(c, _)| *c == column)
+                .map(|(_, down)| if down { " \u{25BE}" } else { " \u{25B4}" });
         let text = |name: String| {
             let label = gtk::Label::new(Some(&format!("{name}{}", arrow.unwrap_or(""))));
             label.set_xalign(0.0);
@@ -1216,7 +1298,11 @@ pub fn fill_headings(
             }
             ListColumn::Attachment => icon("mail-attachment-symbolic", LINE_ICON_PX),
             ListColumn::Importance => icon("emblem-important-symbolic", -1),
-            ListColumn::Sender => binned(text(if look.show_recipient { i18n("To") } else { i18n("From") })),
+            ListColumn::Sender => binned(text(if look.show_recipient {
+                i18n("To")
+            } else {
+                i18n("From")
+            })),
             ListColumn::Recipients => binned(text(i18n("To"))),
             ListColumn::Correspondents | ListColumn::Account => binned(text(i18n(column.label()))),
             ListColumn::Subject => {
@@ -1227,7 +1313,11 @@ pub fn fill_headings(
             }
             ListColumn::Tags => binned(text(i18n(column.label()))),
             ListColumn::Due | ListColumn::Date => {
-                let label = text(if column == ListColumn::Due { i18n("Due") } else { i18n(column.label()) });
+                let label = text(if column == ListColumn::Due {
+                    i18n("Due")
+                } else {
+                    i18n(column.label())
+                });
                 label.set_width_chars(9);
                 label.set_xalign(1.0);
                 binned(label)
@@ -1237,7 +1327,9 @@ pub fn fill_headings(
             bins.insert(column, bin.clone());
         }
         let cell = match bin {
-            Some(bin) if resizable(column) => resize_handle(cell, &bin, column, at < subject_at, resize.clone()),
+            Some(bin) if resizable(column) => {
+                resize_handle(cell, &bin, column, at < subject_at, resize.clone())
+            }
             _ => cell,
         };
         cell.set_tooltip_text(Some(&i18n(column.label())));
@@ -1273,9 +1365,15 @@ fn resize_handle(
     let handle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     handle.add_css_class("column-resize-handle");
     handle.set_size_request(8, -1);
-    handle.set_halign(if before_subject { gtk::Align::End } else { gtk::Align::Start });
+    handle.set_halign(if before_subject {
+        gtk::Align::End
+    } else {
+        gtk::Align::Start
+    });
     handle.set_cursor_from_name(Some("col-resize"));
-    handle.set_tooltip_text(Some(&i18n("Drag to resize, double-click for the usual width")));
+    handle.set_tooltip_text(Some(&i18n(
+        "Drag to resize, double-click for the usual width",
+    )));
     overlay.add_overlay(&handle);
 
     let drag = gtk::GestureDrag::new();
@@ -1288,10 +1386,13 @@ fn resize_handle(
     // The pointer across the window, from a point on the handle as it is now.
     fn across(handle: &gtk::Widget, x: f64, y: f64) -> Option<f32> {
         let root = handle.root()?;
-        handle.compute_point(&root, &gtk::graphene::Point::new(x as f32, y as f32)).map(|p| p.x())
+        handle
+            .compute_point(&root, &gtk::graphene::Point::new(x as f32, y as f32))
+            .map(|p| p.x())
     }
     {
-        let (bin, start, last, pressed_at) = (bin.clone(), start.clone(), last.clone(), pressed_at.clone());
+        let (bin, start, last, pressed_at) =
+            (bin.clone(), start.clone(), last.clone(), pressed_at.clone());
         drag.connect_drag_begin(move |g, x, y| {
             if let Some(at) = g.widget().and_then(|h| across(&h, x, y)) {
                 pressed_at.set(at);
@@ -1308,8 +1409,12 @@ fn resize_handle(
     {
         let (start, last, resize) = (start.clone(), last.clone(), resize.clone());
         drag.connect_drag_update(move |g, dx, dy| {
-            let Some((x, y)) = g.start_point() else { return };
-            let Some(now) = g.widget().and_then(|h| across(&h, x + dx, y + dy)) else { return };
+            let Some((x, y)) = g.start_point() else {
+                return;
+            };
+            let Some(now) = g.widget().and_then(|h| across(&h, x + dx, y + dy)) else {
+                return;
+            };
             let dx = (now - pressed_at.get()).round() as i32;
             let px = (start.get() + if before_subject { dx } else { -dx }).clamp(MIN, MAX);
             if px != last.get() {
@@ -1394,7 +1499,8 @@ pub fn tag_menu_entries(
             let on = msg.has_tag(t);
             let keyword = t.keyword.clone();
             let toggle = toggle.clone();
-            MenuEntry::new(t.name.clone(), move || toggle(keyword.clone(), !on)).swatch(t.color.clone(), on)
+            MenuEntry::new(t.name.clone(), move || toggle(keyword.clone(), !on))
+                .swatch(t.color.clone(), on)
         })
         .collect()
 }
@@ -1450,9 +1556,10 @@ impl SwipeSurface {
     /// The trackpad sensitivity preference, so both `AdwSwipeable::distance`
     /// and the tracker's own callback see the same figure.
     fn set_sensitivity(&self, factor: f64) {
-        self.imp()
-            .sensitivity
-            .set(factor.clamp(crate::config::SWIPE_SENSITIVITY_MIN, crate::config::SWIPE_SENSITIVITY_MAX));
+        self.imp().sensitivity.set(factor.clamp(
+            crate::config::SWIPE_SENSITIVITY_MIN,
+            crate::config::SWIPE_SENSITIVITY_MAX,
+        ));
     }
 
     fn sensitivity(&self) -> f64 {
@@ -1477,7 +1584,10 @@ mod swipe_surface_imp {
 
     impl Default for SwipeSurface {
         fn default() -> Self {
-            Self { progress_px: Cell::new(0.0), sensitivity: Cell::new(1.0) }
+            Self {
+                progress_px: Cell::new(0.0),
+                sensitivity: Cell::new(1.0),
+            }
         }
     }
 
@@ -1522,13 +1632,17 @@ mod swipe_surface_imp {
         // height with no width at all — so a wrapping multi-line preview
         // came out clipped to under two lines (regression since 1.23.0).
         fn request_mode(&self) -> gtk::SizeRequestMode {
-            self.foreground().map(|c| c.request_mode()).unwrap_or(gtk::SizeRequestMode::ConstantSize)
+            self.foreground()
+                .map(|c| c.request_mode())
+                .unwrap_or(gtk::SizeRequestMode::ConstantSize)
         }
 
         // The background strip never dictates the row's size — only the
         // real content does; the strip is simply stretched to match it.
         fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
-            self.foreground().map(|c| c.measure(orientation, for_size)).unwrap_or((0, 0, -1, -1))
+            self.foreground()
+                .map(|c| c.measure(orientation, for_size))
+                .unwrap_or((0, 0, -1, -1))
         }
 
         fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
@@ -1537,8 +1651,9 @@ mod swipe_surface_imp {
             }
             if let Some(fg) = self.foreground() {
                 let offset = self.visual_offset();
-                let transform = (offset != 0.0)
-                    .then(|| gtk::gsk::Transform::new().translate(&gtk::graphene::Point::new(offset, 0.0)));
+                let transform = (offset != 0.0).then(|| {
+                    gtk::gsk::Transform::new().translate(&gtk::graphene::Point::new(offset, 0.0))
+                });
                 fg.allocate(width, height, baseline, transform);
             }
         }
@@ -1557,7 +1672,11 @@ mod swipe_surface_imp {
             let reach = super::THREAD_NODE_REACH;
             // The rail runs down the start side: the right in a
             // right-to-left window (#366).
-            let x = if obj.direction() == gtk::TextDirection::Rtl { 0.0 } else { -reach };
+            let x = if obj.direction() == gtk::TextDirection::Rtl {
+                0.0
+            } else {
+                -reach
+            };
             snapshot.push_clip(&gtk::graphene::Rect::new(x, 0.0, w + reach, h));
 
             let offset = self.visual_offset();
@@ -1611,7 +1730,11 @@ mod swipe_surface_imp {
             vec![-1.0, 0.0, 1.0]
         }
 
-        fn swipe_area(&self, _navigation_direction: adw::NavigationDirection, _is_drag: bool) -> gtk::gdk::Rectangle {
+        fn swipe_area(
+            &self,
+            _navigation_direction: adw::NavigationDirection,
+            _is_drag: bool,
+        ) -> gtk::gdk::Rectangle {
             let w = self.obj();
             gtk::gdk::Rectangle::new(0, 0, w.width(), w.height())
         }
@@ -1768,7 +1891,10 @@ impl Row {
             me: me.clone(),
             shared: Rc::downgrade(shared),
             w,
-            st: RefCell::new(RowState { avatar_shown: true, ..Default::default() }),
+            st: RefCell::new(RowState {
+                avatar_shown: true,
+                ..Default::default()
+            }),
             list_item: RefCell::new(glib::WeakRef::new()),
             tracker: RefCell::new(None),
         });
@@ -1923,7 +2049,9 @@ impl Row {
         self.w.palette_inner.add_controller(palette_motion);
         // The clip is set once: the palette hangs clipped over the spacer
         // whose width is the one thing animated.
-        self.w.palette_clip.set_clip_overlay(&self.w.palette_inner, true);
+        self.w
+            .palette_clip
+            .set_clip_overlay(&self.w.palette_inner, true);
 
         // The conversation chip.
         {
@@ -1992,7 +2120,9 @@ impl Row {
     /// binding would: a folder switch hands the row on rather than having
     /// the view build a new one (#401).
     fn rebind(self: &Rc<Self>) {
-        let Some(item) = self.st.borrow().item.clone() else { return };
+        let Some(item) = self.st.borrow().item.clone() else {
+            return;
+        };
         self.adopt(&item);
         self.refresh();
         self.begin(&item);
@@ -2048,7 +2178,12 @@ impl Row {
         // row on screen deaf to every later change of the message, a read
         // mark included (#333).
         if let Some(item) = item {
-            let mine = item.imp().row.borrow().upgrade().is_none_or(|r| std::ptr::eq(Rc::as_ptr(&r), self));
+            let mine = item
+                .imp()
+                .row
+                .borrow()
+                .upgrade()
+                .is_none_or(|r| std::ptr::eq(Rc::as_ptr(&r), self));
             if mine {
                 item.imp().row.replace(Weak::new());
             }
@@ -2073,7 +2208,11 @@ impl Row {
             st.swipe_active = false;
             st.avatar_texture = None;
             st.face_for = None;
-            (st.palette_anim.take(), st.swipe_anim.take(), st.collapse_timer.take())
+            (
+                st.palette_anim.take(),
+                st.swipe_anim.take(),
+                st.collapse_timer.take(),
+            )
         };
         if let Some(a) = palette_anim {
             a.pause();
@@ -2098,7 +2237,9 @@ impl Row {
         self.w.revealer.set_transition_duration(200);
         self.w.avatar_revealer.set_transition_duration(0);
         self.w.avatar_revealer.set_reveal_child(true);
-        self.w.avatar_revealer.set_transition_duration(crate::ui::FOCUS_ANIM_MS);
+        self.w
+            .avatar_revealer
+            .set_transition_duration(crate::ui::FOCUS_ANIM_MS);
     }
 
     /// Fill the widgets from the bound message and the list's look.
@@ -2117,7 +2258,8 @@ impl Row {
         self.sync_host_classes();
         {
             let st = self.st.borrow();
-            w.revealer.set_reveal_child(meta.revealed && !st.swipe_committing && !meta.appear);
+            w.revealer
+                .set_reveal_child(meta.revealed && !st.swipe_committing && !meta.appear);
         }
 
         // The thread rail and node.
@@ -2128,13 +2270,15 @@ impl Row {
         // centre minus half the button, plus a reply card's 10px indent),
         // hugging the pill's edge without.
         w.actions_line.set_visible(look.show_palette);
-        w.actions_line.set_margin_start(match (look.avatars, meta.is_child) {
-            (true, true) => 32,
-            (true, false) => 22,
-            (false, true) => 20,
-            (false, false) => 10,
-        });
-        w.actions_line.set_margin_bottom(if look.avatars { 3 } else { 4 });
+        w.actions_line
+            .set_margin_start(match (look.avatars, meta.is_child) {
+                (true, true) => 32,
+                (true, false) => 22,
+                (false, true) => 20,
+                (false, false) => 10,
+            });
+        w.actions_line
+            .set_margin_bottom(if look.avatars { 3 } else { 4 });
         self.sync_palette_classes();
 
         // The content box.
@@ -2151,13 +2295,18 @@ impl Row {
             content.push("palette-room");
         }
         w.content.set_css_classes(&content);
-        w.content.set_size_request(if single { look.min_width } else { -1 }, -1);
+        w.content
+            .set_size_request(if single { look.min_width } else { -1 }, -1);
 
         // The circle.
         w.avatar_revealer.set_visible(look.avatars);
         let shown = self.st.borrow().avatar_shown;
         w.avatar_revealer.set_reveal_child(shown);
-        w.avatar_revealer.set_css_classes(if shown { &["focus-fade"] } else { &["focus-fade", "away"] });
+        w.avatar_revealer.set_css_classes(if shown {
+            &["focus-fade"]
+        } else {
+            &["focus-fade", "away"]
+        });
         let ring = format!("hylki-acct-ring-{}", msg.account_id);
         if look.ringed.contains(&msg.account_id) {
             w.avatar.set_css_classes(&[ring.as_str()]);
@@ -2187,34 +2336,65 @@ impl Row {
         // Faded rather than hidden: the slot is always reserved and only
         // the dot's ink changes, so text never jitters as mail is read.
         let unread = msg.unread || meta.unread;
-        w.dot.set_valign(if look.avatars || single { gtk::Align::Center } else { gtk::Align::Start });
+        w.dot.set_valign(if look.avatars || single {
+            gtk::Align::Center
+        } else {
+            gtk::Align::Start
+        });
         w.dot.set_opacity(if unread { 1.0 } else { 0.0 });
         // Only a dot for the message's own unread state takes a click: on a
         // thread head lit by an unread reply, it would mark the head unread.
         let clickable = msg.unread && !look.in_drafts;
         w.dot.set_can_target(clickable);
-        w.dot.set_tooltip_text(clickable.then(|| i18n("Mark as Read")).as_deref());
-        w.text.set_valign(if look.avatars { gtk::Align::Center } else { gtk::Align::Start });
+        w.dot
+            .set_tooltip_text(clickable.then(|| i18n("Mark as Read")).as_deref());
+        w.text.set_valign(if look.avatars {
+            gtk::Align::Center
+        } else {
+            gtk::Align::Start
+        });
 
         w.name_col.set_visible(col(ListColumn::Sender));
         w.name.set_label(&self.name_line(&data, &look));
-        w.name.set_css_classes(if unread { &["message-sender", "unread"] } else { &["message-sender"] });
+        w.name.set_css_classes(if unread {
+            &["message-sender", "unread"]
+        } else {
+            &["message-sender"]
+        });
         // On one line an icon keeps its column whether lit or not, so the
         // columns after it line up.
-        w.clip.set_visible(if single { col(ListColumn::Attachment) } else { msg.has_attachment });
-        w.clip.set_opacity(if msg.has_attachment { 1.0 } else { 0.0 });
+        w.clip.set_visible(if single {
+            col(ListColumn::Attachment)
+        } else {
+            msg.has_attachment
+        });
+        w.clip
+            .set_opacity(if msg.has_attachment { 1.0 } else { 0.0 });
         let starred = msg.starred || meta.starred;
-        w.star.set_visible(if single { col(ListColumn::Star) } else { starred });
+        w.star.set_visible(if single {
+            col(ListColumn::Star)
+        } else {
+            starred
+        });
         w.star.set_opacity(if starred { 1.0 } else { 0.0 });
-        let (answered, forwarded) =
-            if meta.key.is_some() { (meta.answered, meta.forwarded) } else { (msg.answered, msg.forwarded) };
-        w.answer.set_visible(if single { col(ListColumn::Replied) } else { answered || forwarded });
+        let (answered, forwarded) = if meta.key.is_some() {
+            (meta.answered, meta.forwarded)
+        } else {
+            (msg.answered, msg.forwarded)
+        };
+        w.answer.set_visible(if single {
+            col(ListColumn::Replied)
+        } else {
+            answered || forwarded
+        });
         for (arrow, lit) in [(&w.replied, answered), (&w.forwarded, forwarded)] {
             arrow.set_visible(single || lit);
             arrow.set_opacity(if lit { 1.0 } else { 0.0 });
         }
-        w.replied.set_tooltip_text(answered.then(|| i18n("Replied")).as_deref());
-        w.forwarded.set_tooltip_text(forwarded.then(|| i18n("Forwarded")).as_deref());
+        w.replied
+            .set_tooltip_text(answered.then(|| i18n("Replied")).as_deref());
+        w.forwarded
+            .set_tooltip_text(forwarded.then(|| i18n("Forwarded")).as_deref());
         if single {
             self.fill_columns(&data, &look, &shared, unread);
         }
@@ -2234,14 +2414,19 @@ impl Row {
             }
         }
         match (&meta.latest, &meta.latest_at) {
-            (_, Some((ts, date))) if single => w.date.set_label(&crate::models::date_short(*ts, date)),
+            (_, Some((ts, date))) if single => {
+                w.date.set_label(&crate::models::date_short(*ts, date))
+            }
             (Some(latest), _) if !single => w.date.set_label(latest),
-            _ if single => w.date.set_label(&crate::models::date_short(msg.timestamp, &msg.date)),
+            _ if single => w
+                .date
+                .set_label(&crate::models::date_short(msg.timestamp, &msg.date)),
             _ => w.date.set_label(&msg.datetime_list()),
         }
         w.chip.set_visible(meta.count > 1);
         w.chip_count.set_label(&meta.count.to_string());
-        w.chip_caret.set_visible(look.thread_expansion && meta.expandable);
+        w.chip_caret
+            .set_visible(look.thread_expansion && meta.expandable);
         w.chip_caret.set_css_classes(if meta.expanded {
             &["thread-toggle-icon", "open"]
         } else {
@@ -2253,9 +2438,14 @@ impl Row {
         // so the subject is cut only once the text has gone (#334).
         if single {
             let esc = |t: &str| gtk::glib::markup_escape_text(t).to_string();
-            let text = crate::models::preview_display(meta.preview.as_deref().unwrap_or(&msg.preview));
+            let text =
+                crate::models::preview_display(meta.preview.as_deref().unwrap_or(&msg.preview));
             let markup = if look.preview_lines > 0 && !text.is_empty() {
-                format!("{} <span weight=\"normal\" alpha=\"55%\">— {}</span>", esc(&msg.subject), esc(&text))
+                format!(
+                    "{} <span weight=\"normal\" alpha=\"55%\">— {}</span>",
+                    esc(&msg.subject),
+                    esc(&text)
+                )
             } else {
                 esc(&msg.subject)
             };
@@ -2264,25 +2454,35 @@ impl Row {
             w.subject.set_use_markup(false);
             w.subject.set_label(&msg.subject);
         }
-        w.subject.set_css_classes(if unread { &["message-subject", "unread"] } else { &["message-subject"] });
+        w.subject.set_css_classes(if unread {
+            &["message-subject", "unread"]
+        } else {
+            &["message-subject"]
+        });
         w.tags_box.set_visible(col(ListColumn::Tags));
         w.tags_col.set_visible(single && col(ListColumn::Tags));
         self.render_tags(msg, &shared, &look);
         if !single {
             let below = look.pills_below;
-            let home = if below { &w.pills_line } else { &w.subject_line };
+            let home = if below {
+                &w.pills_line
+            } else {
+                &w.subject_line
+            };
             if w.tags_box.parent().as_ref() != Some(home.upcast_ref()) {
                 if let Some(from) = w.tags_box.parent().and_downcast::<gtk::Box>() {
                     from.remove(&w.tags_box);
                 }
                 home.append(&w.tags_box);
             }
-            w.pills_line.set_visible(below && look.show_subject && w.tags_box.first_child().is_some());
+            w.pills_line
+                .set_visible(below && look.show_subject && w.tags_box.first_child().is_some());
         }
 
         let preview = meta.preview.as_deref().unwrap_or(&msg.preview);
         w.preview_line.set_visible(look.preview_lines > 0);
-        w.lock.set_visible(crate::models::preview_is_encrypted(preview));
+        w.lock
+            .set_visible(crate::models::preview_is_encrypted(preview));
         let shown = crate::models::preview_display(preview);
         if single {
             // Carried by the subject's label on one line.
@@ -2299,7 +2499,11 @@ impl Row {
             // A committing row takes no new gestures — it is on its way out.
             // A single line swipes not at all: sideways is how a list wider
             // than its pane scrolls to its other columns (#443).
-            t.set_enabled(shared.swipe_enabled.get() && !look.single_line && !self.st.borrow().swipe_committing);
+            t.set_enabled(
+                shared.swipe_enabled.get()
+                    && !look.single_line
+                    && !self.st.borrow().swipe_committing,
+            );
         }
         self.sync_palette_buttons();
         self.sync_swipe_strip();
@@ -2311,7 +2515,11 @@ impl Row {
         let w = &self.w;
         let msg = &data.msg;
         let on = |c: ListColumn| look.columns.contains(&c);
-        let weight: &[&str] = if unread { &["message-sender", "unread"] } else { &["message-sender"] };
+        let weight: &[&str] = if unread {
+            &["message-sender", "unread"]
+        } else {
+            &["message-sender"]
+        };
 
         w.recipients_col.set_visible(on(ListColumn::Recipients));
         if on(ListColumn::Recipients) {
@@ -2321,7 +2529,11 @@ impl Row {
 
         w.people_col.set_visible(on(ListColumn::Correspondents));
         if on(ListColumn::Correspondents) {
-            let people = data.meta.people.clone().unwrap_or_else(|| msg.from_name.clone());
+            let people = data
+                .meta
+                .people
+                .clone()
+                .unwrap_or_else(|| msg.from_name.clone());
             w.people.set_tooltip_text(Some(&people));
             w.people.set_label(&people);
             w.people.set_css_classes(weight);
@@ -2329,18 +2541,32 @@ impl Row {
 
         w.importance.set_visible(on(ListColumn::Importance));
         let (icon, class, tip) = match msg.importance {
-            Importance::High => ("emblem-important-symbolic", "importance-high", Some(i18n("High importance"))),
-            Importance::Low => ("hylki-importance-low-symbolic", "importance-low", Some(i18n("Low importance"))),
+            Importance::High => (
+                "emblem-important-symbolic",
+                "importance-high",
+                Some(i18n("High importance")),
+            ),
+            Importance::Low => (
+                "hylki-importance-low-symbolic",
+                "importance-low",
+                Some(i18n("Low importance")),
+            ),
             Importance::Normal => ("emblem-important-symbolic", "importance-high", None),
         };
         w.importance.set_icon_name(Some(icon));
         w.importance.set_css_classes(&[class]);
-        w.importance.set_opacity(if tip.is_some() { 1.0 } else { 0.0 });
+        w.importance
+            .set_opacity(if tip.is_some() { 1.0 } else { 0.0 });
         w.importance.set_tooltip_text(tip.as_deref());
 
         w.account_col.set_visible(on(ListColumn::Account));
         if on(ListColumn::Account) {
-            let name = shared.account_names.borrow().get(&msg.account_id).cloned().unwrap_or_default();
+            let name = shared
+                .account_names
+                .borrow()
+                .get(&msg.account_id)
+                .cloned()
+                .unwrap_or_default();
             w.account.set_tooltip_text(Some(&name));
             w.account.set_label(&name);
         }
@@ -2348,8 +2574,14 @@ impl Row {
         w.due_col.set_visible(on(ListColumn::Due));
         if on(ListColumn::Due) {
             w.due.set_label(&due_label(msg.due));
-            let overdue = msg.due > 0 && crate::datefmt::day_key(msg.due) < crate::datefmt::day_key(crate::datefmt::now());
-            w.due.set_css_classes(if overdue { &["message-date", "overdue"] } else { &["message-date"] });
+            let overdue = msg.due > 0
+                && crate::datefmt::day_key(msg.due)
+                    < crate::datefmt::day_key(crate::datefmt::now());
+            w.due.set_css_classes(if overdue {
+                &["message-date", "overdue"]
+            } else {
+                &["message-date"]
+            });
         }
     }
 
@@ -2402,8 +2634,16 @@ impl Row {
     /// changed: one pill per tag the message carries (#71), then one per
     /// Gmail label no tag stands for (#374).
     fn render_tags(&self, msg: &Message, shared: &RowShared, look: &RowLook) {
-        let folder = look.folder_pills.get(&(msg.account_id, msg.folder_id)).cloned();
-        let want = Some((msg.keywords.clone(), msg.labels.clone(), look.tags_gen, folder.clone()));
+        let folder = look
+            .folder_pills
+            .get(&(msg.account_id, msg.folder_id))
+            .cloned();
+        let want = Some((
+            msg.keywords.clone(),
+            msg.labels.clone(),
+            look.tags_gen,
+            folder.clone(),
+        ));
         if self.st.borrow().tags_for == want {
             return;
         }
@@ -2502,7 +2742,8 @@ impl Row {
             let key = format!("{emoji}\u{1}{color}");
             if st.initials.as_ref().is_none_or(|(n, _)| *n != key) {
                 let bg = gtk::gdk::RGBA::parse(&color).unwrap_or(gtk::gdk::RGBA::BLACK);
-                let fg = gtk::gdk::RGBA::parse(crate::color::readable_text(&color)).unwrap_or(gtk::gdk::RGBA::WHITE);
+                let fg = gtk::gdk::RGBA::parse(crate::color::readable_text(&color))
+                    .unwrap_or(gtk::gdk::RGBA::WHITE);
                 let face = crate::ui::initials::InitialsPaintable::solid(&emoji, bg, fg, 0.55);
                 st.initials = Some((key, face));
             }
@@ -2510,7 +2751,8 @@ impl Row {
         }
         let name = self.face_name(data, look);
         if st.initials.as_ref().is_none_or(|(n, _)| *n != name) {
-            st.initials = crate::ui::initials::InitialsPaintable::for_name(&name).map(|p| (name.clone(), p));
+            st.initials =
+                crate::ui::initials::InitialsPaintable::for_name(&name).map(|p| (name.clone(), p));
         }
         st.initials.as_ref().map(|(_, p)| p.clone().upcast())
     }
@@ -2528,7 +2770,11 @@ impl Row {
                 .gravatar
                 .then(|| crate::avatar::own_gravatar(email))
                 .flatten()
-                .or_else(|| face.picture.as_deref().and_then(crate::ui::initials::avatar_texture));
+                .or_else(|| {
+                    face.picture
+                        .as_deref()
+                        .and_then(crate::ui::initials::avatar_texture)
+                });
             self.st.borrow_mut().avatar_texture = tex;
             return;
         }
@@ -2588,7 +2834,13 @@ impl Row {
         let look = shared.look.borrow().clone();
         let current = self.data().map(|d| self.face_email(&d, &look));
         match cmd {
-            FaceCmd::Avatar { email, generation, mode, outcome, logo } => {
+            FaceCmd::Avatar {
+                email,
+                generation,
+                mode,
+                outcome,
+                logo,
+            } => {
                 // Record what came back before deciding what to draw — the
                 // caches are shared, so the sender's other rows benefit even
                 // when this row now shows a different message.
@@ -2613,7 +2865,8 @@ impl Row {
                         // Only chase a result the EDS generation invalidated;
                         // a transient Gravatar failure waits for a later bind.
                         if retry_stale {
-                            let want_logo = look.sender_logos && !crate::logo::known_missing(&email);
+                            let want_logo =
+                                look.sender_logos && !crate::logo::known_missing(&email);
                             self.look_up(find_face(email, generation, mode, want_logo));
                         }
                     }
@@ -2636,7 +2889,9 @@ impl Row {
             }
         }
         if let Some(data) = self.data() {
-            self.w.avatar.set_custom_image(self.avatar_image(&data, &look).as_ref());
+            self.w
+                .avatar
+                .set_custom_image(self.avatar_image(&data, &look).as_ref());
         }
     }
 
@@ -2646,7 +2901,9 @@ impl Row {
     pub fn slide_avatar_away(&self) {
         self.st.borrow_mut().avatar_shown = false;
         self.w.avatar_revealer.set_reveal_child(false);
-        self.w.avatar_revealer.set_css_classes(&["focus-fade", "away"]);
+        self.w
+            .avatar_revealer
+            .set_css_classes(&["focus-fade", "away"]);
     }
 
     /// Fold the circle and slide it in a moment later (Focus Mode has given
@@ -2655,7 +2912,9 @@ impl Row {
         self.st.borrow_mut().avatar_shown = false;
         self.w.avatar_revealer.set_transition_duration(0);
         self.w.avatar_revealer.set_reveal_child(false);
-        self.w.avatar_revealer.set_transition_duration(crate::ui::FOCUS_ANIM_MS);
+        self.w
+            .avatar_revealer
+            .set_transition_duration(crate::ui::FOCUS_ANIM_MS);
         let weak = Rc::downgrade(self);
         let gen = self.st.borrow().gen;
         glib::timeout_add_local_once(std::time::Duration::from_millis(60), move || {
@@ -2856,10 +3115,16 @@ impl Row {
         let revealed = st.hovered || st.palette_open;
         let open = st.palette_open;
         drop(st);
-        self.w
-            .chevron
-            .set_css_classes(if revealed { &["flat", "palette-toggle", "revealed"] } else { &["flat", "palette-toggle"] });
-        self.w.actions_line.set_css_classes(if open { &["actions-line", "open"] } else { &["actions-line"] });
+        self.w.chevron.set_css_classes(if revealed {
+            &["flat", "palette-toggle", "revealed"]
+        } else {
+            &["flat", "palette-toggle"]
+        });
+        self.w.actions_line.set_css_classes(if open {
+            &["actions-line", "open"]
+        } else {
+            &["actions-line"]
+        });
     }
 
     /// Build the palette's buttons on its first open: most rows never open
@@ -2871,7 +3136,13 @@ impl Row {
             let look = shared.look.borrow();
             (look.in_junk, look.in_drafts)
         };
-        if self.st.borrow().palette.as_ref().is_some_and(|p| p.built_for == built_for) {
+        if self
+            .st
+            .borrow()
+            .palette
+            .as_ref()
+            .is_some_and(|p| p.built_for == built_for)
+        {
             return;
         }
         let inner = &self.w.palette_inner;
@@ -2962,7 +3233,12 @@ impl Row {
         {
             inner.append(b);
         }
-        self.st.borrow_mut().palette = Some(PaletteButtons { read, star, tag, built_for });
+        self.st.borrow_mut().palette = Some(PaletteButtons {
+            read,
+            star,
+            tag,
+            built_for,
+        });
         self.sync_palette_buttons();
     }
 
@@ -2985,8 +3261,19 @@ impl Row {
             }
         }
         let starred = data.msg.starred || data.meta.starred;
-        b.star.set_css_classes(if starred { &["flat", "star-active"] } else { &["flat"] });
-        b.star.set_tooltip_text(Some(if starred { i18n("Remove star") } else { i18n("Star") }.as_str()));
+        b.star.set_css_classes(if starred {
+            &["flat", "star-active"]
+        } else {
+            &["flat"]
+        });
+        b.star.set_tooltip_text(Some(
+            if starred {
+                i18n("Remove star")
+            } else {
+                i18n("Star")
+            }
+            .as_str(),
+        ));
         // Only once there is a tag to give.
         b.tag.set_visible(!shared.tags.borrow().is_empty());
     }
@@ -3039,19 +3326,33 @@ impl Row {
 
     fn act(&self, action: RowAction) {
         if let Some(data) = self.data() {
-            self.send(MessageListInput::RowAction { action, message: Box::new(Message::clone(&data.msg)) });
+            self.send(MessageListInput::RowAction {
+                action,
+                message: Box::new(Message::clone(&data.msg)),
+            });
         }
     }
 
     fn tag_menu(&self, btn: &gtk::Button) {
-        let (Some(data), Some(shared)) = (self.data(), self.shared()) else { return };
+        let (Some(data), Some(shared)) = (self.data(), self.shared()) else {
+            return;
+        };
         let tags = shared.tags.borrow().clone();
         let target = Message::clone(&data.msg);
         let input = shared.input.clone();
         let entries = tag_menu_entries(&tags, &data.msg, move |keyword, add| {
-            let _ = input.send(MessageListInput::SetTagFor { message: Box::new(target.clone()), keyword, add });
+            let _ = input.send(MessageListInput::SetTagFor {
+                message: Box::new(target.clone()),
+                keyword,
+                add,
+            });
         });
-        show_context_menu(btn, (btn.width() / 2) as f64, btn.height() as f64, vec![entries]);
+        show_context_menu(
+            btn,
+            (btn.width() / 2) as f64,
+            btn.height() as f64,
+            vec![entries],
+        );
     }
 
     fn move_menu(&self, btn: &gtk::Button) {
@@ -3060,16 +3361,31 @@ impl Row {
         // anchored on the window by the app.
         let point = btn.root().and_then(|root| {
             let root: gtk::Widget = root.upcast();
-            btn.compute_point(&root, &gtk::graphene::Point::new(btn.width() as f32 / 2.0, btn.height() as f32))
+            btn.compute_point(
+                &root,
+                &gtk::graphene::Point::new(btn.width() as f32 / 2.0, btn.height() as f32),
+            )
         });
         let (x, y) = point.map_or((0.0, 0.0), |p| (p.x() as f64, p.y() as f64));
-        self.send(MessageListInput::RowMoveTo { message: Box::new(Message::clone(&data.msg)), x, y });
+        self.send(MessageListInput::RowMoveTo {
+            message: Box::new(Message::clone(&data.msg)),
+            x,
+            y,
+        });
     }
 
     fn context_menu(&self, x: f64, y: f64) {
-        let (Some(data), Some(shared)) = (self.data(), self.shared()) else { return };
-        let Some(view) = shared.view.upgrade() else { return };
-        let Some(point) = self.w.host.compute_point(&view, &gtk::graphene::Point::new(x as f32, y as f32)) else {
+        let (Some(data), Some(shared)) = (self.data(), self.shared()) else {
+            return;
+        };
+        let Some(view) = shared.view.upgrade() else {
+            return;
+        };
+        let Some(point) = self
+            .w
+            .host
+            .compute_point(&view, &gtk::graphene::Point::new(x as f32, y as f32))
+        else {
             return;
         };
         self.send(MessageListInput::ContextMenu {
@@ -3116,7 +3432,12 @@ impl Row {
 
     /// One message as a drag card: its circle, the subject over who it is
     /// from (to, in Sent).
-    fn message_card(&self, data: &RowData, look: &RowLook, image: Option<gtk::gdk::Paintable>) -> gtk::Box {
+    fn message_card(
+        &self,
+        data: &RowData,
+        look: &RowLook,
+        image: Option<gtk::gdk::Paintable>,
+    ) -> gtk::Box {
         let card = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         card.add_css_class("message-drag-card");
         let name = self.face_name(data, look);
@@ -3128,7 +3449,11 @@ impl Row {
         let text = gtk::Box::new(gtk::Orientation::Vertical, 3);
         text.set_valign(gtk::Align::Center);
         text.set_hexpand(true);
-        let subject = if data.msg.subject.trim().is_empty() { i18n("(no subject)") } else { data.msg.subject.clone() };
+        let subject = if data.msg.subject.trim().is_empty() {
+            i18n("(no subject)")
+        } else {
+            data.msg.subject.clone()
+        };
         let title = gtk::Label::new(Some(&subject));
         title.set_xalign(0.0);
         title.set_ellipsize(gtk::pango::EllipsizeMode::End);
@@ -3152,7 +3477,12 @@ impl Row {
 
     fn drag_payload(&self) -> Option<gtk::gdk::ContentProvider> {
         let (data, shared) = (self.data()?, self.shared()?);
-        let me = (data.msg.account_id, data.msg.folder_id, data.msg.uid, data.msg.id);
+        let me = (
+            data.msg.account_id,
+            data.msg.folder_id,
+            data.msg.uid,
+            data.msg.id,
+        );
         let mut items = shared.selected_drag_keys();
         // Dragging a row outside the selection moves just that row.
         if !items.iter().any(|k| k.0 == me.0 && k.3 == me.3) {
@@ -3160,8 +3490,10 @@ impl Row {
         }
         // A conversation row stands for its whole thread (#171).
         let threads = shared.thread_drag.borrow();
-        let items: Vec<_> =
-            items.into_iter().flat_map(|k| threads.get(&(k.0, k.3)).cloned().unwrap_or_else(|| vec![k])).collect();
+        let items: Vec<_> = items
+            .into_iter()
+            .flat_map(|k| threads.get(&(k.0, k.3)).cloned().unwrap_or_else(|| vec![k]))
+            .collect();
         let mut payload = String::from("vireo-move");
         for (a, f, u, i) in items {
             payload.push_str(&format!("\t{a}\t{f}\t{u}\t{i}"));
@@ -3217,14 +3549,20 @@ impl Row {
             classes.push("armed");
         }
         self.w.swipe_bg.set_css_classes(&classes);
-        self.w.swipe_inner.set_halign(if side < 0 { gtk::Align::End } else { gtk::Align::Start });
+        self.w.swipe_inner.set_halign(if side < 0 {
+            gtk::Align::End
+        } else {
+            gtk::Align::Start
+        });
         match action {
             RowAction::Delete => {
                 self.w.swipe_icon.set_icon_name(Some("user-trash-symbolic"));
                 self.w.swipe_label.set_label(&i18n("Delete"));
             }
             _ => {
-                self.w.swipe_icon.set_icon_name(Some("mail-archive-symbolic"));
+                self.w
+                    .swipe_icon
+                    .set_icon_name(Some("mail-archive-symbolic"));
                 self.w.swipe_label.set_label(&i18n("Archive"));
             }
         }
@@ -3264,7 +3602,11 @@ impl Row {
             let mut st = self.st.borrow_mut();
             st.swipe_committing = true;
             st.swipe_active = true;
-            st.swipe_progress = if st.swipe_side < 0 { -SWIPE_MAX } else { SWIPE_MAX };
+            st.swipe_progress = if st.swipe_side < 0 {
+                -SWIPE_MAX
+            } else {
+                SWIPE_MAX
+            };
             drop(st);
             self.w.revealer.set_reveal_child(false);
             if let Some(t) = self.tracker.borrow().as_ref() {
@@ -3315,7 +3657,13 @@ impl Row {
             // convention, like the snap-back.
             let span = (surface.width() as f64).max(SWIPE_MAX * 2.0);
             let target = if side < 0 { span } else { -span };
-            let anim = adw::TimedAnimation::new(&self.w.overlay, surface.progress_px(), target, SWIPE_EXIT_MS, setter);
+            let anim = adw::TimedAnimation::new(
+                &self.w.overlay,
+                surface.progress_px(),
+                target,
+                SWIPE_EXIT_MS,
+                setter,
+            );
             let action = self.swipe_action();
             // The action fires as the exit lands, so the removal that
             // follows has nothing left to hide.
@@ -3327,20 +3675,23 @@ impl Row {
                 row.act(action);
                 // The action left the row in place: put the exit back.
                 let weak = Rc::downgrade(&row);
-                glib::timeout_add_local_once(std::time::Duration::from_millis(SWIPE_RESTORE_MS), move || {
-                    let Some(row) = weak.upgrade() else { return };
-                    if row.st.borrow().gen != gen || !row.st.borrow().swipe_committing {
-                        return;
-                    }
-                    {
-                        let mut st = row.st.borrow_mut();
-                        st.swipe_committing = false;
-                        st.swipe_exit_started = false;
-                        st.swipe_progress = 0.0;
-                    }
-                    row.refresh();
-                    row.animate_swipe();
-                });
+                glib::timeout_add_local_once(
+                    std::time::Duration::from_millis(SWIPE_RESTORE_MS),
+                    move || {
+                        let Some(row) = weak.upgrade() else { return };
+                        if row.st.borrow().gen != gen || !row.st.borrow().swipe_committing {
+                            return;
+                        }
+                        {
+                            let mut st = row.st.borrow_mut();
+                            st.swipe_committing = false;
+                            st.swipe_exit_started = false;
+                            st.swipe_progress = 0.0;
+                        }
+                        row.refresh();
+                        row.animate_swipe();
+                    },
+                );
             });
             anim
         } else {

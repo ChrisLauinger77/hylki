@@ -22,9 +22,14 @@ pub fn paned_grab_pill(
 ) -> gtk::Box {
     let pill = pill_widget();
     let split = paned.clone();
-    attach_drag(&pill, paned, move |_| {}, move |want| {
-        split.set_position(clamp(&split, want));
-    });
+    attach_drag(
+        &pill,
+        paned,
+        move |_| {},
+        move |want| {
+            split.set_position(clamp(&split, want));
+        },
+    );
     pill
 }
 
@@ -117,8 +122,12 @@ pub fn attach_drag(
         });
     }
     drag.connect_drag_update(move |g, ox, oy| {
-        let Some((sx, sy)) = g.start_point() else { return };
-        let Some(now) = to_root_y(sx + ox, sy + oy) else { return };
+        let Some((sx, sy)) = g.start_point() else {
+            return;
+        };
+        let Some(now) = to_root_y(sx + ox, sy + oy) else {
+            return;
+        };
         let (start_pos, start_y) = start.get();
         let want = start_pos + (now - start_y) as i32;
         if !armed.get() {

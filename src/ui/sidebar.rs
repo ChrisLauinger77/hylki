@@ -14,9 +14,9 @@ use std::collections::{HashMap, HashSet};
 use adw::prelude::*;
 use relm4::prelude::*;
 
+use crate::i18n::{i18n, i18n_f, i18n_noop};
 use crate::models::{Account, Folder, FolderKind};
 use crate::ui::context_menu::{show_context_menu, show_context_menu_with_header, MenuEntry};
-use crate::i18n::{i18n, i18n_f, i18n_noop};
 
 /// A per-account inbox shown in the expandable "All Inboxes" sub-list.
 #[derive(Clone)]
@@ -145,7 +145,11 @@ fn toggle_msg(row: UnifiedRow) -> SidebarInput {
 
 /// The chevron glyph for a section that is open or folded.
 fn chevron_icon(open: bool) -> &'static str {
-    if open { "pan-down-symbolic" } else { "pan-end-symbolic" }
+    if open {
+        "pan-down-symbolic"
+    } else {
+        "pan-end-symbolic"
+    }
 }
 
 /// What a unified row is called.
@@ -377,7 +381,9 @@ pub struct Sidebar {
     contact_tree: Option<crate::ui::contacts_page::ContactTree>,
     /// That list's rows, by the scope each picks; shared with its
     /// selection handler.
-    tree_rows: std::rc::Rc<std::cell::RefCell<Vec<(crate::ui::contacts_page::ContactScope, gtk::ListBoxRow)>>>,
+    tree_rows: std::rc::Rc<
+        std::cell::RefCell<Vec<(crate::ui::contacts_page::ContactScope, gtk::ListBoxRow)>>,
+    >,
     attachments_row: Option<gtk::ListBoxRow>,
     /// The footer's Contacts row, when Contacts is placed there.
     contacts_row: Option<gtk::ListBoxRow>,
@@ -546,11 +552,18 @@ pub enum SidebarInput {
     /// Focus Mode's sidebar parts: hide the accounts, fold the unified
     /// rows. `animate` slides what goes (or comes back) and rebuilds once it
     /// has gone; off, the rebuild is immediate (launch).
-    SetFocus { hide_accounts: bool, fold_unified: bool, animate: bool },
+    SetFocus {
+        hide_accounts: bool,
+        fold_unified: bool,
+        animate: bool,
+    },
     /// The Focus Mode slide finished: draw the sidebar as it now is.
     FocusSettled,
     /// A tag row in a Tags section was chosen.
-    TagRowSelected { slot: Slot, index: i32 },
+    TagRowSelected {
+        slot: Slot,
+        index: i32,
+    },
     /// Toggle a Tags section.
     ToggleTagsExpand(Slot),
     /// A unified Starred / Sent / Drafts row was chosen (the merged view).
@@ -562,7 +575,10 @@ pub enum SidebarInput {
     /// The unified Tags row was chosen (every tagged message).
     UnifiedTagsSelected,
     /// A row in a unified Starred / Sent / Drafts row's account list.
-    KindSubRowSelected { kind: FolderKind, index: i32 },
+    KindSubRowSelected {
+        kind: FolderKind,
+        index: i32,
+    },
     /// Toggle a unified Starred / Sent / Drafts row's account list.
     ToggleKindExpand(FolderKind),
     UnifiedRowSelected,
@@ -591,18 +607,27 @@ pub enum SidebarInput {
     },
     /// A right-click choice on a book or group there.
     ContactTreeMenu(crate::ui::contacts_page::TreeAction),
-    FolderRowSelected { account_id: u32, index: i32 },
+    FolderRowSelected {
+        account_id: u32,
+        index: i32,
+    },
     /// Select a folder row programmatically — the app navigated there itself
     /// ("Go to Message" from the gallery, a notification click) and the
     /// highlight must follow. State is set before the row, so the resulting
     /// row-selected signal hits the already-selected guard and stops.
-    SelectFolderRow { account_id: u32, path: String },
+    SelectFolderRow {
+        account_id: u32,
+        path: String,
+    },
     /// A per-account inbox row under "All Inboxes" was chosen.
     UnifiedInboxRowSelected(i32),
     /// Toggle the "All Inboxes" per-account inbox sub-list.
     ToggleUnifiedExpand,
     /// A row in a Filtered Folders section was chosen.
-    FilteredRowSelected { slot: Slot, index: i32 },
+    FilteredRowSelected {
+        slot: Slot,
+        index: i32,
+    },
     /// Toggle a Filtered Folders section.
     ToggleFilteredExpand(Slot),
     /// Open or fold the Favorites list (#367).
@@ -634,10 +659,18 @@ pub enum SidebarInput {
     /// Toggle the collapsible "Folders" (custom folders) section for an account.
     ToggleCustomFoldersLocal(u32),
     /// Collapse/expand one folder-tree node (a parent folder's chevron, #51).
-    ToggleFolderNode { account_id: u32, path: String },
+    ToggleFolderNode {
+        account_id: u32,
+        path: String,
+    },
     /// A folder was dropped on the top or bottom edge of a sibling: put it
     /// just before or after that one.
-    ReorderFolder { account_id: u32, path: String, target: String, after: bool },
+    ReorderFolder {
+        account_id: u32,
+        path: String,
+        target: String,
+        after: bool,
+    },
     ToggleCollapsed,
     /// Show/hide the "Attachments" row in the pinned footer.
     SetAttachmentsRow(bool),
@@ -659,7 +692,11 @@ pub enum SidebarInput {
         fresh: Option<std::collections::HashSet<(u32, u32)>>,
     },
     /// A message drag was dropped on a folder row.
-    DropOnFolder { account_id: u32, path: String, payload: String },
+    DropOnFolder {
+        account_id: u32,
+        path: String,
+        payload: String,
+    },
     /// A message drag has hovered a collapsed account long enough — expand it.
     ExpandForDrop(u32),
 }
@@ -722,23 +759,46 @@ pub enum SidebarOutput {
     /// persistence.
     ContactsFolded(Vec<String>),
     /// A folder-tree node was collapsed or expanded (#51) — for persistence.
-    FolderNodeCollapsed { account_id: u32, path: String, collapsed: bool },
+    FolderNodeCollapsed {
+        account_id: u32,
+        path: String,
+        collapsed: bool,
+    },
     /// A folder was dropped onto a new parent ("" = the account's top level).
-    MoveFolder { account_id: u32, path: String, dest: String },
+    MoveFolder {
+        account_id: u32,
+        path: String,
+        dest: String,
+    },
     /// The user rearranged a run of sibling folders: `paths` is the whole
     /// run in its new order, for persistence.
-    ReorderFolders { account_id: u32, paths: Vec<String> },
+    ReorderFolders {
+        account_id: u32,
+        paths: Vec<String>,
+    },
     /// A folder was dropped beside a folder at another level: move it to
     /// `dest` (that level's parent, "" for the top) on the server, then put
     /// it just before or after `target`.
-    PlaceFolder { account_id: u32, path: String, dest: String, target: String, after: bool },
+    PlaceFolder {
+        account_id: u32,
+        path: String,
+        dest: String,
+        target: String,
+        after: bool,
+    },
     /// The account's own folder order was chosen from its Folders heading;
     /// `None` follows Settings.
-    SetFolderSort { account_id: u32, sort: Option<crate::config::FolderSort> },
+    SetFolderSort {
+        account_id: u32,
+        sort: Option<crate::config::FolderSort>,
+    },
     UnifiedSelected,
     /// A tag was selected (#71): its keyword, and the account it is scoped
     /// to (an account's own Tags section) or `None` for every account.
-    TagSelected { keyword: String, account: Option<u32> },
+    TagSelected {
+        keyword: String,
+        account: Option<u32>,
+    },
     /// The attachments gallery was selected.
     AttachmentsSelected,
     /// The "Contacts" row was clicked — open the contacts browser.
@@ -754,7 +814,10 @@ pub enum SidebarOutput {
     /// folder picked inside it: the state it is now in, not a toggle, since
     /// both sidebars (the pane and the peek) report the same reveal and two
     /// toggles cancelled out (the account then folded at the next rebuild).
-    AccountFolded { id: u32, folded: bool },
+    AccountFolded {
+        id: u32,
+        folded: bool,
+    },
     /// The user toggled the collapsible custom-folders section for an account.
     ToggleCustomFolders(u32),
     /// The user toggled icon-only mode; `true` means collapsed.
@@ -777,12 +840,24 @@ pub enum SidebarOutput {
 /// Actions offered by sidebar right-click menus.
 #[derive(Debug, Clone)]
 pub enum CtxAction {
-    MarkFolderRead { account_id: u32, folder_id: u32 },
+    MarkFolderRead {
+        account_id: u32,
+        folder_id: u32,
+    },
     /// Keep a folder in the Favorites list at the top of the sidebar (#367),
     /// or take it out.
-    AddFavorite { account_id: u32, path: String },
-    RemoveFavorite { account_id: u32, path: String },
-    RefreshFolder { account_id: u32, folder_id: u32 },
+    AddFavorite {
+        account_id: u32,
+        path: String,
+    },
+    RemoveFavorite {
+        account_id: u32,
+        path: String,
+    },
+    RefreshFolder {
+        account_id: u32,
+        folder_id: u32,
+    },
     MarkAllInboxesRead,
     RefreshAllInboxes,
     /// Erase every unified account's Trash or Junk at once (#413).
@@ -793,19 +868,41 @@ pub enum CtxAction {
     /// Create a new custom folder under this account.
     NewFolder(u32),
     /// Delete a custom folder (its contents are moved to Trash first).
-    DeleteFolder { account_id: u32, name: String, path: String },
+    DeleteFolder {
+        account_id: u32,
+        name: String,
+        path: String,
+    },
     /// Rename a custom folder (its leaf name; children follow via RENAME).
-    RenameFolder { account_id: u32, name: String, path: String },
+    RenameFolder {
+        account_id: u32,
+        name: String,
+        path: String,
+    },
     /// Erase everything in Trash or Junk (#152).
-    EmptyFolder { account_id: u32, folder_id: u32, name: String, path: String },
+    EmptyFolder {
+        account_id: u32,
+        folder_id: u32,
+        name: String,
+        path: String,
+    },
     /// Take a folder out of the sidebar and out of syncing (#239). The
     /// account editor's Hidden Folders list brings it back.
-    HideFolder { account_id: u32, path: String },
+    HideFolder {
+        account_id: u32,
+        path: String,
+    },
     /// Open Settings on the filter rule that files into this folder.
-    EditFilter { account_id: u32, path: String },
+    EditFilter {
+        account_id: u32,
+        path: String,
+    },
     /// Run this account's filter rules over the mail already in this
     /// folder (#198).
-    ApplyFilters { account_id: u32, folder_id: u32 },
+    ApplyFilters {
+        account_id: u32,
+        folder_id: u32,
+    },
     /// Open Settings on this tag (by keyword).
     EditTag(String),
     /// Smart folders (#417): make one, or open Settings on one or take it
@@ -992,14 +1089,18 @@ impl Component for Sidebar {
 
         let widgets = view_output!();
         model.freeze_frame = Some(widgets.freeze_frame.clone());
-        widgets.body_overlay.set_clip_overlay(&widgets.freeze_frame, true);
+        widgets
+            .body_overlay
+            .set_clip_overlay(&widgets.freeze_frame, true);
         // Never scroll-to-focus: a rebuild (folder drag-and-drop) destroys
         // the focused row, GTK hands focus to some early widget, and the
         // viewport would yank the sidebar to the top to show it — the
         // "jumps up then back down" on every drop. Sidebar scrolling is the
         // user's alone.
-        if let Some(viewport) =
-            widgets.sidebar_scroller.child().and_downcast::<gtk::Viewport>()
+        if let Some(viewport) = widgets
+            .sidebar_scroller
+            .child()
+            .and_downcast::<gtk::Viewport>()
         {
             viewport.set_scroll_to_focus(false);
         }
@@ -1040,7 +1141,10 @@ impl Sidebar {
                 }
                 let sel = std::mem::replace(&mut self.selected, Sel::None);
                 let email = sel.account().and_then(|acc| {
-                    self.sections.iter().find(|s| s.account.id == acc).map(|s| s.account.email.clone())
+                    self.sections
+                        .iter()
+                        .find(|s| s.account.id == acc)
+                        .map(|s| s.account.email.clone())
                 });
                 self.reannounce = Some((sel, email));
                 self.quiet.set(true);
@@ -1090,16 +1194,17 @@ impl Sidebar {
                 // list holds indices 0..E, the custom list E..), each part in
                 // the user's own order where they set one.
                 for s in &mut sections {
-                    s.folders =
-                        order_folders(std::mem::take(&mut s.folders), &s.folder_order, s.folder_sort);
+                    s.folders = order_folders(
+                        std::mem::take(&mut s.folders),
+                        &s.folder_order,
+                        s.folder_sort,
+                    );
                 }
                 // Seed the tree's collapsed nodes from the persisted state;
                 // later chevron clicks flip the local copy.
                 self.tree_collapsed = sections
                     .iter()
-                    .map(|s| {
-                        (s.account.id, s.tree_collapsed.iter().cloned().collect())
-                    })
+                    .map(|s| (s.account.id, s.tree_collapsed.iter().cloned().collect()))
                     .collect();
                 self.sections = sections;
                 self.show_unified = show_unified;
@@ -1135,12 +1240,16 @@ impl Sidebar {
                 // (narrowed by the app to the rules that opted in) and each
                 // account's own (every rule's destination).
                 self.filtered_rows.clear();
-                self.filtered_rows.insert(Slot::Unified, self.unified_folders.clone());
+                self.filtered_rows
+                    .insert(Slot::Unified, self.unified_folders.clone());
                 for s in &self.sections {
                     let rows = s
                         .filtered
                         .iter()
-                        .map(|f| UnifiedFolderRef { account_id: s.account.id, folder: f.clone() })
+                        .map(|f| UnifiedFolderRef {
+                            account_id: s.account.id,
+                            folder: f.clone(),
+                        })
                         .collect();
                     self.filtered_rows.insert(Slot::Account(s.account.id), rows);
                 }
@@ -1175,14 +1284,18 @@ impl Sidebar {
                 // has just left the unified section is still the open
                 // folder: carry the highlight to the account's own row.
                 let left_unified = |acc: u32| {
-                    self.sections.iter().find(|s| s.account.id == acc).map(|s| !s.in_unified)
+                    self.sections
+                        .iter()
+                        .find(|s| s.account.id == acc)
+                        .map(|s| !s.in_unified)
                 };
                 let moved = match &self.selected {
                     Sel::UnifiedInbox(acc) => Some((*acc, FolderKind::Inbox)),
                     Sel::UnifiedKindRow(kind, acc) => Some((*acc, *kind)),
                     _ => None,
                 };
-                if let Some((acc, kind)) = moved.filter(|(acc, _)| left_unified(*acc) == Some(true)) {
+                if let Some((acc, kind)) = moved.filter(|(acc, _)| left_unified(*acc) == Some(true))
+                {
                     let path = self
                         .sections
                         .iter()
@@ -1219,7 +1332,11 @@ impl Sidebar {
                 }
                 // A folder taken out of Favorites is still the open folder.
                 if let Sel::Favorite(acc, path) = &self.selected {
-                    if !self.favorite_folders.iter().any(|r| r.account_id == *acc && r.folder.path == *path) {
+                    if !self
+                        .favorite_folders
+                        .iter()
+                        .any(|r| r.account_id == *acc && r.folder.path == *path)
+                    {
                         self.selected = Sel::Folder(*acc, path.clone());
                     }
                 }
@@ -1298,7 +1415,9 @@ impl Sidebar {
                 // The row itself is every contact. The footer's opens
                 // Contacts on the book its own picker last showed.
                 if !self.contacts_in_footer() {
-                    let _ = sender.output(SidebarOutput::ContactScope(crate::ui::contacts_page::ContactScope::All));
+                    let _ = sender.output(SidebarOutput::ContactScope(
+                        crate::ui::contacts_page::ContactScope::All,
+                    ));
                 }
             }
 
@@ -1406,9 +1525,7 @@ impl Sidebar {
                 } else if let Some(list) = &self.outbox_list {
                     if let Some(row) = list.row_at_index(0) {
                         if let Some(badge) = row.child().and_downcast::<gtk::Box>() {
-                            if let Some(label) =
-                                badge.last_child().and_downcast::<gtk::Label>()
-                            {
+                            if let Some(label) = badge.last_child().and_downcast::<gtk::Label>() {
                                 label.set_label(&count.to_string());
                             }
                         }
@@ -1472,7 +1589,10 @@ impl Sidebar {
                     }
                     self.selected = key.clone();
                     self.clear_other_selections(key);
-                    let _ = sender.output(SidebarOutput::TagSelected { keyword: t.keyword, account });
+                    let _ = sender.output(SidebarOutput::TagSelected {
+                        keyword: t.keyword,
+                        account,
+                    });
                 }
             }
 
@@ -1625,7 +1745,9 @@ impl Sidebar {
                 });
             }
 
-            SidebarInput::ToggleKindExpand(kind) => self.toggle_row(UnifiedRow::Kind(kind), &sender),
+            SidebarInput::ToggleKindExpand(kind) => {
+                self.toggle_row(UnifiedRow::Kind(kind), &sender)
+            }
 
             SidebarInput::FolderRowSelected { account_id, index } => {
                 let folder = self
@@ -1674,9 +1796,14 @@ impl Sidebar {
                 }
                 if let Sel::UnifiedKindRow(kind, acc) = &self.selected {
                     if *acc == account_id
-                        && self.kind_widgets.get(&UnifiedRow::Kind(*kind)).is_some_and(|w| {
-                            w.rows.iter().any(|r| r.account_id == account_id && r.path == path)
-                        })
+                        && self
+                            .kind_widgets
+                            .get(&UnifiedRow::Kind(*kind))
+                            .is_some_and(|w| {
+                                w.rows
+                                    .iter()
+                                    .any(|r| r.account_id == account_id && r.path == path)
+                            })
                     {
                         return;
                     }
@@ -1694,13 +1821,22 @@ impl Sidebar {
                 self.reveal_account(account_id, &sender);
             }
 
-            SidebarInput::SetUnread { folders, unified, fresh } => {
+            SidebarInput::SetUnread {
+                folders,
+                unified,
+                fresh,
+            } => {
                 self.fresh = fresh;
                 // Mirror the fresh counts into every row list too, so a
                 // rebuild draws them right (the account folders are done
                 // below).
-                let fresh = |aid: u32, fid: u32, cur: u32| folders.get(&(aid, fid)).copied().unwrap_or(cur);
-                for r in self.unified_folders.iter_mut().chain(self.favorite_folders.iter_mut()) {
+                let fresh =
+                    |aid: u32, fid: u32, cur: u32| folders.get(&(aid, fid)).copied().unwrap_or(cur);
+                for r in self
+                    .unified_folders
+                    .iter_mut()
+                    .chain(self.favorite_folders.iter_mut())
+                {
                     r.folder.unread = fresh(r.account_id, r.folder.id, r.folder.unread);
                 }
                 for rows in self.filtered_rows.values_mut() {
@@ -1734,10 +1870,16 @@ impl Sidebar {
                     );
                 }
                 for (row, w) in &self.kind_widgets {
-                    let total: u32 = w.row_badges.keys().map(|k| folders.get(k).copied().unwrap_or(0)).sum();
+                    let total: u32 = w
+                        .row_badges
+                        .keys()
+                        .map(|k| folders.get(k).copied().unwrap_or(0))
+                        .sum();
                     if let Some(b) = &w.badge {
                         b.set_text(&total.to_string());
-                        b.set_visible(total > 0 && !self.row_shown_open(*row) && self.chip_shown(*row));
+                        b.set_visible(
+                            total > 0 && !self.row_shown_open(*row) && self.chip_shown(*row),
+                        );
                     }
                 }
                 // Keep the avatar-circle badges in sync too. They only show while
@@ -1806,8 +1948,11 @@ impl Sidebar {
                 }
             }
 
-
-            SidebarInput::SetFocus { hide_accounts, fold_unified, animate } => {
+            SidebarInput::SetFocus {
+                hide_accounts,
+                fold_unified,
+                animate,
+            } => {
                 let hiding = hide_accounts && !self.focus_hide_accounts;
                 let showing = !hide_accounts && self.focus_hide_accounts;
                 let folding = fold_unified && !self.focus_fold_unified;
@@ -1905,7 +2050,11 @@ impl Sidebar {
                     let expanded = !rev.reveals_child();
                     rev.set_reveal_child(expanded);
                     if let Some(ch) = self.chevrons.get(&id) {
-                        ch.set_icon_name(Some(if expanded { "pan-down-symbolic" } else { "pan-end-symbolic" }));
+                        ch.set_icon_name(Some(if expanded {
+                            "pan-down-symbolic"
+                        } else {
+                            "pan-end-symbolic"
+                        }));
                     }
                     if rail_only {
                         self.rail_open_accounts.insert(id, expanded);
@@ -1926,7 +2075,10 @@ impl Sidebar {
                         label.set_visible(!expanded && n > 0);
                     }
                     if !rail_only {
-                        let _ = sender.output(SidebarOutput::AccountFolded { id, folded: !expanded });
+                        let _ = sender.output(SidebarOutput::AccountFolded {
+                            id,
+                            folded: !expanded,
+                        });
                     }
                 }
             }
@@ -1936,7 +2088,11 @@ impl Sidebar {
                     let expanded = !rev.reveals_child();
                     rev.set_reveal_child(expanded);
                     if let Some(ch) = self.custom_chevrons.get(&id) {
-                        ch.set_icon_name(Some(if expanded { "pan-down-symbolic" } else { "pan-end-symbolic" }));
+                        ch.set_icon_name(Some(if expanded {
+                            "pan-down-symbolic"
+                        } else {
+                            "pan-end-symbolic"
+                        }));
                     }
                     if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
                         s.custom_expanded = expanded;
@@ -1949,13 +2105,22 @@ impl Sidebar {
                 self.toggle_folder_node(account_id, path, &sender);
             }
 
-            SidebarInput::ReorderFolder { account_id, path, target, after } => {
-                let Some(section) = self.sections.iter().find(|s| s.account.id == account_id) else {
+            SidebarInput::ReorderFolder {
+                account_id,
+                path,
+                target,
+                after,
+            } => {
+                let Some(section) = self.sections.iter().find(|s| s.account.id == account_id)
+                else {
                     return;
                 };
                 let h = &section.hierarchy;
                 let level = h.parent(&target);
-                let custom = section.folders.iter().any(|f| f.path == path && f.kind == FolderKind::Custom);
+                let custom = section
+                    .folders
+                    .iter()
+                    .any(|f| f.path == path && f.kind == FolderKind::Custom);
                 if !custom || level == h.parent(&path) {
                     // Already one of the target's siblings: only the order changes.
                     if let Some(paths) = placed_run(&section.folders, h, &path, &target, after) {
@@ -1963,7 +2128,13 @@ impl Sidebar {
                     }
                 } else {
                     // From another level: the server moves it there first.
-                    let _ = sender.output(SidebarOutput::PlaceFolder { account_id, path, dest: level, target, after });
+                    let _ = sender.output(SidebarOutput::PlaceFolder {
+                        account_id,
+                        path,
+                        dest: level,
+                        target,
+                        after,
+                    });
                 }
             }
 
@@ -1972,7 +2143,11 @@ impl Sidebar {
                 self.reveal_account(id, &sender);
             }
 
-            SidebarInput::DropOnFolder { account_id: dest_account, path: dest, payload } => {
+            SidebarInput::DropOnFolder {
+                account_id: dest_account,
+                path: dest,
+                payload,
+            } => {
                 // A dragged folder, not messages: reparent it (#51). Folders
                 // never cross accounts — mailboxes belong to one server.
                 if let Some(rest) = payload.strip_prefix("vireo-folder\t") {
@@ -1994,7 +2169,11 @@ impl Sidebar {
                 // "" is the Folders header (a folder-move destination only);
                 // messages need a real mailbox.
                 if !items.is_empty() && !dest.is_empty() {
-                    let _ = sender.output(SidebarOutput::MoveMessages { dest_account, dest, items });
+                    let _ = sender.output(SidebarOutput::MoveMessages {
+                        dest_account,
+                        dest,
+                        items,
+                    });
                 }
             }
         }
@@ -2029,7 +2208,11 @@ impl Sidebar {
             }
         }
         self.apply_tree_visibility(account_id);
-        let _ = sender.output(SidebarOutput::FolderNodeCollapsed { account_id, path, collapsed });
+        let _ = sender.output(SidebarOutput::FolderNodeCollapsed {
+            account_id,
+            path,
+            collapsed,
+        });
     }
 
     /// Re-apply row visibility across one account's custom-folder tree (#51):
@@ -2042,9 +2225,16 @@ impl Sidebar {
             self.main_folders.get(&account_id),
             self.main_row_revealers.get(&account_id),
         ) {
-            let collapsed = self.tree_collapsed.get(&account_id).cloned().unwrap_or_default();
+            let collapsed = self
+                .tree_collapsed
+                .get(&account_id)
+                .cloned()
+                .unwrap_or_default();
             for (&i, rev) in revealers {
-                let (Some(row), Some(folder)) = (list.row_at_index(i as i32), folders.get(i)) else { continue };
+                let (Some(row), Some(folder)) = (list.row_at_index(i as i32), folders.get(i))
+                else {
+                    continue;
+                };
                 slide_tree_row(&row, rev, hidden_by_collapse(&folder.path, &collapsed));
             }
         }
@@ -2054,10 +2244,16 @@ impl Sidebar {
         ) else {
             return;
         };
-        let collapsed = self.tree_collapsed.get(&account_id).cloned().unwrap_or_default();
+        let collapsed = self
+            .tree_collapsed
+            .get(&account_id)
+            .cloned()
+            .unwrap_or_default();
         let revealers = self.tree_row_revealers.get(&account_id);
         for (i, folder) in folders.iter().enumerate() {
-            let Some(row) = list.row_at_index(i as i32) else { continue };
+            let Some(row) = list.row_at_index(i as i32) else {
+                continue;
+            };
             let hidden = hidden_by_collapse(&folder.path, &collapsed);
             match revealers.and_then(|r| r.get(i)) {
                 Some(rev) => slide_tree_row(&row, rev, hidden),
@@ -2079,9 +2275,11 @@ impl Sidebar {
         // focuses, opening All Inboxes over the folder on screen. A folder's
         // menu (Add to Favorites, #367) rebuilds right under its own list.
         if let Some(root) = container.root() {
-            let doomed = root
-                .focus()
-                .is_some_and(|f| [pinned, container, footer].iter().any(|b| f.is_ancestor(*b)));
+            let doomed = root.focus().is_some_and(|f| {
+                [pinned, container, footer]
+                    .iter()
+                    .any(|b| f.is_ancestor(*b))
+            });
             if doomed {
                 root.set_focus(None::<&gtk::Widget>);
             }
@@ -2146,17 +2344,15 @@ impl Sidebar {
                     *self.freeze_fade.borrow_mut() = Some(anim.clone());
                     anim.play();
                 } else {
-                    let timer = gtk::glib::timeout_add_local_once(
-                        std::time::Duration::from_millis(80),
-                        {
+                    let timer =
+                        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(80), {
                             let freeze = freeze.clone();
                             let slot = self.freeze_timer.clone();
                             move || {
                                 slot.borrow_mut().take();
                                 freeze.set_visible(false);
                             }
-                        },
-                    );
+                        });
                     *self.freeze_timer.borrow_mut() = Some(timer);
                 }
             }
@@ -2283,7 +2479,8 @@ impl Sidebar {
             if self.collapsed {
                 // Refresh, showing a spinner while any account syncs.
                 let refresh = gtk::Button::new();
-                refresh.set_tooltip_text(Some(i18n("Refresh or long-press for Status Bar").as_str()));
+                refresh
+                    .set_tooltip_text(Some(i18n("Refresh or long-press for Status Bar").as_str()));
                 refresh.add_css_class("flat");
                 refresh.set_valign(gtk::Align::Center);
                 refresh.set_halign(gtk::Align::Center);
@@ -2342,7 +2539,8 @@ impl Sidebar {
                         })
                         .icon("mail-message-new-symbolic"),
                         MenuEntry::new(i18n("New Message from Template…"), move || {
-                            let _ = from_template.output(SidebarOutput::ComposeFromTemplateRequested);
+                            let _ =
+                                from_template.output(SidebarOutput::ComposeFromTemplateRequested);
                         })
                         .icon("folder-templates-symbolic"),
                     ]],
@@ -2362,8 +2560,7 @@ impl Sidebar {
                 let main = gtk::Box::new(gtk::Orientation::Horizontal, 6);
                 main.set_hexpand(true);
                 main.set_halign(gtk::Align::Center);
-                let icon =
-                    gtk::Image::from_icon_name("mail-message-new-symbolic");
+                let icon = gtk::Image::from_icon_name("mail-message-new-symbolic");
                 icon.add_css_class("folder-icon");
                 main.append(&icon);
                 let label = gtk::Label::new(Some(i18n("New Message").as_str()));
@@ -2387,7 +2584,11 @@ impl Sidebar {
                 let quiet = self.quiet.clone();
                 caret.connect_clicked(move |b| {
                     if !quiet.get() {
-                        menu(b.upcast_ref(), f64::from(b.width()) / 2.0, f64::from(b.height()));
+                        menu(
+                            b.upcast_ref(),
+                            f64::from(b.width()) / 2.0,
+                            f64::from(b.height()),
+                        );
                     }
                 });
                 hbox.append(&caret);
@@ -2397,7 +2598,9 @@ impl Sidebar {
             let right_click = gtk::GestureClick::new();
             right_click.set_button(gtk::gdk::BUTTON_SECONDARY);
             right_click.connect_pressed(move |gesture, _, x, y| {
-                let Some(widget) = gesture.widget() else { return };
+                let Some(widget) = gesture.widget() else {
+                    return;
+                };
                 compose_menu(&widget, x, y);
             });
             row.add_controller(right_click);
@@ -2432,7 +2635,12 @@ impl Sidebar {
         if self.show_unified {
             unified_rows.push(UnifiedRow::Kind(FolderKind::Inbox));
         }
-        unified_rows.extend(self.unified_kinds.listed().into_iter().map(UnifiedRow::Kind));
+        unified_rows.extend(
+            self.unified_kinds
+                .listed()
+                .into_iter()
+                .map(UnifiedRow::Kind),
+        );
         // Smart folders (#417) close the section, and stand alone with a
         // single account.
         if !self.smart_folders.is_empty() {
@@ -2466,15 +2674,20 @@ impl Sidebar {
                 right_click.set_button(3);
                 let s = sender.clone();
                 right_click.connect_pressed(move |gesture, _, x, y| {
-                    let Some(widget) = gesture.widget() else { return };
+                    let Some(widget) = gesture.widget() else {
+                        return;
+                    };
                     let s2 = s.clone();
                     show_context_menu(
                         &widget,
                         x,
                         y,
-                        vec![vec![MenuEntry::new(i18n("Open GNOME Contacts"), move || {
-                            let _ = s2.output(SidebarOutput::OpenGnomeContacts);
-                        })
+                        vec![vec![MenuEntry::new(
+                            i18n("Open GNOME Contacts"),
+                            move || {
+                                let _ = s2.output(SidebarOutput::OpenGnomeContacts);
+                            },
+                        )
                         .icon("adw-external-link-symbolic")]],
                     );
                 });
@@ -2570,8 +2783,12 @@ impl Sidebar {
 
         // The account sections — unless Settings (or the main menu) has
         // them off, for those who work from the unified section alone.
-        let account_sections: Vec<&SectionData> =
-            if self.show_accounts && !self.focus_hide_accounts { sections.iter().collect() } else { Vec::new() };
+        let account_sections: Vec<&SectionData> = if self.show_accounts && !self.focus_hide_accounts
+        {
+            sections.iter().collect()
+        } else {
+            Vec::new()
+        };
         // Every account section goes in one revealer, so Focus Mode can
         // slide them all away together (and back).
         let accounts_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -2752,8 +2969,12 @@ impl Sidebar {
                 let s = sender.input_sender().clone();
                 let (head, chev) = (header.downgrade(), chev_btn.downgrade());
                 press.connect_pressed(move |_, presses, x, y| {
-                    let (Some(head), Some(chev)) = (head.upgrade(), chev.upgrade()) else { return };
-                    let on_chevron = head.pick(x, y, gtk::PickFlags::DEFAULT).is_some_and(|w| w == chev || w.is_ancestor(&chev));
+                    let (Some(head), Some(chev)) = (head.upgrade(), chev.upgrade()) else {
+                        return;
+                    };
+                    let on_chevron = head
+                        .pick(x, y, gtk::PickFlags::DEFAULT)
+                        .is_some_and(|w| w == chev || w.is_ancestor(&chev));
                     if presses == 2 && !on_chevron {
                         let _ = s.send(SidebarInput::ToggleCollapseLocal(id));
                     }
@@ -2761,7 +2982,11 @@ impl Sidebar {
                 header.add_controller(press);
             }
             // Right-click an account: act on the account / its inbox.
-            let inbox_id = section.folders.iter().find(|f| f.kind == FolderKind::Inbox).map(|f| f.id);
+            let inbox_id = section
+                .folders
+                .iter()
+                .find(|f| f.kind == FolderKind::Inbox)
+                .map(|f| f.id);
             let own_order = !section.folder_order.is_empty();
             let click = gtk::GestureClick::new();
             click.set_button(gtk::gdk::BUTTON_SECONDARY);
@@ -2770,20 +2995,32 @@ impl Sidebar {
             click.connect_pressed(move |_, _, x, y| {
                 let mut items: Vec<(&str, CtxAction)> = Vec::new();
                 if let Some(fid) = inbox_id {
-                    items.push((i18n_noop("Mark Inbox as Read"), CtxAction::MarkFolderRead {
-                        account_id: id,
-                        folder_id: fid,
-                    }));
-                    items.push((i18n_noop("Refresh"), CtxAction::RefreshFolder {
-                        account_id: id,
-                        folder_id: fid,
-                    }));
+                    items.push((
+                        i18n_noop("Mark Inbox as Read"),
+                        CtxAction::MarkFolderRead {
+                            account_id: id,
+                            folder_id: fid,
+                        },
+                    ));
+                    items.push((
+                        i18n_noop("Refresh"),
+                        CtxAction::RefreshFolder {
+                            account_id: id,
+                            folder_id: fid,
+                        },
+                    ));
                 }
                 items.push((i18n_noop("New Folder…"), CtxAction::NewFolder(id)));
                 if own_order {
-                    items.push((i18n_noop("Reset Folder Order"), CtxAction::ResetFolderOrder(id)));
+                    items.push((
+                        i18n_noop("Reset Folder Order"),
+                        CtxAction::ResetFolderOrder(id),
+                    ));
                 }
-                items.push((i18n_noop("Account Settings…"), CtxAction::OpenAccountSettings(id)));
+                items.push((
+                    i18n_noop("Account Settings…"),
+                    CtxAction::OpenAccountSettings(id),
+                ));
                 items.push((i18n_noop("Remove Account…"), CtxAction::RemoveAccount(id)));
                 show_sidebar_menu(&header_w, x, y, items, &cs);
             });
@@ -2850,7 +3087,11 @@ impl Sidebar {
                 .filter(|f| !is_main_row(f, nest))
                 .collect();
             let e = essential.len() as i32;
-            let inside: Vec<&Folder> = essential.iter().copied().filter(|f| f.kind == FolderKind::Custom).collect();
+            let inside: Vec<&Folder> = essential
+                .iter()
+                .copied()
+                .filter(|f| f.kind == FolderKind::Custom)
+                .collect();
             let collapsed_nodes = self.tree_collapsed.get(&id).cloned().unwrap_or_default();
 
             let list = gtk::ListBox::new();
@@ -2867,7 +3108,9 @@ impl Sidebar {
                     && !self.collapsed
                     && match folder.kind {
                         FolderKind::Inbox => !inside.is_empty(),
-                        FolderKind::Custom => inside.iter().any(|g| path_is_under(&g.path, &folder.path)),
+                        FolderKind::Custom => {
+                            inside.iter().any(|g| path_is_under(&g.path, &folder.path))
+                        }
                         _ => false,
                     };
                 let lead: Option<gtk::Widget> = if !nest || self.collapsed {
@@ -2888,7 +3131,10 @@ impl Sidebar {
                     let st = sender.input_sender().clone();
                     let path = folder.path.clone();
                     btn.connect_clicked(move |_| {
-                        let _ = st.send(SidebarInput::ToggleFolderNode { account_id: id, path: path.clone() });
+                        let _ = st.send(SidebarInput::ToggleFolderNode {
+                            account_id: id,
+                            path: path.clone(),
+                        });
                     });
                     self.tree_chevrons.insert((id, folder.path.clone()), img);
                     Some(btn.upcast())
@@ -2897,9 +3143,19 @@ impl Sidebar {
                     spacer.set_width_request(TREE_EXPANDER_WIDTH);
                     Some(spacer.upcast())
                 };
-                let depth = if nested { folder_depth(folder, &inside) + 1 } else { 0 };
-                let (row, badge) =
-                    build_folder_row(folder, self.collapsed, depth, lead.as_ref(), self.chevrons_left, icon);
+                let depth = if nested {
+                    folder_depth(folder, &inside) + 1
+                } else {
+                    0
+                };
+                let (row, badge) = build_folder_row(
+                    folder,
+                    self.collapsed,
+                    depth,
+                    lead.as_ref(),
+                    self.chevrons_left,
+                    icon,
+                );
                 if nested {
                     // Hidden while the Inbox or a parent is folded, as in
                     // the Folders section.
@@ -2912,7 +3168,10 @@ impl Sidebar {
                         rev.set_child(Some(&content));
                         rev.set_reveal_child(!hidden);
                         row.set_child(Some(&rev));
-                        self.main_row_revealers.entry(id).or_default().insert(index, rev);
+                        self.main_row_revealers
+                            .entry(id)
+                            .or_default()
+                            .insert(index, rev);
                     }
                     row.set_visible(!hidden);
                     if !self.collapsed {
@@ -2955,7 +3214,8 @@ impl Sidebar {
                 section.hierarchy.clone(),
                 sender,
             );
-            self.main_folders.insert(id, essential.iter().map(|f| (*f).clone()).collect());
+            self.main_folders
+                .insert(id, essential.iter().map(|f| (*f).clone()).collect());
             attach_folder_context_menu(
                 &list,
                 id,
@@ -2984,8 +3244,7 @@ impl Sidebar {
                     // sub-folders, an equal-width spacer for leaves so names
                     // at one depth stay aligned. Rail mode has no room for
                     // either.
-                    let has_children =
-                        custom.iter().any(|g| path_is_under(&g.path, &folder.path));
+                    let has_children = custom.iter().any(|g| path_is_under(&g.path, &folder.path));
                     let lead: Option<gtk::Widget> = if self.collapsed {
                         None
                     } else if has_children {
@@ -3019,15 +3278,14 @@ impl Sidebar {
                         spacer.set_width_request(TREE_EXPANDER_WIDTH);
                         Some(spacer.upcast())
                     };
-                    let (row, badge) =
-                        build_folder_row(
-                            folder,
-                            self.collapsed,
-                            depth,
-                            lead.as_ref(),
-                            self.chevrons_left,
-                            filter_icon(section, folder),
-                        );
+                    let (row, badge) = build_folder_row(
+                        folder,
+                        self.collapsed,
+                        depth,
+                        lead.as_ref(),
+                        self.chevrons_left,
+                        filter_icon(section, folder),
+                    );
                     // Hidden while any ancestor is collapsed; the row still
                     // exists, so selection indices stay stable. Its content
                     // sits in a revealer so user toggles slide open/closed —
@@ -3043,10 +3301,7 @@ impl Sidebar {
                         rev.set_child(Some(&content));
                         rev.set_reveal_child(!hidden);
                         row.set_child(Some(&rev));
-                        self.tree_row_revealers
-                            .entry(id)
-                            .or_default()
-                            .push(rev);
+                        self.tree_row_revealers.entry(id).or_default().push(rev);
                     }
                     row.set_visible(!hidden);
                     // Custom folders can be picked up and dropped on a new
@@ -3117,7 +3372,12 @@ impl Sidebar {
                     }
                     let btn = heading_chevron(&custom_chevron);
                     btn.set_tooltip_text(Some(
-                        if section.gmail { i18n("Show or hide labels") } else { i18n("Show or hide folders") }.as_str(),
+                        if section.gmail {
+                            i18n("Show or hide labels")
+                        } else {
+                            i18n("Show or hide folders")
+                        }
+                        .as_str(),
                     ));
                     hb.append(&btn);
                     folders_chevron = Some(btn);
@@ -3141,7 +3401,14 @@ impl Sidebar {
                     sender,
                 );
                 if self.collapsed {
-                    folders_toggle.set_tooltip_text(Some(if section.gmail { i18n("Labels") } else { i18n("Folders") }.as_str()));
+                    folders_toggle.set_tooltip_text(Some(
+                        if section.gmail {
+                            i18n("Labels")
+                        } else {
+                            i18n("Folders")
+                        }
+                        .as_str(),
+                    ));
                 }
                 // Right-click: how this account's folders are sorted.
                 let click = gtk::GestureClick::new();
@@ -3225,10 +3492,13 @@ impl Sidebar {
                 // Slide them in once the rebuild's freeze-frame has lifted
                 // (80ms), so the whole of the motion is seen.
                 let r = accounts_revealer.clone();
-                gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(90), move || {
-                    r.set_transition_duration(crate::ui::FOCUS_ANIM_MS);
-                    r.set_reveal_child(true);
-                });
+                gtk::glib::timeout_add_local_once(
+                    std::time::Duration::from_millis(90),
+                    move || {
+                        r.set_transition_duration(crate::ui::FOCUS_ANIM_MS);
+                        r.set_reveal_child(true);
+                    },
+                );
             }
         }
         self.accounts_revealer = any_accounts.then_some(accounts_revealer);
@@ -3350,7 +3620,11 @@ impl Sidebar {
         }
         for section in &self.sections {
             if let Some(label) = self.account_circle_badges.get(&section.account.id) {
-                let inbox = section.folders.iter().find(|f| f.kind == FolderKind::Inbox).map(|f| (section.account.id, f.id));
+                let inbox = section
+                    .folders
+                    .iter()
+                    .find(|f| f.kind == FolderKind::Inbox)
+                    .map(|f| (section.account.id, f.id));
                 mark(label, seen(&mut inbox.iter()));
             }
         }
@@ -3406,7 +3680,11 @@ impl Sidebar {
         let badge: gtk::Label;
         if self.collapsed {
             hbox.set_halign(gtk::Align::Center);
-            let mut tip = if unread > 0 { format!("{title} ({unread})") } else { title.clone() };
+            let mut tip = if unread > 0 {
+                format!("{title} ({unread})")
+            } else {
+                title.clone()
+            };
             // The rail has no room for a chevron: a long press on the icon
             // opens or folds the list instead.
             tip.push('\n');
@@ -3449,7 +3727,11 @@ impl Sidebar {
             // than matching left edges): a small icon flush with a much
             // wider circle's left edge reads as off-centre next to it
             // (PR #95).
-            let icon_inset = if self.chevrons_left { ROW_LEFT_INSET + 9 } else { 0 };
+            let icon_inset = if self.chevrons_left {
+                ROW_LEFT_INSET + 9
+            } else {
+                0
+            };
             if tree {
                 // The 24px button around the 16px glyph overhangs it 4px a
                 // side, taken back in styles.css (`.tree-caret`).
@@ -3537,7 +3819,11 @@ impl Sidebar {
         } else if let UnifiedRow::Kind(kind @ (FolderKind::Trash | FolderKind::Junk)) = row_kind {
             // Right-click the merged Trash or Junk: empty every account's
             // (#413), each one still a row of its own below for one at a time.
-            let label = if kind == FolderKind::Trash { i18n_noop("Empty Trash…") } else { i18n_noop("Empty Junk…") };
+            let label = if kind == FolderKind::Trash {
+                i18n_noop("Empty Trash…")
+            } else {
+                i18n_noop("Empty Junk…")
+            };
             let click = gtk::GestureClick::new();
             click.set_button(gtk::gdk::BUTTON_SECONDARY);
             let cs = sender.clone();
@@ -3552,7 +3838,13 @@ impl Sidebar {
             let cs = sender.clone();
             let list_w = list.clone();
             click.connect_pressed(move |_, _, x, y| {
-                show_sidebar_menu(&list_w, x, y, vec![(i18n_noop("New Smart Folder…"), CtxAction::NewSmartFolder)], &cs);
+                show_sidebar_menu(
+                    &list_w,
+                    x,
+                    y,
+                    vec![(i18n_noop("New Smart Folder…"), CtxAction::NewSmartFolder)],
+                    &cs,
+                );
             });
             list.add_controller(click);
         }
@@ -3620,8 +3912,12 @@ impl Sidebar {
                         None => continue,
                     };
                     let aid = section.account.id;
-                    let (row, badge) =
-                        build_unified_inbox_row(section, folder, self.collapsed, self.chevrons_left);
+                    let (row, badge) = build_unified_inbox_row(
+                        section,
+                        folder,
+                        self.collapsed,
+                        self.chevrons_left,
+                    );
                     // A message dropped here moves to that account's folder
                     // (the app declines mail from other accounts, #23).
                     if !folder.path.is_empty() {
@@ -3651,7 +3947,10 @@ impl Sidebar {
                         let _ = ss.send(if is_inbox {
                             SidebarInput::UnifiedInboxRowSelected(row.index())
                         } else {
-                            SidebarInput::KindSubRowSelected { kind, index: row.index() }
+                            SidebarInput::KindSubRowSelected {
+                                kind,
+                                index: row.index(),
+                            }
                         });
                     }
                 });
@@ -3667,19 +3966,28 @@ impl Sidebar {
                         .and_then(|row| refs.get(row.index() as usize))
                     {
                         if r.path.is_empty() {
-                            let items = vec![(i18n_noop("Account Settings…"), CtxAction::OpenAccountSettings(r.account_id))];
+                            let items = vec![(
+                                i18n_noop("Account Settings…"),
+                                CtxAction::OpenAccountSettings(r.account_id),
+                            )];
                             show_sidebar_menu(&sub_w, x, y, items, &cs);
                             return;
                         }
                         let mut items = vec![
-                            (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead {
-                                account_id: r.account_id,
-                                folder_id: r.folder_id,
-                            }),
-                            (i18n_noop("Refresh"), CtxAction::RefreshFolder {
-                                account_id: r.account_id,
-                                folder_id: r.folder_id,
-                            }),
+                            (
+                                i18n_noop("Mark as Read"),
+                                CtxAction::MarkFolderRead {
+                                    account_id: r.account_id,
+                                    folder_id: r.folder_id,
+                                },
+                            ),
+                            (
+                                i18n_noop("Refresh"),
+                                CtxAction::RefreshFolder {
+                                    account_id: r.account_id,
+                                    folder_id: r.folder_id,
+                                },
+                            ),
                         ];
                         // Each account's Trash and Junk empties from here
                         // too (#369), as from its own section.
@@ -3689,14 +3997,20 @@ impl Sidebar {
                             _ => None,
                         };
                         if let Some(label) = empty_label {
-                            items.push((label, CtxAction::EmptyFolder {
-                                account_id: r.account_id,
-                                folder_id: r.folder_id,
-                                name: r.name.clone(),
-                                path: r.path.clone(),
-                            }));
+                            items.push((
+                                label,
+                                CtxAction::EmptyFolder {
+                                    account_id: r.account_id,
+                                    folder_id: r.folder_id,
+                                    name: r.name.clone(),
+                                    path: r.path.clone(),
+                                },
+                            ));
                         }
-                        items.push((i18n_noop("Account Settings…"), CtxAction::OpenAccountSettings(r.account_id)));
+                        items.push((
+                            i18n_noop("Account Settings…"),
+                            CtxAction::OpenAccountSettings(r.account_id),
+                        ));
                         show_sidebar_menu(&sub_w, x, y, items, &cs);
                     }
                 });
@@ -3726,7 +4040,11 @@ impl Sidebar {
                         self.chevrons_left,
                         false,
                     );
-                    row.add_controller(folder_drop_target(r.account_id, r.folder.path.clone(), sender));
+                    row.add_controller(folder_drop_target(
+                        r.account_id,
+                        r.folder.path.clone(),
+                        sender,
+                    ));
                     sub.append(&row);
                     if counted {
                         row_badges.insert((r.account_id, r.folder.id), badge);
@@ -3750,15 +4068,21 @@ impl Sidebar {
                 click.set_button(gtk::gdk::BUTTON_SECONDARY);
                 let cs = sender.clone();
                 let sub_w = sub.clone();
-                let filtered: Vec<(u32, String)> =
-                    self.unified_folders.iter().map(|r| (r.account_id, r.folder.path.clone())).collect();
+                let filtered: Vec<(u32, String)> = self
+                    .unified_folders
+                    .iter()
+                    .map(|r| (r.account_id, r.folder.path.clone()))
+                    .collect();
                 click.connect_pressed(move |_, _, x, y| {
                     if let Some(r) = sub_w
                         .row_at_y(y as i32)
                         .and_then(|row| refs.get(row.index() as usize))
                     {
-                        let is_filtered = filtered.iter().any(|(a, p)| *a == r.account_id && *p == r.folder.path);
-                        let items = folder_menu_items(r.account_id, &r.folder, is_filtered, true, true);
+                        let is_filtered = filtered
+                            .iter()
+                            .any(|(a, p)| *a == r.account_id && *p == r.folder.path);
+                        let items =
+                            folder_menu_items(r.account_id, &r.folder, is_filtered, true, true);
                         show_sidebar_menu(&sub_w, x, y, items, &cs);
                     }
                 });
@@ -3770,8 +4094,15 @@ impl Sidebar {
                     let icon = gtk::Image::from_icon_name("folder-saved-search-symbolic");
                     pin_icon_size(&icon);
                     let unread = self.smart_unread.get(id).copied().unwrap_or(0);
-                    let (row, badge) =
-                        build_unified_sub_row(&icon, name, name, unread, self.collapsed, self.chevrons_left, false);
+                    let (row, badge) = build_unified_sub_row(
+                        &icon,
+                        name,
+                        name,
+                        unread,
+                        self.collapsed,
+                        self.chevrons_left,
+                        false,
+                    );
                     sub.append(&row);
                     self.smart_badges.insert(id.clone(), badge);
                 }
@@ -3789,12 +4120,25 @@ impl Sidebar {
                 click.set_button(gtk::gdk::BUTTON_SECONDARY);
                 let cs = sender.clone();
                 let sub_w = sub.clone();
-                let ids: Vec<String> = self.smart_folders.iter().map(|(id, _)| id.clone()).collect();
+                let ids: Vec<String> = self
+                    .smart_folders
+                    .iter()
+                    .map(|(id, _)| id.clone())
+                    .collect();
                 click.connect_pressed(move |_, _, x, y| {
-                    if let Some(id) = sub_w.row_at_y(y as i32).and_then(|row| ids.get(row.index() as usize)) {
+                    if let Some(id) = sub_w
+                        .row_at_y(y as i32)
+                        .and_then(|row| ids.get(row.index() as usize))
+                    {
                         let items = vec![
-                            (i18n_noop("Edit Smart Folder…"), CtxAction::EditSmartFolder(id.clone())),
-                            (i18n_noop("Delete Smart Folder…"), CtxAction::DeleteSmartFolder(id.clone())),
+                            (
+                                i18n_noop("Edit Smart Folder…"),
+                                CtxAction::EditSmartFolder(id.clone()),
+                            ),
+                            (
+                                i18n_noop("Delete Smart Folder…"),
+                                CtxAction::DeleteSmartFolder(id.clone()),
+                            ),
                             (i18n_noop("New Smart Folder…"), CtxAction::NewSmartFolder),
                         ];
                         show_sidebar_menu(&sub_w, x, y, items, &cs);
@@ -3834,7 +4178,8 @@ impl Sidebar {
             UnifiedRow::Filtered => {
                 let refs = self.unified_folders.clone();
                 for r in &refs {
-                    let Some(section) = sections.iter().find(|s| s.account.id == r.account_id) else {
+                    let Some(section) = sections.iter().find(|s| s.account.id == r.account_id)
+                    else {
                         continue;
                     };
                     // The glyph in the account's color says whose folder
@@ -3852,11 +4197,16 @@ impl Sidebar {
                         false,
                     );
                     // Filtered folders take drops like any folder of their account.
-                    row.add_controller(folder_drop_target(r.account_id, r.folder.path.clone(), sender));
+                    row.add_controller(folder_drop_target(
+                        r.account_id,
+                        r.folder.path.clone(),
+                        sender,
+                    ));
                     sub.append(&row);
                     row_badges.insert((r.account_id, r.folder.id), badge);
                 }
-                self.filtered_badges.insert(Slot::Unified, row_badges.clone());
+                self.filtered_badges
+                    .insert(Slot::Unified, row_badges.clone());
                 let ss = sender.input_sender().clone();
                 let quiet = self.quiet.clone();
                 sub.connect_row_selected(move |_, row| {
@@ -3882,8 +4232,11 @@ impl Sidebar {
                         .and_then(|row| refs.get(row.index() as usize))
                     {
                         // The same menu the folder has under its account.
-                        let favorite = favorites.iter().any(|(a, p)| *a == r.account_id && *p == r.folder.path);
-                        let items = folder_menu_items(r.account_id, &r.folder, true, true, favorite);
+                        let favorite = favorites
+                            .iter()
+                            .any(|(a, p)| *a == r.account_id && *p == r.folder.path);
+                        let items =
+                            folder_menu_items(r.account_id, &r.folder, true, true, favorite);
                         show_sidebar_menu(&sub_w, x, y, items, &cs);
                     }
                 });
@@ -4103,7 +4456,13 @@ impl Sidebar {
     fn as_heading(&self, row: UnifiedRow) -> bool {
         self.section_style == crate::config::SectionStyle::Tree
             && !self.collapsed
-            && matches!(row, UnifiedRow::Favorites | UnifiedRow::Filtered | UnifiedRow::Tags | UnifiedRow::Contacts)
+            && matches!(
+                row,
+                UnifiedRow::Favorites
+                    | UnifiedRow::Filtered
+                    | UnifiedRow::Tags
+                    | UnifiedRow::Contacts
+            )
     }
 
     /// Build a run of unified rows into `parent`, the first row keeping the
@@ -4146,7 +4505,12 @@ impl Sidebar {
     /// animated revealer, one row per tag (color disc, its name) showing
     /// that account's mail with it. In the rail the header is a tag glyph
     /// and the rows are discs.
-    fn build_tags_section(&mut self, parent: &gtk::Box, slot: Slot, sender: &ComponentSender<Self>) {
+    fn build_tags_section(
+        &mut self,
+        parent: &gtk::Box,
+        slot: Slot,
+        sender: &ComponentSender<Self>,
+    ) {
         let open = self.tags_open(slot);
         let chevron = gtk::Image::from_icon_name(chevron_icon(open));
         let hb = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -4171,7 +4535,13 @@ impl Sidebar {
             lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
             hb.append(&lbl);
         }
-        let toggle = section_heading(&hb, chevron_btn.as_ref(), &[], SidebarInput::ToggleTagsExpand(slot), sender);
+        let toggle = section_heading(
+            &hb,
+            chevron_btn.as_ref(),
+            &[],
+            SidebarInput::ToggleTagsExpand(slot),
+            sender,
+        );
         if self.collapsed {
             toggle.set_tooltip_text(Some(i18n("Tags").as_str()));
         }
@@ -4219,10 +4589,17 @@ impl Sidebar {
                 return;
             }
             if let Some(row) = row {
-                let _ = ss.send(SidebarInput::TagRowSelected { slot, index: row.index() });
+                let _ = ss.send(SidebarInput::TagRowSelected {
+                    slot,
+                    index: row.index(),
+                });
             }
         });
-        attach_tag_context_menu(&list, self.tags.iter().map(|t| t.keyword.clone()).collect(), sender);
+        attach_tag_context_menu(
+            &list,
+            self.tags.iter().map(|t| t.keyword.clone()).collect(),
+            sender,
+        );
 
         let revealer = gtk::Revealer::new();
         revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
@@ -4230,7 +4607,14 @@ impl Sidebar {
         revealer.set_reveal_child(open);
         revealer.set_child(Some(&list));
         parent.append(&revealer);
-        self.tag_sections.insert(slot, SectionWidgets { revealer, chevron, list });
+        self.tag_sections.insert(
+            slot,
+            SectionWidgets {
+                revealer,
+                chevron,
+                list,
+            },
+        );
     }
 
     /// Whether a unified row's total-unread chip is switched on (Settings →
@@ -4314,9 +4698,11 @@ impl Sidebar {
     fn tags_open(&self, slot: Slot) -> bool {
         match slot {
             Slot::Unified => self.tags_expanded,
-            Slot::Account(id) => {
-                self.sections.iter().find(|s| s.account.id == id).is_some_and(|s| s.tags_expanded)
-            }
+            Slot::Account(id) => self
+                .sections
+                .iter()
+                .find(|s| s.account.id == id)
+                .is_some_and(|s| s.tags_expanded),
         }
     }
 
@@ -4347,7 +4733,10 @@ impl Sidebar {
 
     /// Every favorite as (account, path), for a menu built later.
     fn favorite_keys(&self) -> Vec<(u32, String)> {
-        self.favorite_folders.iter().map(|r| (r.account_id, r.folder.path.clone())).collect()
+        self.favorite_folders
+            .iter()
+            .map(|r| (r.account_id, r.folder.path.clone()))
+            .collect()
     }
 
     fn kind_open(&self, kind: FolderKind) -> bool {
@@ -4378,12 +4767,22 @@ impl Sidebar {
     }
 
     fn select_tag(&self, account: Option<u32>, keyword: &str) {
-        let Some(idx) = self.tags.iter().position(|t| t.keyword.eq_ignore_ascii_case(keyword)) else {
+        let Some(idx) = self
+            .tags
+            .iter()
+            .position(|t| t.keyword.eq_ignore_ascii_case(keyword))
+        else {
             return;
         };
         let list = match account {
-            None => self.kind_widgets.get(&UnifiedRow::Tags).map(|w| w.list.clone()),
-            Some(id) => self.tag_sections.get(&Slot::Account(id)).map(|w| w.list.clone()),
+            None => self
+                .kind_widgets
+                .get(&UnifiedRow::Tags)
+                .map(|w| w.list.clone()),
+            Some(id) => self
+                .tag_sections
+                .get(&Slot::Account(id))
+                .map(|w| w.list.clone()),
         };
         if let Some(list) = list {
             if let Some(row) = list.row_at_index(idx as i32) {
@@ -4397,8 +4796,16 @@ impl Sidebar {
     /// List the address books and groups under the Contacts row, the one
     /// the contact list shows picked.
     fn fill_contact_tree(&mut self, sender: &ComponentSender<Self>) {
-        let Some(list) = self.kind_widgets.get(&UnifiedRow::Contacts).map(|w| w.list.clone()) else { return };
-        let Some(tree) = self.contact_tree.as_ref() else { return };
+        let Some(list) = self
+            .kind_widgets
+            .get(&UnifiedRow::Contacts)
+            .map(|w| w.list.clone())
+        else {
+            return;
+        };
+        let Some(tree) = self.contact_tree.as_ref() else {
+            return;
+        };
         self.quiet.set(true);
         while let Some(child) = list.first_child() {
             list.remove(&child);
@@ -4508,7 +4915,9 @@ impl Sidebar {
             list.select_row(Some(row));
             return;
         }
-        let Some(w) = self.kind_widgets.get(&UnifiedRow::Contacts) else { return };
+        let Some(w) = self.kind_widgets.get(&UnifiedRow::Contacts) else {
+            return;
+        };
         match scope {
             None => w.header.select_row(w.header.row_at_index(0).as_ref()),
             Some(scope) => {
@@ -4559,7 +4968,11 @@ impl Sidebar {
         // A view to pick again after a reconnect, once its account is back.
         if let Some((sel, email)) = self.reannounce.clone() {
             let sel = match email {
-                Some(email) => match self.sections.iter().find(|s| s.account.email.eq_ignore_ascii_case(&email)) {
+                Some(email) => match self
+                    .sections
+                    .iter()
+                    .find(|s| s.account.email.eq_ignore_ascii_case(&email))
+                {
                     Some(section) => sel.with_account(section.account.id),
                     // Not listed (yet, or removed): wait, and the timeout
                     // falls back to the usual first view.
@@ -4637,8 +5050,10 @@ impl Sidebar {
             }
             Sel::Favorite(acc, path) => {
                 if let Some(w) = self.kind_widgets.get(&UnifiedRow::Favorites) {
-                    if let Some(idx) =
-                        self.favorite_folders.iter().position(|r| r.account_id == acc && r.folder.path == path)
+                    if let Some(idx) = self
+                        .favorite_folders
+                        .iter()
+                        .position(|r| r.account_id == acc && r.folder.path == path)
                     {
                         w.list.select_row(w.list.row_at_index(idx as i32).as_ref());
                     }
@@ -4690,7 +5105,8 @@ impl Sidebar {
         let accounts_shown = self.show_accounts && !self.focus_hide_accounts;
         let in_inboxes =
             self.show_unified && self.unified_inboxes.iter().any(|r| r.account_id == acc);
-        if inbox.as_ref() == Some(&path) && in_inboxes && (self.unified_expanded || !accounts_shown) {
+        if inbox.as_ref() == Some(&path) && in_inboxes && (self.unified_expanded || !accounts_shown)
+        {
             return Some(Sel::UnifiedInbox(acc));
         }
         if accounts_shown && section.folders.iter().any(|f| f.path == path) {
@@ -4733,15 +5149,17 @@ impl Sidebar {
     /// account's own section.
     fn select_filtered_row(&self, slot: Slot, account_id: u32, path: &str) {
         let list = match slot {
-            Slot::Unified => self.kind_widgets.get(&UnifiedRow::Filtered).map(|w| w.list.clone()),
+            Slot::Unified => self
+                .kind_widgets
+                .get(&UnifiedRow::Filtered)
+                .map(|w| w.list.clone()),
             Slot::Account(_) => None,
         };
         let Some(list) = list else { return };
-        if let Some(idx) = self
-            .filtered_rows
-            .get(&slot)
-            .and_then(|rows| rows.iter().position(|r| r.account_id == account_id && r.folder.path == path))
-        {
+        if let Some(idx) = self.filtered_rows.get(&slot).and_then(|rows| {
+            rows.iter()
+                .position(|r| r.account_id == account_id && r.folder.path == path)
+        }) {
             if let Some(row) = list.row_at_index(idx as i32) {
                 list.select_row(Some(&row));
             }
@@ -4753,7 +5171,9 @@ impl Sidebar {
     /// reported (and persisted) as a toggle. Nothing happens to an account
     /// already open.
     fn reveal_account(&mut self, id: u32, sender: &ComponentSender<Self>) {
-        let Some(rev) = self.revealers.get(&id) else { return };
+        let Some(rev) = self.revealers.get(&id) else {
+            return;
+        };
         if rev.reveals_child() {
             return;
         }
@@ -4837,7 +5257,12 @@ fn parse_move_payload(payload: &str) -> Vec<(u32, u32, u32, u32)> {
     let items: Vec<(u32, u32, u32, u32)> = parts[1..]
         .chunks(4)
         .filter_map(|c| {
-            Some((c[0].parse().ok()?, c[1].parse().ok()?, c[2].parse().ok()?, c[3].parse().ok()?))
+            Some((
+                c[0].parse().ok()?,
+                c[1].parse().ok()?,
+                c[2].parse().ok()?,
+                c[3].parse().ok()?,
+            ))
         })
         .collect();
     // All or nothing: a group that won't parse means the payload isn't ours.
@@ -4904,14 +5329,20 @@ fn section_heading(
 /// The right-click menu of an account's Folders heading: how its folders
 /// are sorted (its own choice, or Settings'), and Reset Folder Order when
 /// it has one of its own.
-fn folder_sort_menu(section: &SectionData, sender: &ComponentSender<Sidebar>) -> Vec<Vec<MenuEntry>> {
+fn folder_sort_menu(
+    section: &SectionData,
+    sender: &ComponentSender<Sidebar>,
+) -> Vec<Vec<MenuEntry>> {
     use crate::config::FolderSort;
     let id = section.account.id;
     let own = section.own_folder_sort;
     let pick = |label: String, sort: Option<FolderSort>| {
         let s = sender.clone();
         MenuEntry::new(label, move || {
-            let _ = s.output(SidebarOutput::SetFolderSort { account_id: id, sort });
+            let _ = s.output(SidebarOutput::SetFolderSort {
+                account_id: id,
+                sort,
+            });
         })
         .selected(own == sort)
     };
@@ -4921,13 +5352,19 @@ fn folder_sort_menu(section: &SectionData, sender: &ComponentSender<Sidebar>) ->
     );
     let mut sections = vec![
         vec![pick(follow, None)],
-        FolderSort::ALL.iter().map(|&sort| pick(sort.label(), Some(sort))).collect(),
+        FolderSort::ALL
+            .iter()
+            .map(|&sort| pick(sort.label(), Some(sort)))
+            .collect(),
     ];
     if !section.folder_order.is_empty() {
         let s = sender.clone();
-        sections.push(vec![MenuEntry::new(i18n("Reset Folder Order"), move || {
-            let _ = s.output(SidebarOutput::Context(CtxAction::ResetFolderOrder(id)));
-        })]);
+        sections.push(vec![MenuEntry::new(
+            i18n("Reset Folder Order"),
+            move || {
+                let _ = s.output(SidebarOutput::Context(CtxAction::ResetFolderOrder(id)));
+            },
+        )]);
     }
     sections
 }
@@ -5016,7 +5453,11 @@ fn folder_drop_zone(
     if level != hierarchy.parent(src) && !level.is_empty() && !custom.contains(&level) {
         return FolderDrop::Refuse;
     }
-    if frac < 1.0 / 3.0 { FolderDrop::Before } else { FolderDrop::After }
+    if frac < 1.0 / 3.0 {
+        FolderDrop::Before
+    } else {
+        FolderDrop::After
+    }
 }
 
 /// The row a drop at `y` (in the list's coordinates) is aimed at: the
@@ -5029,7 +5470,13 @@ fn row_near(list: &gtk::ListBox, y: f64) -> Option<(i32, gtk::graphene::Rect)> {
         if row.is_visible() {
             if let Some(b) = row.compute_bounds(list) {
                 let (top, bottom) = (b.y() as f64, (b.y() + b.height()) as f64);
-                let off = if y < top { top - y } else if y > bottom { y - bottom } else { 0.0 };
+                let off = if y < top {
+                    top - y
+                } else if y > bottom {
+                    y - bottom
+                } else {
+                    0.0
+                };
                 if best.as_ref().is_none_or(|(d, ..)| off < *d) {
                     best = Some((off, i, b));
                 }
@@ -5049,14 +5496,15 @@ fn drop_line_y(list: &gtk::ListBox, folders: &[Folder], i: i32, after: bool) -> 
             .filter(|r| r.is_visible())
             .and_then(|r| r.compute_bounds(list))
     };
-    let edge_between = |upper: Option<gtk::graphene::Rect>, lower: Option<gtk::graphene::Rect>| {
-        match (upper, lower) {
+    let edge_between =
+        |upper: Option<gtk::graphene::Rect>, lower: Option<gtk::graphene::Rect>| match (
+            upper, lower,
+        ) {
             (Some(u), Some(l)) => Some(((u.y() + u.height() + l.y()) / 2.0) as f64),
             (Some(u), None) => Some((u.y() + u.height()) as f64),
             (None, Some(l)) => Some(l.y() as f64),
             (None, None) => None,
-        }
-    };
+        };
     let n = folders.len() as i32;
     if !after {
         let upper = (0..i).rev().find_map(&shown);
@@ -5093,8 +5541,20 @@ fn attach_folder_list_drop(
     drop.set_preload(true);
     list.add_css_class("folder-drop-list");
     let depths: Vec<usize> = {
-        let refs: Vec<&Folder> = folders.iter().filter(|f| f.kind == FolderKind::Custom).collect();
-        folders.iter().map(|f| if f.kind == FolderKind::Custom { folder_depth(f, &refs) } else { 0 }).collect()
+        let refs: Vec<&Folder> = folders
+            .iter()
+            .filter(|f| f.kind == FolderKind::Custom)
+            .collect();
+        folders
+            .iter()
+            .map(|f| {
+                if f.kind == FolderKind::Custom {
+                    folder_depth(f, &refs)
+                } else {
+                    0
+                }
+            })
+            .collect()
     };
     let folders = std::rc::Rc::new(folders);
     // What a drop at `y` does, and on which row.
@@ -5105,7 +5565,10 @@ fn attach_folder_list_drop(
             let (i, b) = row_near(&list, y)?;
             let f = folders.get(i as usize)?;
             let frac = ((y - b.y() as f64) / b.height().max(1.0) as f64).clamp(0.0, 1.0);
-            Some((i, folder_drop_zone(payload, id, f, &custom, &hierarchy, frac)))
+            Some((
+                i,
+                folder_drop_zone(payload, id, f, &custom, &hierarchy, frac),
+            ))
         })
     };
     // Clear the last hover's marks.
@@ -5129,8 +5592,13 @@ fn attach_folder_list_drop(
         let folders = folders.clone();
         drop.connect_motion(move |t, _, y| {
             clear();
-            let payload = t.value().and_then(|v| v.get::<String>().ok()).unwrap_or_default();
-            let Some((i, at)) = aim(&payload, y) else { return gtk::gdk::DragAction::empty() };
+            let payload = t
+                .value()
+                .and_then(|v| v.get::<String>().ok())
+                .unwrap_or_default();
+            let Some((i, at)) = aim(&payload, y) else {
+                return gtk::gdk::DragAction::empty();
+            };
             match at {
                 FolderDrop::Refuse => return gtk::gdk::DragAction::empty(),
                 FolderDrop::Into => {
@@ -5157,17 +5625,29 @@ fn attach_folder_list_drop(
     let ds = sender.input_sender().clone();
     drop.connect_drop(move |_, value, _, y| {
         clear();
-        let Ok(payload) = value.get::<String>() else { return false };
-        let Some((i, at)) = aim(&payload, y) else { return false };
-        let Some(target) = folders.get(i as usize).map(|f| f.path.clone()) else { return false };
+        let Ok(payload) = value.get::<String>() else {
+            return false;
+        };
+        let Some((i, at)) = aim(&payload, y) else {
+            return false;
+        };
+        let Some(target) = folders.get(i as usize).map(|f| f.path.clone()) else {
+            return false;
+        };
         match at {
             FolderDrop::Refuse => false,
             FolderDrop::Into => {
-                let _ = ds.send(SidebarInput::DropOnFolder { account_id: id, path: target, payload });
+                let _ = ds.send(SidebarInput::DropOnFolder {
+                    account_id: id,
+                    path: target,
+                    payload,
+                });
                 true
             }
             FolderDrop::Before | FolderDrop::After => {
-                let Some((_, src, _)) = dragged_folder(&payload) else { return false };
+                let Some((_, src, _)) = dragged_folder(&payload) else {
+                    return false;
+                };
                 let _ = ds.send(SidebarInput::ReorderFolder {
                     account_id: id,
                     path: src.to_string(),
@@ -5205,7 +5685,11 @@ fn folder_drag_source(row: &gtk::ListBoxRow, payload: String) -> gtk::DragSource
     let r = row.downgrade();
     drag.connect_prepare(move |src, x, y| {
         if let Some(row) = r.upgrade() {
-            src.set_icon(Some(&gtk::WidgetPaintable::new(Some(&row))), x as i32, y as i32);
+            src.set_icon(
+                Some(&gtk::WidgetPaintable::new(Some(&row))),
+                x as i32,
+                y as i32,
+            );
         }
         Some(gtk::gdk::ContentProvider::for_value(&payload.to_value()))
     });
@@ -5225,14 +5709,38 @@ fn folder_menu_items(
     favorite: bool,
 ) -> Vec<(&'static str, CtxAction)> {
     let mut items = vec![
-        (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead { account_id: id, folder_id: f.id }),
-        (i18n_noop("Refresh"), CtxAction::RefreshFolder { account_id: id, folder_id: f.id }),
+        (
+            i18n_noop("Mark as Read"),
+            CtxAction::MarkFolderRead {
+                account_id: id,
+                folder_id: f.id,
+            },
+        ),
+        (
+            i18n_noop("Refresh"),
+            CtxAction::RefreshFolder {
+                account_id: id,
+                folder_id: f.id,
+            },
+        ),
     ];
     // Favorites (#367): any folder can be kept at the top of the sidebar.
     items.push(if favorite {
-        (i18n_noop("Remove from Favorites"), CtxAction::RemoveFavorite { account_id: id, path: f.path.clone() })
+        (
+            i18n_noop("Remove from Favorites"),
+            CtxAction::RemoveFavorite {
+                account_id: id,
+                path: f.path.clone(),
+            },
+        )
     } else {
-        (i18n_noop("Add to Favorites"), CtxAction::AddFavorite { account_id: id, path: f.path.clone() })
+        (
+            i18n_noop("Add to Favorites"),
+            CtxAction::AddFavorite {
+                account_id: id,
+                path: f.path.clone(),
+            },
+        )
     });
     // Rules normally only meet mail arriving in the Inbox; from here they
     // can be held up against whatever is already in this folder (#198).
@@ -5247,36 +5755,51 @@ fn folder_menu_items(
             | FolderKind::Starred
     );
     if has_filters && filterable {
-        items.push((i18n_noop("Apply Filters"), CtxAction::ApplyFilters {
-            account_id: id,
-            folder_id: f.id,
-        }));
+        items.push((
+            i18n_noop("Apply Filters"),
+            CtxAction::ApplyFilters {
+                account_id: id,
+                folder_id: f.id,
+            },
+        ));
     }
     // A filter files into this folder: its rule is a click away.
     if filtered {
-        items.push((i18n_noop("Edit Filter…"), CtxAction::EditFilter {
-            account_id: id,
-            path: f.path.clone(),
-        }));
+        items.push((
+            i18n_noop("Edit Filter…"),
+            CtxAction::EditFilter {
+                account_id: id,
+                path: f.path.clone(),
+            },
+        ));
     }
     // Only user-created folders can be renamed or deleted.
     if f.kind == FolderKind::Custom {
-        items.push((i18n_noop("Rename Folder…"), CtxAction::RenameFolder {
-            account_id: id,
-            name: f.name.clone(),
-            path: f.path.clone(),
-        }));
-        items.push((i18n_noop("Delete Folder…"), CtxAction::DeleteFolder {
-            account_id: id,
-            name: f.name.clone(),
-            path: f.path.clone(),
-        }));
+        items.push((
+            i18n_noop("Rename Folder…"),
+            CtxAction::RenameFolder {
+                account_id: id,
+                name: f.name.clone(),
+                path: f.path.clone(),
+            },
+        ));
+        items.push((
+            i18n_noop("Delete Folder…"),
+            CtxAction::DeleteFolder {
+                account_id: id,
+                name: f.name.clone(),
+                path: f.path.clone(),
+            },
+        ));
         // And hidden (#239): only a plain folder, since a role folder out
         // of sight would still be where mail is filed to.
-        items.push((i18n_noop("Hide Folder"), CtxAction::HideFolder {
-            account_id: id,
-            path: f.path.clone(),
-        }));
+        items.push((
+            i18n_noop("Hide Folder"),
+            CtxAction::HideFolder {
+                account_id: id,
+                path: f.path.clone(),
+            },
+        ));
     }
     // Trash and Junk can be emptied outright (#152).
     let empty_label = match f.kind {
@@ -5285,12 +5808,15 @@ fn folder_menu_items(
         _ => None,
     };
     if let Some(label) = empty_label {
-        items.push((label, CtxAction::EmptyFolder {
-            account_id: id,
-            folder_id: f.id,
-            name: f.name.clone(),
-            path: f.path.clone(),
-        }));
+        items.push((
+            label,
+            CtxAction::EmptyFolder {
+                account_id: id,
+                folder_id: f.id,
+                name: f.name.clone(),
+                path: f.path.clone(),
+            },
+        ));
     }
     items
 }
@@ -5413,8 +5939,14 @@ impl Hierarchy {
     /// the sidebar draws it under: Gmail's "[Gmail]/Important" is drawn at
     /// the top, "[Gmail]" not being a folder, but its parent is "[Gmail]".
     pub(crate) fn parent(&self, path: &str) -> String {
-        let head = path.rsplit_once(self.delimiter).map_or("", |(head, _)| head);
-        if format!("{head}{}", self.delimiter) == self.namespace { String::new() } else { head.to_string() }
+        let head = path
+            .rsplit_once(self.delimiter)
+            .map_or("", |(head, _)| head);
+        if format!("{head}{}", self.delimiter) == self.namespace {
+            String::new()
+        } else {
+            head.to_string()
+        }
     }
 
     fn run(&self, folder: &Folder) -> SiblingRun {
@@ -5473,8 +6005,9 @@ pub(crate) fn order_folders(
     use crate::config::FolderSort;
     let nest = nests_in_inbox(&folders);
     let rank = |f: &Folder| order.iter().position(|p| *p == f.path);
-    let (main, custom): (Vec<Folder>, Vec<Folder>) =
-        folders.into_iter().partition(|f| f.kind != FolderKind::Custom);
+    let (main, custom): (Vec<Folder>, Vec<Folder>) = folders
+        .into_iter()
+        .partition(|f| f.kind != FolderKind::Custom);
     let main_order = arrange((0..main.len()).collect(), |i| rank(&main[i]), |i| i);
 
     // The tree, flattened depth-first so every folder follows its parent,
@@ -5491,8 +6024,9 @@ pub(crate) fn order_folders(
         sort: &dyn Fn(Vec<usize>) -> Vec<usize>,
         out: &mut Vec<usize>,
     ) {
-        let children: Vec<usize> =
-            (0..custom.len()).filter(|&i| parents[i].as_deref() == parent).collect();
+        let children: Vec<usize> = (0..custom.len())
+            .filter(|&i| parents[i].as_deref() == parent)
+            .collect();
         for i in sort(children) {
             out.push(i);
             walk(Some(&custom[i].path), custom, parents, sort, out);
@@ -5516,14 +6050,17 @@ pub(crate) fn order_folders(
 
     // The folders inside the Inbox follow it (#345), in their tree order;
     // the rest of the tree comes after the main folders.
-    let (inside, outside): (Vec<usize>, Vec<usize>) =
-        flat.into_iter().partition(|&i| nest && under_inbox(&custom[i].path));
+    let (inside, outside): (Vec<usize>, Vec<usize>) = flat
+        .into_iter()
+        .partition(|&i| nest && under_inbox(&custom[i].path));
     let mut main_slots: Vec<Option<Folder>> = main.into_iter().map(Some).collect();
     let mut custom_slots: Vec<Option<Folder>> = custom.into_iter().map(Some).collect();
     let mut out = Vec::with_capacity(main_slots.len() + custom_slots.len());
     let mut placed = inside.is_empty();
     for i in main_order {
-        let Some(f) = main_slots[i].take() else { continue };
+        let Some(f) = main_slots[i].take() else {
+            continue;
+        };
         let inbox = f.kind == FolderKind::Inbox;
         out.push(f);
         if inbox && !placed {
@@ -5531,7 +6068,12 @@ pub(crate) fn order_folders(
             placed = true;
         }
     }
-    out.extend(inside.iter().chain(&outside).filter_map(|&j| custom_slots[j].take()));
+    out.extend(
+        inside
+            .iter()
+            .chain(&outside)
+            .filter_map(|&j| custom_slots[j].take()),
+    );
     out
 }
 
@@ -5581,7 +6123,6 @@ impl Sidebar {
             contacts: self.contacts_expanded,
         });
     }
-
 }
 
 /// Whether a folder row is hidden because some ancestor node is collapsed.
@@ -5606,7 +6147,8 @@ pub(crate) fn slide_tree_row(row: &gtk::ListBoxRow, rev: &gtk::Revealer, hidden:
 
 /// Whether `path` is inside the Inbox: `INBOX`, then a separator (#345).
 fn under_inbox(path: &str) -> bool {
-    path.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("INBOX"))
+    path.get(..5)
+        .is_some_and(|p| p.eq_ignore_ascii_case("INBOX"))
         && matches!(path.as_bytes().get(5), Some(b'/' | b'.' | b'\\'))
 }
 
@@ -5634,10 +6176,7 @@ pub(crate) fn is_main_row(f: &Folder, nest: bool) -> bool {
     f.kind != FolderKind::Custom || (nest && under_inbox(&f.path))
 }
 
-fn hidden_by_collapse(
-    path: &str,
-    collapsed: &std::collections::HashSet<String>,
-) -> bool {
+fn hidden_by_collapse(path: &str, collapsed: &std::collections::HashSet<String>) -> bool {
     collapsed.iter().any(|p| path_is_under(path, p))
 }
 
@@ -5664,7 +6203,8 @@ fn show_sidebar_menu(
             })
         })
         .collect();
-    let popover = crate::ui::context_menu::show_context_menu_popover(parent, x, y, None, vec![entries]);
+    let popover =
+        crate::ui::context_menu::show_context_menu_popover(parent, x, y, None, vec![entries]);
     let s = sender.clone();
     popover.connect_closed(move |_| {
         if let Some(action) = chosen.borrow_mut().take() {
@@ -5825,10 +6365,7 @@ const ROW_LEFT_INSET: i32 = 8;
 /// Wrap `child` in an overlay with a small unread chip pinned to its top-right
 /// corner — used in the compact rail, where there's no room for an inline badge.
 /// Returns the overlay (to place in the tree) and the chip label (for updates).
-fn with_unread_overlay(
-    child: &impl IsA<gtk::Widget>,
-    unread: u32,
-) -> (gtk::Overlay, gtk::Label) {
+fn with_unread_overlay(child: &impl IsA<gtk::Widget>, unread: u32) -> (gtk::Overlay, gtk::Label) {
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(child));
     let badge = gtk::Label::new(Some(&unread.to_string()));
@@ -5966,7 +6503,11 @@ fn build_folder_row(
             mark.add_css_class("filter-mark");
             mark.add_css_class(&format!("acct-tint-{account_id}"));
             mark.set_halign(gtk::Align::End);
-            mark.set_valign(if collapsed { gtk::Align::End } else { gtk::Align::Start });
+            mark.set_valign(if collapsed {
+                gtk::Align::End
+            } else {
+                gtk::Align::Start
+            });
             overlay.add_overlay(&mark);
             overlay.set_measure_overlay(&mark, false);
             overlay.upcast()
@@ -6020,7 +6561,10 @@ mod tests {
     use super::folder_depth;
     use super::hidden_by_collapse;
     use super::parse_move_payload;
-    use super::{folder_drop_zone, is_main_row, nests_in_inbox, order_folders, placed_run, under_inbox, FolderDrop, Hierarchy};
+    use super::{
+        folder_drop_zone, is_main_row, nests_in_inbox, order_folders, placed_run, under_inbox,
+        FolderDrop, Hierarchy,
+    };
     use crate::config::FolderSort;
     use crate::models::{Folder, FolderKind};
 
@@ -6057,7 +6601,11 @@ mod tests {
     fn folder_depth_needs_a_delimiter_not_just_a_prefix() {
         // "ClientsB" merely shares a prefix with "Clients" — it is a sibling,
         // not a child.
-        let folders = vec![custom(1, "Clients"), custom(2, "ClientsB"), custom(3, "Clients/X")];
+        let folders = vec![
+            custom(1, "Clients"),
+            custom(2, "ClientsB"),
+            custom(3, "Clients/X"),
+        ];
         let refs: Vec<&Folder> = folders.iter().collect();
         assert_eq!(folder_depth(&folders[1], &refs), 0);
         assert_eq!(folder_depth(&folders[2], &refs), 1);
@@ -6083,7 +6631,10 @@ mod tests {
     #[test]
     fn a_drop_payload_carries_every_dragged_message() {
         // One message (the single-selection case).
-        assert_eq!(parse_move_payload("vireo-move\t1\t2\t3\t4"), vec![(1, 2, 3, 4)]);
+        assert_eq!(
+            parse_move_payload("vireo-move\t1\t2\t3\t4"),
+            vec![(1, 2, 3, 4)]
+        );
         // Three, as a multi-selection drag sends them — including a second
         // account, which the app filters out (mail can't cross accounts).
         assert_eq!(
@@ -6099,15 +6650,21 @@ mod tests {
             "some dragged text",
             "vireo-move",
             "vireo-move\t1\t2\t3",       // short group
-            "vireo-move\t1\t2\t3\t4\t5",  // trailing partial group
-            "vireo-move\t1\t2\tx\t4",     // unparsable field
+            "vireo-move\t1\t2\t3\t4\t5", // trailing partial group
+            "vireo-move\t1\t2\tx\t4",    // unparsable field
         ] {
-            assert!(parse_move_payload(bad).is_empty(), "{bad:?} should parse to nothing");
+            assert!(
+                parse_move_payload(bad).is_empty(),
+                "{bad:?} should parse to nothing"
+            );
         }
     }
 
     fn main(id: u32, path: &str, kind: FolderKind) -> Folder {
-        Folder { kind, ..custom(id, path) }
+        Folder {
+            kind,
+            ..custom(id, path)
+        }
     }
 
     fn paths(folders: &[Folder]) -> Vec<&str> {
@@ -6131,45 +6688,131 @@ mod tests {
         let folders = order_folders(server_order(), &[], FolderSort::Custom);
         assert_eq!(
             paths(&folders),
-            ["INBOX", "Sent", "Archive", "Clients", "Clients/Acme", "Clients/Beta", "Travel"]
+            [
+                "INBOX",
+                "Sent",
+                "Archive",
+                "Clients",
+                "Clients/Acme",
+                "Clients/Beta",
+                "Travel"
+            ]
         );
     }
 
     #[test]
     fn a_set_order_sorts_siblings_and_keeps_the_tree() {
-        let order: Vec<String> =
-            ["Archive", "INBOX", "Travel", "Clients/Beta"].iter().map(|s| s.to_string()).collect();
+        let order: Vec<String> = ["Archive", "INBOX", "Travel", "Clients/Beta"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         let folders = order_folders(server_order(), &order, FolderSort::Custom);
         // Archive leads the main folders; Sent (never placed) follows INBOX,
         // the folder before it by default. Clients (never placed) comes
         // before Travel by name, and keeps its sub-folders under it.
         assert_eq!(
             paths(&folders),
-            ["Archive", "INBOX", "Sent", "Clients", "Clients/Acme", "Clients/Beta", "Travel"]
+            [
+                "Archive",
+                "INBOX",
+                "Sent",
+                "Clients",
+                "Clients/Acme",
+                "Clients/Beta",
+                "Travel"
+            ]
         );
     }
 
     #[test]
     fn a_chosen_sort_ignores_the_dragged_order_but_not_the_main_folders() {
-        let folders: Vec<Folder> = [main(1, "INBOX", FolderKind::Inbox), main(2, "Sent", FolderKind::Sent)]
-            .into_iter()
-            .chain(["Beta", "Beta/Two", "Beta/One", "[Gmail]/Alpha", "Zulu"].iter().enumerate().map(|(i, p)| custom(i as u32 + 3, p)))
+        let folders: Vec<Folder> = [
+            main(1, "INBOX", FolderKind::Inbox),
+            main(2, "Sent", FolderKind::Sent),
+        ]
+        .into_iter()
+        .chain(
+            ["Beta", "Beta/Two", "Beta/One", "[Gmail]/Alpha", "Zulu"]
+                .iter()
+                .enumerate()
+                .map(|(i, p)| custom(i as u32 + 3, p)),
+        )
+        .collect();
+        let order: Vec<String> = ["Sent", "INBOX", "Zulu", "Beta"]
+            .iter()
+            .map(|s| s.to_string())
             .collect();
-        let order: Vec<String> = ["Sent", "INBOX", "Zulu", "Beta"].iter().map(|s| s.to_string()).collect();
-        let sorted = |sort| paths(&order_folders(folders.clone(), &order, sort)).iter().map(|p| p.to_string()).collect::<Vec<_>>();
-        assert_eq!(sorted(FolderSort::Custom), ["Sent", "INBOX", "[Gmail]/Alpha", "Zulu", "Beta", "Beta/One", "Beta/Two"]);
-        assert_eq!(sorted(FolderSort::NameAsc), ["Sent", "INBOX", "[Gmail]/Alpha", "Beta", "Beta/One", "Beta/Two", "Zulu"]);
-        assert_eq!(sorted(FolderSort::NameDesc), ["Sent", "INBOX", "Zulu", "Beta", "Beta/Two", "Beta/One", "[Gmail]/Alpha"]);
+        let sorted = |sort| {
+            paths(&order_folders(folders.clone(), &order, sort))
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            sorted(FolderSort::Custom),
+            [
+                "Sent",
+                "INBOX",
+                "[Gmail]/Alpha",
+                "Zulu",
+                "Beta",
+                "Beta/One",
+                "Beta/Two"
+            ]
+        );
+        assert_eq!(
+            sorted(FolderSort::NameAsc),
+            [
+                "Sent",
+                "INBOX",
+                "[Gmail]/Alpha",
+                "Beta",
+                "Beta/One",
+                "Beta/Two",
+                "Zulu"
+            ]
+        );
+        assert_eq!(
+            sorted(FolderSort::NameDesc),
+            [
+                "Sent",
+                "INBOX",
+                "Zulu",
+                "Beta",
+                "Beta/Two",
+                "Beta/One",
+                "[Gmail]/Alpha"
+            ]
+        );
         // As the list came in (by path on the server).
-        assert_eq!(sorted(FolderSort::Path), ["Sent", "INBOX", "Beta", "Beta/Two", "Beta/One", "[Gmail]/Alpha", "Zulu"]);
+        assert_eq!(
+            sorted(FolderSort::Path),
+            [
+                "Sent",
+                "INBOX",
+                "Beta",
+                "Beta/Two",
+                "Beta/One",
+                "[Gmail]/Alpha",
+                "Zulu"
+            ]
+        );
     }
 
     #[test]
     fn folders_sort_by_the_name_shown_and_new_ones_by_name_among_the_placed() {
         // Gmail's folders, as the server sorts them by path.
         let folders: Vec<Folder> = [
-            "2e-303Disk", "9e-308Disk", "Deleted Messages", "Folder 1", "Folder 2", "Test 2",
-            "Test 3", "Trash", "[Gmail]/Important", "[Gmail]/Test",
+            "2e-303Disk",
+            "9e-308Disk",
+            "Deleted Messages",
+            "Folder 1",
+            "Folder 2",
+            "Test 2",
+            "Test 3",
+            "Trash",
+            "[Gmail]/Important",
+            "[Gmail]/Test",
         ]
         .iter()
         .enumerate()
@@ -6179,15 +6822,29 @@ mod tests {
         assert_eq!(
             paths(&order_folders(folders.clone(), &[], FolderSort::Custom)),
             [
-                "2e-303Disk", "9e-308Disk", "Deleted Messages", "Folder 1", "Folder 2",
-                "[Gmail]/Important", "[Gmail]/Test", "Test 2", "Test 3", "Trash",
+                "2e-303Disk",
+                "9e-308Disk",
+                "Deleted Messages",
+                "Folder 1",
+                "Folder 2",
+                "[Gmail]/Important",
+                "[Gmail]/Test",
+                "Test 2",
+                "Test 3",
+                "Trash",
             ]
         );
         // An order dragged before the Folder ones existed: they land after
         // Deleted Messages, the placed folder before them by name.
         let order: Vec<String> = [
-            "[Gmail]/Important", "[Gmail]/Test", "2e-303Disk", "9e-308Disk", "Deleted Messages",
-            "Test 3", "Test 2", "Trash",
+            "[Gmail]/Important",
+            "[Gmail]/Test",
+            "2e-303Disk",
+            "9e-308Disk",
+            "Deleted Messages",
+            "Test 3",
+            "Test 2",
+            "Trash",
         ]
         .iter()
         .map(|s| s.to_string())
@@ -6195,8 +6852,16 @@ mod tests {
         assert_eq!(
             paths(&order_folders(folders, &order, FolderSort::Custom)),
             [
-                "[Gmail]/Important", "[Gmail]/Test", "2e-303Disk", "9e-308Disk", "Deleted Messages",
-                "Folder 1", "Folder 2", "Test 3", "Test 2", "Trash",
+                "[Gmail]/Important",
+                "[Gmail]/Test",
+                "2e-303Disk",
+                "9e-308Disk",
+                "Deleted Messages",
+                "Folder 1",
+                "Folder 2",
+                "Test 3",
+                "Test 2",
+                "Trash",
             ]
         );
     }
@@ -6206,7 +6871,10 @@ mod tests {
     /// `INBOX.` namespace) nothing moves.
     #[test]
     fn folders_inside_the_inbox_follow_it() {
-        let main = |id: u32, path: &str, kind: FolderKind| Folder { kind, ..custom(id, path) };
+        let main = |id: u32, path: &str, kind: FolderKind| Folder {
+            kind,
+            ..custom(id, path)
+        };
         let mixed = vec![
             main(1, "INBOX", FolderKind::Inbox),
             main(2, "Sent", FolderKind::Sent),
@@ -6219,7 +6887,14 @@ mod tests {
         let shown = order_folders(mixed.clone(), &[], FolderSort::Custom);
         assert_eq!(
             paths(&shown),
-            ["INBOX", "INBOX.Ablage", "INBOX.Mailinglisten", "INBOX.Mailinglisten.KiCad", "Sent", "Archiv"]
+            [
+                "INBOX",
+                "INBOX.Ablage",
+                "INBOX.Mailinglisten",
+                "INBOX.Mailinglisten.KiCad",
+                "Sent",
+                "Archiv"
+            ]
         );
         assert_eq!(shown.iter().filter(|f| is_main_row(f, true)).count(), 5);
 
@@ -6229,13 +6904,19 @@ mod tests {
             custom(3, "INBOX.Archiv"),
         ];
         assert!(!nests_in_inbox(&namespaced));
-        assert_eq!(paths(&order_folders(namespaced, &[], FolderSort::Custom)), ["INBOX", "INBOX.Ablage", "INBOX.Archiv"]);
+        assert_eq!(
+            paths(&order_folders(namespaced, &[], FolderSort::Custom)),
+            ["INBOX", "INBOX.Ablage", "INBOX.Archiv"]
+        );
         // "INBOXES" is not inside the Inbox.
         assert!(!under_inbox("INBOXES") && under_inbox("inbox/x") && !under_inbox("INBOX"));
     }
 
     fn gmail() -> Hierarchy {
-        Hierarchy { delimiter: '/', namespace: String::new() }
+        Hierarchy {
+            delimiter: '/',
+            namespace: String::new(),
+        }
     }
 
     #[test]
@@ -6244,22 +6925,38 @@ mod tests {
         assert_eq!(gmail().parent("Test 2/Test"), "Test 2");
         assert_eq!(gmail().parent("Test 3"), "");
         // A Dovecot-style namespace counts as the top level.
-        let dovecot = Hierarchy { delimiter: '.', namespace: "INBOX.".into() };
+        let dovecot = Hierarchy {
+            delimiter: '.',
+            namespace: "INBOX.".into(),
+        };
         assert_eq!(dovecot.parent("INBOX.old-messages"), "");
-        assert_eq!(dovecot.parent("INBOX.old-messages.test 2"), "INBOX.old-messages");
+        assert_eq!(
+            dovecot.parent("INBOX.old-messages.test 2"),
+            "INBOX.old-messages"
+        );
     }
 
     #[test]
     fn a_main_folder_only_reorders_among_main_folders() {
         let custom: Vec<String> = vec!["Clients".into(), "Clients/Acme".into()];
         let drop = |target: &Folder, frac| {
-            folder_drop_zone("vireo-folder-main\t1\tSent", 1, target, &custom, &gmail(), frac)
+            folder_drop_zone(
+                "vireo-folder-main\t1\tSent",
+                1,
+                target,
+                &custom,
+                &gmail(),
+                frac,
+            )
         };
         let inbox = main(1, "INBOX", FolderKind::Inbox);
         assert_eq!(drop(&inbox, 0.4), FolderDrop::Before);
         assert_eq!(drop(&inbox, 0.6), FolderDrop::After);
         assert_eq!(drop(&custom_folder("Clients"), 0.5), FolderDrop::Refuse);
-        assert_eq!(drop(&main(2, "Sent", FolderKind::Sent), 0.1), FolderDrop::Refuse);
+        assert_eq!(
+            drop(&main(2, "Sent", FolderKind::Sent), 0.1),
+            FolderDrop::Refuse
+        );
     }
 
     fn custom_folder(path: &str) -> Folder {
@@ -6268,10 +6965,16 @@ mod tests {
 
     #[test]
     fn a_custom_folder_goes_in_any_gap_or_inside_a_folder() {
-        let custom: Vec<String> = ["Clients", "Clients/Acme", "Clients/Beta", "Travel", "[Gmail]/Important"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let custom: Vec<String> = [
+            "Clients",
+            "Clients/Acme",
+            "Clients/Beta",
+            "Travel",
+            "[Gmail]/Important",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
         let drop = |payload: &str, target: &str, frac| {
             folder_drop_zone(payload, 1, &custom_folder(target), &custom, &gmail(), frac)
         };
@@ -6287,16 +6990,28 @@ mod tests {
         // unless it already lives there; inside it is fine.
         assert_eq!(drop(travel, "[Gmail]/Important", 0.1), FolderDrop::Refuse);
         assert_eq!(drop(travel, "[Gmail]/Important", 0.5), FolderDrop::Into);
-        assert_eq!(drop("vireo-folder\t1\t[Gmail]/Test", "[Gmail]/Important", 0.1), FolderDrop::Before);
+        assert_eq!(
+            drop("vireo-folder\t1\t[Gmail]/Test", "[Gmail]/Important", 0.1),
+            FolderDrop::Before
+        );
         // Never inside itself, nor among the main folders or another account.
         let clients = "vireo-folder\t1\tClients";
         assert_eq!(drop(clients, "Clients/Acme", 0.5), FolderDrop::Refuse);
         assert_eq!(drop(clients, "Clients/Acme", 0.1), FolderDrop::Refuse);
         let inbox = main(1, "INBOX", FolderKind::Inbox);
-        assert_eq!(folder_drop_zone(travel, 1, &inbox, &custom, &gmail(), 0.5), FolderDrop::Refuse);
-        assert_eq!(drop("vireo-folder\t2\tTravel", "Clients", 0.1), FolderDrop::Refuse);
+        assert_eq!(
+            folder_drop_zone(travel, 1, &inbox, &custom, &gmail(), 0.5),
+            FolderDrop::Refuse
+        );
+        assert_eq!(
+            drop("vireo-folder\t2\tTravel", "Clients", 0.1),
+            FolderDrop::Refuse
+        );
         // Mail always goes in.
-        assert_eq!(drop("vireo-move\t1\t2\t3\t4", "Clients", 0.1), FolderDrop::Into);
+        assert_eq!(
+            drop("vireo-move\t1\t2\t3\t4", "Clients", 0.1),
+            FolderDrop::Into
+        );
     }
 
     #[test]

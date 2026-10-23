@@ -47,7 +47,9 @@ fn detect_raw(raw: &[u8]) -> Option<Unsubscribe> {
 /// Read everything a parsed message offers, headers and body.
 pub fn detect(parsed: &mail_parser::Message) -> Option<Unsubscribe> {
     let headers = header_handles(parsed);
-    let post = raw_header_values(parsed, "List-Unsubscribe-Post").into_iter().next();
+    let post = raw_header_values(parsed, "List-Unsubscribe-Post")
+        .into_iter()
+        .next();
     let list_id = raw_header_values(parsed, "List-Id").into_iter().next();
     let mut found = from_headers(&headers, post.as_deref(), list_id.as_deref());
 
@@ -94,14 +96,20 @@ pub fn detect(parsed: &mail_parser::Message) -> Option<Unsubscribe> {
 /// it references one, or its subject wears one of the prefixes mail
 /// programs add.
 fn is_reply_or_forward(parsed: &mail_parser::Message) -> bool {
-    if parsed.in_reply_to().as_text_list().is_some_and(|l| !l.is_empty()) {
+    if parsed
+        .in_reply_to()
+        .as_text_list()
+        .is_some_and(|l| !l.is_empty())
+    {
         return true;
     }
     crate::models::is_reply_or_forward_subject(parsed.subject().unwrap_or_default())
 }
 
 fn first_address(a: Option<&mail_parser::Address>) -> Option<String> {
-    a.and_then(|a| a.first()).and_then(|x| x.address()).map(|s| s.to_string())
+    a.and_then(|a| a.first())
+        .and_then(|x| x.address())
+        .map(|s| s.to_string())
 }
 
 /// Every header value that names an unsubscribe handle: `List-Unsubscribe`
@@ -129,7 +137,12 @@ fn header_handles(parsed: &mail_parser::Message) -> Vec<String> {
     if !top.is_empty() {
         return top;
     }
-    parsed.parts.iter().skip(1).flat_map(|p| of(&p.headers)).collect()
+    parsed
+        .parts
+        .iter()
+        .skip(1)
+        .flat_map(|p| of(&p.headers))
+        .collect()
 }
 
 /// The raw, unfolded value of every top-level header of that name.
@@ -219,7 +232,10 @@ fn handles_of(value: &str) -> Vec<String> {
     while let Some(start) = rest.find('<') {
         let after = &rest[start + 1..];
         let Some(end) = after.find('>') else { break };
-        let handle: String = after[..end].chars().filter(|c| !c.is_whitespace()).collect();
+        let handle: String = after[..end]
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect();
         if !handle.is_empty() {
             out.push(handle);
         }
@@ -241,7 +257,8 @@ fn handles_of(value: &str) -> Vec<String> {
 /// for something that is neither an address nor a web address.
 fn with_scheme(handle: String) -> Option<String> {
     let lower = handle.to_ascii_lowercase();
-    if lower.starts_with("mailto:") || lower.starts_with("http://") || lower.starts_with("https://") {
+    if lower.starts_with("mailto:") || lower.starts_with("http://") || lower.starts_with("https://")
+    {
         return Some(handle);
     }
     if lower.starts_with("www.") {
@@ -255,7 +272,9 @@ fn with_scheme(handle: String) -> Option<String> {
 
 /// A bare address: one `@`, a dot after it, nothing that a URL would carry.
 fn is_email(s: &str) -> bool {
-    let Some((local, domain)) = s.split_once('@') else { return false };
+    let Some((local, domain)) = s.split_once('@') else {
+        return false;
+    };
     !local.is_empty()
         && domain.contains('.')
         && !domain.ends_with('.')
@@ -329,80 +348,267 @@ const MEDIUM: u8 = 2;
 /// whatever the spacing, hyphens or case. English first, then the languages
 /// bulk mail is commonly sent in.
 const STRONG_WORDS: &[&str] = &[
-    "unsubscribe", "unsubcribe", "unsuscribe", "unsubscribing", "optout", "signoff",
-    "stopreceiving", "nolongerwishtoreceive", "nolongerwanttoreceive", "nolongerreceive",
-    "removeme", "removeyourself", "removefromthislist", "removefromlist", "removefromourlist",
-    "leavethislist", "leavelist", "leavethegroup", "cancelsubscription", "cancelyoursubscription",
-    "cancelmysubscription", "endsubscription", "stopemails", "stoptheseemails",
-    "stopthesemessages", "turnoffthesenotifications", "turnoffnotifications",
+    "unsubscribe",
+    "unsubcribe",
+    "unsuscribe",
+    "unsubscribing",
+    "optout",
+    "signoff",
+    "stopreceiving",
+    "nolongerwishtoreceive",
+    "nolongerwanttoreceive",
+    "nolongerreceive",
+    "removeme",
+    "removeyourself",
+    "removefromthislist",
+    "removefromlist",
+    "removefromourlist",
+    "leavethislist",
+    "leavelist",
+    "leavethegroup",
+    "cancelsubscription",
+    "cancelyoursubscription",
+    "cancelmysubscription",
+    "endsubscription",
+    "stopemails",
+    "stoptheseemails",
+    "stopthesemessages",
+    "turnoffthesenotifications",
+    "turnoffnotifications",
     // German
-    "abmelden", "abbestellen", "austragen", "newsletterabmelden", "keineweiteren",
+    "abmelden",
+    "abbestellen",
+    "austragen",
+    "newsletterabmelden",
+    "keineweiteren",
     // French
-    "désabonner", "desabonner", "désinscrire", "desinscrire", "désinscription", "desinscription",
-    "désabonnement", "desabonnement", "neplusrecevoir",
+    "désabonner",
+    "desabonner",
+    "désinscrire",
+    "desinscrire",
+    "désinscription",
+    "desinscription",
+    "désabonnement",
+    "desabonnement",
+    "neplusrecevoir",
     // Spanish
-    "darsedebaja", "darmedebaja", "dardebaja", "bajadelalista", "cancelarsuscripción",
-    "cancelarsuscripcion", "anularsuscripción", "anularsuscripcion", "desuscribir", "dejarderecibir",
+    "darsedebaja",
+    "darmedebaja",
+    "dardebaja",
+    "bajadelalista",
+    "cancelarsuscripción",
+    "cancelarsuscripcion",
+    "anularsuscripción",
+    "anularsuscripcion",
+    "desuscribir",
+    "dejarderecibir",
     // Portuguese
-    "cancelarsubscrição", "cancelarsubscricao", "cancelarinscrição", "cancelarinscricao",
-    "descadastrar", "desinscrever", "sairdalista", "deixarderecebir",
+    "cancelarsubscrição",
+    "cancelarsubscricao",
+    "cancelarinscrição",
+    "cancelarinscricao",
+    "descadastrar",
+    "desinscrever",
+    "sairdalista",
+    "deixarderecebir",
     // Italian
-    "disiscriviti", "disiscrizione", "annullaiscrizione", "cancellaiscrizione", "cancellati",
-    "rimuovimi", "nonriceverepiù",
+    "disiscriviti",
+    "disiscrizione",
+    "annullaiscrizione",
+    "cancellaiscrizione",
+    "cancellati",
+    "rimuovimi",
+    "nonriceverepiù",
     // Dutch
-    "afmelden", "uitschrijven", "uitschrijving", "afmelding",
+    "afmelden",
+    "uitschrijven",
+    "uitschrijving",
+    "afmelding",
     // Swedish, Danish, Norwegian, Finnish
-    "avregistrera", "avslutaprenumeration", "avprenumerera", "afmeld", "frameld", "opsigabonnement",
-    "avmeld", "avsluttabonnement", "meldavabonnement", "peruutatilaus", "poistatilaus", "perutilaus",
+    "avregistrera",
+    "avslutaprenumeration",
+    "avprenumerera",
+    "afmeld",
+    "frameld",
+    "opsigabonnement",
+    "avmeld",
+    "avsluttabonnement",
+    "meldavabonnement",
+    "peruutatilaus",
+    "poistatilaus",
+    "perutilaus",
     "lopetatilaus",
     // Polish, Czech, Slovak, Hungarian, Romanian
-    "wypiszsię", "wypiszsie", "rezygnacja", "anulujsubskrypcję", "anulujsubskrypcje", "zrezygnuj",
-    "odhlásit", "odhlasit", "odhlášení", "odhlaseni", "zrušitodběr", "zrusitodber", "odhlásiť",
-    "leiratkozás", "leiratkozas", "leiratkozom", "dezabonare", "dezabonează", "dezaboneaza",
+    "wypiszsię",
+    "wypiszsie",
+    "rezygnacja",
+    "anulujsubskrypcję",
+    "anulujsubskrypcje",
+    "zrezygnuj",
+    "odhlásit",
+    "odhlasit",
+    "odhlášení",
+    "odhlaseni",
+    "zrušitodběr",
+    "zrusitodber",
+    "odhlásiť",
+    "leiratkozás",
+    "leiratkozas",
+    "leiratkozom",
+    "dezabonare",
+    "dezabonează",
+    "dezaboneaza",
     // Russian, Ukrainian, Greek, Turkish
-    "отписаться", "отписка", "отменитьподписку", "отказатьсяотрассылки", "відписатися", "відписка",
-    "απεγγραφή", "κατάργησηεγγραφής", "διαγραφήαπότηλίστα",
-    "aboneliktençık", "aboneliktencik", "abonelikiptal", "aboneliğiiptal", "listedençık",
+    "отписаться",
+    "отписка",
+    "отменитьподписку",
+    "отказатьсяотрассылки",
+    "відписатися",
+    "відписка",
+    "απεγγραφή",
+    "κατάργησηεγγραφής",
+    "διαγραφήαπότηλίστα",
+    "aboneliktençık",
+    "aboneliktencik",
+    "abonelikiptal",
+    "aboneliğiiptal",
+    "listedençık",
     // Japanese, Chinese, Korean
-    "配信停止", "購読解除", "登録解除", "配信解除", "購読をやめる", "受信拒否", "配信を停止",
-    "取消订阅", "退订", "取消訂閱", "退訂", "구독취소", "수신거부", "구독해지",
+    "配信停止",
+    "購読解除",
+    "登録解除",
+    "配信解除",
+    "購読をやめる",
+    "受信拒否",
+    "配信を停止",
+    "取消订阅",
+    "退订",
+    "取消訂閱",
+    "退訂",
+    "구독취소",
+    "수신거부",
+    "구독해지",
     // Arabic, Hebrew, Indonesian/Malay, Vietnamese, Thai, Hindi
-    "إلغاءالاشتراك", "الغاءالاشتراك", "הסרהמרשימתהתפוצה", "להסרהמרשימת", "הסרמרשימת",
-    "berhentiberlangganan", "berhentilangganan", "hủyđăngký", "huydangky", "ยกเลิกการสมัคร",
-    "ยกเลิกรับข่าวสาร", "सदस्यतारद्द", "सदस्यतासमाप्त",
+    "إلغاءالاشتراك",
+    "الغاءالاشتراك",
+    "הסרהמרשימתהתפוצה",
+    "להסרהמרשימת",
+    "הסרמרשימת",
+    "berhentiberlangganan",
+    "berhentilangganan",
+    "hủyđăngký",
+    "huydangky",
+    "ยกเลิกการสมัคร",
+    "ยกเลิกรับข่าวสาร",
+    "सदस्यतारद्द",
+    "सदस्यतासमाप्त",
 ];
 
 /// Words that mean a preferences page, where unsubscribing is one choice.
 const MEDIUM_WORDS: &[&str] = &[
-    "emailpreference", "communicationpreference", "notificationpreference", "subscriptionpreference",
-    "managepreference", "manageyourpreference", "updatepreference", "updateyourpreference",
-    "changeyourpreference", "preferencecenter", "preferencecentre", "managesubscription",
-    "manageyoursubscription", "managenotification", "notificationsetting", "emailsetting",
-    "subscriptionsetting", "manageemail", "managealert", "manageyouremail", "mailingpreference",
+    "emailpreference",
+    "communicationpreference",
+    "notificationpreference",
+    "subscriptionpreference",
+    "managepreference",
+    "manageyourpreference",
+    "updatepreference",
+    "updateyourpreference",
+    "changeyourpreference",
+    "preferencecenter",
+    "preferencecentre",
+    "managesubscription",
+    "manageyoursubscription",
+    "managenotification",
+    "notificationsetting",
+    "emailsetting",
+    "subscriptionsetting",
+    "manageemail",
+    "managealert",
+    "manageyouremail",
+    "mailingpreference",
 ];
 
 /// Link texts that say nothing by themselves; the sentence around them does.
 const GENERIC_TEXTS: &[&str] = &[
-    "here", "clickhere", "click", "thislink", "link", "thispage", "page", "this", "tap", "taphere",
-    "clic", "cliquezici", "ici", "hier", "klickhier", "klickensiehier", "aquí", "aqui", "hagaclicaquí",
-    "cliqueaqui", "qui", "clicca", "cliccaqui", "klikhier", "kliktutaj", "tutaj", "здесь", "тут",
-    "こちら", "这里", "這裡", "여기",
+    "here",
+    "clickhere",
+    "click",
+    "thislink",
+    "link",
+    "thispage",
+    "page",
+    "this",
+    "tap",
+    "taphere",
+    "clic",
+    "cliquezici",
+    "ici",
+    "hier",
+    "klickhier",
+    "klickensiehier",
+    "aquí",
+    "aqui",
+    "hagaclicaquí",
+    "cliqueaqui",
+    "qui",
+    "clicca",
+    "cliccaqui",
+    "klikhier",
+    "kliktutaj",
+    "tutaj",
+    "здесь",
+    "тут",
+    "こちら",
+    "这里",
+    "這裡",
+    "여기",
 ];
 
 /// What a URL says, lowercased and looked for as a substring.
 const STRONG_URL_WORDS: &[&str] = &[
-    "unsubscribe", "unsub", "optout", "opt-out", "opt_out", "/oo/", "signoff", "sign-off",
-    "desabonn", "desinscri", "abmeld", "abbestell", "afmeld", "uitschrijv", "darsedebaja",
-    "darse-de-baja", "descadastr", "disiscri", "wypisz", "otpis", "remove-me", "removeme",
-    "remove_me", "/remove", "leave-list", "/leave",
+    "unsubscribe",
+    "unsub",
+    "optout",
+    "opt-out",
+    "opt_out",
+    "/oo/",
+    "signoff",
+    "sign-off",
+    "desabonn",
+    "desinscri",
+    "abmeld",
+    "abbestell",
+    "afmeld",
+    "uitschrijv",
+    "darsedebaja",
+    "darse-de-baja",
+    "descadastr",
+    "disiscri",
+    "wypisz",
+    "otpis",
+    "remove-me",
+    "removeme",
+    "remove_me",
+    "/remove",
+    "leave-list",
+    "/leave",
 ];
 const MEDIUM_URL_WORDS: &[&str] = &[
-    "preference", "subscription", "/manage", "email-settings", "emailsettings", "notification",
+    "preference",
+    "subscription",
+    "/manage",
+    "email-settings",
+    "emailsettings",
+    "notification",
 ];
 
 /// Text as the word lists are matched: lowercased, letters and digits only.
 fn squash(s: &str) -> String {
-    s.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect()
+    s.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(|c| c.to_lowercase())
+        .collect()
 }
 
 fn has_strong(squashed: &str) -> bool {
@@ -458,7 +664,9 @@ fn scan_html(html: &str) -> BodyFindings {
             pos = after;
             continue;
         }
-        let Some(tag_end_rel) = lower[after..].find('>') else { break };
+        let Some(tag_end_rel) = lower[after..].find('>') else {
+            break;
+        };
         let tag_end = after + tag_end_rel;
         let tag = &html[start..tag_end];
         let close = lower[tag_end + 1..].find("</a").map(|r| tag_end + 1 + r);
@@ -467,7 +675,9 @@ fn scan_html(html: &str) -> BodyFindings {
         let inner = &html[tag_end + 1..inner_end];
         pos = inner_end;
 
-        let Some(href) = attr(tag, "href").map(|h| decode_entities(&h)) else { continue };
+        let Some(href) = attr(tag, "href").map(|h| decode_entities(&h)) else {
+            continue;
+        };
         let href = href.trim().to_string();
         let mut text = tag_text(inner);
         for a in ["title", "aria-label"] {
@@ -484,7 +694,14 @@ fn scan_html(html: &str) -> BodyFindings {
         // one's words.
         let ctx_start = floor_char(html, start.saturating_sub(600));
         let before = tag_text(&html[ctx_start..start]);
-        let before: String = before.chars().rev().take(160).collect::<Vec<_>>().into_iter().rev().collect();
+        let before: String = before
+            .chars()
+            .rev()
+            .take(160)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
         let tail_from = match close {
             Some(c) => lower[c..].find('>').map(|r| c + r + 1).unwrap_or(inner_end),
             None => inner_end,
@@ -537,7 +754,9 @@ fn attr(tag: &str, name: &str) -> Option<String> {
             continue;
         }
         let rest = lower[from..].trim_start();
-        let Some(rest) = rest.strip_prefix('=') else { continue };
+        let Some(rest) = rest.strip_prefix('=') else {
+            continue;
+        };
         let value_at = tag.len() - rest.len();
         let rest_orig = tag[value_at..].trim_start();
         let value_at = tag.len() - rest_orig.len();
@@ -550,7 +769,9 @@ fn attr(tag: &str, name: &str) -> Option<String> {
                 }
             }
             _ => {
-                let e = rest_orig.find(|c: char| c.is_whitespace() || c == '>').unwrap_or(rest_orig.len());
+                let e = rest_orig
+                    .find(|c: char| c.is_whitespace() || c == '>')
+                    .unwrap_or(rest_orig.len());
                 &rest_orig[..e]
             }
         };
@@ -647,17 +868,55 @@ fn decode_entities(s: &str) -> String {
 
 /// Words in an instruction that mean "write to": "send an email to X".
 const SEND_WORDS: &[&str] = &[
-    "send", "email", "e-mail", "mail", "write", "message", "envía", "envia", "envoyer", "envoyez",
-    "senden", "schreib", "invia", "stuur", "skicka", "wyślij", "отправ", "напиш",
+    "send",
+    "email",
+    "e-mail",
+    "mail",
+    "write",
+    "message",
+    "envía",
+    "envia",
+    "envoyer",
+    "envoyez",
+    "senden",
+    "schreib",
+    "invia",
+    "stuur",
+    "skicka",
+    "wyślij",
+    "отправ",
+    "напиш",
 ];
 /// Words in an instruction that mean "reply": "reply with STOP".
 const REPLY_WORDS: &[&str] = &[
-    "reply", "replying", "respond", "responding", "antworten", "antwort", "répondre", "répondez",
-    "repondre", "responder", "responda", "rispondi", "rispondere", "antwoord", "svara", "odpowiedz",
+    "reply",
+    "replying",
+    "respond",
+    "responding",
+    "antworten",
+    "antwort",
+    "répondre",
+    "répondez",
+    "repondre",
+    "responder",
+    "responda",
+    "rispondi",
+    "rispondere",
+    "antwoord",
+    "svara",
+    "odpowiedz",
     "ответ",
 ];
 /// The words a reply is asked to carry, uppercased as a subject.
-const REPLY_COMMANDS: &[&str] = &["unsubscribe", "stop", "remove", "signoff", "leave", "quit", "end"];
+const REPLY_COMMANDS: &[&str] = &[
+    "unsubscribe",
+    "stop",
+    "remove",
+    "signoff",
+    "leave",
+    "quit",
+    "end",
+];
 
 const TOKEN_BREAK: &[char] = &['<', '>', '"', '\'', '(', ')', '[', ']'];
 
@@ -719,13 +978,20 @@ fn scan_text(text: &str, reply_addr: Option<&str>) -> BodyFindings {
         if out.reply.is_none() && REPLY_WORDS.iter().any(|w| lower.contains(w)) {
             if let Some(to) = reply_addr {
                 let subject = asked.clone().unwrap_or_else(|| command_in(&lower));
-                out.reply = Some(ReplyRoute { to: to.to_string(), subject });
+                out.reply = Some(ReplyRoute {
+                    to: to.to_string(),
+                    subject,
+                });
             }
         }
         // "send an email to leave@list.example": the mailto route.
         if out.mailto.is_none() && SEND_WORDS.iter().any(|w| lower.contains(w)) {
-            for tok in joined.split(|c: char| c.is_whitespace() || c == ',' || TOKEN_BREAK.contains(&c)) {
-                let tok = tok.trim_end_matches(['.', ';', ':', '!', '?']).trim_start_matches("mailto:");
+            for tok in
+                joined.split(|c: char| c.is_whitespace() || c == ',' || TOKEN_BREAK.contains(&c))
+            {
+                let tok = tok
+                    .trim_end_matches(['.', ';', ':', '!', '?'])
+                    .trim_start_matches("mailto:");
                 if is_email(tok) {
                     let subject = asked.clone().unwrap_or_else(|| command_in(&lower));
                     out.mailto = Some(format!("mailto:{tok}?subject={subject}"));
@@ -785,9 +1051,11 @@ pub fn parse_mailto(uri: &str) -> Option<MailtoTarget> {
         match key.as_str() {
             "subject" => subject = v,
             "body" => body = v,
-            "to" | "cc" => {
-                to.extend(v.split(',').map(|a| a.trim().to_string()).filter(|a| a.contains('@')))
-            }
+            "to" | "cc" => to.extend(
+                v.split(',')
+                    .map(|a| a.trim().to_string())
+                    .filter(|a| a.contains('@')),
+            ),
             _ => {}
         }
     }
@@ -802,7 +1070,11 @@ pub fn parse_mailto(uri: &str) -> Option<MailtoTarget> {
     if body.trim().is_empty() {
         body = subject.clone();
     }
-    Some(MailtoTarget { to: to.join(", "), subject, body })
+    Some(MailtoTarget {
+        to: to.join(", "),
+        subject,
+        body,
+    })
 }
 
 fn strip_scheme<'a>(uri: &'a str, scheme: &str) -> Option<&'a str> {
@@ -865,9 +1137,15 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(u.mailto.as_deref(), Some("mailto:leave@list.example?subject=unsubscribe"));
+        assert_eq!(
+            u.mailto.as_deref(),
+            Some("mailto:leave@list.example?subject=unsubscribe")
+        );
         assert_eq!(u.web.as_deref(), Some("https://list.example/u/1"));
-        assert_eq!(u.one_click, None, "no List-Unsubscribe-Post, no one-click promise");
+        assert_eq!(
+            u.one_click, None,
+            "no List-Unsubscribe-Post, no one-click promise"
+        );
         assert!(u.list_id.is_empty());
         assert!(u.in_headers);
     }
@@ -878,11 +1156,24 @@ mod tests {
         let u = from_headers(&hdr, Some("List-Unsubscribe=One-Click"), None).unwrap();
         assert_eq!(u.one_click.as_deref(), Some("https://list.example/u/1"));
         let u = from_headers(&hdr, Some(" \"list-unsubscribe = one-click\" "), None).unwrap();
-        assert_eq!(u.one_click.as_deref(), Some("https://list.example/u/1"), "case, space and quotes are forgiven");
+        assert_eq!(
+            u.one_click.as_deref(),
+            Some("https://list.example/u/1"),
+            "case, space and quotes are forgiven"
+        );
         let u = from_headers(&hdr, Some("something-else"), None).unwrap();
         assert_eq!(u.one_click, None);
-        let u = from_headers(&s(&["<http://list.example/u/1>"]), Some("List-Unsubscribe=One-Click"), None).unwrap();
-        assert_eq!(u.one_click.as_deref(), Some("http://list.example/u/1"), "http gets the POST too");
+        let u = from_headers(
+            &s(&["<http://list.example/u/1>"]),
+            Some("List-Unsubscribe=One-Click"),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            u.one_click.as_deref(),
+            Some("http://list.example/u/1"),
+            "http gets the POST too"
+        );
     }
 
     #[test]
@@ -894,21 +1185,36 @@ mod tests {
         assert_eq!(u.mailto.as_deref(), Some("mailto:leave@list.example"));
         assert_eq!(u.web.as_deref(), Some("https://list.example/leave"));
         assert_eq!(u.list_id, "weekly.list.example");
-        assert_eq!(unfold("<mailto:a@b.c>,\r\n <https://x.y/z>"), "<mailto:a@b.c>, <https://x.y/z>");
+        assert_eq!(
+            unfold("<mailto:a@b.c>,\r\n <https://x.y/z>"),
+            "<mailto:a@b.c>, <https://x.y/z>"
+        );
     }
 
     #[test]
     fn bare_handles_without_brackets_or_schemes_are_taken_too() {
         // ArtStation, through Amazon SES: the URL alone, no brackets.
-        let hdr = s(&["https://www.artstation.com/unsubscribe/notifications/21d2?kind%5B%5D=project_publish"]);
+        let hdr = s(&[
+            "https://www.artstation.com/unsubscribe/notifications/21d2?kind%5B%5D=project_publish",
+        ]);
         let u = from_headers(&hdr, None, None).unwrap();
         assert_eq!(u.web.as_deref(), Some("https://www.artstation.com/unsubscribe/notifications/21d2?kind%5B%5D=project_publish"));
         assert!(!u.direct(), "a page only: the button opens the browser");
-        let u = from_headers(&s(&["MAILTO:leave@x.example, https://x.example/u"]), None, None).unwrap();
+        let u = from_headers(
+            &s(&["MAILTO:leave@x.example, https://x.example/u"]),
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(u.mailto.as_deref(), Some("MAILTO:leave@x.example"));
         assert_eq!(u.web.as_deref(), Some("https://x.example/u"));
         // No scheme at all: an address, or a www. host.
-        let u = from_headers(&s(&["<leave@x.example>, <www.x.example/unsub>"]), None, None).unwrap();
+        let u = from_headers(
+            &s(&["<leave@x.example>, <www.x.example/unsub>"]),
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(u.mailto.as_deref(), Some("mailto:leave@x.example"));
         assert_eq!(u.web.as_deref(), Some("https://www.x.example/unsub"));
         // A bracketed value keeps the strict reading: text outside is not a handle.
@@ -920,14 +1226,26 @@ mod tests {
     fn a_message_with_no_handles_offers_nothing() {
         assert_eq!(from_headers(&[], None, None), None);
         assert_eq!(from_headers(&s(&["nothing in brackets"]), None, None), None);
-        assert_eq!(from_headers(&s(&["<ftp://odd.example/x>"]), None, None), None);
-        let plain = message("", "text/plain", "Hi, lunch on Saturday? I unsubscribed from that gym, by the way.");
-        assert_eq!(detect_raw(&plain), None, "the word alone, with no link, is not a route");
+        assert_eq!(
+            from_headers(&s(&["<ftp://odd.example/x>"]), None, None),
+            None
+        );
+        let plain = message(
+            "",
+            "text/plain",
+            "Hi, lunch on Saturday? I unsubscribed from that gym, by the way.",
+        );
+        assert_eq!(
+            detect_raw(&plain),
+            None,
+            "the word alone, with no link, is not a route"
+        );
     }
 
     #[test]
     fn mailto_targets_are_taken_apart() {
-        let t = parse_mailto("mailto:leave@list.example?subject=unsubscribe%20me&body=please+go").unwrap();
+        let t = parse_mailto("mailto:leave@list.example?subject=unsubscribe%20me&body=please+go")
+            .unwrap();
         assert_eq!(t.to, "leave@list.example");
         assert_eq!(t.subject, "unsubscribe me");
         assert_eq!(t.body, "please go");
@@ -939,20 +1257,35 @@ mod tests {
         let t = parse_mailto("mailto:LISTSERV@lists.example?body=SIGNOFF%20MYLIST").unwrap();
         assert_eq!(t.body, "SIGNOFF MYLIST");
         // Plus-addressed handles keep their `+`: it is part of the address.
-        let t = parse_mailto("mailto:list+abc123@x.example?cc=b+1@x.example&subject=go+away").unwrap();
+        let t =
+            parse_mailto("mailto:list+abc123@x.example?cc=b+1@x.example&subject=go+away").unwrap();
         assert_eq!(t.to, "list+abc123@x.example, b+1@x.example");
         assert_eq!(t.subject, "go away");
-        assert_eq!(parse_mailto("mailto:?subject=x"), None, "no address, no target");
+        assert_eq!(
+            parse_mailto("mailto:?subject=x"),
+            None,
+            "no address, no target"
+        );
         assert_eq!(parse_mailto("https://x.example"), None);
     }
 
     #[test]
     fn vendor_aliases_and_part_headers_count() {
-        let raw = message("X-Unsubscribe-Web: https://x.example/leave/1\r\n", "text/plain", "hi");
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://x.example/leave/1"));
+        let raw = message(
+            "X-Unsubscribe-Web: https://x.example/leave/1\r\n",
+            "text/plain",
+            "hi",
+        );
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://x.example/leave/1")
+        );
         let raw = b"From: a@b.c\r\nContent-Type: multipart/alternative; boundary=B\r\n\r\n--B\r\n\
 Content-Type: text/plain\r\nList-Unsubscribe: <mailto:leave@x.example>\r\n\r\nhi\r\n--B--\r\n";
-        assert_eq!(detect_raw(raw).unwrap().mailto.as_deref(), Some("mailto:leave@x.example"));
+        assert_eq!(
+            detect_raw(raw).unwrap().mailto.as_deref(),
+            Some("mailto:leave@x.example")
+        );
     }
 
     #[test]
@@ -961,7 +1294,10 @@ Content-Type: text/plain\r\nList-Unsubscribe: <mailto:leave@x.example>\r\n\r\nhi
         let u = detect_raw(raw.as_bytes()).expect("handles");
         assert!(u.one_click.is_some() && u.mailto.is_some() && u.direct());
         assert_eq!(u.list_id, "digest.this-week-in-rust.org");
-        assert_eq!(crate::verify::check_sender(raw.as_bytes()).trust, crate::models::SenderTrust::Pass);
+        assert_eq!(
+            crate::verify::check_sender(raw.as_bytes()).trust,
+            crate::models::SenderTrust::Pass
+        );
     }
 
     #[test]
@@ -973,7 +1309,10 @@ List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n\
 Subject: Hello\r\n\r\nBody\r\n";
         let u = detect_raw(raw.as_slice()).unwrap();
         assert_eq!(u.one_click.as_deref(), Some("https://list.example/u/abc"));
-        assert_eq!(u.mailto.as_deref(), Some("mailto:leave@list.example?subject=unsubscribe"));
+        assert_eq!(
+            u.mailto.as_deref(),
+            Some("mailto:leave@list.example?subject=unsubscribe")
+        );
         assert_eq!(u.list_id, "digest.list.example");
         let plain = b"From: a@b.c\r\nSubject: x\r\n\r\nhi\r\n";
         assert_eq!(detect_raw(plain.as_slice()), None);
@@ -1001,9 +1340,19 @@ Subject: Hello\r\n\r\nBody\r\n";
             "text/html",
             "<a href=\"https://esp.example/list-manage/unsubscribe?u=1&amp;id=2\">Click</a>",
         );
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://esp.example/list-manage/unsubscribe?u=1&id=2"));
-        let raw = message("", "text/html", "<a href=\"https://esp.example/optout/9\">Ok</a>");
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://esp.example/optout/9"));
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://esp.example/list-manage/unsubscribe?u=1&id=2")
+        );
+        let raw = message(
+            "",
+            "text/html",
+            "<a href=\"https://esp.example/optout/9\">Ok</a>",
+        );
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://esp.example/optout/9")
+        );
     }
 
     #[test]
@@ -1013,9 +1362,16 @@ Subject: Hello\r\n\r\nBody\r\n";
             "text/html",
             "<td>To stop receiving these emails, please <a href=\"https://x.example/r/1\">click here</a>.</td>",
         );
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://x.example/r/1"));
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://x.example/r/1")
+        );
         // The same sentence with a generic link elsewhere: not this link.
-        let raw = message("", "text/html", "<p>Read the story <a href=\"https://x.example/story\">here</a>.</p>");
+        let raw = message(
+            "",
+            "text/html",
+            "<p>Read the story <a href=\"https://x.example/story\">here</a>.</p>",
+        );
         assert_eq!(detect_raw(&raw), None);
     }
 
@@ -1028,14 +1384,20 @@ Subject: Hello\r\n\r\nBody\r\n";
             "<p>If you do not wish to receive future messages, \
              <a href=\"https://x.example/u/d/abc\">click here</a> to unsubscribe.<br>Irvine, CA</p>",
         );
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://x.example/u/d/abc"));
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://x.example/u/d/abc")
+        );
         // A generic link must not borrow the next link's words.
         let raw = message(
             "",
             "text/html",
             "<a href=\"https://x.example/story\">here</a> · <a href=\"https://x.example/bye\">Unsubscribe</a>",
         );
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://x.example/bye"));
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://x.example/bye")
+        );
     }
 
     #[test]
@@ -1046,9 +1408,20 @@ Subject: Hello\r\n\r\nBody\r\n";
             "<a href=\"https://x.example/prefs\">Manage your preferences</a> · \
              <a href=\"https://x.example/bye\">Unsubscribe</a>",
         );
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://x.example/bye"));
-        let raw = message("", "text/html", "<a href=\"https://x.example/prefs\">Email preferences</a>");
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://x.example/prefs"), "a preferences page still counts when it is all there is");
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://x.example/bye")
+        );
+        let raw = message(
+            "",
+            "text/html",
+            "<a href=\"https://x.example/prefs\">Email preferences</a>",
+        );
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://x.example/prefs"),
+            "a preferences page still counts when it is all there is"
+        );
     }
 
     #[test]
@@ -1058,33 +1431,75 @@ Subject: Hello\r\n\r\nBody\r\n";
             "text/html",
             "<a href=\"https://x.example/u/7\"><img src=\"cid:btn\" alt=\"Unsubscribe\"></a>",
         );
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://x.example/u/7"));
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://x.example/u/7")
+        );
         let raw = message(
             "",
             "text/html",
             "<a href=\"mailto:leave@x.example?subject=Unsubscribe\">Unsubscribe</a>",
         );
         let u = detect_raw(&raw).unwrap();
-        assert_eq!(u.mailto.as_deref(), Some("mailto:leave@x.example?subject=Unsubscribe"));
+        assert_eq!(
+            u.mailto.as_deref(),
+            Some("mailto:leave@x.example?subject=Unsubscribe")
+        );
         assert!(u.direct());
     }
 
     #[test]
     fn other_languages_are_understood() {
-        for text in ["Abmelden", "Se désabonner", "Darse de baja", "Cancelar subscrição", "Disiscriviti", "Uitschrijven", "Avregistrera", "Wypisz się", "Отписаться", "配信停止", "取消订阅", "구독 취소", "Abonelikten çık"] {
-            let raw = message("", "text/html; charset=utf-8", &format!("<a href=\"https://x.example/l\">{text}</a>"));
-            assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://x.example/l"), "{text}");
+        for text in [
+            "Abmelden",
+            "Se désabonner",
+            "Darse de baja",
+            "Cancelar subscrição",
+            "Disiscriviti",
+            "Uitschrijven",
+            "Avregistrera",
+            "Wypisz się",
+            "Отписаться",
+            "配信停止",
+            "取消订阅",
+            "구독 취소",
+            "Abonelikten çık",
+        ] {
+            let raw = message(
+                "",
+                "text/html; charset=utf-8",
+                &format!("<a href=\"https://x.example/l\">{text}</a>"),
+            );
+            assert_eq!(
+                detect_raw(&raw).unwrap().web.as_deref(),
+                Some("https://x.example/l"),
+                "{text}"
+            );
         }
     }
 
     #[test]
     fn plain_text_instructions_are_read() {
-        let raw = message("", "text/plain", "Thanks for reading.\n\nTo unsubscribe, visit:\nhttps://x.example/unsub/abc\n");
-        assert_eq!(detect_raw(&raw).unwrap().web.as_deref(), Some("https://x.example/unsub/abc"));
+        let raw = message(
+            "",
+            "text/plain",
+            "Thanks for reading.\n\nTo unsubscribe, visit:\nhttps://x.example/unsub/abc\n",
+        );
+        assert_eq!(
+            detect_raw(&raw).unwrap().web.as_deref(),
+            Some("https://x.example/unsub/abc")
+        );
 
-        let raw = message("", "text/plain", "To unsubscribe, send an email to leave@x.example with the subject UNSUBSCRIBE.");
+        let raw = message(
+            "",
+            "text/plain",
+            "To unsubscribe, send an email to leave@x.example with the subject UNSUBSCRIBE.",
+        );
         let u = detect_raw(&raw).unwrap();
-        assert_eq!(u.mailto.as_deref(), Some("mailto:leave@x.example?subject=UNSUBSCRIBE"));
+        assert_eq!(
+            u.mailto.as_deref(),
+            Some("mailto:leave@x.example?subject=UNSUBSCRIBE")
+        );
 
         let raw = message(
             "Reply-To: bounce@x.example\r\n",
@@ -1092,11 +1507,25 @@ Subject: Hello\r\n\r\nBody\r\n";
             "Don't want these? Reply to this email with STOP in the subject line.",
         );
         let u = detect_raw(&raw).unwrap();
-        assert_eq!(u.reply, Some(ReplyRoute { to: "bounce@x.example".into(), subject: "STOP".into() }));
+        assert_eq!(
+            u.reply,
+            Some(ReplyRoute {
+                to: "bounce@x.example".into(),
+                subject: "STOP".into()
+            })
+        );
         assert!(u.direct());
 
-        let raw = message("", "text/plain", "Just reply with the word unsubscribe and we'll take you off.");
-        assert_eq!(detect_raw(&raw).unwrap().reply.unwrap().to, "digest@list.example", "From when there is no Reply-To");
+        let raw = message(
+            "",
+            "text/plain",
+            "Just reply with the word unsubscribe and we'll take you off.",
+        );
+        assert_eq!(
+            detect_raw(&raw).unwrap().reply.unwrap().to,
+            "digest@list.example",
+            "From when there is no Reply-To"
+        );
     }
 
     #[test]
@@ -1112,7 +1541,11 @@ Subject: Hello\r\n\r\nBody\r\n";
         assert_eq!(u.reply, None, "no reply route out of a forward");
         assert_eq!(u.web.as_deref(), Some("https://news.example/u/9"));
         // The same words in a message of its own keep the reply route.
-        let raw = message("Subject: This week\r\n", "text/plain", "To stop these, reply with UNSUBSCRIBE.");
+        let raw = message(
+            "Subject: This week\r\n",
+            "text/plain",
+            "To stop these, reply with UNSUBSCRIBE.",
+        );
         assert!(detect_raw(&raw).unwrap().reply.is_some());
     }
 
@@ -1128,7 +1561,11 @@ Subject: Hello\r\n\r\nBody\r\n";
             assert_eq!(detect_raw(&raw), None, "{line}");
         }
         // The same sentence with the command in capitals is an instruction.
-        let raw = message("", "text/plain", "Reply with STOP and we will take you off.");
+        let raw = message(
+            "",
+            "text/plain",
+            "Reply with STOP and we will take you off.",
+        );
         assert_eq!(detect_raw(&raw).unwrap().reply.unwrap().subject, "STOP");
     }
 
@@ -1140,17 +1577,37 @@ Subject: Hello\r\n\r\nBody\r\n";
             "<a href=\"mailto:leave@x.example\">Unsubscribe by email</a>",
         );
         let u = detect_raw(&raw).unwrap();
-        assert_eq!(u.web.as_deref(), Some("https://x.example/page"), "the header's page is kept");
-        assert_eq!(u.mailto.as_deref(), Some("mailto:leave@x.example"), "the body's mailto is added");
+        assert_eq!(
+            u.web.as_deref(),
+            Some("https://x.example/page"),
+            "the header's page is kept"
+        );
+        assert_eq!(
+            u.mailto.as_deref(),
+            Some("mailto:leave@x.example"),
+            "the body's mailto is added"
+        );
         assert!(u.in_headers && u.direct());
     }
 
     #[test]
     fn entities_and_attributes_are_read() {
-        assert_eq!(decode_entities("a &amp; b &#39;c&#x27; &nbsp;d &unknown; e"), "a & b 'c'  d &unknown; e");
-        assert_eq!(attr("<a class=x href='https://a/b' title=\"T\">", "href").as_deref(), Some("https://a/b"));
-        assert_eq!(attr("<a data-href=\"no\" href=https://a/c>", "href").as_deref(), Some("https://a/c"));
-        assert_eq!(tag_text("Un<b>sub</b>scribe <img alt=\"now\"> <style>p{}</style>x"), "Un sub scribe now x");
+        assert_eq!(
+            decode_entities("a &amp; b &#39;c&#x27; &nbsp;d &unknown; e"),
+            "a & b 'c'  d &unknown; e"
+        );
+        assert_eq!(
+            attr("<a class=x href='https://a/b' title=\"T\">", "href").as_deref(),
+            Some("https://a/b")
+        );
+        assert_eq!(
+            attr("<a data-href=\"no\" href=https://a/c>", "href").as_deref(),
+            Some("https://a/c")
+        );
+        assert_eq!(
+            tag_text("Un<b>sub</b>scribe <img alt=\"now\"> <style>p{}</style>x"),
+            "Un sub scribe now x"
+        );
     }
 
     /// A local server that answers the first request with `status` and a
@@ -1163,9 +1620,12 @@ Subject: Hello\r\n\r\nBody\r\n";
             "HTTP/1.1 {status}\r\nLocation: http://127.0.0.1:{port}/done\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
         );
         std::thread::spawn(move || {
-            let ok = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string();
+            let ok =
+                "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string();
             for answer in [reply, ok] {
-                let Ok((mut s, _)) = listener.accept() else { return };
+                let Ok((mut s, _)) = listener.accept() else {
+                    return;
+                };
                 let mut buf = [0u8; 4096];
                 let _ = s.read(&mut buf);
                 let _ = s.write_all(answer.as_bytes());
@@ -1193,9 +1653,14 @@ Subject: Hello\r\n\r\nBody\r\n";
     #[test]
     #[ignore]
     fn survey_dir() {
-        let Ok(dir) = std::env::var("HYLKI_UNSUB_SURVEY") else { return };
+        let Ok(dir) = std::env::var("HYLKI_UNSUB_SURVEY") else {
+            return;
+        };
         let (mut total, mut hdr, mut body_only, mut none, mut missed) = (0, 0, 0, 0, 0);
-        let mut entries: Vec<_> = std::fs::read_dir(&dir).expect("dir").filter_map(|e| e.ok()).collect();
+        let mut entries: Vec<_> = std::fs::read_dir(&dir)
+            .expect("dir")
+            .filter_map(|e| e.ok())
+            .collect();
         entries.sort_by_key(|e| e.file_name());
         for entry in entries {
             let raw = match std::fs::read(entry.path()) {
@@ -1226,16 +1691,31 @@ Subject: Hello\r\n\r\nBody\r\n";
                     } else {
                         "web"
                     };
-                    eprintln!("{:<9} {:<10} {from}", route, if u.in_headers { "header" } else { "body" });
+                    eprintln!(
+                        "{:<9} {:<10} {from}",
+                        route,
+                        if u.in_headers { "header" } else { "body" }
+                    );
                 }
                 None => {
                     none += 1;
                     // Did we miss one? Only counts if the word is really there.
                     let text: String = (0..parsed.as_ref().map_or(0, |p| p.text_body_count()))
-                        .filter_map(|i| parsed.as_ref().and_then(|p| p.body_text(i)).map(|t| t.to_string()))
+                        .filter_map(|i| {
+                            parsed
+                                .as_ref()
+                                .and_then(|p| p.body_text(i))
+                                .map(|t| t.to_string())
+                        })
                         .chain(
-                            (0..parsed.as_ref().map_or(0, |p| p.html_body_count()))
-                                .filter_map(|i| parsed.as_ref().and_then(|p| p.body_html(i)).map(|t| t.to_string())),
+                            (0..parsed.as_ref().map_or(0, |p| p.html_body_count())).filter_map(
+                                |i| {
+                                    parsed
+                                        .as_ref()
+                                        .and_then(|p| p.body_html(i))
+                                        .map(|t| t.to_string())
+                                },
+                            ),
                         )
                         .collect();
                     let sq = squash(&text);
@@ -1255,9 +1735,15 @@ Subject: Hello\r\n\r\nBody\r\n";
     #[test]
     #[ignore]
     fn probe_file() {
-        let Ok(path) = std::env::var("HYLKI_UNSUB_PROBE") else { return };
+        let Ok(path) = std::env::var("HYLKI_UNSUB_PROBE") else {
+            return;
+        };
         let raw = std::fs::read(&path).expect("readable file");
         let check = crate::verify::check_sender(&raw);
-        eprintln!("{path}: trust {:?}, unsubscribe {:#?}", check.trust, detect_raw(&raw));
+        eprintln!(
+            "{path}: trust {:?}, unsubscribe {:#?}",
+            check.trust,
+            detect_raw(&raw)
+        );
     }
 }

@@ -30,7 +30,10 @@ enum Editing {
 #[derive(Debug, Clone, Copy)]
 enum AddWhat {
     /// A CardDAV account; `server` is filled in for a known service.
-    CardDav { server: Option<&'static str>, hint: &'static str },
+    CardDav {
+        server: Option<&'static str>,
+        hint: &'static str,
+    },
     Ldap,
     /// Added in GNOME Online Accounts: Hylki cannot sign in to it itself.
     Online,
@@ -111,7 +114,10 @@ pub struct ContactSources {
 pub enum ContactSourcesInput {
     /// Ask EDS, GNOME Online Accounts and the keyring again.
     Load,
-    Loaded { sources: Vec<Source>, eds: bool },
+    Loaded {
+        sources: Vec<Source>,
+        eds: bool,
+    },
     /// The books new contacts can go to, and the Hylki book's size, from
     /// the app.
     SetBooks(Vec<crate::contacts::Book>),
@@ -121,18 +127,33 @@ pub enum ContactSourcesInput {
     Add,
     /// The kind picked in the add page's dropdown.
     AddKind(u32),
-    Toggle { index: usize, on: bool },
-    ToggleBook { book: String, on: bool },
+    Toggle {
+        index: usize,
+        on: bool,
+    },
+    ToggleBook {
+        book: String,
+        on: bool,
+    },
     /// A name given in Hylki to an account or an address book, by its ID
     /// (`None`: its own name again).
-    Rename { id: String, name: Option<String> },
+    Rename {
+        id: String,
+        name: Option<String>,
+    },
     SaveClicked,
     CloseEditor,
     RemoveCurrent,
     ConfirmRemove(usize),
     Remove(usize),
-    SaveCardDav { account: Account, password: String },
-    SaveLdap { dir: Directory, password: String },
+    SaveCardDav {
+        account: Account,
+        password: String,
+    },
+    SaveLdap {
+        dir: Directory,
+        password: String,
+    },
     /// A save, switch or removal went through (or not). `found` is a saved
     /// CardDAV account once EDS had looked at the server, `checked` a
     /// saved directory's first answer.
@@ -152,7 +173,10 @@ pub enum ContactSourcesInput {
 pub enum ContactSourcesOutput {
     /// A page is pushed over the list (or gone); `form` when it holds
     /// changes Save keeps, so leaving it asks first.
-    PageOpen { open: bool, form: bool },
+    PageOpen {
+        open: bool,
+        form: bool,
+    },
     /// What Hylki reads contacts from changed: read them again.
     Changed,
     ImportLocal,
@@ -316,7 +340,11 @@ impl SimpleComponent for ContactSources {
         }
     }
 
-    fn init(init: ContactSourcesInit, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+    fn init(
+        init: ContactSourcesInit,
+        root: Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
         let widgets = view_output!();
         // Connected once its choice is set, and quiet while the Sidebar
         // page's row sets it.
@@ -356,7 +384,10 @@ impl SimpleComponent for ContactSources {
             let save_action = model.save_action.clone();
             let slot = widgets.editor_slot.clone();
             widgets.nav.connect_visible_page_notify(move |nav| {
-                let open = nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor");
+                let open = nav
+                    .visible_page()
+                    .and_then(|p| p.tag())
+                    .is_some_and(|t| t == "editor");
                 let form = open && save_action.borrow().is_some();
                 if !open {
                     *save_action.borrow_mut() = None;
@@ -368,7 +399,10 @@ impl SimpleComponent for ContactSources {
         // Read each time the page is shown: an account may have been added
         // in GNOME Settings, or a sign-in gone through, since.
         {
-            let (s, out) = (sender.input_sender().clone(), sender.output_sender().clone());
+            let (s, out) = (
+                sender.input_sender().clone(),
+                sender.output_sender().clone(),
+            );
             root.connect_map(move |_| {
                 let _ = s.send(ContactSourcesInput::Load);
                 let _ = out.send(ContactSourcesOutput::LoadBooks);
@@ -425,7 +459,8 @@ impl SimpleComponent for ContactSources {
                 self.books = books;
                 let labels: Vec<&str> = self.books.iter().map(|b| b.name.as_str()).collect();
                 self.book_guard.set(true);
-                self.book_row.set_model(Some(&gtk::StringList::new(&labels)));
+                self.book_row
+                    .set_model(Some(&gtk::StringList::new(&labels)));
                 self.book_row.set_selected(0);
                 self.book_row.set_sensitive(self.books.len() > 1);
                 self.book_guard.set(false);
@@ -455,7 +490,9 @@ impl SimpleComponent for ContactSources {
                 }
             }
             ContactSourcesInput::Toggle { index, on } => {
-                let Some(source) = self.sources.get_mut(index) else { return };
+                let Some(source) = self.sources.get_mut(index) else {
+                    return;
+                };
                 if source.on == on {
                     return;
                 }
@@ -464,19 +501,31 @@ impl SimpleComponent for ContactSources {
                 let s = sender.input_sender().clone();
                 std::thread::spawn(move || {
                     let error = sources::switch_source(&source, on).err();
-                    let _ = s.send(ContactSourcesInput::Done { error, found: None, checked: None });
+                    let _ = s.send(ContactSourcesInput::Done {
+                        error,
+                        found: None,
+                        checked: None,
+                    });
                 });
             }
             ContactSourcesInput::ToggleBook { book, on } => {
                 let s = sender.input_sender().clone();
                 std::thread::spawn(move || {
                     let error = sources::set_off(&book, !on).err();
-                    let _ = s.send(ContactSourcesInput::Done { error, found: None, checked: None });
+                    let _ = s.send(ContactSourcesInput::Done {
+                        error,
+                        found: None,
+                        checked: None,
+                    });
                 });
             }
             ContactSourcesInput::Rename { id, name } => {
                 let error = sources::set_name(&id, name.as_deref()).err();
-                sender.input(ContactSourcesInput::Done { error, found: None, checked: None });
+                sender.input(ContactSourcesInput::Done {
+                    error,
+                    found: None,
+                    checked: None,
+                });
             }
             ContactSourcesInput::SaveClicked => {
                 let action = self.save_action.borrow().clone();
@@ -499,7 +548,9 @@ impl SimpleComponent for ContactSources {
                 }
             }
             ContactSourcesInput::ConfirmRemove(i) => {
-                let Some(source) = self.sources.get(i) else { return };
+                let Some(source) = self.sources.get(i) else {
+                    return;
+                };
                 let body = match source.kind {
                     Kind::Ldap(_) => i18n("Evolution and other apps stop seeing it too. Nothing on the server changes."),
                     _ => i18n("Evolution and other apps stop seeing them too. Nothing on the server changes."),
@@ -524,7 +575,9 @@ impl SimpleComponent for ContactSources {
                 dialog.present();
             }
             ContactSourcesInput::Remove(i) => {
-                let Some(source) = self.sources.get(i).cloned() else { return };
+                let Some(source) = self.sources.get(i).cloned() else {
+                    return;
+                };
                 *self.save_action.borrow_mut() = None;
                 self.close_editor();
                 let s = sender.input_sender().clone();
@@ -536,11 +589,18 @@ impl SimpleComponent for ContactSources {
                     };
                     // Its switch goes with it.
                     let _ = sources::set_off(&source.id, false);
-                    let _ = s.send(ContactSourcesInput::Done { error, found: None, checked: None });
+                    let _ = s.send(ContactSourcesInput::Done {
+                        error,
+                        found: None,
+                        checked: None,
+                    });
                 });
             }
             ContactSourcesInput::SaveCardDav { account, password } => {
-                self.toast(&i18n_f("Looking for address books on {name}…", &[("name", &account.title())]));
+                self.toast(&i18n_f(
+                    "Looking for address books on {name}…",
+                    &[("name", &account.title())],
+                ));
                 let s = sender.input_sender().clone();
                 std::thread::spawn(move || {
                     let password = (!password.is_empty()).then_some(password);
@@ -553,13 +613,19 @@ impl SimpleComponent for ContactSources {
                 std::thread::spawn(move || {
                     let password = (!password.is_empty()).then_some(password);
                     let msg = match directory::save(&dir, password.as_deref()) {
-                        Err(e) => ContactSourcesInput::Done { error: Some(e), found: None, checked: None },
+                        Err(e) => ContactSourcesInput::Done {
+                            error: Some(e),
+                            found: None,
+                            checked: None,
+                        },
                         Ok(uid) => {
                             // A new source takes a moment to appear in the
                             // registry; check it once it has.
                             let mut found = None;
                             for _ in 0..10 {
-                                found = directory::list().ok().and_then(|l| l.into_iter().find(|d| d.uid == uid));
+                                found = directory::list()
+                                    .ok()
+                                    .and_then(|l| l.into_iter().find(|d| d.uid == uid));
                                 if found.is_some() {
                                     break;
                                 }
@@ -567,21 +633,35 @@ impl SimpleComponent for ContactSources {
                             }
                             let _ = s.send(ContactSourcesInput::Load);
                             let checked = found.map(|d| (d.title(), check_within(d, CHECK_LIMIT)));
-                            ContactSourcesInput::Done { error: None, found: None, checked }
+                            ContactSourcesInput::Done {
+                                error: None,
+                                found: None,
+                                checked,
+                            }
                         }
                     };
                     let _ = s.send(msg);
                 });
             }
-            ContactSourcesInput::Done { error, found, checked } => {
+            ContactSourcesInput::Done {
+                error,
+                found,
+                checked,
+            } => {
                 if let Some(e) = error {
                     self.toast(&e);
                 }
                 if let Some((a, status)) = found {
                     let n = a.books.len() as u32;
                     match status.problem() {
-                        Some(problem) => self.toast(&i18n_f("{name}: {problem}", &[("name", &a.title()), ("problem", &problem)])),
-                        None if n == 0 => self.toast(&i18n_f("No address books were found on {name} yet.", &[("name", &a.title())])),
+                        Some(problem) => self.toast(&i18n_f(
+                            "{name}: {problem}",
+                            &[("name", &a.title()), ("problem", &problem)],
+                        )),
+                        None if n == 0 => self.toast(&i18n_f(
+                            "No address books were found on {name} yet.",
+                            &[("name", &a.title())],
+                        )),
                         None => self.toast(&ni18n_f(
                             "Found {n} address book on {name}",
                             "Found {n} address books on {name}",
@@ -591,10 +671,13 @@ impl SimpleComponent for ContactSources {
                     }
                 }
                 match checked {
-                    Some((name, Ok(()))) => self.toast(&i18n_f("Connected to {name}", &[("name", &name)])),
-                    Some((name, Err(e))) => {
-                        self.toast(&i18n_f("{name} did not answer: {error}", &[("name", &name), ("error", &e)]))
+                    Some((name, Ok(()))) => {
+                        self.toast(&i18n_f("Connected to {name}", &[("name", &name)]))
                     }
+                    Some((name, Err(e))) => self.toast(&i18n_f(
+                        "{name} did not answer: {error}",
+                        &[("name", &name), ("error", &e)],
+                    )),
                     None => {}
                 }
                 let _ = sender.output(ContactSourcesOutput::Changed);
@@ -616,20 +699,33 @@ impl SimpleComponent for ContactSources {
 /// After a CardDAV save: show the account at once, wait for EDS to look at
 /// the server, and say what it found. Blocking; `signing_in` when a new
 /// password was given.
-fn report_carddav(s: &relm4::Sender<ContactSourcesInput>, saved: Result<String, String>, signing_in: bool) {
+fn report_carddav(
+    s: &relm4::Sender<ContactSourcesInput>,
+    saved: Result<String, String>,
+    signing_in: bool,
+) {
     let uid = match saved {
         Ok(uid) => uid,
         Err(e) => {
-            let _ = s.send(ContactSourcesInput::Done { error: Some(e), found: None, checked: None });
+            let _ = s.send(ContactSourcesInput::Done {
+                error: Some(e),
+                found: None,
+                checked: None,
+            });
             return;
         }
     };
     let _ = s.send(ContactSourcesInput::Load);
-    let found = carddav::await_books(&uid, std::time::Duration::from_secs(30), signing_in).map(|a| {
-        let status = carddav::status(&a);
-        (a, status)
+    let found =
+        carddav::await_books(&uid, std::time::Duration::from_secs(30), signing_in).map(|a| {
+            let status = carddav::status(&a);
+            (a, status)
+        });
+    let _ = s.send(ContactSourcesInput::Done {
+        error: None,
+        found,
+        checked: None,
     });
-    let _ = s.send(ContactSourcesInput::Done { error: None, found, checked: None });
 }
 
 /// How long Settings waits on a directory's first answer. EDS sets no
@@ -658,14 +754,24 @@ impl ContactSources {
     }
 
     fn push_editor(&self) {
-        if !self.nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor") {
+        if !self
+            .nav
+            .visible_page()
+            .and_then(|p| p.tag())
+            .is_some_and(|t| t == "editor")
+        {
             self.nav.push_by_tag("editor");
         }
     }
 
     fn close_editor(&mut self) {
         self.editing = None;
-        if self.nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor") {
+        if self
+            .nav
+            .visible_page()
+            .and_then(|p| p.tag())
+            .is_some_and(|t| t == "editor")
+        {
             self.nav.pop();
         }
     }
@@ -679,7 +785,9 @@ impl ContactSources {
 
     /// The page about one source.
     fn open_source(&mut self, index: usize, sender: &ComponentSender<Self>) {
-        let Some(source) = self.sources.get(index).cloned() else { return };
+        let Some(source) = self.sources.get(index).cloned() else {
+            return;
+        };
         self.editing = Some(Editing::Source(source.id.clone()));
         *self.save_action.borrow_mut() = None;
         self.editor_page.set_title(&source.title);
@@ -698,7 +806,12 @@ impl ContactSources {
                 page.append(&self.hylki_group(sender));
                 None
             }
-            Kind::CardDav(a) => Some(carddav_form(a.clone(), None, ADD_KINDS[0].what, sender.input_sender().clone())),
+            Kind::CardDav(a) => Some(carddav_form(
+                a.clone(),
+                None,
+                ADD_KINDS[0].what,
+                sender.input_sender().clone(),
+            )),
             Kind::Ldap(d) => Some(ldap_form(d.clone(), sender.input_sender().clone())),
             Kind::ThisComputer => {
                 page.append(&info_group(
@@ -727,7 +840,8 @@ impl ContactSources {
         if !source.books.is_empty() {
             page.append(&books_group(&source, sender.input_sender().clone()));
         }
-        self.save_btn.set_visible(self.save_action.borrow().is_some());
+        self.save_btn
+            .set_visible(self.save_action.borrow().is_some());
         self.editor_slot.set_child(Some(&page));
         self.push_editor();
         self.announce(sender);
@@ -773,7 +887,13 @@ impl ContactSources {
     }
 
     /// The add page's CardDAV form, under the kind dropdown.
-    fn show_carddav_form(&mut self, account: Account, kind: u32, what: AddWhat, sender: &ComponentSender<Self>) {
+    fn show_carddav_form(
+        &mut self,
+        account: Account,
+        kind: u32,
+        what: AddWhat,
+        sender: &ComponentSender<Self>,
+    ) {
         let page = gtk::Box::new(gtk::Orientation::Vertical, 24);
         page.append(&kind_picker(kind, sender.input_sender().clone()));
         let (form, save) = carddav_form(account, Some(kind), what, sender.input_sender().clone());
@@ -787,26 +907,29 @@ impl ContactSources {
     fn hylki_group(&self, sender: &ComponentSender<Self>) -> adw::PreferencesGroup {
         let group = adw::PreferencesGroup::new();
         group.set_title(&i18n("Hylki Address Book"));
-        group.set_description(Some(&i18n("Kept in Hylki's own data folder. Works without GNOME.")));
+        group.set_description(Some(&i18n(
+            "Kept in Hylki's own data folder. Works without GNOME.",
+        )));
         let count = adw::ActionRow::new();
         count.set_title(&i18n("Contacts in the Hylki book"));
         let n = gtk::Label::new(Some(&self.local_count.to_string()));
         n.add_css_class("dim-label");
         count.add_suffix(&n);
         group.add(&count);
-        let action = |title: String, subtitle: String, msg: fn() -> ContactSourcesInput, enabled: bool| {
-            let row = adw::ActionRow::new();
-            row.set_title(&title);
-            row.set_subtitle(&subtitle);
-            row.set_activatable(true);
-            row.set_sensitive(enabled);
-            row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
-            let s = sender.input_sender().clone();
-            row.connect_activated(move |_| {
-                let _ = s.send(msg());
-            });
-            row
-        };
+        let action =
+            |title: String, subtitle: String, msg: fn() -> ContactSourcesInput, enabled: bool| {
+                let row = adw::ActionRow::new();
+                row.set_title(&title);
+                row.set_subtitle(&subtitle);
+                row.set_activatable(true);
+                row.set_sensitive(enabled);
+                row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
+                let s = sender.input_sender().clone();
+                row.connect_activated(move |_| {
+                    let _ = s.send(msg());
+                });
+                row
+            };
         group.add(&action(
             i18n("Import vCard files"),
             i18n("Adds contacts from .vcf files. Importing a file again updates existing entries."),
@@ -875,7 +998,10 @@ impl ContactSources {
             let (label, tip) = match s.origin {
                 Origin::Hylki => (i18n("Hylki"), i18n("Set up in Hylki")),
                 Origin::Online => (i18n("GOA"), i18n("From GNOME Online Accounts")),
-                Origin::Evolution => (i18n("Evolution"), i18n("Kept by Evolution Data Server, set up in Evolution or GNOME Contacts")),
+                Origin::Evolution => (
+                    i18n("Evolution"),
+                    i18n("Kept by Evolution Data Server, set up in Evolution or GNOME Contacts"),
+                ),
             };
             let badge = gtk::Label::new(Some(&label));
             badge.add_css_class("account-source-badge");
@@ -941,7 +1067,10 @@ fn given_name(typed: &str, own: &str) -> Option<String> {
 
 /// The name the account goes by in Hylki: here, and under its address
 /// books in Contacts. GNOME and Evolution keep theirs.
-fn name_group(source: &Source, sender: relm4::Sender<ContactSourcesInput>) -> adw::PreferencesGroup {
+fn name_group(
+    source: &Source,
+    sender: relm4::Sender<ContactSourcesInput>,
+) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
     let own = [("own", source.own_title.as_str())];
     group.set_description(Some(&match source.kind {
@@ -957,7 +1086,10 @@ fn name_group(source: &Source, sender: relm4::Sender<ContactSourcesInput>) -> ad
     row.set_show_apply_button(true);
     let (s, id, own) = (sender, source.id.clone(), source.own_title.clone());
     row.connect_apply(move |r| {
-        let _ = s.send(ContactSourcesInput::Rename { id: id.clone(), name: given_name(&r.text(), &own) });
+        let _ = s.send(ContactSourcesInput::Rename {
+            id: id.clone(),
+            name: given_name(&r.text(), &own),
+        });
     });
     group.add(&row);
     group
@@ -965,7 +1097,10 @@ fn name_group(source: &Source, sender: relm4::Sender<ContactSourcesInput>) -> ad
 
 /// A source's address books, each with its name in Hylki and its own
 /// switch.
-fn books_group(source: &Source, sender: relm4::Sender<ContactSourcesInput>) -> adw::PreferencesGroup {
+fn books_group(
+    source: &Source,
+    sender: relm4::Sender<ContactSourcesInput>,
+) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
     group.set_title(&i18n("Address books"));
     group.set_description(Some(&i18n(
@@ -978,7 +1113,10 @@ fn books_group(source: &Source, sender: relm4::Sender<ContactSourcesInput>) -> a
         row.set_show_apply_button(true);
         let (s, uid, own) = (sender.clone(), book.uid.clone(), book.name.clone());
         row.connect_apply(move |r| {
-            let _ = s.send(ContactSourcesInput::Rename { id: uid.clone(), name: given_name(&r.text(), &own) });
+            let _ = s.send(ContactSourcesInput::Rename {
+                id: uid.clone(),
+                name: given_name(&r.text(), &own),
+            });
         });
         let switch = gtk::Switch::new();
         switch.set_valign(gtk::Align::Center);
@@ -988,7 +1126,10 @@ fn books_group(source: &Source, sender: relm4::Sender<ContactSourcesInput>) -> a
         switch.set_sensitive(source.on);
         let (s, uid) = (sender.clone(), book.uid.clone());
         switch.connect_active_notify(move |w| {
-            let _ = s.send(ContactSourcesInput::ToggleBook { book: uid.clone(), on: w.is_active() });
+            let _ = s.send(ContactSourcesInput::ToggleBook {
+                book: uid.clone(),
+                on: w.is_active(),
+            });
         });
         row.add_suffix(&switch);
         group.add(&row);
@@ -1108,7 +1249,9 @@ fn carddav_form(
             row.grab_focus();
             false
         };
-        let address = preset.map(str::to_string).unwrap_or_else(|| url.text().trim().to_string());
+        let address = preset
+            .map(str::to_string)
+            .unwrap_or_else(|| url.text().trim().to_string());
         if let Err(e) = carddav::parse_url(&address) {
             return fail(&e, &url);
         }
@@ -1122,7 +1265,10 @@ fn carddav_form(
         a.name = name.text().trim().to_string();
         a.url = address;
         a.user = user.text().trim().to_string();
-        let _ = sender.send(ContactSourcesInput::SaveCardDav { account: a, password: pass.text().to_string() });
+        let _ = sender.send(ContactSourcesInput::SaveCardDav {
+            account: a,
+            password: pass.text().to_string(),
+        });
         true
     });
     (form.upcast(), save)
@@ -1131,10 +1277,15 @@ fn carddav_form(
 const SECURITY: [Security; 3] = [Security::StartTls, Security::Ldaps, Security::None];
 
 /// The LDAP directory form, and what Save does with it.
-fn ldap_form(dir: Directory, sender: relm4::Sender<ContactSourcesInput>) -> (gtk::Widget, Rc<dyn Fn() -> bool>) {
+fn ldap_form(
+    dir: Directory,
+    sender: relm4::Sender<ContactSourcesInput>,
+) -> (gtk::Widget, Rc<dyn Fn() -> bool>) {
     let server = adw::PreferencesGroup::new();
     server.set_title(&i18n("Server"));
-    server.set_description(Some(&i18n("Recipients are looked up here as you type, and Contacts searches it too.")));
+    server.set_description(Some(&i18n(
+        "Recipients are looked up here as you type, and Contacts searches it too.",
+    )));
     let name = adw::EntryRow::new();
     name.set_title(&i18n("Name (optional)"));
     name.set_text(&dir.name);
@@ -1144,8 +1295,17 @@ fn ldap_form(dir: Directory, sender: relm4::Sender<ContactSourcesInput>) -> (gtk
     host.set_input_purpose(gtk::InputPurpose::Url);
     let security = adw::ComboRow::new();
     security.set_title(&i18n("Encryption"));
-    security.set_model(Some(&gtk::StringList::new(&[&i18n("StartTLS"), &i18n("TLS (LDAPS)"), &i18n("None")])));
-    security.set_selected(SECURITY.iter().position(|s| *s == dir.security).unwrap_or(0) as u32);
+    security.set_model(Some(&gtk::StringList::new(&[
+        &i18n("StartTLS"),
+        &i18n("TLS (LDAPS)"),
+        &i18n("None"),
+    ])));
+    security.set_selected(
+        SECURITY
+            .iter()
+            .position(|s| *s == dir.security)
+            .unwrap_or(0) as u32,
+    );
     let port = adw::SpinRow::with_range(1.0, 65535.0, 1.0);
     port.set_title(&i18n("Port"));
     port.set_value(f64::from(dir.port));
@@ -1154,8 +1314,14 @@ fn ldap_form(dir: Directory, sender: relm4::Sender<ContactSourcesInput>) -> (gtk
     {
         let port = port.clone();
         security.connect_selected_notify(move |row| {
-            let chosen = SECURITY.get(row.selected() as usize).copied().unwrap_or(Security::StartTls);
-            if SECURITY.iter().any(|s| f64::from(s.default_port()) == port.value()) {
+            let chosen = SECURITY
+                .get(row.selected() as usize)
+                .copied()
+                .unwrap_or(Security::StartTls);
+            if SECURITY
+                .iter()
+                .any(|s| f64::from(s.default_port()) == port.value())
+            {
                 port.set_value(f64::from(chosen.default_port()));
             }
         });
@@ -1165,17 +1331,31 @@ fn ldap_form(dir: Directory, sender: relm4::Sender<ContactSourcesInput>) -> (gtk
     base.set_text(&dir.base_dn);
     let scope = adw::ComboRow::new();
     scope.set_title(&i18n("Search"));
-    scope.set_model(Some(&gtk::StringList::new(&[&i18n("Whole tree"), &i18n("First level")])));
+    scope.set_model(Some(&gtk::StringList::new(&[
+        &i18n("Whole tree"),
+        &i18n("First level"),
+    ])));
     scope.set_selected(if dir.subtree { 0 } else { 1 });
-    for w in [name.upcast_ref::<gtk::Widget>(), host.upcast_ref(), security.upcast_ref(), port.upcast_ref(), base.upcast_ref(), scope.upcast_ref()] {
+    for w in [
+        name.upcast_ref::<gtk::Widget>(),
+        host.upcast_ref(),
+        security.upcast_ref(),
+        port.upcast_ref(),
+        base.upcast_ref(),
+        scope.upcast_ref(),
+    ] {
         server.add(w);
     }
 
     let signin = adw::PreferencesGroup::new();
     signin.set_title(&i18n("Sign-in"));
-    signin.set_description(Some(&i18n("Leave empty for a directory that needs no sign-in.")));
+    signin.set_description(Some(&i18n(
+        "Leave empty for a directory that needs no sign-in.",
+    )));
     let bind = adw::EntryRow::new();
-    bind.set_title(&i18n("Sign in as, such as cn=jane,ou=people,dc=example,dc=com"));
+    bind.set_title(&i18n(
+        "Sign in as, such as cn=jane,ou=people,dc=example,dc=com",
+    ));
     bind.set_text(&dir.bind_dn);
     let pass = adw::PasswordEntryRow::new();
     pass.set_title(&i18n("Password"));
@@ -1216,18 +1396,29 @@ fn ldap_form(dir: Directory, sender: relm4::Sender<ContactSourcesInput>) -> (gtk
         let mut d = dir.clone();
         d.name = name.text().trim().to_string();
         d.host = host_text;
-        let chosen = SECURITY.get(security.selected() as usize).copied().unwrap_or(Security::StartTls);
+        let chosen = SECURITY
+            .get(security.selected() as usize)
+            .copied()
+            .unwrap_or(Security::StartTls);
         d.security = typed_security.unwrap_or(chosen);
         d.port = match typed_port {
             Some(p) => p,
             // The usual port of the encryption picked, when the URL changed it.
-            None if SECURITY.iter().any(|s| f64::from(s.default_port()) == port.value()) => d.security.default_port(),
+            None if SECURITY
+                .iter()
+                .any(|s| f64::from(s.default_port()) == port.value()) =>
+            {
+                d.security.default_port()
+            }
             None => port.value() as u16,
         };
         d.base_dn = base.text().trim().to_string();
         d.subtree = scope.selected() == 0;
         d.bind_dn = bind.text().trim().to_string();
-        let _ = sender.send(ContactSourcesInput::SaveLdap { dir: d, password: pass.text().to_string() });
+        let _ = sender.send(ContactSourcesInput::SaveLdap {
+            dir: d,
+            password: pass.text().to_string(),
+        });
         true
     });
     (form.upcast(), save)

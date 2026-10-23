@@ -242,7 +242,8 @@ const RENDER_VERSION: i64 = 19;
 /// locally for the same Message-ID (POP3, or an IMAP server that refuses
 /// custom keywords). `local_tags` is small and keyed for this lookup, so the
 /// correlated subquery is an index seek per row.
-const KEYWORDS_COL: &str = "messages.keywords || ' ' || COALESCE((SELECT group_concat(lt.keyword, ' ') \
+const KEYWORDS_COL: &str =
+    "messages.keywords || ' ' || COALESCE((SELECT group_concat(lt.keyword, ' ') \
     FROM local_tags lt WHERE lt.account_id = messages.account_id \
     AND messages.message_id <> '' AND lt.message_id = messages.message_id), '')";
 
@@ -266,7 +267,10 @@ fn join_labels(labels: &[String]) -> String {
 }
 
 fn split_labels(col: String) -> Vec<String> {
-    col.split(LABEL_SEP).filter(|l| !l.is_empty()).map(str::to_string).collect()
+    col.split(LABEL_SEP)
+        .filter(|l| !l.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 /// Most messages one tag view lists per account; the list pages within it.
@@ -275,7 +279,11 @@ const TAG_VIEW_LIMIT: i64 = 5000;
 /// Rowids written into a query as a literal list: they are integers, and a
 /// conversation can match more rows than a statement takes bound values.
 fn rowid_list(rowids: &[i64]) -> String {
-    rowids.iter().map(i64::to_string).collect::<Vec<_>>().join(",")
+    rowids
+        .iter()
+        .map(i64::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// Most Message-IDs one cross-folder conversation lookup matches against. A
@@ -326,8 +334,9 @@ pub struct Cache {
 /// message about to be sent gets its ids spelt back the way they arrived
 /// ([`Cache::exact_msgids`]). Only ids that actually differ from their
 /// lowercase form are kept.
-static MSGID_CASE_PENDING: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, String>>> =
-    std::sync::OnceLock::new();
+static MSGID_CASE_PENDING: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::HashMap<String, String>>,
+> = std::sync::OnceLock::new();
 
 fn msgid_case_pending() -> &'static std::sync::Mutex<std::collections::HashMap<String, String>> {
     MSGID_CASE_PENDING.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
@@ -343,11 +352,15 @@ pub fn note_msgid_case(exact: &str) {
     if exact.is_empty() || !exact.bytes().any(|b| b.is_ascii_uppercase()) {
         return;
     }
-    let mut pending = msgid_case_pending().lock().unwrap_or_else(|p| p.into_inner());
+    let mut pending = msgid_case_pending()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
     if pending.len() >= MSGID_CASE_PENDING_CAP {
         return;
     }
-    pending.entry(exact.to_ascii_lowercase()).or_insert_with(|| exact.to_string());
+    pending
+        .entry(exact.to_ascii_lowercase())
+        .or_insert_with(|| exact.to_string());
 }
 
 /// Narrow an existing path's permissions to `mode`, if it exists.
@@ -501,9 +514,11 @@ impl Cache {
         ) else {
             return Vec::new();
         };
-        stmt.query_map([message_id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-            .map(|rows| rows.flatten().collect())
-            .unwrap_or_default()
+        stmt.query_map([message_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })
+        .map(|rows| rows.flatten().collect())
+        .unwrap_or_default()
     }
 
     /// Open (creating if needed) the cache DB at `~/.local/share/hylki/cache.db`.
@@ -535,32 +550,63 @@ impl Cache {
             let rows = stmt.query_map([], |r| Ok((r.get::<_, u32>(0)?, r.get::<_, String>(1)?)))?;
             rows.collect::<rusqlite::Result<_>>()?
         };
-        let wanted: Vec<(u32, String)> = accounts.iter().map(|(id, e)| (*id, e.trim().to_lowercase())).collect();
+        let wanted: Vec<(u32, String)> = accounts
+            .iter()
+            .map(|(id, e)| (*id, e.trim().to_lowercase()))
+            .collect();
         // Two accounts on one address could not be told apart by it.
-        let distinct = wanted.iter().map(|(_, e)| e).collect::<std::collections::HashSet<_>>().len() == wanted.len();
-        let moved = wanted.iter().any(|(id, e)| owners.get(id) != Some(e)) || owners.len() > wanted.len();
+        let distinct = wanted
+            .iter()
+            .map(|(_, e)| e)
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+            == wanted.len();
+        let moved =
+            wanted.iter().any(|(id, e)| owners.get(id) != Some(e)) || owners.len() > wanted.len();
         if !owners.is_empty() && distinct && moved {
-            let keep: Vec<u32> = wanted.iter().filter(|(id, e)| owners.get(id) == Some(e)).map(|(id, _)| *id).collect();
+            let keep: Vec<u32> = wanted
+                .iter()
+                .filter(|(id, e)| owners.get(id) == Some(e))
+                .map(|(id, _)| *id)
+                .collect();
             let moves: Vec<(u32, u32)> = wanted
                 .iter()
                 .filter(|(id, _)| !keep.contains(id))
-                .filter_map(|(id, e)| owners.iter().find(|(_, o)| *o == e).map(|(from, _)| (*from, *id)))
+                .filter_map(|(id, e)| {
+                    owners
+                        .iter()
+                        .find(|(_, o)| *o == e)
+                        .map(|(from, _)| (*from, *id))
+                })
                 .collect();
-            let keep_list = keep.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
+            let keep_list = keep
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
             for table in ACCOUNT_TABLES {
                 // Through negative ids, so a move never meets rows still
                 // waiting to leave the place it goes to.
                 for (from, to) in &moves {
-                    tx.execute(&format!("UPDATE {table} SET account_id = ?1 WHERE account_id = ?2"), params![-i64::from(*to), from])?;
+                    tx.execute(
+                        &format!("UPDATE {table} SET account_id = ?1 WHERE account_id = ?2"),
+                        params![-i64::from(*to), from],
+                    )?;
                 }
                 tx.execute(&format!("DELETE FROM {table} WHERE account_id > 0 AND account_id NOT IN ({keep_list})"), [])?;
-                tx.execute(&format!("UPDATE {table} SET account_id = -account_id WHERE account_id < 0"), [])?;
+                tx.execute(
+                    &format!("UPDATE {table} SET account_id = -account_id WHERE account_id < 0"),
+                    [],
+                )?;
             }
             tracing::info!(?moves, kept = ?keep, "cache: rows follow the accounts to their new places");
         }
         tx.execute("DELETE FROM account_owner", [])?;
         for (id, email) in &wanted {
-            tx.execute("INSERT INTO account_owner (account_id, email) VALUES (?1, ?2)", params![id, email])?;
+            tx.execute(
+                "INSERT INTO account_owner (account_id, email) VALUES (?1, ?2)",
+                params![id, email],
+            )?;
         }
         tx.commit()
     }
@@ -568,9 +614,9 @@ impl Cache {
     /// A separate WAL reader over an already-initialized cache. Background
     /// lookups need another connection, not another migration and cleanup pass.
     pub fn read_connection(&self) -> rusqlite::Result<Cache> {
-        let path = self.conn.path().ok_or_else(|| rusqlite::Error::InvalidPath(
-            std::path::PathBuf::from("cache has no database file")
-        ))?;
+        let path = self.conn.path().ok_or_else(|| {
+            rusqlite::Error::InvalidPath(std::path::PathBuf::from("cache has no database file"))
+        })?;
         let conn = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         conn.busy_timeout(Duration::from_secs(5))?;
         Ok(Cache { conn })
@@ -634,48 +680,81 @@ impl Cache {
         // EXISTS` leaves an existing table alone. Add it in place rather than
         // dropping the index, which would cost every user a full re-sync; the
         // error when it is already there is the expected outcome, not a problem.
-        let _ = conn.execute("ALTER TABLE messages ADD COLUMN preview TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN preview TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // Send Later (#145): when a queued message is due; NULL sends at once.
         let _ = conn.execute("ALTER TABLE outbox ADD COLUMN send_at INTEGER", []);
         // And the message a queued forward forwards (#454).
-        let _ = conn.execute("ALTER TABLE outbox ADD COLUMN forwards TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE outbox ADD COLUMN forwards TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // Same in-place treatment for `reply_to` (added later still): existing
         // rows carry an empty value until their folder's recent window
         // re-syncs, and Reply falls back to the sender until then.
-        let _ =
-            conn.execute("ALTER TABLE messages ADD COLUMN reply_to TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN reply_to TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // And for `keywords` (tags, #71): existing rows read as untagged until
         // their folder syncs again and the flags come down with the rest.
-        let _ =
-            conn.execute("ALTER TABLE messages ADD COLUMN keywords TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN keywords TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // And the list's Importance and Due columns (#334): mail already
         // cached reads as normal, and undated, until it is fetched again.
-        let _ = conn.execute("ALTER TABLE messages ADD COLUMN importance INTEGER NOT NULL DEFAULT 0", []);
-        let _ = conn.execute("ALTER TABLE messages ADD COLUMN due INTEGER NOT NULL DEFAULT 0", []);
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN importance INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN due INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
         // And Gmail's labels (#374): mail already cached shows none until its
         // folder's recent window syncs, or the backfill reaches it.
-        let _ = conn
-            .execute("ALTER TABLE messages ADD COLUMN gmail_labels TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN gmail_labels TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // And replied and forwarded (#454), the same way.
-        let _ = conn.execute("ALTER TABLE messages ADD COLUMN answered INTEGER NOT NULL DEFAULT 0", []);
-        let _ = conn.execute("ALTER TABLE messages ADD COLUMN forwarded INTEGER NOT NULL DEFAULT 0", []);
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN answered INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN forwarded INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
         // And the Bcc of a sent copy (#476).
-        let _ = conn.execute("ALTER TABLE messages ADD COLUMN bcc TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN bcc TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // And the OpenPGP verdict (#133) beside the sender check, as JSON;
         // empty for a message that carried none. Kept as a marker: nothing
         // OpenPGP is cached, so a body that was (by the first build of the
         // feature, which cached signed mail) is dropped here, and the
         // message is fetched and verified afresh at its next open.
-        let _ =
-            conn.execute("ALTER TABLE sender_checks ADD COLUMN pgp TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE sender_checks ADD COLUMN pgp TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // And the meeting invitation (#223) beside it, as JSON; empty for a
         // message that carries none.
-        let _ = conn
-            .execute("ALTER TABLE sender_checks ADD COLUMN invite TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE sender_checks ADD COLUMN invite TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // And the sensitivity label (#411). A check stored before has none:
         // its message shows its label once it is fetched again.
-        let _ = conn
-            .execute("ALTER TABLE sender_checks ADD COLUMN label TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE sender_checks ADD COLUMN label TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         for table in ["bodies", "attachments", "attachments_checked"] {
             let _ = conn.execute(
                 &format!(
@@ -728,9 +807,8 @@ impl Cache {
         // from its BODYSTRUCTURE (no bytes downloaded) and replaces the list
         // it finds, so nothing is lost while it works back.
         if version < 19 {
-            let _ = conn.execute_batch(
-                "DELETE FROM attachment_scan; DELETE FROM attachments_checked;",
-            );
+            let _ =
+                conn.execute_batch("DELETE FROM attachment_scan; DELETE FROM attachments_checked;");
         }
         if (14..15).contains(&version) {
             let _ = conn.execute(
@@ -775,9 +853,9 @@ impl Cache {
             ) else {
                 return;
             };
-            let Ok(mapped) = stmt.query_map([], |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
-            }) else {
+            let Ok(mapped) =
+                stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            else {
                 return;
             };
             mapped.flatten().collect()
@@ -841,9 +919,9 @@ impl Cache {
         }
         // A reply to such a sender recorded the name as it was shown.
         let names: Vec<(String, String)> = {
-            let Ok(mut stmt) =
-                conn.prepare("SELECT email, name FROM addresses WHERE name LIKE '%\\%' OR name LIKE '\"%'")
-            else {
+            let Ok(mut stmt) = conn.prepare(
+                "SELECT email, name FROM addresses WHERE name LIKE '%\\%' OR name LIKE '\"%'",
+            ) else {
                 return;
             };
             let Ok(mapped) = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?))) else {
@@ -903,7 +981,14 @@ impl Cache {
                 tx.execute(
                     "INSERT INTO folders (account_id, path, name, kind, unread, ord)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                    params![account_id, f.path, f.name, kind_to_i64(f.kind), f.unread, i as i64],
+                    params![
+                        account_id,
+                        f.path,
+                        f.name,
+                        kind_to_i64(f.kind),
+                        f.unread,
+                        i as i64
+                    ],
                 )?;
             }
             tx.commit()
@@ -917,7 +1002,12 @@ impl Cache {
     /// and the attachment files. The index of every message, which the list
     /// and search read, is not counted: it stays whatever is removed.
     pub fn downloaded_size(&self) -> (u64, u64) {
-        let sum = |sql: &str| -> u64 { self.conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap_or(0).max(0) as u64 };
+        let sum = |sql: &str| -> u64 {
+            self.conn
+                .query_row(sql, [], |r| r.get::<_, i64>(0))
+                .unwrap_or(0)
+                .max(0) as u64
+        };
         (
             sum("SELECT COALESCE(SUM(length(body)), 0) FROM bodies"),
             sum("SELECT COALESCE(SUM(length(data)), 0) FROM attachments"),
@@ -953,7 +1043,9 @@ impl Cache {
 
     /// How big the cache is on disk, with its write-ahead log, in bytes.
     pub fn file_size() -> u64 {
-        let Some(dir) = crate::config::data_base().map(|d| d.join("hylki")) else { return 0 };
+        let Some(dir) = crate::config::data_base().map(|d| d.join("hylki")) else {
+            return 0;
+        };
         ["cache.db", "cache.db-wal"]
             .iter()
             .filter_map(|f| std::fs::metadata(dir.join(f)).ok())
@@ -974,7 +1066,9 @@ impl Cache {
             let mut stmt = self
                 .conn
                 .prepare("SELECT folder_path, uid FROM messages WHERE account_id = ?1 AND lower(from_addr) = lower(?2)")?;
-            let rows = stmt.query_map(params![account_id, addr.trim()], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            let rows = stmt.query_map(params![account_id, addr.trim()], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })?;
             rows.collect()
         };
         run().unwrap_or_else(|e| {
@@ -983,7 +1077,12 @@ impl Cache {
         })
     }
 
-    pub fn load_messages(&self, account_id: u32, folder_path: &str, folder_id: u32) -> Vec<Message> {
+    pub fn load_messages(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        folder_id: u32,
+    ) -> Vec<Message> {
         self.load_folder(account_id, folder_path, folder_id, "ORDER BY uid DESC")
     }
 
@@ -1000,11 +1099,28 @@ impl Cache {
 
     /// A folder's `limit` newest messages, newest first: what a list shows
     /// at once while the whole folder is read.
-    pub fn load_newest(&self, account_id: u32, folder_path: &str, folder_id: u32, limit: usize) -> Vec<Message> {
-        self.load_folder(account_id, folder_path, folder_id, &format!("ORDER BY ts DESC LIMIT {limit}"))
+    pub fn load_newest(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        folder_id: u32,
+        limit: usize,
+    ) -> Vec<Message> {
+        self.load_folder(
+            account_id,
+            folder_path,
+            folder_id,
+            &format!("ORDER BY ts DESC LIMIT {limit}"),
+        )
     }
 
-    fn load_folder(&self, account_id: u32, folder_path: &str, folder_id: u32, order: &str) -> Vec<Message> {
+    fn load_folder(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        folder_id: u32,
+        order: &str,
+    ) -> Vec<Message> {
         let run = || -> rusqlite::Result<Vec<Message>> {
             let mut stmt = self.conn.prepare(&format!(
                 "SELECT uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels, answered, forwarded, bcc
@@ -1085,7 +1201,8 @@ impl Cache {
                          AND a.uid = ac.uid
                    )",
             )?;
-            let rows = stmt.query_map(params![account_id, folder_path], |row| row.get::<_, u32>(0))?;
+            let rows =
+                stmt.query_map(params![account_id, folder_path], |row| row.get::<_, u32>(0))?;
             rows.collect()
         };
         run().unwrap_or_default()
@@ -1127,7 +1244,9 @@ impl Cache {
             // The exact spellings noted while these (and any earlier) headers
             // were parsed ride along in the same transaction.
             let noted: Vec<(String, String)> = {
-                let mut pending = msgid_case_pending().lock().unwrap_or_else(|p| p.into_inner());
+                let mut pending = msgid_case_pending()
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner());
                 pending.drain().collect()
             };
             for (lower, exact) in &noted {
@@ -1194,9 +1313,11 @@ impl Cache {
             return Some(hit.clone());
         }
         self.conn
-            .query_row("SELECT exact FROM msgid_case WHERE lower = ?1", params![lower], |r| {
-                r.get::<_, String>(0)
-            })
+            .query_row(
+                "SELECT exact FROM msgid_case WHERE lower = ?1",
+                params![lower],
+                |r| r.get::<_, String>(0),
+            )
             .ok()
     }
 
@@ -1211,12 +1332,17 @@ impl Cache {
     }
 
     /// The set of message UIDs already cached for a folder (for backfill diffing).
-    pub fn cached_uids(&self, account_id: u32, folder_path: &str) -> std::collections::HashSet<u32> {
+    pub fn cached_uids(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+    ) -> std::collections::HashSet<u32> {
         let run = || -> rusqlite::Result<std::collections::HashSet<u32>> {
-            let mut stmt = self.conn.prepare(
-                "SELECT uid FROM messages WHERE account_id = ?1 AND folder_path = ?2",
-            )?;
-            let rows = stmt.query_map(params![account_id, folder_path], |row| row.get::<_, u32>(0))?;
+            let mut stmt = self
+                .conn
+                .prepare("SELECT uid FROM messages WHERE account_id = ?1 AND folder_path = ?2")?;
+            let rows =
+                stmt.query_map(params![account_id, folder_path], |row| row.get::<_, u32>(0))?;
             rows.collect()
         };
         run().unwrap_or_default()
@@ -1225,7 +1351,11 @@ impl Cache {
     /// Each cached message's UID with its timestamp, for a folder: what a
     /// Graph or JMAP listing is reconciled against (#429), since a row newer
     /// than the listing itself must not be taken for one deleted.
-    pub fn cached_uid_times(&self, account_id: u32, folder_path: &str) -> std::collections::HashMap<u32, i64> {
+    pub fn cached_uid_times(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+    ) -> std::collections::HashMap<u32, i64> {
         let run = || -> rusqlite::Result<std::collections::HashMap<u32, i64>> {
             let mut stmt = self.conn.prepare(
                 "SELECT uid, ts FROM messages WHERE account_id = ?1 AND folder_path = ?2",
@@ -1250,7 +1380,10 @@ impl Cache {
     fn thread_member_rowids(&self, account_id: u32, ids: &[&String]) -> rusqlite::Result<Vec<i64>> {
         let wanted: std::collections::HashSet<&str> = ids.iter().map(|i| i.as_str()).collect();
         let mut rowids: Vec<i64> = Vec::new();
-        let slots = (0..ids.len()).map(|i| format!("?{}", i + 2)).collect::<Vec<_>>().join(", ");
+        let slots = (0..ids.len())
+            .map(|i| format!("?{}", i + 2))
+            .collect::<Vec<_>>()
+            .join(", ");
         let mut stmt = self.conn.prepare(&format!(
             "SELECT rowid FROM messages WHERE account_id = ?1 AND message_id IN ({slots})"
         ))?;
@@ -1294,7 +1427,11 @@ impl Cache {
         account_id: u32,
         ids: &[String],
     ) -> Vec<(String, Message)> {
-        let ids: Vec<&String> = ids.iter().filter(|i| !i.is_empty()).take(THREAD_ID_LIMIT).collect();
+        let ids: Vec<&String> = ids
+            .iter()
+            .filter(|i| !i.is_empty())
+            .take(THREAD_ID_LIMIT)
+            .collect();
         if ids.is_empty() {
             return Vec::new();
         }
@@ -1314,32 +1451,32 @@ impl Cache {
             let rows = stmt.query_map([THREAD_MEMBER_LIMIT as i64], |row| {
                 let uid: u32 = row.get(1)?;
                 let mut m = Message {
-                        id: uid,
-                        account_id,
-                        folder_id: 0, // filled in by the caller, which knows the ids
-                        uid,
-                        from_name: row.get(2)?,
-                        from_addr: row.get(3)?,
-                        reply_to: row.get(15)?,
-                        to: row.get(10)?,
-                        cc: row.get(11)?,
-                        bcc: row.get(22)?,
-                        subject: row.get(4)?,
-                        preview: row.get(14)?,
-                        body: String::new(),
-                        date: row.get(5)?,
-                        timestamp: row.get(6)?,
-                        unread: row.get(7)?,
-                        starred: row.get(8)?,
-                        answered: row.get(20)?,
-                        forwarded: row.get(21)?,
-                        keywords: split_keywords(row.get(16)?),
-                        has_attachment: row.get(9)?,
-                        message_id: row.get(12)?,
-                        references: row.get(13)?,
-                        importance: crate::models::Importance::from_i64(row.get(17)?),
-                        due: row.get(18)?,
-                        labels: split_labels(row.get(19)?),
+                    id: uid,
+                    account_id,
+                    folder_id: 0, // filled in by the caller, which knows the ids
+                    uid,
+                    from_name: row.get(2)?,
+                    from_addr: row.get(3)?,
+                    reply_to: row.get(15)?,
+                    to: row.get(10)?,
+                    cc: row.get(11)?,
+                    bcc: row.get(22)?,
+                    subject: row.get(4)?,
+                    preview: row.get(14)?,
+                    body: String::new(),
+                    date: row.get(5)?,
+                    timestamp: row.get(6)?,
+                    unread: row.get(7)?,
+                    starred: row.get(8)?,
+                    answered: row.get(20)?,
+                    forwarded: row.get(21)?,
+                    keywords: split_keywords(row.get(16)?),
+                    has_attachment: row.get(9)?,
+                    message_id: row.get(12)?,
+                    references: row.get(13)?,
+                    importance: crate::models::Importance::from_i64(row.get(17)?),
+                    due: row.get(18)?,
+                    labels: split_labels(row.get(19)?),
                 };
                 m.scrub_nuls();
                 Ok((row.get::<_, String>(0)?, m))
@@ -1459,7 +1596,12 @@ impl Cache {
         let folders = self.load_folders(account_id);
         let hidden: HashSet<String> = folders
             .iter()
-            .filter(|f| matches!(f.kind, FolderKind::Trash | FolderKind::Junk | FolderKind::Templates))
+            .filter(|f| {
+                matches!(
+                    f.kind,
+                    FolderKind::Trash | FolderKind::Junk | FolderKind::Templates
+                )
+            })
             .map(|f| f.path.clone())
             .collect();
         // Counted, but never the message a row is shown as: a draft is a
@@ -1489,7 +1631,12 @@ impl Cache {
         // display is its newest message and later ones are ignored.
         let mut latest: Vec<Option<&ThreadLatest>> = vec![None; groups.len()];
         for row in &rows {
-            let Row { folder_path, message_id, references, latest: this } = row;
+            let Row {
+                folder_path,
+                message_id,
+                references,
+                latest: this,
+            } = row;
             if hidden.contains(folder_path) {
                 continue;
             }
@@ -1525,7 +1672,14 @@ impl Cache {
             .filter_map(|(gi, (tag, _))| {
                 let n = named[gi].len() + anonymous[gi];
                 (n > 0).then(|| {
-                    (tag.clone(), ThreadSummary { count: n, latest: latest[gi].cloned(), members: Vec::new() })
+                    (
+                        tag.clone(),
+                        ThreadSummary {
+                            count: n,
+                            latest: latest[gi].cloned(),
+                            members: Vec::new(),
+                        },
+                    )
                 })
             })
             .collect()
@@ -1618,7 +1772,13 @@ impl Cache {
             .unwrap_or((u32::MAX, false))
     }
 
-    pub fn set_label_fill_state(&self, account_id: u32, folder_path: &str, next_uid: u32, done: bool) {
+    pub fn set_label_fill_state(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        next_uid: u32,
+        done: bool,
+    ) {
         let _ = self.conn.execute(
             "INSERT INTO label_fill (account_id, folder_path, next_uid, done) \
              VALUES (?1, ?2, ?3, ?4) \
@@ -1628,13 +1788,22 @@ impl Cache {
     }
 
     /// Up to `limit` cached uids in a folder below `below_uid`, newest first.
-    pub fn uids_below(&self, account_id: u32, folder_path: &str, below_uid: u32, limit: usize) -> Vec<u32> {
+    pub fn uids_below(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        below_uid: u32,
+        limit: usize,
+    ) -> Vec<u32> {
         let run = || -> rusqlite::Result<Vec<u32>> {
             let mut stmt = self.conn.prepare(
                 "SELECT uid FROM messages WHERE account_id = ?1 AND folder_path = ?2 AND uid < ?3 \
                  ORDER BY uid DESC LIMIT ?4",
             )?;
-            let rows = stmt.query_map(params![account_id, folder_path, below_uid, limit as i64], |row| row.get(0))?;
+            let rows = stmt.query_map(
+                params![account_id, folder_path, below_uid, limit as i64],
+                |row| row.get(0),
+            )?;
             rows.collect()
         };
         run().unwrap_or_default()
@@ -1644,7 +1813,14 @@ impl Cache {
     /// changed.
     /// Add Gmail labels to one cached message, or take them off (#374): what
     /// tagging on Gmail changed, before the next sync says it again.
-    pub fn set_gmail_label(&self, account_id: u32, folder_path: &str, uid: u32, labels: &[String], add: bool) {
+    pub fn set_gmail_label(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        uid: u32,
+        labels: &[String],
+        add: bool,
+    ) {
         let current: String = self
             .conn
             .query_row(
@@ -1776,11 +1952,12 @@ impl Cache {
         folder_path: &str,
         uid: u32,
     ) -> Option<crate::models::SenderCheck> {
-        self.sender_check_of(account_id, folder_path, uid).or_else(|| {
-            self.sibling_copies(account_id, folder_path, uid)
-                .into_iter()
-                .find_map(|(p, u)| self.sender_check_of(account_id, &p, u))
-        })
+        self.sender_check_of(account_id, folder_path, uid)
+            .or_else(|| {
+                self.sibling_copies(account_id, folder_path, uid)
+                    .into_iter()
+                    .find_map(|(p, u)| self.sender_check_of(account_id, &p, u))
+            })
     }
 
     fn sender_check_of(
@@ -1871,7 +2048,14 @@ impl Cache {
                 return;
             };
             let Ok(mapped) = stmt.query_map([], |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?))
+                Ok((
+                    r.get(0)?,
+                    r.get(1)?,
+                    r.get(2)?,
+                    r.get(3)?,
+                    r.get(4)?,
+                    r.get(5)?,
+                ))
             }) else {
                 return;
             };
@@ -2056,7 +2240,12 @@ impl Cache {
             .unwrap_or(0) as u32
     }
 
-    pub fn load_attachments(&self, account_id: u32, folder_path: &str, uid: u32) -> Vec<Attachment> {
+    pub fn load_attachments(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        uid: u32,
+    ) -> Vec<Attachment> {
         let own = self.attachments_of(account_id, folder_path, uid);
         if !own.is_empty() {
             return own;
@@ -2231,7 +2420,10 @@ impl Cache {
 
     /// Note the message a queued forward forwards (#454).
     pub fn set_outbox_forwards(&self, id: u32, forwards: &str) {
-        let _ = self.conn.execute("UPDATE outbox SET forwards = ?1 WHERE id = ?2", params![forwards, id]);
+        let _ = self.conn.execute(
+            "UPDATE outbox SET forwards = ?1 WHERE id = ?2",
+            params![forwards, id],
+        );
     }
 
     /// Everything waiting for this account, oldest first (the order it is sent in).
@@ -2288,7 +2480,9 @@ impl Cache {
 
     /// Drop a queued message — it went out, or the user discarded it.
     pub fn delete_outbox(&self, id: u32) {
-        let _ = self.conn.execute("DELETE FROM outbox WHERE id = ?1", params![id]);
+        let _ = self
+            .conn
+            .execute("DELETE FROM outbox WHERE id = ?1", params![id]);
     }
 
     /// Record another failed attempt, so the list can say what went wrong.
@@ -2344,7 +2538,10 @@ impl Cache {
             }
         }
 
-        if let Ok(mut stmt) = self.conn.prepare("SELECT name, email, count FROM addresses") {
+        if let Ok(mut stmt) = self
+            .conn
+            .prepare("SELECT name, email, count FROM addresses")
+        {
             let rows = stmt.query_map([], |r| {
                 Ok((
                     r.get::<_, String>(0).unwrap_or_default(),
@@ -2385,7 +2582,10 @@ impl Cache {
             ))
         });
         for (from, to, cc) in rows.into_iter().flatten().flatten() {
-            for addr in std::iter::once(from.as_str()).chain(to.split(',')).chain(cc.split(',')) {
+            for addr in std::iter::once(from.as_str())
+                .chain(to.split(','))
+                .chain(cc.split(','))
+            {
                 let addr = addr.trim();
                 if addr.contains('@') {
                     out.insert(addr.to_lowercase());
@@ -2430,7 +2630,14 @@ impl Cache {
     }
 
     /// Add or drop a keyword on a cached row (the server copy just changed).
-    pub fn set_keyword(&self, account_id: u32, folder_path: &str, uid: u32, keyword: &str, add: bool) -> bool {
+    pub fn set_keyword(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        uid: u32,
+        keyword: &str,
+        add: bool,
+    ) -> bool {
         let mut current = self.keywords_of(account_id, folder_path, uid);
         current.retain(|k| !k.eq_ignore_ascii_case(keyword));
         if add {
@@ -2527,7 +2734,9 @@ impl Cache {
              WHERE account_id = ?1 AND instr(' ' || lower({KEYWORDS_COL}) || ' ', ?2) > 0"
         );
         self.conn
-            .query_row(&sql, params![account_id, needle], |row| row.get::<_, i64>(0))
+            .query_row(&sql, params![account_id, needle], |row| {
+                row.get::<_, i64>(0)
+            })
             .map(|n| n.max(0) as usize)
             .unwrap_or(0)
     }
@@ -2571,9 +2780,16 @@ impl Cache {
             sql.push_str(&format!(" AND folder_path IN ({})", list(paths, &mut args)));
         }
         if !exclude.is_empty() {
-            sql.push_str(&format!(" AND folder_path NOT IN ({})", list(exclude, &mut args)));
+            sql.push_str(&format!(
+                " AND folder_path NOT IN ({})",
+                list(exclude, &mut args)
+            ));
         }
-        for (col, want) in [("starred", pre.starred), ("unread", pre.unread), ("has_attachment", pre.attachment)] {
+        for (col, want) in [
+            ("starred", pre.starred),
+            ("unread", pre.unread),
+            ("has_attachment", pre.attachment),
+        ] {
             if let Some(want) = want {
                 sql.push_str(&format!(" AND {col} = {}", i32::from(want)));
             }
@@ -2635,9 +2851,20 @@ impl Cache {
     /// drops the copies Gmail keeps per label. `name` is the tag's name: on
     /// Gmail a label named like the tag (or like its keyword) counts as the
     /// tag too (#374).
-    pub fn messages_with_keyword(&self, account_id: u32, keyword: &str, name: &str) -> Vec<(String, Message)> {
+    pub fn messages_with_keyword(
+        &self,
+        account_id: u32,
+        keyword: &str,
+        name: &str,
+    ) -> Vec<(String, Message)> {
         let needle = format!(" {} ", keyword.to_ascii_lowercase());
-        let label = |s: &str| format!("{sep}{}{sep}", crate::mutf7::encode(s).to_lowercase(), sep = LABEL_SEP);
+        let label = |s: &str| {
+            format!(
+                "{sep}{}{sep}",
+                crate::mutf7::encode(s).to_lowercase(),
+                sep = LABEL_SEP
+            )
+        };
         let sql = format!(
             "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
                     has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels, answered, forwarded, bcc \
@@ -2649,39 +2876,49 @@ impl Cache {
         );
         let run = || -> rusqlite::Result<Vec<(String, Message)>> {
             let mut stmt = self.conn.prepare(&sql)?;
-            let rows = stmt.query_map(params![account_id, needle, TAG_VIEW_LIMIT, LABEL_SEP.to_string(), label(keyword), label(name)], |row| {
-                let uid: u32 = row.get(1)?;
-                let mut m = Message {
-                    id: uid,
+            let rows = stmt.query_map(
+                params![
                     account_id,
-                    folder_id: 0, // filled in by the caller, which knows the ids
-                    uid,
-                    from_name: row.get(2)?,
-                    from_addr: row.get(3)?,
-                    reply_to: row.get(15)?,
-                    to: row.get(10)?,
-                    cc: row.get(11)?,
-                    bcc: row.get(22)?,
-                    subject: row.get(4)?,
-                    preview: row.get(14)?,
-                    body: String::new(),
-                    date: row.get(5)?,
-                    timestamp: row.get(6)?,
-                    unread: row.get(7)?,
-                    starred: row.get(8)?,
-                    answered: row.get(20)?,
-                    forwarded: row.get(21)?,
-                    keywords: split_keywords(row.get(16)?),
-                    has_attachment: row.get(9)?,
-                    message_id: row.get(12)?,
-                    references: row.get(13)?,
-                    importance: crate::models::Importance::from_i64(row.get(17)?),
-                    due: row.get(18)?,
-                    labels: split_labels(row.get(19)?),
-                };
-                m.scrub_nuls();
-                Ok((row.get::<_, String>(0)?, m))
-            })?;
+                    needle,
+                    TAG_VIEW_LIMIT,
+                    LABEL_SEP.to_string(),
+                    label(keyword),
+                    label(name)
+                ],
+                |row| {
+                    let uid: u32 = row.get(1)?;
+                    let mut m = Message {
+                        id: uid,
+                        account_id,
+                        folder_id: 0, // filled in by the caller, which knows the ids
+                        uid,
+                        from_name: row.get(2)?,
+                        from_addr: row.get(3)?,
+                        reply_to: row.get(15)?,
+                        to: row.get(10)?,
+                        cc: row.get(11)?,
+                        bcc: row.get(22)?,
+                        subject: row.get(4)?,
+                        preview: row.get(14)?,
+                        body: String::new(),
+                        date: row.get(5)?,
+                        timestamp: row.get(6)?,
+                        unread: row.get(7)?,
+                        starred: row.get(8)?,
+                        answered: row.get(20)?,
+                        forwarded: row.get(21)?,
+                        keywords: split_keywords(row.get(16)?),
+                        has_attachment: row.get(9)?,
+                        message_id: row.get(12)?,
+                        references: row.get(13)?,
+                        importance: crate::models::Importance::from_i64(row.get(17)?),
+                        due: row.get(18)?,
+                        labels: split_labels(row.get(19)?),
+                    };
+                    m.scrub_nuls();
+                    Ok((row.get::<_, String>(0)?, m))
+                },
+            )?;
             rows.collect()
         };
         run().unwrap_or_else(|e| {
@@ -2716,7 +2953,9 @@ impl Cache {
                     |row| row.get(0),
                 )
                 .ok();
-            let Some(msgid) = msgid.filter(|m| !m.is_empty()) else { continue };
+            let Some(msgid) = msgid.filter(|m| !m.is_empty()) else {
+                continue;
+            };
             let Ok(mut stmt) = self.conn.prepare(
                 "SELECT folder_path, uid FROM messages \
                  WHERE account_id = ?1 AND message_id = ?2 AND folder_path <> ?3 AND folder_path <> ?4",
@@ -2816,17 +3055,35 @@ mod tests {
                 params![path, uid, subject, ts, starred],
             ).unwrap();
         }
-        let uids = |v: Vec<(String, Message)>| v.into_iter().map(|(_, m)| m.uid).collect::<Vec<_>>();
+        let uids =
+            |v: Vec<(String, Message)>| v.into_iter().map(|(_, m)| m.uid).collect::<Vec<_>>();
         let none = crate::config::SmartPrefilter::default();
         let trash = vec!["Trash".to_string()];
-        assert_eq!(uids(c.smart_scan(1, None, &trash, none, 10, |_| true)), [2, 3, 1]);
+        assert_eq!(
+            uids(c.smart_scan(1, None, &trash, none, 10, |_| true)),
+            [2, 3, 1]
+        );
         let sent = vec!["Sent".to_string()];
-        assert_eq!(uids(c.smart_scan(1, Some(&sent), &[], none, 10, |_| true)), [3]);
-        let starred = crate::config::SmartPrefilter { starred: Some(true), ..none };
-        assert_eq!(uids(c.smart_scan(1, None, &trash, starred, 10, |_| true)), [3, 1]);
-        assert_eq!(uids(c.smart_scan(1, None, &trash, none, 10, |m| m.subject.ends_with("one"))), [1]);
+        assert_eq!(
+            uids(c.smart_scan(1, Some(&sent), &[], none, 10, |_| true)),
+            [3]
+        );
+        let starred = crate::config::SmartPrefilter {
+            starred: Some(true),
+            ..none
+        };
+        assert_eq!(
+            uids(c.smart_scan(1, None, &trash, starred, 10, |_| true)),
+            [3, 1]
+        );
+        assert_eq!(
+            uids(c.smart_scan(1, None, &trash, none, 10, |m| m.subject.ends_with("one"))),
+            [1]
+        );
         assert_eq!(uids(c.smart_scan(1, None, &[], none, 2, |_| true)), [4, 2]);
-        assert!(c.smart_scan(1, Some(&[]), &[], none, 10, |_| true).is_empty());
+        assert!(c
+            .smart_scan(1, Some(&[]), &[], none, 10, |_| true)
+            .is_empty());
         assert!(c.smart_scan(2, None, &[], none, 10, |_| true).is_empty());
     }
 
@@ -2836,7 +3093,13 @@ mod tests {
     fn account_addresses_are_one_accounts() {
         let c = Cache::in_memory().unwrap();
         for (account, uid, from, to, cc) in [
-            (1u32, 1u32, "Boss@Work.example", "me@work.example, colleague@work.example", ""),
+            (
+                1u32,
+                1u32,
+                "Boss@Work.example",
+                "me@work.example, colleague@work.example",
+                "",
+            ),
             (1, 2, "me@work.example", "client@elsewhere.example", "x"),
             (2, 1, "friend@home.example", "me@home.example", ""),
         ] {
@@ -2848,7 +3111,15 @@ mod tests {
         }
         let mut work: Vec<String> = c.account_addresses(1).into_iter().collect();
         work.sort();
-        assert_eq!(work, ["boss@work.example", "client@elsewhere.example", "colleague@work.example", "me@work.example"]);
+        assert_eq!(
+            work,
+            [
+                "boss@work.example",
+                "client@elsewhere.example",
+                "colleague@work.example",
+                "me@work.example"
+            ]
+        );
         assert!(c.account_addresses(3).is_empty());
     }
 
@@ -2871,7 +3142,10 @@ mod tests {
         assert_eq!(c.downloaded_size(), (5, 2));
         assert_eq!(c.remove_downloaded(None).unwrap(), 1);
         assert_eq!(c.downloaded_size(), (0, 0));
-        let left: i64 = c.conn.query_row("SELECT COUNT(*) FROM messages", [], |r| r.get(0)).unwrap();
+        let left: i64 = c
+            .conn
+            .query_row("SELECT COUNT(*) FROM messages", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(left, 2);
     }
 
@@ -2885,18 +3159,33 @@ mod tests {
             c.conn.execute("INSERT INTO bodies (account_id, folder_path, uid, body) VALUES (?1, ?2, 1, ?2)", params![id, path]).unwrap();
         };
         let paths = |id: u32| -> Vec<String> {
-            let mut stmt = c.conn.prepare("SELECT path FROM folders WHERE account_id = ?1 ORDER BY path").unwrap();
-            stmt.query_map([id], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+            let mut stmt = c
+                .conn
+                .prepare("SELECT path FROM folders WHERE account_id = ?1 ORDER BY path")
+                .unwrap();
+            stmt.query_map([id], |r| r.get(0))
+                .unwrap()
+                .map(Result::unwrap)
+                .collect()
         };
         let body = |id: u32| -> Option<String> {
-            c.conn.query_row("SELECT body FROM bodies WHERE account_id = ?1", [id], |r| r.get(0)).ok()
+            c.conn
+                .query_row("SELECT body FROM bodies WHERE account_id = ?1", [id], |r| {
+                    r.get(0)
+                })
+                .ok()
         };
         put(1, "a-inbox");
         put(2, "b-inbox");
         put(3, "c-inbox");
-        let all = |v: &[(u32, &str)]| v.iter().map(|(i, e)| (*i, e.to_string())).collect::<Vec<_>>();
+        let all = |v: &[(u32, &str)]| {
+            v.iter()
+                .map(|(i, e)| (*i, e.to_string()))
+                .collect::<Vec<_>>()
+        };
         // A cache from before owners were kept is taken as it is.
-        c.claim_accounts(&all(&[(1, "a@x"), (2, "b@x"), (3, "C@x")])).unwrap();
+        c.claim_accounts(&all(&[(1, "a@x"), (2, "b@x"), (3, "C@x")]))
+            .unwrap();
         assert_eq!(paths(1), ["a-inbox"]);
         // The first account goes.
         c.claim_accounts(&all(&[(1, "b@x"), (2, "c@x")])).unwrap();
@@ -2921,8 +3210,12 @@ mod tests {
     #[test]
     #[ignore]
     fn thread_lookup_timing() {
-        let Ok(path) = std::env::var("HYLKI_CACHE_TIMING") else { return };
-        let c = Cache { conn: Connection::open(path).unwrap() };
+        let Ok(path) = std::env::var("HYLKI_CACHE_TIMING") else {
+            return;
+        };
+        let c = Cache {
+            conn: Connection::open(path).unwrap(),
+        };
         let accounts: Vec<u32> = c
             .conn
             .prepare("SELECT DISTINCT account_id FROM messages")
@@ -2959,20 +3252,37 @@ mod tests {
 
     #[test]
     fn background_reader_sees_wal_updates_without_writing() {
-        let path = std::env::temp_dir().join(format!("hylki-cache-reader-{}-{}.db",
-            std::process::id(), std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
-        std::fs::OpenOptions::new().write(true).create_new(true).open(&path).unwrap();
-        let cache = Cache { conn: Connection::open(&path).unwrap() };
+        let path = std::env::temp_dir().join(format!(
+            "hylki-cache-reader-{}-{}.db",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
+        let cache = Cache {
+            conn: Connection::open(&path).unwrap(),
+        };
         cache.conn.execute_batch(SCHEMA).unwrap();
-        cache.conn.pragma_update(None, "journal_mode", "WAL").unwrap();
+        cache
+            .conn
+            .pragma_update(None, "journal_mode", "WAL")
+            .unwrap();
         cache.save_body(1, "INBOX", 42, "first");
         let reader = cache.read_connection().unwrap();
         assert_eq!(reader.load_body(1, "INBOX", 42).as_deref(), Some("first"));
         cache.save_body(1, "INBOX", 42, "updated");
         assert_eq!(reader.load_body(1, "INBOX", 42).as_deref(), Some("updated"));
         let error = reader.conn.execute("DELETE FROM bodies", []).unwrap_err();
-        assert_eq!(error.sqlite_error_code(), Some(rusqlite::ErrorCode::ReadOnly));
+        assert_eq!(
+            error.sqlite_error_code(),
+            Some(rusqlite::ErrorCode::ReadOnly)
+        );
         drop(reader);
         drop(cache);
         std::fs::remove_file(path).unwrap();
@@ -3010,9 +3320,7 @@ mod tests {
         let cache = Cache::open().expect("cache opens");
         drop(cache);
 
-        let mode = |p: &std::path::Path| {
-            std::fs::metadata(p).unwrap().permissions().mode() & 0o777
-        };
+        let mode = |p: &std::path::Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode(&dir), 0o700, "cache directory");
         assert_eq!(mode(&dir.join("cache.db")), 0o600, "cache.db");
         for side in ["cache.db-wal", "cache.db-shm"] {
@@ -3052,14 +3360,17 @@ mod tests {
         let c = Cache::in_memory().unwrap();
         note_msgid_case("vireo-12tPxIJKt7PhQVbIiO@gmail.com");
         note_msgid_case("plain@example.com"); // all lowercase: nothing to note
-        // Known before it is on disk (noted, not yet carried by a batch).
+                                              // Known before it is on disk (noted, not yet carried by a batch).
         assert_eq!(
             c.exact_msgids("vireo-12tpxijkt7phqvbiio@gmail.com plain@example.com"),
             "vireo-12tPxIJKt7PhQVbIiO@gmail.com plain@example.com"
         );
         // The next batch of messages writes it down; then it is on disk.
         c.upsert_messages(1, "INBOX", &[]);
-        assert!(msgid_case_pending().lock().unwrap().is_empty(), "drained by the batch");
+        assert!(
+            msgid_case_pending().lock().unwrap().is_empty(),
+            "drained by the batch"
+        );
         assert_eq!(
             c.exact_msgids("vireo-12tpxijkt7phqvbiio@gmail.com"),
             "vireo-12tPxIJKt7PhQVbIiO@gmail.com"
@@ -3123,16 +3434,42 @@ mod tests {
         let c = Cache::in_memory().unwrap();
         let rcpts = vec!["ada@example.com".to_string()];
         let later = c
-            .queue_outbox(1, "me@example.com", &rcpts, "ada", "Later", "", b"raw", None, "", Some(1_900_000_000))
+            .queue_outbox(
+                1,
+                "me@example.com",
+                &rcpts,
+                "ada",
+                "Later",
+                "",
+                b"raw",
+                None,
+                "",
+                Some(1_900_000_000),
+            )
             .expect("queued");
         let now = c
-            .queue_outbox(1, "me@example.com", &rcpts, "ada", "Now", "", b"raw", None, "", None)
+            .queue_outbox(
+                1,
+                "me@example.com",
+                &rcpts,
+                "ada",
+                "Now",
+                "",
+                b"raw",
+                None,
+                "",
+                None,
+            )
             .expect("queued");
         let items = c.outbox_items(1);
         let by = |id: u32| items.iter().find(|i| i.id == id).expect("listed");
         assert_eq!(by(later).send_at, Some(1_900_000_000));
         assert_eq!(by(now).send_at, None);
-        assert!(by(later).as_message().preview.starts_with("Scheduled for "), "{}", by(later).as_message().preview);
+        assert!(
+            by(later).as_message().preview.starts_with("Scheduled for "),
+            "{}",
+            by(later).as_message().preview
+        );
     }
 
     #[test]
@@ -3225,7 +3562,10 @@ mod tests {
         };
         c.upsert_messages(1, "INBOX", &[m(1, true), m(2, false)]);
         let flags = |c: &Cache| -> Vec<(bool, bool)> {
-            c.load_messages(1, "INBOX", 1).iter().map(|m| (m.answered, m.forwarded)).collect()
+            c.load_messages(1, "INBOX", 1)
+                .iter()
+                .map(|m| (m.answered, m.forwarded))
+                .collect()
         };
         assert_eq!(flags(&c), [(false, false), (true, false)]);
         c.set_answered(1, "INBOX", 2, true);
@@ -3233,7 +3573,11 @@ mod tests {
         assert_eq!(flags(&c), [(true, true), (true, false)]);
         assert_eq!(c.answer_state(1, "INBOX", 2), (true, true));
         assert_eq!(c.answer_state(1, "INBOX", 9), (false, false), "no such row");
-        let (_, tagged) = c.messages_with_keyword(1, "Work", "Work").into_iter().find(|(_, m)| m.uid == 2).unwrap();
+        let (_, tagged) = c
+            .messages_with_keyword(1, "Work", "Work")
+            .into_iter()
+            .find(|(_, m)| m.uid == 2)
+            .unwrap();
         assert!(tagged.answered && tagged.forwarded);
         // The server's word replaces it at the next sync.
         c.upsert_messages(1, "INBOX", &[m(2, false)]);
@@ -3277,7 +3621,14 @@ mod tests {
         assert_eq!(c.load_messages(1, "Sent", 4), [m.clone()]);
         let (_, tagged) = c.messages_with_keyword(1, "Work", "Work").pop().unwrap();
         assert_eq!(tagged.bcc, m.bcc);
-        c.upsert_messages(1, "Sent", &[Message { bcc: "hidden@example.com".into(), ..m }]);
+        c.upsert_messages(
+            1,
+            "Sent",
+            &[Message {
+                bcc: "hidden@example.com".into(),
+                ..m
+            }],
+        );
         assert_eq!(c.load_messages(1, "Sent", 4)[0].bcc, "hidden@example.com");
     }
 
@@ -3286,7 +3637,18 @@ mod tests {
     fn a_queued_forward_keeps_its_original() {
         let c = Cache::in_memory().unwrap();
         let id = c
-            .queue_outbox(1, "me@x", &["ada@x".into()], "Ada", "Fwd: Hello", "", b"raw", None, "", None)
+            .queue_outbox(
+                1,
+                "me@x",
+                &["ada@x".into()],
+                "Ada",
+                "Fwd: Hello",
+                "",
+                b"raw",
+                None,
+                "",
+                None,
+            )
             .unwrap();
         assert_eq!(c.outbox_items(1)[0].forwards, "");
         c.set_outbox_forwards(id, "m1@x");
@@ -3324,17 +3686,28 @@ mod tests {
             references: String::new(),
             importance: Default::default(),
             due: 0,
-            labels: vec!["My Label".into(), "Work/Projects".into(), "&AOk-t&AOk-".into()],
+            labels: vec![
+                "My Label".into(),
+                "Work/Projects".into(),
+                "&AOk-t&AOk-".into(),
+            ],
         };
         c.upsert_messages(1, "INBOX", std::slice::from_ref(&m));
         assert_eq!(c.load_messages(1, "INBOX", 1), [m.clone()]);
-        let (_, by_keyword) = c.messages_with_keyword(1, "$label1", "Urgent").pop().unwrap();
+        let (_, by_keyword) = c
+            .messages_with_keyword(1, "$label1", "Urgent")
+            .pop()
+            .unwrap();
         assert_eq!(by_keyword.labels, m.labels);
         // A label named like a tag finds the message for that tag (#374),
         // whatever its case, the non-ASCII one included.
         assert_eq!(c.messages_with_keyword(1, "work-kw", "my label").len(), 1);
         assert_eq!(c.messages_with_keyword(1, "x", "été").len(), 1);
-        assert_eq!(c.messages_with_keyword(1, "x", "Work").len(), 0, "a nested label is its own name");
+        assert_eq!(
+            c.messages_with_keyword(1, "x", "Work").len(),
+            0,
+            "a nested label is its own name"
+        );
         assert_eq!(c.messages_with_keyword(1, "nothing", "Nothing").len(), 0);
 
         // A label taken off in Gmail comes off here at the next sync.
@@ -3346,9 +3719,14 @@ mod tests {
         assert_eq!(c.label_fill_state(1, "INBOX"), (u32::MAX, false));
         assert_eq!(c.uids_below(1, "INBOX", u32::MAX, 10), [4]);
         assert!(c.uids_below(1, "INBOX", 4, 10).is_empty());
-        let found = std::collections::HashMap::from([(4, vec!["Filled In".to_string()]), (99, vec![])]);
+        let found =
+            std::collections::HashMap::from([(4, vec!["Filled In".to_string()]), (99, vec![])]);
         assert_eq!(c.set_gmail_labels(1, "INBOX", &found), 1);
-        assert_eq!(c.set_gmail_labels(1, "INBOX", &found), 0, "nothing new the second time");
+        assert_eq!(
+            c.set_gmail_labels(1, "INBOX", &found),
+            0,
+            "nothing new the second time"
+        );
         let back = c.load_messages(1, "INBOX", 1).remove(0);
         assert_eq!(back.labels, ["Filled In"]);
         assert_eq!(back.keywords, ["$label1"]);
@@ -3426,7 +3804,10 @@ mod tests {
         assert_eq!(items[0].name, "old.pdf");
         assert!(!items[0].downloaded, "never fetched");
         assert!(items[0].data.is_none());
-        assert_eq!(items[0].size, 900_000, "size comes from the scan, not the blob");
+        assert_eq!(
+            items[0].size, 900_000,
+            "size comes from the scan, not the blob"
+        );
         assert_eq!(items[1].name, "a.png");
         assert!(items[1].downloaded);
         assert_eq!(items[1].data.as_deref(), Some(&[0u8; 4][..]));
@@ -3486,7 +3867,10 @@ mod tests {
         add_meta(&c, "Sent", 2, 0, "out.png", 2);
 
         let inbox_only = [(1u32, "INBOX".to_string())];
-        let q = GalleryQuery { folders: &inbox_only, ..all(GallerySort::Newest, 50, 0) };
+        let q = GalleryQuery {
+            folders: &inbox_only,
+            ..all(GallerySort::Newest, 50, 0)
+        };
         let items = c.gallery_page(&q);
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].name, "in.png");
@@ -3505,7 +3889,11 @@ mod tests {
         add_meta(&c, "INBOX", 2, 0, "beach.png", 2);
 
         let hit = |tokens: &[String]| {
-            c.gallery_page(&GalleryQuery { tokens, ..all(GallerySort::Newest, 50, 0) }).len()
+            c.gallery_page(&GalleryQuery {
+                tokens,
+                ..all(GallerySort::Newest, 50, 0)
+            })
+            .len()
         };
         assert_eq!(hit(&["budget".to_string()]), 1, "filename");
         assert_eq!(hit(&["whitfield".to_string()]), 1, "sender");
@@ -3530,8 +3918,15 @@ mod tests {
         add_meta(&c, "INBOX", 1, 0, "report.pdf", 2);
 
         let wild = ["%".to_string()];
-        let q = GalleryQuery { tokens: &wild, ..all(GallerySort::Newest, 50, 0) };
-        assert_eq!(c.gallery_page(&q).len(), 0, "% matches a literal percent sign");
+        let q = GalleryQuery {
+            tokens: &wild,
+            ..all(GallerySort::Newest, 50, 0)
+        };
+        assert_eq!(
+            c.gallery_page(&q).len(),
+            0,
+            "% matches a literal percent sign"
+        );
     }
 
     /// The type filter and the type sort both read the bucket stored with the
@@ -3545,7 +3940,10 @@ mod tests {
         add_msg(&c, "INBOX", 2, "B", "T", 200);
         add_meta(&c, "INBOX", 2, 0, "doc.pdf", 2);
 
-        let images = GalleryQuery { bucket: 1, ..all(GallerySort::Newest, 50, 0) };
+        let images = GalleryQuery {
+            bucket: 1,
+            ..all(GallerySort::Newest, 50, 0)
+        };
         let items = c.gallery_page(&images);
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].name, "shot.png");
@@ -3614,7 +4012,11 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(c.unscanned_attachment_uids(1, "INBOX", 10), vec![2], "only the empty one");
+        assert_eq!(
+            c.unscanned_attachment_uids(1, "INBOX", 10),
+            vec![2],
+            "only the empty one"
+        );
         assert_eq!(
             c.gallery_page(&all(GallerySort::Newest, 50, 0)).len(),
             1,
@@ -3642,7 +4044,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(c.unscanned_attachment_count(1, "INBOX"), 2);
-        assert_eq!(c.unscanned_attachment_uids(1, "INBOX", 10), vec![2, 1], "newest first");
+        assert_eq!(
+            c.unscanned_attachment_uids(1, "INBOX", 10),
+            vec![2, 1],
+            "newest first"
+        );
 
         c.save_attachment_meta(1, "INBOX", 2, &[]); // described, holds nothing
         assert_eq!(c.unscanned_attachment_count(1, "INBOX"), 1);
@@ -3664,16 +4070,16 @@ mod tests {
 
         let subj: String = c
             .conn
-            .query_row(
-                "SELECT subject FROM messages WHERE uid = 1",
-                [],
-                |r| r.get(0),
-            )
+            .query_row("SELECT subject FROM messages WHERE uid = 1", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(subj, "92-year-old artist Sheila Hicks");
         let plain: String = c
             .conn
-            .query_row("SELECT subject FROM messages WHERE uid = 2", [], |r| r.get(0))
+            .query_row("SELECT subject FROM messages WHERE uid = 2", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(plain, "Already fine");
     }
@@ -3684,7 +4090,10 @@ mod tests {
     fn recheck_suspicious_senders_drops_only_those_verdicts_and_bodies() {
         use crate::models::{SenderCheck, SenderTrust};
         let c = Cache::in_memory().unwrap();
-        let check = |trust| SenderCheck { trust, ..Default::default() };
+        let check = |trust| SenderCheck {
+            trust,
+            ..Default::default()
+        };
         c.save_body(1, "INBOX", 1, "<p>flagged</p>");
         c.save_sender_check(1, "INBOX", 1, &check(SenderTrust::Suspicious));
         c.save_body(1, "INBOX", 2, "<p>fine</p>");
@@ -3695,14 +4104,24 @@ mod tests {
         assert!(c.load_body(1, "INBOX", 1).is_none());
         assert!(c.load_sender_check(1, "INBOX", 1).is_none());
         assert!(c.load_body(1, "INBOX", 2).is_some());
-        assert_eq!(c.load_sender_check(1, "INBOX", 2).map(|k| k.trust), Some(SenderTrust::Pass));
+        assert_eq!(
+            c.load_sender_check(1, "INBOX", 2).map(|k| k.trust),
+            Some(SenderTrust::Pass)
+        );
     }
 
     #[test]
     fn clean_quoted_names_strips_the_escapes_in_place() {
         let c = Cache::in_memory().unwrap();
         add_folder(&c, "INBOX", FolderKind::Inbox);
-        add_msg(&c, "INBOX", 1, r#"\"Sender Name\""#, r#"Re: \"Plans\""#, 100);
+        add_msg(
+            &c,
+            "INBOX",
+            1,
+            r#"\"Sender Name\""#,
+            r#"Re: \"Plans\""#,
+            100,
+        );
         add_msg(&c, "INBOX", 2, "Plain Name", "Already fine", 200);
 
         Cache::clean_quoted_names(&c.conn);
@@ -3716,8 +4135,14 @@ mod tests {
                 )
                 .unwrap()
         };
-        assert_eq!(row(1), ("Sender Name".to_string(), r#"Re: "Plans""#.to_string()));
-        assert_eq!(row(2), ("Plain Name".to_string(), "Already fine".to_string()));
+        assert_eq!(
+            row(1),
+            ("Sender Name".to_string(), r#"Re: "Plans""#.to_string())
+        );
+        assert_eq!(
+            row(2),
+            ("Plain Name".to_string(), "Already fine".to_string())
+        );
     }
 
     /// Insert a message carrying threading headers.
@@ -3736,7 +4161,10 @@ mod tests {
     /// Just the sizes, for the tests that predate the newest-message half of
     /// the answer.
     fn counts(c: &Cache, groups: &[(String, Vec<String>)]) -> Vec<(String, usize)> {
-        c.thread_summaries(1, groups).into_iter().map(|(tag, s)| (tag, s.count)).collect()
+        c.thread_summaries(1, groups)
+            .into_iter()
+            .map(|(tag, s)| (tag, s.count))
+            .collect()
     }
 
     /// As [`add_threaded`], with the sender and preview a row would show.
@@ -3820,13 +4248,25 @@ mod tests {
                 params![uid],
             ).unwrap();
         }
-        assert_eq!(c.refs_repair_state(1, "INBOX"), (u32::MAX, false), "starts at the top");
+        assert_eq!(
+            c.refs_repair_state(1, "INBOX"),
+            (u32::MAX, false),
+            "starts at the top"
+        );
         let first = c.uids_needing_references(1, "INBOX", u32::MAX, 2);
-        assert_eq!(first.iter().map(|(u, _)| *u).collect::<Vec<_>>(), vec![30, 20], "newest first");
+        assert_eq!(
+            first.iter().map(|(u, _)| *u).collect::<Vec<_>>(),
+            vec![30, 20],
+            "newest first"
+        );
 
         c.set_refs_repair_state(1, "INBOX", 20, false);
         let next = c.uids_needing_references(1, "INBOX", 20, 2);
-        assert_eq!(next.iter().map(|(u, _)| *u).collect::<Vec<_>>(), vec![10], "strictly below");
+        assert_eq!(
+            next.iter().map(|(u, _)| *u).collect::<Vec<_>>(),
+            vec![10],
+            "strictly below"
+        );
 
         c.set_refs_repair_state(1, "INBOX", 0, true);
         assert!(c.refs_repair_state(1, "INBOX").1, "and it finishes");
@@ -3934,7 +4374,9 @@ mod tests {
         let left = c.locate_by_message_id("root@x");
         assert_eq!(left.len(), 2);
         assert!(left.iter().any(|(_, p, u)| p == "INBOX" && *u == 1));
-        assert!(left.iter().any(|(_, p, u)| p == "[Gmail]/Trash" && *u == 30));
+        assert!(left
+            .iter()
+            .any(|(_, p, u)| p == "[Gmail]/Trash" && *u == 30));
         assert_eq!(c.locate_by_message_id("other@x").len(), 2);
     }
 
@@ -3957,8 +4399,26 @@ mod tests {
         let c = Cache::in_memory().unwrap();
         add_folder(&c, "INBOX", FolderKind::Inbox);
         add_folder(&c, "Sent", FolderKind::Sent);
-        add_shown(&c, "INBOX", 1, 500, "root@x", "", "Ada", "Can you take a look?");
-        add_shown(&c, "Sent", 2, 600, "mine@x", "root@x", "Me", "Looked, all good");
+        add_shown(
+            &c,
+            "INBOX",
+            1,
+            500,
+            "root@x",
+            "",
+            "Ada",
+            "Can you take a look?",
+        );
+        add_shown(
+            &c,
+            "Sent",
+            2,
+            600,
+            "mine@x",
+            "root@x",
+            "Me",
+            "Looked, all good",
+        );
 
         let groups = vec![("t".to_string(), vec!["root@x".to_string()])];
         let got = c.thread_summaries(1, &groups);
@@ -3975,8 +4435,26 @@ mod tests {
         let c = Cache::in_memory().unwrap();
         add_folder(&c, "INBOX", FolderKind::Inbox);
         add_folder(&c, "Drafts", FolderKind::Drafts);
-        add_shown(&c, "INBOX", 1, 500, "root@x", "", "Ada", "Can you take a look?");
-        add_shown(&c, "Drafts", 2, 900, "draft@x", "root@x", "Me", "Half an answ");
+        add_shown(
+            &c,
+            "INBOX",
+            1,
+            500,
+            "root@x",
+            "",
+            "Ada",
+            "Can you take a look?",
+        );
+        add_shown(
+            &c,
+            "Drafts",
+            2,
+            900,
+            "draft@x",
+            "root@x",
+            "Me",
+            "Half an answ",
+        );
 
         let groups = vec![("t".to_string(), vec!["root@x".to_string()])];
         let got = c.thread_summaries(1, &groups);
@@ -3991,8 +4469,26 @@ mod tests {
         let c = Cache::in_memory().unwrap();
         add_folder(&c, "INBOX", FolderKind::Inbox);
         add_folder(&c, "Trash", FolderKind::Trash);
-        add_shown(&c, "INBOX", 1, 500, "root@x", "", "Ada", "Can you take a look?");
-        add_shown(&c, "Trash", 2, 900, "binned@x", "root@x", "Ada", "Never mind");
+        add_shown(
+            &c,
+            "INBOX",
+            1,
+            500,
+            "root@x",
+            "",
+            "Ada",
+            "Can you take a look?",
+        );
+        add_shown(
+            &c,
+            "Trash",
+            2,
+            900,
+            "binned@x",
+            "root@x",
+            "Ada",
+            "Never mind",
+        );
 
         let groups = vec![("t".to_string(), vec!["root@x".to_string()])];
         let got = c.thread_summaries(1, &groups);
@@ -4027,7 +4523,10 @@ mod tests {
         add_threaded(&c, "[Gmail]/All Mail", 900, 500, "same@x", "");
         c.save_body(1, "[Gmail]/All Mail", 900, "the real body");
 
-        assert_eq!(c.load_body(1, "INBOX", 42).as_deref(), Some("the real body"));
+        assert_eq!(
+            c.load_body(1, "INBOX", 42).as_deref(),
+            Some("the real body")
+        );
         // The copy that actually holds it still answers directly.
         assert_eq!(
             c.load_body(1, "[Gmail]/All Mail", 900).as_deref(),
@@ -4044,7 +4543,10 @@ mod tests {
             1,
             "Paratype",
             7,
-            &[Attachment { name: "spec.pdf".into(), data: vec![1, 2, 3] }],
+            &[Attachment {
+                name: "spec.pdf".into(),
+                data: vec![1, 2, 3],
+            }],
         );
 
         let found = c.load_attachments(1, "INBOX", 42);
@@ -4128,6 +4630,10 @@ mod tests {
         let found = c.messages_by_thread_ids(1, &["root@x".to_string()]);
         let mut ids: Vec<&str> = found.iter().map(|(_, m)| m.message_id.as_str()).collect();
         ids.sort_unstable();
-        assert_eq!(ids, vec!["new-reply@x", "old-reply@x", "root@x"], "all three, any age");
+        assert_eq!(
+            ids,
+            vec!["new-reply@x", "old-reply@x", "root@x"],
+            "all three, any age"
+        );
     }
 }

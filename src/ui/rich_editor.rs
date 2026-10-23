@@ -3,9 +3,9 @@
 //! editing commands. Used for the compose body and the account signature.
 
 use super::tool_flow::ToolFlow;
+use crate::i18n::{i18n, i18n_f, i18n_noop};
 use adw::prelude::*;
 use webkit6::prelude::WebViewExt;
-use crate::i18n::{i18n, i18n_f, i18n_noop};
 
 /// A rich-text editor widget. Add `widget` to a container; read the content back
 /// with [`RichEditor::extract_html`] (asynchronous, since it queries the WebView).
@@ -149,9 +149,15 @@ pub fn installed_dictionaries() -> Vec<String> {
     for d in gtk::glib::system_data_dirs() {
         dirs.push(d.join("hunspell"));
     }
-    dirs.push(gtk::glib::user_config_dir().join("enchant").join("hunspell"));
+    dirs.push(
+        gtk::glib::user_config_dir()
+            .join("enchant")
+            .join("hunspell"),
+    );
     for dir in dirs {
-        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
         for e in entries.flatten() {
             let p = e.path();
             let is_dic = p.extension().is_some_and(|x| x == "dic");
@@ -168,9 +174,7 @@ pub fn installed_dictionaries() -> Vec<String> {
     const KEPT_ENGLISH: &[&str] = &["en_US", "en_GB", "en_CA", "en_AU", "en_NZ"];
     codes
         .into_iter()
-        .filter(|c| {
-            c.split('_').next() != Some("en") || KEPT_ENGLISH.contains(&c.as_str())
-        })
+        .filter(|c| c.split('_').next() != Some("en") || KEPT_ENGLISH.contains(&c.as_str()))
         .collect()
 }
 
@@ -195,7 +199,13 @@ fn append_spelling_menu(menu: &webkit6::ContextMenu, cb: &SpellLangsCallback) {
         &[("language", &spell_language_names(&system))],
     );
     let entries = std::iter::once((String::new(), system_label, chosen.is_empty())).chain(
-        dicts.iter().map(|d| (d.clone(), crate::spell::language_display_name(d), chosen.contains(d))),
+        dicts.iter().map(|d| {
+            (
+                d.clone(),
+                crate::spell::language_display_name(d),
+                chosen.contains(d),
+            )
+        }),
     );
     let sub = webkit6::ContextMenu::new();
     for (i, (code, label, on)) in entries.enumerate() {
@@ -212,19 +222,28 @@ fn append_spelling_menu(menu: &webkit6::ContextMenu, cb: &SpellLangsCallback) {
                 f(next);
             }
         });
-        sub.append(&webkit6::ContextMenuItem::from_gaction(&action, &label, None));
+        sub.append(&webkit6::ContextMenuItem::from_gaction(
+            &action, &label, None,
+        ));
         if i == 0 {
             sub.append(&webkit6::ContextMenuItem::new_separator());
         }
     }
     menu.append(&webkit6::ContextMenuItem::new_separator());
-    menu.append(&webkit6::ContextMenuItem::with_submenu(&i18n("Spelling Language"), &sub));
+    menu.append(&webkit6::ContextMenuItem::with_submenu(
+        &i18n("Spelling Language"),
+        &sub,
+    ));
 }
 
 /// Dictionary codes as the names people read, joined: "Deutsch
 /// (Deutschland), Français (France)".
 pub fn spell_language_names(codes: &[String]) -> String {
-    codes.iter().map(|c| crate::spell::language_display_name(c)).collect::<Vec<_>>().join(", ")
+    codes
+        .iter()
+        .map(|c| crate::spell::language_display_name(c))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 impl RichEditor {
@@ -317,7 +336,9 @@ impl RichEditor {
                 // Focus given before the document was there reached the
                 // view but no caret: place it now.
                 let root_focus = v.root().and_then(|r| r.focus());
-                if root_focus.is_some_and(|f| f == *v.upcast_ref::<gtk::Widget>() || f.is_ancestor(v)) {
+                if root_focus
+                    .is_some_and(|f| f == *v.upcast_ref::<gtk::Widget>() || f.is_ancestor(v))
+                {
                     exec(v, PLACE_CARET);
                 }
             }
@@ -400,7 +421,9 @@ impl RichEditor {
             keys.set_propagation_phase(gtk::PropagationPhase::Capture);
             let weak = webview.downgrade();
             keys.connect_key_pressed(move |_, keyval, _, state| {
-                let Some(v) = weak.upgrade() else { return gtk::glib::Propagation::Proceed };
+                let Some(v) = weak.upgrade() else {
+                    return gtk::glib::Propagation::Proceed;
+                };
                 match history_key(keyval, state) {
                     Some(redo) => {
                         v.execute_editing_command(if redo {
@@ -500,8 +523,7 @@ impl RichEditor {
                     (i18n("Large"), "large"),
                     (i18n("Original Size"), "original"),
                 ] {
-                    let action =
-                        gtk::gio::SimpleAction::new(&format!("hylki-img-{kind}"), None);
+                    let action = gtk::gio::SimpleAction::new(&format!("hylki-img-{kind}"), None);
                     let v = view.clone();
                     action.connect_activate(move |_, _| {
                         exec(&v, &format!("window.__hylkiSetImageSize('{kind}')"));
@@ -549,7 +571,8 @@ impl RichEditor {
             for item in items.iter().filter(|i| {
                 matches!(
                     i.stock_action(),
-                    webkit6::ContextMenuAction::Paste | webkit6::ContextMenuAction::PasteAsPlainText
+                    webkit6::ContextMenuAction::Paste
+                        | webkit6::ContextMenuAction::PasteAsPlainText
                 )
             }) {
                 menu.remove(item);
@@ -558,16 +581,28 @@ impl RichEditor {
             // Plain text has no formatting to keep, so it offers only the
             // paste it does.
             let plain = menu_plain.get();
-            for (label, rich) in [(i18n("Paste with Formatting"), true), (i18n("Paste as Plain Text"), false)] {
+            for (label, rich) in [
+                (i18n("Paste with Formatting"), true),
+                (i18n("Paste as Plain Text"), false),
+            ] {
                 if rich && plain {
                     continue;
                 }
-                let action =
-                    gtk::gio::SimpleAction::new(if rich { "hylki-paste-rich" } else { "hylki-paste-plain" }, None);
+                let action = gtk::gio::SimpleAction::new(
+                    if rich {
+                        "hylki-paste-rich"
+                    } else {
+                        "hylki-paste-plain"
+                    },
+                    None,
+                );
                 let v = view.clone();
                 let cb = menu_attach_cb.clone();
                 action.connect_activate(move |_, _| paste_into(&v, rich, &cb, plain));
-                menu.insert(&webkit6::ContextMenuItem::from_gaction(&action, &label, None), at);
+                menu.insert(
+                    &webkit6::ContextMenuItem::from_gaction(&action, &label, None),
+                    at,
+                );
                 at += 1;
             }
             // Undo and Redo lead an editable menu, as they do everywhere
@@ -609,16 +644,22 @@ impl RichEditor {
         // the widget takes them — declaring just `GdkFileList` leaves every
         // other drag (text, an image dragged out of the reader) to WebKit.
         {
-            let drop =
-                gtk::DropTarget::new(gtk::gdk::FileList::static_type(), gtk::gdk::DragAction::COPY);
+            let drop = gtk::DropTarget::new(
+                gtk::gdk::FileList::static_type(),
+                gtk::gdk::DragAction::COPY,
+            );
             drop.set_propagation_phase(gtk::PropagationPhase::Capture);
             let weak = webview.downgrade();
             let cb = attach_cb.clone();
             let src = source.clone();
             let plain = plain.clone();
             drop.connect_drop(move |_, value, x, y| {
-                let Some(v) = weak.upgrade() else { return false };
-                let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
+                let Some(v) = weak.upgrade() else {
+                    return false;
+                };
+                let Ok(list) = value.get::<gtk::gdk::FileList>() else {
+                    return false;
+                };
                 // Source mode has no document to hold a picture: everything
                 // dropped becomes an attachment, and the user writes the
                 // reference to it themselves.
@@ -641,7 +682,8 @@ impl RichEditor {
         stack.add_named(&edit, Some("edit"));
 
         let expanded = crate::config::load_privacy().toolbar_expanded;
-        let (toolbar, toolbar_commands, toolbar_end, bar_state) = build_toolbar(&webview, &stack, &attach_cb, expanded);
+        let (toolbar, toolbar_commands, toolbar_end, bar_state) =
+            build_toolbar(&webview, &stack, &attach_cb, expanded);
         // `fmtState` in PASTE_SCRIPT posts where the caret is: the block
         // kinds it sits in (`q` quote, `u` bulleted list, `o` numbered
         // list), its paragraph style and its font. A set toggle also means a
@@ -674,8 +716,13 @@ impl RichEditor {
             let anchor = stack.downgrade();
             keys.connect_key_pressed(move |_, keyval, _, state| {
                 use gtk::gdk::{Key, ModifierType};
-                let mods = state & (ModifierType::CONTROL_MASK | ModifierType::SHIFT_MASK | ModifierType::ALT_MASK);
-                if mods != ModifierType::CONTROL_MASK || !matches!(keyval, Key::period | Key::semicolon) {
+                let mods = state
+                    & (ModifierType::CONTROL_MASK
+                        | ModifierType::SHIFT_MASK
+                        | ModifierType::ALT_MASK);
+                if mods != ModifierType::CONTROL_MASK
+                    || !matches!(keyval, Key::period | Key::semicolon)
+                {
                     return gtk::glib::Propagation::Proceed;
                 }
                 let (Some(v), Some(anchor)) = (weak.upgrade(), anchor.upgrade()) else {
@@ -716,11 +763,13 @@ impl RichEditor {
     /// Asynchronous like every other page command: [`RichEditor::can_undo`]
     /// only catches up when WebKit reports the new state.
     pub fn undo(&self) {
-        self.webview.execute_editing_command(webkit6::EDITING_COMMAND_UNDO);
+        self.webview
+            .execute_editing_command(webkit6::EDITING_COMMAND_UNDO);
     }
 
     pub fn redo(&self) {
-        self.webview.execute_editing_command(webkit6::EDITING_COMMAND_REDO);
+        self.webview
+            .execute_editing_command(webkit6::EDITING_COMMAND_REDO);
     }
 
     /// Run any WebCore editing command against the document ("DeleteBackward",
@@ -851,7 +900,10 @@ impl RichEditor {
         self.webview.grab_focus();
         if self.source.get().is_some() {
             // The document's own field is what takes the caret.
-            exec(&self.webview, "var t=document.getElementById('src');if(t)t.focus();");
+            exec(
+                &self.webview,
+                "var t=document.getElementById('src');if(t)t.focus();",
+            );
         } else {
             exec(&self.webview, PLACE_CARET);
         }
@@ -866,9 +918,10 @@ impl RichEditor {
     /// Run a snippet and hand back what it returns, as text ("" when it
     /// failed).
     pub fn eval(&self, js: &str, cb: impl FnOnce(String) + 'static) {
-        self.webview.evaluate_javascript(js, None, None, gtk::gio::Cancellable::NONE, move |res| {
-            cb(res.map(|v| v.to_str().to_string()).unwrap_or_default())
-        });
+        self.webview
+            .evaluate_javascript(js, None, None, gtk::gio::Cancellable::NONE, move |res| {
+                cb(res.map(|v| v.to_str().to_string()).unwrap_or_default())
+            });
     }
 
     /// Whether keyboard focus is currently inside the editor's WebView — the
@@ -878,7 +931,9 @@ impl RichEditor {
         self.webview
             .root()
             .and_then(|r| r.focus())
-            .is_some_and(|f| f == *self.webview.upcast_ref::<gtk::Widget>() || f.is_ancestor(&self.webview))
+            .is_some_and(|f| {
+                f == *self.webview.upcast_ref::<gtk::Widget>() || f.is_ancestor(&self.webview)
+            })
     }
 
     /// Paste the clipboard into the editor, keeping (`rich`) or stripping the
@@ -889,11 +944,19 @@ impl RichEditor {
     /// the document has loaded they wait for it.
     pub fn insert_files(&self, paths: &[std::path::PathBuf]) {
         if !self.loaded.get() {
-            self.pending_files.borrow_mut().extend(paths.iter().cloned());
+            self.pending_files
+                .borrow_mut()
+                .extend(paths.iter().cloned());
             return;
         }
         let files: Vec<_> = paths.iter().map(gtk::gio::File::for_path).collect();
-        deliver_files(&self.webview, &files, None, &self.attach_cb, !self.plain.get());
+        deliver_files(
+            &self.webview,
+            &files,
+            None,
+            &self.attach_cb,
+            !self.plain.get(),
+        );
     }
 
     pub fn paste(&self, rich: bool) {
@@ -1038,7 +1101,9 @@ fn show_emoji_chooser(webview: &webkit6::WebView, anchor: &gtk::Stack) {
         None,
         gtk::gio::Cancellable::NONE,
         move |res| {
-            let (Some(v), Some(anchor)) = (weak.upgrade(), anchor.upgrade()) else { return };
+            let (Some(v), Some(anchor)) = (weak.upgrade(), anchor.upgrade()) else {
+                return;
+            };
             let chooser = gtk::EmojiChooser::new();
             chooser.set_parent(&anchor);
             let at: Vec<f64> = res
@@ -1051,7 +1116,10 @@ fn show_emoji_chooser(webview: &webkit6::WebView, anchor: &gtk::Stack) {
                 // CSS pixels are widget pixels times the zoom.
                 let z = v.zoom_level();
                 let (x, y) = v
-                    .compute_point(&anchor, &gtk::graphene::Point::new((x * z) as f32, (y * z) as f32))
+                    .compute_point(
+                        &anchor,
+                        &gtk::graphene::Point::new((x * z) as f32, (y * z) as f32),
+                    )
                     .map_or((x * z, y * z), |p| (p.x() as f64, p.y() as f64));
                 chooser.set_pointing_to(Some(&gtk::gdk::Rectangle::new(
                     x as i32,
@@ -1065,7 +1133,10 @@ fn show_emoji_chooser(webview: &webkit6::WebView, anchor: &gtk::Stack) {
                 let Some(v) = weak.upgrade() else { return };
                 v.grab_focus();
                 let text = serde_json::to_string(emoji).unwrap_or_default();
-                exec(&v, &format!("window.__hylkiEmojiPut && window.__hylkiEmojiPut({text})"));
+                exec(
+                    &v,
+                    &format!("window.__hylkiEmojiPut && window.__hylkiEmojiPut({text})"),
+                );
             });
             chooser.connect_closed(|c| {
                 // Unparented after the pick has been handled, not inside the
@@ -1196,7 +1267,11 @@ fn paste_into(
     cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
     plain: bool,
 ) {
-    if webview.clipboard().formats().contains_type(gtk::gdk::FileList::static_type()) {
+    if webview
+        .clipboard()
+        .formats()
+        .contains_type(gtk::gdk::FileList::static_type())
+    {
         let v = webview.clone();
         let cb = cb.clone();
         webview.clipboard().read_value_async(
@@ -1256,17 +1331,17 @@ fn deliver_files(
         let Some(path) = file.path() else { continue };
         match read_image_for_insert(file, &path) {
             Some((b64, mime)) => {
-                let (x, y) = point.take().map_or(("null".into(), "null".into()), |(x, y)| {
-                    (format!("{x}"), format!("{y}"))
-                });
+                let (x, y) = point
+                    .take()
+                    .map_or(("null".into(), "null".into()), |(x, y)| {
+                        (format!("{x}"), format!("{y}"))
+                    });
                 // The base64 goes in unescaped on purpose: its alphabet has
                 // nothing a JS string literal cares about, and running the
                 // escape over tens of megabytes of it costs real time. Only
                 // the MIME type comes from outside.
                 let mime = js_escape(&mime);
-                let name = js_escape(
-                    &path.file_name().unwrap_or_default().to_string_lossy(),
-                );
+                let name = js_escape(&path.file_name().unwrap_or_default().to_string_lossy());
                 exec(
                     webview,
                     &format!(
@@ -1332,7 +1407,8 @@ fn inline_mime(file: &gtk::gio::File) -> Option<String> {
         "image/svg+xml",
         "image/avif",
     ];
-    (INLINE_MIMES.contains(&mime.as_str()) && info.size() as u64 <= MAX_INLINE_BYTES).then_some(mime)
+    (INLINE_MIMES.contains(&mime.as_str()) && info.size() as u64 <= MAX_INLINE_BYTES)
+        .then_some(mime)
 }
 
 /// Whether the file is a picture the editor would place in the text rather
@@ -1364,7 +1440,10 @@ impl ToolbarState {
             }
         }
         let block = parts.next().unwrap_or("");
-        let style = BLOCK_STYLES.iter().find(|(tag, _)| *tag == block).map_or(BLOCK_STYLES[0].1, |(_, l)| *l);
+        let style = BLOCK_STYLES
+            .iter()
+            .find(|(tag, _)| *tag == block)
+            .map_or(BLOCK_STYLES[0].1, |(_, l)| *l);
         self.style.set_label(&i18n(style));
         self.font.set_label(&font_label(parts.next().unwrap_or("")));
         let size = parts.next().unwrap_or("");
@@ -1382,7 +1461,9 @@ fn font_label(family: &str) -> String {
     match FONTS.iter().find(|(k, _, _)| *k == key) {
         Some((_, _, label)) => i18n(label),
         None if family.is_empty() => i18n(FONTS[0].2),
-        None if family.chars().count() > 18 => format!("{}…", family.chars().take(17).collect::<String>()),
+        None if family.chars().count() > 18 => {
+            format!("{}…", family.chars().take(17).collect::<String>())
+        }
         None => family.to_string(),
     }
 }
@@ -1408,11 +1489,23 @@ const FONTS: &[(&str, &str, &str)] = &[
     ("arial", "Arial, Helvetica, sans-serif", "Arial"),
     ("verdana", "Verdana, Geneva, sans-serif", "Verdana"),
     ("tahoma", "Tahoma, Verdana, sans-serif", "Tahoma"),
-    ("trebuchet ms", "'Trebuchet MS', Helvetica, sans-serif", "Trebuchet MS"),
+    (
+        "trebuchet ms",
+        "'Trebuchet MS', Helvetica, sans-serif",
+        "Trebuchet MS",
+    ),
     ("georgia", "Georgia, serif", "Georgia"),
-    ("times new roman", "'Times New Roman', Times, serif", "Times New Roman"),
+    (
+        "times new roman",
+        "'Times New Roman', Times, serif",
+        "Times New Roman",
+    ),
     ("garamond", "Garamond, serif", "Garamond"),
-    ("courier new", "'Courier New', Courier, monospace", "Courier New"),
+    (
+        "courier new",
+        "'Courier New', Courier, monospace",
+        "Courier New",
+    ),
 ];
 
 /// The font sizes (#358), in points, the unit mail programs show.
@@ -1451,7 +1544,10 @@ fn bar_button(icon: &str, tip: &str) -> gtk::Button {
 /// menu of the bar opened, and give the editor the focus again.
 fn run_restored(webview: &gtk::glib::WeakRef<webkit6::WebView>, js: &str) {
     if let Some(wv) = webview.upgrade() {
-        exec(&wv, &format!("window.__hylkiRestore&&window.__hylkiRestore();{js}"));
+        exec(
+            &wv,
+            &format!("window.__hylkiRestore&&window.__hylkiRestore();{js}"),
+        );
         wv.grab_focus();
     }
 }
@@ -1459,7 +1555,11 @@ fn run_restored(webview: &gtk::glib::WeakRef<webkit6::WebView>, js: &str) {
 /// A menu of the bar. Opening it keeps the caret, which the popover's own
 /// focus would otherwise cost the document. Its content scrolls, so that
 /// [`fit_menu`] can keep it to the room there is.
-fn bar_menu(webview: &webkit6::WebView, tip: &str, content: &impl IsA<gtk::Widget>) -> (gtk::MenuButton, gtk::Popover) {
+fn bar_menu(
+    webview: &webkit6::WebView,
+    tip: &str,
+    content: &impl IsA<gtk::Widget>,
+) -> (gtk::MenuButton, gtk::Popover) {
     let scroller = gtk::ScrolledWindow::new();
     scroller.set_hscrollbar_policy(gtk::PolicyType::Never);
     scroller.set_propagate_natural_width(true);
@@ -1488,7 +1588,11 @@ fn bar_menu(webview: &webkit6::WebView, tip: &str, content: &impl IsA<gtk::Widge
 /// never opened at all (#358): the font menu, with its recent fonts, did
 /// not open from a composer near the foot of the screen.
 fn fit_menu(btn: &gtk::MenuButton) {
-    let Some(scroller) = btn.popover().and_then(|p| p.child()).and_downcast::<gtk::ScrolledWindow>() else {
+    let Some(scroller) = btn
+        .popover()
+        .and_then(|p| p.child())
+        .and_downcast::<gtk::ScrolledWindow>()
+    else {
         return;
     };
     let Some(root) = btn.root() else { return };
@@ -1506,7 +1610,10 @@ fn fit_menu(btn: &gtk::MenuButton) {
 /// binding's own `choose_family`: GTK answers a dialog accepted with no row
 /// selected with no family and no error, which the binding takes for a
 /// family and aborts on (#358).
-pub(crate) fn choose_family(parent: Option<&gtk::Window>, done: impl FnOnce(Option<gtk::pango::FontFamily>) + 'static) {
+pub(crate) fn choose_family(
+    parent: Option<&gtk::Window>,
+    done: impl FnOnce(Option<gtk::pango::FontFamily>) + 'static,
+) {
     use gtk::glib::translate::{from_glib_full, ToGlibPtr};
     type Done = Box<dyn FnOnce(Option<gtk::pango::FontFamily>)>;
     unsafe extern "C" fn finish(
@@ -1517,7 +1624,11 @@ pub(crate) fn choose_family(parent: Option<&gtk::Window>, done: impl FnOnce(Opti
         let done = unsafe { Box::from_raw(data as *mut Done) };
         let mut error = std::ptr::null_mut();
         let family = unsafe {
-            gtk::ffi::gtk_font_dialog_choose_family_finish(source as *mut gtk::ffi::GtkFontDialog, result, &mut error)
+            gtk::ffi::gtk_font_dialog_choose_family_finish(
+                source as *mut gtk::ffi::GtkFontDialog,
+                result,
+                &mut error,
+            )
         };
         if !error.is_null() {
             unsafe { gtk::glib::ffi::g_error_free(error) };
@@ -1542,14 +1653,21 @@ pub(crate) fn choose_family(parent: Option<&gtk::Window>, done: impl FnOnce(Opti
 /// `font` as a CSS family list, with the generic family it falls back to
 /// where the recipient does not have it.
 pub(crate) fn recent_font_css(font: &crate::config::RecentFont) -> String {
-    let name: String = font.name.chars().filter(|c| !matches!(c, '\'' | '"' | '\\')).collect();
+    let name: String = font
+        .name
+        .chars()
+        .filter(|c| !matches!(c, '\'' | '"' | '\\'))
+        .collect();
     let generic = if font.mono { "monospace" } else { "sans-serif" };
     format!("'{name}', {generic}")
 }
 
 /// The editor command that sets `font`.
 fn font_js(font: &crate::config::RecentFont) -> String {
-    format!("window.__hylkiStyled('fontName',{})", js_str(&recent_font_css(font)))
+    format!(
+        "window.__hylkiStyled('fontName',{})",
+        js_str(&recent_font_css(font))
+    )
 }
 
 /// The fonts Settings → Composing offers for new messages, as (CSS family
@@ -1557,9 +1675,17 @@ fn font_js(font: &crate::config::RecentFont) -> String {
 /// and `current` when it is none of those.
 pub(crate) fn compose_font_choices(current: &str) -> Vec<(String, String)> {
     let mut out = vec![(String::new(), i18n("Default"))];
-    out.extend(FONTS.iter().map(|(_, css, name)| (css.to_string(), i18n(name))));
+    out.extend(
+        FONTS
+            .iter()
+            .map(|(_, css, name)| (css.to_string(), i18n(name))),
+    );
     let recent = crate::config::load_recent_fonts();
-    for css in recent.iter().map(recent_font_css).chain((!current.is_empty()).then(|| current.to_string())) {
+    for css in recent
+        .iter()
+        .map(recent_font_css)
+        .chain((!current.is_empty()).then(|| current.to_string()))
+    {
         if !out.iter().any(|(c, _)| c.eq_ignore_ascii_case(&css)) {
             let name = first_family(&css).to_string();
             out.push((css, name));
@@ -1570,13 +1696,21 @@ pub(crate) fn compose_font_choices(current: &str) -> Vec<(String, String)> {
 
 /// A CSS family list's first family, unquoted.
 fn first_family(css: &str) -> &str {
-    css.split(',').next().unwrap_or("").trim().trim_matches(|c| c == '\'' || c == '"')
+    css.split(',')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .trim_matches(|c| c == '\'' || c == '"')
 }
 
 /// A family list from the settings file made safe to write into a style
 /// sheet or a `style` attribute.
 fn clean_family(css: &str) -> String {
-    css.chars().filter(|c| !matches!(c, '"' | '<' | '>' | '{' | '}' | ';' | '\\' | '&') && !c.is_control()).collect::<String>().trim().to_string()
+    css.chars()
+        .filter(|c| !matches!(c, '"' | '<' | '>' | '{' | '}' | ';' | '\\' | '&') && !c.is_control())
+        .collect::<String>()
+        .trim()
+        .to_string()
 }
 
 /// The editor's own font, which the signature and the quoted original
@@ -1591,7 +1725,11 @@ fn body_font() -> String {
     if family.is_empty() && prefs.compose_font_size == 0 {
         return EDITOR_FONT.to_string();
     }
-    let family = if family.is_empty() { "system-ui,sans-serif".to_string() } else { family };
+    let family = if family.is_empty() {
+        "system-ui,sans-serif".to_string()
+    } else {
+        family
+    };
     let size = match prefs.compose_font_size {
         0 => "14px".to_string(),
         pt => format!("{pt}pt"),
@@ -1665,7 +1803,11 @@ fn fill_recent_fonts(
 }
 
 /// A list of menu items, each running its command in the editor.
-fn menu_items(webview: &webkit6::WebView, popover: &gtk::glib::WeakRef<gtk::Popover>, items: &[(String, String, Option<&str>)]) -> gtk::Box {
+fn menu_items(
+    webview: &webkit6::WebView,
+    popover: &gtk::glib::WeakRef<gtk::Popover>,
+    items: &[(String, String, Option<&str>)],
+) -> gtk::Box {
     let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
     for (label, js, class) in items {
         let text = gtk::Label::new(Some(label));
@@ -1713,10 +1855,15 @@ fn color_menu(
     let apply: std::rc::Rc<dyn Fn(Option<gtk::gdk::RGBA>)> = {
         let (weak, repaint, chosen) = (webview.downgrade(), repaint.clone(), chosen.clone());
         std::rc::Rc::new(move |color| {
-            let value = color.as_ref().map_or_else(|| none.to_string(), crate::color::to_hex);
+            let value = color
+                .as_ref()
+                .map_or_else(|| none.to_string(), crate::color::to_hex);
             *chosen.borrow_mut() = color;
             repaint();
-            run_restored(&weak, &format!("window.__hylkiStyled('{cmd}',{})", js_str(&value)));
+            run_restored(
+                &weak,
+                &format!("window.__hylkiStyled('{cmd}',{})", js_str(&value)),
+            );
         })
     };
     let reset = gtk::Button::with_label(&i18n(clear));
@@ -1751,21 +1898,34 @@ fn color_menu(
     let custom = gtk::Button::with_label(&i18n("Custom…"));
     custom.add_css_class("flat");
     {
-        let (pop, weak, apply, chosen) = (weak_pop.clone(), webview.downgrade(), apply.clone(), chosen.clone());
+        let (pop, weak, apply, chosen) = (
+            weak_pop.clone(),
+            webview.downgrade(),
+            apply.clone(),
+            chosen.clone(),
+        );
         custom.connect_clicked(move |b| {
             if let Some(p) = pop.upgrade() {
                 p.popdown();
             }
             let picker = gtk::ColorDialog::new();
             picker.set_with_alpha(false);
-            let initial = chosen.borrow().clone().unwrap_or(gtk::gdk::RGBA::new(0.5, 0.5, 0.5, 1.0));
+            let initial = chosen
+                .borrow()
+                .clone()
+                .unwrap_or(gtk::gdk::RGBA::new(0.5, 0.5, 0.5, 1.0));
             let parent = b.root().and_downcast::<gtk::Window>();
             let (weak, apply) = (weak.clone(), apply.clone());
-            picker.choose_rgba(parent.as_ref(), Some(&initial), None::<&gtk::gio::Cancellable>, move |res| match res {
-                Ok(rgba) => apply(Some(rgba)),
-                // Cancelled: the caret goes back where it was all the same.
-                Err(_) => run_restored(&weak, ""),
-            });
+            picker.choose_rgba(
+                parent.as_ref(),
+                Some(&initial),
+                None::<&gtk::gio::Cancellable>,
+                move |res| match res {
+                    Ok(rgba) => apply(Some(rgba)),
+                    // Cancelled: the caret goes back where it was all the same.
+                    Err(_) => run_restored(&weak, ""),
+                },
+            );
         });
     }
     content.append(&custom);
@@ -1887,7 +2047,13 @@ fn build_toolbar(
     style.set_always_show_arrow(true);
     let font_items: Vec<(String, String, Option<&str>)> = FONTS
         .iter()
-        .map(|(_, family, label)| (i18n(label), format!("window.__hylkiStyled('fontName',{})", js_str(family)), None))
+        .map(|(_, family, label)| {
+            (
+                i18n(label),
+                format!("window.__hylkiStyled('fontName',{})", js_str(family)),
+                None,
+            )
+        })
         .collect();
     let font_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     font_box.add_css_class("context-menu-list");
@@ -1896,7 +2062,11 @@ fn build_toolbar(
     let mut item = font_list.first_child();
     for (_, family, _) in FONTS {
         let Some(button) = item else { break };
-        if let Some(label) = button.downcast_ref::<gtk::Button>().and_then(|b| b.child()).and_downcast::<gtk::Label>() {
+        if let Some(label) = button
+            .downcast_ref::<gtk::Button>()
+            .and_then(|b| b.child())
+            .and_downcast::<gtk::Label>()
+        {
             preview_font(&label, family);
         }
         item = button.next_sibling();
@@ -1920,7 +2090,10 @@ fn build_toolbar(
             let weak = weak.clone();
             choose_family(parent.as_ref(), move |family| match family {
                 Some(family) => {
-                    let font = crate::config::RecentFont { name: family.name().to_string(), mono: family.is_monospace() };
+                    let font = crate::config::RecentFont {
+                        name: family.name().to_string(),
+                        mono: family.is_monospace(),
+                    };
                     run_restored(&weak, &font_js(&font));
                     crate::config::note_recent_font(font);
                 }
@@ -1933,7 +2106,11 @@ fn build_toolbar(
     // afresh each time it opens so that every composer offers the same.
     let recent_fonts = gtk::Box::new(gtk::Orientation::Vertical, 0);
     {
-        let (weak, pop, recent) = (webview.downgrade(), font_pop.downgrade(), recent_fonts.clone());
+        let (weak, pop, recent) = (
+            webview.downgrade(),
+            font_pop.downgrade(),
+            recent_fonts.clone(),
+        );
         font.set_create_popup_func(move |btn| {
             fill_recent_fonts(&recent, &weak, &pop);
             fit_menu(btn);
@@ -1943,9 +2120,14 @@ fn build_toolbar(
     let prefs = crate::config::load_privacy();
     font.set_label(&font_label(first_family(&prefs.compose_font)));
     font.set_always_show_arrow(true);
-    let size_items: Vec<(String, String, Option<&str>)> = std::iter::once((i18n("Default"), "window.__hylkiSize(0)".to_string(), None))
-        .chain(SIZES.iter().map(|pt| (pt.to_string(), format!("window.__hylkiSize({pt})"), None)))
-        .collect();
+    let size_items: Vec<(String, String, Option<&str>)> =
+        std::iter::once((i18n("Default"), "window.__hylkiSize(0)".to_string(), None))
+            .chain(
+                SIZES
+                    .iter()
+                    .map(|pt| (pt.to_string(), format!("window.__hylkiSize({pt})"), None)),
+            )
+            .collect();
     let size_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     size_box.add_css_class("context-menu-list");
     let (size, size_pop) = bar_menu(webview, i18n_noop("Font size"), &size_box);
@@ -1980,12 +2162,31 @@ fn build_toolbar(
     };
 
     let chars = cluster();
-    simple(&chars, &[
-        ("format-text-bold-symbolic", i18n_noop("Bold"), "document.execCommand('bold')"),
-        ("format-text-italic-symbolic", i18n_noop("Italic"), "document.execCommand('italic')"),
-        ("format-text-underline-symbolic", i18n_noop("Underline"), "document.execCommand('underline')"),
-        ("format-text-strikethrough-symbolic", i18n_noop("Strikethrough"), "document.execCommand('strikeThrough')"),
-    ]);
+    simple(
+        &chars,
+        &[
+            (
+                "format-text-bold-symbolic",
+                i18n_noop("Bold"),
+                "document.execCommand('bold')",
+            ),
+            (
+                "format-text-italic-symbolic",
+                i18n_noop("Italic"),
+                "document.execCommand('italic')",
+            ),
+            (
+                "format-text-underline-symbolic",
+                i18n_noop("Underline"),
+                "document.execCommand('underline')",
+            ),
+            (
+                "format-text-strikethrough-symbolic",
+                i18n_noop("Strikethrough"),
+                "document.execCommand('strikeThrough')",
+            ),
+        ],
+    );
     group.append(&chars);
 
     let colors = cluster();
@@ -2017,7 +2218,11 @@ fn build_toolbar(
     // its block; the click flips it at once and the document's next state
     // report settles it, so it never sticks wrong.
     let mut toggles = Vec::new();
-    let toggle = |icon: &str, tip: &str, cmd: &str, key: char, toggles: &mut Vec<(char, gtk::ToggleButton)>| {
+    let toggle = |icon: &str,
+                  tip: &str,
+                  cmd: &str,
+                  key: char,
+                  toggles: &mut Vec<(char, gtk::ToggleButton)>| {
         let t = gtk::ToggleButton::new();
         t.set_icon_name(icon);
         t.set_tooltip_text(Some(i18n(tip).as_str()));
@@ -2034,20 +2239,49 @@ fn build_toolbar(
         t
     };
     let lists = cluster();
-    lists.append(&toggle("view-list-bullet-symbolic", i18n_noop("Bulleted list"), "document.execCommand('insertUnorderedList')", 'u', &mut toggles));
-    lists.append(&toggle("view-list-ordered-symbolic", i18n_noop("Numbered list"), "document.execCommand('insertOrderedList')", 'o', &mut toggles));
+    lists.append(&toggle(
+        "view-list-bullet-symbolic",
+        i18n_noop("Bulleted list"),
+        "document.execCommand('insertUnorderedList')",
+        'u',
+        &mut toggles,
+    ));
+    lists.append(&toggle(
+        "view-list-ordered-symbolic",
+        i18n_noop("Numbered list"),
+        "document.execCommand('insertOrderedList')",
+        'o',
+        &mut toggles,
+    ));
     group.append(&lists);
     // Inside a list, indenting nests the items under the one above.
     let indents = cluster();
-    simple(&indents, &[
-        ("format-indent-less-symbolic", i18n_noop("Decrease indent"), "window.__hylkiIndent(false)"),
-        ("format-indent-more-symbolic", i18n_noop("Increase indent"), "window.__hylkiIndent(true)"),
-    ]);
+    simple(
+        &indents,
+        &[
+            (
+                "format-indent-less-symbolic",
+                i18n_noop("Decrease indent"),
+                "window.__hylkiIndent(false)",
+            ),
+            (
+                "format-indent-more-symbolic",
+                i18n_noop("Increase indent"),
+                "window.__hylkiIndent(true)",
+            ),
+        ],
+    );
 
     let inserts = cluster();
     // Adwaita has no blockquote glyph; the bubble with its quote marks
     // reads as one.
-    inserts.append(&toggle("format-quote-symbolic", i18n_noop("Quote"), "window.__hylkiQuote()", 'q', &mut toggles));
+    inserts.append(&toggle(
+        "format-quote-symbolic",
+        i18n_noop("Quote"),
+        "window.__hylkiQuote()",
+        'q',
+        &mut toggles,
+    ));
     let link = bar_button("insert-link-symbolic", i18n_noop("Insert link"));
     {
         let weak = webview.downgrade();
@@ -2081,7 +2315,14 @@ fn build_toolbar(
     media.append(&picture);
 
     let tail = cluster();
-    simple(&tail, &[("edit-clear-symbolic", i18n_noop("Clear formatting"), "document.execCommand('removeFormat')")]);
+    simple(
+        &tail,
+        &[(
+            "edit-clear-symbolic",
+            i18n_noop("Clear formatting"),
+            "document.execCommand('removeFormat')",
+        )],
+    );
     group.append(&tail);
 
     // The rest (#358) behind a chevron, after everything above so showing
@@ -2124,17 +2365,34 @@ fn build_toolbar(
     more.set_can_focus(false);
     more.add_css_class("flat");
     let show_more = {
-        let (reveal, breaker, group, tail, extras) =
-            (reveal.clone(), breaker.clone(), group.clone(), tail.clone(), extras.clone());
+        let (reveal, breaker, group, tail, extras) = (
+            reveal.clone(),
+            breaker.clone(),
+            group.clone(),
+            tail.clone(),
+            extras.clone(),
+        );
         move |b: &gtk::ToggleButton| {
             let on = b.is_active();
-            b.set_icon_name(if on { "pan-start-symbolic" } else { "pan-end-symbolic" });
-            b.set_tooltip_text(Some(if on { i18n("Fewer formatting tools") } else { i18n("More formatting tools") }.as_str()));
+            b.set_icon_name(if on {
+                "pan-start-symbolic"
+            } else {
+                "pan-end-symbolic"
+            });
+            b.set_tooltip_text(Some(
+                if on {
+                    i18n("Fewer formatting tools")
+                } else {
+                    i18n("More formatting tools")
+                }
+                .as_str(),
+            ));
             // The room left on the row after Clear formatting, against what
             // the tools and the chevron need.
             let gap = 10.0;
             let spare = group.room_after(tail.upcast_ref()).unwrap_or(0) as f32;
-            let need = extras.measure(gtk::Orientation::Horizontal, -1).1 as f32 + gap + b.width() as f32;
+            let need =
+                extras.measure(gtk::Orientation::Horizontal, -1).1 as f32 + gap + b.width() as f32;
             if reveal.transition_duration() > 0 && group.width() > 0 && need > spare {
                 breaker.set_size_request((spare - 1.0).max(0.0) as i32, -1);
                 breaker.set_visible(true);
@@ -2165,7 +2423,10 @@ fn build_toolbar(
     group.append(&ride);
     // HYLKI_SHOWCASE_TOOLBAR_TOGGLE=<ms>: press the chevron that long after
     // the bar is built, so frames of the slide can be captured.
-    if let Some(ms) = std::env::var("HYLKI_SHOWCASE_TOOLBAR_TOGGLE").ok().and_then(|v| v.parse::<u64>().ok()) {
+    if let Some(ms) = std::env::var("HYLKI_SHOWCASE_TOOLBAR_TOGGLE")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+    {
         let more = more.downgrade();
         gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
             if let Some(m) = more.upgrade() {
@@ -2173,16 +2434,26 @@ fn build_toolbar(
                 m.set_active(!m.is_active());
                 // HYLKI_SHOWCASE_TOOLBAR_SHOTS=<png prefix>:<ms>,<ms>…
                 // captures the window that long after the press.
-                if let Some((prefix, times)) = std::env::var("HYLKI_SHOWCASE_TOOLBAR_SHOTS").ok().and_then(|v| {
-                    v.rsplit_once(':').map(|(p, t)| (p.to_string(), t.to_string()))
-                }) {
+                if let Some((prefix, times)) = std::env::var("HYLKI_SHOWCASE_TOOLBAR_SHOTS")
+                    .ok()
+                    .and_then(|v| {
+                        v.rsplit_once(':')
+                            .map(|(p, t)| (p.to_string(), t.to_string()))
+                    })
+                {
                     for t in times.split(',').filter_map(|t| t.parse::<u64>().ok()) {
                         let (root, path) = (m.root(), format!("{prefix}{t}.png"));
-                        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(t), move || {
-                            if let Some(r) = root {
-                                crate::app::showcase_capture(r.upcast_ref::<gtk::Widget>(), &path);
-                            }
-                        });
+                        gtk::glib::timeout_add_local_once(
+                            std::time::Duration::from_millis(t),
+                            move || {
+                                if let Some(r) = root {
+                                    crate::app::showcase_capture(
+                                        r.upcast_ref::<gtk::Widget>(),
+                                        &path,
+                                    );
+                                }
+                            },
+                        );
                     }
                 }
             }
@@ -2190,7 +2461,17 @@ fn build_toolbar(
     }
 
     group.set_end(&end);
-    (group.clone(), group, end, ToolbarState { toggles, style, font, size })
+    (
+        group.clone(),
+        group,
+        end,
+        ToolbarState {
+            toggles,
+            style,
+            font,
+            size,
+        },
+    )
 }
 
 /// Choose pictures to put in the message at the caret (#358), the way a
@@ -2207,7 +2488,10 @@ fn pick_pictures(
     filter.add_mime_type("image/*");
     let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
     filters.append(&filter);
-    let dialog = gtk::FileDialog::builder().title(i18n("Insert Picture")).filters(&filters).build();
+    let dialog = gtk::FileDialog::builder()
+        .title(i18n("Insert Picture"))
+        .filters(&filters)
+        .build();
     let parent = anchor.root().and_downcast::<gtk::Window>();
     let (weak, cb) = (webview.downgrade(), attach_cb.clone());
     dialog.open_multiple(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
@@ -2243,7 +2527,10 @@ fn prompt_link(webview: &webkit6::WebView, anchor: &gtk::Button) {
             if !url.is_empty() {
                 exec(
                     &wv,
-                    &format!("document.execCommand('createLink',false,'{}')", js_escape(url)),
+                    &format!(
+                        "document.execCommand('createLink',false,'{}')",
+                        js_escape(url)
+                    ),
                 );
             }
         }
@@ -3402,7 +3689,12 @@ fn css_monospace_family(desc: &str) -> String {
         .split(',')
         .map(str::trim)
         .filter(|f| !f.is_empty() && !f.eq_ignore_ascii_case("monospace"))
-        .map(|f| format!("\"{}\"", f.replace(['\\', '"', '<', '>', '{', '}', ';'], "")))
+        .map(|f| {
+            format!(
+                "\"{}\"",
+                f.replace(['\\', '"', '<', '>', '{', '}', ';'], "")
+            )
+        })
         .collect();
     families.push("monospace".to_string());
     families.join(",")
@@ -3432,7 +3724,9 @@ fn preview_document(html: &str, webview: &webkit6::WebView, image_policy: &str) 
 /// and `allowed`, or nothing when `allowed` is `None`. Only `img-src` is
 /// set: the editor's own scripts are inline and have to keep running.
 fn image_policy_meta(allowed: Option<&[String]>) -> String {
-    let Some(allowed) = allowed else { return String::new() };
+    let Some(allowed) = allowed else {
+        return String::new();
+    };
     let mut sources = String::from("data: blob:");
     for url in allowed {
         // A source expression names a path, never a query, and must not
@@ -3440,7 +3734,9 @@ fn image_policy_meta(allowed: Option<&[String]>) -> String {
         let url = url.split(['?', '#']).next().unwrap_or_default();
         let lower = url.to_ascii_lowercase();
         let usable = (lower.starts_with("https://") || lower.starts_with("http://"))
-            && !url.contains(|c: char| c.is_whitespace() || matches!(c, ';' | ',' | '"' | '\'' | '<' | '>' | '&'));
+            && !url.contains(|c: char| {
+                c.is_whitespace() || matches!(c, ';' | ',' | '"' | '\'' | '<' | '>' | '&')
+            });
         if usable {
             sources.push(' ');
             sources.push_str(url);
@@ -3533,14 +3829,28 @@ pub fn signature_from_source(source: &str, base: Option<&std::path::Path>) -> St
     }
     let with_images = inline_local_images(source, base);
     let mut b = ammonia::Builder::default();
-    b.add_tags(["table", "thead", "tbody", "tfoot", "tr", "td", "th", "font", "center", "u", "span", "img"])
-        .add_generic_attributes([
-            "style", "width", "height", "align", "valign", "bgcolor", "border", "cellpadding",
-            "cellspacing", "color", "face", "size",
-        ])
-        .add_tag_attributes("img", ["src", "alt", "width", "height"])
-        .url_schemes(std::collections::HashSet::from(["http", "https", "mailto", "tel", "data"]))
-        .link_rel(None);
+    b.add_tags([
+        "table", "thead", "tbody", "tfoot", "tr", "td", "th", "font", "center", "u", "span", "img",
+    ])
+    .add_generic_attributes([
+        "style",
+        "width",
+        "height",
+        "align",
+        "valign",
+        "bgcolor",
+        "border",
+        "cellpadding",
+        "cellspacing",
+        "color",
+        "face",
+        "size",
+    ])
+    .add_tag_attributes("img", ["src", "alt", "width", "height"])
+    .url_schemes(std::collections::HashSet::from([
+        "http", "https", "mailto", "tel", "data",
+    ]))
+    .link_rel(None);
     b.clean(&with_images).to_string().trim().to_string()
 }
 
@@ -3629,7 +3939,10 @@ fn local_image_data_uri(value: &str, base: Option<&std::path::Path>, max: u64) -
         return None;
     }
     let data = std::fs::read(&path).ok()?;
-    Some(format!("data:{mime};base64,{}", crate::oauth::base64_encode(&data)))
+    Some(format!(
+        "data:{mime};base64,{}",
+        crate::oauth::base64_encode(&data)
+    ))
 }
 
 /// Re-ground an open editor document (#148): the color scheme and the page
@@ -3673,20 +3986,31 @@ mod signature_tests {
         let sig = r#"<p>Jo</p><img src="https://cdn.example/logo.png?v=2&amp;x=1" alt="">
             <img src="data:image/png;base64,AAAA">"#;
         let urls = remote_image_urls(sig);
-        assert_eq!(urls, vec!["https://cdn.example/logo.png?v=2&x=1".to_string()]);
+        assert_eq!(
+            urls,
+            vec!["https://cdn.example/logo.png?v=2&x=1".to_string()]
+        );
         assert_eq!(
             image_policy_meta(Some(&urls)),
             "<meta http-equiv=\"Content-Security-Policy\" \
              content=\"img-src data: blob: https://cdn.example/logo.png\">"
         );
-        assert_eq!(image_policy_meta(Some(&["https://x.example/a;b".to_string()])).matches("x.example").count(), 0);
+        assert_eq!(
+            image_policy_meta(Some(&["https://x.example/a;b".to_string()]))
+                .matches("x.example")
+                .count(),
+            0
+        );
         assert_eq!(image_policy_meta(None), "");
     }
 
     /// Plain text stays a typed signature: escaped, line breaks kept.
     #[test]
     fn plain_text_is_escaped_like_a_typed_signature() {
-        assert_eq!(signature_from_source("Ada & Co\nCEO\n", None), "Ada &amp; Co<br>CEO");
+        assert_eq!(
+            signature_from_source("Ada & Co\nCEO\n", None),
+            "Ada &amp; Co<br>CEO"
+        );
     }
 
     /// The parts a designed signature is made of survive; what could run or
@@ -3700,7 +4024,10 @@ mod signature_tests {
         let out = signature_from_source(src, None);
         assert!(out.contains("<table style=\"border:0\">"), "{out}");
         assert!(out.contains("<td style=\"color:#333\">"), "{out}");
-        assert!(out.contains("<a href=\"https://example.com\">site</a>"), "{out}");
+        assert!(
+            out.contains("<a href=\"https://example.com\">site</a>"),
+            "{out}"
+        );
         assert!(!out.contains("onclick"), "{out}");
         assert!(!out.contains("script"), "{out}");
         assert!(!out.contains("color:red"), "{out}");
@@ -3716,7 +4043,10 @@ mod signature_tests {
                    <img src=\"missing.png\"></p>";
         let out = signature_from_source(src, Some(&dir));
         std::fs::remove_dir_all(&dir).ok();
-        assert!(out.contains("src=\"data:image/png;base64,iVBORw==\""), "{out}");
+        assert!(
+            out.contains("src=\"data:image/png;base64,iVBORw==\""),
+            "{out}"
+        );
         assert!(out.contains("width=\"80\""), "{out}");
         assert!(out.contains("src=\"https://x.example/a.png\""), "{out}");
         // A path that resolves to nothing is left as written.
@@ -3737,8 +4067,9 @@ impl Drop for RichEditor {
         if std::rc::Rc::strong_count(&self._theme_handler) != 1 {
             return; // another handle still uses the view
         }
-        let views: Vec<webkit6::WebView> =
-            std::iter::once(self.webview.clone()).chain(self.preview.borrow().clone()).collect();
+        let views: Vec<webkit6::WebView> = std::iter::once(self.webview.clone())
+            .chain(self.preview.borrow().clone())
+            .collect();
         gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
             for v in &views {
                 crate::memory_report::release_web_view(v);
@@ -3758,7 +4089,10 @@ mod body_tests {
         let json = r#"["<p>Hi</p>","Hi\nthere \u0000 \"quoted\""]"#;
         assert_eq!(
             split_body(json),
-            ("<p>Hi</p>".to_string(), "Hi\nthere \u{0} \"quoted\"".to_string())
+            (
+                "<p>Hi</p>".to_string(),
+                "Hi\nthere \u{0} \"quoted\"".to_string()
+            )
         );
         assert_eq!(split_body("null"), (String::new(), String::new()));
     }
@@ -3768,11 +4102,20 @@ mod body_tests {
     /// it (#424).
     #[test]
     fn plain_text_uses_the_desktop_monospace_family() {
-        assert_eq!(css_monospace_family("Adwaita Mono 11"), "\"Adwaita Mono\",monospace");
-        assert_eq!(css_monospace_family("Source Code Pro Bold 10"), "\"Source Code Pro\",monospace");
+        assert_eq!(
+            css_monospace_family("Adwaita Mono 11"),
+            "\"Adwaita Mono\",monospace"
+        );
+        assert_eq!(
+            css_monospace_family("Source Code Pro Bold 10"),
+            "\"Source Code Pro\",monospace"
+        );
         assert_eq!(css_monospace_family("Monospace 10"), "monospace");
         assert_eq!(css_monospace_family(""), "monospace");
-        assert_eq!(css_monospace_family("Evil\"}body{x 10"), "\"Evilbodyx\",monospace");
+        assert_eq!(
+            css_monospace_family("Evil\"}body{x 10"),
+            "\"Evilbodyx\",monospace"
+        );
     }
 }
 
@@ -3785,7 +4128,10 @@ mod compose_font_tests {
     #[test]
     fn style_carries_the_chosen_font() {
         assert_eq!(font_style("", 0), "");
-        assert_eq!(font_style("Georgia, serif", 12), "font-family:Georgia, serif;font-size:12pt;");
+        assert_eq!(
+            font_style("Georgia, serif", 12),
+            "font-family:Georgia, serif;font-size:12pt;"
+        );
         assert_eq!(font_style("", 14), "font-size:14pt;");
     }
 

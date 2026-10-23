@@ -13,9 +13,9 @@ use relm4::prelude::*;
 
 use crate::config::AccountConfig;
 use crate::config::Protocol;
+use crate::i18n::{i18n, i18n_f};
 use crate::ui::accounts::{Provider, PROVIDERS};
 use crate::worker::{self, ConnTest};
-use crate::i18n::{i18n, i18n_f};
 
 /// Wordmark art, embedded so the wizard needs nothing on disk. A 1024px
 /// PNG master rather than the SVG the website uses: neither librsvg nor
@@ -75,7 +75,11 @@ pub enum WelcomeOutput {
 
 #[derive(Debug)]
 pub enum WelcomeCmd {
-    Tested { account: Box<AccountConfig>, result: ConnTest, seq: u32 },
+    Tested {
+        account: Box<AccountConfig>,
+        result: ConnTest,
+        seq: u32,
+    },
     /// The browser sign-in for a custom OAuth account ended: its refresh
     /// token, or why not.
     SignedIn {
@@ -357,8 +361,7 @@ fn bind_wordmark_to_position(carousel: &adw::Carousel, frame: &gtk::Box, holder:
         let p = car.position().clamp(0.0, 1.0);
         let s = HERO_SIZE + (SMALL_SIZE - HERO_SIZE) * p;
         frame.set_size_request(s as i32, wordmark_height_of(Wordmark::WithIconWhite, s));
-        holder
-            .set_margin_top((HERO_TOP as f64 + (SMALL_TOP - HERO_TOP as f64) * p) as i32);
+        holder.set_margin_top((HERO_TOP as f64 + (SMALL_TOP - HERO_TOP as f64) * p) as i32);
         // The small form also keeps 16px of air below itself; the hero's
         // spacing is the tagline's own margin, so this fades in with p.
         holder.set_margin_bottom((SMALL_BOTTOM * p) as i32);
@@ -438,7 +441,9 @@ impl Component for Welcome {
         // ---- Page 1: hero (tagline + start; the wordmark floats above) ----
         let hero = gtk::Box::new(gtk::Orientation::Vertical, 18);
         hero.set_halign(gtk::Align::Center);
-        let tag = tagline(&i18n("A clean, fast home for your mail.\nLet's set things up — it takes about a minute."));
+        let tag = tagline(&i18n(
+            "A clean, fast home for your mail.\nLet's set things up — it takes about a minute.",
+        ));
         tag.set_margin_top(16);
         // The interface language, first of all (#179): System, English and
         // every shipped translation. A pick restarts Hylki into it, so the
@@ -458,7 +463,10 @@ impl Component for Welcome {
         lang.set_selected(choices.iter().position(|(_, c)| *c == current).unwrap_or(0) as u32);
         {
             let s = sender.clone();
-            lang.connect_selected_notify(move |d| s.input_sender().emit(WelcomeInput::LanguageChanged(d.selected())));
+            lang.connect_selected_notify(move |d| {
+                s.input_sender()
+                    .emit(WelcomeInput::LanguageChanged(d.selected()))
+            });
         }
         lang_row.append(&lang);
         // Fair warning: a pick restarts the app.
@@ -494,7 +502,10 @@ impl Component for Welcome {
         ]);
         // HYLKI_SHOWCASE_WIZARD_LANG=<n> picks choice n on the drop-down
         // after 4 s, what a click there does (for testing the restart).
-        if let Some(n) = std::env::var("HYLKI_SHOWCASE_WIZARD_LANG").ok().and_then(|v| v.parse::<u32>().ok()) {
+        if let Some(n) = std::env::var("HYLKI_SHOWCASE_WIZARD_LANG")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+        {
             let lang = lang.clone();
             gtk::glib::timeout_add_seconds_local_once(4, move || lang.set_selected(n));
         }
@@ -545,7 +556,8 @@ impl Component for Welcome {
         }
         {
             let s = sender.clone();
-            open_goa.connect_clicked(move |_| s.input_sender().emit(WelcomeInput::OpenOnlineAccounts));
+            open_goa
+                .connect_clicked(move |_| s.input_sender().emit(WelcomeInput::OpenOnlineAccounts));
             let s = sender.clone();
             rescan.connect_clicked(move |_| s.input_sender().emit(WelcomeInput::RescanGoa));
         }
@@ -567,11 +579,15 @@ impl Component for Welcome {
         // The providers' marks before their names, as in Settings.
         provider_row.set_factory(Some(&crate::ui::accounts::provider_factory()));
         // Default to the plain IMAP/POP3 entry.
-        let manual = wizard_providers().position(|p| p.wizard_is_manual()).unwrap_or(0);
+        let manual = wizard_providers()
+            .position(|p| p.wizard_is_manual())
+            .unwrap_or(0);
         provider_row.set_selected(manual as u32);
         {
             let s = sender.clone();
-            provider_row.connect_selected_notify(move |_| s.input_sender().emit(WelcomeInput::ProviderChanged));
+            provider_row.connect_selected_notify(move |_| {
+                s.input_sender().emit(WelcomeInput::ProviderChanged)
+            });
         }
         let name_row = adw::EntryRow::new();
         name_row.set_title(&i18n("Your name"));
@@ -694,12 +710,18 @@ impl Component for Welcome {
         // ---- Page 5: personalize ----
         let pers = gtk::Box::new(gtk::Orientation::Vertical, 14);
         pers.append(&title(&i18n("Make it yours")));
-        pers.append(&tagline(&i18n("A few popular choices — everything can be changed later in Settings.")));
+        pers.append(&tagline(&i18n(
+            "A few popular choices — everything can be changed later in Settings.",
+        )));
         let pers_card = card();
         let preview_row = adw::ComboRow::new();
         preview_row.set_title(&i18n("Preview lines"));
         preview_row.set_subtitle(&i18n("Message text shown under each subject"));
-        preview_row.set_model(Some(&gtk::StringList::new(&[i18n("None").as_str(), i18n("1 line").as_str(), i18n("2 lines").as_str()])));
+        preview_row.set_model(Some(&gtk::StringList::new(&[
+            i18n("None").as_str(),
+            i18n("1 line").as_str(),
+            i18n("2 lines").as_str(),
+        ])));
         preview_row.set_selected(crate::config::load_preview_lines().min(2));
         let sw_avatars = adw::SwitchRow::new();
         sw_avatars.set_title(&i18n("Sender avatars"));
@@ -723,11 +745,14 @@ impl Component for Welcome {
         pers.append(&icon_hdr);
         // With an icon set outside Hylki on the launcher (#252), nothing is
         // preselected, and only an actual pick replaces it.
-        let icon_choice = std::rc::Rc::new(std::cell::RefCell::new(if crate::app_icon::custom_icon().is_some() {
-            String::new()
-        } else {
-            crate::config::load_app_icon().unwrap_or_else(|| crate::app_icon::DEFAULT_ID.to_string())
-        }));
+        let icon_choice = std::rc::Rc::new(std::cell::RefCell::new(
+            if crate::app_icon::custom_icon().is_some() {
+                String::new()
+            } else {
+                crate::config::load_app_icon()
+                    .unwrap_or_else(|| crate::app_icon::DEFAULT_ID.to_string())
+            },
+        ));
         let icon_card = card();
         let icon_row = gtk::ListBoxRow::new();
         icon_row.set_activatable(false);
@@ -863,7 +888,11 @@ impl Component for Welcome {
             icon_choice,
         };
         rebuild_goa_rows(&widgets.goa_list, &model.goa, &sender);
-        bind_wordmark_to_position(&widgets.carousel, &widgets.wordmark_frame, &widgets.wordmark_box);
+        bind_wordmark_to_position(
+            &widgets.carousel,
+            &widgets.wordmark_frame,
+            &widgets.wordmark_box,
+        );
 
         // Screenshot hook, mirroring the main window's: HYLKI_SHOWCASE=path
         // captures the wizard after a beat; HYLKI_SHOWCASE_PAGE=N walks to
@@ -909,7 +938,8 @@ impl Component for Welcome {
     ) {
         match message {
             WelcomeInput::LanguageChanged(i) => {
-                if let Some((_, code)) = crate::ui::preferences::language_choices().get(i as usize) {
+                if let Some((_, code)) = crate::ui::preferences::language_choices().get(i as usize)
+                {
                     let _ = sender.output(WelcomeOutput::Language(code.clone()));
                 }
             }
@@ -941,7 +971,8 @@ impl Component for Welcome {
                 // the address is asked for, and even that is filled in by
                 // the sign-in.
                 let custom = wizard_provider(sel).is_some_and(|p| p.wizard_is_custom_oauth());
-                let builtin = wizard_provider(sel).is_some_and(|p| p.wizard_builtin_oauth().is_some());
+                let builtin =
+                    wizard_provider(sel).is_some_and(|p| p.wizard_builtin_oauth().is_some());
                 // A newer choice supersedes a sign-in still waiting in the
                 // browser; its late result is ignored.
                 self.test_seq += 1;
@@ -960,9 +991,11 @@ impl Component for Welcome {
                     row.set_visible(custom);
                 }
                 widgets.server_exp.set_visible(!builtin);
-                widgets
-                    .add_btn
-                    .set_label(&if oauth { i18n("Sign In & Add") } else { i18n("Test & Add") });
+                widgets.add_btn.set_label(&if oauth {
+                    i18n("Sign In & Add")
+                } else {
+                    i18n("Test & Add")
+                });
                 if let Some(p) = wizard_provider(sel) {
                     let (ih, ip, sh, sp) = p.wizard_servers();
                     let jmap = p.wizard_protocol() == Protocol::Jmap;
@@ -980,14 +1013,24 @@ impl Component for Welcome {
                     }
                     // A JMAP server is one address, and it sends the mail
                     // itself: no SMTP rows.
-                    widgets.host_row.set_title(&if jmap { i18n("Server (host name or URL)") } else { i18n("IMAP server") });
-                    widgets.port_row.set_title(&if jmap { i18n("Port") } else { i18n("IMAP port") });
+                    widgets.host_row.set_title(&if jmap {
+                        i18n("Server (host name or URL)")
+                    } else {
+                        i18n("IMAP server")
+                    });
+                    widgets.port_row.set_title(&if jmap {
+                        i18n("Port")
+                    } else {
+                        i18n("IMAP port")
+                    });
                     widgets.smtp_row.set_visible(!jmap);
                     widgets.smtp_port_row.set_visible(!jmap);
                     // Fastmail over JMAP takes an API token, not the password (#356).
-                    widgets
-                        .pass_row
-                        .set_title(&if p.wizard_token() { i18n("API Token") } else { i18n("Password") });
+                    widgets.pass_row.set_title(&if p.wizard_token() {
+                        i18n("API Token")
+                    } else {
+                        i18n("Password")
+                    });
                     let hint = p.wizard_hint();
                     widgets.hint_lbl.set_visible(!hint.is_empty());
                     widgets.hint_lbl.set_text(&i18n(hint));
@@ -1019,7 +1062,9 @@ impl Component for Welcome {
                     return;
                 }
                 if email.is_empty() || password.is_empty() || host.is_empty() {
-                    widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
+                    widgets
+                        .status_lbl
+                        .set_css_classes(&["welcome-hint", "error"]);
                     widgets
                         .status_lbl
                         .set_text(&i18n("Enter your email address and password first."));
@@ -1030,7 +1075,12 @@ impl Component for Welcome {
                     email: email.clone(),
                     protocol,
                     imap_host: host,
-                    imap_port: widgets.port_row.text().trim().parse().unwrap_or(if protocol == Protocol::Jmap { 443 } else { 993 }),
+                    imap_port: widgets
+                        .port_row
+                        .text()
+                        .trim()
+                        .parse()
+                        .unwrap_or(if protocol == Protocol::Jmap { 443 } else { 993 }),
                     smtp_host: smtp,
                     smtp_port: widgets.smtp_port_row.text().trim().parse().unwrap_or(587),
                     username: email,
@@ -1044,24 +1094,35 @@ impl Component for Welcome {
                 widgets.test_spinner.set_visible(true);
                 widgets.test_spinner.start();
                 widgets.status_lbl.set_css_classes(&["welcome-hint"]);
-                widgets.status_lbl.set_text(&i18n("Checking the connection…"));
+                widgets
+                    .status_lbl
+                    .set_text(&i18n("Checking the connection…"));
                 sender.oneshot_command(async move {
                     let test = {
                         let account = account.clone();
-                        tokio::task::spawn_blocking(move || worker::test_connection_blocking(account))
-                            .await
-                            .unwrap_or_else(|_| ConnTest {
-                                incoming: Err("test could not run".into()),
-                                smtp: Err("test could not run".into()),
-                            })
+                        tokio::task::spawn_blocking(move || {
+                            worker::test_connection_blocking(account)
+                        })
+                        .await
+                        .unwrap_or_else(|_| ConnTest {
+                            incoming: Err("test could not run".into()),
+                            smtp: Err("test could not run".into()),
+                        })
                     };
-                    WelcomeCmd::Tested { account: Box::new(account), result: test, seq }
+                    WelcomeCmd::Tested {
+                        account: Box::new(account),
+                        result: test,
+                        seq,
+                    }
                 });
             }
             WelcomeInput::ImportGoa(index) => {
                 if let Some(g) = self.goa.get(index).cloned() {
                     let (password, oauth) = if g.password_based {
-                        (crate::goa::mail_passwords(&g.id).0.unwrap_or_default(), false)
+                        (
+                            crate::goa::mail_passwords(&g.id).0.unwrap_or_default(),
+                            false,
+                        )
                     } else {
                         (String::new(), true)
                     };
@@ -1069,25 +1130,33 @@ impl Component for Welcome {
                     self.added.push(account.email.clone());
                     self.goa.remove(index);
                     widgets.goa_status.set_visible(true);
-                    widgets.goa_status.set_css_classes(&["welcome-hint", "success"]);
                     widgets
                         .goa_status
-                        .set_text(&i18n_f("✓ {email} — added", &[("email", &(account.email).to_string())]));
+                        .set_css_classes(&["welcome-hint", "success"]);
+                    widgets.goa_status.set_text(&i18n_f(
+                        "✓ {email} — added",
+                        &[("email", &(account.email).to_string())],
+                    ));
                     let _ = sender.output(WelcomeOutput::ImportGoa(Box::new(account)));
                     rebuild_goa_rows(&widgets.goa_list, &self.goa, &sender);
                     widgets.goa_list.set_visible(!self.goa.is_empty());
                     self.goa_imported = true;
                     self.refresh_footer(widgets);
-                    widgets.acct_title.set_text(&i18n("Add another email account"));
+                    widgets
+                        .acct_title
+                        .set_text(&i18n("Add another email account"));
                 }
             }
             WelcomeInput::RescanGoa => {
                 self.goa = crate::goa::list_mail_accounts();
-                self.goa.retain(|g| g.can_connect() && !self.added.contains(&g.email));
+                self.goa
+                    .retain(|g| g.can_connect() && !self.added.contains(&g.email));
                 rebuild_goa_rows(&widgets.goa_list, &self.goa, &sender);
                 widgets.goa_list.set_visible(!self.goa.is_empty());
                 // Everything found was added already: say so, not "none found".
-                widgets.goa_empty.set_visible(self.goa.is_empty() && self.added.is_empty());
+                widgets
+                    .goa_empty
+                    .set_visible(self.goa.is_empty() && self.added.is_empty());
             }
             WelcomeInput::OpenOnlineAccounts => crate::ui::accounts::open_online_accounts(),
             WelcomeInput::RefreshFooter => self.refresh_footer(widgets),
@@ -1117,7 +1186,11 @@ impl Component for Welcome {
         _root: &Self::Root,
     ) {
         match message {
-            WelcomeCmd::Tested { account, result, seq } => {
+            WelcomeCmd::Tested {
+                account,
+                result,
+                seq,
+            } => {
                 if seq != self.test_seq {
                     // A newer test was started (the user corrected a field and
                     // clicked again); this stale verdict no longer matters.
@@ -1129,8 +1202,13 @@ impl Component for Welcome {
                 match (&result.incoming, &result.smtp) {
                     (Ok(_), Ok(_)) => {
                         self.added.push(account.email.clone());
-                        widgets.status_lbl.set_css_classes(&["welcome-hint", "success"]);
-                        widgets.status_lbl.set_text(&i18n_f("✓ {email} — connected and added", &[("email", &(email).to_string())]));
+                        widgets
+                            .status_lbl
+                            .set_css_classes(&["welcome-hint", "success"]);
+                        widgets.status_lbl.set_text(&i18n_f(
+                            "✓ {email} — connected and added",
+                            &[("email", &(email).to_string())],
+                        ));
                         widgets.pass_row.set_text("");
                         widgets.email_row.set_text("");
                         let _ = sender.output(WelcomeOutput::AddAccount(account));
@@ -1138,16 +1216,30 @@ impl Component for Welcome {
                         self.refresh_footer(widgets);
                     }
                     (Err(e), _) => {
-                        widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
-                        widgets.status_lbl.set_text(&i18n_f("{email} — mail server: {e}", &[("email", &(email).to_string()), ("e", &(e).to_string())]));
+                        widgets
+                            .status_lbl
+                            .set_css_classes(&["welcome-hint", "error"]);
+                        widgets.status_lbl.set_text(&i18n_f(
+                            "{email} — mail server: {e}",
+                            &[("email", &(email).to_string()), ("e", &(e).to_string())],
+                        ));
                     }
                     (_, Err(e)) => {
-                        widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
-                        widgets.status_lbl.set_text(&i18n_f("{email} — sending (SMTP): {e}", &[("email", &(email).to_string()), ("e", &(e).to_string())]));
+                        widgets
+                            .status_lbl
+                            .set_css_classes(&["welcome-hint", "error"]);
+                        widgets.status_lbl.set_text(&i18n_f(
+                            "{email} — sending (SMTP): {e}",
+                            &[("email", &(email).to_string()), ("e", &(e).to_string())],
+                        ));
                     }
                 }
             }
-            WelcomeCmd::SignedIn { mut account, result, seq } => {
+            WelcomeCmd::SignedIn {
+                mut account,
+                result,
+                seq,
+            } => {
                 if seq != self.test_seq {
                     return;
                 }
@@ -1170,16 +1262,25 @@ impl Component for Welcome {
                         let email = account.email.clone();
                         account.oauth_refresh = refresh;
                         self.added.push(email.clone());
-                        widgets.status_lbl.set_css_classes(&["welcome-hint", "success"]);
-                        widgets.status_lbl.set_text(&i18n_f("✓ {email} — signed in and added", &[("email", &email)]));
+                        widgets
+                            .status_lbl
+                            .set_css_classes(&["welcome-hint", "success"]);
+                        widgets.status_lbl.set_text(&i18n_f(
+                            "✓ {email} — signed in and added",
+                            &[("email", &email)],
+                        ));
                         widgets.email_row.set_text("");
                         let _ = sender.output(WelcomeOutput::AddAccount(account));
                         self.manual_added = true;
                         self.refresh_footer(widgets);
                     }
                     Err(e) => {
-                        widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
-                        widgets.status_lbl.set_text(&i18n_f("Sign-in failed: {e}", &[("e", &e)]));
+                        widgets
+                            .status_lbl
+                            .set_css_classes(&["welcome-hint", "error"]);
+                        widgets
+                            .status_lbl
+                            .set_text(&i18n_f("Sign-in failed: {e}", &[("e", &e)]));
                     }
                 }
             }
@@ -1220,8 +1321,13 @@ impl Welcome {
         smtp: String,
     ) {
         let text = |row: &adw::EntryRow| row.text().trim().to_string();
-        let builtin = wizard_provider(widgets.provider_row.selected()).and_then(|p| p.wizard_builtin_oauth());
-        let protocol = if builtin.is_some() { Protocol::Graph } else { Protocol::Imap };
+        let builtin =
+            wizard_provider(widgets.provider_row.selected()).and_then(|p| p.wizard_builtin_oauth());
+        let protocol = if builtin.is_some() {
+            Protocol::Graph
+        } else {
+            Protocol::Imap
+        };
         let settings = builtin.unwrap_or_else(|| crate::config::OAuthSettings {
             auth_url: text(&widgets.oauth_auth_url_row),
             token_url: text(&widgets.oauth_token_url_row),
@@ -1238,7 +1344,9 @@ impl Welcome {
                 || settings.auth_url.is_empty()
                 || settings.token_url.is_empty())
         {
-            widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
+            widgets
+                .status_lbl
+                .set_css_classes(&["welcome-hint", "error"]);
             widgets.status_lbl.set_text(&i18n(
                 "Enter your email address, the client ID and both OAuth URLs first.",
             ));
@@ -1248,9 +1356,17 @@ impl Welcome {
             name: widgets.name_row.text().trim().to_string(),
             email: email.clone(),
             protocol,
-            imap_host: if protocol == Protocol::Graph { String::new() } else { host },
+            imap_host: if protocol == Protocol::Graph {
+                String::new()
+            } else {
+                host
+            },
             imap_port: widgets.port_row.text().trim().parse().unwrap_or(993),
-            smtp_host: if protocol == Protocol::Graph { String::new() } else { smtp },
+            smtp_host: if protocol == Protocol::Graph {
+                String::new()
+            } else {
+                smtp
+            },
             smtp_port: widgets.smtp_port_row.text().trim().parse().unwrap_or(587),
             username: email,
             oauth: true,
@@ -1263,19 +1379,26 @@ impl Welcome {
         widgets.test_spinner.set_visible(true);
         widgets.test_spinner.start();
         widgets.status_lbl.set_css_classes(&["welcome-hint"]);
-        widgets.status_lbl.set_text(&i18n("Opening browser… complete sign-in there."));
+        widgets
+            .status_lbl
+            .set_text(&i18n("Opening browser… complete sign-in there."));
         sender.oneshot_command(async move {
             let result = tokio::task::spawn_blocking(move || {
                 let refresh = crate::oauth::run_flow(&settings)?.refresh_token;
                 if settings.token_url.contains("microsoftonline") {
-                    let (name, address, refresh) = crate::oauth::microsoft_whoami(&settings, &refresh, None)?;
+                    let (name, address, refresh) =
+                        crate::oauth::microsoft_whoami(&settings, &refresh, None)?;
                     return Ok((refresh, Some((name, address))));
                 }
                 Ok((refresh, None))
             })
             .await
             .unwrap_or_else(|_| Err("sign-in task failed".into()));
-            WelcomeCmd::SignedIn { account: Box::new(account), result, seq }
+            WelcomeCmd::SignedIn {
+                account: Box::new(account),
+                result,
+                seq,
+            }
         });
     }
 }

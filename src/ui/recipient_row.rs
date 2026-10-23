@@ -20,8 +20,8 @@ use std::sync::OnceLock;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use gtk::{gdk, glib};
 use gtk::glib::subclass::Signal;
+use gtk::{gdk, glib};
 
 use crate::i18n::{i18n, i18n_f};
 
@@ -71,7 +71,9 @@ mod imp {
                 vec![
                     Signal::builder("changed").build(),
                     // A pill of this row starts (true) or ends (false) a drag.
-                    Signal::builder("pill-drag").param_types([bool::static_type()]).build(),
+                    Signal::builder("pill-drag")
+                        .param_types([bool::static_type()])
+                        .build(),
                 ]
             })
         }
@@ -98,7 +100,9 @@ mod imp {
                 label.set_ellipsize(gtk::pango::EllipsizeMode::End);
                 label.set_can_target(false);
                 label.set_use_markup(false);
-                obj.bind_property("title", label, "label").sync_create().build();
+                obj.bind_property("title", label, "label")
+                    .sync_create()
+                    .build();
             }
             self.empty_title.add_css_class("title");
             self.empty_title.add_css_class("dimmed");
@@ -109,7 +113,11 @@ mod imp {
             self.text.set_valign(gtk::Align::Center);
             self.text.set_enable_undo(true);
             self.text.set_accessible_role(gtk::AccessibleRole::TextBox);
-            self.text.update_relation(&[gtk::accessible::Relation::LabelledBy(&[self.title.upcast_ref::<gtk::Accessible>()])]);
+            self.text
+                .update_relation(&[gtk::accessible::Relation::LabelledBy(&[self
+                    .title
+                    .upcast_ref::<gtk::Accessible>(
+                )])]);
             self.flow.add_css_class("recipient-flow");
             self.flow.set_text_child(&self.text);
 
@@ -127,11 +135,13 @@ mod imp {
             overlay.add_overlay(&self.empty_title);
             area.append(&overlay);
 
-            self.edit_icon.set_icon_name(Some("adw-entry-edit-symbolic"));
+            self.edit_icon
+                .set_icon_name(Some("adw-entry-edit-symbolic"));
             self.edit_icon.add_css_class("edit-icon");
             self.edit_icon.set_valign(gtk::Align::Center);
             self.edit_icon.set_can_target(false);
-            self.edit_icon.set_accessible_role(gtk::AccessibleRole::Presentation);
+            self.edit_icon
+                .set_accessible_role(gtk::AccessibleRole::Presentation);
             area.append(&self.edit_icon);
             obj.wire_focus(&area);
 
@@ -254,7 +264,10 @@ impl RecipientRow {
                 return;
             }
             let current = text.text().to_string();
-            let at = current.char_indices().nth((*pos).max(0) as usize).map_or(current.len(), |(i, _)| i);
+            let at = current
+                .char_indices()
+                .nth((*pos).max(0) as usize)
+                .map_or(current.len(), |(i, _)| i);
             let (before, after) = current.split_at(at);
             if let Some(action) = on_insert(before, new, after) {
                 text.stop_signal_emission_by_name("insert-text");
@@ -295,7 +308,9 @@ impl RecipientRow {
             if !text.text().is_empty() {
                 return;
             }
-            let Some((pill, recipient)) = row.imp().pills.borrow_mut().pop() else { return };
+            let Some((pill, recipient)) = row.imp().pills.borrow_mut().pop() else {
+                return;
+            };
             text.stop_signal_emission_by_name("backspace");
             row.imp().flow.remove(&pill);
             row.set_typed(&recipient);
@@ -309,18 +324,28 @@ impl RecipientRow {
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak = self.downgrade();
         keys.connect_key_pressed(move |_, key, _, state| {
-            let Some(row) = weak.upgrade() else { return glib::Propagation::Proceed };
+            let Some(row) = weak.upgrade() else {
+                return glib::Propagation::Proceed;
+            };
             let text = &row.imp().text;
-            let Some(last) = row.pill_list().pop() else { return glib::Propagation::Proceed };
+            let Some(last) = row.pill_list().pop() else {
+                return glib::Propagation::Proceed;
+            };
             let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
             if ctrl && matches!(key, gdk::Key::a | gdk::Key::A) && text.text().is_empty() {
                 row.select_all();
                 last.grab_focus();
                 return glib::Propagation::Stop;
             }
-            let towards = if row.direction() == gtk::TextDirection::Rtl { gdk::Key::Right } else { gdk::Key::Left };
-            let other = state.intersects(gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK);
-            if key != towards || other || text.position() != 0 || text.selection_bounds().is_some() {
+            let towards = if row.direction() == gtk::TextDirection::Rtl {
+                gdk::Key::Right
+            } else {
+                gdk::Key::Left
+            };
+            let other =
+                state.intersects(gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK);
+            if key != towards || other || text.position() != 0 || text.selection_bounds().is_some()
+            {
                 return glib::Propagation::Proceed;
             }
             row.select_only(&last);
@@ -350,20 +375,31 @@ impl RecipientRow {
         sweep.set_propagation_phase(gtk::PropagationPhase::Capture);
         // From where among all the pills it started, the selection Ctrl
         // kept, and whether it has moved enough to be a sweep.
-        let swept: std::rc::Rc<RefCell<Option<(usize, Vec<gtk::Widget>, bool)>>> = Default::default();
+        let swept: std::rc::Rc<RefCell<Option<(usize, Vec<gtk::Widget>, bool)>>> =
+            Default::default();
         let weak = self.downgrade();
         let s = swept.clone();
         sweep.connect_drag_begin(move |gesture, x, y| {
             let Some(row) = weak.upgrade() else { return };
             let text = &row.imp().text;
             let on = row.pick(x, y, gtk::PickFlags::DEFAULT);
-            let on_text = on.as_ref().is_some_and(|w| w.is_ancestor(text) || w == text.upcast_ref::<gtk::Widget>()) && !text.text().is_empty();
-            if on_text || on.is_none_or(|w| is_in_pill(&w) || w.ancestor(gtk::Button::static_type()).is_some()) {
+            let on_text = on
+                .as_ref()
+                .is_some_and(|w| w.is_ancestor(text) || w == text.upcast_ref::<gtk::Widget>())
+                && !text.text().is_empty();
+            if on_text
+                || on.is_none_or(|w| {
+                    is_in_pill(&w) || w.ancestor(gtk::Button::static_type()).is_some()
+                })
+            {
                 gesture.set_state(gtk::EventSequenceState::Denied);
                 return;
             }
             gesture.set_state(gtk::EventSequenceState::Claimed);
-            let kept = if gesture.current_event_state().contains(gdk::ModifierType::CONTROL_MASK) {
+            let kept = if gesture
+                .current_event_state()
+                .contains(gdk::ModifierType::CONTROL_MASK)
+            {
                 row.all_pills().into_iter().filter(is_selected).collect()
             } else {
                 Vec::new()
@@ -373,9 +409,13 @@ impl RecipientRow {
         let weak = self.downgrade();
         let s = swept.clone();
         sweep.connect_drag_update(move |gesture, dx, dy| {
-            let (Some(row), Some((x, y))) = (weak.upgrade(), gesture.start_point()) else { return };
+            let (Some(row), Some((x, y))) = (weak.upgrade(), gesture.start_point()) else {
+                return;
+            };
             let mut swept = s.borrow_mut();
-            let Some((from, kept, moved)) = swept.as_mut() else { return };
+            let Some((from, kept, moved)) = swept.as_mut() else {
+                return;
+            };
             *moved = *moved || dx.hypot(dy) >= row.settings().gtk_dnd_drag_threshold() as f64;
             if !*moved {
                 return;
@@ -388,8 +428,12 @@ impl RecipientRow {
         });
         let weak = self.downgrade();
         sweep.connect_drag_end(move |gesture, dx, dy| {
-            let Some((from, kept, moved)) = swept.take() else { return };
-            let (Some(row), Some((x, y))) = (weak.upgrade(), gesture.start_point()) else { return };
+            let Some((from, kept, moved)) = swept.take() else {
+                return;
+            };
+            let (Some(row), Some((x, y))) = (weak.upgrade(), gesture.start_point()) else {
+                return;
+            };
             let to = row.sweep_index(x + dx, y + dy);
             if !moved || (from == to && kept.is_empty()) {
                 row.imp().text.grab_focus();
@@ -398,10 +442,21 @@ impl RecipientRow {
             // Shift+click goes on from where the sweep started, and the
             // focus is on the pill it ended at.
             let pills = row.all_pills();
-            let (start, end) = if to < from { (from - 1, to) } else { (from, to.max(1) - 1) };
-            let end = if from == to { kept.last() } else { pills.get(end) };
+            let (start, end) = if to < from {
+                (from - 1, to)
+            } else {
+                (from, to.max(1) - 1)
+            };
+            let end = if from == to {
+                kept.last()
+            } else {
+                pills.get(end)
+            };
             if let Some(start) = pills.get(start).filter(|_| from != to) {
-                if let Some(field) = start.ancestor(RecipientRow::static_type()).and_downcast::<RecipientRow>() {
+                if let Some(field) = start
+                    .ancestor(RecipientRow::static_type())
+                    .and_downcast::<RecipientRow>()
+                {
                     field.imp().anchor.replace(Some(start.clone()));
                 }
             }
@@ -425,7 +480,9 @@ impl RecipientRow {
         });
         let weak = self.downgrade();
         target.connect_motion(move |target, x, y| {
-            let Some(row) = weak.upgrade() else { return gdk::DragAction::empty() };
+            let Some(row) = weak.upgrade() else {
+                return gdk::DragAction::empty();
+            };
             let dragged = target.value().and_then(|v| v.get::<gtk::Widget>().ok());
             let at = row.drop_index(x, y);
             // No marker where letting go leaves the pills as they are, nor
@@ -444,9 +501,13 @@ impl RecipientRow {
         });
         let weak = self.downgrade();
         target.connect_drop(move |_, value, x, y| {
-            let Some(row) = weak.upgrade() else { return false };
+            let Some(row) = weak.upgrade() else {
+                return false;
+            };
             row.imp().flow.set_marker(None);
-            let Ok(pill) = value.get::<gtk::Widget>() else { return false };
+            let Ok(pill) = value.get::<gtk::Widget>() else {
+                return false;
+            };
             row.take_pills(acting_on(&pill), row.drop_index(x, y));
             true
         });
@@ -481,11 +542,16 @@ impl RecipientRow {
                 // not to a pill of another field, nor to the pills' menu,
                 // nor nowhere for a moment as that menu closes.
                 let focus = row.root().and_then(|r| r.focus());
-                let gone = focus.is_some_and(|w| !is_in_pill(&w) && w.ancestor(gtk::Popover::static_type()).is_none());
+                let gone = focus.is_some_and(|w| {
+                    !is_in_pill(&w) && w.ancestor(gtk::Popover::static_type()).is_none()
+                });
                 if gone {
                     row.clear_selection();
                 }
-                let active = row.root().and_downcast::<gtk::Window>().is_some_and(|w| w.is_active());
+                let active = row
+                    .root()
+                    .and_downcast::<gtk::Window>()
+                    .is_some_and(|w| w.is_active());
                 let typed = row.typed();
                 if active && !row.imp().focused.get() && is_whole_address(&typed) {
                     row.complete(&typed);
@@ -537,12 +603,14 @@ impl RecipientRow {
         label.set_max_width_chars(32);
         label.set_single_line_mode(true);
         pill.append(&label);
-        pill.set_tooltip_text(Some(if valid {
-            addr.to_string()
-        } else {
-            i18n_f("“{addr}” is not an email address.", &[("addr", addr)])
-        }
-        .as_str()));
+        pill.set_tooltip_text(Some(
+            if valid {
+                addr.to_string()
+            } else {
+                i18n_f("“{addr}” is not an email address.", &[("addr", addr)])
+            }
+            .as_str(),
+        ));
 
         let remove = gtk::Button::from_icon_name("window-close-symbolic");
         remove.add_css_class("flat");
@@ -551,11 +619,16 @@ impl RecipientRow {
         remove.set_focus_on_click(false);
         remove.set_valign(gtk::Align::Center);
         remove.set_tooltip_text(Some(i18n("Remove").as_str()));
-        remove.update_property(&[gtk::accessible::Property::Label(&i18n_f("Remove {name}", &[("name", shown)]))]);
+        remove.update_property(&[gtk::accessible::Property::Label(&i18n_f(
+            "Remove {name}",
+            &[("name", shown)],
+        ))]);
         let weak = self.downgrade();
         let weak_pill = pill.downgrade();
         remove.connect_clicked(move |_| {
-            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
+            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else {
+                return;
+            };
             row.remove_pill(pill.upcast_ref());
         });
         pill.append(&remove);
@@ -572,9 +645,13 @@ impl RecipientRow {
         let weak_pill = pill.downgrade();
         let c = collapse.clone();
         click.connect_pressed(move |gesture, n, x, y| {
-            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
+            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else {
+                return;
+            };
             let pill = pill.upcast::<gtk::Widget>();
-            let on_remove = pill.pick(x, y, gtk::PickFlags::DEFAULT).is_some_and(|w| w.ancestor(gtk::Button::static_type()).is_some());
+            let on_remove = pill
+                .pick(x, y, gtk::PickFlags::DEFAULT)
+                .is_some_and(|w| w.ancestor(gtk::Button::static_type()).is_some());
             if on_remove {
                 return;
             }
@@ -600,7 +677,9 @@ impl RecipientRow {
         let weak_pill = pill.downgrade();
         let c = collapse.clone();
         click.connect_released(move |_, _, _, _| {
-            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
+            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else {
+                return;
+            };
             if c.take() {
                 row.select_only(pill.upcast_ref());
             }
@@ -614,7 +693,9 @@ impl RecipientRow {
         let weak = self.downgrade();
         let weak_pill = pill.downgrade();
         menu.connect_pressed(move |gesture, _, x, y| {
-            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
+            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else {
+                return;
+            };
             gesture.set_state(gtk::EventSequenceState::Claimed);
             let pill = pill.upcast::<gtk::Widget>();
             if !is_selected(&pill) {
@@ -651,7 +732,11 @@ impl RecipientRow {
             }
             // The pill as it looks now, before it dims for the drag.
             let image = gtk::WidgetPaintable::new(Some(&pill)).current_image();
-            source.set_icon(Some(&drag_icon(&image, acting_on(&pill).len())), x as i32, y as i32);
+            source.set_icon(
+                Some(&drag_icon(&image, acting_on(&pill).len())),
+                x as i32,
+                y as i32,
+            );
             Some(gdk::ContentProvider::for_value(&pill.to_value()))
         });
         let weak = self.downgrade();
@@ -687,7 +772,13 @@ impl RecipientRow {
     }
 
     fn fields(&self) -> Vec<RecipientRow> {
-        let fields: Vec<_> = self.imp().fields.borrow().iter().filter_map(|f| f.upgrade()).collect();
+        let fields: Vec<_> = self
+            .imp()
+            .fields
+            .borrow()
+            .iter()
+            .filter_map(|f| f.upgrade())
+            .collect();
         if fields.is_empty() {
             vec![self.clone()]
         } else {
@@ -706,22 +797,38 @@ impl RecipientRow {
     }
 
     fn pill_list(&self) -> Vec<gtk::Widget> {
-        self.imp().pills.borrow().iter().map(|(p, _)| p.clone()).collect()
+        self.imp()
+            .pills
+            .borrow()
+            .iter()
+            .map(|(p, _)| p.clone())
+            .collect()
     }
 
     /// The pills of every field shown, in order.
     fn all_pills(&self) -> Vec<gtk::Widget> {
-        self.fields().iter().filter(|f| f.is_mapped()).flat_map(|f| f.pill_list()).collect()
+        self.fields()
+            .iter()
+            .filter(|f| f.is_mapped())
+            .flat_map(|f| f.pill_list())
+            .collect()
     }
 
     /// Where a sweep at `(x, y)` in this field is, as a place among
     /// `all_pills`: above a field is before its pills, and below the last
     /// is after all of them.
     fn sweep_index(&self, x: f64, y: f64) -> usize {
-        let fields: Vec<_> = self.fields().into_iter().filter(|f| f.is_mapped()).collect();
+        let fields: Vec<_> = self
+            .fields()
+            .into_iter()
+            .filter(|f| f.is_mapped())
+            .collect();
         let mut before = 0;
         for field in &fields {
-            let Some(p) = self.compute_point(field, &gtk::graphene::Point::new(x as f32, y as f32)) else { continue };
+            let Some(p) = self.compute_point(field, &gtk::graphene::Point::new(x as f32, y as f32))
+            else {
+                continue;
+            };
             if p.y() < 0.0 {
                 break;
             }
@@ -734,7 +841,11 @@ impl RecipientRow {
     }
 
     fn index_of(&self, pill: &gtk::Widget) -> Option<usize> {
-        self.imp().pills.borrow().iter().position(|(p, _)| p == pill)
+        self.imp()
+            .pills
+            .borrow()
+            .iter()
+            .position(|(p, _)| p == pill)
     }
 
     /// Unselect every pill of every field.
@@ -767,7 +878,9 @@ impl RecipientRow {
     /// of the others.
     fn select_range(&self, pill: &gtk::Widget) {
         let pills = self.pill_list();
-        let Some(to) = pills.iter().position(|p| p == pill) else { return };
+        let Some(to) = pills.iter().position(|p| p == pill) else {
+            return;
+        };
         let anchor = self.imp().anchor.borrow().clone();
         let from = anchor.and_then(|a| pills.iter().position(|p| *p == a));
         if from.is_none() {
@@ -786,7 +899,10 @@ impl RecipientRow {
     fn drop_index(&self, x: f64, y: f64) -> usize {
         let imp = self.imp();
         let flow = &imp.flow;
-        let Some(p) = self.compute_point(flow, &gtk::graphene::Point::new(x as f32, y as f32)) else { return 0 };
+        let Some(p) = self.compute_point(flow, &gtk::graphene::Point::new(x as f32, y as f32))
+        else {
+            return 0;
+        };
         let rtl = flow.direction() == gtk::TextDirection::Rtl;
         let y = (p.y() as f64).clamp(0.0, (flow.height() - 1).max(0) as f64);
         imp.pills
@@ -796,7 +912,11 @@ impl RecipientRow {
             .filter(|b| {
                 let (top, bottom) = (b.y() as f64, (b.y() + b.height()) as f64);
                 let middle = (b.x() + b.width() / 2.0) as f64;
-                let past = if rtl { (p.x() as f64) > middle } else { (p.x() as f64) < middle };
+                let past = if rtl {
+                    (p.x() as f64) > middle
+                } else {
+                    (p.x() as f64) < middle
+                };
                 bottom <= y || (top <= y && !past)
             })
             .count()
@@ -804,7 +924,11 @@ impl RecipientRow {
 
     /// The order this field's pills would have with `moving` put at place
     /// `at`, or `None` when some come from another field.
-    fn order_after(&self, moving: &[(RecipientRow, gtk::Widget)], at: usize) -> Option<Vec<gtk::Widget>> {
+    fn order_after(
+        &self,
+        moving: &[(RecipientRow, gtk::Widget)],
+        at: usize,
+    ) -> Option<Vec<gtk::Widget>> {
         if moving.iter().any(|(f, _)| f != self) {
             return None;
         }
@@ -812,14 +936,19 @@ impl RecipientRow {
         let is_moving = |p: &gtk::Widget| moving.iter().any(|(_, m)| m == p);
         let next = pills.iter().skip(at).find(|p| !is_moving(p));
         let mut order: Vec<_> = pills.iter().filter(|p| !is_moving(p)).cloned().collect();
-        let i = next.and_then(|n| order.iter().position(|p| p == n)).unwrap_or(order.len());
+        let i = next
+            .and_then(|n| order.iter().position(|p| p == n))
+            .unwrap_or(order.len());
         order.splice(i..i, moving.iter().map(|(_, p)| p.clone()));
         Some(order)
     }
 
     /// Whether putting `moving` at place `at` leaves this field as it is.
     fn would_stay(&self, moving: &[(RecipientRow, gtk::Widget)], at: usize) -> bool {
-        !moving.is_empty() && self.order_after(moving, at).is_some_and(|o| o == self.pill_list())
+        !moving.is_empty()
+            && self
+                .order_after(moving, at)
+                .is_some_and(|o| o == self.pill_list())
     }
 
     /// Move `moving`, pills of any field this one included, to place `at`
@@ -832,15 +961,26 @@ impl RecipientRow {
             return moving.into_iter().map(|(_, p)| p).collect();
         }
         let imp = self.imp();
-        let next = self.pill_list().into_iter().skip(at).find(|p| !moving.iter().any(|(_, m)| m == p));
+        let next = self
+            .pill_list()
+            .into_iter()
+            .skip(at)
+            .find(|p| !moving.iter().any(|(_, m)| m == p));
         let mut taken = Vec::new();
         let mut changed = vec![self.clone()];
         for (field, pill) in &moving {
-            let Some(i) = field.index_of(pill) else { continue };
+            let Some(i) = field.index_of(pill) else {
+                continue;
+            };
             let recipient = field.imp().pills.borrow()[i].1.clone();
             // One that does not read as an address stays where it is
             // rather than be lost.
-            let Some((name, addr)) = crate::worker::parse_recipients(&recipient).into_iter().next() else { continue };
+            let Some((name, addr)) = crate::worker::parse_recipients(&recipient)
+                .into_iter()
+                .next()
+            else {
+                continue;
+            };
             let focused = pill.is_focus();
             field.imp().pills.borrow_mut().remove(i);
             field.imp().flow.remove(pill);
@@ -849,14 +989,21 @@ impl RecipientRow {
             }
             taken.push((name, addr, recipient, focused));
         }
-        let mut at = next.and_then(|n| self.index_of(&n)).unwrap_or(imp.pills.borrow().len());
+        let mut at = next
+            .and_then(|n| self.index_of(&n))
+            .unwrap_or(imp.pills.borrow().len());
         let mut focus = None;
         let mut first = None;
         let mut placed = Vec::new();
         for (name, addr, recipient, focused) in taken {
             let have = imp.pills.borrow().iter().find_map(|(p, r)| {
-                let other = crate::worker::parse_recipients(r).into_iter().next().map(|(_, a)| a);
-                other.is_some_and(|a| a.eq_ignore_ascii_case(&addr)).then(|| p.clone())
+                let other = crate::worker::parse_recipients(r)
+                    .into_iter()
+                    .next()
+                    .map(|(_, a)| a);
+                other
+                    .is_some_and(|a| a.eq_ignore_ascii_case(&addr))
+                    .then(|| p.clone())
             });
             let pill = have.unwrap_or_else(|| {
                 let p = self.insert_pill(at, &name, &addr, &recipient);
@@ -885,13 +1032,24 @@ impl RecipientRow {
     /// selects the field's pills, Delete or Backspace removes the
     /// selection, Return edits the pill, the menu key opens its menu, and a
     /// letter goes to the text.
-    fn pill_key(&self, pill: &gtk::Widget, key: gdk::Key, state: gdk::ModifierType) -> glib::Propagation {
-        let Some(i) = self.index_of(pill) else { return glib::Propagation::Proceed };
+    fn pill_key(
+        &self,
+        pill: &gtk::Widget,
+        key: gdk::Key,
+        state: gdk::ModifierType,
+    ) -> glib::Propagation {
+        let Some(i) = self.index_of(pill) else {
+            return glib::Propagation::Proceed;
+        };
         let pills = self.pill_list();
         let rtl = self.direction() == gtk::TextDirection::Rtl;
         let shift = state.contains(gdk::ModifierType::SHIFT_MASK);
         let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
-        let (back, forward) = if rtl { (gdk::Key::Right, gdk::Key::Left) } else { (gdk::Key::Left, gdk::Key::Right) };
+        let (back, forward) = if rtl {
+            (gdk::Key::Right, gdk::Key::Left)
+        } else {
+            (gdk::Key::Left, gdk::Key::Right)
+        };
         // Select the pill at `j`, alone or from the anchor with Shift.
         let go = |j: usize| {
             let p = &pills[j];
@@ -907,7 +1065,9 @@ impl RecipientRow {
         };
         match key {
             gdk::Key::a | gdk::Key::A if ctrl => self.select_all(),
-            _ if ctrl || state.contains(gdk::ModifierType::ALT_MASK) => return glib::Propagation::Proceed,
+            _ if ctrl || state.contains(gdk::ModifierType::ALT_MASK) => {
+                return glib::Propagation::Proceed
+            }
             k if k == back => {
                 if i > 0 {
                     go(i - 1);
@@ -930,7 +1090,11 @@ impl RecipientRow {
                 // the one after, as they would on letters.
                 let before = pills[..i].iter().rev().find(stays).cloned();
                 let after = pills[i + 1..].iter().find(stays).cloned();
-                let next = if key == gdk::Key::BackSpace { before.or(after) } else { after.or(before) };
+                let next = if key == gdk::Key::BackSpace {
+                    before.or(after)
+                } else {
+                    after.or(before)
+                };
                 for (field, p) in &gone {
                     field.remove_pill(p);
                 }
@@ -942,9 +1106,13 @@ impl RecipientRow {
                     None => self.focus_text(),
                 }
             }
-            gdk::Key::Return | gdk::Key::KP_Enter | gdk::Key::ISO_Enter | gdk::Key::F2 => self.edit_pill(pill),
+            gdk::Key::Return | gdk::Key::KP_Enter | gdk::Key::ISO_Enter | gdk::Key::F2 => {
+                self.edit_pill(pill)
+            }
             gdk::Key::Menu => self.pill_menu(pill, pill.width() as f64 / 2.0, pill.height() as f64),
-            gdk::Key::F10 if shift => self.pill_menu(pill, pill.width() as f64 / 2.0, pill.height() as f64),
+            gdk::Key::F10 if shift => {
+                self.pill_menu(pill, pill.width() as f64 / 2.0, pill.height() as f64)
+            }
             // Typing goes on in the text, after the pills.
             _ => match key.to_unicode().filter(|c| !c.is_control()) {
                 Some(c) => {
@@ -964,7 +1132,10 @@ impl RecipientRow {
     /// pill: move them to another field, edit the pill, remove them.
     fn pill_menu(&self, pill: &gtk::Widget, x: f64, y: f64) {
         use crate::ui::context_menu::{show_context_menu, MenuEntry};
-        let Some(p) = pill.compute_point(self, &gtk::graphene::Point::new(x as f32, y as f32)) else { return };
+        let Some(p) = pill.compute_point(self, &gtk::graphene::Point::new(x as f32, y as f32))
+        else {
+            return;
+        };
         let acting = acting_on(pill);
         let mut moves = Vec::new();
         for field in self.fields().into_iter().filter(|f| f != self) {
@@ -979,7 +1150,9 @@ impl RecipientRow {
                 // closes, which lets go of the selection: once it has, the
                 // moved pills are selected again, and the one the menu was
                 // opened on takes the focus.
-                let Some(focus) = placed.get(which).or(placed.first()).cloned() else { return };
+                let Some(focus) = placed.get(which).or(placed.first()).cloned() else {
+                    return;
+                };
                 glib::idle_add_local_once(move || {
                     focus.grab_focus();
                     for p in &placed {
@@ -1004,7 +1177,12 @@ impl RecipientRow {
                 row.focus_text();
             }
         });
-        show_context_menu(self, p.x() as f64, p.y() as f64, vec![moves, vec![edit, remove]]);
+        show_context_menu(
+            self,
+            p.x() as f64,
+            p.y() as f64,
+            vec![moves, vec![edit, remove]],
+        );
     }
 
     fn focus_text(&self) {
@@ -1028,7 +1206,9 @@ impl RecipientRow {
         }
         let recipient = {
             let mut pills = imp.pills.borrow_mut();
-            let Some(i) = pills.iter().position(|(p, _)| p == pill) else { return };
+            let Some(i) = pills.iter().position(|(p, _)| p == pill) else {
+                return;
+            };
             pills.remove(i).1
         };
         imp.flow.remove(pill);
@@ -1081,7 +1261,12 @@ fn set_selected(pill: &gtk::Widget, on: bool) {
 /// The pills an action on `pill` takes: every selected pill of every
 /// field, in order, when `pill` is one of them, or else `pill` alone.
 fn acting_on(pill: &gtk::Widget) -> Vec<(RecipientRow, gtk::Widget)> {
-    let Some(row) = pill.ancestor(RecipientRow::static_type()).and_downcast::<RecipientRow>() else { return Vec::new() };
+    let Some(row) = pill
+        .ancestor(RecipientRow::static_type())
+        .and_downcast::<RecipientRow>()
+    else {
+        return Vec::new();
+    };
     if !is_selected(pill) {
         return vec![(row, pill.clone())];
     }
@@ -1100,7 +1285,10 @@ fn drag_icon(pill: &gdk::Paintable, count: usize) -> gdk::Paintable {
     if count < 2 {
         return pill.clone();
     }
-    let (w, h) = (pill.intrinsic_width() as f32, pill.intrinsic_height() as f32);
+    let (w, h) = (
+        pill.intrinsic_width() as f32,
+        pill.intrinsic_height() as f32,
+    );
     let snapshot = gtk::Snapshot::new();
     // The others as a pill's edge behind it.
     snapshot.save();
@@ -1110,7 +1298,9 @@ fn drag_icon(pill: &gdk::Paintable, count: usize) -> gdk::Paintable {
     snapshot.pop();
     snapshot.restore();
     pill.snapshot(&snapshot, w as f64, h as f64);
-    snapshot.to_paintable(Some(&gtk::graphene::Size::new(w + 4.0, h + 4.0))).unwrap_or_else(|| pill.clone())
+    snapshot
+        .to_paintable(Some(&gtk::graphene::Size::new(w + 4.0, h + 4.0)))
+        .unwrap_or_else(|| pill.clone())
 }
 
 /// Whether `widget` is a pill or inside one.
@@ -1148,10 +1338,16 @@ fn on_insert(before: &str, new: &str, after: &str) -> Option<Insert> {
             return Some(if rest.is_empty() {
                 Insert::Swallow
             } else {
-                Insert::Commit { done: String::new(), rest }
+                Insert::Commit {
+                    done: String::new(),
+                    rest,
+                }
             });
         }
-        return Some(Insert::Commit { done: done.to_string(), rest });
+        return Some(Insert::Commit {
+            done: done.to_string(),
+            rest,
+        });
     }
     if new.chars().all(char::is_whitespace) {
         // Nothing to separate yet.
@@ -1161,16 +1357,23 @@ fn on_insert(before: &str, new: &str, after: &str) -> Option<Insert> {
         // A space at the end of a whole address finishes it; anywhere else,
         // or after a name, it is part of what is being typed.
         if after.trim().is_empty() && is_whole_address(before) {
-            return Some(Insert::Commit { done: before.to_string(), rest: String::new() });
+            return Some(Insert::Commit {
+                done: before.to_string(),
+                rest: String::new(),
+            });
         }
         return None;
     }
     // Several addresses pasted with spaces between them.
     if new.chars().any(char::is_whitespace) {
         let words: Vec<&str> = joined.split_whitespace().collect();
-        let ended = words.len() > 1 || (after.trim().is_empty() && new.ends_with(char::is_whitespace));
+        let ended =
+            words.len() > 1 || (after.trim().is_empty() && new.ends_with(char::is_whitespace));
         if ended && !words.is_empty() && words.iter().all(|w| is_whole_address(w)) {
-            return Some(Insert::Commit { done: words.join(", "), rest: String::new() });
+            return Some(Insert::Commit {
+                done: words.join(", "),
+                rest: String::new(),
+            });
         }
     }
     None
@@ -1320,7 +1523,8 @@ mod flow_imp {
                 };
                 let x = x.clamp(0, (width - w).max(0));
                 let x = if rtl { width - x - w } else { x };
-                self.marker.size_allocate(&gtk::Allocation::new(x, y, w, h), -1);
+                self.marker
+                    .size_allocate(&gtk::Allocation::new(x, y, w, h), -1);
             }
         }
 
@@ -1410,7 +1614,11 @@ impl PillFlow {
 
     fn lines(&self, width: i32) -> Vec<Line> {
         let mut lines: Vec<Line> = Vec::new();
-        let mut cur = Line { y: 0, h: 0, items: Vec::new() };
+        let mut cur = Line {
+            y: 0,
+            h: 0,
+            items: Vec::new(),
+        };
         let mut x = 0;
         for child in self.children() {
             let (_, nat, _, _) = child.measure(gtk::Orientation::Horizontal, -1);
@@ -1420,7 +1628,14 @@ impl PillFlow {
             let need = if text { TEXT_MIN } else { nat.min(width) };
             if x > 0 && x + need > width {
                 let y = cur.y + cur.h + SPACING;
-                lines.push(std::mem::replace(&mut cur, Line { y, h: 0, items: Vec::new() }));
+                lines.push(std::mem::replace(
+                    &mut cur,
+                    Line {
+                        y,
+                        h: 0,
+                        items: Vec::new(),
+                    },
+                ));
                 x = 0;
             }
             let w = if text { (width - x).max(need) } else { need };
@@ -1439,13 +1654,22 @@ mod tests {
     use super::*;
 
     fn commit(done: &str, rest: &str) -> Option<Insert> {
-        Some(Insert::Commit { done: done.into(), rest: rest.into() })
+        Some(Insert::Commit {
+            done: done.into(),
+            rest: rest.into(),
+        })
     }
 
     #[test]
     fn a_space_after_a_whole_address_makes_a_pill() {
-        assert_eq!(on_insert("ann@example.com", " ", ""), commit("ann@example.com", ""));
-        assert_eq!(on_insert("Ann Lee <ann@example.com>", " ", ""), commit("Ann Lee <ann@example.com>", ""));
+        assert_eq!(
+            on_insert("ann@example.com", " ", ""),
+            commit("ann@example.com", "")
+        );
+        assert_eq!(
+            on_insert("Ann Lee <ann@example.com>", " ", ""),
+            commit("Ann Lee <ann@example.com>", "")
+        );
     }
 
     #[test]
@@ -1459,11 +1683,17 @@ mod tests {
 
     #[test]
     fn a_comma_makes_a_pill_and_never_stays() {
-        assert_eq!(on_insert("ann@example.com", ",", ""), commit("ann@example.com", ""));
+        assert_eq!(
+            on_insert("ann@example.com", ",", ""),
+            commit("ann@example.com", "")
+        );
         assert_eq!(on_insert("Ann", ",", ""), commit("Ann", ""));
         assert_eq!(on_insert("", ",", ""), Some(Insert::Swallow));
         assert_eq!(on_insert("", " ", ""), Some(Insert::Swallow));
-        assert_eq!(on_insert("bob@example.com", ";", ""), commit("bob@example.com", ""));
+        assert_eq!(
+            on_insert("bob@example.com", ";", ""),
+            commit("bob@example.com", "")
+        );
     }
 
     #[test]
@@ -1487,8 +1717,14 @@ mod tests {
 
     #[test]
     fn separators_outside_quotes_read_as_commas() {
-        assert_eq!(normalise_separators("a@x.com; b@y.com\nc@z.com"), "a@x.com, b@y.com,c@z.com");
-        assert_eq!(normalise_separators("\"Lee; Ann\" <a@x.com>"), "\"Lee; Ann\" <a@x.com>");
+        assert_eq!(
+            normalise_separators("a@x.com; b@y.com\nc@z.com"),
+            "a@x.com, b@y.com,c@z.com"
+        );
+        assert_eq!(
+            normalise_separators("\"Lee; Ann\" <a@x.com>"),
+            "\"Lee; Ann\" <a@x.com>"
+        );
     }
 
     #[test]

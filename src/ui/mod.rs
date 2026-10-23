@@ -3,18 +3,18 @@ pub mod attachment_drawer;
 pub mod attachments_gallery;
 pub mod carry_over;
 pub mod chip_flow;
+pub mod cloud_accounts;
 pub mod column_bin;
 pub mod command_palette;
-pub mod fade_label;
-pub mod cloud_accounts;
-pub mod translation_page;
 pub mod compose;
+pub mod contact_sources;
+pub mod contact_tree;
 pub mod contacts_browser;
 pub mod contacts_page;
 pub mod context_menu;
-pub mod contact_sources;
 pub mod drop_zones;
 pub mod emoji;
+pub mod fade_label;
 pub mod folder_picker;
 pub mod grab_pill;
 pub mod icon_picker;
@@ -32,10 +32,10 @@ pub mod print_preview;
 pub mod recipient_row;
 pub mod rich_editor;
 pub mod send_morph;
-pub mod contact_tree;
 pub mod sidebar;
 pub mod theme_picker;
 pub mod tool_flow;
+pub mod translation_page;
 pub mod web_signin;
 pub mod welcome;
 
@@ -122,7 +122,10 @@ impl DisplayCss {
                 gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
             );
         }
-        DisplayCss { provider, css: Default::default() }
+        DisplayCss {
+            provider,
+            css: Default::default(),
+        }
     }
 
     pub fn load(&self, css: String) {
@@ -151,7 +154,11 @@ pub fn ctrl_scroll_zoom(
     let p = pending.clone();
     scroll.connect_scroll_begin(move |_| p.set(0.0));
     scroll.connect_scroll(move |c, _, dy| {
-        if !c.current_event_state().contains(gtk::gdk::ModifierType::CONTROL_MASK) || !zooms() {
+        if !c
+            .current_event_state()
+            .contains(gtk::gdk::ModifierType::CONTROL_MASK)
+            || !zooms()
+        {
             pending.set(0.0);
             return gtk::glib::Propagation::Proceed;
         }

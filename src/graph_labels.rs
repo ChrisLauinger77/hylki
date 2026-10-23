@@ -16,7 +16,8 @@ use std::time::{Duration, Instant};
 use crate::config::{AccountConfig, Protocol};
 use crate::sensitivity::SensitivityLabel;
 
-const URL: &str = "https://graph.microsoft.com/beta/me/security/informationProtection/sensitivityLabels";
+const URL: &str =
+    "https://graph.microsoft.com/beta/me/security/informationProtection/sensitivityLabels";
 
 /// How long a list is used. Labels change when an administrator edits the
 /// policy, which is rare.
@@ -72,7 +73,9 @@ pub fn fill(account: &AccountConfig, label: &mut SensitivityLabel) {
     if label.id.is_empty() || !usable(account) {
         return;
     }
-    let Some(found) = lookup(account, &label.id.to_ascii_lowercase()) else { return };
+    let Some(found) = lookup(account, &label.id.to_ascii_lowercase()) else {
+        return;
+    };
     if label.name.is_empty() {
         label.name = found.name;
     }
@@ -90,7 +93,12 @@ fn lookup(account: &AccountConfig, id: &str) -> Option<TenantLabel> {
                 return labels.get(id).cloned();
             }
         }
-        if st.refused.contains(email) || st.failed.get(email).is_some_and(|at| now.duration_since(*at) < RETRY) {
+        if st.refused.contains(email)
+            || st
+                .failed
+                .get(email)
+                .is_some_and(|at| now.duration_since(*at) < RETRY)
+        {
             return None;
         }
     }
@@ -133,19 +141,27 @@ fn agent() -> &'static ureq::Agent {
 
 fn get(token: &str, url: &str) -> Result<serde_json::Value, (Option<u16>, String)> {
     tracing::debug!(target: "hylki::graph", "> GET {}", url.strip_prefix("https://graph.microsoft.com").unwrap_or(url));
-    match agent().get(url).set("Authorization", &format!("Bearer {token}")).call() {
+    match agent()
+        .get(url)
+        .set("Authorization", &format!("Bearer {token}"))
+        .call()
+    {
         Ok(resp) => resp.into_json().map_err(|e| (None, e.to_string())),
         Err(ureq::Error::Status(code, resp)) => {
             let v = resp.into_json::<serde_json::Value>().unwrap_or_default();
             let what = v["error"]["code"].as_str().unwrap_or_default();
-            Err((Some(code), format!("HTTP {code} {what}").trim_end().to_string()))
+            Err((
+                Some(code),
+                format!("HTTP {code} {what}").trim_end().to_string(),
+            ))
         }
         Err(e) => Err((None, e.to_string())),
     }
 }
 
 fn read_list(account: &AccountConfig) -> Result<HashMap<String, TenantLabel>, Failure> {
-    let mut token = crate::worker::oauth_token_blocking(account).ok_or_else(|| Failure::Failed("no token".into()))?;
+    let mut token = crate::worker::oauth_token_blocking(account)
+        .ok_or_else(|| Failure::Failed("no token".into()))?;
     let mut labels = HashMap::new();
     let mut url = URL.to_string();
     let mut renewed = false;
@@ -154,7 +170,8 @@ fn read_list(account: &AccountConfig) -> Result<HashMap<String, TenantLabel>, Fa
             Err((Some(401), _)) if !renewed => {
                 renewed = true;
                 crate::worker::forget_access_token(account);
-                token = crate::worker::oauth_token_blocking(account).ok_or_else(|| Failure::Failed("no token".into()))?;
+                token = crate::worker::oauth_token_blocking(account)
+                    .ok_or_else(|| Failure::Failed("no token".into()))?;
                 continue;
             }
             Err((Some(400 | 403 | 404), why)) => return Err(Failure::Refused(why)),
@@ -163,7 +180,9 @@ fn read_list(account: &AccountConfig) -> Result<HashMap<String, TenantLabel>, Fa
         };
         labels.extend(parse(&page));
         match page["@odata.nextLink"].as_str() {
-            Some(next) if next.starts_with("https://graph.microsoft.com/") => url = next.to_string(),
+            Some(next) if next.starts_with("https://graph.microsoft.com/") => {
+                url = next.to_string()
+            }
             _ => break,
         }
     }
@@ -187,13 +206,19 @@ fn name_of(v: &serde_json::Value) -> String {
 fn parse(page: &serde_json::Value) -> Vec<(String, TenantLabel)> {
     let mut out = Vec::new();
     for v in page["value"].as_array().into_iter().flatten() {
-        let Some(id) = v["id"].as_str().filter(|id| !id.is_empty()) else { continue };
+        let Some(id) = v["id"].as_str().filter(|id| !id.is_empty()) else {
+            continue;
+        };
         let name = name_of(v);
         if name.is_empty() {
             continue;
         }
         let parent = name_of(&v["parent"]);
-        let name = if parent.is_empty() { name } else { format!("{parent} / {name}") };
+        let name = if parent.is_empty() {
+            name
+        } else {
+            format!("{parent} / {name}")
+        };
         let tooltip = [&v["tooltip"], &v["description"]]
             .into_iter()
             .filter_map(|t| t.as_str())
@@ -201,7 +226,14 @@ fn parse(page: &serde_json::Value) -> Vec<(String, TenantLabel)> {
             .find(|t| !t.is_empty())
             .unwrap_or_default()
             .to_string();
-        out.push((id.to_ascii_lowercase(), TenantLabel { name, color: color(v["color"].as_str().unwrap_or_default()), tooltip }));
+        out.push((
+            id.to_ascii_lowercase(),
+            TenantLabel {
+                name,
+                color: color(v["color"].as_str().unwrap_or_default()),
+                tooltip,
+            },
+        ));
     }
     out
 }
@@ -245,7 +277,10 @@ mod tests {
         assert_eq!(got.len(), 3, "a label without a name is left out");
         let sub = &got["0d39dc11-75ff-4309-8b32-ff94f0e41607"];
         assert_eq!(sub.name, "Highly Confidential / Any User (No Protection)");
-        assert_eq!(sub.tooltip, "Data labeled for Any User will not be protected.");
+        assert_eq!(
+            sub.tooltip,
+            "Data labeled for Any User will not be protected."
+        );
         assert_eq!(got["566663c7-4d8d-4b8f-b280-784a31971dbe"].color, "#a4262c");
         let public = &got["c0ffee00-0000-0000-0000-000000000001"];
         assert_eq!(public.color, "", "only a color goes into the markup");
@@ -262,12 +297,36 @@ mod tests {
             ..crate::ui::welcome::blank_account()
         };
         assert!(usable(&acc));
-        assert!(!usable(&AccountConfig { goa_id: Some("account_1".into()), ..acc.clone() }));
-        assert!(!usable(&AccountConfig { graph_label_names: false, ..acc.clone() }));
-        assert!(!usable(&AccountConfig { protocol: Protocol::Imap, ..acc.clone() }));
+        assert!(!usable(&AccountConfig {
+            goa_id: Some("account_1".into()),
+            ..acc.clone()
+        }));
+        assert!(!usable(&AccountConfig {
+            graph_label_names: false,
+            ..acc.clone()
+        }));
+        assert!(!usable(&AccountConfig {
+            protocol: Protocol::Imap,
+            ..acc.clone()
+        }));
         // An account that may not ask leaves the label as the header has it.
-        let mut label = SensitivityLabel { id: "x".into(), ..Default::default() };
-        fill(&AccountConfig { enabled: false, ..acc }, &mut label);
-        assert_eq!(label, SensitivityLabel { id: "x".into(), ..Default::default() });
+        let mut label = SensitivityLabel {
+            id: "x".into(),
+            ..Default::default()
+        };
+        fill(
+            &AccountConfig {
+                enabled: false,
+                ..acc
+            },
+            &mut label,
+        );
+        assert_eq!(
+            label,
+            SensitivityLabel {
+                id: "x".into(),
+                ..Default::default()
+            }
+        );
     }
 }

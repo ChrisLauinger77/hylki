@@ -85,7 +85,10 @@ impl MailboxQuota {
     pub fn used_line(&self) -> String {
         i18n_f(
             "{used} of {limit} used",
-            &[("used", &human_size(self.used)), ("limit", &human_size(self.limit))],
+            &[
+                ("used", &human_size(self.used)),
+                ("limit", &human_size(self.limit)),
+            ],
         )
     }
 
@@ -93,7 +96,10 @@ impl MailboxQuota {
     pub fn free_line(&self) -> String {
         let free = self.limit.saturating_sub(self.used);
         let pct = ((1.0 - self.fraction()) * 100.0).round() as u32;
-        i18n_f("{free} free ({pct}%)", &[("free", &human_size(free)), ("pct", &pct.to_string())])
+        i18n_f(
+            "{free} free ({pct}%)",
+            &[("free", &human_size(free)), ("pct", &pct.to_string())],
+        )
     }
 }
 
@@ -122,13 +128,26 @@ pub fn localize_special_folder_names(folders: &mut [Folder]) {
     for f in folders {
         let (label, english): (&str, &[&str]) = match f.kind {
             FolderKind::Inbox => ("Inbox", &["inbox"]),
-            FolderKind::Sent => ("Sent", &["sent", "sent items", "sent mail", "sent messages"]),
+            FolderKind::Sent => (
+                "Sent",
+                &["sent", "sent items", "sent mail", "sent messages"],
+            ),
             FolderKind::Drafts => ("Drafts", &["drafts", "draft"]),
             FolderKind::Templates => ("Templates", &["templates", "template"]),
-            FolderKind::Trash => ("Trash", &["trash", "deleted items", "deleted messages", "bin"]),
+            FolderKind::Trash => (
+                "Trash",
+                &["trash", "deleted items", "deleted messages", "bin"],
+            ),
             FolderKind::Junk => (
                 "Junk",
-                &["junk", "junk mail", "junk e-mail", "junk email", "spam", "bulk mail"],
+                &[
+                    "junk",
+                    "junk mail",
+                    "junk e-mail",
+                    "junk email",
+                    "spam",
+                    "bulk mail",
+                ],
             ),
             FolderKind::Archive => ("Archive", &["archive", "archives"]),
             FolderKind::Starred => ("Starred", &["starred"]),
@@ -152,7 +171,9 @@ pub fn folder_is_hidden(path: &str, delimiter: Option<&str>, hidden: &[String]) 
         if h == path {
             return true;
         }
-        let Some(rest) = path.strip_prefix(h.as_str()) else { return false };
+        let Some(rest) = path.strip_prefix(h.as_str()) else {
+            return false;
+        };
         match delimiter {
             Some(d) if !d.is_empty() => rest.starts_with(d),
             _ => rest.starts_with(['/', '.', '\\']),
@@ -186,7 +207,10 @@ pub fn exchange_non_mail_folders(folders: &[Folder]) -> Vec<String> {
         .filter(|f| !f.path.contains(['/', '\\']))
         .map(|f| (f, f.name.trim().to_lowercase()))
         .collect();
-    let markers = top.iter().filter(|(_, n)| MARKERS.contains(&n.as_str())).count();
+    let markers = top
+        .iter()
+        .filter(|(_, n)| MARKERS.contains(&n.as_str()))
+        .count();
     if markers < 2 {
         return Vec::new();
     }
@@ -200,7 +224,10 @@ pub fn exchange_non_mail_folders(folders: &[Folder]) -> Vec<String> {
 /// server marks one, so the name is all there is to go by; any other is
 /// assigned under Special Folders.
 pub fn is_templates_name(name: &str) -> bool {
-    matches!(name.trim().to_lowercase().as_str(), "templates" | "template")
+    matches!(
+        name.trim().to_lowercase().as_str(),
+        "templates" | "template"
+    )
 }
 
 /// The [`FolderKind`] behind a Special Folders role key (#82).
@@ -228,7 +255,9 @@ pub fn assign_folder_roles(
     folders: &mut [Folder],
 ) {
     for (role, path) in roles {
-        let Some(kind) = role_kind(role) else { continue };
+        let Some(kind) = role_kind(role) else {
+            continue;
+        };
         if !folders.iter().any(|f| &f.path == path) {
             // The assigned folder vanished server-side: leave detection alone.
             continue;
@@ -237,7 +266,10 @@ pub fn assign_folder_roles(
         // pointed at INBOX lost its inbox — and with it its place under All
         // Inboxes, its new-mail notifications and its filters. The
         // assignment is ignored; the editor no longer offers the Inbox.
-        if folders.iter().any(|f| &f.path == path && f.kind == FolderKind::Inbox) {
+        if folders
+            .iter()
+            .any(|f| &f.path == path && f.kind == FolderKind::Inbox)
+        {
             continue;
         }
         for f in folders.iter_mut() {
@@ -332,7 +364,11 @@ impl Importance {
                 _ => Importance::Normal,
             };
         }
-        match value.split(|c: char| !c.is_ascii_alphanumeric() && c != '-').next().unwrap_or("") {
+        match value
+            .split(|c: char| !c.is_ascii_alphanumeric() && c != '-')
+            .next()
+            .unwrap_or("")
+        {
             "high" | "urgent" => Importance::High,
             "low" | "non-urgent" => Importance::Low,
             _ => Importance::Normal,
@@ -456,9 +492,11 @@ pub fn preview_is_encrypted(preview: &str) -> bool {
 /// answer or a forward, in any of the languages they write them in.
 pub fn is_reply_or_forward_subject(subject: &str) -> bool {
     let subject = subject.trim_start().to_ascii_lowercase();
-    ["re:", "fw:", "fwd:", "aw:", "sv:", "vs:", "tr:", "rv:", "wg:", "antw:", "r:", "i:"]
-        .iter()
-        .any(|p| subject.starts_with(p))
+    [
+        "re:", "fw:", "fwd:", "aw:", "sv:", "vs:", "tr:", "rv:", "wg:", "antw:", "r:", "i:",
+    ]
+    .iter()
+    .any(|p| subject.starts_with(p))
 }
 
 /// The words the list shows for a stored preview.
@@ -488,14 +526,28 @@ pub enum PgpSignature {
     /// Not signed (or nothing gpg could say about it).
     #[default]
     None,
-    Good { signer: String, key_id: String, trust: PgpTrust },
+    Good {
+        signer: String,
+        key_id: String,
+        trust: PgpTrust,
+    },
     /// The signature does not match the content.
-    Bad { signer: String },
+    Bad {
+        signer: String,
+    },
     /// Signed with a key the keyring does not hold.
-    NoKey { key_id: String },
-    ExpiredKey { signer: String },
-    RevokedKey { signer: String },
-    ExpiredSignature { signer: String },
+    NoKey {
+        key_id: String,
+    },
+    ExpiredKey {
+        signer: String,
+    },
+    RevokedKey {
+        signer: String,
+    },
+    ExpiredSignature {
+        signer: String,
+    },
 }
 
 /// What OpenPGP made of a message (#133): encrypted or not, decrypted or
@@ -556,22 +608,52 @@ impl PgpStatus {
         if self.encrypted {
             return match &self.signature {
                 S::None => i18n("Encrypted with OpenPGP"),
-                S::Good { signer, .. } => i18n_f("Encrypted, and signed by {signer}", &[("signer", signer)]),
-                S::Bad { .. } => i18n("Encrypted; the signature does not match, the message may have been altered"),
-                S::NoKey { key_id } => i18n_f("Encrypted; signed with a key you don't have ({id})", &[("id", &key(key_id))]),
-                S::ExpiredKey { signer } => i18n_f("Encrypted, and signed by {signer} with an expired key", &[("signer", signer)]),
-                S::RevokedKey { signer } => i18n_f("Encrypted, and signed by {signer} with a revoked key", &[("signer", signer)]),
-                S::ExpiredSignature { signer } => i18n_f("Encrypted, and signed by {signer}; the signature has expired", &[("signer", signer)]),
+                S::Good { signer, .. } => {
+                    i18n_f("Encrypted, and signed by {signer}", &[("signer", signer)])
+                }
+                S::Bad { .. } => i18n(
+                    "Encrypted; the signature does not match, the message may have been altered",
+                ),
+                S::NoKey { key_id } => i18n_f(
+                    "Encrypted; signed with a key you don't have ({id})",
+                    &[("id", &key(key_id))],
+                ),
+                S::ExpiredKey { signer } => i18n_f(
+                    "Encrypted, and signed by {signer} with an expired key",
+                    &[("signer", signer)],
+                ),
+                S::RevokedKey { signer } => i18n_f(
+                    "Encrypted, and signed by {signer} with a revoked key",
+                    &[("signer", signer)],
+                ),
+                S::ExpiredSignature { signer } => i18n_f(
+                    "Encrypted, and signed by {signer}; the signature has expired",
+                    &[("signer", signer)],
+                ),
             };
         }
         match &self.signature {
             S::None => i18n("OpenPGP-signed; the signature could not be checked"),
             S::Good { signer, .. } => i18n_f("Signed by {signer}", &[("signer", signer)]),
-            S::Bad { .. } => i18n("The OpenPGP signature does not match; the message may have been altered"),
-            S::NoKey { key_id } => i18n_f("Signed with a key you don't have ({id})", &[("id", &key(key_id))]),
-            S::ExpiredKey { signer } => i18n_f("Signed by {signer} with an expired key", &[("signer", signer)]),
-            S::RevokedKey { signer } => i18n_f("Signed by {signer} with a revoked key", &[("signer", signer)]),
-            S::ExpiredSignature { signer } => i18n_f("Signed by {signer}; the signature has expired", &[("signer", signer)]),
+            S::Bad { .. } => {
+                i18n("The OpenPGP signature does not match; the message may have been altered")
+            }
+            S::NoKey { key_id } => i18n_f(
+                "Signed with a key you don't have ({id})",
+                &[("id", &key(key_id))],
+            ),
+            S::ExpiredKey { signer } => i18n_f(
+                "Signed by {signer} with an expired key",
+                &[("signer", signer)],
+            ),
+            S::RevokedKey { signer } => i18n_f(
+                "Signed by {signer} with a revoked key",
+                &[("signer", signer)],
+            ),
+            S::ExpiredSignature { signer } => i18n_f(
+                "Signed by {signer}; the signature has expired",
+                &[("signer", signer)],
+            ),
         }
     }
 
@@ -586,8 +668,14 @@ impl PgpStatus {
         match &self.signature {
             S::None if self.encrypted => i18n("Encrypted"),
             S::None => i18n("Signature not checked"),
-            S::Good { trust: PgpTrust::Full, .. } if self.encrypted => i18n("Encrypted and signed"),
-            S::Good { trust: PgpTrust::Full, .. } => i18n("Signed"),
+            S::Good {
+                trust: PgpTrust::Full,
+                ..
+            } if self.encrypted => i18n("Encrypted and signed"),
+            S::Good {
+                trust: PgpTrust::Full,
+                ..
+            } => i18n("Signed"),
             S::Good { .. } => i18n("Signed, key not trusted"),
             S::Bad { .. } => i18n("Bad signature"),
             S::NoKey { .. } => i18n("Signed, unknown key"),
@@ -606,8 +694,14 @@ impl PgpStatus {
         }
         match &self.signature {
             S::Bad { .. } | S::RevokedKey { .. } => "pgp-bad",
-            S::Good { trust: PgpTrust::Full, .. } => "pgp-good",
-            S::Good { .. } | S::NoKey { .. } | S::ExpiredKey { .. } | S::ExpiredSignature { .. } => "pgp-warn",
+            S::Good {
+                trust: PgpTrust::Full,
+                ..
+            } => "pgp-good",
+            S::Good { .. }
+            | S::NoKey { .. }
+            | S::ExpiredKey { .. }
+            | S::ExpiredSignature { .. } => "pgp-warn",
             S::None if self.encrypted => "pgp-good",
             S::None => "pgp-warn",
         }
@@ -802,14 +896,19 @@ impl Invite {
         !self.cancelled
             && matches!(self.method.as_str(), "REQUEST" | "COUNTER")
             && !self.uid.is_empty()
-            && self.organizer.as_ref().is_some_and(|o| o.email.contains('@'))
+            && self
+                .organizer
+                .as_ref()
+                .is_some_and(|o| o.email.contains('@'))
     }
 
     /// The attendee entry for whoever is reading, matched against the
     /// addresses this account answers to.
     pub fn me<'a>(&'a self, addresses: &[String]) -> Option<&'a InvitePerson> {
         self.attendees.iter().find(|a| {
-            addresses.iter().any(|mine| mine.eq_ignore_ascii_case(&a.email))
+            addresses
+                .iter()
+                .any(|mine| mine.eq_ignore_ascii_case(&a.email))
         })
     }
 
@@ -817,7 +916,10 @@ impl Invite {
     /// organizer, whom several calendars put on the attendee list as well
     /// and who is named in their own right.
     pub fn guests(&self) -> impl Iterator<Item = &InvitePerson> {
-        let chair = self.organizer.as_ref().map(|o| o.email.to_ascii_lowercase());
+        let chair = self
+            .organizer
+            .as_ref()
+            .map(|o| o.email.to_ascii_lowercase());
         self.attendees.iter().filter(move |a| {
             !a.resource && chair.as_deref() != Some(a.email.to_ascii_lowercase().as_str())
         })
@@ -952,9 +1054,10 @@ impl OutboxItem {
             } else {
                 // A scheduled message says when it goes, until it is due.
                 let waiting = match self.send_at {
-                    Some(at) if at > crate::datefmt::now() => {
-                        i18n_f("Scheduled for {when}", &[("when", &crate::datefmt::date_time(at))])
-                    }
+                    Some(at) if at > crate::datefmt::now() => i18n_f(
+                        "Scheduled for {when}",
+                        &[("when", &crate::datefmt::date_time(at))],
+                    ),
                     _ => Self::waiting_label(self.queued_at),
                 };
                 let attempts = match self.attempts {
@@ -1017,9 +1120,11 @@ pub fn human_size(bytes: u64) -> String {
 /// Whether a filename looks like a raster image we can thumbnail/preview inline.
 pub fn is_image_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
-    [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".heic", ".heif", ".avif"]
-        .iter()
-        .any(|ext| lower.ends_with(ext))
+    [
+        ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".heic", ".heif", ".avif",
+    ]
+    .iter()
+    .any(|ext| lower.ends_with(ext))
 }
 
 /// The lowercase extension of a filename (empty when there is none).
@@ -1028,7 +1133,9 @@ pub fn is_image_name(name: &str) -> bool {
 /// Whatever follows the last dot only counts as an extension when it looks
 /// like one (short, alphanumeric), so "Report v1.2 draft" has none either.
 pub fn ext_of(name: &str) -> String {
-    let Some((_, ext)) = name.rsplit_once('.') else { return String::new() };
+    let Some((_, ext)) = name.rsplit_once('.') else {
+        return String::new();
+    };
     if ext.is_empty() || ext.len() > 8 || !ext.chars().all(|c| c.is_ascii_alphanumeric()) {
         return String::new();
     }
@@ -1208,7 +1315,9 @@ impl Message {
     /// Whether the message carries `keyword`. IMAP keywords are atoms
     /// compared case-insensitively (RFC 3501), so `work` and `Work` are one.
     pub fn has_keyword(&self, keyword: &str) -> bool {
-        self.keywords.iter().any(|k| k.eq_ignore_ascii_case(keyword))
+        self.keywords
+            .iter()
+            .any(|k| k.eq_ignore_ascii_case(keyword))
     }
 
     /// Add or drop `keyword`, keeping the list free of duplicates.
@@ -1293,7 +1402,6 @@ impl Message {
     pub fn datetime_list(&self) -> String {
         datetime_list_at(self.timestamp, &self.date)
     }
-
 }
 
 /// One pill on a message: a tag (#71), or a Gmail label no tag stands for
@@ -1314,8 +1422,10 @@ pub fn pills<'a>(
     tags: &'a [crate::config::Tag],
 ) -> Vec<Pill<'a>> {
     // A decoded name can hold a NUL (`&AAA-`), which a GTK label aborts on.
-    let shown: Vec<String> =
-        labels.iter().map(|l| crate::mutf7::decode(l).replace('\0', " ")).collect();
+    let shown: Vec<String> = labels
+        .iter()
+        .map(|l| crate::mutf7::decode(l).replace('\0', " "))
+        .collect();
     let names_label = |t: &crate::config::Tag, i: usize| {
         t.keyword.eq_ignore_ascii_case(&labels[i]) || t.name.eq_ignore_ascii_case(&shown[i])
     };
@@ -1341,17 +1451,17 @@ pub fn pills<'a>(
 /// label is how a user picks the color instead.
 pub fn label_hue(name: &str) -> usize {
     // FNV-1a: std's hasher makes no promise to stay the same across releases.
-    let hash = name
-        .to_lowercase()
-        .bytes()
-        .fold(0x811c_9dc5_u32, |h, b| (h ^ b as u32).wrapping_mul(0x0100_0193));
+    let hash = name.to_lowercase().bytes().fold(0x811c_9dc5_u32, |h, b| {
+        (h ^ b as u32).wrapping_mul(0x0100_0193)
+    });
     hash as usize % crate::config::TAG_COLORS.len()
 }
 
 /// Whether a Gmail label (as the server writes it, modified UTF-7) stands for
 /// a tag: named like its keyword, or like its name.
 pub fn label_names_tag(label: &str, tag: &crate::config::Tag) -> bool {
-    tag.keyword.eq_ignore_ascii_case(label) || tag.name.eq_ignore_ascii_case(&crate::mutf7::decode(label))
+    tag.keyword.eq_ignore_ascii_case(label)
+        || tag.name.eq_ignore_ascii_case(&crate::mutf7::decode(label))
 }
 
 /// A short date for a single line: the time for today, the day and month
@@ -1460,10 +1570,22 @@ mod tests {
             keyword: keyword.into(),
             color: "#1c71d8".into(),
         };
-        let tags = [tag("Urgent", "$label1"), tag("Work", "Work"), tag("Receipts", "receipts")];
+        let tags = [
+            tag("Urgent", "$label1"),
+            tag("Work", "Work"),
+            tag("Receipts", "receipts"),
+        ];
         let keywords = vec!["$Label1".to_string()];
-        let labels: Vec<String> =
-            ["Clients/Acme", "work", "&AOk-t&AOk-", "My Label", "Receipts"].iter().map(|l| l.to_string()).collect();
+        let labels: Vec<String> = [
+            "Clients/Acme",
+            "work",
+            "&AOk-t&AOk-",
+            "My Label",
+            "Receipts",
+        ]
+        .iter()
+        .map(|l| l.to_string())
+        .collect();
         let names: Vec<String> = pills(&keywords, &labels, &tags)
             .into_iter()
             .map(|p| match p {
@@ -1473,10 +1595,20 @@ mod tests {
             .collect();
         assert_eq!(
             names,
-            ["tag:Urgent", "tag:Work", "tag:Receipts", "label:Clients/Acme", "label:été", "label:My Label"]
+            [
+                "tag:Urgent",
+                "tag:Work",
+                "tag:Receipts",
+                "label:Clients/Acme",
+                "label:été",
+                "label:My Label"
+            ]
         );
         assert!(pills(&[], &[], &tags).is_empty());
-        assert_eq!(pills(&[], &["&AAA-".to_string()], &[]), [Pill::Label(" ".into())]);
+        assert_eq!(
+            pills(&[], &["&AAA-".to_string()], &[]),
+            [Pill::Label(" ".into())]
+        );
     }
 
     /// #374: a label's color follows its name, whatever the case, and the
@@ -1486,11 +1618,19 @@ mod tests {
         assert_eq!(label_hue("Clients/Acme"), label_hue("clients/acme"));
         // Pinned: a label must not change color between releases.
         assert_eq!(["Work", "Clients", "Newsletters"].map(label_hue), [0, 7, 3]);
-        let hues: std::collections::HashSet<usize> =
-            ["Travel", "Receipts", "Clients", "Family", "Newsletters", "Bills", "School", "Friends"]
-                .iter()
-                .map(|n| label_hue(n))
-                .collect();
+        let hues: std::collections::HashSet<usize> = [
+            "Travel",
+            "Receipts",
+            "Clients",
+            "Family",
+            "Newsletters",
+            "Bills",
+            "School",
+            "Friends",
+        ]
+        .iter()
+        .map(|n| label_hue(n))
+        .collect();
         assert!(hues.len() >= 4, "{hues:?}");
         assert!(hues.iter().all(|&h| h < crate::config::TAG_COLORS.len()));
     }
@@ -1506,14 +1646,23 @@ mod tests {
         };
         let work = tag("Work", "$label2");
         let ete = tag("Été", "ete");
-        let mut m = crate::backend::MockBackend::new().message(1).expect("a demo message");
+        let mut m = crate::backend::MockBackend::new()
+            .message(1)
+            .expect("a demo message");
         m.keywords.clear();
         m.labels = vec!["work".into(), "&AMk-t&AOk-".into(), "Other".into()];
         assert!(m.has_tag(&work) && m.has_tag(&ete));
         assert!(!m.has_tag(&tag("Home", "home")));
-        assert_eq!(m.tag_keywords(&[work.clone(), ete.clone()]), ["$label2", "ete"]);
+        assert_eq!(
+            m.tag_keywords(&[work.clone(), ete.clone()]),
+            ["$label2", "ete"]
+        );
         m.keywords = vec!["$Label2".into()];
-        assert_eq!(m.tag_keywords(&[work.clone()]), ["$Label2"], "no second copy of a keyword it has");
+        assert_eq!(
+            m.tag_keywords(&[work.clone()]),
+            ["$Label2"],
+            "no second copy of a keyword it has"
+        );
         m.drop_tag(&work);
         assert!(!m.has_tag(&work) && m.keywords.is_empty());
         assert_eq!(m.labels, ["&AMk-t&AOk-", "Other"]);
@@ -1522,15 +1671,42 @@ mod tests {
     /// #334: each priority header's spellings, and normal for anything else.
     #[test]
     fn importance_reads_every_priority_header() {
-        assert_eq!(Importance::from_header("X-Priority", "1 (Highest)"), Importance::High);
-        assert_eq!(Importance::from_header("x-priority", " 2"), Importance::High);
-        assert_eq!(Importance::from_header("X-Priority", "3 (Normal)"), Importance::Normal);
-        assert_eq!(Importance::from_header("X-Priority", "5 (Lowest)"), Importance::Low);
-        assert_eq!(Importance::from_header("Importance", "High"), Importance::High);
-        assert_eq!(Importance::from_header("Importance", "low"), Importance::Low);
-        assert_eq!(Importance::from_header("Priority", "urgent"), Importance::High);
-        assert_eq!(Importance::from_header("Priority", "non-urgent"), Importance::Low);
-        assert_eq!(Importance::from_header("Importance", "whatever"), Importance::Normal);
+        assert_eq!(
+            Importance::from_header("X-Priority", "1 (Highest)"),
+            Importance::High
+        );
+        assert_eq!(
+            Importance::from_header("x-priority", " 2"),
+            Importance::High
+        );
+        assert_eq!(
+            Importance::from_header("X-Priority", "3 (Normal)"),
+            Importance::Normal
+        );
+        assert_eq!(
+            Importance::from_header("X-Priority", "5 (Lowest)"),
+            Importance::Low
+        );
+        assert_eq!(
+            Importance::from_header("Importance", "High"),
+            Importance::High
+        );
+        assert_eq!(
+            Importance::from_header("Importance", "low"),
+            Importance::Low
+        );
+        assert_eq!(
+            Importance::from_header("Priority", "urgent"),
+            Importance::High
+        );
+        assert_eq!(
+            Importance::from_header("Priority", "non-urgent"),
+            Importance::Low
+        );
+        assert_eq!(
+            Importance::from_header("Importance", "whatever"),
+            Importance::Normal
+        );
         // The first header that says anything wins; a normal one says nothing.
         let headers = [("X-Priority", "3"), ("Importance", "high")];
         let lookup = |name: &str| headers.iter().find(|(n, _)| *n == name).map(|(_, v)| *v);
@@ -1543,24 +1719,52 @@ mod tests {
 
     #[test]
     fn a_quota_says_what_is_used_and_free() {
-        let q = MailboxQuota { used: 250, limit: 1000 };
+        let q = MailboxQuota {
+            used: 250,
+            limit: 1000,
+        };
         assert_eq!(q.fraction(), 0.25);
         assert!(q.free_line().ends_with("(75%)"));
-        let over = MailboxQuota { used: 1200, limit: 1000 };
+        let over = MailboxQuota {
+            used: 1200,
+            limit: 1000,
+        };
         assert_eq!(over.fraction(), 1.0);
         assert!(over.free_line().ends_with("(0%)"));
     }
 
     #[test]
     fn the_pgp_chip_names_its_verdict() {
-        let good = |trust| PgpSignature::Good { signer: "A".into(), key_id: "1".into(), trust };
-        let status = |encrypted, signature| PgpStatus { encrypted, decrypted: encrypted, signature, ..Default::default() };
+        let good = |trust| PgpSignature::Good {
+            signer: "A".into(),
+            key_id: "1".into(),
+            trust,
+        };
+        let status = |encrypted, signature| PgpStatus {
+            encrypted,
+            decrypted: encrypted,
+            signature,
+            ..Default::default()
+        };
         assert_eq!(status(false, good(PgpTrust::Full)).short_label(), "Signed");
-        assert_eq!(status(true, good(PgpTrust::Full)).short_label(), "Encrypted and signed");
-        assert_eq!(status(false, good(PgpTrust::Unknown)).short_label(), "Signed, key not trusted");
-        assert_eq!(status(false, PgpSignature::Bad { signer: "A".into() }).short_label(), "Bad signature");
+        assert_eq!(
+            status(true, good(PgpTrust::Full)).short_label(),
+            "Encrypted and signed"
+        );
+        assert_eq!(
+            status(false, good(PgpTrust::Unknown)).short_label(),
+            "Signed, key not trusted"
+        );
+        assert_eq!(
+            status(false, PgpSignature::Bad { signer: "A".into() }).short_label(),
+            "Bad signature"
+        );
         assert_eq!(status(true, PgpSignature::None).short_label(), "Encrypted");
-        let locked = PgpStatus { encrypted: true, decrypted: false, ..Default::default() };
+        let locked = PgpStatus {
+            encrypted: true,
+            decrypted: false,
+            ..Default::default()
+        };
         assert_eq!(locked.short_label(), "Not decrypted");
     }
 
@@ -1583,7 +1787,10 @@ mod tests {
         let before: Vec<String> = folders.iter().map(|f| f.name.clone()).collect();
         // The tests run without a catalogue, as English does.
         localize_special_folder_names(&mut folders);
-        assert_eq!(folders.iter().map(|f| f.name.clone()).collect::<Vec<_>>(), before);
+        assert_eq!(
+            folders.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
+            before
+        );
     }
 
     fn item() -> OutboxItem {
@@ -1626,10 +1833,18 @@ mod tests {
         i.last_error = "Connection refused (os error 111)".into();
         let row = i.as_message();
         assert!(row.preview.contains("4 attempts"), "{}", row.preview);
-        assert!(row.preview.contains("Connection refused"), "{}", row.preview);
+        assert!(
+            row.preview.contains("Connection refused"),
+            "{}",
+            row.preview
+        );
         // With nothing failed yet, the body stands in for the reason.
         let row = item().as_message();
-        assert!(row.preview.contains("Here are the figures"), "{}", row.preview);
+        assert!(
+            row.preview.contains("Here are the figures"),
+            "{}",
+            row.preview
+        );
         assert!(!row.preview.contains("attempts"), "{}", row.preview);
     }
 
@@ -1682,9 +1897,15 @@ mod tests {
         assign_folder_roles(&roles, &mut folders);
         let drafts = folders.iter().find(|f| f.path == "Brouillons").unwrap();
         assert_eq!(drafts.kind, FolderKind::Drafts);
-        assert!(crate::worker::chip_counts_all(drafts.kind), "chip counts every draft");
+        assert!(
+            crate::worker::chip_counts_all(drafts.kind),
+            "chip counts every draft"
+        );
         // Positions and ids are untouched: the worker's cache keys ids by order.
-        assert_eq!(folders.iter().map(|f| f.id).collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(
+            folders.iter().map(|f| f.id).collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
         assert_eq!(folders[1].path, "Brouillons");
     }
 
@@ -1729,7 +1950,11 @@ mod tests {
     fn a_hidden_folder_takes_its_sub_folders_with_it() {
         let hidden = vec!["Sync Issues".to_string()];
         assert!(folder_is_hidden("Sync Issues", Some("/"), &hidden));
-        assert!(folder_is_hidden("Sync Issues/Conflicts", Some("/"), &hidden));
+        assert!(folder_is_hidden(
+            "Sync Issues/Conflicts",
+            Some("/"),
+            &hidden
+        ));
         assert!(!folder_is_hidden("Sync Issues Archive", Some("/"), &hidden));
         assert!(!folder_is_hidden("INBOX/Sync Issues", Some("/"), &hidden));
         // Without a known delimiter, the usual three all count.
@@ -1759,7 +1984,14 @@ mod tests {
         hidden.sort();
         assert_eq!(
             hidden,
-            vec!["Calendar", "Contacts", "Conversation History", "Notes", "Sync Issues", "Tasks"]
+            vec![
+                "Calendar",
+                "Contacts",
+                "Conversation History",
+                "Notes",
+                "Sync Issues",
+                "Tasks"
+            ]
         );
 
         // Apple Notes keeps a "Notes" folder on ordinary IMAP servers; that

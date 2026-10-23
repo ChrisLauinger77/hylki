@@ -68,7 +68,11 @@ pub fn set_name(uid: &str, name: Option<&str>) -> Result<(), String> {
 }
 
 fn switch_path() -> Option<PathBuf> {
-    Some(crate::config::config_base()?.join("hylki").join("contacts.toml"))
+    Some(
+        crate::config::config_base()?
+            .join("hylki")
+            .join("contacts.toml"),
+    )
 }
 
 /// The IDs switched off for Hylki: sources (an account, a directory, the
@@ -102,12 +106,19 @@ pub fn hylki_used() -> bool {
 pub fn group_of(uid: &str, sources: &HashMap<String, String>) -> String {
     let mut current = uid.to_string();
     for _ in 0..4 {
-        let Some(data) = sources.get(&current) else { break };
-        let Some(kf) = crate::platform::keyfile(data) else { break };
+        let Some(data) = sources.get(&current) else {
+            break;
+        };
+        let Some(kf) = crate::platform::keyfile(data) else {
+            break;
+        };
         if kf.has_group("Collection") {
             return current;
         }
-        let parent = kf.string("Data Source", "Parent").map(|s| s.to_string()).unwrap_or_default();
+        let parent = kf
+            .string("Data Source", "Parent")
+            .map(|s| s.to_string())
+            .unwrap_or_default();
         if parent.is_empty() || !sources.contains_key(&parent) {
             break;
         }
@@ -117,7 +128,11 @@ pub fn group_of(uid: &str, sources: &HashMap<String, String>) -> String {
         .get(uid)
         .and_then(|d| crate::platform::keyfile_value(d, "Address Book", "BackendName"))
         .is_some_and(|b| b == "local");
-    if local { THIS_COMPUTER.to_string() } else { uid.to_string() }
+    if local {
+        THIS_COMPUTER.to_string()
+    } else {
+        uid.to_string()
+    }
 }
 
 /// Whether an EDS book is used by Hylki: neither it nor its account is
@@ -202,7 +217,9 @@ fn online_mark(provider_type: &str, host: &str) -> &'static str {
 
 /// The mark of a CardDAV account, by its server.
 fn carddav_mark(url: &str) -> &'static str {
-    let host = crate::carddav::parse_url(url).map(|u| u.host.to_ascii_lowercase()).unwrap_or_default();
+    let host = crate::carddav::parse_url(url)
+        .map(|u| u.host.to_ascii_lowercase())
+        .unwrap_or_default();
     if host.ends_with("icloud.com") {
         "icloud"
     } else if host.ends_with("fastmail.com") {
@@ -218,8 +235,17 @@ fn carddav_mark(url: &str) -> &'static str {
 fn books_line(books: &[Book]) -> String {
     match books.len() {
         0 => String::new(),
-        1..=3 => books.iter().map(|b| b.name.as_str()).collect::<Vec<_>>().join(", "),
-        n => ni18n_f("{n} address book", "{n} address books", n as u32, &[("n", &n.to_string())]),
+        1..=3 => books
+            .iter()
+            .map(|b| b.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", "),
+        n => ni18n_f(
+            "{n} address book",
+            "{n} address books",
+            n as u32,
+            &[("n", &n.to_string())],
+        ),
     }
 }
 
@@ -236,7 +262,11 @@ pub fn list_with_eds() -> (Vec<Source>, bool) {
 impl Book {
     /// The name Hylki uses: the one given to it, else its own.
     pub fn shown(&self) -> &str {
-        self.given.as_deref().unwrap_or(if self.name.is_empty() { &self.uid } else { &self.name })
+        self.given.as_deref().unwrap_or(if self.name.is_empty() {
+            &self.uid
+        } else {
+            &self.name
+        })
     }
 }
 
@@ -263,12 +293,17 @@ fn list_own() -> Vec<Source> {
     let off = off();
     let count = crate::local_contacts::count();
     let mut out = vec![Source {
-                own_title: String::new(),
-                given: None,
+        own_title: String::new(),
+        given: None,
         id: HYLKI.to_string(),
         kind: Kind::Hylki,
         title: i18n("Hylki Address Book"),
-        detail: ni18n_f("{n} contact, kept by Hylki", "{n} contacts, kept by Hylki", count as u32, &[("n", &count.to_string())]),
+        detail: ni18n_f(
+            "{n} contact, kept by Hylki",
+            "{n} contacts, kept by Hylki",
+            count as u32,
+            &[("n", &count.to_string())],
+        ),
         mark: "x-office-address-book-symbolic",
         origin: Origin::Hylki,
         books: Vec::new(),
@@ -276,24 +311,47 @@ fn list_own() -> Vec<Source> {
         paused: None,
         status: None,
     }];
-    let Some(registry) = crate::contacts::registry_sources() else { return out };
-    let sources: HashMap<String, String> = registry.iter().map(|(_, uid, data)| (uid.clone(), data.clone())).collect();
+    let Some(registry) = crate::contacts::registry_sources() else {
+        return out;
+    };
+    let sources: HashMap<String, String> = registry
+        .iter()
+        .map(|(_, uid, data)| (uid.clone(), data.clone()))
+        .collect();
     let online = crate::goa::contacts_accounts();
-    let carddav: HashMap<String, crate::carddav::Account> =
-        crate::carddav::list().unwrap_or_default().into_iter().map(|a| (a.uid.clone(), a)).collect();
+    let carddav: HashMap<String, crate::carddav::Account> = crate::carddav::list()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|a| (a.uid.clone(), a))
+        .collect();
 
     // The address books by the source they are grouped under, LDAP aside.
     let mut groups: HashMap<String, Vec<(Book, bool)>> = HashMap::new();
     for (uid, data) in &sources {
-        let Some(kf) = crate::platform::keyfile(data) else { continue };
-        let Ok(backend) = kf.string("Address Book", "BackendName") else { continue };
+        let Some(kf) = crate::platform::keyfile(data) else {
+            continue;
+        };
+        let Ok(backend) = kf.string("Address Book", "BackendName") else {
+            continue;
+        };
         if backend == "ldap" {
             continue;
         }
-        let name = kf.string("Data Source", "DisplayName").map(|s| s.to_string()).unwrap_or_default();
+        let name = kf
+            .string("Data Source", "DisplayName")
+            .map(|s| s.to_string())
+            .unwrap_or_default();
         let eds_on = kf.boolean("Data Source", "Enabled").unwrap_or(true);
-        let book = Book { uid: uid.clone(), name, given: None, on: !off.contains(uid) };
-        groups.entry(group_of(uid, &sources)).or_default().push((book, eds_on));
+        let book = Book {
+            uid: uid.clone(),
+            name,
+            given: None,
+            on: !off.contains(uid),
+        };
+        groups
+            .entry(group_of(uid, &sources))
+            .or_default()
+            .push((book, eds_on));
     }
     // A CardDAV account still looking for its books is listed all the same.
     for uid in carddav.keys() {
@@ -313,7 +371,10 @@ fn list_own() -> Vec<Source> {
                 id,
                 kind: Kind::ThisComputer,
                 title: i18n("On This Computer"),
-                detail: i18n_f("{books} · kept by GNOME Contacts and Evolution", &[("books", &books_line(&books))]),
+                detail: i18n_f(
+                    "{books} · kept by GNOME Contacts and Evolution",
+                    &[("books", &books_line(&books))],
+                ),
                 mark: "computer-symbolic",
                 origin: Origin::Evolution,
                 books,
@@ -326,7 +387,10 @@ fn list_own() -> Vec<Source> {
         let data = sources.get(&id).cloned().unwrap_or_default();
         let kf = crate::platform::keyfile(&data);
         let get = |group: &str, key: &str| {
-            kf.as_ref().and_then(|k| k.string(group, key).ok()).map(|s| s.to_string()).unwrap_or_default()
+            kf.as_ref()
+                .and_then(|k| k.string(group, key).ok())
+                .map(|s| s.to_string())
+                .unwrap_or_default()
         };
         let display = get("Data Source", "DisplayName");
         let goa_id = get("GNOME Online Accounts", "AccountId");
@@ -334,24 +398,35 @@ fn list_own() -> Vec<Source> {
             let goa = online.get(&goa_id);
             let host = books
                 .iter()
-                .find_map(|b| sources.get(&b.uid).and_then(|d| crate::platform::keyfile_value(d, "Authentication", "Host")))
+                .find_map(|b| {
+                    sources
+                        .get(&b.uid)
+                        .and_then(|d| crate::platform::keyfile_value(d, "Authentication", "Host"))
+                })
                 .unwrap_or_default();
             let mark = online_mark(goa.map_or("", |g| g.provider_type.as_str()), &host);
             // GNOME names an iCloud account by how it connects (WebDAV).
             let provider = if mark == "icloud" {
                 "iCloud".to_string()
             } else {
-                goa.map(|g| g.provider_name.clone()).filter(|p| !p.is_empty()).unwrap_or_else(|| i18n("Online account"))
+                goa.map(|g| g.provider_name.clone())
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or_else(|| i18n("Online account"))
             };
             // An address over the provider's name ("Microsoft 365").
-            let identity = [goa.map(|g| g.identity.clone()).unwrap_or_default(), get("Collection", "Identity"), display]
-                .into_iter()
-                .filter(|i| !i.is_empty())
-                .find(|i| i.contains('@'))
-                .or_else(|| goa.map(|g| g.identity.clone()).filter(|i| !i.is_empty()))
-                .unwrap_or_default();
-            let paused = (goa.is_some_and(|g| g.contacts_disabled) || all_eds_off)
-                .then(|| i18n("Contacts is switched off for this account in GNOME Online Accounts."));
+            let identity = [
+                goa.map(|g| g.identity.clone()).unwrap_or_default(),
+                get("Collection", "Identity"),
+                display,
+            ]
+            .into_iter()
+            .filter(|i| !i.is_empty())
+            .find(|i| i.contains('@'))
+            .or_else(|| goa.map(|g| g.identity.clone()).filter(|i| !i.is_empty()))
+            .unwrap_or_default();
+            let paused = (goa.is_some_and(|g| g.contacts_disabled) || all_eds_off).then(|| {
+                i18n("Contacts is switched off for this account in GNOME Online Accounts.")
+            });
             accounts.push(Source {
                 own_title: String::new(),
                 given: None,
@@ -375,7 +450,11 @@ fn list_own() -> Vec<Source> {
                 _ if books.is_empty() => i18n("Looking for address books…"),
                 _ => format!("CardDAV · {}", books_line(&books)),
             };
-            let origin = if is_hylki_made(&data) { Origin::Hylki } else { Origin::Evolution };
+            let origin = if is_hylki_made(&data) {
+                Origin::Hylki
+            } else {
+                Origin::Evolution
+            };
             accounts.push(Source {
                 own_title: String::new(),
                 given: None,
@@ -392,10 +471,14 @@ fn list_own() -> Vec<Source> {
             });
             continue;
         }
-        let title = if display.is_empty() { books.first().map(|b| b.name.clone()).unwrap_or_default() } else { display };
+        let title = if display.is_empty() {
+            books.first().map(|b| b.name.clone()).unwrap_or_default()
+        } else {
+            display
+        };
         accounts.push(Source {
-                own_title: String::new(),
-                given: None,
+            own_title: String::new(),
+            given: None,
             title,
             detail: books_line(&books),
             mark: "x-office-address-book-symbolic",
@@ -409,19 +492,27 @@ fn list_own() -> Vec<Source> {
         });
     }
     for dir in crate::directory::list().unwrap_or_default() {
-        let failed = if dir.enabled { crate::directory::last_error(&dir.uid) } else { None };
+        let failed = if dir.enabled {
+            crate::directory::last_error(&dir.uid)
+        } else {
+            None
+        };
         let mut detail = format!("LDAP · {}", dir.host);
         if !dir.base_dn.is_empty() {
             detail.push_str(&format!(" · {}", dir.base_dn));
         }
         accounts.push(Source {
-                own_title: String::new(),
-                given: None,
+            own_title: String::new(),
+            given: None,
             id: dir.uid.clone(),
             title: dir.title(),
             detail: failed.unwrap_or(detail),
             mark: "network-server-symbolic",
-            origin: if is_hylki_made_ldap(&dir) { Origin::Hylki } else { Origin::Evolution },
+            origin: if is_hylki_made_ldap(&dir) {
+                Origin::Hylki
+            } else {
+                Origin::Evolution
+            },
             on: !off.contains(&dir.uid) && dir.enabled,
             kind: Kind::Ldap(dir),
             books: Vec::new(),
@@ -432,7 +523,12 @@ fn list_own() -> Vec<Source> {
     // By name, and two of one name (an address used for iCloud and for
     // Microsoft 365) always in the same order: the books are read from a
     // map, whose order changes from one read to the next.
-    accounts.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()).then_with(|| a.id.cmp(&b.id)));
+    accounts.sort_by(|a, b| {
+        a.title
+            .to_lowercase()
+            .cmp(&b.title.to_lowercase())
+            .then_with(|| a.id.cmp(&b.id))
+    });
     out.extend(accounts);
     out
 }
@@ -475,11 +571,29 @@ mod tests {
 
     fn sources() -> HashMap<String, String> {
         HashMap::from([
-            ("goa1".to_string(), "[Data Source]\nDisplayName=Google\n\n[Collection]\nBackendName=google\n".to_string()),
-            ("b1".to_string(), "[Data Source]\nParent=goa1\n\n[Address Book]\nBackendName=carddav\n".to_string()),
-            ("b2".to_string(), "[Data Source]\nParent=goa1\n\n[Address Book]\nBackendName=carddav\n".to_string()),
-            ("system-address-book".to_string(), "[Data Source]\nParent=local-stub\n\n[Address Book]\nBackendName=local\n".to_string()),
-            ("lone".to_string(), "[Data Source]\nParent=webdav-stub\n\n[Address Book]\nBackendName=carddav\n".to_string()),
+            (
+                "goa1".to_string(),
+                "[Data Source]\nDisplayName=Google\n\n[Collection]\nBackendName=google\n"
+                    .to_string(),
+            ),
+            (
+                "b1".to_string(),
+                "[Data Source]\nParent=goa1\n\n[Address Book]\nBackendName=carddav\n".to_string(),
+            ),
+            (
+                "b2".to_string(),
+                "[Data Source]\nParent=goa1\n\n[Address Book]\nBackendName=carddav\n".to_string(),
+            ),
+            (
+                "system-address-book".to_string(),
+                "[Data Source]\nParent=local-stub\n\n[Address Book]\nBackendName=local\n"
+                    .to_string(),
+            ),
+            (
+                "lone".to_string(),
+                "[Data Source]\nParent=webdav-stub\n\n[Address Book]\nBackendName=carddav\n"
+                    .to_string(),
+            ),
         ])
     }
 
@@ -509,24 +623,39 @@ mod tests {
     #[test]
     #[ignore]
     fn live_switches() {
-        let Ok(spec) = std::env::var("CARDDAV_LIVE") else { return };
+        let Ok(spec) = std::env::var("CARDDAV_LIVE") else {
+            return;
+        };
         let mut f = spec.splitn(3, '|').map(str::to_string);
         let (url, user, pw) = (f.next().unwrap(), f.next().unwrap(), f.next().unwrap());
         let mut a = crate::carddav::Account::empty();
         a.url = url;
         a.user = user;
         let uid = crate::carddav::save(&a, Some(&pw)).unwrap();
-        let got = crate::carddav::await_books(&uid, std::time::Duration::from_secs(30), true).unwrap();
+        let got =
+            crate::carddav::await_books(&uid, std::time::Duration::from_secs(30), true).unwrap();
         crate::carddav::sync_books(true);
         std::thread::sleep(std::time::Duration::from_secs(2));
         let from_server = || {
-            crate::contacts::read_contact_details().into_iter().filter(|c| c.book_name.contains(&got.books[0])).count()
+            crate::contacts::read_contact_details()
+                .into_iter()
+                .filter(|c| c.book_name.contains(&got.books[0]))
+                .count()
         };
         let shown = from_server();
         println!("contacts from {}: {shown}", got.books[0]);
         assert!(shown > 0);
-        let row = super::list().into_iter().find(|s| s.id == uid).expect("the account has a row");
-        let book = row.books.iter().find(|b| b.name == got.books[0]).unwrap().uid.clone();
+        let row = super::list()
+            .into_iter()
+            .find(|s| s.id == uid)
+            .expect("the account has a row");
+        let book = row
+            .books
+            .iter()
+            .find(|b| b.name == got.books[0])
+            .unwrap()
+            .uid
+            .clone();
         super::switch_source(&row, false).unwrap();
         assert_eq!(from_server(), 0, "account off");
         super::switch_source(&row, true).unwrap();

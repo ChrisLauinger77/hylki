@@ -8,11 +8,11 @@
 
 use std::time::Duration;
 
+use crate::i18n::{i18n, i18n_f};
 use gtk::glib;
 use gtk::prelude::*;
 use relm4::factory::FactoryVecDeque;
 use relm4::prelude::*;
-use crate::i18n::{i18n, i18n_f};
 
 const TRANSIENT_SECS: u64 = 5;
 
@@ -453,15 +453,17 @@ impl SimpleComponent for NotificationCenter {
                     // Keys are taken one at a time: a key held as the console
                     // closes never sees its release here.
                     E::KeyPress => {
-                        let up = ev
-                            .downcast_ref::<gtk::gdk::KeyEvent>()
-                            .is_some_and(|k| {
-                                matches!(
-                                    k.keyval(),
-                                    Key::Up | Key::KP_Up | Key::Page_Up | Key::KP_Page_Up
-                                        | Key::Home | Key::KP_Home
-                                )
-                            });
+                        let up = ev.downcast_ref::<gtk::gdk::KeyEvent>().is_some_and(|k| {
+                            matches!(
+                                k.keyval(),
+                                Key::Up
+                                    | Key::KP_Up
+                                    | Key::Page_Up
+                                    | Key::KP_Page_Up
+                                    | Key::Home
+                                    | Key::KP_Home
+                            )
+                        });
                         if up && adj.value() > adj.lower() {
                             follow.set(false);
                         }
@@ -513,8 +515,12 @@ impl SimpleComponent for NotificationCenter {
                 });
             }
             drag.connect_drag_update(move |g, ox, oy| {
-                let Some((sx, sy)) = g.start_point() else { return };
-                let Some(now) = to_root_y(sx + ox, sy + oy) else { return };
+                let Some((sx, sy)) = g.start_point() else {
+                    return;
+                };
+                let Some(now) = to_root_y(sx + ox, sy + oy) else {
+                    return;
+                };
                 let (start_h, start_y) = start.get();
                 let ceiling = grip
                     .root()
@@ -579,16 +585,21 @@ impl NotificationCenter {
         let none = None::<&gtk::Widget>;
         if top {
             l.area.reorder_child_after(&l.bar, none);
-            l.console_box.reorder_child_after(&l.grip, l.console_box.last_child().as_ref());
+            l.console_box
+                .reorder_child_after(&l.grip, l.console_box.last_child().as_ref());
         } else {
-            l.area.reorder_child_after(&l.bar, l.area.last_child().as_ref());
+            l.area
+                .reorder_child_after(&l.bar, l.area.last_child().as_ref());
             l.console_box.reorder_child_after(&l.grip, none);
         }
         // The window's column: first child at the top, last at the foot.
         if let Some(column) = l.root.parent().and_downcast::<gtk::Box>() {
             if top {
                 column.reorder_child_after(&l.root, none);
-            } else if let Some(last) = column.last_child().filter(|w| w != l.root.upcast_ref::<gtk::Widget>()) {
+            } else if let Some(last) = column
+                .last_child()
+                .filter(|w| w != l.root.upcast_ref::<gtk::Widget>())
+            {
                 column.reorder_child_after(&l.root, Some(&last));
             }
         }
@@ -751,7 +762,11 @@ impl NotificationCenter {
                     // up to read, so that waits until they are back at the
                     // bottom, within a far looser ceiling.
                     let lc = self.console_buf.line_count();
-                    let cap = if self.console_follow.get() { 2200 } else { 20_000 };
+                    let cap = if self.console_follow.get() {
+                        2200
+                    } else {
+                        20_000
+                    };
                     if lc > cap {
                         let mut start = self.console_buf.start_iter();
                         if let Some(mut cut) = self.console_buf.iter_at_line(lc - 2000) {
@@ -917,4 +932,3 @@ fn draw_crt_grain(_a: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i3
     let _ = cr.set_source(&grad);
     let _ = cr.paint();
 }
-

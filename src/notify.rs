@@ -5,9 +5,9 @@
 //! ([`PRESENT_ACTION`], [`OPEN_MESSAGE_ACTION`]) are registered on the application
 //! in `app.rs` (they need the app's message channel to navigate).
 
+use crate::i18n::i18n;
 use gtk::gio;
 use gtk::prelude::*;
-use crate::i18n::i18n;
 
 /// App action (bare name) that raises the main window. Used by error alerts.
 pub const PRESENT_ACTION: &str = "present-window";
@@ -30,7 +30,8 @@ pub const PRESENT_COMPOSE_ACTION: &str = "present-compose";
 const COMPOSE_READY_ID: &str = "vireo-compose-ready";
 /// Whether a [`compose_ready`] alert is (or may be) showing, so that
 /// withdrawing it costs nothing on the focus changes where there is none.
-static COMPOSE_READY_POSTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static COMPOSE_READY_POSTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// Build the (title, body) for a new-mail notification. `others` is how many
 /// *additional* new messages arrived beyond the newest one shown.
@@ -56,14 +57,22 @@ fn compose_new_mail(
     }
     if others == 0 {
         (
-            if from.is_empty() { i18n("New message") } else { from.to_string() },
+            if from.is_empty() {
+                i18n("New message")
+            } else {
+                from.to_string()
+            },
             subject.to_string(),
         )
     } else {
         (
             format!("{} new messages", others + 1),
             // Lead with the newest so the summary is still informative.
-            if subject.is_empty() { from.to_string() } else { format!("{from} — {subject}") },
+            if subject.is_empty() {
+                from.to_string()
+            } else {
+                format!("{from} — {subject}")
+            },
         )
     }
 }
@@ -110,7 +119,10 @@ pub fn new_mail(
     if others == 0 && in_place {
         use crate::config::NotificationButton;
         let buttons = crate::config::load_notification_buttons();
-        for button in NotificationButton::ALL.into_iter().filter(|b| buttons.get(*b)) {
+        for button in NotificationButton::ALL
+            .into_iter()
+            .filter(|b| buttons.get(*b))
+        {
             let (label, action) = match button {
                 NotificationButton::MarkRead => (i18n("Mark as Read"), MARK_READ_ACTION),
                 NotificationButton::Archive => (i18n("Archive"), ARCHIVE_ACTION),

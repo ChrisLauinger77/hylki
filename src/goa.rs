@@ -125,7 +125,7 @@ impl GoaMailAccount {
             oauth,
             oauth_settings: None,
             oauth_refresh: String::new(),
-        push: None,
+            push: None,
         }
     }
 }
@@ -178,7 +178,9 @@ fn get_str(map: &HashMap<String, OwnedValue>, key: &str) -> String {
 }
 
 fn get_bool(map: &HashMap<String, OwnedValue>, key: &str) -> bool {
-    map.get(key).and_then(|v| bool::try_from(v).ok()).unwrap_or(false)
+    map.get(key)
+        .and_then(|v| bool::try_from(v).ok())
+        .unwrap_or(false)
 }
 
 /// Split a GOA `ImapHost`/`SmtpHost` value into host and port. GOA stores a
@@ -204,8 +206,7 @@ fn host_and_port(value: String, default_port: u16) -> (String, u16) {
     (value, default_port)
 }
 
-type ManagedObjects =
-    HashMap<OwnedObjectPath, HashMap<String, HashMap<String, OwnedValue>>>;
+type ManagedObjects = HashMap<OwnedObjectPath, HashMap<String, HashMap<String, OwnedValue>>>;
 
 /// List mail-capable GNOME Online Accounts. Returns an empty list if GOA isn't
 /// running or has no mail accounts — never errors into the UI.
@@ -268,10 +269,14 @@ fn mail_account(ifaces: &HashMap<String, HashMap<String, OwnedValue>>) -> Option
     // The host strings may carry a custom port ("host:1143"); without one,
     // the conventional port for the advertised transport applies (143 for
     // STARTTLS IMAP, else 993; 587 for STARTTLS SMTP, else 465).
-    let (imap_host, imap_port) =
-        host_and_port(get_str(mail, "ImapHost"), if imap_starttls { 143 } else { 993 });
-    let (smtp_host, smtp_port) =
-        host_and_port(get_str(mail, "SmtpHost"), if smtp_starttls { 587 } else { 465 });
+    let (imap_host, imap_port) = host_and_port(
+        get_str(mail, "ImapHost"),
+        if imap_starttls { 143 } else { 993 },
+    );
+    let (smtp_host, smtp_port) = host_and_port(
+        get_str(mail, "SmtpHost"),
+        if smtp_starttls { 587 } else { 465 },
+    );
     let oauth2 = ifaces.contains_key(IFACE_OAUTH2);
     Some(GoaMailAccount {
         id: get_str(account, "Id"),
@@ -301,7 +306,9 @@ fn mail_account(ifaces: &HashMap<String, HashMap<String, OwnedValue>>) -> Option
             imap_accept_invalid_certs: get_bool(mail, "ImapAcceptSslErrors"),
             smtp_accept_invalid_certs: get_bool(mail, "SmtpAcceptSslErrors"),
             // An OAuth provider always signs in with its token.
-            smtp_no_auth: !oauth2 && mail.contains_key("SmtpUseAuth") && !get_bool(mail, "SmtpUseAuth"),
+            smtp_no_auth: !oauth2
+                && mail.contains_key("SmtpUseAuth")
+                && !get_bool(mail, "SmtpUseAuth"),
         },
     })
 }
@@ -337,10 +344,13 @@ pub fn list_files_accounts() -> Vec<GoaFilesAccount> {
                 &(),
             )
             .map_err(|e| e.to_string())?;
-        let (objects,): (ManagedObjects,) = reply.body().deserialize().map_err(|e| e.to_string())?;
+        let (objects,): (ManagedObjects,) =
+            reply.body().deserialize().map_err(|e| e.to_string())?;
         let mut out = Vec::new();
         for ifaces in objects.values() {
-            let Some(account) = ifaces.get(IFACE_ACCOUNT) else { continue };
+            let Some(account) = ifaces.get(IFACE_ACCOUNT) else {
+                continue;
+            };
             if !ifaces.contains_key(IFACE_OAUTH2) {
                 continue;
             }
@@ -349,7 +359,10 @@ pub fn list_files_accounts() -> Vec<GoaFilesAccount> {
                 continue;
             }
             let email = {
-                let e = ifaces.get(IFACE_MAIL).map(|m| get_str(m, "EmailAddress")).unwrap_or_default();
+                let e = ifaces
+                    .get(IFACE_MAIL)
+                    .map(|m| get_str(m, "EmailAddress"))
+                    .unwrap_or_default();
                 if e.is_empty() {
                     get_str(account, "PresentationIdentity")
                 } else {
@@ -396,12 +409,21 @@ pub fn contacts_accounts() -> HashMap<String, GoaContactsAccount> {
     let list = || -> Result<HashMap<String, GoaContactsAccount>, String> {
         let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
         let reply = conn
-            .call_method(Some(GOA_DEST), GOA_PATH, Some("org.freedesktop.DBus.ObjectManager"), "GetManagedObjects", &())
+            .call_method(
+                Some(GOA_DEST),
+                GOA_PATH,
+                Some("org.freedesktop.DBus.ObjectManager"),
+                "GetManagedObjects",
+                &(),
+            )
             .map_err(|e| e.to_string())?;
-        let (objects,): (ManagedObjects,) = reply.body().deserialize().map_err(|e| e.to_string())?;
+        let (objects,): (ManagedObjects,) =
+            reply.body().deserialize().map_err(|e| e.to_string())?;
         let mut out = HashMap::new();
         for ifaces in objects.values() {
-            let Some(account) = ifaces.get(IFACE_ACCOUNT) else { continue };
+            let Some(account) = ifaces.get(IFACE_ACCOUNT) else {
+                continue;
+            };
             out.insert(
                 get_str(account, "Id"),
                 GoaContactsAccount {
@@ -453,9 +475,16 @@ pub fn live_state() -> Option<GoaLiveState> {
     let mut state = GoaLiveState {
         account_ids: HashSet::new(),
         disabled_mail_ids: HashSet::new(),
-        mail: objects.values().filter_map(mail_account).map(|m| (m.id.clone(), m)).collect(),
+        mail: objects
+            .values()
+            .filter_map(mail_account)
+            .map(|m| (m.id.clone(), m))
+            .collect(),
     };
-    for account in objects.values().filter_map(|ifaces| ifaces.get(IFACE_ACCOUNT)) {
+    for account in objects
+        .values()
+        .filter_map(|ifaces| ifaces.get(IFACE_ACCOUNT))
+    {
         let id = get_str(account, "Id");
         if id.is_empty() {
             continue;
@@ -481,7 +510,10 @@ pub fn watch_changes<F: Fn(GoaLiveState) + Send + 'static>(on_change: F) {
         .spawn(move || {
             while rx.recv().is_ok() {
                 // Swallow the burst, then snapshot once it goes quiet.
-                while rx.recv_timeout(std::time::Duration::from_millis(300)).is_ok() {}
+                while rx
+                    .recv_timeout(std::time::Duration::from_millis(300))
+                    .is_ok()
+                {}
                 if let Some(state) = live_state() {
                     on_change(state);
                 }
@@ -515,9 +547,7 @@ pub fn watch_changes<F: Fn(GoaLiveState) + Send + 'static>(on_change: F) {
         });
 }
 
-fn watch_added_signals(
-    tx: &std::sync::mpsc::Sender<()>,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn watch_added_signals(tx: &std::sync::mpsc::Sender<()>) -> Result<(), Box<dyn std::error::Error>> {
     let conn = zbus::blocking::Connection::session()?;
     let om = zbus::blocking::fdo::ObjectManagerProxy::builder(&conn)
         .destination(GOA_DEST)?
@@ -594,8 +624,7 @@ fn try_oauth_token(goa_id: &str) -> Result<String, String> {
         )
         .map_err(|e| e.to_string())?;
     // GetAccessToken() -> (access_token: s, expires_in: i)
-    let (token, _expires): (String, i32) =
-        reply.body().deserialize().map_err(|e| e.to_string())?;
+    let (token, _expires): (String, i32) = reply.body().deserialize().map_err(|e| e.to_string())?;
     if token.is_empty() {
         Err("GOA returned an empty access token".to_string())
     } else {
@@ -676,7 +705,11 @@ pub fn mail_passwords(goa_id: &str) -> (Option<String>, Option<String>) {
 mod tests {
     use super::host_and_port;
 
-    fn mail_object(imap_host: &str, imap_tls: &str, accept: bool) -> super::HashMap<String, super::HashMap<String, super::OwnedValue>> {
+    fn mail_object(
+        imap_host: &str,
+        imap_tls: &str,
+        accept: bool,
+    ) -> super::HashMap<String, super::HashMap<String, super::OwnedValue>> {
         use zbus::zvariant::{OwnedValue, Str};
         let s = |v: &str| OwnedValue::from(Str::from(v.to_string()));
         let mut account = super::HashMap::new();
@@ -687,8 +720,14 @@ mod tests {
         mail.insert("EmailAddress".to_string(), s("me@example.org"));
         mail.insert("ImapHost".to_string(), s(imap_host));
         mail.insert("ImapUserName".to_string(), s("me"));
-        mail.insert("ImapUseSsl".to_string(), OwnedValue::from(imap_tls == "ssl"));
-        mail.insert("ImapUseTls".to_string(), OwnedValue::from(imap_tls == "starttls"));
+        mail.insert(
+            "ImapUseSsl".to_string(),
+            OwnedValue::from(imap_tls == "ssl"),
+        );
+        mail.insert(
+            "ImapUseTls".to_string(),
+            OwnedValue::from(imap_tls == "starttls"),
+        );
         mail.insert("ImapAcceptSslErrors".to_string(), OwnedValue::from(accept));
         mail.insert("SmtpHost".to_string(), s("mail.example.org"));
         mail.insert("SmtpUserName".to_string(), s("me"));
@@ -705,8 +744,14 @@ mod tests {
     #[test]
     fn a_generic_imap_account_carries_its_security() {
         let g = super::mail_account(&mail_object("mail.example.org", "starttls", true)).unwrap();
-        assert_eq!((g.imap_host.as_str(), g.imap_port), ("mail.example.org", 143));
-        assert_eq!((g.smtp_host.as_str(), g.smtp_port), ("mail.example.org", 587));
+        assert_eq!(
+            (g.imap_host.as_str(), g.imap_port),
+            ("mail.example.org", 143)
+        );
+        assert_eq!(
+            (g.smtp_host.as_str(), g.smtp_port),
+            ("mail.example.org", 587)
+        );
         assert!(g.security.imap_starttls && g.security.smtp_starttls);
         assert!(g.security.imap_accept_invalid_certs && !g.security.smtp_accept_invalid_certs);
         assert!(!g.security.smtp_no_auth && g.password_based);
@@ -724,12 +769,23 @@ mod tests {
         account.label = Some("Work".into());
         assert!(g.apply_servers(&mut account));
         assert_eq!(account.security.as_ref(), Some(&g.security));
-        assert!(!g.apply_servers(&mut account), "nothing new the second time");
-        let moved = super::mail_account(&mail_object("imap.example.net:1143", "starttls", true)).unwrap();
+        assert!(
+            !g.apply_servers(&mut account),
+            "nothing new the second time"
+        );
+        let moved =
+            super::mail_account(&mail_object("imap.example.net:1143", "starttls", true)).unwrap();
         assert!(moved.apply_servers(&mut account));
-        assert_eq!((account.imap_host.as_str(), account.imap_port), ("imap.example.net", 1143));
+        assert_eq!(
+            (account.imap_host.as_str(), account.imap_port),
+            ("imap.example.net", 1143)
+        );
         assert!(account.security.as_ref().is_some_and(|s| s.imap_starttls));
-        assert_eq!(account.label.as_deref(), Some("Work"), "Hylki's own settings stay");
+        assert_eq!(
+            account.label.as_deref(),
+            Some("Work"),
+            "Hylki's own settings stay"
+        );
     }
 
     #[test]
@@ -751,9 +807,15 @@ mod tests {
             ("mail.example.com".into(), 993)
         );
         // A bare IPv6 address has many colons but no port.
-        assert_eq!(host_and_port("2001:db8::1".into(), 143), ("2001:db8::1".into(), 143));
+        assert_eq!(
+            host_and_port("2001:db8::1".into(), 143),
+            ("2001:db8::1".into(), 143)
+        );
         // A bracketed IPv6 address without a port.
-        assert_eq!(host_and_port("[2001:db8::1]".into(), 143), ("2001:db8::1".into(), 143));
+        assert_eq!(
+            host_and_port("[2001:db8::1]".into(), 143),
+            ("2001:db8::1".into(), 143)
+        );
     }
 
     #[test]
@@ -764,8 +826,6 @@ mod tests {
         );
     }
 }
-
-
 
 /// Import the first generic IMAP/SMTP account from a GOA daemon and test its
 /// servers. Needs a session bus with one (`GOA_LIVE=1`, and
@@ -780,7 +840,10 @@ mod live {
         }
         let all = super::list_mail_accounts();
         eprintln!("listed: {all:#?}");
-        let g = all.iter().find(|g| g.provider_type == "imap_smtp").expect("an imap_smtp account");
+        let g = all
+            .iter()
+            .find(|g| g.provider_type == "imap_smtp")
+            .expect("an imap_smtp account");
         let (imap, _smtp) = super::mail_passwords(&g.id);
         let config = g.to_config(imap.expect("a password"), false);
         let result = crate::worker::test_connection_blocking(config);

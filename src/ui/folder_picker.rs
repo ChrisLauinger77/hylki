@@ -54,8 +54,13 @@ pub fn show_folder_picker(
         title.set_xalign(0.0);
         text.append(&title);
         let count = gtk::Label::new(Some(
-            crate::i18n::ni18n_f("{n} message", "{n} messages", n as u32, &[("n", &n.to_string())])
-                .as_str(),
+            crate::i18n::ni18n_f(
+                "{n} message",
+                "{n} messages",
+                n as u32,
+                &[("n", &n.to_string())],
+            )
+            .as_str(),
         ));
         count.set_xalign(0.0);
         count.add_css_class("dim-label");
@@ -164,7 +169,8 @@ pub fn show_folder_picker(
                     settle(heading.take());
                     heading = Some((row.clone(), false));
                 } else {
-                    let name: Option<std::ptr::NonNull<String>> = unsafe { row.data("folder-name") };
+                    let name: Option<std::ptr::NonNull<String>> =
+                        unsafe { row.data("folder-name") };
                     let hit = query.is_empty()
                         || name.is_some_and(|n| unsafe { n.as_ref() }.contains(&query));
                     row.set_visible(hit);

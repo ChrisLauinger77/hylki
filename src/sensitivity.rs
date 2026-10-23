@@ -37,7 +37,11 @@ impl SensitivityLabel {
     /// The pill's text.
     pub fn short_label(&self) -> String {
         if self.purview() {
-            return if self.name.is_empty() { i18n("Labeled") } else { self.name.clone() };
+            return if self.name.is_empty() {
+                i18n("Labeled")
+            } else {
+                self.name.clone()
+            };
         }
         match self.name.as_str() {
             "personal" => i18n("Personal"),
@@ -50,7 +54,10 @@ impl SensitivityLabel {
     /// enforced here.
     pub fn summary(&self) -> String {
         if !self.purview() {
-            return i18n_f("The sender marked this message “{label}”.", &[("label", &self.short_label())]);
+            return i18n_f(
+                "The sender marked this message “{label}”.",
+                &[("label", &self.short_label())],
+            );
         }
         if self.name.is_empty() {
             return i18n("The sender's organization labeled this message without naming the label in it. For a Microsoft 365 account, turning on “Show sensitivity label names” in its settings shows the name. Hylki shows the label but does not apply its rules.");
@@ -60,7 +67,11 @@ impl SensitivityLabel {
             &[("label", &self.name)],
         );
         // The organization's own words, as Outlook shows them.
-        if self.tooltip.is_empty() { said } else { format!("{said}\n\n{}", self.tooltip) }
+        if self.tooltip.is_empty() {
+            said
+        } else {
+            format!("{said}\n\n{}", self.tooltip)
+        }
     }
 }
 
@@ -83,7 +94,12 @@ pub fn detect(parsed: &mail_parser::Message) -> Option<SensitivityLabel> {
 
 /// A folded header value as one line.
 fn unfold(value: &str) -> String {
-    value.split(['\r', '\n']).map(str::trim).filter(|l| !l.is_empty()).collect::<Vec<_>>().join(" ")
+    value
+        .split(['\r', '\n'])
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// The enabled label of an `msip_labels` value. A message relabeled keeps
@@ -93,9 +109,15 @@ fn from_msip(value: &str) -> Option<SensitivityLabel> {
     // Label id → (enabled, name), in the order the ids first appear.
     let mut labels: Vec<(String, bool, String)> = Vec::new();
     for pair in value.split(';') {
-        let Some((key, val)) = pair.trim().split_once('=') else { continue };
-        let Some(rest) = strip_prefix_ci(key.trim(), "MSIP_Label_") else { continue };
-        let Some((id, field)) = rest.rsplit_once('_') else { continue };
+        let Some((key, val)) = pair.trim().split_once('=') else {
+            continue;
+        };
+        let Some(rest) = strip_prefix_ci(key.trim(), "MSIP_Label_") else {
+            continue;
+        };
+        let Some((id, field)) = rest.rsplit_once('_') else {
+            continue;
+        };
         let id = id.to_ascii_lowercase();
         let at = match labels.iter().position(|(i, _, _)| *i == id) {
             Some(at) => at,
@@ -114,22 +136,42 @@ fn from_msip(value: &str) -> Option<SensitivityLabel> {
     let (id, _, name) = labels.into_iter().find(|(_, on, _)| *on)?;
     // A tenant that keeps names out of its metadata writes the id there,
     // which says nothing to a reader; a sublabel is "Parent\Child".
-    let name = if looks_like_guid(&name) { String::new() } else { name.replace('\\', " / ") };
-    Some(SensitivityLabel { name, id, ..Default::default() })
+    let name = if looks_like_guid(&name) {
+        String::new()
+    } else {
+        name.replace('\\', " / ")
+    };
+    Some(SensitivityLabel {
+        name,
+        id,
+        ..Default::default()
+    })
 }
 
 fn from_sensitivity(value: &str) -> Option<SensitivityLabel> {
     let v = value.trim().to_ascii_lowercase();
-    matches!(v.as_str(), "personal" | "private" | "company-confidential")
-        .then(|| SensitivityLabel { name: v, ..Default::default() })
+    matches!(v.as_str(), "personal" | "private" | "company-confidential").then(|| {
+        SensitivityLabel {
+            name: v,
+            ..Default::default()
+        }
+    })
 }
 
 fn strip_prefix_ci<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
-    (s.len() >= prefix.len() && s[..prefix.len()].eq_ignore_ascii_case(prefix)).then(|| &s[prefix.len()..])
+    (s.len() >= prefix.len() && s[..prefix.len()].eq_ignore_ascii_case(prefix))
+        .then(|| &s[prefix.len()..])
 }
 
 fn looks_like_guid(s: &str) -> bool {
-    s.len() == 36 && s.chars().enumerate().all(|(i, c)| if [8, 13, 18, 23].contains(&i) { c == '-' } else { c.is_ascii_hexdigit() })
+    s.len() == 36
+        && s.chars().enumerate().all(|(i, c)| {
+            if [8, 13, 18, 23].contains(&i) {
+                c == '-'
+            } else {
+                c.is_ascii_hexdigit()
+            }
+        })
 }
 
 #[cfg(test)]
@@ -138,7 +180,11 @@ mod tests {
 
     fn parse(headers: &str) -> Option<SensitivityLabel> {
         let raw = format!("From: a@b.c\r\nSubject: x\r\n{headers}\r\nbody\r\n");
-        detect(&mail_parser::MessageParser::default().parse(raw.as_bytes()).unwrap())
+        detect(
+            &mail_parser::MessageParser::default()
+                .parse(raw.as_bytes())
+                .unwrap(),
+        )
     }
 
     #[test]
@@ -172,12 +218,18 @@ mod tests {
         )
         .unwrap();
         assert!(hidden.name.is_empty() && !hidden.id.is_empty());
-        assert!(parse("msip_labels: MSIP_Label_dddddddd-0000-0000-0000-000000000004_Enabled=false").is_none());
+        assert!(parse(
+            "msip_labels: MSIP_Label_dddddddd-0000-0000-0000-000000000004_Enabled=false"
+        )
+        .is_none());
     }
 
     #[test]
     fn the_older_sensitivity_header_counts_too() {
-        assert_eq!(parse("Sensitivity: Company-Confidential").unwrap().name, "company-confidential");
+        assert_eq!(
+            parse("Sensitivity: Company-Confidential").unwrap().name,
+            "company-confidential"
+        );
         assert_eq!(parse("Sensitivity: Personal").unwrap().id, "");
         assert!(parse("Sensitivity: normal").is_none());
         assert!(parse("X-Other: 1").is_none());

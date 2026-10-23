@@ -59,7 +59,10 @@ fn stream(file: &mut Cfb, path: &str) -> Option<Vec<u8>> {
 /// 8-bit kind (`001E`, read as UTF-8, else Latin-1).
 fn string(file: &mut Cfb, dir: &str, id: u16) -> Option<String> {
     if let Some(raw) = stream(file, &format!("{dir}/__substg1.0_{id:04X}001F")) {
-        let units: Vec<u16> = raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+        let units: Vec<u16> = raw
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
         let s = String::from_utf16_lossy(&units);
         return Some(s.trim_end_matches('\0').to_string()).filter(|s| !s.is_empty());
     }
@@ -80,7 +83,9 @@ fn binary(file: &mut Cfb, dir: &str, id: u16) -> Option<Vec<u8>> {
 /// attachment) and then 16 bytes a property, the value in the last 8.
 fn fixed(file: &mut Cfb, dir: &str, header: usize) -> std::collections::HashMap<u16, u64> {
     let mut out = std::collections::HashMap::new();
-    let Some(raw) = stream(file, &format!("{dir}/__properties_version1.0")) else { return out };
+    let Some(raw) = stream(file, &format!("{dir}/__properties_version1.0")) else {
+        return out;
+    };
     for entry in raw.get(header..).unwrap_or_default().chunks_exact(16) {
         let tag = u32::from_le_bytes([entry[0], entry[1], entry[2], entry[3]]);
         let value = u64::from_le_bytes(entry[8..16].try_into().unwrap_or_default());
@@ -98,7 +103,12 @@ fn unix_time(filetime: u64) -> i64 {
 fn children(file: &Cfb, prefix: &str) -> Vec<String> {
     let mut names: Vec<String> = file
         .read_storage("/")
-        .map(|entries| entries.filter(|e| e.is_storage() && e.name().starts_with(prefix)).map(|e| e.name().to_string()).collect())
+        .map(|entries| {
+            entries
+                .filter(|e| e.is_storage() && e.name().starts_with(prefix))
+                .map(|e| e.name().to_string())
+                .collect()
+        })
         .unwrap_or_default();
     names.sort();
     names
@@ -107,7 +117,11 @@ fn children(file: &Cfb, prefix: &str) -> Vec<String> {
 /// An address for a header: the SMTP one when there is one, since an
 /// Exchange one ("/O=EXCHANGELABS/…") means nothing outside it.
 fn smtp(candidates: &[Option<String>]) -> Option<String> {
-    candidates.iter().flatten().find(|a| a.contains('@') && !a.starts_with('/')).cloned()
+    candidates
+        .iter()
+        .flatten()
+        .find(|a| a.contains('@') && !a.starts_with('/'))
+        .cloned()
 }
 
 /// A header value, RFC 2047-encoded when it is not plain ASCII.
@@ -115,7 +129,10 @@ fn encode_word(text: &str) -> String {
     if text.is_ascii() {
         text.to_string()
     } else {
-        format!("=?UTF-8?B?{}?=", base64::engine::general_purpose::STANDARD.encode(text))
+        format!(
+            "=?UTF-8?B?{}?=",
+            base64::engine::general_purpose::STANDARD.encode(text)
+        )
     }
 }
 
@@ -157,8 +174,16 @@ fn kept_headers(headers: &str) -> String {
         }
         let continued = line.starts_with(' ') || line.starts_with('\t');
         if !continued {
-            let name = line.split(':').next().unwrap_or_default().trim().to_ascii_lowercase();
-            skipping = matches!(name.as_str(), "content-type" | "content-transfer-encoding" | "mime-version");
+            let name = line
+                .split(':')
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .to_ascii_lowercase();
+            skipping = matches!(
+                name.as_str(),
+                "content-type" | "content-transfer-encoding" | "mime-version"
+            );
         }
         if !skipping {
             out.push_str(line);
@@ -170,29 +195,39 @@ fn kept_headers(headers: &str) -> String {
 
 /// The message in a `.msg` file, as RFC 5322 bytes.
 pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
-    let mut file = cfb::CompoundFile::open(Cursor::new(bytes.to_vec())).map_err(|e| e.to_string())?;
+    let mut file =
+        cfb::CompoundFile::open(Cursor::new(bytes.to_vec())).map_err(|e| e.to_string())?;
     let root = "";
     let props = fixed(&mut file, root, 32);
 
     // Sent, received, or for a message never sent (a draft saved from
     // Outlook), last changed or made.
-    let date = [CLIENT_SUBMIT_TIME, DELIVERY_TIME, LAST_MODIFICATION_TIME, CREATION_TIME]
-        .iter()
-        .find_map(|id| props.get(id).copied().filter(|t| *t > 0))
-        .and_then(|t| chrono::DateTime::from_timestamp(unix_time(t), 0))
-        .map(|d| format!("Date: {}\r\n", d.to_rfc2822()));
+    let date = [
+        CLIENT_SUBMIT_TIME,
+        DELIVERY_TIME,
+        LAST_MODIFICATION_TIME,
+        CREATION_TIME,
+    ]
+    .iter()
+    .find_map(|id| props.get(id).copied().filter(|t| *t > 0))
+    .and_then(|t| chrono::DateTime::from_timestamp(unix_time(t), 0))
+    .map(|d| format!("Date: {}\r\n", d.to_rfc2822()));
     let mut headers = String::new();
-    let transport = string(&mut file, root, TRANSPORT_HEADERS).filter(|h| h.to_ascii_lowercase().contains("from:"));
+    let transport = string(&mut file, root, TRANSPORT_HEADERS)
+        .filter(|h| h.to_ascii_lowercase().contains("from:"));
     if let Some(kept) = transport {
         headers.push_str(&kept_headers(&kept));
         // Not every server's header block has one.
-        let dated = headers.lines().any(|l| l.to_ascii_lowercase().starts_with("date:"));
+        let dated = headers
+            .lines()
+            .any(|l| l.to_ascii_lowercase().starts_with("date:"));
         if !dated {
             headers.extend(date);
         }
     } else {
         headers.extend(date);
-        let sender_name = string(&mut file, root, SENT_REPRESENTING_NAME).or_else(|| string(&mut file, root, SENDER_NAME));
+        let sender_name = string(&mut file, root, SENT_REPRESENTING_NAME)
+            .or_else(|| string(&mut file, root, SENDER_NAME));
         let sender = smtp(&[
             string(&mut file, root, SENDER_SMTP),
             string(&mut file, root, SENT_REPRESENTING_EMAIL),
@@ -206,10 +241,18 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
         let mut cc = Vec::new();
         for dir in children(&file, "__recip_version1.0_") {
             let dir = format!("/{dir}");
-            let kind = fixed(&mut file, &dir, 8).get(&RECIPIENT_TYPE).copied().unwrap_or(1) as u32;
+            let kind = fixed(&mut file, &dir, 8)
+                .get(&RECIPIENT_TYPE)
+                .copied()
+                .unwrap_or(1) as u32;
             let name = string(&mut file, &dir, RECIPIENT_NAME);
-            let addr = smtp(&[string(&mut file, &dir, RECIPIENT_SMTP), string(&mut file, &dir, RECIPIENT_EMAIL)]);
-            let Some(m) = mailbox(name.as_deref(), addr.as_deref()) else { continue };
+            let addr = smtp(&[
+                string(&mut file, &dir, RECIPIENT_SMTP),
+                string(&mut file, &dir, RECIPIENT_EMAIL),
+            ]);
+            let Some(m) = mailbox(name.as_deref(), addr.as_deref()) else {
+                continue;
+            };
             match kind {
                 1 => to.push(m),
                 2 => cc.push(m),
@@ -232,7 +275,11 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
             headers.push_str(&format!("Subject: {}\r\n", encode_word(&subject)));
         }
 
-        for (id, name) in [(INTERNET_MESSAGE_ID, "Message-ID"), (IN_REPLY_TO, "In-Reply-To"), (REFERENCES, "References")] {
+        for (id, name) in [
+            (INTERNET_MESSAGE_ID, "Message-ID"),
+            (IN_REPLY_TO, "In-Reply-To"),
+            (REFERENCES, "References"),
+        ] {
             if let Some(v) = string(&mut file, root, id) {
                 headers.push_str(&format!("{name}: {v}\r\n"));
             }
@@ -240,7 +287,8 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
     }
 
     // The body: HTML when the message has it, else the plain text.
-    let html = binary(&mut file, root, HTML).or_else(|| string(&mut file, root, HTML).map(String::into_bytes));
+    let html = binary(&mut file, root, HTML)
+        .or_else(|| string(&mut file, root, HTML).map(String::into_bytes));
     let (body, subtype) = match html {
         Some(h) if !h.is_empty() => (h, "html"),
         _ => match string(&mut file, root, BODY) {
@@ -250,26 +298,40 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
     };
     // Outlook writes HTML in the message's code page; most is UTF-8, the
     // rest Windows-1252.
-    let charset = if std::str::from_utf8(&body).is_ok() { "utf-8" } else { "windows-1252" };
+    let charset = if std::str::from_utf8(&body).is_ok() {
+        "utf-8"
+    } else {
+        "windows-1252"
+    };
 
     let mut attachments = Vec::new();
     for dir in children(&file, "__attach_version1.0_") {
         let dir = format!("/{dir}");
         // An attached message is a storage, not data: left out.
-        let Some(data) = binary(&mut file, &dir, ATTACH_DATA) else { continue };
+        let Some(data) = binary(&mut file, &dir, ATTACH_DATA) else {
+            continue;
+        };
         let name = string(&mut file, &dir, ATTACH_LONG_FILENAME)
             .or_else(|| string(&mut file, &dir, ATTACH_FILENAME))
             .unwrap_or_else(|| "attachment".to_string());
-        let mime = string(&mut file, &dir, ATTACH_MIME).unwrap_or_else(|| "application/octet-stream".to_string());
+        let mime = string(&mut file, &dir, ATTACH_MIME)
+            .unwrap_or_else(|| "application/octet-stream".to_string());
         let content_id = string(&mut file, &dir, ATTACH_CONTENT_ID);
-        attachments.push(Attachment { name, mime, content_id, data });
+        attachments.push(Attachment {
+            name,
+            mime,
+            content_id,
+            data,
+        });
     }
 
     let mut out = headers;
     out.push_str("MIME-Version: 1.0\r\n");
     let boundary = "hylki-msg-mixed";
     let related = "hylki-msg-related";
-    out.push_str(&format!("Content-Type: multipart/mixed; boundary=\"{boundary}\"\r\n\r\n"));
+    out.push_str(&format!(
+        "Content-Type: multipart/mixed; boundary=\"{boundary}\"\r\n\r\n"
+    ));
     let body_part = format!(
         "Content-Type: text/{subtype}; charset={charset}\r\nContent-Transfer-Encoding: base64\r\n\r\n{}",
         base64_lines(&body)
@@ -284,7 +346,10 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
             encode_word(&name)
         );
         if let Some(cid) = &a.content_id {
-            part.push_str(&format!("Content-ID: <{}>\r\n", cid.trim_matches(|c| c == '<' || c == '>')));
+            part.push_str(&format!(
+                "Content-ID: <{}>\r\n",
+                cid.trim_matches(|c| c == '<' || c == '>')
+            ));
         }
         part.push_str("\r\n");
         part.push_str(&base64_lines(&a.data));
@@ -296,14 +361,17 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
         subtype == "html"
             && a.content_id.as_deref().is_some_and(|cid| {
                 let cid = cid.trim_matches(|c| c == '<' || c == '>');
-                body.windows(cid.len() + 4).any(|w| w == format!("cid:{cid}").as_bytes())
+                body.windows(cid.len() + 4)
+                    .any(|w| w == format!("cid:{cid}").as_bytes())
             })
     });
     out.push_str(&format!("--{boundary}\r\n"));
     if inline.is_empty() {
         out.push_str(&body_part);
     } else {
-        out.push_str(&format!("Content-Type: multipart/related; boundary=\"{related}\"\r\n\r\n"));
+        out.push_str(&format!(
+            "Content-Type: multipart/related; boundary=\"{related}\"\r\n\r\n"
+        ));
         out.push_str(&format!("--{related}\r\n{body_part}"));
         for a in &inline {
             out.push_str(&format!("--{related}\r\n{}", attachment_part(a, true)));
@@ -336,13 +404,37 @@ mod tests {
         let mut put = |file: &mut cfb::CompoundFile<Cursor<Vec<u8>>>, path: &str, data: &[u8]| {
             file.create_stream(path).unwrap().write_all(data).unwrap();
         };
-        put(&mut file, "/__substg1.0_0037001F", &utf16("Quarterly numbers – draft"));
+        put(
+            &mut file,
+            "/__substg1.0_0037001F",
+            &utf16("Quarterly numbers – draft"),
+        );
         put(&mut file, "/__substg1.0_0C1A001F", &utf16("Ada Lovelace"));
-        put(&mut file, "/__substg1.0_0C1F001F", &utf16("/O=EXCHANGELABS/OU=ADMIN/CN=ADA"));
-        put(&mut file, "/__substg1.0_5D01001F", &utf16("ada@example.com"));
-        put(&mut file, "/__substg1.0_1035001F", &utf16("<q3@example.com>"));
-        put(&mut file, "/__substg1.0_10130102", b"<html><body><p>Numbers attached.</p><img src=\"cid:chart1\"></body></html>");
-        put(&mut file, "/__substg1.0_1000001F", &utf16("Numbers attached."));
+        put(
+            &mut file,
+            "/__substg1.0_0C1F001F",
+            &utf16("/O=EXCHANGELABS/OU=ADMIN/CN=ADA"),
+        );
+        put(
+            &mut file,
+            "/__substg1.0_5D01001F",
+            &utf16("ada@example.com"),
+        );
+        put(
+            &mut file,
+            "/__substg1.0_1035001F",
+            &utf16("<q3@example.com>"),
+        );
+        put(
+            &mut file,
+            "/__substg1.0_10130102",
+            b"<html><body><p>Numbers attached.</p><img src=\"cid:chart1\"></body></html>",
+        );
+        put(
+            &mut file,
+            "/__substg1.0_1000001F",
+            &utf16("Numbers attached."),
+        );
         if let Some(t) = transport {
             put(&mut file, "/__substg1.0_007D001F", &utf16(t));
         }
@@ -354,24 +446,67 @@ mod tests {
         props.extend_from_slice(&ft.to_le_bytes());
         put(&mut file, "/__properties_version1.0", &props);
 
-        file.create_storage("/__recip_version1.0_#00000000").unwrap();
-        put(&mut file, "/__recip_version1.0_#00000000/__substg1.0_3001001F", &utf16("Grace Hopper"));
-        put(&mut file, "/__recip_version1.0_#00000000/__substg1.0_39FE001F", &utf16("grace@example.com"));
+        file.create_storage("/__recip_version1.0_#00000000")
+            .unwrap();
+        put(
+            &mut file,
+            "/__recip_version1.0_#00000000/__substg1.0_3001001F",
+            &utf16("Grace Hopper"),
+        );
+        put(
+            &mut file,
+            "/__recip_version1.0_#00000000/__substg1.0_39FE001F",
+            &utf16("grace@example.com"),
+        );
         let mut rprops = vec![0u8; 8];
         rprops.extend_from_slice(&((0x0C15u32 << 16) | 0x0003).to_le_bytes());
         rprops.extend_from_slice(&0u32.to_le_bytes());
         rprops.extend_from_slice(&1u64.to_le_bytes());
-        put(&mut file, "/__recip_version1.0_#00000000/__properties_version1.0", &rprops);
+        put(
+            &mut file,
+            "/__recip_version1.0_#00000000/__properties_version1.0",
+            &rprops,
+        );
 
-        file.create_storage("/__attach_version1.0_#00000000").unwrap();
-        put(&mut file, "/__attach_version1.0_#00000000/__substg1.0_37010102", b"a,b\n1,2\n");
-        put(&mut file, "/__attach_version1.0_#00000000/__substg1.0_3707001F", &utf16("numbers.csv"));
-        put(&mut file, "/__attach_version1.0_#00000000/__substg1.0_370E001F", &utf16("text/csv"));
-        file.create_storage("/__attach_version1.0_#00000001").unwrap();
-        put(&mut file, "/__attach_version1.0_#00000001/__substg1.0_37010102", &[0x89, b'P', b'N', b'G']);
-        put(&mut file, "/__attach_version1.0_#00000001/__substg1.0_3707001F", &utf16("chart.png"));
-        put(&mut file, "/__attach_version1.0_#00000001/__substg1.0_370E001F", &utf16("image/png"));
-        put(&mut file, "/__attach_version1.0_#00000001/__substg1.0_3712001F", &utf16("chart1"));
+        file.create_storage("/__attach_version1.0_#00000000")
+            .unwrap();
+        put(
+            &mut file,
+            "/__attach_version1.0_#00000000/__substg1.0_37010102",
+            b"a,b\n1,2\n",
+        );
+        put(
+            &mut file,
+            "/__attach_version1.0_#00000000/__substg1.0_3707001F",
+            &utf16("numbers.csv"),
+        );
+        put(
+            &mut file,
+            "/__attach_version1.0_#00000000/__substg1.0_370E001F",
+            &utf16("text/csv"),
+        );
+        file.create_storage("/__attach_version1.0_#00000001")
+            .unwrap();
+        put(
+            &mut file,
+            "/__attach_version1.0_#00000001/__substg1.0_37010102",
+            &[0x89, b'P', b'N', b'G'],
+        );
+        put(
+            &mut file,
+            "/__attach_version1.0_#00000001/__substg1.0_3707001F",
+            &utf16("chart.png"),
+        );
+        put(
+            &mut file,
+            "/__attach_version1.0_#00000001/__substg1.0_370E001F",
+            &utf16("image/png"),
+        );
+        put(
+            &mut file,
+            "/__attach_version1.0_#00000001/__substg1.0_3712001F",
+            &utf16("chart1"),
+        );
         file.flush().unwrap();
         file.into_inner().into_inner()
     }
@@ -386,11 +521,20 @@ mod tests {
         let from = parsed.from().and_then(|a| a.first()).unwrap();
         assert_eq!(from.address(), Some("ada@example.com"));
         assert_eq!(from.name(), Some("Ada Lovelace"));
-        assert_eq!(parsed.to().and_then(|a| a.first()).and_then(|a| a.address()), Some("grace@example.com"));
+        assert_eq!(
+            parsed
+                .to()
+                .and_then(|a| a.first())
+                .and_then(|a| a.address()),
+            Some("grace@example.com")
+        );
         assert_eq!(parsed.message_id(), Some("q3@example.com"));
         assert_eq!(parsed.date().map(|d| d.to_timestamp()), Some(1_791_540_000));
         assert!(parsed.body_html(0).unwrap().contains("Numbers attached."));
-        let names: Vec<String> = parsed.attachments().filter_map(|a| a.attachment_name().map(str::to_string)).collect();
+        let names: Vec<String> = parsed
+            .attachments()
+            .filter_map(|a| a.attachment_name().map(str::to_string))
+            .collect();
         assert!(names.contains(&"numbers.csv".to_string()), "{names:?}");
         assert!(names.contains(&"chart.png".to_string()), "{names:?}");
     }
@@ -401,7 +545,13 @@ mod tests {
         let eml = to_eml(&sample(Some(headers))).unwrap();
         let parsed = mail_parser::MessageParser::default().parse(&eml).unwrap();
         assert_eq!(parsed.subject(), Some("From the server"));
-        assert_eq!(parsed.from().and_then(|a| a.first()).and_then(|a| a.address()), Some("ada@lab.example"));
+        assert_eq!(
+            parsed
+                .from()
+                .and_then(|a| a.first())
+                .and_then(|a| a.address()),
+            Some("ada@lab.example")
+        );
         // Outlook's body structure is not carried over: the body is ours.
         assert!(parsed.body_html(0).unwrap().contains("Numbers attached."));
     }
@@ -411,7 +561,9 @@ mod tests {
     #[test]
     #[ignore]
     fn real_files() {
-        let Ok(dir) = std::env::var("MSG_DIR") else { return };
+        let Ok(dir) = std::env::var("MSG_DIR") else {
+            return;
+        };
         for entry in std::fs::read_dir(dir).unwrap().flatten() {
             let bytes = std::fs::read(entry.path()).unwrap();
             let eml = to_eml(&bytes).unwrap();
@@ -420,12 +572,18 @@ mod tests {
                 let text = String::from_utf8_lossy(&eml);
                 println!("{}", text.split("\r\n\r\n").next().unwrap_or_default());
             }
-            let names: Vec<String> = p.attachments().filter_map(|a| a.attachment_name().map(str::to_string)).collect();
+            let names: Vec<String> = p
+                .attachments()
+                .filter_map(|a| a.attachment_name().map(str::to_string))
+                .collect();
             println!(
                 "{}: subject={:?} from={:?} to={} date={:?} html={} text={} attachments={names:?}",
                 entry.file_name().to_string_lossy(),
                 p.subject(),
-                p.from().and_then(|a| a.first()).map(|a| (a.name().map(str::to_string), a.address().map(str::to_string))),
+                p.from().and_then(|a| a.first()).map(|a| (
+                    a.name().map(str::to_string),
+                    a.address().map(str::to_string)
+                )),
                 p.to().map(|a| a.iter().count()).unwrap_or(0),
                 p.date().map(|d| d.to_rfc3339()),
                 p.body_html(0).map(|b| b.len()).unwrap_or(0),

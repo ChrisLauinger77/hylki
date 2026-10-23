@@ -51,7 +51,11 @@ fn shared_base(own: fn() -> Option<PathBuf>, sub: &str) -> Option<PathBuf> {
         && std::env::var("FLATPAK_ID").is_ok_and(|id| id == "co.hyprlab.Hylki.Beta")
         && stable_data_present()
     {
-        return Some(dirs::home_dir()?.join(".var/app/co.hyprlab.Hylki").join(sub));
+        return Some(
+            dirs::home_dir()?
+                .join(".var/app/co.hyprlab.Hylki")
+                .join(sub),
+        );
     }
     own()
 }
@@ -159,9 +163,13 @@ pub fn avatar_path(name: &str) -> Option<PathBuf> {
 /// account editor that has not been saved yet.
 fn prune_avatars(accounts: &[AccountConfig]) {
     let Some(dir) = avatars_dir() else { return };
-    let Ok(entries) = std::fs::read_dir(&dir) else { return };
-    let used: std::collections::HashSet<&str> =
-        accounts.iter().filter_map(|a| a.avatar.as_deref()).collect();
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return;
+    };
+    let used: std::collections::HashSet<&str> = accounts
+        .iter()
+        .filter_map(|a| a.avatar.as_deref())
+        .collect();
     for entry in entries.flatten() {
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
@@ -194,7 +202,12 @@ pub fn custom_sound() -> Option<PathBuf> {
         .ok()?
         .flatten()
         .map(|e| e.path())
-        .find(|p| p.is_file() && !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
+        .find(|p| {
+            p.is_file()
+                && !p
+                    .file_name()
+                    .is_some_and(|n| n.to_string_lossy().starts_with('.'))
+        })
 }
 
 /// Make a copy of `src` the custom new-mail sound, in place of any earlier one.
@@ -225,10 +238,15 @@ pub fn set_custom_sound(src: &Path) -> std::io::Result<PathBuf> {
 /// (#397), while the same audio without the tag plays. The tag only holds
 /// the title, artist and cover art, none of which a notification needs.
 fn without_id3v2(mut bytes: &[u8]) -> &[u8] {
-    while bytes.len() >= 10 && bytes.starts_with(b"ID3") && bytes[6..10].iter().all(|b| b & 0x80 == 0) {
+    while bytes.len() >= 10
+        && bytes.starts_with(b"ID3")
+        && bytes[6..10].iter().all(|b| b & 0x80 == 0)
+    {
         // A syncsafe size: seven bits a byte, not counting the 10-byte
         // header, nor the 10-byte footer when flag 0x10 says there is one.
-        let size = bytes[6..10].iter().fold(0usize, |n, b| (n << 7) | usize::from(*b));
+        let size = bytes[6..10]
+            .iter()
+            .fold(0usize, |n, b| (n << 7) | usize::from(*b));
         let footer = if bytes[5] & 0x10 != 0 { 10 } else { 0 };
         let Some(rest) = bytes.get(10 + size + footer..) else {
             break;
@@ -244,7 +262,10 @@ fn without_id3v2(mut bytes: &[u8]) -> &[u8] {
 fn repair_custom_sound(path: &Path) {
     use std::io::Read;
     let mut head = [0u8; 3];
-    let tagged = std::fs::File::open(path).and_then(|mut f| f.read_exact(&mut head)).is_ok() && &head == b"ID3";
+    let tagged = std::fs::File::open(path)
+        .and_then(|mut f| f.read_exact(&mut head))
+        .is_ok()
+        && &head == b"ID3";
     if !tagged {
         return;
     }
@@ -258,7 +279,10 @@ fn repair_custom_sound(path: &Path) {
     let part = path.with_file_name(".incoming");
     match std::fs::write(&part, audio).and_then(|()| std::fs::rename(&part, path)) {
         Ok(()) => tracing::info!("new-mail sound: took the ID3v2 tag off {}", path.display()),
-        Err(e) => tracing::warn!("new-mail sound: could not take the ID3v2 tag off {}: {e}", path.display()),
+        Err(e) => tracing::warn!(
+            "new-mail sound: could not take the ID3v2 tag off {}: {e}",
+            path.display()
+        ),
     }
 }
 
@@ -299,8 +323,13 @@ impl NewMailSound {
             repair_custom_sound(&path);
             return Some(SoundSource::File(path));
         }
-        let name = BUILTIN_SOUNDS.iter().find(|n| **n == self.sound).unwrap_or(&BUILTIN_SOUNDS[0]);
-        Some(SoundSource::Resource(format!("/co/hyprlab/Hylki/sounds/{name}.ogg")))
+        let name = BUILTIN_SOUNDS
+            .iter()
+            .find(|n| **n == self.sound)
+            .unwrap_or(&BUILTIN_SOUNDS[0]);
+        Some(SoundSource::Resource(format!(
+            "/co/hyprlab/Hylki/sounds/{name}.ogg"
+        )))
     }
 }
 
@@ -320,7 +349,12 @@ pub fn load_new_mail_sound() -> NewMailSound {
     let custom = custom_sound().is_some();
     NewMailSound {
         enabled: custom,
-        sound: if custom { CUSTOM_SOUND } else { BUILTIN_SOUNDS[0] }.to_string(),
+        sound: if custom {
+            CUSTOM_SOUND
+        } else {
+            BUILTIN_SOUNDS[0]
+        }
+        .to_string(),
         when_focused: false,
     }
 }
@@ -340,7 +374,11 @@ pub fn save_new_mail_sound(sound: &NewMailSound) {
 /// What to play for new mail, if anything.
 pub fn new_mail_sound() -> Option<SoundSource> {
     let sound = load_new_mail_sound();
-    if sound.enabled { sound.source() } else { None }
+    if sound.enabled {
+        sound.source()
+    } else {
+        None
+    }
 }
 
 /// Whether the new-mail sound plays while the window is in front as well
@@ -359,12 +397,13 @@ const KEYRING_SERVICE: &str = "co.hyprlab.Hylki";
 /// with it every account.
 fn known_protocol<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Protocol, D::Error> {
     let name = String::deserialize(d)?;
-    Ok(Protocol::deserialize(serde::de::value::StrDeserializer::<serde::de::value::Error>::new(&name)).unwrap_or_else(
-        |_| {
-            tracing::warn!("unknown account protocol {name:?}, read as IMAP");
-            Protocol::Imap
-        },
-    ))
+    Ok(Protocol::deserialize(
+        serde::de::value::StrDeserializer::<serde::de::value::Error>::new(&name),
+    )
+    .unwrap_or_else(|_| {
+        tracing::warn!("unknown account protocol {name:?}, read as IMAP");
+        Protocol::Imap
+    }))
 }
 
 /// Incoming-mail protocol for an account.
@@ -666,7 +705,10 @@ pub struct AliasConfig {
     /// The alias's own SMTP server; empty = send through the account's SMTP.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub smtp_host: String,
-    #[serde(default = "default_smtp_port", skip_serializing_if = "is_default_smtp_port")]
+    #[serde(
+        default = "default_smtp_port",
+        skip_serializing_if = "is_default_smtp_port"
+    )]
     pub smtp_port: u16,
     /// SMTP username (used only when `smtp_host` is set).
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -732,7 +774,10 @@ where
     Ok(Vec::<Entry>::deserialize(deserializer)?
         .into_iter()
         .map(|e| match e {
-            Entry::Plain(identity) => AliasConfig { identity, ..AliasConfig::default() },
+            Entry::Plain(identity) => AliasConfig {
+                identity,
+                ..AliasConfig::default()
+            },
             Entry::Full(alias) => alias,
         })
         .collect())
@@ -756,7 +801,6 @@ pub struct OAuthSettings {
     pub redirect_uri: String,
 }
 
-
 impl AccountConfig {
     /// The account's signatures and the one new messages start with. A
     /// config written before #445 holds a single `signature`, which is
@@ -765,13 +809,18 @@ impl AccountConfig {
         if self.signatures.is_empty() {
             return match self.signature.as_deref().filter(|s| !s.trim().is_empty()) {
                 Some(html) => (
-                    vec![NamedSignature { name: crate::i18n::i18n("Signature"), html: html.to_string() }],
+                    vec![NamedSignature {
+                        name: crate::i18n::i18n("Signature"),
+                        html: html.to_string(),
+                    }],
                     Some(0),
                 ),
                 None => (Vec::new(), None),
             };
         }
-        let default = self.default_signature.filter(|i| *i < self.signatures.len());
+        let default = self
+            .default_signature
+            .filter(|i| *i < self.signatures.len());
         (self.signatures.clone(), default)
     }
 
@@ -821,12 +870,14 @@ pub fn load_demo_accounts() -> Option<Vec<AccountConfig>> {
 
 pub fn save_demo_accounts(accounts: &[AccountConfig]) -> std::io::Result<()> {
     use std::io::{Error, ErrorKind};
-    let path =
-        demo_accounts_path().ok_or_else(|| Error::new(ErrorKind::NotFound, "no config directory"))?;
+    let path = demo_accounts_path()
+        .ok_or_else(|| Error::new(ErrorKind::NotFound, "no config directory"))?;
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    let file = ConfigFile { accounts: accounts.to_vec() };
+    let file = ConfigFile {
+        accounts: accounts.to_vec(),
+    };
     let toml = toml::to_string_pretty(&file).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
     write_private(&path, &toml)
 }
@@ -857,11 +908,18 @@ pub fn load() -> Option<Vec<AccountConfig>> {
                     && a.goa_id.is_some()
                     && a.imap_host.trim().is_empty()
                 {
-                    tracing::info!("{}: empty-host GOA OAuth account — using Microsoft Graph", a.email);
+                    tracing::info!(
+                        "{}: empty-host GOA OAuth account — using Microsoft Graph",
+                        a.email
+                    );
                     a.protocol = Protocol::Graph;
                 }
             }
-            tracing::info!("loaded {} account(s) from {}", cfg.accounts.len(), path.display());
+            tracing::info!(
+                "loaded {} account(s) from {}",
+                cfg.accounts.len(),
+                path.display()
+            );
             Some(cfg.accounts)
         }
         Ok(_) => None,
@@ -950,8 +1008,7 @@ fn write_config(accounts: &[AccountConfig]) -> std::io::Result<()> {
     let file = ConfigFile {
         accounts: accounts.to_vec(),
     };
-    let toml =
-        toml::to_string_pretty(&file).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+    let toml = toml::to_string_pretty(&file).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
     write_private(&path, &toml)?;
 
     tracing::info!("saved {} account(s) to {}", accounts.len(), path.display());
@@ -1152,11 +1209,21 @@ pub fn delete_cloud_password(key: &str) {
 fn eds_entry(uid: &str, label: &str) -> keyring::Result<keyring::Entry> {
     // Hylki's own attributes stay, as the keyring crate finds its items by
     // them; EDS finds the item by the source UID alone.
-    let mut cred = keyring::secret_service::SsCredential::new_with_target(None, KEYRING_SERVICE, &format!("eds:{uid}"))?;
+    let mut cred = keyring::secret_service::SsCredential::new_with_target(
+        None,
+        KEYRING_SERVICE,
+        &format!("eds:{uid}"),
+    )?;
     cred.attributes.extend([
-        ("xdg:schema".to_string(), "org.gnome.Evolution.Data.Source".to_string()),
+        (
+            "xdg:schema".to_string(),
+            "org.gnome.Evolution.Data.Source".to_string(),
+        ),
         ("e-source-uid".to_string(), uid.to_string()),
-        ("eds-origin".to_string(), "evolution-data-server".to_string()),
+        (
+            "eds-origin".to_string(),
+            "evolution-data-server".to_string(),
+        ),
     ]);
     cred.label = format!("Evolution Data Source \"{label}\"");
     Ok(keyring::Entry::new_with_credential(Box::new(cred)))
@@ -1238,11 +1305,13 @@ fn load_key(key: &str) -> Option<String> {
 /// account in with an empty one until Hylki restarted (#375).
 fn read_key(key: &str) -> Result<Option<String>, String> {
     let key = key.to_owned();
-    on_keyring_thread(move || match keyring_entry(&key).and_then(|e| e.get_password()) {
-        Ok(password) => Ok(Some(password)),
-        Err(keyring::Error::NoEntry) => Ok(load_legacy_key(&key)),
-        Err(e) => Err(e.to_string()),
-    })
+    on_keyring_thread(
+        move || match keyring_entry(&key).and_then(|e| e.get_password()) {
+            Ok(password) => Ok(Some(password)),
+            Err(keyring::Error::NoEntry) => Ok(load_legacy_key(&key)),
+            Err(e) => Err(e.to_string()),
+        },
+    )
 }
 
 /// [`load_password`], with a keyring that could not be read as an error.
@@ -1261,8 +1330,12 @@ pub fn read_smtp_password(email: &str) -> Result<Option<String>, String> {
 /// it is: the old app may still be installed and using it.
 fn load_legacy_key(key: &str) -> Option<String> {
     for pred in crate::legacy::PREDECESSORS {
-        let Ok(old) = keyring::Entry::new(pred.keyring_service, key) else { continue };
-        let Ok(password) = old.get_password() else { continue };
+        let Ok(old) = keyring::Entry::new(pred.keyring_service, key) else {
+            continue;
+        };
+        let Ok(password) = old.get_password() else {
+            continue;
+        };
         if password.is_empty() {
             continue;
         }
@@ -1360,7 +1433,11 @@ pub struct ReaderStyle {
 
 impl ReaderStyle {
     /// The sender's formatting stands entirely.
-    pub const NONE: ReaderStyle = ReaderStyle { font: None, colors: false, plain_font: None };
+    pub const NONE: ReaderStyle = ReaderStyle {
+        font: None,
+        colors: false,
+        plain_font: None,
+    };
 
     /// Whether anything of the sender's is overridden.
     pub fn active(&self) -> bool {
@@ -1926,14 +2003,9 @@ fn default_chevrons_left() -> bool {
     false
 }
 
-
-
-
 fn default_fetch_interval() -> u64 {
     300
 }
-
-
 
 fn default_thread_expansion() -> bool {
     // Off for new installs (2026-08-30): conversations expand in the reading
@@ -1943,9 +2015,6 @@ fn default_thread_expansion() -> bool {
     false
 }
 
-
-
-
 fn default_single_message_card() -> bool {
     // On for new installs (Jason, 2026-08-31): lone messages get the same
     // inset card as conversations. Only a privacy.toml MISSING this key sees
@@ -1954,22 +2023,13 @@ fn default_single_message_card() -> bool {
     true
 }
 
-
-
-
-
 fn default_palette_collapse() -> u64 {
     5
 }
 
-
 fn default_notification_buttons() -> Vec<String> {
     NotificationButtons::default().to_list()
 }
-
-
-
-
 
 fn default_card_actions_auto() -> bool {
     // Off for new installs (2026-08-30): card actions wait behind the ⋯
@@ -1977,14 +2037,9 @@ fn default_card_actions_auto() -> bool {
     false
 }
 
-
-
-
 fn default_preview_lines() -> u32 {
     1
 }
-
-
 
 impl Default for PrivacyFile {
     fn default() -> Self {
@@ -2170,7 +2225,11 @@ impl LegacySwitches {
             (&mut file.contacts_placement, self.show_contacts),
         ] {
             if *at == SectionPlacement::AllInboxes {
-                *at = if on { SectionPlacement::AboveAccounts } else { SectionPlacement::Off };
+                *at = if on {
+                    SectionPlacement::AboveAccounts
+                } else {
+                    SectionPlacement::Off
+                };
                 moved = true;
             }
         }
@@ -2208,31 +2267,11 @@ fn apply_new_defaults(file: &mut PrivacyFile) -> bool {
     changed
 }
 
-
-
-
-
-
-
-
-
-
-
 /// How dates are written, and on what clock.
 pub fn load_date_format() -> (DateStyle, ClockStyle) {
     let p = load_privacy();
     (p.date_style, p.clock_style)
 }
-
-
-
-
-
-
-
-
-
-
 
 /// The unified rows' unread-chip switches. A file from before the
 /// per-row switches carried one switch, for All Inboxes; it still counts.
@@ -2242,10 +2281,6 @@ pub fn load_unified_chips() -> UnifiedChips {
     chips.all_inboxes = chips.all_inboxes && p.unified_chip;
     chips
 }
-
-
-
-
 
 /// Which of the unified section's folder rows are shown besides All
 /// Inboxes: each combines that folder across every account, and opens to
@@ -2269,7 +2304,14 @@ pub struct UnifiedKinds {
 
 impl Default for UnifiedKinds {
     fn default() -> Self {
-        UnifiedKinds { starred: true, sent: true, drafts: true, archive: true, junk: false, trash: false }
+        UnifiedKinds {
+            starred: true,
+            sent: true,
+            drafts: true,
+            archive: true,
+            junk: false,
+            trash: false,
+        }
     }
 }
 
@@ -2290,7 +2332,11 @@ pub struct PrintOptions {
 
 impl Default for PrintOptions {
     fn default() -> Self {
-        PrintOptions { page_numbers: true, date: false, punch_margin: false }
+        PrintOptions {
+            page_numbers: true,
+            date: false,
+            punch_margin: false,
+        }
     }
 }
 
@@ -2343,8 +2389,14 @@ impl UnifiedChips {
 }
 
 impl UnifiedKinds {
-    pub const NONE: UnifiedKinds =
-        UnifiedKinds { starred: false, sent: false, drafts: false, archive: false, junk: false, trash: false };
+    pub const NONE: UnifiedKinds = UnifiedKinds {
+        starred: false,
+        sent: false,
+        drafts: false,
+        archive: false,
+        junk: false,
+        trash: false,
+    };
 
     /// Whether the row for `kind` is on (Inbox and custom folders have none
     /// of their own here, so they are `false`).
@@ -2364,11 +2416,12 @@ impl UnifiedKinds {
     /// The kinds with a row, in sidebar order: an account's own order.
     pub fn listed(self) -> Vec<crate::models::FolderKind> {
         use crate::models::FolderKind::*;
-        [Starred, Sent, Drafts, Archive, Junk, Trash].into_iter().filter(|k| self.has(*k)).collect()
+        [Starred, Sent, Drafts, Archive, Junk, Trash]
+            .into_iter()
+            .filter(|k| self.has(*k))
+            .collect()
     }
 }
-
-
 
 /// Where a sidebar section (Filters, Tags, Favorites, Contacts) is drawn.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -2445,8 +2498,12 @@ pub enum FolderSort {
 }
 
 impl FolderSort {
-    pub const ALL: [FolderSort; 4] =
-        [FolderSort::Custom, FolderSort::NameAsc, FolderSort::NameDesc, FolderSort::Path];
+    pub const ALL: [FolderSort; 4] = [
+        FolderSort::Custom,
+        FolderSort::NameAsc,
+        FolderSort::NameDesc,
+        FolderSort::Path,
+    ];
 
     pub fn label(self) -> String {
         match self {
@@ -2463,10 +2520,6 @@ impl FolderSort {
     }
 }
 
-
-
-
-
 /// Where an account files the copy of a reply it sends (#468).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2482,20 +2535,28 @@ pub enum ReplyCopies {
 }
 
 impl ReplyCopies {
-    pub const ALL: [ReplyCopies; 3] =
-        [ReplyCopies::WithSent, ReplyCopies::Original, ReplyCopies::OriginalNotInbox];
+    pub const ALL: [ReplyCopies; 3] = [
+        ReplyCopies::WithSent,
+        ReplyCopies::Original,
+        ReplyCopies::OriginalNotInbox,
+    ];
 
     pub fn label(self) -> String {
         match self {
             ReplyCopies::WithSent => crate::i18n::i18n("With sent mail"),
             ReplyCopies::Original => crate::i18n::i18n("Folder of the original"),
-            ReplyCopies::OriginalNotInbox => crate::i18n::i18n("Folder of the original, not the Inbox"),
+            ReplyCopies::OriginalNotInbox => {
+                crate::i18n::i18n("Folder of the original, not the Inbox")
+            }
         }
     }
 
     /// Its place in [`ReplyCopies::ALL`], for combo rows.
     pub fn index(self) -> u32 {
-        ReplyCopies::ALL.iter().position(|s| *s == self).unwrap_or(0) as u32
+        ReplyCopies::ALL
+            .iter()
+            .position(|s| *s == self)
+            .unwrap_or(0) as u32
     }
 
     fn is_default(&self) -> bool {
@@ -2515,7 +2576,6 @@ pub enum ReadMark {
     /// Never automatically; only an explicit mark-as-read.
     Manual,
 }
-
 
 /// What a hand-off of files from GNOME Files ("Send with Hylki", "Open
 /// With Hylki", "Email…") opens them into.
@@ -2558,7 +2618,11 @@ pub struct FilesPrefs {
 
 impl Default for FilesPrefs {
     fn default() -> Self {
-        Self { action: FilesAction::Ask, large: FilesLarge::Ask, limit_mb: default_files_limit_mb() }
+        Self {
+            action: FilesAction::Ask,
+            large: FilesLarge::Ask,
+            limit_mb: default_files_limit_mb(),
+        }
     }
 }
 
@@ -2573,12 +2637,14 @@ fn default_files_limit_mb() -> u32 {
     20
 }
 
-
 pub fn load_files_prefs() -> FilesPrefs {
     let f = load_privacy();
-    FilesPrefs { action: f.files_action, large: f.files_large, limit_mb: f.files_limit_mb.max(1) }
+    FilesPrefs {
+        action: f.files_action,
+        large: f.files_large,
+        limit_mb: f.files_limit_mb.max(1),
+    }
 }
-
 
 /// A mail filter rule (#47): file matching inbox arrivals into a folder,
 /// Evolution-style, applied client-side whenever Hylki syncs the inbox.
@@ -2643,7 +2709,8 @@ fn strip_reply_prefixes(subject: &str) -> &str {
     let mut rest = subject.trim();
     while let Some(next) = PREFIXES.iter().find_map(|p| {
         let head = rest.get(..p.len())?;
-        head.eq_ignore_ascii_case(p).then(|| rest[p.len()..].trim_start())
+        head.eq_ignore_ascii_case(p)
+            .then(|| rest[p.len()..].trim_start())
     }) {
         rest = next;
     }
@@ -2675,7 +2742,9 @@ enum ContactCheck {
 fn field_to_disk(field: FilterField) -> (FilterField, Option<ContactCheck>) {
     match field {
         FilterField::FromInContacts => (FilterField::FromAddress, Some(ContactCheck::InContacts)),
-        FilterField::FromNotInContacts => (FilterField::FromAddress, Some(ContactCheck::NotInContacts)),
+        FilterField::FromNotInContacts => {
+            (FilterField::FromAddress, Some(ContactCheck::NotInContacts))
+        }
         other => (other, None),
     }
 }
@@ -2700,15 +2769,28 @@ struct FilterConditionDisk {
 
 impl From<FilterConditionDisk> for FilterCondition {
     fn from(d: FilterConditionDisk) -> Self {
-        FilterCondition { field: field_from_disk(d.field, d.contacts), matcher: d.matcher, value: d.value }
+        FilterCondition {
+            field: field_from_disk(d.field, d.contacts),
+            matcher: d.matcher,
+            value: d.value,
+        }
     }
 }
 
 impl From<FilterCondition> for FilterConditionDisk {
     fn from(c: FilterCondition) -> Self {
         let (field, contacts) = field_to_disk(c.field);
-        let value = if contacts.is_some() { String::new() } else { c.value };
-        FilterConditionDisk { field, matcher: c.matcher, value, contacts }
+        let value = if contacts.is_some() {
+            String::new()
+        } else {
+            c.value
+        };
+        FilterConditionDisk {
+            field,
+            matcher: c.matcher,
+            value,
+            contacts,
+        }
     }
 }
 
@@ -2756,7 +2838,11 @@ impl From<FilterRuleDisk> for FilterRule {
 impl From<FilterRule> for FilterRuleDisk {
     fn from(r: FilterRule) -> Self {
         let (field, contacts) = field_to_disk(r.field);
-        let value = if contacts.is_some() { String::new() } else { r.value };
+        let value = if contacts.is_some() {
+            String::new()
+        } else {
+            r.value
+        };
         FilterRuleDisk {
             name: r.name,
             account_email: r.account_email,
@@ -2801,7 +2887,10 @@ pub enum FilterField {
 impl FilterField {
     /// Whether the field needs no text and no matcher.
     pub fn is_contact_check(self) -> bool {
-        matches!(self, FilterField::FromInContacts | FilterField::FromNotInContacts)
+        matches!(
+            self,
+            FilterField::FromInContacts | FilterField::FromNotInContacts
+        )
     }
 
     /// Every field, in the order the editor lists them.
@@ -2828,8 +2917,12 @@ pub enum FilterMatch {
 
 impl FilterMatch {
     /// Every matcher, in the order the editor lists them.
-    pub const ALL: [FilterMatch; 4] =
-        [FilterMatch::Contains, FilterMatch::Equals, FilterMatch::StartsWith, FilterMatch::EndsWith];
+    pub const ALL: [FilterMatch; 4] = [
+        FilterMatch::Contains,
+        FilterMatch::Equals,
+        FilterMatch::StartsWith,
+        FilterMatch::EndsWith,
+    ];
 }
 
 /// What a message offers the conditions to look at.
@@ -2868,7 +2961,9 @@ impl FilterCondition {
     /// Case-insensitive match against one message.
     pub fn matches(&self, input: &FilterInput) -> bool {
         if self.field.is_contact_check() {
-            let Some(contacts) = input.contacts else { return false };
+            let Some(contacts) = input.contacts else {
+                return false;
+            };
             let known = contacts.contains(&input.from_addr.trim().to_lowercase());
             return known == (self.field == FilterField::FromInContacts);
         }
@@ -2900,7 +2995,8 @@ impl FilterCondition {
         // included; the other matchers hold each recipient up on its own,
         // so "is x@y" matches mail sent to x@y and someone else, and "ends
         // with @y" finds any one recipient there, not only the last (#201).
-        let hays = if self.field == FilterField::Recipients && self.matcher != FilterMatch::Contains {
+        let hays = if self.field == FilterField::Recipients && self.matcher != FilterMatch::Contains
+        {
             mailboxes(&hay)
         } else {
             vec![hay]
@@ -2976,7 +3072,11 @@ impl FilterRule {
     /// Every condition, the first included.
     pub fn conditions(&self) -> Vec<FilterCondition> {
         let mut all = Vec::with_capacity(1 + self.more.len());
-        all.push(FilterCondition { field: self.field, matcher: self.matcher, value: self.value.clone() });
+        all.push(FilterCondition {
+            field: self.field,
+            matcher: self.matcher,
+            value: self.value.clone(),
+        });
         all.extend(self.more.iter().cloned());
         all
     }
@@ -3059,14 +3159,22 @@ fn filters_path() -> Option<PathBuf> {
 }
 
 pub fn load_filters() -> Vec<FilterRule> {
-    let Some(path) = filters_path() else { return Vec::new() };
-    let Ok(text) = std::fs::read_to_string(path) else { return Vec::new() };
-    toml::from_str::<FiltersFile>(&text).map(|f| f.rules).unwrap_or_default()
+    let Some(path) = filters_path() else {
+        return Vec::new();
+    };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    toml::from_str::<FiltersFile>(&text)
+        .map(|f| f.rules)
+        .unwrap_or_default()
 }
 
 pub fn save_filters(rules: &[FilterRule]) {
     let Some(path) = filters_path() else { return };
-    let file = FiltersFile { rules: rules.to_vec() };
+    let file = FiltersFile {
+        rules: rules.to_vec(),
+    };
     match toml::to_string_pretty(&file) {
         Ok(toml) => {
             if let Err(e) = write_private(&path, &toml) {
@@ -3235,13 +3343,24 @@ impl SmartCondition {
             SmartField::Unread => input.unread,
             SmartField::Read => !input.unread,
             SmartField::Attachment => input.attachment,
-            SmartField::Tagged if self.value.is_empty() => {
-                input.keywords.iter().any(|k| input.tags.contains(&k.to_lowercase()))
-            }
-            SmartField::Tagged => input.keywords.iter().any(|k| k.eq_ignore_ascii_case(&self.value)),
+            SmartField::Tagged if self.value.is_empty() => input
+                .keywords
+                .iter()
+                .any(|k| input.tags.contains(&k.to_lowercase())),
+            SmartField::Tagged => input
+                .keywords
+                .iter()
+                .any(|k| k.eq_ignore_ascii_case(&self.value)),
             field => {
-                let Some(field) = field.filter_field() else { return false };
-                FilterCondition { field, matcher: self.matcher, value: self.value.clone() }.matches(&input.text)
+                let Some(field) = field.filter_field() else {
+                    return false;
+                };
+                FilterCondition {
+                    field,
+                    matcher: self.matcher,
+                    value: self.value.clone(),
+                }
+                .matches(&input.text)
             }
         }
     }
@@ -3291,9 +3410,12 @@ impl SmartFolder {
     /// Whether a condition asks about the address books, which are read
     /// only when one does.
     pub fn needs_contacts(&self) -> bool {
-        self.conditions
-            .iter()
-            .any(|c| matches!(c.field, SmartField::FromInContacts | SmartField::FromNotInContacts))
+        self.conditions.iter().any(|c| {
+            matches!(
+                c.field,
+                SmartField::FromInContacts | SmartField::FromNotInContacts
+            )
+        })
     }
 }
 
@@ -3301,7 +3423,12 @@ impl SmartFolder {
 /// an old name is never taken for another.
 pub fn new_smart_folder_id() -> String {
     crate::rng::token(12).unwrap_or_else(|_| {
-        format!("{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos()))
+        format!(
+            "{:x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos())
+        )
     })
 }
 
@@ -3316,17 +3443,27 @@ fn smart_folders_path() -> Option<PathBuf> {
 }
 
 pub fn load_smart_folders() -> Vec<SmartFolder> {
-    let Some(path) = smart_folders_path() else { return Vec::new() };
-    let Ok(text) = std::fs::read_to_string(path) else { return Vec::new() };
-    toml::from_str::<SmartFoldersFile>(&text).map(|f| f.folders).unwrap_or_else(|e| {
-        tracing::warn!("could not read smart folders: {e}");
-        Vec::new()
-    })
+    let Some(path) = smart_folders_path() else {
+        return Vec::new();
+    };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    toml::from_str::<SmartFoldersFile>(&text)
+        .map(|f| f.folders)
+        .unwrap_or_else(|e| {
+            tracing::warn!("could not read smart folders: {e}");
+            Vec::new()
+        })
 }
 
 pub fn save_smart_folders(folders: &[SmartFolder]) {
-    let Some(path) = smart_folders_path() else { return };
-    let file = SmartFoldersFile { folders: folders.to_vec() };
+    let Some(path) = smart_folders_path() else {
+        return;
+    };
+    let file = SmartFoldersFile {
+        folders: folders.to_vec(),
+    };
     match toml::to_string_pretty(&file) {
         Ok(toml) => {
             if let Err(e) = write_private(&path, &toml) {
@@ -3363,7 +3500,11 @@ pub const TAG_COLORS: &[&str] = &[
 impl Tag {
     /// The characters an IMAP keyword (an atom) may hold.
     pub fn is_keyword_char(c: char) -> bool {
-        c.is_ascii_graphic() && !matches!(c, '(' | ')' | '{' | '}' | '"' | '\\' | '%' | '*' | ']' | '[')
+        c.is_ascii_graphic()
+            && !matches!(
+                c,
+                '(' | ')' | '{' | '}' | '"' | '\\' | '%' | '*' | ']' | '['
+            )
     }
 
     /// Whether `s` can be sent to a server as a keyword.
@@ -3414,7 +3555,11 @@ impl Tag {
             })
             .collect::<Vec<_>>()
             .join(" ");
-        if name.is_empty() { keyword.to_string() } else { name }
+        if name.is_empty() {
+            keyword.to_string()
+        } else {
+            name
+        }
     }
 
     /// The color to offer for a found keyword: Thunderbird's built-ins get
@@ -3467,14 +3612,22 @@ fn tags_path() -> Option<PathBuf> {
 }
 
 pub fn load_tags() -> Vec<Tag> {
-    let Some(path) = tags_path() else { return Vec::new() };
-    let Ok(text) = std::fs::read_to_string(path) else { return Vec::new() };
-    toml::from_str::<TagsFile>(&text).map(|f| f.tags).unwrap_or_default()
+    let Some(path) = tags_path() else {
+        return Vec::new();
+    };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    toml::from_str::<TagsFile>(&text)
+        .map(|f| f.tags)
+        .unwrap_or_default()
 }
 
 pub fn save_tags(tags: &[Tag]) {
     let Some(path) = tags_path() else { return };
-    let file = TagsFile { tags: tags.to_vec() };
+    let file = TagsFile {
+        tags: tags.to_vec(),
+    };
     match toml::to_string_pretty(&file) {
         Ok(toml) => {
             if let Err(e) = write_private(&path, &toml) {
@@ -3534,7 +3687,9 @@ fn write_file_struct<T: serde::Serialize>(
     path: Option<PathBuf>,
     value: &Option<T>,
 ) -> Result<(), String> {
-    let (Some(path), Some(value)) = (path, value) else { return Ok(()) };
+    let (Some(path), Some(value)) = (path, value) else {
+        return Ok(());
+    };
     let toml = toml::to_string_pretty(value).map_err(|e| e.to_string())?;
     write_private(&path, &toml).map_err(|e| e.to_string())
 }
@@ -3586,10 +3741,6 @@ pub fn import_bundle(text: &str) -> Result<usize, String> {
     Ok(bundle.accounts.len())
 }
 
-
-
-
-
 /// The zoom steps Ctrl+ and Ctrl- walk, and Settings offers, in percent.
 pub const READER_ZOOM_STEPS: [u32; 12] = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 250];
 
@@ -3601,7 +3752,11 @@ fn default_reader_zoom() -> u32 {
 /// as 100.
 pub fn load_reader_zoom() -> u32 {
     let z = load_privacy().reader_zoom;
-    if READER_ZOOM_STEPS.contains(&z) { z } else { 100 }
+    if READER_ZOOM_STEPS.contains(&z) {
+        z
+    } else {
+        100
+    }
 }
 
 /// What Reader View does each time a message is opened.
@@ -3630,12 +3785,6 @@ impl ReaderDefault {
         }
     }
 }
-
-
-
-
-
-
 
 /// The three reader-override preferences (#56): font switch, font, color switch.
 pub fn load_reader_override() -> (bool, String, bool) {
@@ -3671,7 +3820,9 @@ impl ComposeFormat {
 
 /// Which messages of a conversation open folded to one line (#326). The
 /// newest always opens; a folded one opens with a click.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum FoldMessages {
     /// Every message opens.
@@ -3696,7 +3847,6 @@ pub enum ReplyPosition {
     Follow,
 }
 
-
 /// Where the signature goes in a reply or forward (#237). Above the quoted
 /// original is what Apple Mail and Thunderbird do, and what a reader
 /// expects: the signature closes the words above it, not the words
@@ -3708,8 +3858,6 @@ pub enum SignaturePosition {
     AboveQuote,
     BelowQuote,
 }
-
-
 
 /// What the number on the launcher icon counts (#431).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -3747,8 +3895,6 @@ pub fn load_compose_format() -> ComposeFormat {
         ComposeFormat::Rich
     })
 }
-
-
 
 /// One of the action buttons a new-mail notification can carry (#244).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -3813,7 +3959,12 @@ impl NotificationButtons {
 
 impl Default for NotificationButtons {
     fn default() -> Self {
-        Self { mark_read: true, archive: true, delete: true, ..Self::NONE }
+        Self {
+            mark_read: true,
+            archive: true,
+            delete: true,
+            ..Self::NONE
+        }
     }
 }
 
@@ -3842,7 +3993,10 @@ impl NotificationButtons {
 
     /// How many are on.
     pub fn count(self) -> usize {
-        NotificationButton::ALL.into_iter().filter(|b| self.get(*b)).count()
+        NotificationButton::ALL
+            .into_iter()
+            .filter(|b| self.get(*b))
+            .count()
     }
 
     /// Whether the set is full, so another button cannot be switched on.
@@ -3878,17 +4032,6 @@ pub fn load_notification_buttons() -> NotificationButtons {
     NotificationButtons::from_list(&load_privacy().notification_buttons)
 }
 
-
-
-
-
-
-
-
-
-
-
-
 /// The narrowest and widest trackpad swipe sensitivity the setting offers,
 /// also the clamp a hand-edited file is held to (0 would divide by zero).
 pub const SWIPE_SENSITIVITY_MIN: f64 = 1.0;
@@ -3909,17 +4052,6 @@ pub fn load_swipe_sensitivity() -> f64 {
         .swipe_sensitivity
         .clamp(SWIPE_SENSITIVITY_MIN, SWIPE_SENSITIVITY_MAX)
 }
-
-
-
-
-
-
-
-
-
-
-
 
 /// "Fold up expanded items" (Settings → Sidebar → Icon rail): while the
 /// sidebar is collapsed to its icon rail, the items ticked here show folded
@@ -4019,7 +4151,6 @@ impl RailFold {
     }
 }
 
-
 fn default_text_scale() -> u32 {
     100
 }
@@ -4028,7 +4159,11 @@ fn default_text_scale() -> u32 {
 /// as the desktop's own size.
 pub fn load_text_scale() -> u32 {
     let percent = load_privacy().text_scale;
-    if crate::text_scale::STEPS.contains(&percent) { percent } else { 100 }
+    if crate::text_scale::STEPS.contains(&percent) {
+        percent
+    } else {
+        100
+    }
 }
 
 /// The appearance theme's id; "system" (the stock look) when unset.
@@ -4175,7 +4310,11 @@ impl ListColumn {
             }
         }
         if !out.contains(&ListColumn::Subject) {
-            let at = out.iter().position(|c| *c == ListColumn::Sender).map(|i| i + 1).unwrap_or(0);
+            let at = out
+                .iter()
+                .position(|c| *c == ListColumn::Sender)
+                .map(|i| i + 1)
+                .unwrap_or(0);
             out.insert(at, ListColumn::Subject);
         }
         out
@@ -4198,13 +4337,19 @@ pub fn load_list_column_widths() -> std::collections::HashMap<ListColumn, i32> {
 pub fn list_column_widths_from(
     saved: &std::collections::BTreeMap<String, i32>,
 ) -> std::collections::HashMap<ListColumn, i32> {
-    saved.iter().filter_map(|(k, px)| Some((ListColumn::from_key(k)?, (*px).clamp(32, 800)))).collect()
+    saved
+        .iter()
+        .filter_map(|(k, px)| Some((ListColumn::from_key(k)?, (*px).clamp(32, 800))))
+        .collect()
 }
 
 pub fn list_column_widths_to(
     widths: &std::collections::HashMap<ListColumn, i32>,
 ) -> std::collections::BTreeMap<String, i32> {
-    widths.iter().map(|(c, px)| (c.key().to_string(), *px)).collect()
+    widths
+        .iter()
+        .map(|(c, px)| (c.key().to_string(), *px))
+        .collect()
 }
 
 /// The single-line list's columns, in order (#334).
@@ -4218,8 +4363,6 @@ pub fn load_preview_lines() -> u32 {
     load_privacy().preview_lines.min(3)
 }
 
-
-
 /// The address book chosen for new contacts (empty: automatic).
 pub fn load_contact_book() -> String {
     load_privacy().contact_book
@@ -4230,12 +4373,6 @@ pub fn load_autostart() -> bool {
     let p = load_privacy();
     p.run_in_background && p.autostart
 }
-
-
-
-
-
-
 
 /// Persist all app settings together (so no field is clobbered).
 pub fn save_privacy(file: PrivacyFile) {
@@ -4459,7 +4596,11 @@ struct WindowFile {
 
 impl Default for WindowFile {
     fn default() -> Self {
-        Self { width: 1280, height: 840, maximized: false }
+        Self {
+            width: 1280,
+            height: 840,
+            maximized: false,
+        }
     }
 }
 
@@ -4486,7 +4627,11 @@ pub fn save_window_state(width: i32, height: i32, maximized: bool) {
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let file = WindowFile { width, height, maximized };
+    let file = WindowFile {
+        width,
+        height,
+        maximized,
+    };
     if let Ok(toml) = toml::to_string_pretty(&file) {
         let _ = std::fs::write(&path, toml);
     }
@@ -4617,7 +4762,8 @@ pub fn load_recent_fonts() -> Vec<RecentFont> {
 /// few.
 pub fn note_recent_font(font: RecentFont) {
     update_state(|s| {
-        s.recent_fonts.retain(|f| !f.name.eq_ignore_ascii_case(&font.name));
+        s.recent_fonts
+            .retain(|f| !f.name.eq_ignore_ascii_case(&font.name));
         s.recent_fonts.insert(0, font);
         s.recent_fonts.truncate(RECENT_FONTS);
     });
@@ -4710,7 +4856,11 @@ pub fn load_last_view() -> (Option<LastView>, String) {
 /// this runs on every folder switch.
 pub fn save_last_view(view: LastView) {
     let mut s = load_state();
-    let account = if view.email.is_empty() { s.last_account.clone() } else { view.email.clone() };
+    let account = if view.email.is_empty() {
+        s.last_account.clone()
+    } else {
+        view.email.clone()
+    };
     if s.last_view.as_ref() == Some(&view) && s.last_account == account {
         return;
     }
@@ -4792,7 +4942,13 @@ pub struct DrawerState {
 
 impl Default for DrawerState {
     fn default() -> Self {
-        Self { height: 160, collapsed: false, thumb: 56, list_view: false, sort_desc: false }
+        Self {
+            height: 160,
+            collapsed: false,
+            thumb: 56,
+            list_view: false,
+            sort_desc: false,
+        }
     }
 }
 
@@ -4814,7 +4970,11 @@ pub fn load_drawer_state() -> DrawerState {
 /// The remembered summary-fetch mode for an account (#226), as
 /// (use ENVELOPE, preview items rejected). The default when nothing is known.
 pub fn load_fetch_mode(email: &str) -> (bool, bool) {
-    match load_state().fetch_modes.get(&email.to_ascii_lowercase()).map(String::as_str) {
+    match load_state()
+        .fetch_modes
+        .get(&email.to_ascii_lowercase())
+        .map(String::as_str)
+    {
         Some("headers") => (false, false),
         Some("no-previews") => (true, true),
         Some("headers-no-previews") => (false, true),
@@ -4942,7 +5102,11 @@ pub fn save_gallery_scope(archive: bool, other: bool, folders: &[(u32, String, b
 /// (the caller computes an opening default from the pane).
 pub fn load_split_reply_height() -> i32 {
     let h = load_state().split_reply_height;
-    if h == 0 { 0 } else { h.clamp(220, 4000) }
+    if h == 0 {
+        0
+    } else {
+        h.clamp(220, 4000)
+    }
 }
 
 pub fn save_split_reply_height(height: i32) {
@@ -4976,10 +5140,12 @@ pub fn save_contacts_pane_width(width: i32) {
     update_state(|s| s.contacts_pane_width = width.clamp(280, 4000));
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::{decode_gallery_folder, encode_gallery_folder, ConfigFile, ListColumn, PrivacyFile, StateFile};
+    use super::{
+        decode_gallery_folder, encode_gallery_folder, ConfigFile, ListColumn, PrivacyFile,
+        StateFile,
+    };
 
     /// A section once kept in the unified section moves above the accounts
     /// where its switch was on, and off where it was off; one already
@@ -5007,7 +5173,8 @@ mod tests {
     #[test]
     fn contacts_moves_to_the_footer_once() {
         use super::SectionPlacement::*;
-        let mut file: PrivacyFile = toml::from_str("contacts_placement = \"above_accounts\"\n").unwrap();
+        let mut file: PrivacyFile =
+            toml::from_str("contacts_placement = \"above_accounts\"\n").unwrap();
         assert!(super::apply_new_defaults(&mut file));
         assert_eq!(file.contacts_placement, Footer);
         file.contacts_placement = BelowAccounts;
@@ -5069,13 +5236,24 @@ mod tests {
     #[test]
     fn launcher_badge_follows_the_old_switch() {
         use super::LauncherBadge::*;
-        let read = |text: &str| toml::from_str::<PrivacyFile>(text).unwrap().launcher_badge();
+        let read = |text: &str| {
+            toml::from_str::<PrivacyFile>(text)
+                .unwrap()
+                .launcher_badge()
+        };
         assert_eq!(read(""), AllUnread);
         assert_eq!(read("launcher_count = true"), AllUnread);
         assert_eq!(read("launcher_count = false"), Off);
-        assert_eq!(read("launcher_count = true\nlauncher_badge = \"new_since_front\""), NewSinceFront);
+        assert_eq!(
+            read("launcher_count = true\nlauncher_badge = \"new_since_front\""),
+            NewSinceFront
+        );
         assert_eq!(read("launcher_count = true\nlauncher_badge = \"off\""), Off);
-        let saved = PrivacyFile { launcher_count: true, launcher_badge: Some(NewSinceFront), ..Default::default() };
+        let saved = PrivacyFile {
+            launcher_count: true,
+            launcher_badge: Some(NewSinceFront),
+            ..Default::default()
+        };
         assert_eq!(read(&toml::to_string(&saved).unwrap()), NewSinceFront);
     }
 
@@ -5087,7 +5265,10 @@ mod tests {
         assert!(old.favorites.is_empty() && old.favorites_expanded);
         let new: super::SidebarFile =
             toml::from_str("favorites = [\"b@x\\tWork\", \"a@x\\tINBOX\"]").expect("parses");
-        assert_eq!(new.favorites, vec!["b@x\tWork".to_string(), "a@x\tINBOX".to_string()]);
+        assert_eq!(
+            new.favorites,
+            vec!["b@x\tWork".to_string(), "a@x\tINBOX".to_string()]
+        );
     }
 
     /// #369: unified Junk and Trash are off in a file that predates them,
@@ -5098,9 +5279,23 @@ mod tests {
         let kinds: super::UnifiedKinds = toml::from_str("starred = false").expect("parses");
         assert!(!kinds.junk && !kinds.trash && kinds.archive);
         assert_eq!(kinds.listed(), vec![Sent, Drafts, Archive]);
-        let all = super::UnifiedKinds { junk: true, trash: true, ..Default::default() };
-        assert_eq!(all.listed(), vec![Starred, Sent, Drafts, Archive, Junk, Trash]);
-        assert_eq!(super::UnifiedKinds { trash: true, ..super::UnifiedKinds::NONE }.listed(), vec![Trash]);
+        let all = super::UnifiedKinds {
+            junk: true,
+            trash: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            all.listed(),
+            vec![Starred, Sent, Drafts, Archive, Junk, Trash]
+        );
+        assert_eq!(
+            super::UnifiedKinds {
+                trash: true,
+                ..super::UnifiedKinds::NONE
+            }
+            .listed(),
+            vec![Trash]
+        );
     }
 
     /// #334: the saved columns come back in order; a name this version does
@@ -5114,21 +5309,40 @@ mod tests {
         );
         assert_eq!(
             ListColumn::from_keys(&keys(&["star", "sender", "date"])),
-            vec![ListColumn::Star, ListColumn::Sender, ListColumn::Subject, ListColumn::Date]
+            vec![
+                ListColumn::Star,
+                ListColumn::Sender,
+                ListColumn::Subject,
+                ListColumn::Date
+            ]
         );
-        assert_eq!(ListColumn::from_keys(&ListColumn::to_keys(&ListColumn::DEFAULT)), ListColumn::DEFAULT.to_vec());
+        assert_eq!(
+            ListColumn::from_keys(&ListColumn::to_keys(&ListColumn::DEFAULT)),
+            ListColumn::DEFAULT.to_vec()
+        );
         // Dragged widths keep their column, within reason; an unknown
         // column's is dropped.
-        let saved: std::collections::BTreeMap<String, i32> =
-            [("sender".into(), 240), ("date".into(), 5), ("colour".into(), 90)].into_iter().collect();
+        let saved: std::collections::BTreeMap<String, i32> = [
+            ("sender".into(), 240),
+            ("date".into(), 5),
+            ("colour".into(), 90),
+        ]
+        .into_iter()
+        .collect();
         let widths = super::list_column_widths_from(&saved);
         assert_eq!(widths.len(), 2);
         assert_eq!(widths[&ListColumn::Sender], 240);
         assert_eq!(widths[&ListColumn::Date], 32);
-        assert_eq!(super::list_column_widths_to(&widths).get("sender"), Some(&240));
+        assert_eq!(
+            super::list_column_widths_to(&widths).get("sender"),
+            Some(&240)
+        );
         // A settings file from before the columns has the old layout.
         let old: PrivacyFile = toml::from_str("list_layout = \"single_line\"").unwrap();
-        assert_eq!(ListColumn::from_keys(&old.list_columns), ListColumn::DEFAULT.to_vec());
+        assert_eq!(
+            ListColumn::from_keys(&old.list_columns),
+            ListColumn::DEFAULT.to_vec()
+        );
     }
 
     /// Every gallery folder override survives the trip to the file and back,
@@ -5156,7 +5370,11 @@ mod tests {
     #[test]
     fn a_malformed_gallery_override_is_skipped() {
         for bad in ["", "1", "1\tInbox", "notanid\tInbox\t1", "1\t\t1"] {
-            assert_eq!(decode_gallery_folder(bad), None, "{bad:?} should not decode");
+            assert_eq!(
+                decode_gallery_folder(bad),
+                None,
+                "{bad:?} should not decode"
+            );
         }
     }
 
@@ -5168,7 +5386,10 @@ mod tests {
         let fresh: StateFile = toml::from_str("").expect("an empty state document must parse");
         assert!(fresh.gallery_archive);
         assert!(fresh.gallery_other);
-        assert_eq!(fresh.gallery_thumb_width, super::default_gallery_thumb_width());
+        assert_eq!(
+            fresh.gallery_thumb_width,
+            super::default_gallery_thumb_width()
+        );
         assert_eq!(fresh.list_pane_width, super::default_list_pane_width());
     }
 
@@ -5190,7 +5411,10 @@ mod tests {
         assert_eq!(aliases.len(), 2);
         assert_eq!(aliases[0].identity, "Ann Work <ann@work.org>");
         assert_eq!(aliases[0].address(), "ann@work.org");
-        assert!(!aliases[0].has_own_smtp(), "a plain alias rides the account's SMTP");
+        assert!(
+            !aliases[0].has_own_smtp(),
+            "a plain alias rides the account's SMTP"
+        );
         assert_eq!(aliases[1].address(), "ann@shop.org");
     }
 
@@ -5217,7 +5441,10 @@ mod tests {
         assert_eq!(alias.smtp_host, "smtp.work.org");
         assert_eq!(alias.smtp_port, 465);
         assert_eq!(alias.smtp_username, "ann@work.org");
-        assert!(alias.smtp_password.is_empty(), "passwords live in the keyring");
+        assert!(
+            alias.smtp_password.is_empty(),
+            "passwords live in the keyring"
+        );
     }
 
     #[test]
@@ -5239,12 +5466,18 @@ mod tests {
         .unwrap();
         cfg.accounts[0].aliases[0].smtp_password = "hunter2".into();
         let out = toml::to_string_pretty(&cfg).unwrap();
-        assert!(!out.contains("hunter2"), "password serialized to disk: {out}");
+        assert!(
+            !out.contains("hunter2"),
+            "password serialized to disk: {out}"
+        );
         // And the round trip keeps the alias's transport settings.
         let back: ConfigFile = toml::from_str(&out).unwrap();
         let alias = &back.accounts[0].aliases[0];
         assert_eq!(alias.smtp_host, "smtp.work.org");
-        assert_eq!(alias.smtp_port, 587, "unwritten port falls back to the default");
+        assert_eq!(
+            alias.smtp_port, 587,
+            "unwritten port falls back to the default"
+        );
     }
 
     #[test]
@@ -5256,8 +5489,7 @@ mod tests {
         // of none: the setting offers 1–3 and that is what it is worth honouring.
         // 0 is a real setting — previews off — but nothing above 3 is.
         for (written, expected) in [(0, 0), (1, 1), (3, 3), (99, 3)] {
-            let p: PrivacyFile =
-                toml::from_str(&format!("preview_lines = {written}")).unwrap();
+            let p: PrivacyFile = toml::from_str(&format!("preview_lines = {written}")).unwrap();
             assert_eq!(p.preview_lines.min(3), expected, "for {written}");
         }
     }
@@ -5271,8 +5503,12 @@ mod tests {
 
     #[test]
     fn new_mail_sound_names_a_builtin_or_falls_back() {
-        let resource = |sound: &str| match (super::NewMailSound { enabled: true, sound: sound.into(), when_focused: false })
-            .source()
+        let resource = |sound: &str| match (super::NewMailSound {
+            enabled: true,
+            sound: sound.into(),
+            when_focused: false,
+        })
+        .source()
         {
             Some(super::SoundSource::Resource(p)) => p,
             _ => panic!("a built-in plays from the bundle"),
@@ -5280,8 +5516,16 @@ mod tests {
         assert_eq!(resource("hum"), "/co/hyprlab/Hylki/sounds/hum.ogg");
         assert_eq!(resource("bogus"), "/co/hyprlab/Hylki/sounds/click.ogg");
         // A sound.toml from before the in-front switch (#337) still reads.
-        let saved: super::NewMailSound = toml::from_str("enabled = true\nsound = \"swing\"").unwrap();
-        assert_eq!(saved, super::NewMailSound { enabled: true, sound: "swing".into(), when_focused: false });
+        let saved: super::NewMailSound =
+            toml::from_str("enabled = true\nsound = \"swing\"").unwrap();
+        assert_eq!(
+            saved,
+            super::NewMailSound {
+                enabled: true,
+                sound: "swing".into(),
+                when_focused: false
+            }
+        );
         let saved: super::NewMailSound =
             toml::from_str("enabled = true\nsound = \"swing\"\nwhen_focused = true").unwrap();
         assert!(saved.when_focused);
@@ -5291,16 +5535,32 @@ mod tests {
     fn notification_buttons_default_to_all_and_round_trip() {
         // An older privacy.toml with no key carries every button.
         let p: PrivacyFile = toml::from_str("").unwrap();
-        assert_eq!(super::NotificationButtons::from_list(&p.notification_buttons), super::NotificationButtons::default());
+        assert_eq!(
+            super::NotificationButtons::from_list(&p.notification_buttons),
+            super::NotificationButtons::default()
+        );
         // An empty list is no buttons at all, not the default.
         let p: PrivacyFile = toml::from_str("notification_buttons = []").unwrap();
         let none = super::NotificationButtons::NONE;
-        assert_eq!(super::NotificationButtons::from_list(&p.notification_buttons), none);
+        assert_eq!(
+            super::NotificationButtons::from_list(&p.notification_buttons),
+            none
+        );
         let p: PrivacyFile =
             toml::from_str(r#"notification_buttons = ["delete", "bogus", "mark_read"]"#).unwrap();
         let b = super::NotificationButtons::from_list(&p.notification_buttons);
-        assert_eq!(b, super::NotificationButtons { mark_read: true, delete: true, ..none });
-        assert_eq!(b.to_list(), vec!["mark_read".to_string(), "delete".to_string()]);
+        assert_eq!(
+            b,
+            super::NotificationButtons {
+                mark_read: true,
+                delete: true,
+                ..none
+            }
+        );
+        assert_eq!(
+            b.to_list(),
+            vec!["mark_read".to_string(), "delete".to_string()]
+        );
     }
 
     #[test]
@@ -5314,7 +5574,12 @@ mod tests {
         let b = super::NotificationButtons::from_list(&p.notification_buttons);
         assert_eq!(
             b,
-            super::NotificationButtons { archive: true, delete: true, reply: true, ..super::NotificationButtons::NONE }
+            super::NotificationButtons {
+                archive: true,
+                delete: true,
+                reply: true,
+                ..super::NotificationButtons::NONE
+            }
         );
         assert!(b.full());
         assert_eq!(b.count(), 3);
@@ -5331,9 +5596,18 @@ mod tests {
 mod filter_tests {
     use super::*;
 
-    fn smart_input<'a>(starred: bool, unread: bool, keywords: &'a [String], tags: &'a [String]) -> SmartInput<'a> {
+    fn smart_input<'a>(
+        starred: bool,
+        unread: bool,
+        keywords: &'a [String],
+        tags: &'a [String],
+    ) -> SmartInput<'a> {
         SmartInput {
-            text: FilterInput { subject: "Quarterly invoice", from_addr: "billing@shop.example", ..Default::default() },
+            text: FilterInput {
+                subject: "Quarterly invoice",
+                from_addr: "billing@shop.example",
+                ..Default::default()
+            },
             starred,
             unread,
             attachment: false,
@@ -5354,13 +5628,23 @@ mod filter_tests {
     }
 
     fn smart_cond(field: SmartField, value: &str) -> SmartCondition {
-        SmartCondition { field, matcher: FilterMatch::Contains, value: value.into() }
+        SmartCondition {
+            field,
+            matcher: FilterMatch::Contains,
+            value: value.into(),
+        }
     }
 
     /// #417's own example: sent mail that is starred or carries a tag.
     #[test]
     fn smart_folder_starred_or_tagged() {
-        let f = smart(true, vec![smart_cond(SmartField::Starred, ""), smart_cond(SmartField::Tagged, "")]);
+        let f = smart(
+            true,
+            vec![
+                smart_cond(SmartField::Starred, ""),
+                smart_cond(SmartField::Tagged, ""),
+            ],
+        );
         let tags = vec!["$label1".to_string()];
         let none: Vec<String> = Vec::new();
         let tagged = vec!["$Label1".to_string()];
@@ -5376,11 +5660,23 @@ mod filter_tests {
 
     #[test]
     fn smart_folder_every_condition() {
-        let f = smart(false, vec![smart_cond(SmartField::Unread, ""), smart_cond(SmartField::Subject, "invoice, receipt")]);
+        let f = smart(
+            false,
+            vec![
+                smart_cond(SmartField::Unread, ""),
+                smart_cond(SmartField::Subject, "invoice, receipt"),
+            ],
+        );
         let none: Vec<String> = Vec::new();
         assert!(f.matches(&smart_input(false, true, &none, &none)));
         assert!(!f.matches(&smart_input(false, false, &none, &none)));
-        assert_eq!(f.prefilter(), SmartPrefilter { unread: Some(true), ..Default::default() });
+        assert_eq!(
+            f.prefilter(),
+            SmartPrefilter {
+                unread: Some(true),
+                ..Default::default()
+            }
+        );
         let one_tag = smart(false, vec![smart_cond(SmartField::Tagged, "work")]);
         let work = vec!["Work".to_string()];
         assert!(one_tag.matches(&smart_input(false, false, &work, &none)));
@@ -5389,15 +5685,27 @@ mod filter_tests {
 
     #[test]
     fn smart_folders_file_round_trips() {
-        let f = smart(true, vec![smart_cond(SmartField::Starred, ""), smart_cond(SmartField::FromAddress, "shop")]);
-        let text = toml::to_string_pretty(&SmartFoldersFile { folders: vec![f.clone()] }).unwrap();
+        let f = smart(
+            true,
+            vec![
+                smart_cond(SmartField::Starred, ""),
+                smart_cond(SmartField::FromAddress, "shop"),
+            ],
+        );
+        let text = toml::to_string_pretty(&SmartFoldersFile {
+            folders: vec![f.clone()],
+        })
+        .unwrap();
         assert!(text.contains("folder = \"sent\""), "{text}");
         let back: SmartFoldersFile = toml::from_str(&text).unwrap();
         assert_eq!(back.folders, vec![f]);
         // Only what a folder needs has to be written.
         let short: SmartFoldersFile =
             toml::from_str("[[folders]]\nid = \"a\"\nname = \"Starred\"\n[[folders.conditions]]\nfield = \"starred\"\n").unwrap();
-        assert_eq!(short.folders[0].conditions[0].matcher, FilterMatch::Contains);
+        assert_eq!(
+            short.folders[0].conditions[0].matcher,
+            FilterMatch::Contains
+        );
         assert!(short.folders[0].folder.is_none() && !short.folders[0].any);
     }
 
@@ -5417,7 +5725,11 @@ mod filter_tests {
     }
 
     fn cond(field: FilterField, matcher: FilterMatch, value: &str) -> FilterCondition {
-        FilterCondition { field, matcher, value: value.into() }
+        FilterCondition {
+            field,
+            matcher,
+            value: value.into(),
+        }
     }
 
     /// The four header fields the original rules looked at.
@@ -5427,15 +5739,25 @@ mod filter_tests {
         subject: &'a str,
         recipients: &'a str,
     ) -> FilterInput<'a> {
-        FilterInput { from_addr, from_name, subject, recipients, ..Default::default() }
+        FilterInput {
+            from_addr,
+            from_name,
+            subject,
+            recipients,
+            ..Default::default()
+        }
     }
 
     #[test]
     fn draft_filter_matches_sender_and_subject() {
-        let rule = FilterRule::draft_from_message("me@x.org", "billing@shop.example", "Your invoice");
+        let rule =
+            FilterRule::draft_from_message("me@x.org", "billing@shop.example", "Your invoice");
         assert_eq!(rule.account_email, "me@x.org");
         assert!(!rule.any, "both conditions have to match");
-        assert!(rule.dest_path.is_empty() && rule.tag.is_empty(), "the user picks what the rule does");
+        assert!(
+            rule.dest_path.is_empty() && rule.tag.is_empty(),
+            "the user picks what the rule does"
+        );
         assert_eq!(
             rule.conditions(),
             vec![
@@ -5456,7 +5778,9 @@ mod filter_tests {
     #[test]
     fn draft_filter_strips_reply_and_forward_prefixes() {
         let subject_of = |subject| {
-            FilterRule::draft_from_message("me@x.org", "a@b.org", subject).conditions()[1].value.clone()
+            FilterRule::draft_from_message("me@x.org", "a@b.org", subject).conditions()[1]
+                .value
+                .clone()
         };
         assert_eq!(subject_of("Re: Invoice"), "Invoice");
         assert_eq!(subject_of("RE: Fwd: re:  Invoice"), "Invoice");
@@ -5470,7 +5794,11 @@ mod filter_tests {
     fn draft_filter_skips_an_empty_subject() {
         for subject in ["", "   ", "Re: ", "Fwd:"] {
             let rule = FilterRule::draft_from_message("me@x.org", "a@b.org", subject);
-            assert_eq!(rule.conditions().len(), 1, "subject {subject:?} leaves the sender alone");
+            assert_eq!(
+                rule.conditions().len(),
+                1,
+                "subject {subject:?} leaves the sender alone"
+            );
             assert_eq!(rule.field, FilterField::FromAddress);
         }
     }
@@ -5538,10 +5866,18 @@ mod filter_tests {
     #[test]
     fn contact_conditions_reach_disk_in_a_form_older_versions_read() {
         let mut r = rule(FilterField::FromNotInContacts, FilterMatch::Contains, "");
-        r.more.push(cond(FilterField::FromInContacts, FilterMatch::Contains, ""));
-        r.more.push(cond(FilterField::Subject, FilterMatch::Contains, "sale"));
-        let text = toml::to_string_pretty(&FiltersFile { rules: vec![r.clone()] }).unwrap();
-        assert!(!text.contains("from_in_contacts") && !text.contains("from_not_in_contacts"), "{text}");
+        r.more
+            .push(cond(FilterField::FromInContacts, FilterMatch::Contains, ""));
+        r.more
+            .push(cond(FilterField::Subject, FilterMatch::Contains, "sale"));
+        let text = toml::to_string_pretty(&FiltersFile {
+            rules: vec![r.clone()],
+        })
+        .unwrap();
+        assert!(
+            !text.contains("from_in_contacts") && !text.contains("from_not_in_contacts"),
+            "{text}"
+        );
         assert!(text.contains("contacts = \"not_in_contacts\""), "{text}");
         let back: FiltersFile = toml::from_str(&text).unwrap();
         assert_eq!(back.rules, vec![r]);
@@ -5564,7 +5900,10 @@ mod filter_tests {
             rules: Vec<OldRule>,
         }
         let old: OldFile = toml::from_str(&text).unwrap();
-        assert_eq!((old.rules[0].field.as_str(), old.rules[0].value.as_str()), ("from_address", ""));
+        assert_eq!(
+            (old.rules[0].field.as_str(), old.rules[0].value.as_str()),
+            ("from_address", "")
+        );
         assert_eq!(old.rules[0].more[0].field, "from_address");
         assert_eq!(old.rules[0].more[0].value, "");
         assert_eq!(old.rules[0].more[1].field, "subject");
@@ -5574,7 +5913,11 @@ mod filter_tests {
     fn filters_check_the_sender_against_the_address_books() {
         let book: std::collections::HashSet<String> =
             ["ann@x.org".to_string()].into_iter().collect();
-        let with_book = |from_addr| FilterInput { from_addr, contacts: Some(&book), ..Default::default() };
+        let with_book = |from_addr| FilterInput {
+            from_addr,
+            contacts: Some(&book),
+            ..Default::default()
+        };
 
         let inside = rule(FilterField::FromInContacts, FilterMatch::Contains, "");
         let outside = rule(FilterField::FromNotInContacts, FilterMatch::Contains, "");
@@ -5585,14 +5928,24 @@ mod filter_tests {
 
         // Unknown address books match neither way, so a book that failed to
         // load cannot make every sender look unknown.
-        let none = FilterInput { from_addr: "bob@x.org", ..Default::default() };
+        let none = FilterInput {
+            from_addr: "bob@x.org",
+            ..Default::default()
+        };
         assert!(!inside.matches(&none));
         assert!(!outside.matches(&none));
 
         // Combined with another condition, and reported to the caller.
         let mut mixed = rule(FilterField::FromNotInContacts, FilterMatch::Contains, "");
-        mixed.more.push(cond(FilterField::Subject, FilterMatch::Contains, "sale"));
-        let input = FilterInput { from_addr: "bob@x.org", subject: "Big SALE", contacts: Some(&book), ..Default::default() };
+        mixed
+            .more
+            .push(cond(FilterField::Subject, FilterMatch::Contains, "sale"));
+        let input = FilterInput {
+            from_addr: "bob@x.org",
+            subject: "Big SALE",
+            contacts: Some(&book),
+            ..Default::default()
+        };
         assert!(mixed.matches(&input));
         assert!(mixed.needs_contacts());
         assert!(!rule(FilterField::Subject, FilterMatch::Contains, "x").needs_contacts());
@@ -5602,14 +5955,25 @@ mod filter_tests {
     fn filter_values_hold_comma_separated_alternatives() {
         // #192: "invoice, receipt" matches either; spaces around the commas
         // and empty pieces are ignored; a comma-free value is one piece.
-        assert_eq!(FilterCondition::alternatives(" Invoice ,receipt,, "), ["invoice", "receipt"]);
+        assert_eq!(
+            FilterCondition::alternatives(" Invoice ,receipt,, "),
+            ["invoice", "receipt"]
+        );
         assert_eq!(FilterCondition::alternatives("plain"), ["plain"]);
-        let r = rule(FilterField::Subject, FilterMatch::Contains, "invoice, receipt");
+        let r = rule(
+            FilterField::Subject,
+            FilterMatch::Contains,
+            "invoice, receipt",
+        );
         assert!(r.matches(&headers("", "", "Your RECEIPT", "")));
         assert!(r.matches(&headers("", "", "invoice #12", "")));
         assert!(!r.matches(&headers("", "", "hello", "")));
         // Each alternative gets the whole matcher, not just "contains".
-        let r = rule(FilterField::FromAddress, FilterMatch::EndsWith, "@a.org, @b.org");
+        let r = rule(
+            FilterField::FromAddress,
+            FilterMatch::EndsWith,
+            "@a.org, @b.org",
+        );
         assert!(r.matches(&headers("x@B.org", "", "", "")));
         assert!(!r.matches(&headers("x@b.org.evil", "", "", "")));
     }
@@ -5617,8 +5981,13 @@ mod filter_tests {
     #[test]
     fn filter_rules_combine_conditions_all_or_any() {
         // #192: a second condition narrows by default…
-        let mut r = rule(FilterField::FromAddress, FilterMatch::EndsWith, "@shop.example");
-        r.more.push(cond(FilterField::Subject, FilterMatch::Contains, "order"));
+        let mut r = rule(
+            FilterField::FromAddress,
+            FilterMatch::EndsWith,
+            "@shop.example",
+        );
+        r.more
+            .push(cond(FilterField::Subject, FilterMatch::Contains, "order"));
         assert!(r.matches(&headers("a@shop.example", "", "Order shipped", "")));
         assert!(!r.matches(&headers("a@shop.example", "", "Newsletter", "")));
         assert!(!r.matches(&headers("a@other.example", "", "Order shipped", "")));
@@ -5629,7 +5998,8 @@ mod filter_tests {
         assert!(!r.matches(&headers("a@other.example", "", "Newsletter", "")));
         // A condition with nothing to match holds nothing up in "any" mode
         // and blocks an "all" rule, as an inert rule should.
-        r.more.push(cond(FilterField::Subject, FilterMatch::Contains, ""));
+        r.more
+            .push(cond(FilterField::Subject, FilterMatch::Contains, ""));
         assert!(r.matches(&headers("a@shop.example", "", "", "")));
         r.any = false;
         assert!(!r.matches(&headers("a@shop.example", "", "Order shipped", "")));
@@ -5637,9 +6007,20 @@ mod filter_tests {
         // The conditions round-trip through the accessors, first one included.
         let conds = r.conditions();
         assert_eq!(conds.len(), 3);
-        assert_eq!(conds[0], cond(FilterField::FromAddress, FilterMatch::EndsWith, "@shop.example"));
+        assert_eq!(
+            conds[0],
+            cond(
+                FilterField::FromAddress,
+                FilterMatch::EndsWith,
+                "@shop.example"
+            )
+        );
         assert!(!r.set_conditions(Vec::new()), "a rule needs a condition");
-        assert!(r.set_conditions(vec![cond(FilterField::FromName, FilterMatch::Equals, "Bank")]));
+        assert!(r.set_conditions(vec![cond(
+            FilterField::FromName,
+            FilterMatch::Equals,
+            "Bank"
+        )]));
         assert_eq!(r.field, FilterField::FromName);
         assert_eq!(r.value, "Bank");
         assert!(r.more.is_empty());
@@ -5677,7 +6058,12 @@ mod filter_tests {
         // A display name counts on its own too.
         assert!(r(FilterMatch::Equals, "ann").matches(&input));
         // The single bare address most mail carries.
-        assert!(r(FilterMatch::Equals, "me@shop.example").matches(&headers("", "", "", "me@shop.example")));
+        assert!(r(FilterMatch::Equals, "me@shop.example").matches(&headers(
+            "",
+            "",
+            "",
+            "me@shop.example"
+        )));
         assert!(!r(FilterMatch::Equals, "me@shop.example").matches(&headers("", "", "", "")));
     }
 
@@ -5685,7 +6071,11 @@ mod filter_tests {
     fn filter_body_matches_hits_or_text_on_hand() {
         // #191: the server's search result counts, and so does the text the
         // list carries; the matcher is always "contains".
-        let r = rule(FilterField::Body, FilterMatch::Equals, "unsubscribe, opt out");
+        let r = rule(
+            FilterField::Body,
+            FilterMatch::Equals,
+            "unsubscribe, opt out",
+        );
         let hits = vec!["unsubscribe".to_string()];
         let mut input = headers("", "", "", "");
         input.body_hits = &hits;
@@ -5697,7 +6087,9 @@ mod filter_tests {
         input.body = "nothing of the sort";
         assert!(!r.matches(&input));
         assert_eq!(r.body_needles(), ["unsubscribe", "opt out"]);
-        assert!(rule(FilterField::Subject, FilterMatch::Contains, "x").body_needles().is_empty());
+        assert!(rule(FilterField::Subject, FilterMatch::Contains, "x")
+            .body_needles()
+            .is_empty());
     }
 
     #[test]
@@ -5717,10 +6109,16 @@ dest_path = "Lists"
         let r = &back.rules[0];
         assert!(r.more.is_empty());
         assert!(!r.any);
-        assert_eq!(r.conditions(), vec![cond(FilterField::Subject, FilterMatch::Contains, "digest")]);
+        assert_eq!(
+            r.conditions(),
+            vec![cond(FilterField::Subject, FilterMatch::Contains, "digest")]
+        );
         // And a one-condition rule written now carries none of the new keys,
         // so those versions read it back too.
-        let text = toml::to_string_pretty(&FiltersFile { rules: back.rules.clone() }).unwrap();
+        let text = toml::to_string_pretty(&FiltersFile {
+            rules: back.rules.clone(),
+        })
+        .unwrap();
         assert!(!text.contains("more"), "{text}");
         assert!(!text.contains("any"), "{text}");
     }
@@ -5733,7 +6131,8 @@ dest_path = "Lists"
         assert!(apply_new_defaults(&mut old));
         assert!(old.list_group_by_date);
         old.list_group_by_date = false;
-        let mut again: PrivacyFile = toml::from_str(&toml::to_string_pretty(&old).unwrap()).unwrap();
+        let mut again: PrivacyFile =
+            toml::from_str(&toml::to_string_pretty(&old).unwrap()).unwrap();
         assert!(!apply_new_defaults(&mut again));
         assert!(!again.list_group_by_date);
         let mut fresh = PrivacyFile::default();
@@ -5761,8 +6160,14 @@ dest_path = "Lists"
 
         let mut acc = old.clone();
         let two = vec![
-            NamedSignature { name: "English".into(), html: "Regards".into() },
-            NamedSignature { name: "Deutsch".into(), html: "Grüße".into() },
+            NamedSignature {
+                name: "English".into(),
+                html: "Regards".into(),
+            },
+            NamedSignature {
+                name: "Deutsch".into(),
+                html: "Grüße".into(),
+            },
         ];
         acc.set_signatures(two.clone(), Some(1));
         assert_eq!(acc.signature.as_deref(), Some("Grüße"));
@@ -5862,7 +6267,13 @@ dest_path = "Lists"
         // The later sections ride along, and a bundle without them (from
         // before they existed) still parses, leaving them unset.
         assert_eq!(back.cloud.as_ref().map(Vec::len), Some(1));
-        assert_eq!(back.spell_words.as_ref().and_then(|w| w.get("en_US")).map(Vec::len), Some(1));
+        assert_eq!(
+            back.spell_words
+                .as_ref()
+                .and_then(|w| w.get("en_US"))
+                .map(Vec::len),
+            Some(1)
+        );
         let old: SettingsBundle = toml::from_str("version = 1\n[privacy]\n").unwrap();
         assert!(old.cloud.is_none() && old.spell_words.is_none());
         // Auto-empty (#140): "never" is left out of the file, an age is kept.
@@ -5910,13 +6321,19 @@ dest_path = "Lists"
         // before #197 reads the file back unchanged.
         let plain = rule(FilterField::Subject, FilterMatch::Contains, "digest");
         assert_eq!(plain.name, "");
-        let text = toml::to_string_pretty(&FiltersFile { rules: vec![plain.clone()] }).unwrap();
+        let text = toml::to_string_pretty(&FiltersFile {
+            rules: vec![plain.clone()],
+        })
+        .unwrap();
         assert!(!text.contains("name"), "{text}");
         // A named one keeps its name across a round trip, and an unknown
         // `name` key in a file from a newer version is simply carried.
         let mut named = plain.clone();
         named.name = "Mailing lists".into();
-        let text = toml::to_string_pretty(&FiltersFile { rules: vec![named.clone()] }).unwrap();
+        let text = toml::to_string_pretty(&FiltersFile {
+            rules: vec![named.clone()],
+        })
+        .unwrap();
         let back: FiltersFile = toml::from_str(&text).unwrap();
         assert_eq!(back.rules, vec![named.clone()]);
         // The label falls back to the conditions when there is no name.
@@ -5927,10 +6344,20 @@ dest_path = "Lists"
     #[test]
     fn filter_rules_roundtrip_through_toml() {
         let mut multi = rule(FilterField::Body, FilterMatch::Contains, "unsubscribe");
-        multi.more.push(cond(FilterField::ReplyTo, FilterMatch::EndsWith, "@list.example"));
+        multi.more.push(cond(
+            FilterField::ReplyTo,
+            FilterMatch::EndsWith,
+            "@list.example",
+        ));
         multi.any = true;
-        let rules = vec![rule(FilterField::Subject, FilterMatch::EndsWith, "digest"), multi];
-        let text = toml::to_string_pretty(&FiltersFile { rules: rules.clone() }).unwrap();
+        let rules = vec![
+            rule(FilterField::Subject, FilterMatch::EndsWith, "digest"),
+            multi,
+        ];
+        let text = toml::to_string_pretty(&FiltersFile {
+            rules: rules.clone(),
+        })
+        .unwrap();
         let back: FiltersFile = toml::from_str(&text).unwrap();
         assert_eq!(back.rules, rules);
     }
@@ -6157,8 +6584,16 @@ pub fn load_reader_toolbar() -> ReaderToolbar {
         return ReaderToolbar::default();
     };
     let mut layout = ReaderToolbar {
-        left: file.left.iter().filter_map(|k| ToolbarItem::from_key(k)).collect(),
-        right: file.right.iter().filter_map(|k| ToolbarItem::from_key(k)).collect(),
+        left: file
+            .left
+            .iter()
+            .filter_map(|k| ToolbarItem::from_key(k))
+            .collect(),
+        right: file
+            .right
+            .iter()
+            .filter_map(|k| ToolbarItem::from_key(k))
+            .collect(),
     };
     layout.sanitize();
     layout
@@ -6212,10 +6647,20 @@ mod toolbar_tests {
 
     #[test]
     fn file_round_trip_skips_unknown_names() {
-        let file: ToolbarFile = toml::from_str("left = [\"reply\", \"bogus\", \"delete\"]\nright = [\"print\"]\n").unwrap();
+        let file: ToolbarFile =
+            toml::from_str("left = [\"reply\", \"bogus\", \"delete\"]\nright = [\"print\"]\n")
+                .unwrap();
         let mut layout = ReaderToolbar {
-            left: file.left.iter().filter_map(|k| ToolbarItem::from_key(k)).collect(),
-            right: file.right.iter().filter_map(|k| ToolbarItem::from_key(k)).collect(),
+            left: file
+                .left
+                .iter()
+                .filter_map(|k| ToolbarItem::from_key(k))
+                .collect(),
+            right: file
+                .right
+                .iter()
+                .filter_map(|k| ToolbarItem::from_key(k))
+                .collect(),
         };
         layout.sanitize();
         assert_eq!(layout.left, vec![ToolbarItem::Reply, ToolbarItem::Delete]);
@@ -6240,15 +6685,21 @@ mod files_prefs_tests {
 
     #[test]
     fn keys_round_trip_by_name() {
-        let file: PrivacyFile =
-            toml::from_str("files_action = \"reply\"\nfiles_large = \"cloud\"\nfiles_limit_mb = 50\n").unwrap();
+        let file: PrivacyFile = toml::from_str(
+            "files_action = \"reply\"\nfiles_large = \"cloud\"\nfiles_limit_mb = 50\n",
+        )
+        .unwrap();
         assert_eq!(file.files_action, FilesAction::Reply);
         assert_eq!(file.files_large, FilesLarge::Cloud);
         assert_eq!(file.files_limit_mb, 50);
         let text = toml::to_string(&file).unwrap();
         assert!(text.contains("files_action = \"reply\""), "{text}");
         assert!(text.contains("files_large = \"cloud\""), "{text}");
-        let prefs = FilesPrefs { action: FilesAction::New, large: FilesLarge::Attach, limit_mb: 3 };
+        let prefs = FilesPrefs {
+            action: FilesAction::New,
+            large: FilesLarge::Attach,
+            limit_mb: 3,
+        };
         assert_eq!(prefs.limit_bytes(), 3_000_000);
     }
 }
@@ -6419,7 +6870,9 @@ pub fn load_unsubscribed() -> Vec<UnsubscribedList> {
     let Some(text) = unsubscribed_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
         return Vec::new();
     };
-    toml::from_str::<UnsubscribedFile>(&text).unwrap_or_default().lists
+    toml::from_str::<UnsubscribedFile>(&text)
+        .unwrap_or_default()
+        .lists
 }
 
 pub fn save_unsubscribed(lists: &[UnsubscribedList]) {
@@ -6429,7 +6882,9 @@ pub fn save_unsubscribed(lists: &[UnsubscribedList]) {
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let file = UnsubscribedFile { lists: lists.to_vec() };
+    let file = UnsubscribedFile {
+        lists: lists.to_vec(),
+    };
     if let Ok(toml) = toml::to_string_pretty(&file) {
         let _ = std::fs::write(&path, toml);
     }
@@ -6475,7 +6930,9 @@ pub fn load_invite_answers() -> Vec<InviteAnswer> {
     let Some(text) = invites_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
         return Vec::new();
     };
-    toml::from_str::<InviteAnswerFile>(&text).unwrap_or_default().answers
+    toml::from_str::<InviteAnswerFile>(&text)
+        .unwrap_or_default()
+        .answers
 }
 
 pub fn save_invite_answers(answers: &[InviteAnswer]) {
@@ -6486,7 +6943,9 @@ pub fn save_invite_answers(answers: &[InviteAnswer]) {
         let _ = std::fs::create_dir_all(dir);
     }
     let kept = answers.len().saturating_sub(INVITE_ANSWER_LIMIT);
-    let file = InviteAnswerFile { answers: answers[kept..].to_vec() };
+    let file = InviteAnswerFile {
+        answers: answers[kept..].to_vec(),
+    };
     if let Ok(toml) = toml::to_string_pretty(&file) {
         let _ = std::fs::write(&path, toml);
     }

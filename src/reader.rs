@@ -38,7 +38,10 @@ pub fn extract(body: &str) -> String {
     // A body with no markup at all is plain text, cached as it came: shown
     // line for line, as the ordinary view shows it (see `body_html`).
     if !body.contains('<') {
-        return format!("<div class=\"hylki-plain\">{}</div>", escape_text(body.trim_matches('\n')));
+        return format!(
+            "<div class=\"hylki-plain\">{}</div>",
+            escape_text(body.trim_matches('\n'))
+        );
     }
     extract_blocks(body).concat()
 }
@@ -47,7 +50,10 @@ pub fn extract(body: &str) -> String {
 /// translation (#327) splits a long message at.
 pub fn extract_blocks(body: &str) -> Vec<String> {
     if !body.contains('<') {
-        return vec![format!("<div class=\"hylki-plain\">{}</div>", escape_text(body.trim_matches('\n')))];
+        return vec![format!(
+            "<div class=\"hylki-plain\">{}</div>",
+            escape_text(body.trim_matches('\n'))
+        )];
     }
     let dom = html5ever::parse_document(RcDom::default(), Default::default()).one(body);
     let mut out = Vec::new();
@@ -127,7 +133,11 @@ struct Elem {
 
 impl Elem {
     fn new(tag: &'static str) -> Elem {
-        Elem { tag, attrs: Vec::new(), kids: Vec::new() }
+        Elem {
+            tag,
+            attrs: Vec::new(),
+            kids: Vec::new(),
+        }
     }
 
     fn is_block(&self) -> bool {
@@ -160,7 +170,11 @@ impl Elem {
 
     /// Whitespace inside is meaningful (shown as written).
     fn keeps_space(&self) -> bool {
-        self.tag == "pre" || self.attrs.iter().any(|(k, v)| *k == "class" && v == "hylki-plain")
+        self.tag == "pre"
+            || self
+                .attrs
+                .iter()
+                .any(|(k, v)| *k == "class" && v == "hylki-plain")
     }
 }
 
@@ -222,7 +236,18 @@ impl Out {
 /// is padded with count as nothing.
 fn is_blank(t: &str) -> bool {
     t.chars().all(|c| {
-        c.is_whitespace() || matches!(c, '\u{a0}' | '\u{200b}' | '\u{200c}' | '\u{200d}' | '\u{feff}' | '\u{ad}' | '\u{2007}' | '\u{202f}')
+        c.is_whitespace()
+            || matches!(
+                c,
+                '\u{a0}'
+                    | '\u{200b}'
+                    | '\u{200c}'
+                    | '\u{200d}'
+                    | '\u{feff}'
+                    | '\u{ad}'
+                    | '\u{2007}'
+                    | '\u{202f}'
+            )
     })
 }
 
@@ -238,12 +263,21 @@ fn escape_text(s: &str) -> String {
 /// The class and id markers kept on an element: what the wrapper's quote
 /// fold and the plain-text sheet look for. Nothing else of the sender's
 /// classes survives.
-const KEPT_CLASSES: [&str; 6] =
-    ["gmail_quote", "gmail_signature", "moz-signature", "hylki-quote-attr", "hylki-plain", "yahoo_quoted"];
+const KEPT_CLASSES: [&str; 6] = [
+    "gmail_quote",
+    "gmail_signature",
+    "moz-signature",
+    "hylki-quote-attr",
+    "hylki-plain",
+    "yahoo_quoted",
+];
 const KEPT_IDS: [&str; 2] = ["divRplyFwdMsg", "Signature"];
 
 fn attr<'a>(attrs: &'a [html5ever::Attribute], name: &str) -> Option<&'a str> {
-    attrs.iter().find(|a| &*a.name.local == name).map(|a| &*a.value)
+    attrs
+        .iter()
+        .find(|a| &*a.name.local == name)
+        .map(|a| &*a.value)
 }
 
 /// Emit `node` and what is under it into `out`. `pre` keeps whitespace as
@@ -284,10 +318,10 @@ fn walk(node: &Handle, out: &mut Vec<Out>, pre: bool, in_link: bool) {
                 // Dropped with everything inside: code, styling, chrome and
                 // the parts of a page a message has no business carrying.
                 "script" | "style" | "head" | "title" | "meta" | "link" | "template"
-                | "noscript" | "iframe" | "frame" | "frameset" | "object" | "embed"
-                | "applet" | "svg" | "math" | "canvas" | "form" | "input" | "button"
-                | "select" | "textarea" | "option" | "datalist" | "map" | "area" | "base"
-                | "audio" | "video" | "source" | "track" | "picture" | "o:p" | "xml" => {}
+                | "noscript" | "iframe" | "frame" | "frameset" | "object" | "embed" | "applet"
+                | "svg" | "math" | "canvas" | "form" | "input" | "button" | "select"
+                | "textarea" | "option" | "datalist" | "map" | "area" | "base" | "audio"
+                | "video" | "source" | "track" | "picture" | "o:p" | "xml" => {}
                 "br" => out.push(Out::Elem(Elem::new("br"))),
                 "hr" => out.push(Out::Elem(Elem::new("hr"))),
                 "img" => {
@@ -318,7 +352,9 @@ fn walk(node: &Handle, out: &mut Vec<Out>, pre: bool, in_link: bool) {
                 // (#358).
                 "blockquote"
                     if attr(&attrs, "style").is_some_and(|s| {
-                        s.replace(' ', "").to_ascii_lowercase().contains("border:none")
+                        s.replace(' ', "")
+                            .to_ascii_lowercase()
+                            .contains("border:none")
                     }) =>
                 {
                     push_elem(out, Elem::new("div"), pre, in_link)
@@ -334,9 +370,7 @@ fn walk(node: &Handle, out: &mut Vec<Out>, pre: bool, in_link: bool) {
                     push_elem(out, Elem::new("pre"), true, in_link)
                 }
                 "figure" => push_elem(out, Elem::new("figure"), pre, in_link),
-                "figcaption" | "caption" => {
-                    push_elem(out, Elem::new("figcaption"), pre, in_link)
-                }
+                "figcaption" | "caption" => push_elem(out, Elem::new("figcaption"), pre, in_link),
                 "table" => {
                     if is_data_table(node) {
                         push_elem(out, Elem::new("table"), pre, in_link);
@@ -367,9 +401,9 @@ fn walk(node: &Handle, out: &mut Vec<Out>, pre: bool, in_link: bool) {
                     }
                     children(out, pre, in_link);
                 }
-                "div" | "section" | "article" | "main" | "header" | "footer" | "aside"
-                | "nav" | "center" | "address" | "details" | "summary" | "fieldset"
-                | "legend" | "body" | "html" => {
+                "div" | "section" | "article" | "main" | "header" | "footer" | "aside" | "nav"
+                | "center" | "address" | "details" | "summary" | "fieldset" | "legend" | "body"
+                | "html" => {
                     // A plain-text part keeps its line structure (#181): the
                     // worker wraps it in `.hylki-plain`, and so does this.
                     // (`body_html` puts the class on `<body>` itself for a
@@ -381,21 +415,21 @@ fn walk(node: &Handle, out: &mut Vec<Out>, pre: bool, in_link: bool) {
                         push_elem(out, Elem::new("div"), pre || plain, in_link);
                     }
                 }
-                "a" => {
-                    match (in_link, link_href(&attrs)) {
-                        (false, Some(href)) => {
-                            let mut e = Elem::new("a");
-                            e.attrs.push(("href", href));
-                            if let Some(t) = attr(&attrs, "title").filter(|t| !t.trim().is_empty()) {
-                                e.attrs.push(("title", t.trim().to_string()));
-                            }
-                            push_elem(out, e, pre, true);
+                "a" => match (in_link, link_href(&attrs)) {
+                    (false, Some(href)) => {
+                        let mut e = Elem::new("a");
+                        e.attrs.push(("href", href));
+                        if let Some(t) = attr(&attrs, "title").filter(|t| !t.trim().is_empty()) {
+                            e.attrs.push(("title", t.trim().to_string()));
                         }
-                        _ => children(out, pre, in_link),
+                        push_elem(out, e, pre, true);
                     }
-                }
+                    _ => children(out, pre, in_link),
+                },
                 "strong" | "b" => push_elem(out, Elem::new("strong"), pre, in_link),
-                "em" | "i" | "cite" | "var" | "dfn" => push_elem(out, Elem::new("em"), pre, in_link),
+                "em" | "i" | "cite" | "var" | "dfn" => {
+                    push_elem(out, Elem::new("em"), pre, in_link)
+                }
                 "u" | "ins" => push_elem(out, Elem::new("u"), pre, in_link),
                 "s" | "strike" | "del" => push_elem(out, Elem::new("s"), pre, in_link),
                 "sub" => push_elem(out, Elem::new("sub"), pre, in_link),
@@ -416,7 +450,9 @@ fn walk(node: &Handle, out: &mut Vec<Out>, pre: bool, in_link: bool) {
                 _ => children(out, pre, in_link),
             }
         }
-        NodeData::Doctype { .. } | NodeData::Comment { .. } | NodeData::ProcessingInstruction { .. } => {}
+        NodeData::Doctype { .. }
+        | NodeData::Comment { .. }
+        | NodeData::ProcessingInstruction { .. } => {}
     }
 }
 
@@ -476,7 +512,10 @@ fn declarations(style: &str) -> Vec<(String, String)> {
 
 /// A CSS length that amounts to nothing: `0`, `0px`, `0.0em`…
 fn is_zero_length(v: &str) -> bool {
-    let n: String = v.chars().take_while(|c| c.is_ascii_digit() || *c == '.').collect();
+    let n: String = v
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
     !n.is_empty() && n.parse::<f64>().is_ok_and(|n| n == 0.0)
 }
 
@@ -484,7 +523,10 @@ fn is_zero_length(v: &str) -> bool {
 /// do); `None` for anything else (percentages, em…).
 fn px(v: &str) -> Option<f64> {
     let v = v.trim();
-    let n: String = v.chars().take_while(|c| c.is_ascii_digit() || *c == '.').collect();
+    let n: String = v
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
     let rest = v[n.len()..].trim();
     if n.is_empty() || !(rest.is_empty() || rest.eq_ignore_ascii_case("px")) {
         return None;
@@ -498,9 +540,17 @@ pub(crate) fn is_hidden(attrs: &[html5ever::Attribute]) -> bool {
     if attr(attrs, "hidden").is_some() {
         return true;
     }
-    let Some(style) = attr(attrs, "style") else { return false };
+    let Some(style) = attr(attrs, "style") else {
+        return false;
+    };
     let decls = declarations(style);
-    let get = |k: &str| decls.iter().rev().find(|(p, _)| p == k).map(|(_, v)| v.as_str());
+    let get = |k: &str| {
+        decls
+            .iter()
+            .rev()
+            .find(|(p, _)| p == k)
+            .map(|(_, v)| v.as_str())
+    };
     if get("display").is_some_and(|v| v == "none")
         || get("visibility").is_some_and(|v| v == "hidden")
         || get("mso-hide").is_some_and(|v| v == "all")
@@ -569,7 +619,10 @@ fn link_href(attrs: &[html5ever::Attribute]) -> Option<String> {
         // Relative to nothing: a message has no page to resolve it against.
         return None;
     }
-    if matches!(scheme.as_str(), "javascript" | "vbscript" | "data" | "file" | "blob") {
+    if matches!(
+        scheme.as_str(),
+        "javascript" | "vbscript" | "data" | "file" | "blob"
+    ) {
         return None;
     }
     Some(href.to_string())
@@ -587,7 +640,9 @@ fn in_data_table(node: &Handle) -> bool {
     let mut cur = node.parent.take();
     node.parent.set(cur.clone());
     while let Some(weak) = cur {
-        let Some(p) = weak.upgrade() else { return false };
+        let Some(p) = weak.upgrade() else {
+            return false;
+        };
         if element_name(&p).as_deref() == Some("table") {
             return is_data_table(&p);
         }
@@ -614,7 +669,9 @@ fn is_data_table(table: &Handle) -> bool {
         blocky: &mut bool,
     ) {
         for c in node.children.borrow().iter() {
-            let Some(name) = element_name(c) else { continue };
+            let Some(name) = element_name(c) else {
+                continue;
+            };
             match name.as_str() {
                 "tr" => {
                     *rows += 1;
@@ -652,8 +709,22 @@ fn has_block_inside(node: &Handle) -> bool {
         if let Some(name) = element_name(c) {
             if matches!(
                 name.as_str(),
-                "table" | "div" | "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "ul" | "ol"
-                    | "img" | "blockquote" | "pre" | "hr" | "center"
+                "table"
+                    | "div"
+                    | "p"
+                    | "h1"
+                    | "h2"
+                    | "h3"
+                    | "h4"
+                    | "h5"
+                    | "h6"
+                    | "ul"
+                    | "ol"
+                    | "img"
+                    | "blockquote"
+                    | "pre"
+                    | "hr"
+                    | "center"
             ) {
                 return true;
             }
@@ -691,7 +762,10 @@ fn tidy(kids: Vec<Out>, root: bool) -> Vec<Out> {
                     continue;
                 }
                 e.kids = tidy(std::mem::take(&mut e.kids), false);
-                if matches!(e.tag, "div" | "blockquote" | "li" | "td" | "th" | "dd" | "figure") {
+                if matches!(
+                    e.tag,
+                    "div" | "blockquote" | "li" | "td" | "th" | "dd" | "figure"
+                ) {
                     e.kids = paragraphs(std::mem::take(&mut e.kids), e.tag != "div");
                 }
                 // A heading (or paragraph) holds a line, not boxes: blocks a
@@ -714,7 +788,11 @@ fn tidy(kids: Vec<Out>, root: bool) -> Vec<Out> {
                     // card) is turned inside out: the formatting goes into
                     // each block, and the blocks stand on their own.
                     Out::Elem(e) if !e.is_block() && e.kids.iter().any(Out::is_block) => {
-                        let shell = Elem { tag: e.tag, attrs: e.attrs.clone(), kids: Vec::new() };
+                        let shell = Elem {
+                            tag: e.tag,
+                            attrs: e.attrs.clone(),
+                            kids: Vec::new(),
+                        };
                         out.extend(wrap_inline(&shell, e.kids));
                     }
                     n => out.push(n),
@@ -754,7 +832,13 @@ fn flatten_blocks(kids: Vec<Out>) -> Vec<Out> {
 /// `kids` wrapped in a copy of `shell` (an inline element) — block by block
 /// where they hold blocks, so no block ever sits inside an inline element.
 fn wrap_inline(shell: &Elem, kids: Vec<Out>) -> Vec<Out> {
-    let clone = |kids: Vec<Out>| Out::Elem(Elem { tag: shell.tag, attrs: shell.attrs.clone(), kids });
+    let clone = |kids: Vec<Out>| {
+        Out::Elem(Elem {
+            tag: shell.tag,
+            attrs: shell.attrs.clone(),
+            kids,
+        })
+    };
     if !kids.iter().any(Out::is_block) {
         return vec![clone(kids)];
     }
@@ -808,7 +892,11 @@ fn paragraphs(kids: Vec<Out>, keep_lone: bool) -> Vec<Out> {
         for piece in split_breaks(std::mem::take(run)) {
             let piece = trim_run(piece);
             if piece.iter().any(Out::has_content) {
-                out.push(Out::Elem(Elem { tag: "p", attrs: Vec::new(), kids: piece }));
+                out.push(Out::Elem(Elem {
+                    tag: "p",
+                    attrs: Vec::new(),
+                    kids: piece,
+                }));
             }
         }
     };
@@ -900,13 +988,20 @@ mod tests {
         let html = "<div style=\"font-size:0px;text-align:left;display:inline-block;width:100%\">\
                     <table><tr><td style=\"font-size:0px;padding:10px 25px\"><div style=\"font-size:16px\">Convention reminder</div></td></tr></table></div>\
                     <div style=\"max-height:0px\">not clipped, shown</div>";
-        assert_eq!(extract(html), "<p>Convention reminder</p><p>not clipped, shown</p>");
+        assert_eq!(
+            extract(html),
+            "<p>Convention reminder</p><p>not clipped, shown</p>"
+        );
     }
 
     #[test]
     fn a_heading_holds_a_line_not_boxes() {
-        let html = "<h2><p>Your package</p><p>was delivered!</p></h2><p><div>a</div><div>b</div></p>";
-        assert_eq!(extract(html), "<h2>Your package<br>was delivered!</h2><p>a</p><p>b</p>");
+        let html =
+            "<h2><p>Your package</p><p>was delivered!</p></h2><p><div>a</div><div>b</div></p>";
+        assert_eq!(
+            extract(html),
+            "<h2>Your package<br>was delivered!</h2><p>a</p><p>b</p>"
+        );
     }
 
     #[test]
@@ -933,7 +1028,8 @@ mod tests {
 
     #[test]
     fn a_data_table_keeps_its_grid() {
-        let html = "<table><tr><th>Item</th><th>Price</th></tr><tr><td>Tea</td><td>3</td></tr></table>";
+        let html =
+            "<table><tr><th>Item</th><th>Price</th></tr><tr><td>Tea</td><td>3</td></tr></table>";
         let out = extract(html);
         assert_eq!(
             out,
@@ -955,7 +1051,8 @@ mod tests {
 
     #[test]
     fn links_keep_their_target_and_nothing_dangerous() {
-        let html = "<p><a href=\"https://a.example/x\" style=\"color:red\" target=\"_blank\">go</a> \
+        let html =
+            "<p><a href=\"https://a.example/x\" style=\"color:red\" target=\"_blank\">go</a> \
                     <a href=\"javascript:alert(1)\">bad</a> <a href=\"#top\">top</a> \
                     <a href=\"mailto:x@y.z\">mail</a></p>";
         let out = extract(html);
@@ -969,15 +1066,22 @@ mod tests {
     fn plain_text_keeps_its_lines() {
         let html = "<html><body><div class=\"hylki-plain\">line one\n\n  indented\n&gt; quoted</div></body></html>";
         let out = extract(html);
-        assert_eq!(out, "<div class=\"hylki-plain\">line one\n\n  indented\n&gt; quoted</div>");
+        assert_eq!(
+            out,
+            "<div class=\"hylki-plain\">line one\n\n  indented\n&gt; quoted</div>"
+        );
     }
 
     #[test]
     fn raw_plain_text_keeps_its_lines_too() {
         let out = extract("Hi,\n\nTwo lines & a line\n  indented.\n");
-        assert_eq!(out, "<div class=\"hylki-plain\">Hi,\n\nTwo lines &amp; a line\n  indented.</div>");
+        assert_eq!(
+            out,
+            "<div class=\"hylki-plain\">Hi,\n\nTwo lines &amp; a line\n  indented.</div>"
+        );
         // The ordinary view's own plain wrapper (`body_html`) reads the same.
-        let wrapped = "<!doctype html><html><head></head><body class=\"hylki-plain\">a\n\nb</body></html>";
+        let wrapped =
+            "<!doctype html><html><head></head><body class=\"hylki-plain\">a\n\nb</body></html>";
         assert_eq!(extract(wrapped), "<div class=\"hylki-plain\">a\n\nb</div>");
     }
 
@@ -985,7 +1089,10 @@ mod tests {
     fn double_breaks_become_paragraphs() {
         let html = "<div>First line<br>still first<br><br>Second<br/>\n<br/>Third</div>";
         let out = extract(html);
-        assert_eq!(out, "<p>First line<br>still first</p><p>Second</p><p>Third</p>");
+        assert_eq!(
+            out,
+            "<p>First line<br>still first</p><p>Second</p><p>Third</p>"
+        );
     }
 
     #[test]
@@ -1026,7 +1133,9 @@ mod tests {
     #[test]
     #[ignore]
     fn probe_file() {
-        let Ok(path) = std::env::var("HYLKI_READER_PROBE") else { return };
+        let Ok(path) = std::env::var("HYLKI_READER_PROBE") else {
+            return;
+        };
         let body = std::fs::read_to_string(path).unwrap();
         println!("{}", extract(&body));
     }

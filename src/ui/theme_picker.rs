@@ -151,7 +151,9 @@ pub fn gallery(selected: &str, on_pick: Rc<dyn Fn(&str)>) -> gtk::FlowBox {
     // Connected after the initial selection, so only the user's picks report.
     let current = std::cell::RefCell::new(selected.to_string());
     grid.connect_selected_children_changed(move |g| {
-        let Some(child) = g.selected_children().into_iter().next() else { return };
+        let Some(child) = g.selected_children().into_iter().next() else {
+            return;
+        };
         let id = child.widget_name().to_string();
         if *current.borrow() == id {
             return;
@@ -203,7 +205,17 @@ fn thumbnail(m: Mini) -> gtk::DrawingArea {
         };
 
         for (dy, blur, spread, alpha) in CARD_SHADOW {
-            shadow(cr, x0, y0 + dy, THUMB_W, THUMB_H, THUMB_RADIUS, blur, spread, alpha);
+            shadow(
+                cr,
+                x0,
+                y0 + dy,
+                THUMB_W,
+                THUMB_H,
+                THUMB_RADIUS,
+                blur,
+                spread,
+                alpha,
+            );
         }
 
         // Everything inside is clipped to the window's rounded shape.
@@ -216,21 +228,65 @@ fn thumbnail(m: Mini) -> gtk::DrawingArea {
         // The header bar, over a hairline.
         let header_h = 11.0;
         fill(cr, x0, y0, THUMB_W, header_h, rgb(m.header), 1.0);
-        fill(cr, x0, y0 + header_h - 0.5, THUMB_W, 0.5, rgb(m.border), 1.0);
+        fill(
+            cr,
+            x0,
+            y0 + header_h - 0.5,
+            THUMB_W,
+            0.5,
+            rgb(m.border),
+            1.0,
+        );
 
         // The sidebar, with one row selected in the accent.
         let side_w = 24.0;
         let body_y = y0 + header_h;
-        fill(cr, x0, body_y, side_w, THUMB_H - header_h, rgb(m.sidebar), 1.0);
-        fill(cr, x0 + side_w - 0.5, body_y, 0.5, THUMB_H - header_h, rgb(m.border), 1.0);
+        fill(
+            cr,
+            x0,
+            body_y,
+            side_w,
+            THUMB_H - header_h,
+            rgb(m.sidebar),
+            1.0,
+        );
+        fill(
+            cr,
+            x0 + side_w - 0.5,
+            body_y,
+            0.5,
+            THUMB_H - header_h,
+            rgb(m.border),
+            1.0,
+        );
         let row_h = 7.0;
-        rounded(cr, x0 + 2.5, body_y + 4.0 + row_h - 1.5, side_w - 5.0, row_h - 1.0, 2.0);
+        rounded(
+            cr,
+            x0 + 2.5,
+            body_y + 4.0 + row_h - 1.5,
+            side_w - 5.0,
+            row_h - 1.0,
+            2.0,
+        );
         cr.set_source_rgba(accent.0, accent.1, accent.2, 0.22);
         let _ = cr.fill();
 
         // The content pane, with a raised card and an accent button.
-        fill(cr, x0 + side_w, body_y, THUMB_W - side_w, THUMB_H - header_h, rgb(m.view), 1.0);
-        let (cx, cy, cw, ch) = (x0 + side_w + 5.0, body_y + 5.0, THUMB_W - side_w - 10.0, THUMB_H - header_h - 10.0);
+        fill(
+            cr,
+            x0 + side_w,
+            body_y,
+            THUMB_W - side_w,
+            THUMB_H - header_h,
+            rgb(m.view),
+            1.0,
+        );
+        let (cx, cy, cw, ch) = (
+            x0 + side_w + 5.0,
+            body_y + 5.0,
+            THUMB_W - side_w - 10.0,
+            THUMB_H - header_h - 10.0,
+        );
         rounded(cr, cx, cy, cw, ch, 3.5);
         let card = rgb(m.card);
         cr.set_source_rgb(card.0, card.1, card.2);
@@ -243,13 +299,28 @@ fn thumbnail(m: Mini) -> gtk::DrawingArea {
         rounded(cr, cx + cw - bw - 3.5, cy + ch - bh - 3.5, bw, bh, 3.25);
         cr.set_source_rgb(accent.0, accent.1, accent.2);
         let _ = cr.fill();
-        pill(cr, cx + cw - bw - 3.5 + 4.0, cy + ch - bh - 3.5 + 2.5, bw - 8.0, 1.5, rgb(m.accent_fg), 0.9);
+        pill(
+            cr,
+            cx + cw - bw - 3.5 + 4.0,
+            cy + ch - bh - 3.5 + 2.5,
+            bw - 8.0,
+            1.5,
+            rgb(m.accent_fg),
+            0.9,
+        );
 
         let _ = cr.restore();
 
         // The window's own edge: a hairline so a light window still reads
         // as a window on a light card, and a dark one on a dark card.
-        rounded(cr, x0 + 0.5, y0 + 0.5, THUMB_W - 1.0, THUMB_H - 1.0, THUMB_RADIUS - 0.5);
+        rounded(
+            cr,
+            x0 + 0.5,
+            y0 + 0.5,
+            THUMB_W - 1.0,
+            THUMB_H - 1.0,
+            THUMB_RADIUS - 0.5,
+        );
         let window = rgb(m.window);
         let lum = 0.299 * window.0 + 0.587 * window.1 + 0.114 * window.2;
         let line = if lum > 0.5 { 0.0 } else { 1.0 };
@@ -290,13 +361,30 @@ fn rounded(cr: &gtk::cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
 /// the shape, `blur` fades its edge out over that many points. Cairo has
 /// no blur, so the fade is stacked rings, each carrying a share of `alpha`
 /// so the solid middle adds up to it exactly.
-fn shadow(cr: &gtk::cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64, blur: f64, spread: f64, alpha: f64) {
+fn shadow(
+    cr: &gtk::cairo::Context,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    r: f64,
+    blur: f64,
+    spread: f64,
+    alpha: f64,
+) {
     let rings = (blur * 2.0).ceil().max(1.0) as usize;
     let share = 1.0 - (1.0 - alpha).powf(1.0 / rings as f64);
     for i in 0..rings {
         // From the outermost, faintest reach to the innermost, all overlapping.
         let reach = spread + blur * (1.0 - i as f64 / rings as f64);
-        rounded(cr, x - reach, y - reach, w + 2.0 * reach, h + 2.0 * reach, r + reach);
+        rounded(
+            cr,
+            x - reach,
+            y - reach,
+            w + 2.0 * reach,
+            h + 2.0 * reach,
+            r + reach,
+        );
         cr.set_source_rgba(0.0, 0.0, 6.0 / 255.0, share);
         let _ = cr.fill();
     }

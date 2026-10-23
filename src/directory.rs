@@ -54,7 +54,11 @@ impl Security {
     }
 
     pub fn default_port(self) -> u16 {
-        if self == Security::Ldaps { 636 } else { 389 }
+        if self == Security::Ldaps {
+            636
+        } else {
+            389
+        }
     }
 }
 
@@ -66,7 +70,9 @@ impl Security {
 pub fn parse_server(text: &str) -> (String, Option<Security>, Option<u16>) {
     let text = text.trim();
     let (security, rest) = match text.split_once("://") {
-        Some((scheme, rest)) if scheme.eq_ignore_ascii_case("ldaps") => (Some(Security::Ldaps), rest),
+        Some((scheme, rest)) if scheme.eq_ignore_ascii_case("ldaps") => {
+            (Some(Security::Ldaps), rest)
+        }
         Some((scheme, rest)) if scheme.eq_ignore_ascii_case("ldap") => (None, rest),
         _ => (None, text),
     };
@@ -127,7 +133,11 @@ impl Directory {
 
     /// The name shown in lists: the given one, or the server.
     pub fn title(&self) -> String {
-        if self.name.trim().is_empty() { self.host.clone() } else { self.name.clone() }
+        if self.name.trim().is_empty() {
+            self.host.clone()
+        } else {
+            self.name.clone()
+        }
     }
 
     fn keyring_key(&self) -> String {
@@ -136,7 +146,11 @@ impl Directory {
 
     fn from_source(uid: &str, path: &str, data: &str) -> Option<Self> {
         let kf = crate::platform::keyfile(data)?;
-        let get = |group: &str, key: &str| kf.string(group, key).map(|s| s.to_string()).unwrap_or_default();
+        let get = |group: &str, key: &str| {
+            kf.string(group, key)
+                .map(|s| s.to_string())
+                .unwrap_or_default()
+        };
         if get("Address Book", "BackendName") != "ldap" {
             return None;
         }
@@ -176,7 +190,8 @@ impl Directory {
     /// never read, so EDS has been connecting without any (#307).
     fn wants_security_moved(&self) -> bool {
         crate::platform::keyfile(&self.data).is_some_and(|kf| {
-            kf.has_key("LDAP Backend", "SecurityMethod").unwrap_or(false)
+            kf.has_key("LDAP Backend", "SecurityMethod")
+                .unwrap_or(false)
                 && !kf.has_key("Security", "Method").unwrap_or(false)
         })
     }
@@ -198,7 +213,10 @@ impl Directory {
         kf.set_string("Authentication", "Host", &parse_server(&self.host).0);
         kf.set_integer("Authentication", "Port", i32::from(self.port));
         kf.set_string("Authentication", "User", self.bind_dn.trim());
-        let method = kf.string("Authentication", "Method").map(|s| s.to_string()).unwrap_or_default();
+        let method = kf
+            .string("Authentication", "Method")
+            .map(|s| s.to_string())
+            .unwrap_or_default();
         let method = if self.bind_dn.trim().is_empty() {
             "none"
         } else if method == "ldap/simple-email" {
@@ -210,7 +228,11 @@ impl Directory {
         };
         kf.set_string("Authentication", "Method", method);
         kf.set_string("LDAP Backend", "RootDn", self.base_dn.trim());
-        kf.set_string("LDAP Backend", "Scope", if self.subtree { "subtree" } else { "onelevel" });
+        kf.set_string(
+            "LDAP Backend",
+            "Scope",
+            if self.subtree { "subtree" } else { "onelevel" },
+        );
         kf.set_string("Security", "Method", self.security.key());
         let _ = kf.remove_key("LDAP Backend", "SecurityMethod");
         kf.to_data().to_string()
@@ -237,7 +259,8 @@ fn registry() -> Result<String, String> {
 
 /// Every LDAP directory EDS knows, Evolution's included, by name.
 pub fn list() -> Result<Vec<Directory>, String> {
-    let sources = crate::contacts::registry_sources().ok_or_else(|| i18n("Evolution Data Server is not available"))?;
+    let sources = crate::contacts::registry_sources()
+        .ok_or_else(|| i18n("Evolution Data Server is not available"))?;
     let mut out: Vec<Directory> = sources
         .iter()
         .filter_map(|(path, uid, data)| Directory::from_source(uid, path, data))
@@ -258,11 +281,23 @@ pub fn save(dir: &Directory, password: Option<&str>) -> Result<String, String> {
     if dir.uid.is_empty() {
         dir.uid = gtk::glib::uuid_string_random().replace('-', "");
         let sources: HashMap<&str, String> = HashMap::from([(dir.uid.as_str(), dir.to_source())]);
-        conn.call_method(Some(dest.as_str()), MANAGER_PATH, Some(MANAGER_IFACE), "CreateSources", &(sources,))
-            .map_err(|e| e.to_string())?;
+        conn.call_method(
+            Some(dest.as_str()),
+            MANAGER_PATH,
+            Some(MANAGER_IFACE),
+            "CreateSources",
+            &(sources,),
+        )
+        .map_err(|e| e.to_string())?;
     } else {
-        conn.call_method(Some(dest.as_str()), dir.path.as_str(), Some(WRITABLE_IFACE), "Write", &(dir.to_source(),))
-            .map_err(|e| e.to_string())?;
+        conn.call_method(
+            Some(dest.as_str()),
+            dir.path.as_str(),
+            Some(WRITABLE_IFACE),
+            "Write",
+            &(dir.to_source(),),
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(pw) = password.filter(|p| !p.is_empty()) {
         crate::config::store_cloud_password(&dir.keyring_key(), pw).map_err(|e| e.to_string())?;
@@ -279,7 +314,13 @@ pub fn save(dir: &Directory, password: Option<&str>) -> Result<String, String> {
 fn move_security(dir: &mut Directory) {
     let written = registry().and_then(|dest| {
         bus()?
-            .call_method(Some(dest.as_str()), dir.path.as_str(), Some(WRITABLE_IFACE), "Write", &(dir.to_source(),))
+            .call_method(
+                Some(dest.as_str()),
+                dir.path.as_str(),
+                Some(WRITABLE_IFACE),
+                "Write",
+                &(dir.to_source(),),
+            )
             .map_err(|e| e.to_string())
     });
     match written {
@@ -288,7 +329,9 @@ fn move_security(dir: &mut Directory) {
             dir.data = dir.to_source();
             forget_book(&dir.uid);
         }
-        Err(e) => tracing::warn!(directory = %dir.title(), "LDAP directory's encryption could not be moved: {e}"),
+        Err(e) => {
+            tracing::warn!(directory = %dir.title(), "LDAP directory's encryption could not be moved: {e}")
+        }
     }
 }
 
@@ -302,8 +345,14 @@ pub fn set_enabled(dir: &Directory, enabled: bool) -> Result<(), String> {
 pub fn remove(dir: &Directory) -> Result<(), String> {
     let conn = bus()?;
     let dest = registry()?;
-    conn.call_method(Some(dest.as_str()), dir.path.as_str(), Some(REMOVABLE_IFACE), "Remove", &())
-        .map_err(|e| e.to_string())?;
+    conn.call_method(
+        Some(dest.as_str()),
+        dir.path.as_str(),
+        Some(REMOVABLE_IFACE),
+        "Remove",
+        &(),
+    )
+    .map_err(|e| e.to_string())?;
     crate::config::delete_cloud_password(&dir.keyring_key());
     forget_book(&dir.uid);
     note_answer(&dir.uid);
@@ -329,7 +378,13 @@ fn books() -> &'static Mutex<HashMap<String, (String, String)>> {
 fn forget_book(uid: &str) {
     let book = books().lock().ok().and_then(|mut b| b.remove(uid));
     if let (Some((bus_name, path)), Ok(conn)) = (book, bus()) {
-        let _ = conn.call_method(Some(bus_name.as_str()), path.as_str(), Some(crate::contacts::BOOK_IFACE), "Close", &());
+        let _ = conn.call_method(
+            Some(bus_name.as_str()),
+            path.as_str(),
+            Some(crate::contacts::BOOK_IFACE),
+            "Close",
+            &(),
+        );
     }
 }
 
@@ -337,7 +392,8 @@ fn open(conn: &zbus::blocking::Connection, uid: &str) -> Result<(String, String)
     if let Some(b) = books().lock().ok().and_then(|b| b.get(uid).cloned()) {
         return Ok(b);
     }
-    let dest = crate::contacts::factory_dest().ok_or_else(|| i18n("Evolution Data Server is not available"))?;
+    let dest = crate::contacts::factory_dest()
+        .ok_or_else(|| i18n("Evolution Data Server is not available"))?;
     let book = crate::contacts::open_book(conn, &dest, uid)?;
     if let Ok(mut b) = books().lock() {
         b.insert(uid.to_string(), book.clone());
@@ -345,9 +401,19 @@ fn open(conn: &zbus::blocking::Connection, uid: &str) -> Result<(String, String)
     Ok(book)
 }
 
-fn contact_list(conn: &zbus::blocking::Connection, book: &(String, String), query: &str) -> Result<Vec<String>, String> {
+fn contact_list(
+    conn: &zbus::blocking::Connection,
+    book: &(String, String),
+    query: &str,
+) -> Result<Vec<String>, String> {
     let reply = conn
-        .call_method(Some(book.0.as_str()), book.1.as_str(), Some(crate::contacts::BOOK_IFACE), "GetContactList", &(query,))
+        .call_method(
+            Some(book.0.as_str()),
+            book.1.as_str(),
+            Some(crate::contacts::BOOK_IFACE),
+            "GetContactList",
+            &(query,),
+        )
         .map_err(|e| e.to_string())?;
     let (cards,): (Vec<String>,) = reply.body().deserialize().map_err(|e| e.to_string())?;
     Ok(cards)
@@ -364,12 +430,29 @@ struct LastCredentials {
 }
 
 fn last_credentials(conn: &zbus::blocking::Connection, dir: &Directory) -> LastCredentials {
-    let Ok(dest) = registry() else { return LastCredentials::default() };
-    conn.call_method(Some(dest.as_str()), dir.path.as_str(), Some(SOURCE_IFACE), "GetLastCredentialsRequiredArguments", &())
-        .ok()
-        .and_then(|r| r.body().deserialize::<(String, String, String, String, String)>().ok())
-        .map(|(reason, _cert_pem, _cert_errors, _error_name, message)| LastCredentials { reason, message })
-        .unwrap_or_default()
+    let Ok(dest) = registry() else {
+        return LastCredentials::default();
+    };
+    conn.call_method(
+        Some(dest.as_str()),
+        dir.path.as_str(),
+        Some(SOURCE_IFACE),
+        "GetLastCredentialsRequiredArguments",
+        &(),
+    )
+    .ok()
+    .and_then(|r| {
+        r.body()
+            .deserialize::<(String, String, String, String, String)>()
+            .ok()
+    })
+    .map(
+        |(reason, _cert_pem, _cert_errors, _error_name, message)| LastCredentials {
+            reason,
+            message,
+        },
+    )
+    .unwrap_or_default()
 }
 
 /// The error worth showing for a directory that failed to connect: what
@@ -403,12 +486,25 @@ fn connect_error(dir: &Directory, last: &LastCredentials, fallback: String) -> S
     }
 }
 
-fn authenticate(conn: &zbus::blocking::Connection, dir: &Directory, password: &str) -> Result<(), String> {
+fn authenticate(
+    conn: &zbus::blocking::Connection,
+    dir: &Directory,
+    password: &str,
+) -> Result<(), String> {
     let dest = registry()?;
-    let credentials = vec![format!("username:{}", dir.bind_dn.trim()), format!("password:{password}")];
-    conn.call_method(Some(dest.as_str()), dir.path.as_str(), Some(SOURCE_IFACE), "InvokeAuthenticate", &(credentials,))
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+    let credentials = vec![
+        format!("username:{}", dir.bind_dn.trim()),
+        format!("password:{password}"),
+    ];
+    conn.call_method(
+        Some(dest.as_str()),
+        dir.path.as_str(),
+        Some(SOURCE_IFACE),
+        "InvokeAuthenticate",
+        &(credentials,),
+    )
+    .map(|_| ())
+    .map_err(|e| e.to_string())
 }
 
 /// Ask one directory, signing in first when EDS says it wants that.
@@ -421,7 +517,10 @@ fn query_directory(dir: &Directory, query: &str) -> Result<Vec<String>, String> 
             // EDS takes a server it cannot resolve or route to as offline.
             if e.contains("Offline unavailable") {
                 let server = format!("{}:{}", dir.host.trim(), dir.port);
-                return Err(i18n_f("Could not reach {server}. Check the server's name and the network.", &[("server", &server)]));
+                return Err(i18n_f(
+                    "Could not reach {server}. Check the server's name and the network.",
+                    &[("server", &server)],
+                ));
             }
             return Err(e);
         }
@@ -431,7 +530,10 @@ fn query_directory(dir: &Directory, query: &str) -> Result<Vec<String>, String> 
         Err(e) => e,
     };
     // A book whose factory went away since: open it again, once.
-    if first.contains("UnknownObject") || first.contains("ServiceUnknown") || first.contains("NoReply") {
+    if first.contains("UnknownObject")
+        || first.contains("ServiceUnknown")
+        || first.contains("NoReply")
+    {
         forget_book(&dir.uid);
         let book = open(&conn, &dir.uid)?;
         return contact_list(&conn, &book, query);
@@ -439,17 +541,25 @@ fn query_directory(dir: &Directory, query: &str) -> Result<Vec<String>, String> 
     let last = last_credentials(&conn, dir);
     tracing::debug!(directory = %dir.title(), reason = %last.reason, message = %last.message, "LDAP directory not answering: {first}");
     let signs_in = !dir.bind_dn.trim().is_empty();
-    let own = if signs_in { crate::config::load_cloud_password(&dir.keyring_key()) } else { None };
+    let own = if signs_in {
+        crate::config::load_cloud_password(&dir.keyring_key())
+    } else {
+        None
+    };
     match (last.reason.as_str(), own) {
         // Wants the password, or failed to connect last time: sign in
         // again, which also makes the backend try the server again.
-        ("required" | "rejected" | "ssl_failed" | "error", Some(pw)) => authenticate(&conn, dir, &pw)?,
+        ("required" | "rejected" | "ssl_failed" | "error", Some(pw)) => {
+            authenticate(&conn, dir, &pw)?
+        }
         // No password of Hylki's, as for a directory set up in Evolution:
         // "required" is what the backend records as it opens, and EDS then
         // signs in by itself with the password Evolution stored (#307).
         // Anything else is an answer already.
         ("required", None) => {}
-        ("rejected" | "ssl_failed" | "error", None) => return Err(connect_error(dir, &last, first)),
+        ("rejected" | "ssl_failed" | "error", None) => {
+            return Err(connect_error(dir, &last, first))
+        }
         _ => {}
     }
     wait_for_answer(&conn, dir, &book, query, last)
@@ -481,7 +591,8 @@ fn wait_for_answer(
             Err(e) => {
                 let now = last_credentials(conn, dir);
                 let failed = matches!(now.reason.as_str(), "rejected" | "ssl_failed" | "error")
-                    && (now.reason.as_str(), now.message.as_str()) != (before.reason.as_str(), before.message.as_str());
+                    && (now.reason.as_str(), now.message.as_str())
+                        != (before.reason.as_str(), before.message.as_str());
                 let unanswered = now.reason == "required" && started.elapsed() >= EDS_SIGN_IN;
                 if failed || unanswered || Instant::now() >= deadline {
                     return Err(connect_error(dir, &now, e));
@@ -529,7 +640,10 @@ fn enabled() -> Vec<Directory> {
     }
     let off = crate::contact_sources::off();
     let dirs: Vec<Directory> = match list() {
-        Ok(d) => d.into_iter().filter(|d| d.enabled && !off.contains(&d.uid)).collect(),
+        Ok(d) => d
+            .into_iter()
+            .filter(|d| d.enabled && !off.contains(&d.uid))
+            .collect(),
         Err(e) => {
             tracing::debug!("LDAP directories unavailable: {e}");
             Vec::new()
@@ -545,7 +659,10 @@ fn enabled() -> Vec<Directory> {
 /// view's address book filter. Blocking, but only a registry call at most
 /// every [`LIST_FRESH`].
 pub fn enabled_names() -> Vec<(String, String)> {
-    enabled().into_iter().map(|d| (d.uid.clone(), d.title())).collect()
+    enabled()
+        .into_iter()
+        .map(|d| (d.uid.clone(), d.title()))
+        .collect()
 }
 
 /// A directory's last failure, kept until it answers again.
@@ -562,12 +679,21 @@ fn failures() -> &'static Mutex<HashMap<String, Failure>> {
 /// Why the directory last failed to answer, until it answers again: for
 /// Settings to show beside it.
 pub fn last_error(uid: &str) -> Option<String> {
-    failures().lock().ok().and_then(|f| f.get(uid).map(|x| x.message.clone()))
+    failures()
+        .lock()
+        .ok()
+        .and_then(|f| f.get(uid).map(|x| x.message.clone()))
 }
 
 fn note_failure(uid: &str, message: &str) {
     if let Ok(mut f) = failures().lock() {
-        f.insert(uid.to_string(), Failure { message: message.to_string(), at: Instant::now() });
+        f.insert(
+            uid.to_string(),
+            Failure {
+                message: message.to_string(),
+                at: Instant::now(),
+            },
+        );
     }
 }
 
@@ -580,14 +706,19 @@ fn note_answer(uid: &str) {
 /// Failed within [`RETRY_AFTER`]: not asked again yet. Answers the failure.
 fn resting(uid: &str) -> Option<String> {
     let f = failures().lock().ok()?;
-    f.get(uid).filter(|x| x.at.elapsed() < RETRY_AFTER).map(|x| x.message.clone())
+    f.get(uid)
+        .filter(|x| x.at.elapsed() < RETRY_AFTER)
+        .map(|x| x.message.clone())
 }
 
 /// One lookup at a time per directory: a later one waits for the sign-in or
 /// the failure the earlier one is waiting on, rather than starting another.
 fn directory_lock(uid: &str) -> Arc<Mutex<()>> {
     static LOCKS: OnceLock<Mutex<HashMap<String, Arc<Mutex<()>>>>> = OnceLock::new();
-    let mut locks = LOCKS.get_or_init(|| Mutex::new(HashMap::new())).lock().unwrap_or_else(|e| e.into_inner());
+    let mut locks = LOCKS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     locks.entry(uid.to_string()).or_default().clone()
 }
 
@@ -601,7 +732,10 @@ pub struct DirectoryFailure {
 
 impl DirectoryFailure {
     pub fn text(&self) -> String {
-        i18n_f("{name} did not answer: {error}", &[("name", &self.name), ("error", &self.message)])
+        i18n_f(
+            "{name} did not answer: {error}",
+            &[("name", &self.name), ("error", &self.message)],
+        )
     }
 }
 
@@ -621,7 +755,11 @@ fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<DirectoryFailure>)
         match resting(&dir.uid) {
             Some(message) => {
                 tracing::debug!(directory = %dir.title(), "LDAP directory not asked, it failed less than {}s ago: {message}", RETRY_AFTER.as_secs());
-                failed.push(DirectoryFailure { uid: dir.uid.clone(), name: dir.title(), message });
+                failed.push(DirectoryFailure {
+                    uid: dir.uid.clone(),
+                    name: dir.title(),
+                    message,
+                });
             }
             None => dirs.push(dir),
         }
@@ -640,29 +778,30 @@ fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<DirectoryFailure>)
     );
     // Each directory on its own thread: one that is slow to sign in does
     // not hold up the others.
-    let answers: Vec<(Directory, Result<Vec<String>, String>, Duration)> = std::thread::scope(|scope| {
-        let query = &query;
-        let asked: Vec<_> = dirs
-            .into_iter()
-            .map(|dir| {
-                scope.spawn(move || {
-                    let lock = directory_lock(&dir.uid);
-                    let _held = lock.lock().unwrap_or_else(|e| e.into_inner());
-                    let started = Instant::now();
-                    // The lookup this one waited behind may have just failed.
-                    if let Some(message) = resting(&dir.uid) {
-                        return (dir, Err(message), started.elapsed());
-                    }
-                    let answer = query_directory(&dir, query);
-                    if let Err(e) = &answer {
-                        note_failure(&dir.uid, e);
-                    }
-                    (dir, answer, started.elapsed())
+    let answers: Vec<(Directory, Result<Vec<String>, String>, Duration)> =
+        std::thread::scope(|scope| {
+            let query = &query;
+            let asked: Vec<_> = dirs
+                .into_iter()
+                .map(|dir| {
+                    scope.spawn(move || {
+                        let lock = directory_lock(&dir.uid);
+                        let _held = lock.lock().unwrap_or_else(|e| e.into_inner());
+                        let started = Instant::now();
+                        // The lookup this one waited behind may have just failed.
+                        if let Some(message) = resting(&dir.uid) {
+                            return (dir, Err(message), started.elapsed());
+                        }
+                        let answer = query_directory(&dir, query);
+                        if let Err(e) = &answer {
+                            note_failure(&dir.uid, e);
+                        }
+                        (dir, answer, started.elapsed())
+                    })
                 })
-            })
-            .collect();
-        asked.into_iter().filter_map(|h| h.join().ok()).collect()
-    });
+                .collect();
+            asked.into_iter().filter_map(|h| h.join().ok()).collect()
+        });
     let mut found = Vec::new();
     for (dir, answer, took) in answers {
         match answer {
@@ -680,7 +819,11 @@ fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<DirectoryFailure>)
             }
             Err(e) => {
                 tracing::warn!(directory = %dir.title(), typed, ms = took.as_millis() as u64, "LDAP directory lookup failed: {e}");
-                failed.push(DirectoryFailure { uid: dir.uid.clone(), name: dir.title(), message: e });
+                failed.push(DirectoryFailure {
+                    uid: dir.uid.clone(),
+                    name: dir.title(),
+                    message: e,
+                });
             }
         }
     }
@@ -692,19 +835,28 @@ fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<DirectoryFailure>)
 /// directories that failed. Blocking: call it off the main thread.
 pub fn search(typed: &str) -> (Vec<Suggestion>, Vec<DirectoryFailure>) {
     let (found, failed) = lookup(typed);
-    let suggestions = found.iter().flat_map(|(_, cards)| cards.iter().flat_map(|c| suggestions_from_vcard(c))).collect();
+    let suggestions = found
+        .iter()
+        .flat_map(|(_, cards)| cards.iter().flat_map(|c| suggestions_from_vcard(c)))
+        .collect();
     (suggestions, failed)
 }
 
 /// The same people as whole entries, for the Contacts view, at most `limit`
 /// from each directory, each naming the directory it came from as its book.
-pub fn search_contacts(typed: &str, limit: usize) -> (Vec<crate::contacts::ContactDetails>, Vec<DirectoryFailure>) {
+pub fn search_contacts(
+    typed: &str,
+    limit: usize,
+) -> (Vec<crate::contacts::ContactDetails>, Vec<DirectoryFailure>) {
     let (found, failed) = lookup(typed);
     let mut out = Vec::new();
     for (dir, cards) in found {
         let mut entries = Vec::new();
         for card in cards {
-            let Some(mut c) = crate::contacts::parse_vcard_fields(&card).filter(|c| !c.is_group()) else { continue };
+            let Some(mut c) = crate::contacts::parse_vcard_fields(&card).filter(|c| !c.is_group())
+            else {
+                continue;
+            };
             // A directory's photo is carried in the card; nothing on disk is
             // read for it.
             c.photo = crate::contacts::vcard_photo_with(&card, false);
@@ -745,12 +897,19 @@ fn suggestions_from_vcard(card: &str) -> Vec<Suggestion> {
     let mut name = String::new();
     let mut emails = Vec::new();
     for line in unfolded.lines() {
-        let Some((prop, value)) = crate::contacts::split_vcard_line(line) else { continue };
+        let Some((prop, value)) = crate::contacts::split_vcard_line(line) else {
+            continue;
+        };
         let prop = prop.split(';').next().unwrap_or("").trim();
-        let value = crate::contacts::unescape_vcard_text(value).trim().to_string();
+        let value = crate::contacts::unescape_vcard_text(value)
+            .trim()
+            .to_string();
         if prop.eq_ignore_ascii_case("FN") && name.is_empty() {
             name = value;
-        } else if prop.eq_ignore_ascii_case("EMAIL") && value.contains('@') && !value.contains(['\r', '\n']) {
+        } else if prop.eq_ignore_ascii_case("EMAIL")
+            && value.contains('@')
+            && !value.contains(['\r', '\n'])
+        {
             emails.push(value);
         }
     }
@@ -774,11 +933,15 @@ mod tests {
 
     #[test]
     fn a_directory_entry_gives_a_suggestion_per_address() {
-        let card = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alan Turing\r\nEMAIL;TYPE=OTHER:alan@example.org\r\n\
+        let card =
+            "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alan Turing\r\nEMAIL;TYPE=OTHER:alan@example.org\r\n\
                     EMAIL;TYPE=OTHER:turing@example.org\r\nEND:VCARD\r\n";
         let s = suggestions_from_vcard(card);
         assert_eq!(s.len(), 2);
-        assert_eq!((s[0].name.as_str(), s[0].email.as_str()), ("Alan Turing", "alan@example.org"));
+        assert_eq!(
+            (s[0].name.as_str(), s[0].email.as_str()),
+            ("Alan Turing", "alan@example.org")
+        );
         assert_eq!(s[1].email, "turing@example.org");
         assert!(s.iter().all(|s| s.from_contacts && s.from_directory));
     }
@@ -791,9 +954,16 @@ mod tests {
     #[test]
     #[ignore]
     fn live() {
-        let Ok(spec) = std::env::var("LDAP_LIVE") else { return };
+        let Ok(spec) = std::env::var("LDAP_LIVE") else {
+            return;
+        };
         let mut f = spec.splitn(4, '|').map(str::to_string);
-        let (server, base, bind, pw) = (f.next().unwrap(), f.next().unwrap(), f.next().unwrap(), f.next().unwrap());
+        let (server, base, bind, pw) = (
+            f.next().unwrap(),
+            f.next().unwrap(),
+            f.next().unwrap(),
+            f.next().unwrap(),
+        );
         let (host, security, port) = parse_server(&server);
         let mut d = Directory::empty();
         d.name = "live".into();
@@ -806,14 +976,23 @@ mod tests {
         // encryption under the key EDS never read.
         let uid = if std::env::var_os("LDAP_LIVE_OLD").is_some() {
             d.uid = "hylkiliveold".into();
-            let old = d.to_source().replace("[Security]\nMethod=", "[Old]\nX=").replace(
-                "[LDAP Backend]\n",
-                &format!("[LDAP Backend]\nSecurityMethod={}\n", d.security.key()),
-            );
+            let old = d
+                .to_source()
+                .replace("[Security]\nMethod=", "[Old]\nX=")
+                .replace(
+                    "[LDAP Backend]\n",
+                    &format!("[LDAP Backend]\nSecurityMethod={}\n", d.security.key()),
+                );
             let sources: HashMap<&str, String> = HashMap::from([("hylkiliveold", old)]);
             bus()
                 .unwrap()
-                .call_method(Some(registry().unwrap().as_str()), MANAGER_PATH, Some(MANAGER_IFACE), "CreateSources", &(sources,))
+                .call_method(
+                    Some(registry().unwrap().as_str()),
+                    MANAGER_PATH,
+                    Some(MANAGER_IFACE),
+                    "CreateSources",
+                    &(sources,),
+                )
                 .expect("old source");
             crate::config::store_cloud_password("ldap:hylkiliveold", &pw).unwrap();
             "hylkiliveold".to_string()
@@ -829,7 +1008,10 @@ mod tests {
             std::thread::sleep(Duration::from_millis(200));
         }
         let found = found.expect("listed");
-        println!("saved host={:?} port={} security={:?}", found.host, found.port, found.security);
+        println!(
+            "saved host={:?} port={} security={:?}",
+            found.host, found.port, found.security
+        );
         let t = Instant::now();
         println!("check: {:?} after {:?}", check(&found), t.elapsed());
         remove(&found).expect("removed");
@@ -842,7 +1024,9 @@ mod tests {
     #[test]
     #[ignore]
     fn live_search() {
-        let Ok(typed) = std::env::var("LDAP_LIVE_SEARCH") else { return };
+        let Ok(typed) = std::env::var("LDAP_LIVE_SEARCH") else {
+            return;
+        };
         for round in 1..=2 {
             let t = Instant::now();
             let (found, errors) = search(&typed);
@@ -858,9 +1042,20 @@ mod tests {
         // answered, and names the one resting.
         let (entries, errors) = search_contacts(&typed, 50);
         for c in &entries {
-            println!("  entry: {} {:?} in {}", c.name, c.primary_email(), c.book_name);
+            println!(
+                "  entry: {} {:?} in {}",
+                c.name,
+                c.primary_email(),
+                c.book_name
+            );
         }
-        println!("  contacts errors: {:?}", errors.iter().map(DirectoryFailure::text).collect::<Vec<_>>());
+        println!(
+            "  contacts errors: {:?}",
+            errors
+                .iter()
+                .map(DirectoryFailure::text)
+                .collect::<Vec<_>>()
+        );
         for d in list().unwrap() {
             println!("  {} last error: {:?}", d.title(), last_error(&d.uid));
         }
@@ -868,14 +1063,26 @@ mod tests {
 
     #[test]
     fn a_server_typed_as_a_url_is_taken_apart() {
-        assert_eq!(parse_server("ldaps://ldap.example.com"), ("ldap.example.com".into(), Some(Security::Ldaps), None));
+        assert_eq!(
+            parse_server("ldaps://ldap.example.com"),
+            ("ldap.example.com".into(), Some(Security::Ldaps), None)
+        );
         assert_eq!(
             parse_server(" ldaps://ldap.example.com:3269/ou=x,dc=example,dc=com "),
             ("ldap.example.com".into(), Some(Security::Ldaps), Some(3269))
         );
-        assert_eq!(parse_server("LDAP://ldap.example.com:389"), ("ldap.example.com".into(), None, Some(389)));
-        assert_eq!(parse_server("ldap.example.com"), ("ldap.example.com".into(), None, None));
-        assert_eq!(parse_server("ldap.example.com:636"), ("ldap.example.com".into(), None, Some(636)));
+        assert_eq!(
+            parse_server("LDAP://ldap.example.com:389"),
+            ("ldap.example.com".into(), None, Some(389))
+        );
+        assert_eq!(
+            parse_server("ldap.example.com"),
+            ("ldap.example.com".into(), None, None)
+        );
+        assert_eq!(
+            parse_server("ldap.example.com:636"),
+            ("ldap.example.com".into(), None, Some(636))
+        );
         assert_eq!(parse_server("[::1]:636"), ("::1".into(), None, Some(636)));
         assert_eq!(parse_server("::1"), ("::1".into(), None, None));
     }
@@ -883,17 +1090,36 @@ mod tests {
     #[test]
     fn the_recorded_reason_beats_not_connected() {
         let not_connected = || "Cannot get contact list: Not connected".to_string();
-        let last = |reason: &str, message: &str| LastCredentials { reason: reason.into(), message: message.into() };
+        let last = |reason: &str, message: &str| LastCredentials {
+            reason: reason.into(),
+            message: message.into(),
+        };
         let mut d = Directory::empty();
         d.host = "ldap.example.com".into();
         d.port = 636;
         d.security = Security::Ldaps;
-        assert_eq!(connect_error(&d, &last("error", "Can't contact LDAP server"), not_connected()), "Can't contact LDAP server");
-        assert!(connect_error(&d, &last("error", "Repository offline"), not_connected()).contains("ldap.example.com:636 over TLS"));
-        assert!(connect_error(&d, &last("error", "TLS not available"), not_connected()).contains("StartTLS"));
+        assert_eq!(
+            connect_error(
+                &d,
+                &last("error", "Can't contact LDAP server"),
+                not_connected()
+            ),
+            "Can't contact LDAP server"
+        );
+        assert!(
+            connect_error(&d, &last("error", "Repository offline"), not_connected())
+                .contains("ldap.example.com:636 over TLS")
+        );
+        assert!(
+            connect_error(&d, &last("error", "TLS not available"), not_connected())
+                .contains("StartTLS")
+        );
         assert!(connect_error(&d, &last("ssl_failed", ""), not_connected()).contains("certificate"));
         assert!(connect_error(&d, &last("rejected", ""), not_connected()).contains("password"));
-        assert_eq!(connect_error(&d, &last("", ""), not_connected()), not_connected());
+        assert_eq!(
+            connect_error(&d, &last("", ""), not_connected()),
+            not_connected()
+        );
     }
 
     #[test]
@@ -919,7 +1145,9 @@ mod tests {
         let out = anon.to_source();
         assert!(out.contains("Filter=(ou=staff)"));
         assert!(out.contains("Method=none"));
-        assert!(Directory::from_source("x", "/p", "[Address Book]\nBackendName=carddav\n").is_none());
+        assert!(
+            Directory::from_source("x", "/p", "[Address Book]\nBackendName=carddav\n").is_none()
+        );
     }
 
     /// #307: Hylki once wrote the encryption where EDS never looks, so EDS

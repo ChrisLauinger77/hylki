@@ -65,10 +65,14 @@ fn watch_loop<F: Fn()>(on_wake: &F) -> Result<(), Box<dyn std::error::Error>> {
 /// /proc/uptime is the boot clock, which keeps counting. Must be called on the
 /// GTK main thread.
 pub fn watch_clock_gap<F: Fn() + 'static>(on_wake: F) {
-    let Some(mut uptime) = boot_clock() else { return };
+    let Some(mut uptime) = boot_clock() else {
+        return;
+    };
     let mut mono = Instant::now();
     gtk::glib::timeout_add_seconds_local(CLOCK_TICK, move || {
-        let Some(now_uptime) = boot_clock() else { return gtk::glib::ControlFlow::Break };
+        let Some(now_uptime) = boot_clock() else {
+            return gtk::glib::ControlFlow::Break;
+        };
         let now_mono = Instant::now();
         let slept = (now_uptime.saturating_sub(uptime)).saturating_sub(now_mono - mono);
         uptime = now_uptime;
@@ -192,7 +196,10 @@ pub fn fetches_ahead() -> bool {
 /// A Refresh clicked while offline: let connections through for a while,
 /// since the monitor can be wrong (a network with no default route).
 pub fn try_anyway() {
-    TRY_UNTIL.store(since_start() + TRY_ANYWAY.as_millis() as u64, Ordering::Relaxed);
+    TRY_UNTIL.store(
+        since_start() + TRY_ANYWAY.as_millis() as u64,
+        Ordering::Relaxed,
+    );
 }
 
 /// Whether a connection to `host` is worth trying. A server on this machine
@@ -225,7 +232,9 @@ fn url_host(url: &str) -> &str {
 fn is_local(host: &str) -> bool {
     let host = host.trim().trim_start_matches('[').trim_end_matches(']');
     host.eq_ignore_ascii_case("localhost")
-        || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
 }
 
 #[cfg(test)]
@@ -247,7 +256,10 @@ mod tests {
 
     #[test]
     fn url_hosts() {
-        assert_eq!(url_host("https://api.fastmail.com/jmap/session"), "api.fastmail.com");
+        assert_eq!(
+            url_host("https://api.fastmail.com/jmap/session"),
+            "api.fastmail.com"
+        );
         assert_eq!(url_host("http://localhost:8080"), "localhost");
         assert_eq!(url_host("https://user@[::1]:443/jmap"), "::1");
         assert_eq!(url_host("mail.example.com"), "mail.example.com");

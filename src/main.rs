@@ -2,9 +2,9 @@
 
 mod app;
 mod app_icon;
-mod background;
 mod avatar;
 mod backend;
+mod background;
 mod brand;
 mod cache;
 mod carddav;
@@ -23,18 +23,18 @@ mod graph_labels;
 mod i18n;
 mod invite;
 mod launcher_badge;
-mod local_contacts;
 mod legacy;
+mod local_contacts;
 mod logo;
-mod memory_report;
 mod markdown;
+mod memory_report;
 mod models;
 mod ms_broker;
 mod mutf7;
 mod nautilus_ext;
 mod notify;
-mod outgoing;
 mod oauth;
+mod outgoing;
 mod outlook_msg;
 mod percent;
 mod pgp;
@@ -43,16 +43,16 @@ mod power;
 mod ram_cache;
 mod reader;
 mod rng;
+mod sensitivity;
 mod spell;
 mod startup;
 mod text_scale;
 mod theme;
 mod theme_palettes;
 mod translate;
-mod sensitivity;
 mod tray;
-mod unsubscribe;
 mod ui;
+mod unsubscribe;
 mod verify;
 mod web_fonts;
 mod worker;
@@ -61,11 +61,18 @@ use relm4::RelmApp;
 
 use crate::app::AppModel;
 
-pub const APP_ID: &str =
-    if cfg!(feature = "beta") { "co.hyprlab.Hylki.Beta" } else { "co.hyprlab.Hylki" };
+pub const APP_ID: &str = if cfg!(feature = "beta") {
+    "co.hyprlab.Hylki.Beta"
+} else {
+    "co.hyprlab.Hylki"
+};
 
 /// The user-visible application name.
-pub const APP_NAME: &str = if cfg!(feature = "beta") { "Hylki (beta)" } else { "Hylki" };
+pub const APP_NAME: &str = if cfg!(feature = "beta") {
+    "Hylki (beta)"
+} else {
+    "Hylki"
+};
 
 /// The user-visible version — the crate version verbatim. Beta builds carry a
 /// semver prerelease in Cargo.toml itself (e.g. "1.18.2-beta.2" on the beta
@@ -125,8 +132,8 @@ fn main() {
     // console has everything under the hood to show.
     {
         use tracing_subscriber::layer::SubscriberExt;
-        use tracing_subscriber::Layer;
         use tracing_subscriber::util::SubscriberInitExt;
+        use tracing_subscriber::Layer;
         let stderr = tracing_subscriber::fmt::layer().with_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "hylki=info".into()),
@@ -137,7 +144,10 @@ fn main() {
             .with_target(false)
             .compact()
             .with_filter(tracing_subscriber::EnvFilter::new("hylki=debug"));
-        tracing_subscriber::registry().with(stderr).with(console).init();
+        tracing_subscriber::registry()
+            .with(stderr)
+            .with(console)
+            .init();
     }
 
     // The restart helper (see app_icon.rs) never builds a UI: it waits for
@@ -196,7 +206,14 @@ fn main() {
             let mut attach_paths = Vec::new();
             for f in files {
                 let uri = f.uri().to_string();
-                tracing::info!("open: {}", if uri.starts_with("mailto:") { "mailto: URI" } else { uri.as_str() });
+                tracing::info!(
+                    "open: {}",
+                    if uri.starts_with("mailto:") {
+                        "mailto: URI"
+                    } else {
+                        uri.as_str()
+                    }
+                );
                 if uri.starts_with("mailto:") {
                     app::queue_mailto(uri);
                 } else if uri.starts_with("mid:") || uri.starts_with("MID:") {
@@ -354,7 +371,10 @@ fn relay_to_primary(args: &[String]) -> bool {
         drop(remote);
         return false;
     }
-    tracing::info!("handing off to the running instance ({} argument(s))", files.len());
+    tracing::info!(
+        "handing off to the running instance ({} argument(s))",
+        files.len()
+    );
     if files.is_empty() {
         remote.activate();
     } else {
@@ -380,23 +400,25 @@ fn relay_to_primary(args: &[String]) -> bool {
 /// app's own icons, and GNOME's for a theme that lacks them.
 fn register_resources() {
     use gtk::{gio, glib};
-    let bytes = glib::Bytes::from_static(include_bytes!(concat!(
-        env!("OUT_DIR"),
-        "/hylki.gresource"
-    )));
+    let bytes =
+        glib::Bytes::from_static(include_bytes!(concat!(env!("OUT_DIR"), "/hylki.gresource")));
     match gio::Resource::from_data(&bytes) {
         Ok(resource) => gio::resources_register(&resource),
         Err(e) => tracing::error!("failed to register bundled icon resources: {e}"),
     }
     // The bundled sender logos (see src/logo.rs), under
     // /co/hyprlab/Hylki/logos/<source>/<file>.
-    let logos = glib::Bytes::from_static(include_bytes!(concat!(env!("OUT_DIR"), "/logos.gresource")));
+    let logos =
+        glib::Bytes::from_static(include_bytes!(concat!(env!("OUT_DIR"), "/logos.gresource")));
     match gio::Resource::from_data(&logos) {
         Ok(resource) => gio::resources_register(&resource),
         Err(e) => tracing::error!("failed to register bundled logo resources: {e}"),
     }
     // The built-in new-mail sounds, under /co/hyprlab/Hylki/sounds/<name>.ogg.
-    let sounds = glib::Bytes::from_static(include_bytes!(concat!(env!("OUT_DIR"), "/sounds.gresource")));
+    let sounds = glib::Bytes::from_static(include_bytes!(concat!(
+        env!("OUT_DIR"),
+        "/sounds.gresource"
+    )));
     match gio::Resource::from_data(&sounds) {
         Ok(resource) => gio::resources_register(&resource),
         Err(e) => tracing::error!("failed to register bundled sound resources: {e}"),

@@ -53,13 +53,13 @@ pub fn detect_raw(raw: &[u8]) -> Option<Invite> {
 pub fn detect(parsed: &mail_parser::Message) -> Option<Invite> {
     use mail_parser::MimeHeaders;
     for part in parsed.parts.iter() {
-        let calendar = part
-            .content_type()
-            .is_some_and(|c| c.ctype().eq_ignore_ascii_case("text")
-                && c.subtype().is_some_and(|s| s.eq_ignore_ascii_case("calendar")))
-            || part
-                .attachment_name()
-                .is_some_and(|n| n.to_ascii_lowercase().ends_with(".ics"));
+        let calendar = part.content_type().is_some_and(|c| {
+            c.ctype().eq_ignore_ascii_case("text")
+                && c.subtype()
+                    .is_some_and(|s| s.eq_ignore_ascii_case("calendar"))
+        }) || part
+            .attachment_name()
+            .is_some_and(|n| n.to_ascii_lowercase().ends_with(".ics"));
         if !calendar || part.contents().len() > MAX_ICS {
             continue;
         }
@@ -437,12 +437,21 @@ fn person(line: &Line) -> Option<InvitePerson> {
     }
     Some(InvitePerson {
         // A CN that is just the address again adds nothing.
-        name: if name.eq_ignore_ascii_case(&email) { String::new() } else { name },
+        name: if name.eq_ignore_ascii_case(&email) {
+            String::new()
+        } else {
+            name
+        },
         email,
-        status: line.param("PARTSTAT").unwrap_or("NEEDS-ACTION").to_ascii_uppercase(),
+        status: line
+            .param("PARTSTAT")
+            .unwrap_or("NEEDS-ACTION")
+            .to_ascii_uppercase(),
         // RFC 5545 defaults RSVP to FALSE; an organizer who wants an answer
         // says so.
-        rsvp: line.param("RSVP").is_some_and(|v| v.eq_ignore_ascii_case("TRUE")),
+        rsvp: line
+            .param("RSVP")
+            .is_some_and(|v| v.eq_ignore_ascii_case("TRUE")),
         // A resource (a room, a projector) is on the attendee list but is
         // not a person, and listing it as one reads oddly.
         resource: line
@@ -473,7 +482,10 @@ impl Stamp {
     fn read(line: &Line) -> Option<Stamp> {
         let mut stamp = Stamp::parse(line.raw.trim())?;
         stamp.tzid = line.param("TZID").unwrap_or_default().trim().to_string();
-        if line.param("VALUE").is_some_and(|v| v.eq_ignore_ascii_case("DATE")) {
+        if line
+            .param("VALUE")
+            .is_some_and(|v| v.eq_ignore_ascii_case("DATE"))
+        {
             stamp.date_only = true;
         }
         Some(stamp)
@@ -528,9 +540,15 @@ impl Stamp {
         if let Some(tz) = glib::TimeZone::from_identifier(Some(&self.tzid)) {
             return Some(tz);
         }
-        let spec = zones.iter().find(|z| z.id.eq_ignore_ascii_case(&self.tzid))?;
+        let spec = zones
+            .iter()
+            .find(|z| z.id.eq_ignore_ascii_case(&self.tzid))?;
         let offset = spec.offset_at(self)?;
-        let (sign, mins) = if offset < 0 { ('-', -offset / 60) } else { ('+', offset / 60) };
+        let (sign, mins) = if offset < 0 {
+            ('-', -offset / 60)
+        } else {
+            ('+', offset / 60)
+        };
         glib::TimeZone::from_identifier(Some(&format!("{sign}{:02}:{:02}", mins / 60, mins % 60)))
     }
 }
@@ -608,7 +626,9 @@ impl Observance {
             }
             "RRULE" => {
                 for part in line.raw.split(';') {
-                    let Some((k, v)) = part.split_once('=') else { continue };
+                    let Some((k, v)) = part.split_once('=') else {
+                        continue;
+                    };
                     match k.to_ascii_uppercase().as_str() {
                         "BYMONTH" => self.month = v.trim().parse().unwrap_or(self.month),
                         "BYMONTHDAY" => self.day = v.trim().parse().unwrap_or(self.day),
@@ -685,7 +705,8 @@ impl TimeZoneSpec {
         if self.observances.len() == 1 {
             return Some(self.observances[0].offset_to);
         }
-        let key = |mo: i32, d: i32, at: i32| (mo as i64) * 100_000_000 + (d as i64) * 100_000 + at as i64;
+        let key =
+            |mo: i32, d: i32, at: i32| (mo as i64) * 100_000_000 + (d as i64) * 100_000 + at as i64;
         let reading = key(when.mo, when.d, when.h * 3600 + when.mi * 60 + when.s);
         // Sort the year's changeovers and take the last one already past.
         // Before the first, the one in force is the year's last — the
@@ -728,7 +749,11 @@ fn utc_offset(text: &str) -> Option<i32> {
 
 fn days_in_month(year: i32, month: i32) -> i32 {
     use chrono::Datelike;
-    let (y, m) = if month >= 12 { (year + 1, 1) } else { (year, month + 1) };
+    let (y, m) = if month >= 12 {
+        (year + 1, 1)
+    } else {
+        (year, month + 1)
+    };
     chrono::NaiveDate::from_ymd_opt(y, m as u32, 1)
         .and_then(|first| first.pred_opt())
         .map_or(30, |last| last.day() as i32)
@@ -858,7 +883,10 @@ mod tests {
         assert_eq!(inv.start, 1_793_606_400);
         assert_eq!(inv.end, inv.start + 3600);
         assert!(!inv.all_day);
-        assert_eq!(inv.organizer.as_ref().map(|o| o.email.as_str()), Some("chloe@example.org"));
+        assert_eq!(
+            inv.organizer.as_ref().map(|o| o.email.as_str()),
+            Some("chloe@example.org")
+        );
         assert_eq!(inv.attendees.len(), 2);
         assert!(inv.attendees[0].rsvp);
         assert_eq!(inv.attendees[0].status, "NEEDS-ACTION");
@@ -924,7 +952,10 @@ mod tests {
         let ics = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:u\r\nSUMMARY:A rather lo\r\n ng meeting name\r\nDTSTART:20261102T080000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
         assert_eq!(parse(ics).unwrap().summary, "A rather long meeting name");
         let tabbed = ics.replace("\r\n ng", "\r\n\tng");
-        assert_eq!(parse(&tabbed).unwrap().summary, "A rather long meeting name");
+        assert_eq!(
+            parse(&tabbed).unwrap().summary,
+            "A rather long meeting name"
+        );
     }
 
     #[test]
@@ -1018,10 +1049,20 @@ mod tests {
     #[test]
     fn the_last_sunday_of_a_month_is_found() {
         // 25 October 2026 is the last Sunday of that month.
-        let o = Observance { month: 10, ordinal: -1, weekday: 7, ..Observance::default() };
+        let o = Observance {
+            month: 10,
+            ordinal: -1,
+            weekday: 7,
+            ..Observance::default()
+        };
         assert_eq!(o.day_in(2026), Some(25));
         // And the second Sunday of March 2026 is the 8th.
-        let o = Observance { month: 3, ordinal: 2, weekday: 7, ..Observance::default() };
+        let o = Observance {
+            month: 3,
+            ordinal: 2,
+            weekday: 7,
+            ..Observance::default()
+        };
         assert_eq!(o.day_in(2026), Some(8));
     }
 }

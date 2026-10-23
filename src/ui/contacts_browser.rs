@@ -11,7 +11,11 @@ use crate::i18n::i18n;
 /// Present the contacts browser as a modal of `parent`. `on_choose` runs with
 /// the chosen contact when a row is activated, `on_show_all` when the header
 /// button asks for Hylki's Contacts view (the window closes either way).
-pub fn present(parent: &impl IsA<gtk::Window>, on_choose: impl Fn(Contact) + 'static, on_show_all: impl Fn() + 'static) {
+pub fn present(
+    parent: &impl IsA<gtk::Window>,
+    on_choose: impl Fn(Contact) + 'static,
+    on_show_all: impl Fn() + 'static,
+) {
     let on_choose = std::rc::Rc::new(on_choose);
     let mut contacts = crate::contacts::read_contacts();
     contacts.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -123,7 +127,10 @@ pub fn launch_gnome_contacts_for(uid: &str) {
         launch_gnome_contacts();
         return;
     }
-    let uid: String = uid.chars().filter(|c| !c.is_whitespace() && *c != '\'').collect();
+    let uid: String = uid
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '\'')
+        .collect();
     if let Ok(app) = gtk::gio::AppInfo::create_from_commandline(
         format!("gnome-contacts -i '{uid}'"),
         Some(i18n("Contacts").as_str()),

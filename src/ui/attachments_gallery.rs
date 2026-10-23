@@ -13,9 +13,9 @@ use relm4::prelude::*;
 
 use std::collections::HashMap;
 
+use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::models::{ext_of, is_image_name, FolderKind, GalleryItem, GallerySort};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
-use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// Width of the table's trailing quick-actions column (three icon buttons);
 /// the header carries a spacer of the same width so the columns line up.
@@ -99,7 +99,12 @@ enum Master {
 /// clearing it, so turning the master back on restores each folder to whatever
 /// the user had chosen. `tick` is the user's own choice, or `None` when they
 /// have not touched this folder and its kind's default stands.
-fn in_scope(kind: FolderKind, include_archive: bool, include_other: bool, tick: Option<bool>) -> bool {
+fn in_scope(
+    kind: FolderKind,
+    include_archive: bool,
+    include_other: bool,
+    tick: Option<bool>,
+) -> bool {
     let master_on = match kind_master(kind) {
         Some(Master::Archive) => include_archive,
         Some(Master::Other) => include_other,
@@ -180,14 +185,23 @@ pub struct AttachmentsGallery {
 pub type FileKey = (u32, String, u32, String);
 
 fn key_of(item: &GalleryItem) -> FileKey {
-    (item.account_id, item.folder_path.clone(), item.uid, item.name.clone())
+    (
+        item.account_id,
+        item.folder_path.clone(),
+        item.uid,
+        item.name.clone(),
+    )
 }
 
 #[derive(Debug)]
 pub enum GalleryInput {
     /// A page came back from the cache: `offset` 0 replaces the list, anything
     /// else appends. `total` is how many the query matches altogether.
-    Page { items: Vec<GalleryItem>, total: u32, offset: u32 },
+    Page {
+        items: Vec<GalleryItem>,
+        total: u32,
+        offset: u32,
+    },
     SetLoading(bool),
     /// The scroll came near the end — ask for the next page if there is one.
     LoadMore,
@@ -203,7 +217,12 @@ pub enum GalleryInput {
     SetFetching(bool),
     /// A message's attachments arrived: fill in the bytes for every loaded row
     /// of that message, so its thumbnail and preview appear in place.
-    Fetched { account_id: u32, path: String, uid: u32, items: Vec<crate::models::Attachment> },
+    Fetched {
+        account_id: u32,
+        path: String,
+        uid: u32,
+        items: Vec<crate::models::Attachment>,
+    },
     /// Filter the grid to items matching this search text (sender, subject,
     /// filename, folder, and type keywords like "pdf" or "spreadsheet").
     /// Debounced — the query itself runs on [`GalleryInput::ApplyQuery`].
@@ -234,7 +253,11 @@ pub enum GalleryInput {
     /// Master switch: pull from folders that are neither Inbox nor Archive.
     SetIncludeOther(bool),
     /// One folder was ticked or unticked in the folder list.
-    SetFolder { account_id: u32, path: String, on: bool },
+    SetFolder {
+        account_id: u32,
+        path: String,
+        on: bool,
+    },
     /// A grid cell was activated (single click) — open the lightbox on that item.
     Activate(u32),
     Prev,
@@ -267,7 +290,11 @@ pub enum GalleryInput {
     /// A cell was double-clicked: open it externally, closing any preview.
     OpenExternal(usize),
     /// Right-click on cell `index` at `(x, y)` (cell-relative) — show its menu there.
-    ContextMenu { index: usize, x: f64, y: f64 },
+    ContextMenu {
+        index: usize,
+        x: f64,
+        y: f64,
+    },
     /// A lightbox-size PDF render finished (keyed by content hash) — show it
     /// if that PDF is still the one being previewed.
     PreviewRendered(u64),
@@ -284,15 +311,29 @@ pub enum GalleryInput {
 #[derive(Debug)]
 pub enum GalleryOutput {
     /// Open the source message of an attachment in the reader.
-    OpenMessage { account_id: u32, folder_path: String, uid: u32 },
+    OpenMessage {
+        account_id: u32,
+        folder_path: String,
+        uid: u32,
+    },
     /// Run this query against the cache and send the page back.
     Load(GalleryRequest),
     /// Fetch an attachment whose bytes were never downloaded, so it can be
     /// opened or previewed.
-    Fetch { account_id: u32, folder_path: String, uid: u32 },
+    Fetch {
+        account_id: u32,
+        folder_path: String,
+        uid: u32,
+    },
     /// Take an attachment out of its message on the server (#289); the app
     /// asks first.
-    DeleteFromServer { account_id: u32, folder_path: String, uid: u32, name: String, size: u64 },
+    DeleteFromServer {
+        account_id: u32,
+        folder_path: String,
+        uid: u32,
+        name: String,
+        size: u64,
+    },
 }
 
 #[relm4::component(pub)]
@@ -907,7 +948,11 @@ impl Component for AttachmentsGallery {
         _root: &Self::Root,
     ) {
         match msg {
-            GalleryInput::Page { items, total, offset } => {
+            GalleryInput::Page {
+                items,
+                total,
+                offset,
+            } => {
                 if offset == 0 {
                     // The first page of a fresh query replaces everything.
                     self.all_items = items;
@@ -935,15 +980,19 @@ impl Component for AttachmentsGallery {
             }
             GalleryInput::ScanStatus(remaining) => self.scan_remaining = remaining,
             GalleryInput::SetFetching(on) => self.fetching = on,
-            GalleryInput::Fetched { account_id, path, uid, items } => {
+            GalleryInput::Fetched {
+                account_id,
+                path,
+                uid,
+                items,
+            } => {
                 let mut touched = false;
-                for row in self
-                    .all_items
-                    .iter_mut()
-                    .filter(|i| {
-                        i.account_id == account_id && i.folder_path == path && i.uid == uid && i.data.is_none()
-                    })
-                {
+                for row in self.all_items.iter_mut().filter(|i| {
+                    i.account_id == account_id
+                        && i.folder_path == path
+                        && i.uid == uid
+                        && i.data.is_none()
+                }) {
                     // Match on the name rather than the index: the scan numbers
                     // parts as the server describes them and the fetch numbers
                     // them as the parser finds them, which need not agree.
@@ -1123,7 +1172,11 @@ impl Component for AttachmentsGallery {
                     self.scope_changed(&sender);
                 }
             }
-            GalleryInput::SetFolder { account_id, path, on } => {
+            GalleryInput::SetFolder {
+                account_id,
+                path,
+                on,
+            } => {
                 let entry = self.overrides.entry(account_id).or_default();
                 if entry.insert(path, on) != Some(on) {
                     // The list already draws this tick; rebuilding it here
@@ -1212,9 +1265,9 @@ impl Component for AttachmentsGallery {
                     // A GtkSearchEntry is composite: the focus widget is the
                     // GtkText inside it, so ask whether the focus is anywhere
                     // within the entry rather than whether it *is* the entry.
-                    let kept = focus
-                        .as_ref()
-                        .is_some_and(|f| f == entry.upcast_ref::<gtk::Widget>() || f.is_ancestor(&entry));
+                    let kept = focus.as_ref().is_some_and(|f| {
+                        f == entry.upcast_ref::<gtk::Widget>() || f.is_ancestor(&entry)
+                    });
                     tracing::info!(
                         target: "hylki::showcase",
                         "gallery search focus: kept={kept} holder={} toolbar_visible={} text={:?}",
@@ -1246,7 +1299,12 @@ impl AttachmentsGallery {
     /// items listed, of which carrying their file bytes, and those bytes.
     pub fn memory_stats(&self) -> (usize, usize, u64) {
         let with_data = self.all_items.iter().filter(|i| i.data.is_some()).count();
-        let bytes = self.all_items.iter().filter_map(|i| i.data.as_ref()).map(|d| d.len() as u64).sum();
+        let bytes = self
+            .all_items
+            .iter()
+            .filter_map(|i| i.data.as_ref())
+            .map(|d| d.len() as u64)
+            .sum();
         (self.all_items.len(), with_data, bytes)
     }
 
@@ -1459,7 +1517,11 @@ impl AttachmentsGallery {
         let kinds: HashMap<(u32, &str), FolderKind> = self
             .accounts
             .iter()
-            .flat_map(|a| a.folders.iter().map(move |f| ((a.id, f.path.as_str()), f.kind)))
+            .flat_map(|a| {
+                a.folders
+                    .iter()
+                    .map(move |f| ((a.id, f.path.as_str()), f.kind))
+            })
             .collect();
         let mut folders: Vec<(u32, String, bool)> = self
             .overrides
@@ -1566,8 +1628,13 @@ impl AttachmentsGallery {
         for display in 0..self.all_items.len() {
             if let Some(item) = self.item_at(display) {
                 let deleting = self.deleting.contains(&key_of(item));
-                self.flow
-                    .append(&build_cell(display, item, self.thumb_width, deleting, sender));
+                self.flow.append(&build_cell(
+                    display,
+                    item,
+                    self.thumb_width,
+                    deleting,
+                    sender,
+                ));
             }
         }
     }
@@ -1579,7 +1646,8 @@ impl AttachmentsGallery {
         for display in 0..self.all_items.len() {
             if let Some(item) = self.item_at(display) {
                 let deleting = self.deleting.contains(&key_of(item));
-                self.table.append(&build_row(display, item, deleting, sender));
+                self.table
+                    .append(&build_row(display, item, deleting, sender));
             }
         }
     }
@@ -1588,7 +1656,9 @@ impl AttachmentsGallery {
     /// never downloaded — most of an archive — is fetched first, and opens when
     /// [`GalleryInput::Fetched`] brings it back.
     fn open_item(&self, index: usize, sender: &ComponentSender<Self>) {
-        let Some(item) = self.item_at(index) else { return };
+        let Some(item) = self.item_at(index) else {
+            return;
+        };
         match &item.data {
             Some(data) => {
                 let parent = self.flow.root().and_downcast::<gtk::Window>();
@@ -1609,7 +1679,9 @@ impl AttachmentsGallery {
 
     /// Save item `index` to a file the user chooses.
     fn download_item(&self, index: usize, sender: &ComponentSender<Self>) {
-        let Some(item) = self.item_at(index) else { return };
+        let Some(item) = self.item_at(index) else {
+            return;
+        };
         let Some(data) = item.data.clone() else {
             // Not in hand yet: fetch it, and the user can save it once the
             // thumbnail fills in.
@@ -1659,14 +1731,20 @@ impl AttachmentsGallery {
         let open = MenuEntry::new(i18n("Open"), move || s.input(GalleryInput::OpenItem(index)))
             .icon("document-open-symbolic");
         let s = sender.clone();
-        let download = MenuEntry::new(i18n("Download…"), move || s.input(GalleryInput::DownloadItem(index)))
-            .icon("folder-download-symbolic");
+        let download = MenuEntry::new(i18n("Download…"), move || {
+            s.input(GalleryInput::DownloadItem(index))
+        })
+        .icon("folder-download-symbolic");
         let s = sender.clone();
-        let goto = MenuEntry::new(i18n("Go to Message"), move || s.input(GalleryInput::GoToItem(index)))
-            .icon("mail-unread-symbolic");
+        let goto = MenuEntry::new(i18n("Go to Message"), move || {
+            s.input(GalleryInput::GoToItem(index))
+        })
+        .icon("mail-unread-symbolic");
         let s = sender.clone();
-        let delete = MenuEntry::new(i18n("Delete from Server…"), move || s.input(GalleryInput::DeleteItem(index)))
-            .icon("user-trash-symbolic");
+        let delete = MenuEntry::new(i18n("Delete from Server…"), move || {
+            s.input(GalleryInput::DeleteItem(index))
+        })
+        .icon("user-trash-symbolic");
         let sections = vec![vec![open, download, goto], vec![delete]];
 
         // Anchor on the clicked cell/row itself so the click point (already
@@ -1715,7 +1793,9 @@ fn build_cell(
             spawn_thumbnail_render(&item.name, data, move |tex| {
                 // The cell may be gone by now (search narrowed, list rebuilt);
                 // the render still landed in the cache for the next build.
-                let Some(holder) = holder.upgrade() else { return };
+                let Some(holder) = holder.upgrade() else {
+                    return;
+                };
                 while let Some(child) = holder.first_child() {
                     holder.remove(&child);
                 }
@@ -1911,7 +1991,11 @@ pub(crate) fn fade_out(widget: &impl IsA<gtk::Widget>, done: impl Fn() + 'static
 
 fn caption(item: &GalleryItem) -> String {
     let unknown = i18n("Unknown");
-    let who = if item.from_name.trim().is_empty() { unknown.as_str() } else { item.from_name.trim() };
+    let who = if item.from_name.trim().is_empty() {
+        unknown.as_str()
+    } else {
+        item.from_name.trim()
+    };
     let subject = item.subject.trim();
     let mut parts = vec![who.to_string()];
     if !subject.is_empty() {
@@ -1936,7 +2020,6 @@ fn folder_label(path: &str) -> String {
         crate::mutf7::decode(name)
     }
 }
-
 
 /// One table row: mini thumbnail/type icon, name, sender, type, date, size —
 /// the same widths as the header buttons, so the columns line up.
@@ -2000,7 +2083,11 @@ fn build_row(
     };
     // No extension: say so, rather than showing the name again.
     let ext = ext_of(&item.name);
-    let kind_text = if ext.is_empty() { i18n("File") } else { ext.to_ascii_uppercase() };
+    let kind_text = if ext.is_empty() {
+        i18n("File")
+    } else {
+        ext.to_ascii_uppercase()
+    };
     let kind = fixed(&kind_text, 90, 0.0);
     line.append(&kind);
 
@@ -2098,7 +2185,10 @@ fn scan_text(loading_more: bool, scan_remaining: u32) -> String {
     if scan_remaining > 0 {
         // Deliberately counts messages, not attachments: until a message has
         // been described there is no telling how many files it holds.
-        i18n_f("Indexing {n} messages…", &[("n", &scan_remaining.to_string())])
+        i18n_f(
+            "Indexing {n} messages…",
+            &[("n", &scan_remaining.to_string())],
+        )
     } else if loading_more {
         i18n("Loading more…")
     } else {
@@ -2118,10 +2208,7 @@ fn count_text(shown: usize, total: usize) -> String {
     } else {
         i18n_f(
             "{shown} of {total}",
-            &[
-                ("shown", &shown.to_string()),
-                ("total", &total.to_string()),
-            ],
+            &[("shown", &shown.to_string()), ("total", &total.to_string())],
         )
     }
 }
@@ -2191,7 +2278,12 @@ struct TextureCache {
 
 impl TextureCache {
     fn new(budget: u64) -> Self {
-        TextureCache { map: Default::default(), order: Default::default(), bytes: 0, budget }
+        TextureCache {
+            map: Default::default(),
+            order: Default::default(),
+            bytes: 0,
+            budget,
+        }
     }
 
     fn get(&self, key: &u64) -> Option<&Option<gdk::Texture>> {
@@ -2209,7 +2301,9 @@ impl TextureCache {
         }
         // Keep at least the newest entry even when it alone busts the budget.
         while self.bytes > self.budget && self.order.len() > 1 {
-            let Some(oldest) = self.order.pop_front() else { break };
+            let Some(oldest) = self.order.pop_front() else {
+                break;
+            };
             if let Some(Some(old)) = self.map.remove(&oldest) {
                 self.bytes -= crate::memory_report::texture_bytes(&old);
             }
@@ -2246,7 +2340,10 @@ thread_local! {
 /// thumbnails (entries, of which rendered, pixel bytes) then the lightbox
 /// PDF pages the same way.
 pub(crate) fn cache_stats() -> ((usize, usize, u64), (usize, usize, u64)) {
-    (THUMB_CACHE.with(|c| c.borrow().stats()), PDF_PREVIEWS.with(|c| c.borrow().stats()))
+    (
+        THUMB_CACHE.with(|c| c.borrow().stats()),
+        PDF_PREVIEWS.with(|c| c.borrow().stats()),
+    )
 }
 
 #[cfg(test)]
@@ -2255,7 +2352,14 @@ mod texture_cache_tests {
 
     fn texture(px: i32) -> gdk::Texture {
         let bytes = glib::Bytes::from_owned(vec![0u8; (px * px * 4) as usize]);
-        gdk::MemoryTexture::new(px, px, gdk::MemoryFormat::R8g8b8a8, &bytes, (px * 4) as usize).upcast()
+        gdk::MemoryTexture::new(
+            px,
+            px,
+            gdk::MemoryFormat::R8g8b8a8,
+            &bytes,
+            (px * 4) as usize,
+        )
+        .upcast()
     }
 
     #[test]
@@ -2315,11 +2419,10 @@ pub(crate) fn lightbox_pdf_texture(
     }
     let data = data.to_vec();
     glib::spawn_future_local(async move {
-        let tex =
-            gtk::gio::spawn_blocking(move || pdf_page_texture(&data, PREVIEW_RENDER_WIDTH))
-                .await
-                .ok()
-                .flatten();
+        let tex = gtk::gio::spawn_blocking(move || pdf_page_texture(&data, PREVIEW_RENDER_WIDTH))
+            .await
+            .ok()
+            .flatten();
         PDF_PREVIEWS.with(|c| {
             c.borrow_mut().insert(key, tex.clone());
         });
@@ -2404,7 +2507,9 @@ const PREVIEW_RENDER_WIDTH: f64 = 1600.0;
 /// rendered. Printing (#359) renders with poppler too, on the main thread.
 pub(crate) fn pdf_render_lock() -> std::sync::MutexGuard<'static, ()> {
     static PDF_RENDER: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    PDF_RENDER.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    PDF_RENDER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Render a PDF's first page to a texture at `target_width`, by way of an
@@ -2500,10 +2605,20 @@ pub(crate) fn icon_color_class(name: &str) -> &'static str {
 pub(crate) fn open_bytes(name: &str, data: &[u8], parent: Option<&gtk::Window>) {
     let safe: String = name
         .chars()
-        .map(|c| if c.is_alphanumeric() || matches!(c, '.' | '-' | '_') { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let Some(dir) = attachment_dir() else { return };
-    let base = if safe.is_empty() { "attachment".to_string() } else { safe };
+    let base = if safe.is_empty() {
+        "attachment".to_string()
+    } else {
+        safe
+    };
     let Some((mut file, path)) = create_private(&dir, &base) else {
         tracing::warn!("could not open a temporary file for the attachment");
         return;
@@ -2668,7 +2783,10 @@ fn attachment_dir() -> Option<std::path::PathBuf> {
     {
         use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
         if !dir.exists() {
-            let _ = std::fs::DirBuilder::new().recursive(true).mode(0o700).create(&dir);
+            let _ = std::fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(&dir);
         }
         // `symlink_metadata`, so a symlink pointing at somewhere friendlier is
         // seen for what it is rather than followed.
@@ -2839,8 +2957,16 @@ mod tests {
     /// not Sent.
     #[test]
     fn sent_is_the_only_kind_off_by_default() {
-        for kind in [FolderKind::Inbox, FolderKind::Starred, FolderKind::Archive, FolderKind::Custom] {
-            assert!(in_scope(kind, true, true, None), "{kind:?} should be on by default");
+        for kind in [
+            FolderKind::Inbox,
+            FolderKind::Starred,
+            FolderKind::Archive,
+            FolderKind::Custom,
+        ] {
+            assert!(
+                in_scope(kind, true, true, None),
+                "{kind:?} should be on by default"
+            );
         }
         assert!(!in_scope(FolderKind::Sent, true, true, None));
     }
@@ -2878,7 +3004,14 @@ mod tests {
         assert!(in_scope(FolderKind::Archive, true, true, Some(true)));
     }
 
-    fn item(name: &str, from: &str, subject: &str, folder: &str, ts: i64, size: u64) -> GalleryItem {
+    fn item(
+        name: &str,
+        from: &str,
+        subject: &str,
+        folder: &str,
+        ts: i64,
+        size: u64,
+    ) -> GalleryItem {
         GalleryItem {
             account_id: 1,
             downloaded: true,
@@ -2892,8 +3025,6 @@ mod tests {
             data: None,
         }
     }
-
-
 
     /// A minimal one-page PDF, built by hand — just enough structure for
     /// poppler to load and render, with no dependency on an external file.
@@ -2935,7 +3066,6 @@ mod tests {
         out
     }
 
-
     #[test]
     fn sort_index_roundtrips_every_criterion() {
         for i in 0..10 {
@@ -2946,12 +3076,33 @@ mod tests {
     #[test]
     fn column_headers_carry_the_sort_arrow() {
         use super::column_header;
-        assert_eq!(column_header("Name", GallerySort::Name, GallerySort::Name, GallerySort::NameDesc), "Name ↑");
         assert_eq!(
-            column_header("Name", GallerySort::NameDesc, GallerySort::Name, GallerySort::NameDesc),
+            column_header(
+                "Name",
+                GallerySort::Name,
+                GallerySort::Name,
+                GallerySort::NameDesc
+            ),
+            "Name ↑"
+        );
+        assert_eq!(
+            column_header(
+                "Name",
+                GallerySort::NameDesc,
+                GallerySort::Name,
+                GallerySort::NameDesc
+            ),
             "Name ↓"
         );
-        assert_eq!(column_header("Name", GallerySort::Newest, GallerySort::Name, GallerySort::NameDesc), "Name");
+        assert_eq!(
+            column_header(
+                "Name",
+                GallerySort::Newest,
+                GallerySort::Name,
+                GallerySort::NameDesc
+            ),
+            "Name"
+        );
     }
 
     #[test]
@@ -2982,7 +3133,6 @@ mod tests {
             Thumbnail::Pending
         ));
     }
-
 
     #[test]
     fn icon_color_class_maps_types() {

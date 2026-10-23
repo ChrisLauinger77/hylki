@@ -49,7 +49,9 @@ mod imp {
 
     impl WidgetImpl for FadeLabel {
         fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
-            let Some(label) = self.label.borrow().clone() else { return (0, 0, -1, -1) };
+            let Some(label) = self.label.borrow().clone() else {
+                return (0, 0, -1, -1);
+            };
             let (min, nat, base_min, base_nat) = label.measure(orientation, for_size);
             if orientation == gtk::Orientation::Horizontal {
                 // Any width will do: whatever does not fit fades.
@@ -60,7 +62,9 @@ mod imp {
         }
 
         fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
-            let Some(label) = self.label.borrow().clone() else { return };
+            let Some(label) = self.label.borrow().clone() else {
+                return;
+            };
             let (_, nat, _, _) = label.measure(gtk::Orientation::Horizontal, -1);
             let full = nat.max(width);
             let overflow = (full - width).max(0) as f64;
@@ -75,7 +79,9 @@ mod imp {
 
         fn snapshot(&self, snapshot: &gtk::Snapshot) {
             let obj = self.obj();
-            let Some(label) = self.label.borrow().clone() else { return };
+            let Some(label) = self.label.borrow().clone() else {
+                return;
+            };
             let (w, h) = (obj.width() as f32, obj.height() as f32);
             let overflow = obj.overflow_px();
             if overflow <= 0.0 || w <= 0.0 {
@@ -88,7 +94,8 @@ mod imp {
             let left = (offset / FADE).clamp(0.0, 1.0);
             let right = ((overflow - offset) / FADE).clamp(0.0, 1.0);
             let edge = (FADE / w).min(0.5);
-            let stop = |at: f32, alpha: f32| gsk::ColorStop::new(at, gdk::RGBA::new(0.0, 0.0, 0.0, alpha));
+            let stop =
+                |at: f32, alpha: f32| gsk::ColorStop::new(at, gdk::RGBA::new(0.0, 0.0, 0.0, alpha));
             let bounds = graphene::Rect::new(0.0, 0.0, w, h);
             snapshot.push_clip(&bounds);
             snapshot.push_mask(gsk::MaskMode::Alpha);
@@ -96,7 +103,12 @@ mod imp {
                 &bounds,
                 &graphene::Point::new(0.0, 0.0),
                 &graphene::Point::new(w, 0.0),
-                &[stop(0.0, 1.0 - left), stop(edge, 1.0), stop(1.0 - edge, 1.0), stop(1.0, 1.0 - right)],
+                &[
+                    stop(0.0, 1.0 - left),
+                    stop(edge, 1.0),
+                    stop(1.0 - edge, 1.0),
+                    stop(1.0, 1.0 - right),
+                ],
             );
             snapshot.pop();
             obj.snapshot_child(&label, snapshot);
@@ -128,7 +140,9 @@ impl FadeLabel {
 
     /// How much of the text is out of sight at rest, in pixels.
     fn overflow_px(&self) -> f32 {
-        let Some(label) = self.imp().label.borrow().clone() else { return 0.0 };
+        let Some(label) = self.imp().label.borrow().clone() else {
+            return 0.0;
+        };
         (label.width() - self.width()).max(0) as f32
     }
 
@@ -146,7 +160,11 @@ impl FadeLabel {
             return;
         }
         // About 70 px a second out, faster back; never a crawl or a jump.
-        let ms = if on { (to - from).abs() * 14.0 } else { (to - from).abs() * 5.0 };
+        let ms = if on {
+            (to - from).abs() * 14.0
+        } else {
+            (to - from).abs() * 5.0
+        };
         let weak = self.downgrade();
         let target = adw::CallbackAnimationTarget::new(move |v| {
             if let Some(obj) = weak.upgrade() {

@@ -17,8 +17,8 @@
 //! refused — Hylki still runs; it just isn't listed, which is the desktop's
 //! decision to make, not ours.
 
-use zbus::zvariant::Value;
 use crate::i18n::{i18n, ni18n_f};
+use zbus::zvariant::Value;
 
 const PORTAL_DEST: &str = "org.freedesktop.portal.Desktop";
 const PORTAL_PATH: &str = "/org/freedesktop/portal/desktop";
@@ -33,7 +33,8 @@ const IFACE_BACKGROUND: &str = "org.freedesktop.portal.Background";
 /// and blocking a settings toggle on a dialog the user may leave sitting there
 /// would be worse than proceeding.
 pub fn request(autostart: bool) {
-    let reason = i18n("Hylki checks for new mail and shows notifications while its window is closed.");
+    let reason =
+        i18n("Hylki checks for new mail and shows notifications while its window is closed.");
     if let Err(e) = call_request(&reason, autostart) {
         tracing::debug!("background portal request skipped: {e}");
     }
@@ -94,7 +95,12 @@ pub fn set_status(message: &str) {
 pub fn status_text(unread: u32) -> String {
     match unread {
         0 => i18n("Checking for new mail"),
-        n => ni18n_f("{n} unread message", "{n} unread messages", n, &[("n", &n.to_string())]),
+        n => ni18n_f(
+            "{n} unread message",
+            "{n} unread messages",
+            n,
+            &[("n", &n.to_string())],
+        ),
     }
 }
 

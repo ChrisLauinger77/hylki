@@ -119,7 +119,10 @@ impl Arrivals {
 
     /// How many of the arrivals are still unread, where `unread_uids` gives
     /// a folder's unread UIDs as the app now lists them.
-    pub fn count<I: IntoIterator<Item = u32>>(&self, mut unread_uids: impl FnMut(u32, u32) -> I) -> u32 {
+    pub fn count<I: IntoIterator<Item = u32>>(
+        &self,
+        mut unread_uids: impl FnMut(u32, u32) -> I,
+    ) -> u32 {
         let mut by_folder: HashMap<(u32, u32), Vec<u32>> = HashMap::new();
         for &(a, f, uid) in &self.mail {
             by_folder.entry((a, f)).or_default().push(uid);
@@ -153,7 +156,12 @@ mod tests {
     fn only_new_unread_mail_counts() {
         let mut a = Arrivals::default();
         // 1 and 2 were there before; 3 is new and unread, 4 new but read.
-        a.note(1, 10, Some(&uids(&[1, 2])), [(1, true), (2, true), (3, true), (4, false)]);
+        a.note(
+            1,
+            10,
+            Some(&uids(&[1, 2])),
+            [(1, true), (2, true), (3, true), (4, false)],
+        );
         assert_eq!(a.count(|_, _| vec![1, 2, 3]), 1);
         // A later sync repeats 3 and brings 5.
         a.note(1, 10, Some(&uids(&[1, 2, 3, 4])), [(3, true), (5, true)]);
@@ -167,7 +175,10 @@ mod tests {
         a.note(2, 20, Some(&uids(&[])), [(7, true)]);
         assert_eq!(a.count(|_, _| vec![7, 8]), 3);
         // 8 read in account 1; account 2's 7 deleted.
-        assert_eq!(a.count(|acct, _| if acct == 1 { vec![7] } else { vec![] }), 1);
+        assert_eq!(
+            a.count(|acct, _| if acct == 1 { vec![7] } else { vec![] }),
+            1
+        );
     }
 
     #[test]

@@ -115,7 +115,9 @@ pub fn present_window(window: &impl gtk::prelude::IsA<gtk::Window>) {
     let window = window.as_ref();
     window.set_visible(true);
     window.present();
-    let Some(surface) = window.surface() else { return };
+    let Some(surface) = window.surface() else {
+        return;
+    };
     if !surface.display().type_().name().starts_with("GdkX11") {
         return;
     }

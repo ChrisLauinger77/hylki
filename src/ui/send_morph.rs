@@ -207,14 +207,29 @@ impl SendMorph {
         imp.scale.set(scale);
         // The stage is still hidden, so the pane's size is the one it will
         // be given.
-        imp.size.set(self.pane().map_or((0, 0), |p| (p.width(), p.height())));
+        imp.size
+            .set(self.pane().map_or((0, 0), |p| (p.width(), p.height())));
         let e = &before.editor;
-        imp.base.set(self.native().and_then(|n| n.renderer()).and_then(|r| {
-            sample(&r, &before.still, scale, (before.composer.x() + 4.0).max(e.x() - 6.0), e.y() + e.height() / 2.0)
-        }));
+        imp.base
+            .set(self.native().and_then(|n| n.renderer()).and_then(|r| {
+                sample(
+                    &r,
+                    &before.still,
+                    scale,
+                    (before.composer.x() + 4.0).max(e.x() - 6.0),
+                    e.y() + e.height() / 2.0,
+                )
+            }));
         if let Some(r) = self.native().and_then(|n| n.renderer()) {
-            imp.chrome_cut.replace(cut(&r, &before.still, scale, &before.composer, Some(&inflate(e, 4.0))));
-            imp.editor_cut.replace(cut(&r, &before.still, scale, e, None));
+            imp.chrome_cut.replace(cut(
+                &r,
+                &before.still,
+                scale,
+                &before.composer,
+                Some(&inflate(e, 4.0)),
+            ));
+            imp.editor_cut
+                .replace(cut(&r, &before.still, scale, e, None));
         }
         imp.before.replace(Some(before));
         imp.scene.replace(None);
@@ -271,7 +286,9 @@ impl SendMorph {
 
     /// The pane under the stage: the overlay's main child.
     fn pane(&self) -> Option<gtk::Widget> {
-        self.parent().and_downcast::<gtk::Overlay>().and_then(|o| o.child())
+        self.parent()
+            .and_downcast::<gtk::Overlay>()
+            .and_then(|o| o.child())
     }
 
     fn set_pane_drawn(&self, drawn: bool) {
@@ -398,7 +415,11 @@ impl SendMorph {
         }
         let card = graphene::Rect::new(arrival.rect.x(), top, arrival.rect.width(), bottom - top);
         let card_radius = (
-            if arrival.rect.y() >= view.y() - 0.5 { CARD_RADIUS } else { 0.0 },
+            if arrival.rect.y() >= view.y() - 0.5 {
+                CARD_RADIUS
+            } else {
+                0.0
+            },
             if arrival.rect.y() + arrival.rect.height() <= view.y() + view.height() + 0.5 {
                 CARD_RADIUS
             } else {
@@ -409,7 +430,11 @@ impl SendMorph {
         // shift of any card on that side that both documents have.
         let shift_of = |cards: &[Card]| -> Option<f32> {
             cards.iter().find_map(|c| {
-                before.cards.iter().find(|o| o.key == c.key).map(|o| c.rect.y() - o.rect.y())
+                before
+                    .cards
+                    .iter()
+                    .find(|o| o.key == c.key)
+                    .map(|o| c.rect.y() - o.rect.y())
             })
         };
         let above: Vec<Card> = after.cards[..at].iter().rev().cloned().collect();
@@ -418,7 +443,9 @@ impl SendMorph {
         let shift_below = shift_of(&below);
         // A side with no card in both moves with the other side, or failing
         // that with the top of the view.
-        let shift_above = shift_above.or(shift_below).unwrap_or(view.y() - before.view.y());
+        let shift_above = shift_above
+            .or(shift_below)
+            .unwrap_or(view.y() - before.view.y());
         let shift_below = shift_below.unwrap_or(shift_above);
         let scale = self.imp().scale.get();
         let renderer = self.native().and_then(|n| n.renderer())?;
@@ -429,14 +456,20 @@ impl SendMorph {
         let page = sample(&after.still, view.x() + 3.0, view.y() + view.height() / 2.0)?;
         let editor_ground = sample(&before.still, e.x() + 6.0, e.y() + e.height() - 6.0)?;
         let card_ground = sample(&after.still, card.x() + 6.0, card.y() + card.height() - 6.0)?;
-        let header_cut = after.header.and_then(|hb| cut(&renderer, &after.still, scale, &hb, None));
+        let header_cut = after
+            .header
+            .and_then(|hb| cut(&renderer, &after.still, scale, &hb, None));
         let card_cut = cut(&renderer, &after.still, scale, &card, None);
         // Without a measured line (an empty body), the cards' tops meet.
         let (editor_text, card_text, text_ratio) = match (before.text, arrival.text) {
             (Some((et, es)), Some((ct, cs))) => (
                 (et.x() - e.x(), et.y() - e.y()),
                 (ct.x() - card.x(), ct.y() - card.y()),
-                if es > 0.0 && cs > 0.0 { (cs / es).clamp(0.5, 2.0) } else { 1.0 },
+                if es > 0.0 && cs > 0.0 {
+                    (cs / es).clamp(0.5, 2.0)
+                } else {
+                    1.0
+                },
             ),
             _ => ((0.0, 0.0), (0.0, arrival.head), 1.0),
         };
@@ -464,7 +497,11 @@ impl SendMorph {
         // At rest before the clock starts, the scene is drawn a hair past
         // its start, so every way the flight draws is already in use.
         let resting = imp.scene.borrow().is_some() && imp.motion_start.get() == 0;
-        let t = if resting { 0.001 } else { self.motion_progress() };
+        let t = if resting {
+            0.001
+        } else {
+            self.motion_progress()
+        };
         self.draw_at(s, t, self.chrome_progress());
     }
 
@@ -473,7 +510,9 @@ impl SendMorph {
     fn draw_at(&self, s: &gtk::Snapshot, t: f64, c: f64) {
         let imp = self.imp();
         let before = imp.before.borrow();
-        let Some(before) = before.as_ref() else { return };
+        let Some(before) = before.as_ref() else {
+            return;
+        };
         let scale = imp.scale.get();
         let (w, h) = (self.width() as f32, self.height() as f32);
         let full = graphene::Rect::new(0.0, 0.0, w, h);
@@ -548,7 +587,12 @@ impl SendMorph {
         {
             let dy = (1.0 - e) * (before.view.y() - after.view.y());
             let top = head_top + dy;
-            let clip = graphene::Rect::new(after.reader.x(), top, after.reader.width(), (view.y() - top).max(0.0));
+            let clip = graphene::Rect::new(
+                after.reader.x(),
+                top,
+                after.reader.width(),
+                (view.y() - top).max(0.0),
+            );
             s.push_clip(&clip);
             draw_still(s, &after.still, scale, &full, 0.0, dy);
             s.pop();
@@ -559,7 +603,12 @@ impl SendMorph {
             let dy = (1.0 - e) * ((before.view.y() + before.view.height()) - bottom_after);
             let top = view.y() + view.height();
             let bottom = after.reader.y() + after.reader.height() + dy;
-            let clip = graphene::Rect::new(after.reader.x(), top, after.reader.width(), (bottom - top).max(0.0));
+            let clip = graphene::Rect::new(
+                after.reader.x(),
+                top,
+                after.reader.width(),
+                (bottom - top).max(0.0),
+            );
             s.push_clip(&clip);
             draw_still(s, &after.still, scale, &full, 0.0, dy);
             s.pop();
@@ -583,7 +632,12 @@ impl SendMorph {
             let top = before.view.y() + dy;
             let bottom = (old_split_above + dy).min(frame.y());
             if bottom > top {
-                s.push_clip(&graphene::Rect::new(view.x(), top, view.width(), bottom - top));
+                s.push_clip(&graphene::Rect::new(
+                    view.x(),
+                    top,
+                    view.width(),
+                    bottom - top,
+                ));
                 draw_still(s, &before.still, scale, &full, 0.0, dy);
                 s.pop();
             }
@@ -593,7 +647,12 @@ impl SendMorph {
             let top = (old_split_below + dy).max(frame_bottom);
             let bottom = before.view.y() + before.view.height() + dy;
             if bottom > top {
-                s.push_clip(&graphene::Rect::new(view.x(), top, view.width(), bottom - top));
+                s.push_clip(&graphene::Rect::new(
+                    view.x(),
+                    top,
+                    view.width(),
+                    bottom - top,
+                ));
                 draw_still(s, &before.still, scale, &full, 0.0, dy);
                 s.pop();
             }
@@ -603,7 +662,12 @@ impl SendMorph {
             let top = after.view.y() + dy;
             let bottom = card.y() + dy;
             if bottom > top {
-                s.push_clip(&graphene::Rect::new(view.x(), top, view.width(), bottom - top));
+                s.push_clip(&graphene::Rect::new(
+                    view.x(),
+                    top,
+                    view.width(),
+                    bottom - top,
+                ));
                 draw_still(s, &after.still, scale, &full, 0.0, dy);
                 s.pop();
             }
@@ -613,7 +677,12 @@ impl SendMorph {
             let top = card.y() + card.height() + dy;
             let bottom = after.view.y() + after.view.height() + dy;
             if bottom > top {
-                s.push_clip(&graphene::Rect::new(view.x(), top, view.width(), bottom - top));
+                s.push_clip(&graphene::Rect::new(
+                    view.x(),
+                    top,
+                    view.width(),
+                    bottom - top,
+                ));
                 draw_still(s, &after.still, scale, &full, 0.0, dy);
                 s.pop();
             }
@@ -636,7 +705,11 @@ impl SendMorph {
         let rounded = rounded_rect(&frame, top_r, bottom_r);
         // Lifted while waiting, it stays up for the first half of the
         // flight and settles as it lands.
-        shadow(s, &rounded, chrome * (1.0 - smoothstep(0.45, 1.0, t) as f32));
+        shadow(
+            s,
+            &rounded,
+            chrome * (1.0 - smoothstep(0.45, 1.0, t) as f32),
+        );
         s.push_rounded_clip(&rounded);
         s.append_color(&mix(&scene.editor_ground, &scene.card_ground, e), &frame);
         // The same words lie on top of each other, so the card's own
@@ -686,7 +759,6 @@ impl SendMorph {
     }
 }
 
-
 /// HYLKI_MORPH_SLOW=<factor> plays the morph that many times slower, to
 /// look at it (development only).
 fn slow_motion() -> f64 {
@@ -699,7 +771,9 @@ fn slow_motion() -> f64 {
 /// HYLKI_MORPH_FRAMES=<dir> saves every frame of the morph there as a PNG
 /// named by its time and progress (development only).
 fn record_frame(obj: &SendMorph) {
-    let Some(dir) = std::env::var_os("HYLKI_MORPH_FRAMES") else { return };
+    let Some(dir) = std::env::var_os("HYLKI_MORPH_FRAMES") else {
+        return;
+    };
     if obj.width() <= 0 || obj.height() <= 0 {
         return;
     }
@@ -711,10 +785,22 @@ fn record_frame(obj: &SendMorph) {
     let scale = imp.scale.get();
     snap.scale(scale, scale);
     obj.draw(&snap);
-    let (Some(node), Some(renderer)) = (snap.to_node(), obj.native().and_then(|n| n.renderer())) else { return };
-    let rect = graphene::Rect::new(0.0, 0.0, obj.width() as f32 * scale, obj.height() as f32 * scale);
+    let (Some(node), Some(renderer)) = (snap.to_node(), obj.native().and_then(|n| n.renderer()))
+    else {
+        return;
+    };
+    let rect = graphene::Rect::new(
+        0.0,
+        0.0,
+        obj.width() as f32 * scale,
+        obj.height() as f32 * scale,
+    );
     let tex = renderer.render_texture(&node, Some(&rect));
-    let landed = if imp.scene.borrow().is_some() { "m" } else { "w" };
+    let landed = if imp.scene.borrow().is_some() {
+        "m"
+    } else {
+        "w"
+    };
     let path = std::path::Path::new(&dir).join(format!("{since:07.1}-{landed}-{t:.3}.png"));
     let _ = tex.save_to_png(path);
 }
@@ -724,12 +810,18 @@ fn record_frame(obj: &SendMorph) {
 /// beside it to crop by, since the pane alone leaves out the window's
 /// ground (development only).
 fn record_final(obj: &SendMorph) {
-    let (Some(dir), Some(pane)) = (std::env::var_os("HYLKI_MORPH_FRAMES"), obj.parent()) else { return };
+    let (Some(dir), Some(pane)) = (std::env::var_os("HYLKI_MORPH_FRAMES"), obj.parent()) else {
+        return;
+    };
     for (ms, name) in [(30, "zz-final-a.png"), (400, "zz-final-b.png")] {
         let (dir, pane) = (dir.clone(), pane.clone());
         glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
-            let Some(window) = pane.root().map(|r| r.upcast::<gtk::Widget>()) else { return };
-            let Some(at) = pane.compute_bounds(&window) else { return };
+            let Some(window) = pane.root().map(|r| r.upcast::<gtk::Widget>()) else {
+                return;
+            };
+            let Some(at) = pane.compute_bounds(&window) else {
+                return;
+            };
             capture_next_frame(&window, move |still| {
                 let Some((tex, scale)) = still else { return };
                 let dir = std::path::Path::new(&dir);
@@ -763,14 +855,28 @@ fn capture(widget: &gtk::Widget) -> Option<(gdk::Texture, f32)> {
     snap.scale(scale, scale);
     paintable.snapshot(&snap, w as f64, h as f64);
     let node = snap.to_node()?;
-    let viewport = graphene::Rect::new(0.0, 0.0, (w as f32 * scale).round(), (h as f32 * scale).round());
+    let viewport = graphene::Rect::new(
+        0.0,
+        0.0,
+        (w as f32 * scale).round(),
+        (h as f32 * scale).round(),
+    );
     Some((renderer.render_texture(&node, Some(&viewport)), scale))
 }
 
 /// The color of one pixel of a still, at logical point (x, y).
-fn sample(renderer: &gsk::Renderer, tex: &gdk::Texture, scale: f32, x: f32, y: f32) -> Option<gdk::RGBA> {
+fn sample(
+    renderer: &gsk::Renderer,
+    tex: &gdk::Texture,
+    scale: f32,
+    x: f32,
+    y: f32,
+) -> Option<gdk::RGBA> {
     let snap = gtk::Snapshot::new();
-    snap.append_texture(tex, &graphene::Rect::new(0.0, 0.0, tex.width() as f32, tex.height() as f32));
+    snap.append_texture(
+        tex,
+        &graphene::Rect::new(0.0, 0.0, tex.width() as f32, tex.height() as f32),
+    );
     let node = snap.to_node()?;
     let (px, py) = ((x * scale).floor(), (y * scale).floor());
     if px < 0.0 || py < 0.0 || px >= tex.width() as f32 || py >= tex.height() as f32 {
@@ -781,7 +887,12 @@ fn sample(renderer: &gsk::Renderer, tex: &gdk::Texture, scale: f32, x: f32, y: f
 
 /// The window's own color behind the pane: at the first of `points` where
 /// the pane's still is see-through, what the whole window draws there.
-fn ground_behind(root: &gtk::Widget, still: &gdk::Texture, scale: f32, points: &[(f32, f32)]) -> Option<gdk::RGBA> {
+fn ground_behind(
+    root: &gtk::Widget,
+    still: &gdk::Texture,
+    scale: f32,
+    points: &[(f32, f32)],
+) -> Option<gdk::RGBA> {
     let renderer = root.native()?.renderer()?;
     let window: gtk::Widget = root.root()?.upcast();
     let &(x, y) = points
@@ -790,9 +901,18 @@ fn ground_behind(root: &gtk::Widget, still: &gdk::Texture, scale: f32, points: &
     let at = root.compute_point(&window, &graphene::Point::new(x, y))?;
     let snap = gtk::Snapshot::new();
     snap.scale(scale, scale);
-    gtk::WidgetPaintable::new(Some(&window)).snapshot(&snap, window.width() as f64, window.height() as f64);
+    gtk::WidgetPaintable::new(Some(&window)).snapshot(
+        &snap,
+        window.width() as f64,
+        window.height() as f64,
+    );
     let node = snap.to_node()?;
-    pixel(&renderer, &node, (at.x() * scale).floor(), (at.y() * scale).floor())
+    pixel(
+        &renderer,
+        &node,
+        (at.x() * scale).floor(),
+        (at.y() * scale).floor(),
+    )
 }
 
 /// One device pixel of a render node, at (px, py).
@@ -802,14 +922,31 @@ fn pixel(renderer: &gsk::Renderer, node: &gsk::RenderNode, px: f32, py: f32) -> 
     d.set_format(gdk::MemoryFormat::R8g8b8a8);
     let (bytes, _) = d.download_bytes();
     let b = bytes.get(..4)?;
-    Some(gdk::RGBA::new(b[0] as f32 / 255.0, b[1] as f32 / 255.0, b[2] as f32 / 255.0, b[3] as f32 / 255.0))
+    Some(gdk::RGBA::new(
+        b[0] as f32 / 255.0,
+        b[1] as f32 / 255.0,
+        b[2] as f32 / 255.0,
+        b[3] as f32 / 255.0,
+    ))
 }
 
 /// Draw the whole still, shifted by (dx, dy); callers clip to the part they
 /// want. Shifts are snapped to device pixels so text stays sharp in motion.
-fn draw_still(s: &gtk::Snapshot, tex: &gdk::Texture, scale: f32, full: &graphene::Rect, dx: f32, dy: f32) {
+fn draw_still(
+    s: &gtk::Snapshot,
+    tex: &gdk::Texture,
+    scale: f32,
+    full: &graphene::Rect,
+    dx: f32,
+    dy: f32,
+) {
     let snap = |v: f32| (v * scale).round() / scale;
-    let r = graphene::Rect::new(full.x() + snap(dx), full.y() + snap(dy), tex.width() as f32 / scale, tex.height() as f32 / scale);
+    let r = graphene::Rect::new(
+        full.x() + snap(dx),
+        full.y() + snap(dy),
+        tex.width() as f32 / scale,
+        tex.height() as f32 / scale,
+    );
     s.append_texture(tex, &r);
 }
 
@@ -824,13 +961,22 @@ fn cut(
 ) -> Option<Cut> {
     let x0 = (rect.x() * scale).floor();
     let y0 = (rect.y() * scale).floor();
-    let x1 = ((rect.x() + rect.width()) * scale).ceil().min(still.width() as f32);
-    let y1 = ((rect.y() + rect.height()) * scale).ceil().min(still.height() as f32);
+    let x1 = ((rect.x() + rect.width()) * scale)
+        .ceil()
+        .min(still.width() as f32);
+    let y1 = ((rect.y() + rect.height()) * scale)
+        .ceil()
+        .min(still.height() as f32);
     if x1 - x0 < 1.0 || y1 - y0 < 1.0 {
         return None;
     }
     let at = graphene::Rect::new(x0 / scale, y0 / scale, (x1 - x0) / scale, (y1 - y0) / scale);
-    let full = graphene::Rect::new(0.0, 0.0, still.width() as f32 / scale, still.height() as f32 / scale);
+    let full = graphene::Rect::new(
+        0.0,
+        0.0,
+        still.width() as f32 / scale,
+        still.height() as f32 / scale,
+    );
     let snap = gtk::Snapshot::new();
     snap.scale(scale, scale);
     match hole {
@@ -851,7 +997,12 @@ fn cut(
 /// Draw a piece where it was cut from, shifted by (dx, dy), as it falls:
 /// under a scale, device pixels are not where whole numbers put them.
 fn draw_piece(s: &gtk::Snapshot, cut: &Cut, dx: f32, dy: f32) {
-    let r = graphene::Rect::new(cut.at.x() + dx, cut.at.y() + dy, cut.at.width(), cut.at.height());
+    let r = graphene::Rect::new(
+        cut.at.x() + dx,
+        cut.at.y() + dy,
+        cut.at.width(),
+        cut.at.height(),
+    );
     s.append_scaled_texture(&cut.tex, gsk::ScalingFilter::Linear, &r);
 }
 
@@ -859,7 +1010,12 @@ fn draw_piece(s: &gtk::Snapshot, cut: &Cut, dx: f32, dy: f32) {
 /// pixels.
 fn draw_cut(s: &gtk::Snapshot, cut: &Cut, scale: f32, dx: f32, dy: f32) {
     let snap = |v: f32| (v * scale).round() / scale;
-    let r = graphene::Rect::new(cut.at.x() + snap(dx), cut.at.y() + snap(dy), cut.at.width(), cut.at.height());
+    let r = graphene::Rect::new(
+        cut.at.x() + snap(dx),
+        cut.at.y() + snap(dy),
+        cut.at.width(),
+        cut.at.height(),
+    );
     s.append_texture(&cut.tex, &r);
 }
 
@@ -904,17 +1060,32 @@ fn around(outer: &graphene::Rect, hole: &graphene::Rect) -> Vec<graphene::Rect> 
 }
 
 fn inflate(r: &graphene::Rect, by: f32) -> graphene::Rect {
-    graphene::Rect::new(r.x() - by, r.y() - by, r.width() + 2.0 * by, r.height() + 2.0 * by)
+    graphene::Rect::new(
+        r.x() - by,
+        r.y() - by,
+        r.width() + 2.0 * by,
+        r.height() + 2.0 * by,
+    )
 }
 
 fn lerp_rect(a: &graphene::Rect, b: &graphene::Rect, e: f32) -> graphene::Rect {
     let l = |x: f32, y: f32| x + (y - x) * e;
-    graphene::Rect::new(l(a.x(), b.x()), l(a.y(), b.y()), l(a.width(), b.width()), l(a.height(), b.height()))
+    graphene::Rect::new(
+        l(a.x(), b.x()),
+        l(a.y(), b.y()),
+        l(a.width(), b.width()),
+        l(a.height(), b.height()),
+    )
 }
 
 fn mix(a: &gdk::RGBA, b: &gdk::RGBA, e: f32) -> gdk::RGBA {
     let l = |x: f32, y: f32| x + (y - x) * e;
-    gdk::RGBA::new(l(a.red(), b.red()), l(a.green(), b.green()), l(a.blue(), b.blue()), l(a.alpha(), b.alpha()))
+    gdk::RGBA::new(
+        l(a.red(), b.red()),
+        l(a.green(), b.green()),
+        l(a.blue(), b.blue()),
+        l(a.alpha(), b.alpha()),
+    )
 }
 
 fn smoothstep(a: f64, b: f64, t: f64) -> f64 {
@@ -979,8 +1150,15 @@ pub fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
     let stage = stage.clone();
     capture_next_frame(&p.root.clone(), move |still| {
         let bounds = |w: &gtk::Widget| w.compute_bounds(&p.root);
-        let rects = (bounds(&p.composer), bounds(&p.editor), bounds(&p.reader), bounds(p.view.upcast_ref()));
-        let (Some((still, scale)), (Some(composer), Some(editor), Some(reader), Some(view))) = (still, rects) else {
+        let rects = (
+            bounds(&p.composer),
+            bounds(&p.editor),
+            bounds(&p.reader),
+            bounds(p.view.upcast_ref()),
+        );
+        let (Some((still, scale)), (Some(composer), Some(editor), Some(reader), Some(view))) =
+            (still, rects)
+        else {
             tracing::info!(target: "hylki::morph", "send morph: the pane could not be captured");
             ready(false);
             return;
@@ -990,7 +1168,11 @@ pub fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
             ready(false);
             return;
         }
-        let header = p.header.as_ref().filter(|_| p.header_shown).and_then(|h| bounds(h));
+        let header = p
+            .header
+            .as_ref()
+            .filter(|_| p.header_shown)
+            .and_then(|h| bounds(h));
         // Where the reader leaves its background to the window, the window's
         // color is what shows.
         let ground = ground_behind(
@@ -1000,10 +1182,23 @@ pub fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
             &[
                 (reader.x() + 2.0, reader.y() + 2.0),
                 (reader.x() + 2.0, view.y() - 2.0),
-                (reader.x() + reader.width() - 2.0, reader.y() + reader.height() - 2.0),
+                (
+                    reader.x() + reader.width() - 2.0,
+                    reader.y() + reader.height() - 2.0,
+                ),
             ],
         );
-        let before = Before { still, composer, editor, reader, view, header, ground, cards: Vec::new(), text: None };
+        let before = Before {
+            still,
+            composer,
+            editor,
+            reader,
+            view,
+            header,
+            ground,
+            cards: Vec::new(),
+            text: None,
+        };
         stage.begin(before, scale);
         // Two questions for the web views; the pane may change once both
         // are answered.
@@ -1027,13 +1222,21 @@ pub fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
                 None,
                 None::<&gtk::gio::Cancellable>,
                 move |r| {
-                    let cards = r.ok().and_then(|v| Measured::parse(&v.to_str(), &view)).map(|m| m.cards()).unwrap_or_default();
+                    let cards = r
+                        .ok()
+                        .and_then(|v| Measured::parse(&v.to_str(), &view))
+                        .map(|m| m.cards())
+                        .unwrap_or_default();
                     stage.set_before_cards(cards);
                     answered();
                 },
             );
         }
-        match p.editor_view.as_ref().and_then(|ev| Some((ev, ev.compute_bounds(&p.root)?))) {
+        match p
+            .editor_view
+            .as_ref()
+            .and_then(|ev| Some((ev, ev.compute_bounds(&p.root)?)))
+        {
             Some((ev, at)) => {
                 webkit6::prelude::WebViewExt::evaluate_javascript(
                     ev,
@@ -1059,9 +1262,13 @@ pub fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
 /// each widget's last drawing and hands it to [`gtk::WidgetPaintable`], but
 /// anything waiting to be redrawn (a blinking caret is enough) has none until
 /// the frame is drawn; right after it, every part of the pane has one.
-pub fn capture_next_frame(widget: &gtk::Widget, then: impl FnOnce(Option<(gdk::Texture, f32)>) + 'static) {
+pub fn capture_next_frame(
+    widget: &gtk::Widget,
+    then: impl FnOnce(Option<(gdk::Texture, f32)>) + 'static,
+) {
     type Then = Box<dyn FnOnce(Option<(gdk::Texture, f32)>)>;
-    let then: std::rc::Rc<RefCell<Option<Then>>> = std::rc::Rc::new(RefCell::new(Some(Box::new(then))));
+    let then: std::rc::Rc<RefCell<Option<Then>>> =
+        std::rc::Rc::new(RefCell::new(Some(Box::new(then))));
     let Some(clock) = widget.frame_clock() else {
         if let Some(f) = then.take() {
             f(capture(widget));
@@ -1150,44 +1357,70 @@ fn poll_once(poll: std::rc::Rc<Poll>) {
         return;
     }
     let p = poll.clone();
-    poll.view.evaluate_javascript(CARDS_JS, None, None, None::<&gtk::gio::Cancellable>, move |r| {
-        let view_rect = p.view.compute_bounds(&p.root);
-        let measured = r.ok().zip(view_rect).and_then(|(v, rect)| Measured::parse(&v.to_str(), &rect));
-        let ready = measured.as_ref().is_some_and(|m| m.live && m.cards.iter().any(|(k, _, _)| *k == p.key));
-        let same = ready && *p.last.borrow() == measured;
-        p.same.set(if same { p.same.get() + 1 } else { 0 });
-        p.last.replace(measured);
-        // A document still moving after a while (pictures coming in, say)
-        // is landed on as it stands: the card is there, and waiting on would
-        // only keep the reply off the screen.
-        let long = p.started.elapsed() > std::time::Duration::from_millis(SETTLE_MS);
-        if p.same.get() >= 1 || (ready && long) {
-            // Settled: the still is taken after the next frame, by when
-            // GTK holds the web view's picture of it.
-            land_on(&p);
-            return;
-        }
-        let p2 = p.clone();
-        glib::timeout_add_local_once(std::time::Duration::from_millis(16), move || poll_once(p2));
-    });
+    poll.view.evaluate_javascript(
+        CARDS_JS,
+        None,
+        None,
+        None::<&gtk::gio::Cancellable>,
+        move |r| {
+            let view_rect = p.view.compute_bounds(&p.root);
+            let measured = r
+                .ok()
+                .zip(view_rect)
+                .and_then(|(v, rect)| Measured::parse(&v.to_str(), &rect));
+            let ready = measured
+                .as_ref()
+                .is_some_and(|m| m.live && m.cards.iter().any(|(k, _, _)| *k == p.key));
+            let same = ready && *p.last.borrow() == measured;
+            p.same.set(if same { p.same.get() + 1 } else { 0 });
+            p.last.replace(measured);
+            // A document still moving after a while (pictures coming in, say)
+            // is landed on as it stands: the card is there, and waiting on would
+            // only keep the reply off the screen.
+            let long = p.started.elapsed() > std::time::Duration::from_millis(SETTLE_MS);
+            if p.same.get() >= 1 || (ready && long) {
+                // Settled: the still is taken after the next frame, by when
+                // GTK holds the web view's picture of it.
+                land_on(&p);
+                return;
+            }
+            let p2 = p.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(16), move || {
+                poll_once(p2)
+            });
+        },
+    );
 }
 
 fn land_on(p: &Poll) {
-    let (Some(m), Some(reader), Some(view)) =
-        (p.last.borrow().clone(), p.reader.compute_bounds(&p.root), p.view.compute_bounds(&p.root))
-    else {
+    let (Some(m), Some(reader), Some(view)) = (
+        p.last.borrow().clone(),
+        p.reader.compute_bounds(&p.root),
+        p.view.compute_bounds(&p.root),
+    ) else {
         p.stage.abort();
         return;
     };
     let (stage, key, started) = (p.stage.clone(), p.key.clone(), p.started);
-    let header = p.header.as_ref().and_then(|h| h.compute_bounds(&p.root)).filter(|r| r.height() > 0.0);
+    let header = p
+        .header
+        .as_ref()
+        .and_then(|h| h.compute_bounds(&p.root))
+        .filter(|r| r.height() > 0.0);
     capture_next_frame(&p.root, move |still| {
         let Some((still, _)) = still else {
             stage.abort();
             return;
         };
         tracing::info!(target: "hylki::morph", "send morph: landing after {:?}", started.elapsed());
-        stage.land(After { still, reader, view, header, cards: m.cards(), arrival: key });
+        stage.land(After {
+            still,
+            reader,
+            view,
+            header,
+            cards: m.cards(),
+            arrival: key,
+        });
     });
 }
 
@@ -1221,8 +1454,11 @@ for(var j=0;j<fs.length;j++){if(!fs[j].classList.contains('hylki-live'))live=fal
 return JSON.stringify({w:window.innerWidth,y:window.scrollY,live:live,cards:r});})()");
 
 /// The script that finds where the editor's first line of text begins.
-pub const EDITOR_TEXT_JS: &str =
-    concat!("(function(){", first_text_js!(), "return JSON.stringify({w:window.innerWidth,t:ft(document)});})()");
+pub const EDITOR_TEXT_JS: &str = concat!(
+    "(function(){",
+    first_text_js!(),
+    "return JSON.stringify({w:window.innerWidth,t:ft(document)});})()"
+);
 
 /// `ft(doc)`: the top-left corner of the first text a document shows, or
 /// null. Text that is not laid out (styles, a folded quote) has no box.
@@ -1242,10 +1478,17 @@ use first_text_js;
 pub fn parse_text(json: &str, view: &graphene::Rect) -> Option<(graphene::Point, f32)> {
     let v: serde_json::Value = serde_json::from_str(json).ok()?;
     let css_w = v.get("w")?.as_f64()? as f32;
-    let k = if css_w > 0.0 { view.width() / css_w } else { 1.0 };
+    let k = if css_w > 0.0 {
+        view.width() / css_w
+    } else {
+        1.0
+    };
     let t = v.get("t")?.as_array()?;
     let n = |i: usize| t.get(i).and_then(|x| x.as_f64()).map(|x| x as f32);
-    Some((graphene::Point::new(view.x() + n(0)? * k, view.y() + n(1)? * k), n(2).unwrap_or(0.0) * k))
+    Some((
+        graphene::Point::new(view.x() + n(0)? * k, view.y() + n(1)? * k),
+        n(2).unwrap_or(0.0) * k,
+    ))
 }
 
 /// What [`CARDS_JS`] reported, placed in stage coordinates given the web
@@ -1262,7 +1505,11 @@ impl Measured {
     pub fn parse(json: &str, view: &graphene::Rect) -> Option<Measured> {
         let v: serde_json::Value = serde_json::from_str(json).ok()?;
         let css_w = v.get("w")?.as_f64()? as f32;
-        let k = if css_w > 0.0 { view.width() / css_w } else { 1.0 };
+        let k = if css_w > 0.0 {
+            view.width() / css_w
+        } else {
+            1.0
+        };
         let cards = v
             .get("cards")?
             .as_array()?
@@ -1273,11 +1520,21 @@ impl Measured {
                 let n = |i: usize| c.get(i).and_then(|x| x.as_f64()).map(|x| x as f32);
                 let text = c.get(6).and_then(|t| t.as_array()).and_then(|t| {
                     let n = |i: usize| t.get(i).and_then(|x| x.as_f64()).map(|x| x as f32);
-                    Some((view.x() + n(0)? * k, view.y() + n(1)? * k, n(2).unwrap_or(0.0) * k))
+                    Some((
+                        view.x() + n(0)? * k,
+                        view.y() + n(1)? * k,
+                        n(2).unwrap_or(0.0) * k,
+                    ))
                 });
                 Some((
                     key,
-                    [view.x() + n(1)? * k, view.y() + n(2)? * k, n(3)? * k, n(4)? * k, n(5)? * k],
+                    [
+                        view.x() + n(1)? * k,
+                        view.y() + n(2)? * k,
+                        n(3)? * k,
+                        n(4)? * k,
+                        n(5)? * k,
+                    ],
                     text,
                 ))
             })
@@ -1330,9 +1587,16 @@ mod tests {
     #[test]
     fn measured_cards_land_in_stage_pixels() {
         let view = graphene::Rect::new(10.0, 100.0, 400.0, 300.0);
-        let m = Measured::parse(r#"{"w":200,"y":0,"live":true,"cards":[["1:2",7,7,186,50,20]]}"#, &view).unwrap();
+        let m = Measured::parse(
+            r#"{"w":200,"y":0,"live":true,"cards":[["1:2",7,7,186,50,20]]}"#,
+            &view,
+        )
+        .unwrap();
         let c = &m.cards()[0];
         assert_eq!(c.key, "1:2");
-        assert_eq!((c.rect.x(), c.rect.y(), c.rect.width(), c.head), (24.0, 114.0, 372.0, 40.0));
+        assert_eq!(
+            (c.rect.x(), c.rect.y(), c.rect.width(), c.head),
+            (24.0, 114.0, 372.0, 40.0)
+        );
     }
 }

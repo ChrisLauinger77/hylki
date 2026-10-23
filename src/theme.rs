@@ -299,4 +299,3 @@ border: none;box-shadow: none;outline: none;}}",
         on_warning = crate::color::readable_text(p.warning),
     )
 }
-

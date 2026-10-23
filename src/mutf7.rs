@@ -80,8 +80,14 @@ const MODIFIED_BASE64: base64::engine::GeneralPurpose = base64::engine::GeneralP
 /// Decode one `&…-` run: modified BASE64 of UTF-16BE.
 fn decode_run(run: &str) -> Option<String> {
     use base64::Engine;
-    let bytes = MODIFIED_BASE64.decode(run).ok().filter(|b| !b.is_empty() && b.len() % 2 == 0)?;
-    let units: Vec<u16> = bytes.chunks_exact(2).map(|p| u16::from_be_bytes([p[0], p[1]])).collect();
+    let bytes = MODIFIED_BASE64
+        .decode(run)
+        .ok()
+        .filter(|b| !b.is_empty() && b.len() % 2 == 0)?;
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|p| u16::from_be_bytes([p[0], p[1]]))
+        .collect();
     String::from_utf16(&units).ok()
 }
 

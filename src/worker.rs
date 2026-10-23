@@ -18,15 +18,19 @@ use async_native_tls::TlsStream;
 use futures::TryStreamExt;
 use lettre::message::Mailbox;
 use lettre::transport::smtp::authentication::Credentials;
-use lettre::{Address, AsyncSmtpTransport, AsyncTransport, Message as LettreMessage, Tokio1Executor};
+use lettre::{
+    Address, AsyncSmtpTransport, AsyncTransport, Message as LettreMessage, Tokio1Executor,
+};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
 use crate::backend::{MailBackend, MockBackend};
 use crate::cache::Cache;
 use crate::config::{AccountConfig, ReplyCopies};
-use crate::models::{Account, Folder, FolderKind, KeywordFinding, MailboxQuota, Message, ThreadSummary};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
+use crate::models::{
+    Account, Folder, FolderKind, KeywordFinding, MailboxQuota, Message, ThreadSummary,
+};
 
 /// The JMAP path (#245), a child module so it shares this file's helpers.
 mod graph;
@@ -56,7 +60,8 @@ const FIRST_PAGE: u32 = 200;
 ///
 /// The priority headers ride along for the list's Importance column (#334):
 /// the ENVELOPE has none of them either.
-const REFS_FETCH_ITEM: &str = " BODY.PEEK[HEADER.FIELDS (REFERENCES X-PRIORITY IMPORTANCE PRIORITY)]";
+const REFS_FETCH_ITEM: &str =
+    " BODY.PEEK[HEADER.FIELDS (REFERENCES X-PRIORITY IMPORTANCE PRIORITY)]";
 
 /// Background index backfill: how many messages to fetch per idle drain step.
 /// Bigger = fewer round-trips; smaller = more responsive to interleaved requests.
@@ -147,9 +152,8 @@ static PREVIEW_ITEMS_REJECTED: std::sync::LazyLock<
 /// that only looks like Gmail by its folder names (a mailbox migrated with
 /// its `[Gmail]/` folders) refuses the item, and an unreadable reply would
 /// otherwise fail every sync after it.
-static GMAIL_LABELS: std::sync::LazyLock<
-    std::sync::Mutex<std::collections::HashMap<u32, bool>>,
-> = std::sync::LazyLock::new(Default::default);
+static GMAIL_LABELS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<u32, bool>>> =
+    std::sync::LazyLock::new(Default::default);
 
 /// Start reading the account's Gmail labels if it is Gmail, unless the
 /// server has already refused them this session.
@@ -162,7 +166,10 @@ fn note_gmail_account(account_id: u32, account: &AccountConfig, folders: &[Folde
 }
 
 fn gmail_labels_wanted(account_id: u32) -> bool {
-    GMAIL_LABELS.lock().map(|g| g.get(&account_id) == Some(&true)).unwrap_or(false)
+    GMAIL_LABELS
+        .lock()
+        .map(|g| g.get(&account_id) == Some(&true))
+        .unwrap_or(false)
 }
 
 fn refuse_gmail_labels(account_id: u32) {
@@ -216,7 +223,12 @@ pub fn compact_parse_error(text: &str) -> String {
     let Some(end) = text[start..].find(']').map(|i| start + i + 1) else {
         return text.to_string();
     };
-    format!("{}input: [{} bytes]{}", &text[..start], text[start + 8..end - 1].split(',').count(), &text[end..])
+    format!(
+        "{}input: [{} bytes]{}",
+        &text[..start],
+        text[start + 8..end - 1].split(',').count(),
+        &text[end..]
+    )
 }
 
 /// Whether the error is the IMAP parser giving up on a server's reply, as
@@ -350,7 +362,10 @@ const IDLE_START_TIMEOUT: Duration = Duration::from_secs(10);
 #[derive(Debug)]
 pub enum MailRequest {
     /// Load the message summaries for a folder.
-    LoadMessages { folder_id: u32, path: String },
+    LoadMessages {
+        folder_id: u32,
+        path: String,
+    },
     /// Resync a folder's message list in the background: the same fetch as
     /// [`LoadMessages`](Self::LoadMessages), but quiet (no status), and the
     /// folder is not adopted as the IDLE folder or put on the watch list.
@@ -358,7 +373,10 @@ pub enum MailRequest {
     /// another folder is open, so its list (the tray menu, the new-mail
     /// notification) follows the count instead of waiting for the inbox
     /// to be opened.
-    SyncFolder { folder_id: u32, path: String },
+    SyncFolder {
+        folder_id: u32,
+        path: String,
+    },
     /// Load cached attachments across the account's folders, for the gallery.
     /// Load the full body of a single message.
     LoadBody {
@@ -396,17 +414,36 @@ pub enum MailRequest {
     },
     /// Mark a message as spam: tag `$Junk` (so the server filter can learn) and
     /// move it to the Junk folder.
-    MarkSpam { path: String, uid: u32, dest: String },
+    MarkSpam {
+        path: String,
+        uid: u32,
+        dest: String,
+    },
     /// The opposite (#168): tag `$NotJunk`, clear `$Junk`, and move the
     /// message back to `dest` (the Inbox).
-    MarkHam { path: String, uid: u32, dest: String },
+    MarkHam {
+        path: String,
+        uid: u32,
+        dest: String,
+    },
     /// [`MailRequest::MarkHam`] for a selection, in one server round; answers
     /// with [`WorkerEvent::BulkComplete`] like `MoveMessages`.
-    MarkHamMany { path: String, uids: Vec<u32>, dest: String },
+    MarkHamMany {
+        path: String,
+        uids: Vec<u32>,
+        dest: String,
+    },
     /// Add or remove the `\Seen` flag.
-    SetSeen { path: String, uid: u32, seen: bool },
+    SetSeen {
+        path: String,
+        uid: u32,
+        seen: bool,
+    },
     /// Mark every message in a folder as read (`\Seen`).
-    MarkAllRead { folder_id: u32, path: String },
+    MarkAllRead {
+        folder_id: u32,
+        path: String,
+    },
     /// Add or remove the `\Flagged` flag.
     SetFlagged {
         path: String,
@@ -443,38 +480,68 @@ pub enum MailRequest {
     /// with [`WorkerEvent::Related`]; never touches the network.
     /// Work through a folder's attachment-carrying messages that have never
     /// been described, recording what each one holds without downloading it.
-    ScanAttachments { folder_path: String },
-    LoadRelated { message_id: u32, ids: Vec<String> },
+    ScanAttachments {
+        folder_path: String,
+    },
+    LoadRelated {
+        message_id: u32,
+        ids: Vec<String>,
+    },
     /// What each of these conversations looks like whole: how big it really
     /// is, counting the members in the account's other folders (#222), and
     /// which message moved it last, the replies in Sent included (#236). One
     /// `(tag, Message-IDs)` per thread on the list's page; answers with
     /// [`WorkerEvent::ThreadSummaries`] and, like [`MailRequest::LoadRelated`],
     /// never touches the network.
-    LoadThreadSummaries { groups: Vec<(String, Vec<String>)> },
+    LoadThreadSummaries {
+        groups: Vec<(String, Vec<String>)>,
+    },
     /// Permanently erase messages from `path` (flag `\Deleted` + EXPUNGE), used
     /// when "delete" is asked for in Trash, where there is nowhere left to move to.
-    PurgeMessages { path: String, uids: Vec<u32> },
+    PurgeMessages {
+        path: String,
+        uids: Vec<u32>,
+    },
     /// Erase every message in a folder (Empty Trash / Empty Junk, #152).
-    EmptyFolder { folder_id: u32, path: String },
+    EmptyFolder {
+        folder_id: u32,
+        path: String,
+    },
     /// Create a new mailbox (folder) at `path`.
-    CreateFolder { path: String },
+    CreateFolder {
+        path: String,
+    },
     /// Undo a move: find the messages (by Message-ID header — their UIDs
     /// changed in transit) in `path`, where a move just put them, and move
     /// them back to `dest`, then reload that folder so they reappear.
-    UndoMove { path: String, dest: String, dest_folder_id: u32, message_ids: Vec<String> },
+    UndoMove {
+        path: String,
+        dest: String,
+        dest_folder_id: u32,
+        message_ids: Vec<String>,
+    },
     /// Find a message by its (normalized) RFC Message-ID across every folder
     /// of the account, for a `mid:` link (#130) the cache could not resolve.
     /// Answered with [`WorkerEvent::Located`] either way.
-    Locate { message_id: String },
+    Locate {
+        message_id: String,
+    },
     /// Move/rename a mailbox (drag-and-drop in the sidebar, #51). The server
     /// renames any child hierarchy along with it (RFC 3501 §6.3.5).
-    RenameFolder { old_path: String, new_path: String },
+    RenameFolder {
+        old_path: String,
+        new_path: String,
+    },
     /// Delete a mailbox, first moving its contents to `trash` (if set).
-    DeleteFolder { path: String, trash: Option<String> },
+    DeleteFolder {
+        path: String,
+        trash: Option<String>,
+    },
     /// The account's hidden folders changed (#239): list again without
     /// them, so they leave the sidebar and every sync at once.
-    SetHiddenFolders { paths: Vec<String> },
+    SetHiddenFolders {
+        paths: Vec<String>,
+    },
     /// Send a new message over SMTP, optionally APPENDing a copy to `sent_path`.
     Send {
         message: Box<OutgoingMessage>,
@@ -485,11 +552,15 @@ pub enum MailRequest {
         ticket: u64,
     },
     /// Try the Outbox again now (a queued message, or every one of them).
-    FlushOutbox { id: Option<u32> },
+    FlushOutbox {
+        id: Option<u32>,
+    },
     /// Load the Outbox for display.
     LoadOutbox,
     /// Discard a queued message without sending it.
-    DeleteOutbox { id: u32 },
+    DeleteOutbox {
+        id: u32,
+    },
     /// Save a message to the Drafts folder (`folder_id`/`path`) without sending.
     SaveDraft {
         message: Box<OutgoingMessage>,
@@ -518,21 +589,41 @@ pub enum MailRequest {
     /// serves requests in order, so by then the one ahead has run, however
     /// it went; until then a folder list fetched earlier still shows the
     /// mail, and the app keeps it off screen (#255).
-    Settle { path: String, uids: Vec<u32> },
+    Settle {
+        path: String,
+        uids: Vec<u32>,
+    },
     /// Moving mail to another account (#265), step one: the message's raw
     /// bytes, answered with [`WorkerEvent::RawExported`] carrying `token`.
     /// `for_reader` when the user is waiting on it: a draft being opened.
-    ExportRaw { token: u64, path: String, uid: u32, for_reader: bool },
+    ExportRaw {
+        token: u64,
+        path: String,
+        uid: u32,
+        for_reader: bool,
+    },
     /// Step two, on the receiving account: add `raw` to `path` with its
     /// read and starred state, answered with [`WorkerEvent::RawImported`].
-    ImportRaw { token: u64, path: String, raw: Vec<u8>, seen: bool, flagged: bool },
+    ImportRaw {
+        token: u64,
+        path: String,
+        raw: Vec<u8>,
+        seen: bool,
+        flagged: bool,
+    },
     /// Take one attachment out of a message on the server (#289), found by
     /// its name and, among files sharing the name, its decoded size.
     /// IMAP and JMAP store a copy without it and delete the original, so
     /// the message comes back under a new UID; Microsoft 365 deletes the
     /// attachment in place. Answered with [`WorkerEvent::AttachmentDeleted`]
     /// or an error.
-    DeleteAttachment { message_id: u32, path: String, uid: u32, name: String, size: u64 },
+    DeleteAttachment {
+        message_id: u32,
+        path: String,
+        uid: u32,
+        name: String,
+        size: u64,
+    },
     /// The tag finder (Settings → Tags → Find Tags…): report every keyword
     /// in use across the account's folders as one
     /// [`WorkerEvent::KeywordsFound`] — always answered, even when empty, so
@@ -546,7 +637,9 @@ pub enum MailRequest {
     /// a tag set or cleared on another device reaches the tag views here
     /// without the folder it sits in being opened. `keywords` are the
     /// configured tags. Answered with [`WorkerEvent::KeywordsSynced`].
-    RefreshKeywords { keywords: Vec<String> },
+    RefreshKeywords {
+        keywords: Vec<String>,
+    },
 }
 
 /// A message composed by the user, ready to send.
@@ -620,40 +713,64 @@ pub struct CalendarPart {
 pub enum WorkerEvent {
     /// A batch of a folder's attachments was described (not downloaded).
     /// `remaining` is how many of its messages are still unscanned.
-    AttachmentsScanned { folder_path: String, added: u32, remaining: u32 },
+    AttachmentsScanned {
+        folder_path: String,
+        added: u32,
+        remaining: u32,
+    },
     Account(Account),
     /// The sending identities a JMAP server keeps for the account (#346):
     /// `(name, address)`, the address `*@domain` for one that sends as
     /// anyone at the domain.
     Identities(Vec<(String, String)>),
     Folders(Vec<Folder>),
-    Messages { folder_id: u32, messages: Vec<Message> },
+    Messages {
+        folder_id: u32,
+        messages: Vec<Message>,
+    },
     /// What the server found for the "Message body" filter conditions
     /// (#191) among a folder's just-listed mail: uid → the lowercased
     /// alternatives it contains. Sent just ahead of the `Messages` it
     /// describes, and only for an inbox with body rules.
-    BodyHits { folder_id: u32, hits: std::collections::HashMap<u32, Vec<String>> },
+    BodyHits {
+        folder_id: u32,
+        hits: std::collections::HashMap<u32, Vec<String>>,
+    },
     /// Additional indexed message summaries for a folder, produced by the
     /// background backfill. Merged into the existing index without replacing it.
-    MessagesAppend { folder_id: u32, messages: Vec<Message> },
+    MessagesAppend {
+        folder_id: u32,
+        messages: Vec<Message>,
+    },
     /// The rest of a conversation, gathered from the cache across the account's
     /// folders in answer to [`MailRequest::LoadRelated`]. `message_id` echoes the
     /// message it was asked for, so a late answer to a message the user has
     /// already moved on from can be ignored.
-    Related { message_id: u32, messages: Vec<Message> },
+    Related {
+        message_id: u32,
+        messages: Vec<Message>,
+    },
     /// What the whole conversation looks like for the threads the list asked
     /// about, tagged as it tagged them (#222, #236). Only threads the cache
     /// found something for are listed; the rest keep the count, the sender and
     /// the preview the list worked out from its own page.
-    ThreadSummaries { summaries: Vec<(String, ThreadSummary)> },
+    ThreadSummaries {
+        summaries: Vec<(String, ThreadSummary)>,
+    },
     /// An undone move put these messages back in `folder_id`; sent after the
     /// folder's fresh [`WorkerEvent::Messages`] so the app can land the user
     /// on the restored message instead of wherever the reload left the list.
-    Restored { folder_id: u32, message_ids: Vec<String> },
+    Restored {
+        folder_id: u32,
+        message_ids: Vec<String>,
+    },
     /// The answer to [`MailRequest::Locate`]: where the message with that
     /// Message-ID lives (`folder_path`, `uid`), or `None` when no folder of
     /// this account has it.
-    Located { message_id: String, hit: Option<(String, u32)> },
+    Located {
+        message_id: String,
+        hit: Option<(String, u32)>,
+    },
     /// The answer to [`MailRequest::FindKeywords`]: the keywords in use on
     /// this account, system flags left out.
     KeywordsFound(Vec<KeywordFinding>),
@@ -661,81 +778,156 @@ pub enum WorkerEvent {
     Quota(Option<MailboxQuota>),
     /// The answer to [`MailRequest::RefreshKeywords`]: the folders whose
     /// cached keywords changed (empty when nothing did).
-    KeywordsSynced { paths: Vec<String> },
+    KeywordsSynced {
+        paths: Vec<String>,
+    },
     /// Cached attachments for an inbox, for the attachments gallery.
     /// The background backfill for a folder finished — its whole index is now
     /// present, so the UI can stop expecting more rows to stream in.
-    BackfillDone { folder_id: u32 },
+    BackfillDone {
+        folder_id: u32,
+    },
     /// A folder's load has been all the way to the server and back, however
     /// it went. Sent after the `Messages` the server's answer produced (and
     /// after an error, which produces none), so a manual filter run (#198)
     /// knows the folder is done rather than stopping at the cache's answer,
     /// which arrives first and instantly.
-    FolderSynced { folder_id: u32 },
+    FolderSynced {
+        folder_id: u32,
+    },
     /// Server-side unread count for a folder (from STATUS/SEARCH, independent of
     /// the loaded window — accurate even for multi-thousand mailboxes).
-    FolderUnread { folder_id: u32, unread: u32 },
+    FolderUnread {
+        folder_id: u32,
+        unread: u32,
+    },
     /// The same, from a per-folder IDLE watcher ([`watch_folder`]), which knows
     /// its folder only by path: folder ids are positional and shift when the
     /// list changes, but a path stays true for as long as the folder exists.
     /// The app resolves it against whatever list it currently holds.
-    FolderUnreadByPath { path: String, unread: u32 },
+    FolderUnreadByPath {
+        path: String,
+        unread: u32,
+    },
     /// A `SetSeen` has been stored (or failed): the app stops holding its own
     /// read state for that message over what the server reports.
-    SeenSettled { path: String, uid: u32 },
+    SeenSettled {
+        path: String,
+        uid: u32,
+    },
     /// A message was replied to or forwarded from here, and is marked so
     /// (#454).
-    Answered { path: String, uid: u32, forwarded: bool },
+    Answered {
+        path: String,
+        uid: u32,
+        forwarded: bool,
+    },
     /// A `SetKeyword` has been stored (or failed), the same for a tag.
-    TagSettled { path: String, uid: u32, keyword: String },
+    TagSettled {
+        path: String,
+        uid: u32,
+        keyword: String,
+    },
     /// The answer to [`MailRequest::Settle`]: whatever took these messages
     /// out of `path` has been done or has failed.
-    MovesSettled { path: String, uids: Vec<u32> },
+    MovesSettled {
+        path: String,
+        uids: Vec<u32>,
+    },
     /// The answer to [`MailRequest::ExportRaw`].
-    RawExported { token: u64, raw: Result<Vec<u8>, String> },
+    RawExported {
+        token: u64,
+        raw: Result<Vec<u8>, String>,
+    },
     /// The answer to [`MailRequest::ImportRaw`].
-    RawImported { token: u64, result: Result<(), String> },
+    RawImported {
+        token: u64,
+        result: Result<(), String>,
+    },
     /// The answer to [`MailRequest::DeleteAttachment`]: the message that was
     /// `uid` in `path` is now `new_uid` there, `None` when the copy could not
     /// be found again. The folder's list has been sent again first.
-    AttachmentDeleted { message_id: u32, path: String, uid: u32, new_uid: Option<u32>, name: String, size: u64 },
+    AttachmentDeleted {
+        message_id: u32,
+        path: String,
+        uid: u32,
+        new_uid: Option<u32>,
+        name: String,
+        size: u64,
+    },
     /// [`MailRequest::DeleteAttachment`] did not happen; an `Error` saying
     /// why goes with it. The file stays where it was.
-    AttachmentNotDeleted { message_id: u32, name: String, size: u64 },
+    AttachmentNotDeleted {
+        message_id: u32,
+        name: String,
+        size: u64,
+    },
     /// `path` is the folder the body was read from. A UID is unique only within
     /// its folder, so without it a background prefetch's body can be applied to a
     /// different message that happens to share the number.
     /// A chunk of a folder's threading references was repaired, so what the list
     /// is showing may now group differently; or its Gmail labels were filled
     /// in (#374).
-    RefsRepaired { folder_id: u32 },
-    Body { message_id: u32, path: String, body: String },
+    RefsRepaired {
+        folder_id: u32,
+    },
+    Body {
+        message_id: u32,
+        path: String,
+        body: String,
+    },
     /// A message the cache listed is no longer in `path` on the server; its
     /// cached row has been dropped.
-    Gone { message_id: u32, path: String, uid: u32 },
+    Gone {
+        message_id: u32,
+        path: String,
+        uid: u32,
+    },
     /// Whether the message's From: address survived its provider's SPF/DKIM/DMARC
     /// checks. Sent right after `Body`, from the same fetch. This and the
     /// attachment events below name the folder, like `Body`: a UID means a
     /// message only within its folder.
-    SenderChecked { path: String, message_id: u32, check: crate::models::SenderCheck },
-    Source { text: String },
-    Attachments { path: String, message_id: u32, items: Vec<crate::models::Attachment> },
+    SenderChecked {
+        path: String,
+        message_id: u32,
+        check: crate::models::SenderCheck,
+    },
+    Source {
+        text: String,
+    },
+    Attachments {
+        path: String,
+        message_id: u32,
+        items: Vec<crate::models::Attachment>,
+    },
     /// The message has attachments that aren't cached; the UI should offer to
     /// download them rather than fetching automatically.
-    AttachmentsPending { path: String, message_id: u32 },
+    AttachmentsPending {
+        path: String,
+        message_id: u32,
+    },
     /// A message flagged as having an attachment turned out to have none once its
     /// body was fetched (e.g. iCloud marketing mail whose only extra parts are
     /// inline `cid:` images). The UI should drop its paperclip.
-    NoAttachments { path: String, message_id: u32 },
+    NoAttachments {
+        path: String,
+        message_id: u32,
+    },
     /// The opposite: a message with no paperclip turned out to carry attachments
     /// after all (an inline PDF the structure didn't advertise — issue #9). The
     /// UI should show the paperclip and offer the files.
-    HasAttachments { path: String, message_id: u32 },
+    HasAttachments {
+        path: String,
+        message_id: u32,
+    },
     Sent,
     /// The worker is done with the `MailRequest::Send` carrying `ticket`:
     /// `sent` if it went out, otherwise it was queued in the Outbox or
     /// handed back with `Unsent` (#434).
-    SendDone { ticket: u64, sent: bool },
+    SendDone {
+        ticket: u64,
+        sent: bool,
+    },
     /// A message that could be neither sent, queued nor saved as a draft, handed
     /// back so the app can open it in a composer again (#340): its composer
     /// closed when Send or Save was pressed, so this is the only copy left.
@@ -745,29 +937,43 @@ pub enum WorkerEvent {
     Notice(String),
     /// The account's Outbox, whenever it changes (queued, retried, sent or
     /// discarded). Empty means nothing is waiting.
-    Outbox { items: Vec<crate::models::OutboxItem> },
+    Outbox {
+        items: Vec<crate::models::OutboxItem>,
+    },
     /// A draft was saved to the Drafts folder, under this Message-ID
     /// (`None`: an automatic save that did not go through). `autosave`
     /// echoes the request's.
-    DraftSaved { autosave: Option<u32>, message_id: Option<String> },
+    DraftSaved {
+        autosave: Option<u32>,
+        message_id: Option<String>,
+    },
     /// A bulk MoveMessages request finished (success or failure) — drives the
     /// bulk-action spinner in the UI.
     BulkComplete,
     Status(String),
     /// `connectivity` marks connection/sync errors that should auto-clear once
     /// a later connect or sync succeeds.
-    Error { text: String, connectivity: bool },
+    Error {
+        text: String,
+        connectivity: bool,
+    },
 }
 
 impl WorkerEvent {
     /// A failure the user has to see, which stays until dismissed.
     pub fn error(text: impl Into<String>) -> Self {
-        WorkerEvent::Error { text: text.into(), connectivity: false }
+        WorkerEvent::Error {
+            text: text.into(),
+            connectivity: false,
+        }
     }
 
     /// A connection or sync failure, which the next success clears.
     pub fn net_error(text: impl Into<String>) -> Self {
-        WorkerEvent::Error { text: text.into(), connectivity: true }
+        WorkerEvent::Error {
+            text: text.into(),
+            connectivity: true,
+        }
     }
 }
 
@@ -784,7 +990,9 @@ type ImapSession = Session<ImapIo<TlsStream<TcpStream>>>;
 async fn blocking<T: Send + 'static>(
     f: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
-    tokio::task::spawn_blocking(f).await.unwrap_or_else(|_| Err("task failed".into()))
+    tokio::task::spawn_blocking(f)
+        .await
+        .unwrap_or_else(|_| Err("task failed".into()))
 }
 
 /// A distinct accent color per account (cycles through a small palette).
@@ -827,7 +1035,10 @@ pub fn spawn(
             {
                 Ok(rt) => rt,
                 Err(e) => {
-                    emit(WorkerEvent::error(i18n_f("runtime error: {e}", &[("e", &(e).to_string())])));
+                    emit(WorkerEvent::error(i18n_f(
+                        "runtime error: {e}",
+                        &[("e", &(e).to_string())],
+                    )));
                     return;
                 }
             };
@@ -870,13 +1081,16 @@ fn cache_lane(
     emit: impl Fn(WorkerEvent) + Clone + Send + 'static,
 ) {
     let cache = protocol.and_then(|_| {
-        Cache::open().map_err(|e| tracing::warn!("cache lane unavailable: {e}")).ok()
+        Cache::open()
+            .map_err(|e| tracing::warn!("cache lane unavailable: {e}"))
+            .ok()
     });
     // Filling the list's conversation badges may scan the account once per
     // thread. It must not hold cached bodies, or even cache misses, behind it.
     // Give that work its own WAL reader; forwarded network requests keep their
     // original ordering in this lane.
-    let summary_cache = cache.as_ref()
+    let summary_cache = cache
+        .as_ref()
         .filter(|_| protocol != Some(crate::config::Protocol::Pop3))
         .and_then(|c| c.read_connection().ok());
     let summaries = if let Some(cache) = summary_cache {
@@ -906,11 +1120,19 @@ fn cache_lane(
             continue;
         };
         let forward = match req {
-            MailRequest::LoadBody { message_id, path, uid } => {
+            MailRequest::LoadBody {
+                message_id,
+                path,
+                uid,
+            } => {
                 if serve_cached_body(c, account_id, &path, uid, message_id, &emit) {
                     None
                 } else {
-                    Some(MailRequest::LoadBody { message_id, path, uid })
+                    Some(MailRequest::LoadBody {
+                        message_id,
+                        path,
+                        uid,
+                    })
                 }
             }
             MailRequest::LoadBodies { items, path } => {
@@ -926,16 +1148,33 @@ fn cache_lane(
                     Some(MailRequest::LoadBodies { items, path })
                 }
             }
-            MailRequest::LoadAttachments { message_id, path, uid, download } => {
+            MailRequest::LoadAttachments {
+                message_id,
+                path,
+                uid,
+                download,
+            } => {
                 let items = c.load_attachments(account_id, &path, uid);
                 if !items.is_empty() {
-                    emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
+                    emit(WorkerEvent::Attachments {
+                        path: path.to_string(),
+                        message_id,
+                        items,
+                    });
                     None
                 } else if !download {
-                    emit(WorkerEvent::AttachmentsPending { path: path.to_string(), message_id });
+                    emit(WorkerEvent::AttachmentsPending {
+                        path: path.to_string(),
+                        message_id,
+                    });
                     None
                 } else {
-                    Some(MailRequest::LoadAttachments { message_id, path, uid, download })
+                    Some(MailRequest::LoadAttachments {
+                        message_id,
+                        path,
+                        uid,
+                        download,
+                    })
                 }
             }
             MailRequest::LoadRelated { message_id, ids }
@@ -991,9 +1230,17 @@ fn serve_cached_body(
     if body == "(empty message)" {
         return false;
     }
-    emit(WorkerEvent::Body { message_id, path: path.to_string(), body });
+    emit(WorkerEvent::Body {
+        message_id,
+        path: path.to_string(),
+        body,
+    });
     if let Some(check) = cache.load_sender_check(account_id, path, uid) {
-        emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
+        emit(WorkerEvent::SenderChecked {
+            path: path.to_string(),
+            message_id,
+            check,
+        });
     }
     true
 }
@@ -1009,7 +1256,13 @@ fn serve_cached_body(
 /// them back on screen. A template is no part of any conversation (#360).
 fn related_from_cache(cache: &Cache, account_id: u32, ids: &[String]) -> Vec<Message> {
     let skipped = [FolderKind::Trash, FolderKind::Junk, FolderKind::Templates];
-    related_in(cache, account_id, &cache.load_folders(account_id), ids, &skipped)
+    related_in(
+        cache,
+        account_id,
+        &cache.load_folders(account_id),
+        ids,
+        &skipped,
+    )
 }
 
 /// [`related_from_cache`] over an already loaded folder list, leaving out the
@@ -1050,7 +1303,12 @@ fn thread_summaries_with_members(
         return summaries;
     }
     let folders = cache.load_folders(account_id);
-    let skipped = [FolderKind::Trash, FolderKind::Junk, FolderKind::Drafts, FolderKind::Templates];
+    let skipped = [
+        FolderKind::Trash,
+        FolderKind::Junk,
+        FolderKind::Drafts,
+        FolderKind::Templates,
+    ];
     for (tag, summary) in &mut summaries {
         if summary.count < 2 {
             continue;
@@ -1092,13 +1350,19 @@ fn is_reader_load(req: &MailRequest) -> bool {
             | MailRequest::LoadBodies { .. }
             | MailRequest::LoadSource { .. }
             | MailRequest::LoadAttachments { download: true, .. }
-            | MailRequest::ExportRaw { for_reader: true, .. }
+            | MailRequest::ExportRaw {
+                for_reader: true,
+                ..
+            }
     )
 }
 
 /// A folder list fetch: work the reader's loads may go ahead of.
 fn is_list_load(req: &MailRequest) -> bool {
-    matches!(req, MailRequest::LoadMessages { .. } | MailRequest::SyncFolder { .. })
+    matches!(
+        req,
+        MailRequest::LoadMessages { .. } | MailRequest::SyncFolder { .. }
+    )
 }
 
 /// Refresh ticks now only schedule idle work, so they are no longer a
@@ -1229,10 +1493,10 @@ async fn run_imap(
             }
             if account.password.is_empty() {
                 emit(WorkerEvent::error(format!(
-                        "GNOME Online Accounts has no password for {}. Open Settings → Online \
+                    "GNOME Online Accounts has no password for {}. Open Settings → Online \
                          Accounts and sign in again.",
-                        account.email
-                    )));
+                    account.email
+                )));
             }
         }
     }
@@ -1298,7 +1562,9 @@ async fn run_imap(
     let mut backlog: std::collections::VecDeque<MailRequest> = std::collections::VecDeque::new();
     // IMAP IDLE push: watch the most recently loaded folder for new mail.
     // The account's own setting wins over the global switch (#91).
-    let push_enabled = account.push.unwrap_or_else(|| crate::config::load_privacy().push);
+    let push_enabled = account
+        .push
+        .unwrap_or_else(|| crate::config::load_privacy().push);
     let mut idle_folder: Option<(u32, String)> = None;
     // When the other folders' unread chips were last re-checked (None = not
     // yet this session; the first idle pass counts the startup listing).
@@ -1359,7 +1625,9 @@ async fn run_imap(
                 refs_repair.push_back((f.id, f.path.clone()));
             }
             if gmail_labels_wanted(account_id)
-                && cache.as_ref().is_some_and(|c| !c.label_fill_state(account_id, &f.path).1)
+                && cache
+                    .as_ref()
+                    .is_some_and(|c| !c.label_fill_state(account_id, &f.path).1)
             {
                 label_fill.push_back((f.id, f.path.clone()));
             }
@@ -1382,8 +1650,14 @@ async fn run_imap(
             if !outbox_flushed {
                 outbox_flushed = true;
                 flush_outbox(
-                    cache.as_ref(), account_id, &account, None, &mut session, &mut use_envelope,
-                    &emit, false,
+                    cache.as_ref(),
+                    account_id,
+                    &account,
+                    None,
+                    &mut session,
+                    &mut use_envelope,
+                    &emit,
+                    false,
                 )
                 .await;
             }
@@ -1436,15 +1710,20 @@ async fn run_imap(
                     // Highest priority: get new mail's body cached so opening it is
                     // instant (no network wait).
                     let interrupted_body = body_prefetch.front().cloned();
-                    let result = interrupt_read_for_reader(run_one_body_prefetch(
-                        &mut body_prefetch,
-                        &mut session,
-                        &account,
-                        account_id,
-                        cache.as_ref(),
-                        &mut body_emitted,
-                        &emit,
-                    ), &mut rx, &mut backlog).await;
+                    let result = interrupt_read_for_reader(
+                        run_one_body_prefetch(
+                            &mut body_prefetch,
+                            &mut session,
+                            &account,
+                            account_id,
+                            cache.as_ref(),
+                            &mut body_emitted,
+                            &emit,
+                        ),
+                        &mut rx,
+                        &mut backlog,
+                    )
+                    .await;
                     if result.is_none() {
                         if let Some(body) = interrupted_body {
                             if !body_prefetch.contains(&body) {
@@ -1457,8 +1736,13 @@ async fn run_imap(
                 } else if folder_refresh_due && session.is_some() && net {
                     folder_refresh_due = false;
                     refresh_folder_names(
-                        account_id, &account, session.as_mut().unwrap(), cache.as_ref(), &emit,
-                    ).await;
+                        account_id,
+                        &account,
+                        session.as_mut().unwrap(),
+                        cache.as_ref(),
+                        &emit,
+                    )
+                    .await;
                     continue;
                 } else if sweep_due && session.is_some() && net {
                     // The unread chips' re-count, owed since IDLE last woke
@@ -1481,11 +1765,23 @@ async fn run_imap(
                         sweep_due = false;
                         last_unread_sweep = Some(std::time::Instant::now());
                         auto_empty_imap(
-                            account_id, &account, sess, cache.as_ref(), &mut last_auto_empty, &emit,
-                        ).await;
+                            account_id,
+                            &account,
+                            sess,
+                            cache.as_ref(),
+                            &mut last_auto_empty,
+                            &emit,
+                        )
+                        .await;
                         clean_lists_imap(
-                            account_id, &account, sess, cache.as_ref(), &mut last_list_clean, &emit,
-                        ).await;
+                            account_id,
+                            &account,
+                            sess,
+                            cache.as_ref(),
+                            &mut last_list_clean,
+                            &emit,
+                        )
+                        .await;
                     }
                     continue;
                 } else if !prefetch.is_empty() && ahead {
@@ -1500,7 +1796,11 @@ async fn run_imap(
                     .await;
                     pending_resync = true;
                     continue;
-                } else if !refs_repair.is_empty() && session.is_some() && backfill.is_empty() && ahead {
+                } else if !refs_repair.is_empty()
+                    && session.is_some()
+                    && backfill.is_empty()
+                    && ahead
+                {
                     // Lower priority than indexing new mail: repair the threading
                     // references of already-indexed replies, a chunk at a time.
                     run_one_refs_repair(
@@ -1512,9 +1812,19 @@ async fn run_imap(
                     )
                     .await;
                     continue;
-                } else if !label_fill.is_empty() && session.is_some() && backfill.is_empty() && ahead {
-                    run_one_label_fill(&mut label_fill, &mut session, account_id, cache.as_ref(), &emit)
-                        .await;
+                } else if !label_fill.is_empty()
+                    && session.is_some()
+                    && backfill.is_empty()
+                    && ahead
+                {
+                    run_one_label_fill(
+                        &mut label_fill,
+                        &mut session,
+                        account_id,
+                        cache.as_ref(),
+                        &emit,
+                    )
+                    .await;
                     continue;
                 } else if !backfill.is_empty() && ahead {
                     // Index the rest of the mailbox in the background. Connect first
@@ -1557,19 +1867,27 @@ async fn run_imap(
                         // its original place so cancelling a network read cannot
                         // skip a chunk of the search index.
                         let interrupted_job = backfill.front().cloned();
-                        let result = interrupt_read_for_reader(run_one_backfill(
-                            &mut backfill,
-                            &mut session,
-                            &account,
-                            account_id,
-                            cache.as_ref(),
-                            &mut prefetch,
-                            &mut use_envelope,
-                            &emit,
-                        ), &mut rx, &mut backlog).await;
+                        let result = interrupt_read_for_reader(
+                            run_one_backfill(
+                                &mut backfill,
+                                &mut session,
+                                &account,
+                                account_id,
+                                cache.as_ref(),
+                                &mut prefetch,
+                                &mut use_envelope,
+                                &emit,
+                            ),
+                            &mut rx,
+                            &mut backlog,
+                        )
+                        .await;
                         if result.is_none() {
                             if let Some(job) = interrupted_job {
-                                tracing::debug!(account_id, "background index yielded to the reader");
+                                tracing::debug!(
+                                    account_id,
+                                    "background index yielded to the reader"
+                                );
                                 restore_interrupted_backfill(&mut backfill, job);
                             }
                         }
@@ -1580,15 +1898,20 @@ async fn run_imap(
                     // Catch mail delivered while the connection was busy prefetching.
                     if pending_resync {
                         pending_resync = false;
-                        let result = interrupt_read_for_reader(load_messages_retry(
-                            account_id,
-                            &mut session,
-                            &account,
-                            fid,
-                            &fpath,
-                            &mut use_envelope,
-                            cache.as_ref(),
-                        ), &mut rx, &mut backlog).await;
+                        let result = interrupt_read_for_reader(
+                            load_messages_retry(
+                                account_id,
+                                &mut session,
+                                &account,
+                                fid,
+                                &fpath,
+                                &mut use_envelope,
+                                cache.as_ref(),
+                            ),
+                            &mut rx,
+                            &mut backlog,
+                        )
+                        .await;
                         if result.is_none() {
                             pending_resync = true;
                             tracing::debug!(account_id, "idle resync yielded to the reader");
@@ -1612,11 +1935,20 @@ async fn run_imap(
                                 account_id,
                             );
                             emit_body_hits(
-                                &mut session, &account, account_id, fid, &fpath, &messages,
-                                cache.as_ref(), &emit,
+                                &mut session,
+                                &account,
+                                account_id,
+                                fid,
+                                &fpath,
+                                &messages,
+                                cache.as_ref(),
+                                &emit,
                             )
                             .await;
-                            emit(WorkerEvent::Messages { folder_id: fid, messages });
+                            emit(WorkerEvent::Messages {
+                                folder_id: fid,
+                                messages,
+                            });
                         }
                         continue;
                     }
@@ -1648,9 +1980,7 @@ async fn run_imap(
                             // Owed, not run here: the idle chain runs it
                             // after the new mail's body is prefetched, and
                             // any request that arrives meanwhile goes first.
-                            if last_unread_sweep
-                                .map_or(true, |t| t.elapsed() >= UNREAD_SWEEP_MIN)
-                            {
+                            if last_unread_sweep.map_or(true, |t| t.elapsed() >= UNREAD_SWEEP_MIN) {
                                 sweep_due = true;
                             }
                             continue;
@@ -1700,7 +2030,10 @@ async fn run_imap(
                     .as_ref()
                     .map(|c| related_from_cache(c, account_id, ids))
                     .unwrap_or_default();
-                emit(WorkerEvent::Related { message_id: *message_id, messages });
+                emit(WorkerEvent::Related {
+                    message_id: *message_id,
+                    messages,
+                });
                 continue; // cache-only, never hits the network
             }
             MailRequest::LoadThreadSummaries { groups } => {
@@ -1716,10 +2049,9 @@ async fn run_imap(
                 path,
                 uid,
             } => {
-                if cache
-                    .as_ref()
-                    .is_some_and(|c| serve_cached_body(c, account_id, path, *uid, *message_id, &emit))
-                {
+                if cache.as_ref().is_some_and(|c| {
+                    serve_cached_body(c, account_id, path, *uid, *message_id, &emit)
+                }) {
                     continue; // already cached; no network needed
                 }
             }
@@ -1758,7 +2090,10 @@ async fn run_imap(
                 // Not cached and the user hasn't asked to download — tell the UI
                 // so it can offer a "Load attachments" button instead of fetching.
                 if !download {
-                    emit(WorkerEvent::AttachmentsPending { path: path.to_string(), message_id: *message_id });
+                    emit(WorkerEvent::AttachmentsPending {
+                        path: path.to_string(),
+                        message_id: *message_id,
+                    });
                     continue;
                 }
             }
@@ -1784,15 +2119,28 @@ async fn run_imap(
                 if let MailRequest::LoadMessages { folder_id, .. }
                 | MailRequest::SyncFolder { folder_id, .. } = &req
                 {
-                    emit(WorkerEvent::BackfillDone { folder_id: *folder_id });
+                    emit(WorkerEvent::BackfillDone {
+                        folder_id: *folder_id,
+                    });
                 }
                 // A message sent or scheduled with the server out of reach
                 // waits in the Outbox; dropped here it was lost (#442).
-                if let MailRequest::Send { mut message, sent_path, ticket } = req {
+                if let MailRequest::Send {
+                    mut message,
+                    sent_path,
+                    ticket,
+                } = req
+                {
                     restore_msgid_case(cache.as_ref(), &mut message);
                     match message.send_at.filter(|t| *t > crate::datefmt::now()) {
                         Some(at) => schedule_send(
-                            cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), at, &emit,
+                            cache.as_ref(),
+                            account_id,
+                            &account,
+                            &message,
+                            sent_path.as_deref(),
+                            at,
+                            &emit,
                         ),
                         None => {
                             let e = if crate::power::reaches(&account.imap_host) {
@@ -1801,11 +2149,21 @@ async fn run_imap(
                                 offline_text()
                             };
                             send_failed(
-                                cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), &e, false, &emit,
+                                cache.as_ref(),
+                                account_id,
+                                &account,
+                                &message,
+                                sent_path.as_deref(),
+                                &e,
+                                false,
+                                &emit,
                             );
                         }
                     }
-                    emit(WorkerEvent::SendDone { ticket, sent: false });
+                    emit(WorkerEvent::SendDone {
+                        ticket,
+                        sent: false,
+                    });
                 }
                 continue;
             }
@@ -1814,9 +2172,12 @@ async fn run_imap(
         let mut lost = false;
         // A background resync keeps quiet and leaves IDLE/watching alone.
         let background = matches!(req, MailRequest::SyncFolder { .. });
-        let invalidates_selection = matches!(&req,
-            MailRequest::RenameFolder { .. } | MailRequest::DeleteFolder { .. }
-                | MailRequest::DeleteAttachment { .. });
+        let invalidates_selection = matches!(
+            &req,
+            MailRequest::RenameFolder { .. }
+                | MailRequest::DeleteFolder { .. }
+                | MailRequest::DeleteAttachment { .. }
+        );
         if invalidates_selection {
             if let Some(sess) = session.as_mut() {
                 sess.as_mut().set_selected_folder(None);
@@ -1837,12 +2198,18 @@ async fn run_imap(
                 // recovers transparently instead of surfacing an EOF.
                 let result = interrupt_read_for_reader(
                     load_messages_retry(
-                        account_id, &mut session, &account, folder_id, &path,
-                        &mut use_envelope, cache.as_ref(),
+                        account_id,
+                        &mut session,
+                        &account,
+                        folder_id,
+                        &path,
+                        &mut use_envelope,
+                        cache.as_ref(),
                     ),
                     &mut rx,
                     &mut backlog,
-                ).await;
+                )
+                .await;
                 let Some(result) = result else {
                     tracing::debug!("folder sync yielded to the reader: {path}");
                     backlog.push_back(if background {
@@ -1870,12 +2237,7 @@ async fn run_imap(
                             });
                         }
                         // Pre-download recent bodies so opening them is instant.
-                        queue_body_prefetch(
-                            &mut body_prefetch,
-                            &path,
-                            &messages,
-                            &body_emitted,
-                        );
+                        queue_body_prefetch(&mut body_prefetch, &path, &messages, &body_emitted);
                         // Queue background attachment pre-downloads for recent
                         // messages that have them — older ones download on demand.
                         queue_attachment_prefetch(
@@ -1902,8 +2264,14 @@ async fn run_imap(
                             }
                         }
                         emit_body_hits(
-                            &mut session, &account, account_id, folder_id, &path, &messages,
-                            cache.as_ref(), &emit,
+                            &mut session,
+                            &account,
+                            account_id,
+                            folder_id,
+                            &path,
+                            &messages,
+                            cache.as_ref(),
+                            &emit,
                         )
                         .await;
                         // A load that came back with less than a full first
@@ -1922,7 +2290,10 @@ async fn run_imap(
                         // list stops showing the spinner once it holds a full
                         // page anyway.
                         let complete = messages.len() < FIRST_PAGE as usize;
-                        emit(WorkerEvent::Messages { folder_id, messages });
+                        emit(WorkerEvent::Messages {
+                            folder_id,
+                            messages,
+                        });
                         if complete {
                             emit(WorkerEvent::BackfillDone { folder_id });
                         }
@@ -1936,7 +2307,10 @@ async fn run_imap(
                         }
                     }
                     Err(e) => {
-                        emit(WorkerEvent::net_error(i18n_f("Could not load {path}: {e}", &[("path", &(path).to_string()), ("e", &(e).to_string())])));
+                        emit(WorkerEvent::net_error(i18n_f(
+                            "Could not load {path}: {e}",
+                            &[("path", &(path).to_string()), ("e", &(e).to_string())],
+                        )));
                         // The load failed, so nothing more is on its way for
                         // this folder: end its index (#218) rather than leave
                         // the list spinning on a backfill that will not run.
@@ -1961,16 +2335,33 @@ async fn run_imap(
                         c.save_sender_check(account_id, &path, uid, &check);
                         c.set_has_attachment(account_id, &path, uid, has_attachments);
                     }
-                    emit(WorkerEvent::Body { message_id, path: path.clone(), body });
-                    emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
+                    emit(WorkerEvent::Body {
+                        message_id,
+                        path: path.clone(),
+                        body,
+                    });
+                    emit(WorkerEvent::SenderChecked {
+                        path: path.to_string(),
+                        message_id,
+                        check,
+                    });
                     emit(if has_attachments {
-                        WorkerEvent::HasAttachments { path: path.to_string(), message_id }
+                        WorkerEvent::HasAttachments {
+                            path: path.to_string(),
+                            message_id,
+                        }
                     } else {
-                        WorkerEvent::NoAttachments { path: path.to_string(), message_id }
+                        WorkerEvent::NoAttachments {
+                            path: path.to_string(),
+                            message_id,
+                        }
                     });
                 }
                 Err(e) => {
-                    emit(WorkerEvent::net_error(i18n_f("Could not load message: {e}", &[("e", &(e).to_string())])));
+                    emit(WorkerEvent::net_error(i18n_f(
+                        "Could not load message: {e}",
+                        &[("e", &(e).to_string())],
+                    )));
                 }
             },
 
@@ -2014,38 +2405,50 @@ async fn run_imap(
                                     check,
                                 });
                                 emit(if has_attachments {
-                                    WorkerEvent::HasAttachments { path: path.to_string(), message_id: *message_id }
+                                    WorkerEvent::HasAttachments {
+                                        path: path.to_string(),
+                                        message_id: *message_id,
+                                    }
                                 } else {
-                                    WorkerEvent::NoAttachments { path: path.to_string(), message_id: *message_id }
+                                    WorkerEvent::NoAttachments {
+                                        path: path.to_string(),
+                                        message_id: *message_id,
+                                    }
                                 });
                             }
                             if !missing.is_empty() {
                                 settle_missing_bodies(
-                                    &mut session, account_id, &path, missing, cache.as_ref(), &emit,
+                                    &mut session,
+                                    account_id,
+                                    &path,
+                                    missing,
+                                    cache.as_ref(),
+                                    &emit,
                                 )
                                 .await;
                             }
                         }
                         Err(e) => {
-                            emit(WorkerEvent::net_error(i18n_f("Could not load conversation: {e}", &[("e", &(e).to_string())])));
+                            emit(WorkerEvent::net_error(i18n_f(
+                                "Could not load conversation: {e}",
+                                &[("e", &(e).to_string())],
+                            )));
                         }
                     }
                 }
             }
 
-            MailRequest::LoadSource { path, uid, .. } => match load_source_retry(
-                &mut session,
-                &account,
-                &path,
-                uid,
-            )
-            .await
-            {
-                Ok(text) => emit(WorkerEvent::Source { text }),
-                Err(e) => {
-                    emit(WorkerEvent::net_error(i18n_f("Could not load source: {e}", &[("e", &(e).to_string())])));
+            MailRequest::LoadSource { path, uid, .. } => {
+                match load_source_retry(&mut session, &account, &path, uid).await {
+                    Ok(text) => emit(WorkerEvent::Source { text }),
+                    Err(e) => {
+                        emit(WorkerEvent::net_error(i18n_f(
+                            "Could not load source: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
+                    }
                 }
-            },
+            }
 
             MailRequest::LoadAttachments {
                 message_id,
@@ -2061,17 +2464,27 @@ async fn run_imap(
                             c.mark_attachments_checked(account_id, &path, uid);
                         }
                     }
-                    emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
+                    emit(WorkerEvent::Attachments {
+                        path: path.to_string(),
+                        message_id,
+                        items,
+                    });
                 }
                 Err(e) => {
-                    emit(WorkerEvent::net_error(i18n_f("Could not load attachments: {e}", &[("e", &(e).to_string())])));
+                    emit(WorkerEvent::net_error(i18n_f(
+                        "Could not load attachments: {e}",
+                        &[("e", &(e).to_string())],
+                    )));
                 }
             },
 
             MailRequest::SetSeen { path, uid, seen } => {
                 let sess = session.as_mut().unwrap();
                 if let Err(e) = store_flag(sess, &path, uid, "\\Seen", seen).await {
-                    emit(WorkerEvent::error(i18n_f("Could not update message: {e}", &[("e", &(e).to_string())])));
+                    emit(WorkerEvent::error(i18n_f(
+                        "Could not update message: {e}",
+                        &[("e", &(e).to_string())],
+                    )));
                     lost = true;
                 } else if let Some(c) = cache.as_ref() {
                     c.set_unread(account_id, &path, uid, !seen);
@@ -2079,21 +2492,26 @@ async fn run_imap(
                 emit(WorkerEvent::SeenSettled { path, uid });
             }
 
-            MailRequest::SetFlagged {
-                path,
-                uid,
-                flagged,
-            } => {
+            MailRequest::SetFlagged { path, uid, flagged } => {
                 let sess = session.as_mut().unwrap();
                 if let Err(e) = store_flag(sess, &path, uid, "\\Flagged", flagged).await {
-                    emit(WorkerEvent::error(i18n_f("Could not change the star: {e}", &[("e", &(e).to_string())])));
+                    emit(WorkerEvent::error(i18n_f(
+                        "Could not change the star: {e}",
+                        &[("e", &(e).to_string())],
+                    )));
                     lost = true;
                 } else if let Some(c) = cache.as_ref() {
                     c.set_starred(account_id, &path, uid, flagged);
                 }
             }
 
-            MailRequest::SetKeyword { path, uid, message_id, keyword, add } => {
+            MailRequest::SetKeyword {
+                path,
+                uid,
+                message_id,
+                keyword,
+                add,
+            } => {
                 let sess = session.as_mut().unwrap();
                 let stored = store_keyword(sess, &path, uid, &keyword, add).await;
                 // On Gmail a tag is a label too (#374), so Gmail's own apps
@@ -2110,7 +2528,9 @@ async fn run_imap(
                                 folder_refresh_due = true;
                             }
                         }
-                        Err(e) => tracing::warn!("[account {account_id}] could not set Gmail label: {e}"),
+                        Err(e) => {
+                            tracing::warn!("[account {account_id}] could not set Gmail label: {e}")
+                        }
                     }
                 }
                 match stored {
@@ -2137,7 +2557,10 @@ async fn run_imap(
                         }
                     }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not tag message: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not tag message: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2151,10 +2574,16 @@ async fn run_imap(
                         if let Some(c) = cache.as_ref() {
                             c.mark_folder_read(account_id, &path);
                         }
-                        emit(WorkerEvent::FolderUnread { folder_id, unread: 0 });
+                        emit(WorkerEvent::FolderUnread {
+                            folder_id,
+                            unread: 0,
+                        });
                     }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not mark folder read: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not mark folder read: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2179,11 +2608,15 @@ async fn run_imap(
                             c.delete_message(account_id, &path, uid);
                         }
                         if created {
-                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit)
+                                .await;
                         }
                     }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not mark as spam: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not mark as spam: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2197,11 +2630,15 @@ async fn run_imap(
                             c.delete_message(account_id, &path, uid);
                         }
                         if created {
-                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit)
+                                .await;
                         }
                     }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not mark as not spam: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not mark as not spam: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2217,31 +2654,56 @@ async fn run_imap(
                             }
                         }
                         if created {
-                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit)
+                                .await;
                         }
                     }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not mark {len} messages as not spam: {e}", &[("len", &(uids.len()).to_string()), ("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not mark {len} messages as not spam: {e}",
+                            &[("len", &(uids.len()).to_string()), ("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
                 emit(WorkerEvent::BulkComplete);
             }
 
-            MailRequest::ExportRaw { token, path, uid, .. } => {
-                let raw = load_raw_retry(&mut session, &account, &path, uid).await.map_err(|e| e.to_string());
+            MailRequest::ExportRaw {
+                token, path, uid, ..
+            } => {
+                let raw = load_raw_retry(&mut session, &account, &path, uid)
+                    .await
+                    .map_err(|e| e.to_string());
                 emit(WorkerEvent::RawExported { token, raw });
             }
 
-            MailRequest::ImportRaw { token, path, raw, seen, flagged } => {
+            MailRequest::ImportRaw {
+                token,
+                path,
+                raw,
+                seen,
+                flagged,
+            } => {
                 let sess = session.as_mut().unwrap();
                 let flags = import_flags(seen, flagged);
-                let result = append_msg(sess, &path, flags.as_deref(), &raw).await.map_err(|e| e.to_string());
+                let result = append_msg(sess, &path, flags.as_deref(), &raw)
+                    .await
+                    .map_err(|e| e.to_string());
                 emit(WorkerEvent::RawImported { token, result });
             }
 
-            MailRequest::DeleteAttachment { message_id, path, uid, name, size } => {
-                let folders = cache.as_ref().map(|c| c.load_folders(account_id)).unwrap_or_default();
+            MailRequest::DeleteAttachment {
+                message_id,
+                path,
+                uid,
+                name,
+                size,
+            } => {
+                let folders = cache
+                    .as_ref()
+                    .map(|c| c.load_folders(account_id))
+                    .unwrap_or_default();
                 // Gmail keeps every message in All Mail as well as under the
                 // label it is shown in: the original would stay there, file
                 // and all, beside the copy.
@@ -2251,24 +2713,35 @@ async fn run_imap(
                     continue;
                 }
                 emit(WorkerEvent::Status(i18n("Removing the attachment…")));
-                let result = strip_imap_attachment(&mut session, &account, &path, uid, &name, size).await;
+                let result =
+                    strip_imap_attachment(&mut session, &account, &path, uid, &name, size).await;
                 emit(WorkerEvent::Status(String::new()));
                 match result {
                     Ok((new_uid, raw)) => {
                         if let Some(c) = cache.as_ref() {
                             c.delete_message(account_id, &path, uid);
                         }
-                        if let Some(folder_id) = folders.iter().find(|f| f.path == path).map(|f| f.id) {
+                        if let Some(folder_id) =
+                            folders.iter().find(|f| f.path == path).map(|f| f.id)
+                        {
                             if let Ok(messages) = load_messages_retry(
-                                account_id, &mut session, &account, folder_id, &path,
-                                &mut use_envelope, cache.as_ref(),
+                                account_id,
+                                &mut session,
+                                &account,
+                                folder_id,
+                                &path,
+                                &mut use_envelope,
+                                cache.as_ref(),
                             )
                             .await
                             {
                                 if let Some(c) = cache.as_ref() {
                                     c.upsert_messages(account_id, &path, &messages);
                                 }
-                                emit(WorkerEvent::Messages { folder_id, messages });
+                                emit(WorkerEvent::Messages {
+                                    folder_id,
+                                    messages,
+                                });
                             }
                         }
                         if let Some(c) = cache.as_ref() {
@@ -2277,7 +2750,14 @@ async fn run_imap(
                                 cache_rewritten(c, account_id, &path, new_uid, &raw);
                             }
                         }
-                        emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid, name, size });
+                        emit(WorkerEvent::AttachmentDeleted {
+                            message_id,
+                            path,
+                            uid,
+                            new_uid,
+                            name,
+                            size,
+                        });
                     }
                     Err(e) => {
                         let why = i18n_f("Could not remove the attachment: {e}", &[("e", &e.text)]);
@@ -2296,11 +2776,15 @@ async fn run_imap(
                             c.delete_message(account_id, &path, uid);
                         }
                         if created {
-                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit)
+                                .await;
                         }
                     }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not move message: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not move message: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2317,7 +2801,8 @@ async fn run_imap(
                             }
                         }
                         if created {
-                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit)
+                                .await;
                         }
                     }
                     Err(e) => {
@@ -2325,7 +2810,10 @@ async fn run_imap(
                             "move failed: {path:?} -> {dest:?} set={} ({e})",
                             uid_set(&uids)
                         );
-                        emit(WorkerEvent::error(i18n_f("Could not move {len} messages: {e}", &[("len", &(uids.len()).to_string()), ("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not move {len} messages: {e}",
+                            &[("len", &(uids.len()).to_string()), ("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2340,14 +2828,22 @@ async fn run_imap(
                 // Hylki has never listed.
                 let sess = session.as_mut().unwrap();
                 let mut hit: Option<(String, u32)> = None;
-                match list_folders(account_id, sess, &account.folder_roles, &account.hidden_folders).await {
+                match list_folders(
+                    account_id,
+                    sess,
+                    &account.folder_roles,
+                    &account.hidden_folders,
+                )
+                .await
+                {
                     Ok(folders) => {
                         for f in folders {
                             if sel(sess, &f.path).await.is_err() {
                                 continue;
                             }
-                            let Ok(set) = search_uids(sess, format!("HEADER Message-ID \"{message_id}\""))
-                                .await
+                            let Ok(set) =
+                                search_uids(sess, format!("HEADER Message-ID \"{message_id}\""))
+                                    .await
                             else {
                                 continue;
                             };
@@ -2357,9 +2853,14 @@ async fn run_imap(
                             }
                         }
                     }
-                    Err(e) => tracing::warn!("[account {account_id}] locate: listing folders failed: {e}"),
+                    Err(e) => {
+                        tracing::warn!("[account {account_id}] locate: listing folders failed: {e}")
+                    }
                 }
-                emit(WorkerEvent::Located { message_id: message_id.clone(), hit });
+                emit(WorkerEvent::Located {
+                    message_id: message_id.clone(),
+                    hit,
+                });
             }
 
             MailRequest::ScanAttachments { folder_path } => {
@@ -2369,7 +2870,8 @@ async fn run_imap(
                 // — the difference between a gallery that reaches back two
                 // decades and one that shows only what has been opened.
                 let Some(c) = cache.as_ref() else { continue };
-                let uids = c.unscanned_attachment_uids(account_id, folder_path.as_str(), SCAN_CHUNK);
+                let uids =
+                    c.unscanned_attachment_uids(account_id, folder_path.as_str(), SCAN_CHUNK);
                 if uids.is_empty() {
                     emit(WorkerEvent::AttachmentsScanned {
                         folder_path: folder_path.clone(),
@@ -2423,7 +2925,12 @@ async fn run_imap(
                                     .map(structure_attachments)
                                     .unwrap_or_default();
                                 added += metas.len() as u32;
-                                c.save_attachment_meta(account_id, folder_path.as_str(), uid, &metas);
+                                c.save_attachment_meta(
+                                    account_id,
+                                    folder_path.as_str(),
+                                    uid,
+                                    &metas,
+                                );
                             }
                             for uid in batch.iter().filter(|u| !seen.contains(u)) {
                                 c.save_attachment_meta(account_id, folder_path.as_str(), *uid, &[]);
@@ -2475,10 +2982,19 @@ async fn run_imap(
                 // unused one is dropped here).
                 let sess = session.as_mut().unwrap();
                 let mut found: Vec<KeywordFinding> = Vec::new();
-                match list_folders(account_id, sess, &account.folder_roles, &account.hidden_folders).await {
+                match list_folders(
+                    account_id,
+                    sess,
+                    &account.folder_roles,
+                    &account.hidden_folders,
+                )
+                .await
+                {
                     Ok(folders) => {
                         for f in &folders {
-                            let Ok(mb) = exam(sess, &f.path).await else { continue };
+                            let Ok(mb) = exam(sess, &f.path).await else {
+                                continue;
+                            };
                             let candidates: Vec<String> = mb
                                 .flags
                                 .iter()
@@ -2495,7 +3011,10 @@ async fn run_imap(
                                 if n == 0 {
                                     continue;
                                 }
-                                match found.iter_mut().find(|x| x.keyword.eq_ignore_ascii_case(&kw)) {
+                                match found
+                                    .iter_mut()
+                                    .find(|x| x.keyword.eq_ignore_ascii_case(&kw))
+                                {
                                     Some(x) => {
                                         x.count += n;
                                         if !x.folders.contains(&f.name) {
@@ -2513,7 +3032,9 @@ async fn run_imap(
                             }
                         }
                     }
-                    Err(e) => tracing::warn!("[account {account_id}] find tags: listing folders failed: {e}"),
+                    Err(e) => tracing::warn!(
+                        "[account {account_id}] find tags: listing folders failed: {e}"
+                    ),
                 }
                 emit(WorkerEvent::KeywordsFound(found));
             }
@@ -2522,12 +3043,17 @@ async fn run_imap(
                 // RFC 2087/9208: the quota root the inbox belongs to is the
                 // account's own, and its STORAGE resource is the mailbox size.
                 let sess = session.as_mut().unwrap();
-                let offered = sess.capabilities().await.is_ok_and(|caps| caps.has_str("QUOTA"));
+                let offered = sess
+                    .capabilities()
+                    .await
+                    .is_ok_and(|caps| caps.has_str("QUOTA"));
                 let quota = if offered {
                     match sess.get_quota_root("INBOX").await {
                         Ok((_, quotas)) => imap_storage_quota(&quotas),
                         Err(e) => {
-                            tracing::warn!("[account {account_id}] quota: GETQUOTAROOT failed: {e}");
+                            tracing::warn!(
+                                "[account {account_id}] quota: GETQUOTAROOT failed: {e}"
+                            );
                             None
                         }
                     }
@@ -2543,7 +3069,12 @@ async fn run_imap(
                 emit(WorkerEvent::KeywordsSynced { paths });
             }
 
-            MailRequest::UndoMove { path, dest, dest_folder_id, message_ids } => {
+            MailRequest::UndoMove {
+                path,
+                dest,
+                dest_folder_id,
+                message_ids,
+            } => {
                 // Find the moved messages where the move landed them. UIDs
                 // changed in transit; Message-IDs did not.
                 let mut uids: Vec<u32> = Vec::new();
@@ -2556,7 +3087,8 @@ async fn run_imap(
                         Ok(mb) => {
                             exists = mb.exists;
                             for id in &message_ids {
-                                match search_uids(sess, format!("HEADER Message-ID \"{id}\"")).await {
+                                match search_uids(sess, format!("HEADER Message-ID \"{id}\"")).await
+                                {
                                     Ok(set) => uids.extend(set),
                                     Err(e) => {
                                         failed = Some(e.to_string());
@@ -2607,7 +3139,10 @@ async fn run_imap(
                     }
                 }
                 if let Some(e) = failed {
-                    emit(WorkerEvent::error(i18n_f("Undo failed: {e}", &[("e", &(e).to_string())])));
+                    emit(WorkerEvent::error(i18n_f(
+                        "Undo failed: {e}",
+                        &[("e", &(e).to_string())],
+                    )));
                 } else if uids.is_empty() {
                     // Not an error the reader needs interrupting for: the
                     // step is simply spent (#200).
@@ -2617,15 +3152,23 @@ async fn run_imap(
                     // the list (the app can't restore them optimistically —
                     // it never learns their new UIDs).
                     if let Ok(messages) = load_messages_retry(
-                        account_id, &mut session, &account, dest_folder_id, &dest,
-                        &mut use_envelope, cache.as_ref(),
+                        account_id,
+                        &mut session,
+                        &account,
+                        dest_folder_id,
+                        &dest,
+                        &mut use_envelope,
+                        cache.as_ref(),
                     )
                     .await
                     {
                         if let Some(c) = cache.as_ref() {
                             c.upsert_messages(account_id, &dest, &messages);
                         }
-                        emit(WorkerEvent::Messages { folder_id: dest_folder_id, messages });
+                        emit(WorkerEvent::Messages {
+                            folder_id: dest_folder_id,
+                            messages,
+                        });
                         emit(WorkerEvent::Restored {
                             folder_id: dest_folder_id,
                             message_ids: message_ids.clone(),
@@ -2643,7 +3186,8 @@ async fn run_imap(
                 let sess = session.as_mut().unwrap();
                 // Gmail only takes a label off mail expunged outside Trash,
                 // so the mail would sit on in All Mail (#471).
-                let trash = gmail_trash(cache.as_ref(), account_id, &account).filter(|t| *t != path);
+                let trash =
+                    gmail_trash(cache.as_ref(), account_id, &account).filter(|t| *t != path);
                 let result = match &trash {
                     Some(trash) => gmail_erase(sess, &path, &uids, trash).await,
                     None => purge_messages(sess, &path, &uids).await,
@@ -2660,7 +3204,10 @@ async fn run_imap(
                         }
                     }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not delete permanently: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not delete permanently: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2689,11 +3236,20 @@ async fn run_imap(
                             }
                         }
                         tracing::info!("emptied {path}: {} message(s) erased", uids.len());
-                        emit(WorkerEvent::Messages { folder_id, messages: Vec::new() });
-                        emit(WorkerEvent::FolderUnread { folder_id, unread: 0 });
+                        emit(WorkerEvent::Messages {
+                            folder_id,
+                            messages: Vec::new(),
+                        });
+                        emit(WorkerEvent::FolderUnread {
+                            folder_id,
+                            unread: 0,
+                        });
                     }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not empty the folder: {e}", &[("e", &e.to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not empty the folder: {e}",
+                            &[("e", &e.to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2702,9 +3258,14 @@ async fn run_imap(
             MailRequest::CreateFolder { path } => {
                 let sess = session.as_mut().unwrap();
                 match create_folder(sess, &path).await {
-                    Ok(()) => refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await,
+                    Ok(()) => {
+                        refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await
+                    }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not create folder: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not create folder: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2713,9 +3274,14 @@ async fn run_imap(
             MailRequest::RenameFolder { old_path, new_path } => {
                 let sess = session.as_mut().unwrap();
                 match rename_folder(sess, &old_path, &new_path).await {
-                    Ok(()) => refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await,
+                    Ok(()) => {
+                        refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await
+                    }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not move folder: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not move folder: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
@@ -2730,22 +3296,40 @@ async fn run_imap(
             MailRequest::DeleteFolder { path, trash } => {
                 let sess = session.as_mut().unwrap();
                 match delete_folder(sess, &path, trash.as_deref()).await {
-                    Ok(()) => refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await,
+                    Ok(()) => {
+                        refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await
+                    }
                     Err(e) => {
-                        emit(WorkerEvent::error(i18n_f("Could not delete folder: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::error(i18n_f(
+                            "Could not delete folder: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         lost = true;
                     }
                 }
             }
 
             // Send Later (#145): into the Outbox until its time.
-            MailRequest::Send { mut message, sent_path, ticket }
-                if message.send_at.is_some_and(|t| t > crate::datefmt::now()) =>
-            {
+            MailRequest::Send {
+                mut message,
+                sent_path,
+                ticket,
+            } if message.send_at.is_some_and(|t| t > crate::datefmt::now()) => {
                 let at = message.send_at.unwrap_or_default();
                 restore_msgid_case(cache.as_ref(), &mut message);
-                schedule_send(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), at, &emit);
-                emit(WorkerEvent::SendDone { ticket, sent: false });
+                schedule_send(
+                    cache.as_ref(),
+                    account_id,
+                    &account,
+                    &message,
+                    sent_path.as_deref(),
+                    at,
+                    &emit,
+                );
+                emit(WorkerEvent::SendDone {
+                    ticket,
+                    sent: false,
+                });
                 // The draft it was opened from is superseded by the queued copy.
                 if let Some(o) = message.draft_origin.clone() {
                     if o.account_id == account_id {
@@ -2756,43 +3340,74 @@ async fn run_imap(
                             c.delete_message(account_id, &o.path, o.uid);
                         }
                         if let Ok(messages) = load_messages_retry(
-                            account_id, &mut session, &account, o.folder_id, &o.path,
-                            &mut use_envelope, cache.as_ref(),
+                            account_id,
+                            &mut session,
+                            &account,
+                            o.folder_id,
+                            &o.path,
+                            &mut use_envelope,
+                            cache.as_ref(),
                         )
                         .await
                         {
-                            emit(WorkerEvent::Messages { folder_id: o.folder_id, messages });
+                            emit(WorkerEvent::Messages {
+                                folder_id: o.folder_id,
+                                messages,
+                            });
                         }
                     }
                 }
             }
 
-            MailRequest::Send { mut message, sent_path, ticket } => {
+            MailRequest::Send {
+                mut message,
+                sent_path,
+                ticket,
+            } => {
                 emit(WorkerEvent::Status(i18n("Sending…")));
                 restore_msgid_case(cache.as_ref(), &mut message);
                 match send_smtp(&account, &message).await {
                     Ok(raw) => {
                         emit(WorkerEvent::Status(String::new()));
                         mark_answered(
-                            &mut session, cache.as_ref(), account_id,
-                            &message.in_reply_to, &message.forwards, &emit,
+                            &mut session,
+                            cache.as_ref(),
+                            account_id,
+                            &message.in_reply_to,
+                            &message.forwards,
+                            &emit,
                         )
                         .await;
                         // Save a copy to the Sent folder, or beside the
                         // original for a reply (#468); sending still counts
                         // as success even if this part fails.
-                        let reply = reply_copy_path(&account, account_id, cache.as_ref(), &message.in_reply_to);
+                        let reply = reply_copy_path(
+                            &account,
+                            account_id,
+                            cache.as_ref(),
+                            &message.in_reply_to,
+                        );
                         let sess = session.as_mut().unwrap();
-                        match file_sent_copy(sess, reply.as_deref(), sent_path.as_deref(), &raw).await {
+                        match file_sent_copy(sess, reply.as_deref(), sent_path.as_deref(), &raw)
+                            .await
+                        {
                             Ok(Some(path)) => {
                                 index_sent_copy(
-                                    account_id, &mut session, &account, &path,
-                                    &mut use_envelope, cache.as_ref(), &emit,
+                                    account_id,
+                                    &mut session,
+                                    &account,
+                                    &path,
+                                    &mut use_envelope,
+                                    cache.as_ref(),
+                                    &emit,
                                 )
                                 .await;
                             }
                             Ok(None) => {}
-                            Err(e) => emit(WorkerEvent::error(i18n_f("Message sent, but saving to Sent failed: {e}", &[("e", &(e).to_string())]))),
+                            Err(e) => emit(WorkerEvent::error(i18n_f(
+                                "Message sent, but saving to Sent failed: {e}",
+                                &[("e", &(e).to_string())],
+                            ))),
                         }
                         // If sending an edited draft (from this account), remove the
                         // now-obsolete draft and refresh the Drafts folder.
@@ -2806,15 +3421,23 @@ async fn run_imap(
                                     c.delete_message(account_id, &o.path, o.uid);
                                 }
                                 if let Ok(messages) = load_messages_retry(
-                                    account_id, &mut session, &account, o.folder_id, &o.path,
-                                    &mut use_envelope, cache.as_ref(),
+                                    account_id,
+                                    &mut session,
+                                    &account,
+                                    o.folder_id,
+                                    &o.path,
+                                    &mut use_envelope,
+                                    cache.as_ref(),
                                 )
                                 .await
                                 {
                                     if let Some(c) = cache.as_ref() {
                                         c.upsert_messages(account_id, &o.path, &messages);
                                     }
-                                    emit(WorkerEvent::Messages { folder_id: o.folder_id, messages });
+                                    emit(WorkerEvent::Messages {
+                                        folder_id: o.folder_id,
+                                        messages,
+                                    });
                                 }
                             }
                         }
@@ -2825,15 +3448,29 @@ async fn run_imap(
                     }
                     Err(e) => {
                         emit(WorkerEvent::Status(String::new()));
-                        send_failed(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), &e.to_string(), smtp_refused(&e), &emit);
-                        emit(WorkerEvent::SendDone { ticket, sent: false });
+                        send_failed(
+                            cache.as_ref(),
+                            account_id,
+                            &account,
+                            &message,
+                            sent_path.as_deref(),
+                            &e.to_string(),
+                            smtp_refused(&e),
+                            &emit,
+                        );
+                        emit(WorkerEvent::SendDone {
+                            ticket,
+                            sent: false,
+                        });
                     }
                 }
             }
 
             MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
 
-            MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, &emit),
+            MailRequest::DeleteOutbox { id } => {
+                delete_queued(cache.as_ref(), account_id, id, &emit)
+            }
 
             MailRequest::FlushOutbox { id } => {
                 flush_outbox(
@@ -2849,13 +3486,23 @@ async fn run_imap(
                 .await;
             }
 
-            MailRequest::SaveDraft { message, folder_id, path, autosave, template } => {
+            MailRequest::SaveDraft {
+                message,
+                folder_id,
+                path,
+                autosave,
+                template,
+            } => {
                 if autosave.is_none() {
                     emit(WorkerEvent::Status(saving_text(template)));
                 }
                 // A draft is kept as written: signing and encrypting happen
                 // at send time (#133).
-                let mut message = OutgoingMessage { sign: false, encrypt: false, ..*message };
+                let mut message = OutgoingMessage {
+                    sign: false,
+                    encrypt: false,
+                    ..*message
+                };
                 restore_msgid_case(cache.as_ref(), &mut message);
                 match build_draft(&account, &message) {
                     Ok(email) => {
@@ -2885,32 +3532,61 @@ async fn run_imap(
                                 }
                                 // Reload Drafts so the saved draft appears.
                                 if let Ok(messages) = load_messages_retry(
-                                    account_id, &mut session, &account, folder_id, &path,
-                                    &mut use_envelope, cache.as_ref(),
+                                    account_id,
+                                    &mut session,
+                                    &account,
+                                    folder_id,
+                                    &path,
+                                    &mut use_envelope,
+                                    cache.as_ref(),
                                 )
                                 .await
                                 {
                                     if let Some(c) = cache.as_ref() {
                                         c.upsert_messages(account_id, &path, &messages);
                                     }
-                                    emit(WorkerEvent::Messages { folder_id, messages });
+                                    emit(WorkerEvent::Messages {
+                                        folder_id,
+                                        messages,
+                                    });
                                 }
                                 // Surface a newly-created Drafts folder in the sidebar.
                                 if let Some(sess) = session.as_mut() {
-                                    refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
+                                    refresh_folders(
+                                        account_id,
+                                        &account,
+                                        sess,
+                                        cache.as_ref(),
+                                        &emit,
+                                    )
+                                    .await;
                                 }
                                 // Saved as a draft instead of sent: the queued
                                 // copy it was edited from is now superseded.
                                 // A template is a copy, and supersedes nothing.
                                 if !template {
-                                    drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
+                                    drop_superseded_outbox(
+                                        cache.as_ref(),
+                                        account_id,
+                                        &message,
+                                        &emit,
+                                    );
                                 }
                                 emit(WorkerEvent::Status(String::new()));
-                                emit(WorkerEvent::DraftSaved { autosave, message_id: Some(message_id) });
+                                emit(WorkerEvent::DraftSaved {
+                                    autosave,
+                                    message_id: Some(message_id),
+                                });
                             }
                             Err(e) => {
                                 emit(WorkerEvent::Status(String::new()));
-                                draft_not_saved(autosave, template, e.to_string(), message.clone(), &emit);
+                                draft_not_saved(
+                                    autosave,
+                                    template,
+                                    e.to_string(),
+                                    message.clone(),
+                                    &emit,
+                                );
                                 lost = true;
                             }
                         }
@@ -2955,7 +3631,10 @@ async fn connect_and_list(
     if !crate::power::reaches(&account.imap_host) {
         return None;
     }
-    emit(WorkerEvent::Status(i18n_f("Connecting to {host}…", &[("host", &account.imap_host)])));
+    emit(WorkerEvent::Status(i18n_f(
+        "Connecting to {host}…",
+        &[("host", &account.imap_host)],
+    )));
 
     let result = match connect(account).await {
         Ok(mut session) => {
@@ -2966,17 +3645,27 @@ async fn connect_and_list(
                 label: account.display_label(),
                 accent: accent_for(account_id).into(),
             }));
-            let cached = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+            let cached = cache
+                .map(|c| c.load_folders(account_id))
+                .unwrap_or_default();
             match list_folder_metadata(
-                account_id, &mut session, &account.folder_roles, &account.hidden_folders, Some(&cached),
-            ).await {
+                account_id,
+                &mut session,
+                &account.folder_roles,
+                &account.hidden_folders,
+                Some(&cached),
+            )
+            .await
+            {
                 // An empty LIST can't be right — INBOX always exists (RFC
                 // 3501). Keep whatever the cache has instead of wiping it.
                 Ok(folders) if folders.is_empty() => {}
                 Ok(folders) => {
                     note_gmail_account(account_id, account, &folders);
                     let changed = cache
-                        .map(|c| !crate::cache::folders_equal(&c.load_folders(account_id), &folders))
+                        .map(|c| {
+                            !crate::cache::folders_equal(&c.load_folders(account_id), &folders)
+                        })
                         .unwrap_or(true);
                     if let Some(c) = cache {
                         c.save_folders(account_id, &folders);
@@ -2985,12 +3674,18 @@ async fn connect_and_list(
                         emit(WorkerEvent::Folders(folders));
                     }
                 }
-                Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not list folders: {e}", &[("e", &(e).to_string())]))),
+                Err(e) => emit(WorkerEvent::net_error(i18n_f(
+                    "Could not list folders: {e}",
+                    &[("e", &(e).to_string())],
+                ))),
             }
             Some(session)
         }
         Err(e) => {
-            emit(WorkerEvent::net_error(i18n_f("Connection failed: {e}", &[("e", &(e).to_string())])));
+            emit(WorkerEvent::net_error(i18n_f(
+                "Connection failed: {e}",
+                &[("e", &(e).to_string())],
+            )));
             None
         }
     };
@@ -3055,7 +3750,11 @@ async fn load_messages_retry(
                 // A mode reached by stepping has now loaded a folder: the
                 // next launch starts here.
                 if stepped {
-                    crate::config::save_fetch_mode(&account.email, *use_envelope, previews_rejected(account_id));
+                    crate::config::save_fetch_mode(
+                        &account.email,
+                        *use_envelope,
+                        previews_rejected(account_id),
+                    );
                 }
                 return result;
             }
@@ -3168,7 +3867,9 @@ async fn settle_missing_bodies(
     let uids: Vec<u32> = missing.iter().map(|(_, uid)| *uid).collect();
     // The folder is still selected from the fetch.
     let present = match session.as_mut() {
-        Some(sess) => search_uids(sess, format!("UID {}", uid_set(&uids))).await.ok(),
+        Some(sess) => search_uids(sess, format!("UID {}", uid_set(&uids)))
+            .await
+            .ok(),
         None => None,
     };
     for (message_id, uid) in missing {
@@ -3176,7 +3877,11 @@ async fn settle_missing_bodies(
             if let Some(c) = cache {
                 c.delete_message(account_id, path, uid);
             }
-            emit(WorkerEvent::Gone { message_id, path: path.to_string(), uid });
+            emit(WorkerEvent::Gone {
+                message_id,
+                path: path.to_string(),
+                uid,
+            });
         } else {
             emit(WorkerEvent::Body {
                 message_id,
@@ -3214,7 +3919,9 @@ async fn load_source(
     uid: u32,
 ) -> Result<String, async_imap::error::Error> {
     select_for_read(session, path).await?;
-    let raw = fetch_raw_message(session, uid).await?.ok_or_else(|| no_content_error(uid))?;
+    let raw = fetch_raw_message(session, uid)
+        .await?
+        .ok_or_else(|| no_content_error(uid))?;
     Ok(String::from_utf8_lossy(&raw).into_owned())
 }
 
@@ -3262,7 +3969,11 @@ async fn run_one_prefetch(
                 }
                 let (body, check, _) = render_raw(&raw);
                 let (attachments, _) = attachments_of(&raw);
-                emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id: uid, check: check.clone() });
+                emit(WorkerEvent::SenderChecked {
+                    path: path.to_string(),
+                    message_id: uid,
+                    check: check.clone(),
+                });
                 if let Some(c) = cache {
                     c.save_body(account_id, &path, uid, &body);
                     c.save_sender_check(account_id, &path, uid, &check);
@@ -3275,7 +3986,10 @@ async fn run_one_prefetch(
                 // attachment but with none once fetched (iCloud multipart/mixed
                 // wrapping only inline images).
                 if attachments.is_empty() {
-                    emit(WorkerEvent::NoAttachments { path: path.to_string(), message_id: uid });
+                    emit(WorkerEvent::NoAttachments {
+                        path: path.to_string(),
+                        message_id: uid,
+                    });
                 }
             }
         }
@@ -3383,9 +4097,17 @@ async fn run_one_body_prefetch(
     // sender badge blank with no second chance to fill it.
     if let Some(body) = cache.and_then(|c| c.load_body(account_id, &path, uid)) {
         queue.pop_front();
-        emit(WorkerEvent::Body { message_id: uid, path: path.clone(), body });
+        emit(WorkerEvent::Body {
+            message_id: uid,
+            path: path.clone(),
+            body,
+        });
         if let Some(check) = cache.and_then(|c| c.load_sender_check(account_id, &path, uid)) {
-            emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id: uid, check });
+            emit(WorkerEvent::SenderChecked {
+                path: path.to_string(),
+                message_id: uid,
+                check,
+            });
         }
         emitted.insert((path, uid));
         return;
@@ -3419,12 +4141,23 @@ async fn run_one_body_prefetch(
             c.save_sender_check(account_id, &path, uid, &check);
             c.set_has_attachment(account_id, &path, uid, has_attachments);
         }
-        emit(WorkerEvent::Body { message_id: uid, path: path.clone(), body });
-        emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id: uid, check });
+        emit(WorkerEvent::Body {
+            message_id: uid,
+            path: path.clone(),
+            body,
+        });
+        emit(WorkerEvent::SenderChecked {
+            path: path.to_string(),
+            message_id: uid,
+            check,
+        });
         // The background prefetch reads the whole message anyway, so a wrong
         // paperclip corrects itself before the message is ever opened.
         if has_attachments {
-            emit(WorkerEvent::HasAttachments { path: path.to_string(), message_id: uid });
+            emit(WorkerEvent::HasAttachments {
+                path: path.to_string(),
+                message_id: uid,
+            });
         }
         emitted.insert((path, uid));
     }
@@ -3538,7 +4271,13 @@ async fn idle_wait(
         Wake::Missed | Wake::Idle(Ok(async_imap::extensions::idle::IdleResponse::NewData(_))) => {
             if session.is_some() {
                 if let Ok(messages) = load_messages_retry(
-                    account_id, session, account, folder_id, path, use_envelope, cache,
+                    account_id,
+                    session,
+                    account,
+                    folder_id,
+                    path,
+                    use_envelope,
+                    cache,
                 )
                 .await
                 {
@@ -3549,9 +4288,14 @@ async fn idle_wait(
                     // opening it is instant.
                     queue_body_prefetch(body_prefetch, path, &messages, body_emitted);
                     queue_attachment_prefetch(att_prefetch, path, &messages, cache, account_id);
-                    emit_body_hits(session, account, account_id, folder_id, path, &messages, cache, emit)
-                        .await;
-                    emit(WorkerEvent::Messages { folder_id, messages });
+                    emit_body_hits(
+                        session, account, account_id, folder_id, path, &messages, cache, emit,
+                    )
+                    .await;
+                    emit(WorkerEvent::Messages {
+                        folder_id,
+                        messages,
+                    });
                     // Refresh the true unread count too. IDLE only re-synced the
                     // message list; without this the sidebar chip never moves when
                     // new mail lands in a background (unfocused) inbox — it would
@@ -3609,7 +4353,10 @@ fn watch_changed_folders(
     // reorganizing, a suspect baseline), and admitting them would churn every
     // standing watcher out for nothing. Let the next sweep pick the real ones.
     if changed.iter().filter(|(k, _)| watchable(*k)).count() > WATCHER_LIMIT {
-        tracing::info!("sweep: bulk change ({} folders), not adjusting watchers", changed.len());
+        tracing::info!(
+            "sweep: bulk change ({} folders), not adjusting watchers",
+            changed.len()
+        );
         return;
     }
     let mut stagger = 0;
@@ -3699,10 +4446,11 @@ async fn watch_folder(
     lease: Option<Rc<Cell<std::time::Instant>>>,
     emit: impl Fn(WorkerEvent),
 ) {
-    let lapsed =
-        |lease: &Option<Rc<Cell<std::time::Instant>>>| {
-            lease.as_ref().is_some_and(|l| l.get().elapsed() >= WATCH_LEASE)
-        };
+    let lapsed = |lease: &Option<Rc<Cell<std::time::Instant>>>| {
+        lease
+            .as_ref()
+            .is_some_and(|l| l.get().elapsed() >= WATCH_LEASE)
+    };
     let mut backoff = start_delay;
     loop {
         tokio::time::sleep(backoff).await;
@@ -3747,7 +4495,10 @@ async fn watch_folder(
         // dropped connection left), then settle into the IDLE/verify cycle.
         let mut last_count = selected_unseen(&mut sess).await;
         match last_count {
-            Some(unread) => emit(WorkerEvent::FolderUnreadByPath { path: path.clone(), unread }),
+            Some(unread) => emit(WorkerEvent::FolderUnreadByPath {
+                path: path.clone(),
+                unread,
+            }),
             None => continue, // wedged straight out of the gate; reconnect
         }
         loop {
@@ -3806,7 +4557,10 @@ async fn watch_folder(
                     if moved {
                         tracing::debug!("watcher for {path}: unseen now {unread}");
                         last_count = Some(unread);
-                        emit(WorkerEvent::FolderUnreadByPath { path: path.clone(), unread });
+                        emit(WorkerEvent::FolderUnreadByPath {
+                            path: path.clone(),
+                            unread,
+                        });
                     }
                 }
                 None => break, // count unavailable = session gone; reconnect
@@ -3872,8 +4626,18 @@ async fn fetch_raw_message(
     session: &mut ImapSession,
     uid: u32,
 ) -> Result<Option<Vec<u8>>, async_imap::error::Error> {
-    for (n, items) in ["(BODY.PEEK[])", "(RFC822)", "(BODY.PEEK[HEADER] BODY.PEEK[TEXT])"].iter().enumerate() {
-        let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), items).await?.try_collect().await?;
+    for (n, items) in [
+        "(BODY.PEEK[])",
+        "(RFC822)",
+        "(BODY.PEEK[HEADER] BODY.PEEK[TEXT])",
+    ]
+    .iter()
+    .enumerate()
+    {
+        let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), items)
+            .await?
+            .try_collect()
+            .await?;
         if let Some(raw) = fetches.iter().find_map(raw_of) {
             if n > 0 {
                 tracing::info!(target: "hylki::imap", "message {uid}: content came with {items}");
@@ -3904,7 +4668,9 @@ async fn load_raw(
     uid: u32,
 ) -> Result<Vec<u8>, async_imap::error::Error> {
     select_for_read(session, path).await?;
-    fetch_raw_message(session, uid).await?.ok_or_else(|| no_content_error(uid))
+    fetch_raw_message(session, uid)
+        .await?
+        .ok_or_else(|| no_content_error(uid))
 }
 
 /// Decoded size at or above which a part carrying a Content-ID counts as an
@@ -3938,11 +4704,18 @@ pub(crate) fn render_raw(raw: &[u8]) -> (String, crate::models::SenderCheck, boo
                 Some(inner) => extract_body(inner),
                 None => wrap_plain(&pgp_notice(&u.status)),
             };
-            let has = u.inner.as_deref().is_some_and(|i| !extract_attachments(i).is_empty());
+            let has = u
+                .inner
+                .as_deref()
+                .is_some_and(|i| !extract_attachments(i).is_empty());
             check.pgp = Some(u.status);
             (body, check, has)
         }
-        None => (extract_body(raw), check, !extract_attachments(raw).is_empty()),
+        None => (
+            extract_body(raw),
+            check,
+            !extract_attachments(raw).is_empty(),
+        ),
     }
 }
 
@@ -3986,7 +4759,10 @@ fn extract_attachments(raw: &[u8]) -> Vec<crate::models::Attachment> {
     let Some(parsed) = mail_parser::MessageParser::default().parse(raw) else {
         return Vec::new();
     };
-    attachment_parts(&parsed, raw).into_iter().map(|(_, a)| a).collect()
+    attachment_parts(&parsed, raw)
+        .into_iter()
+        .map(|(_, a)| a)
+        .collect()
 }
 
 /// The attachments of a parsed message, each with the index of the MIME
@@ -4002,7 +4778,9 @@ fn attachment_parts(
         if Some(id) == legacy {
             continue;
         }
-        let Some(part) = parsed.parts.get(id) else { continue };
+        let Some(part) = parsed.parts.get(id) else {
+            continue;
+        };
         // What is left where an attachment was removed, here or by
         // Thunderbird (#289): a note, not a file.
         if strip::is_placeholder(part) {
@@ -4032,9 +4810,7 @@ fn attachment_parts(
             // give it the suffix its type implies, or nothing opens it.
             let ext = part
                 .content_type()
-                .map(|c| {
-                    mime_extension(c.ctype(), c.subtype().unwrap_or_default())
-                })
+                .map(|c| mime_extension(c.ctype(), c.subtype().unwrap_or_default()))
                 .unwrap_or_default();
             format!("attachment-{}{ext}", i + 1)
         });
@@ -4134,7 +4910,12 @@ fn prefetch_status(remaining: usize) -> String {
     if remaining == 0 {
         String::new()
     } else {
-        ni18n_f("Downloading attachments… {n} remaining", "Downloading attachments… {n} remaining", remaining as u32, &[("n", &remaining.to_string())])
+        ni18n_f(
+            "Downloading attachments… {n} remaining",
+            "Downloading attachments… {n} remaining",
+            remaining as u32,
+            &[("n", &remaining.to_string())],
+        )
     }
 }
 
@@ -4159,7 +4940,9 @@ type SmtpError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Push the account's queue to the UI (empty list = nothing waiting).
 fn emit_outbox(cache: Option<&Cache>, account_id: u32, emit: &impl Fn(WorkerEvent)) {
-    let items = cache.map(|c| c.outbox_items(account_id)).unwrap_or_default();
+    let items = cache
+        .map(|c| c.outbox_items(account_id))
+        .unwrap_or_default();
     emit(WorkerEvent::Outbox { items });
 }
 
@@ -4203,7 +4986,8 @@ fn send_failed(
     refused: bool,
     emit: &impl Fn(WorkerEvent),
 ) {
-    let queued = !refused && queue_outbox_message(cache, account_id, account, msg, sent_path, error, None);
+    let queued =
+        !refused && queue_outbox_message(cache, account_id, account, msg, sent_path, error, None);
     // Queue first, drop the superseded row second: a crash in between leaves
     // the message queued twice, which is recoverable, rather than not at all.
     if let (true, Some(old), Some(c)) = (queued, msg.outbox_origin, cache) {
@@ -4253,7 +5037,10 @@ fn schedule_send(
         }
         emit(WorkerEvent::Notice(i18n_f(
             "“{subject}” will be sent {when}",
-            &[("subject", &msg.subject), ("when", &crate::datefmt::date_time(at))],
+            &[
+                ("subject", &msg.subject),
+                ("when", &crate::datefmt::date_time(at)),
+            ],
         )));
     } else {
         emit(WorkerEvent::error(i18n("Could not schedule the message.")));
@@ -4293,19 +5080,26 @@ fn queue_outbox_message(
         .join(", ");
     let preview: String = msg.body.split_whitespace().collect::<Vec<_>>().join(" ");
     let preview: String = preview.chars().take(160).collect();
-    let id = cache
-        .queue_outbox(
-            account_id,
-            envelope.from().map(|f| f.to_string()).unwrap_or_default().as_str(),
-            &envelope.to().iter().map(|a| a.to_string()).collect::<Vec<_>>(),
-            &recipients,
-            &msg.subject,
-            &preview,
-            &raw,
-            sent_path,
-            error,
-            send_at,
-        );
+    let id = cache.queue_outbox(
+        account_id,
+        envelope
+            .from()
+            .map(|f| f.to_string())
+            .unwrap_or_default()
+            .as_str(),
+        &envelope
+            .to()
+            .iter()
+            .map(|a| a.to_string())
+            .collect::<Vec<_>>(),
+        &recipients,
+        &msg.subject,
+        &preview,
+        &raw,
+        sent_path,
+        error,
+        send_at,
+    );
     if let Some(id) = id.filter(|_| !msg.forwards.is_empty()) {
         cache.set_outbox_forwards(id, &msg.forwards);
     }
@@ -4324,8 +5118,15 @@ pub(crate) fn park_for_next_launch(
 ) -> bool {
     let mut msg = msg.clone();
     restore_msgid_case(Some(cache), &mut msg);
-    let queued =
-        queue_outbox_message(Some(cache), account_id, account, &msg, sent_path, "", Some(crate::datefmt::now()));
+    let queued = queue_outbox_message(
+        Some(cache),
+        account_id,
+        account,
+        &msg,
+        sent_path,
+        "",
+        Some(crate::datefmt::now()),
+    );
     if let (true, Some(old)) = (queued, msg.outbox_origin) {
         cache.delete_outbox(old);
     }
@@ -4352,7 +5153,9 @@ fn current_sent_copy_path(
     cache: Option<&Cache>,
     queued: Option<&str>,
 ) -> Option<String> {
-    let folders = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+    let folders = cache
+        .map(|c| c.load_folders(account_id))
+        .unwrap_or_default();
     pick_queued_sent_copy(account, &folders, queued)
 }
 
@@ -4394,7 +5197,9 @@ pub(crate) fn answered_copies(
     in_reply_to: &str,
     forwards: &str,
 ) -> Vec<(String, u32, bool)> {
-    let Some(cache) = cache else { return Vec::new() };
+    let Some(cache) = cache else {
+        return Vec::new();
+    };
     [(in_reply_to, false), (forwards, true)]
         .into_iter()
         .filter_map(|(ids, forwarded)| Some((first_msgid(ids)?, forwarded)))
@@ -4410,7 +5215,12 @@ pub(crate) fn answered_copies(
 
 /// The first Message-ID of a header's worth, as the cache keys it.
 fn first_msgid(ids: &str) -> Option<String> {
-    let id = ids.split_whitespace().next()?.trim_start_matches('<').trim_end_matches('>').to_ascii_lowercase();
+    let id = ids
+        .split_whitespace()
+        .next()?
+        .trim_start_matches('<')
+        .trim_end_matches('>')
+        .to_ascii_lowercase();
     (!id.is_empty()).then_some(id)
 }
 
@@ -4430,7 +5240,9 @@ async fn mark_answered(
     for (path, uid, forwarded) in answered_copies(cache, account_id, in_reply_to, forwards) {
         if let Some(sess) = session.as_mut() {
             let stored = if forwarded {
-                store_keyword(sess, &path, uid, FORWARDED_KEYWORD, true).await.map(|_| ())
+                store_keyword(sess, &path, uid, FORWARDED_KEYWORD, true)
+                    .await
+                    .map(|_| ())
             } else {
                 store_flag(sess, &path, uid, "\\Answered", true).await
             };
@@ -4441,7 +5253,11 @@ async fn mark_answered(
         if let Some(c) = cache {
             c.set_answered(account_id, &path, uid, forwarded);
         }
-        emit(WorkerEvent::Answered { path, uid, forwarded });
+        emit(WorkerEvent::Answered {
+            path,
+            uid,
+            forwarded,
+        });
     }
 }
 
@@ -4470,11 +5286,19 @@ pub(crate) fn reply_copy_path(
         .filter(|(a, _, _)| *a == account_id)
         .map(|(_, path, _)| path)
         .collect();
-    pick_reply_folder(account.reply_copies, &cache.load_folders(account_id), &holding)
+    pick_reply_folder(
+        account.reply_copies,
+        &cache.load_folders(account_id),
+        &holding,
+    )
 }
 
 /// [`reply_copy_path`] once it is known which folders hold the original.
-fn pick_reply_folder(choice: ReplyCopies, folders: &[Folder], holding: &[String]) -> Option<String> {
+fn pick_reply_folder(
+    choice: ReplyCopies,
+    folders: &[Folder],
+    holding: &[String],
+) -> Option<String> {
     holding
         .iter()
         // A folder no longer listed was deleted, or hidden and so unsynced.
@@ -4500,7 +5324,9 @@ pub(crate) fn raw_in_reply_to(raw: &[u8]) -> String {
     let parsed = mail_parser::MessageParser::default().parse_headers(raw);
     match parsed.as_ref().map(|p| p.in_reply_to()) {
         Some(mail_parser::HeaderValue::Text(t)) => t.to_string(),
-        Some(mail_parser::HeaderValue::TextList(v)) => v.first().map(|t| t.to_string()).unwrap_or_default(),
+        Some(mail_parser::HeaderValue::TextList(v)) => {
+            v.first().map(|t| t.to_string()).unwrap_or_default()
+        }
         _ => String::new(),
     }
 }
@@ -4521,7 +5347,9 @@ async fn file_sent_copy(
         }
     }
     let Some(path) = sent else { return Ok(None) };
-    append_to_sent(session, path, raw).await.map(|()| Some(path.to_string()))
+    append_to_sent(session, path, raw)
+        .await
+        .map(|()| Some(path.to_string()))
 }
 
 async fn flush_outbox(
@@ -4561,7 +5389,10 @@ async fn flush_outbox(
             None => {
                 // Unsendable as stored: keep it, but say so rather than retrying
                 // it forever in silence.
-                cache.record_outbox_failure(item.id, "the stored recipients are not valid addresses");
+                cache.record_outbox_failure(
+                    item.id,
+                    "the stored recipients are not valid addresses",
+                );
                 continue;
             }
         };
@@ -4570,21 +5401,39 @@ async fn flush_outbox(
                 sent_any = true;
                 sent += 1;
                 cache.delete_outbox(item.id);
-                mark_answered(session, Some(cache), account_id, &raw_in_reply_to(&item.raw), &item.forwards, emit)
-                    .await;
+                mark_answered(
+                    session,
+                    Some(cache),
+                    account_id,
+                    &raw_in_reply_to(&item.raw),
+                    &item.forwards,
+                    emit,
+                )
+                .await;
                 let dest = current_sent_copy_path(
                     account,
                     account_id,
                     Some(cache),
                     item.sent_path.as_deref(),
                 );
-                let reply = reply_copy_path(account, account_id, Some(cache), &raw_in_reply_to(&item.raw));
+                let reply = reply_copy_path(
+                    account,
+                    account_id,
+                    Some(cache),
+                    &raw_in_reply_to(&item.raw),
+                );
                 if let Some(sess) = session.as_mut() {
                     let copy = queued_with_bcc(&item.raw, &item.rcpts);
                     match file_sent_copy(sess, reply.as_deref(), dest.as_deref(), &copy).await {
                         Ok(Some(path)) => {
                             index_sent_copy(
-                                account_id, session, account, &path, use_envelope, Some(cache), emit,
+                                account_id,
+                                session,
+                                account,
+                                &path,
+                                use_envelope,
+                                Some(cache),
+                                emit,
                             )
                             .await;
                         }
@@ -4596,7 +5445,13 @@ async fn flush_outbox(
             Err(e) => {
                 cache.record_outbox_failure(item.id, &e.to_string());
                 if loud {
-                    emit(WorkerEvent::error(i18n_f("Still could not send “{subject}”: {e}", &[("subject", &item.subject.to_string()), ("e", &e.to_string())])));
+                    emit(WorkerEvent::error(i18n_f(
+                        "Still could not send “{subject}”: {e}",
+                        &[
+                            ("subject", &item.subject.to_string()),
+                            ("e", &e.to_string()),
+                        ],
+                    )));
                 }
                 // A failure now will almost certainly repeat for the rest of the
                 // queue (the connection is down), so stop rather than hammering.
@@ -4701,10 +5556,22 @@ pub(crate) fn with_bcc(raw: &[u8], bcc: &str) -> Vec<u8> {
 /// the stored envelope.
 pub(crate) fn queued_with_bcc(raw: &[u8], envelope_rcpts: &[String]) -> Vec<u8> {
     let parsed = mail_parser::MessageParser::default().parse_headers(raw);
-    let to = parsed.as_ref().map(|p| addr_list(p.to())).unwrap_or_default();
-    let cc = parsed.as_ref().map(|p| addr_list(p.cc())).unwrap_or_default();
-    let bcc = parsed.as_ref().map(|p| addr_list(p.bcc())).unwrap_or_default();
-    with_bcc(raw, &unnamed_rcpts(envelope_rcpts, &[&to, &cc, &bcc]).join(", "))
+    let to = parsed
+        .as_ref()
+        .map(|p| addr_list(p.to()))
+        .unwrap_or_default();
+    let cc = parsed
+        .as_ref()
+        .map(|p| addr_list(p.cc()))
+        .unwrap_or_default();
+    let bcc = parsed
+        .as_ref()
+        .map(|p| addr_list(p.bcc()))
+        .unwrap_or_default();
+    with_bcc(
+        raw,
+        &unnamed_rcpts(envelope_rcpts, &[&to, &cc, &bcc]).join(", "),
+    )
 }
 
 /// Take a queued message or a saved draft apart so it can be edited again.
@@ -4722,27 +5589,53 @@ pub fn editable_from_raw(raw: &[u8], envelope_rcpts: &[String]) -> EditableMessa
         .as_ref()
         .and_then(|p| p.from())
         .and_then(|a| a.first())
-        .and_then(|a| Some(format_recipient(a.name().unwrap_or_default(), a.address()?.trim())))
+        .and_then(|a| {
+            Some(format_recipient(
+                a.name().unwrap_or_default(),
+                a.address()?.trim(),
+            ))
+        })
         .unwrap_or_default();
-    let to = parsed.as_ref().map(|p| addr_list(p.to())).unwrap_or_default();
-    let cc = parsed.as_ref().map(|p| addr_list(p.cc())).unwrap_or_default();
+    let to = parsed
+        .as_ref()
+        .map(|p| addr_list(p.to()))
+        .unwrap_or_default();
+    let cc = parsed
+        .as_ref()
+        .map(|p| addr_list(p.cc()))
+        .unwrap_or_default();
     let subject = parsed
         .as_ref()
         .and_then(|p| p.subject())
         .unwrap_or_default()
         .to_string();
     let ids = |hv: &HeaderValue| -> String {
-        let strip = |t: &str| t.trim().trim_start_matches('<').trim_end_matches('>').trim().to_string();
+        let strip = |t: &str| {
+            t.trim()
+                .trim_start_matches('<')
+                .trim_end_matches('>')
+                .trim()
+                .to_string()
+        };
         match hv {
             HeaderValue::Text(t) => strip(t),
             HeaderValue::TextList(v) => v.iter().map(|t| strip(t)).collect::<Vec<_>>().join(" "),
             _ => String::new(),
         }
     };
-    let in_reply_to = parsed.as_ref().map(|p| ids(p.in_reply_to())).unwrap_or_default();
-    let references = parsed.as_ref().map(|p| ids(p.references())).unwrap_or_default();
+    let in_reply_to = parsed
+        .as_ref()
+        .map(|p| ids(p.in_reply_to()))
+        .unwrap_or_default();
+    let references = parsed
+        .as_ref()
+        .map(|p| ids(p.references()))
+        .unwrap_or_default();
 
-    let header_bcc = parsed.as_ref().map(|p| addr_list(p.bcc())).unwrap_or_default();
+    let header_bcc = parsed
+        .as_ref()
+        .map(|p| addr_list(p.bcc()))
+        .unwrap_or_default();
     let bcc = std::iter::once(header_bcc.clone())
         .filter(|b| !b.is_empty())
         .chain(unnamed_rcpts(envelope_rcpts, &[&to, &cc, &header_bcc]))
@@ -4758,7 +5651,12 @@ pub fn editable_from_raw(raw: &[u8], envelope_rcpts: &[String]) -> EditableMessa
         .and_then(|p| {
             let html = p.body_html(0)?;
             let mut budget = 16 * 1024 * 1024;
-            Some(inline_cid_images(&html, &p.parts, &mut budget, &mut embedded))
+            Some(inline_cid_images(
+                &html,
+                &p.parts,
+                &mut budget,
+                &mut embedded,
+            ))
         })
         .unwrap_or_default();
     let body_html = if html.trim().is_empty() {
@@ -4830,27 +5728,43 @@ fn draft_not_saved(
 ) {
     if autosave.is_some() {
         tracing::info!("automatic draft save failed: {why}");
-        emit(WorkerEvent::DraftSaved { autosave, message_id: None });
+        emit(WorkerEvent::DraftSaved {
+            autosave,
+            message_id: None,
+        });
         return;
     }
     if template {
-        emit(WorkerEvent::error(i18n_f("Could not save template: {e}", &[("e", &why)])));
+        emit(WorkerEvent::error(i18n_f(
+            "Could not save template: {e}",
+            &[("e", &why)],
+        )));
         // Save as Template leaves its composer open, with nothing to give
         // back. An edited template's composer has closed: the text returns
         // as a new message, cut loose from the template, so that saving it
         // cannot put a draft in the template's place.
         if message.draft_origin.is_some() {
-            emit(WorkerEvent::Unsent(Box::new(OutgoingMessage { draft_origin: None, ..message })));
+            emit(WorkerEvent::Unsent(Box::new(OutgoingMessage {
+                draft_origin: None,
+                ..message
+            })));
         }
         return;
     }
-    emit(WorkerEvent::error(i18n_f("Could not save draft: {e}", &[("e", &why)])));
+    emit(WorkerEvent::error(i18n_f(
+        "Could not save draft: {e}",
+        &[("e", &why)],
+    )));
     emit(WorkerEvent::Unsent(Box::new(message)));
 }
 
 /// What the status line says while a draft, or a template, is saved.
 fn saving_text(template: bool) -> String {
-    if template { i18n("Saving template…") } else { i18n("Saving draft…") }
+    if template {
+        i18n("Saving template…")
+    } else {
+        i18n("Saving draft…")
+    }
 }
 
 /// Rebuild the SMTP envelope stored alongside a queued message.
@@ -4945,7 +5859,13 @@ fn is_invisible(c: char) -> bool {
 fn clean_address(raw: &str) -> String {
     raw.chars()
         .filter(|&c| !is_invisible(c))
-        .map(|c| if matches!(c, '\u{a0}' | '\u{2007}' | '\u{202f}') { ' ' } else { c })
+        .map(|c| {
+            if matches!(c, '\u{a0}' | '\u{2007}' | '\u{202f}') {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect::<String>()
         .trim()
         .to_string()
@@ -4954,7 +5874,10 @@ fn clean_address(raw: &str) -> String {
 /// The field with the invisible characters taken out of its addresses, when
 /// it had any: the composer shows the cleaned text before it sends.
 pub fn clean_recipient_field(field: &str) -> Option<String> {
-    if !field.chars().any(|c| is_invisible(c) || matches!(c, '\u{a0}' | '\u{2007}' | '\u{202f}')) {
+    if !field
+        .chars()
+        .any(|c| is_invisible(c) || matches!(c, '\u{a0}' | '\u{2007}' | '\u{202f}'))
+    {
         return None;
     }
     let clean = parse_recipients(field)
@@ -4983,7 +5906,11 @@ fn unquote_name(raw: &str) -> String {
     let mut out = String::with_capacity(inner.len());
     let mut chars = inner.chars();
     while let Some(c) = chars.next() {
-        out.push(if c == '\\' { chars.next().unwrap_or(c) } else { c });
+        out.push(if c == '\\' {
+            chars.next().unwrap_or(c)
+        } else {
+            c
+        });
     }
     out.trim().to_string()
 }
@@ -5075,9 +6002,15 @@ fn build_message(
     let (from, from_addr) = match msg.from_alias.as_deref() {
         Some(alias) => match parse_recipients(alias).into_iter().next() {
             Some((name, addr)) => (mailbox(&name, &addr)?, addr),
-            None => (mailbox(&account.name, &account.email)?, account.email.clone()),
+            None => (
+                mailbox(&account.name, &account.email)?,
+                account.email.clone(),
+            ),
         },
-        None => (mailbox(&account.name, &account.email)?, account.email.clone()),
+        None => (
+            mailbox(&account.name, &account.email)?,
+            account.email.clone(),
+        ),
     };
     let sender_address = from.email.clone();
     let from_mailbox = from.clone();
@@ -5102,10 +6035,8 @@ fn build_message(
         builder = builder.keep_bcc();
     }
     if draft && recipients == 0 {
-        let envelope = lettre::address::Envelope::new(
-            Some(sender_address.clone()),
-            vec![sender_address],
-        )?;
+        let envelope =
+            lettre::address::Envelope::new(Some(sender_address.clone()), vec![sender_address])?;
         builder = builder.envelope(envelope);
     }
     // Our own Message-ID, in the account's own domain. Without one the SMTP
@@ -5115,7 +6046,11 @@ fn build_message(
     // Encrypted, the real subject travels inside unless the account says
     // otherwise (#493); see `protect_headers`.
     let protect = msg.encrypt && !account.plain_subject;
-    let subject = if protect { PROTECTED_SUBJECT.to_string() } else { msg.subject.clone() };
+    let subject = if protect {
+        PROTECTED_SUBJECT.to_string()
+    } else {
+        msg.subject.clone()
+    };
     let mut builder = builder
         .subject(subject)
         .message_id(Some(new_message_id(&from_addr)));
@@ -5123,9 +6058,9 @@ fn build_message(
     // (they are stored stripped). References carries the whole chain so a client
     // can place the reply even if it never saw the immediate parent.
     if !msg.in_reply_to.trim().is_empty() {
-        builder = builder.header(lettre::message::header::InReplyTo::from(
-            bracketed(&msg.in_reply_to),
-        ));
+        builder = builder.header(lettre::message::header::InReplyTo::from(bracketed(
+            &msg.in_reply_to,
+        )));
     }
     // Reply-To (#58): answers go where the sender asked, not to From.
     for (name, addr) in parse_recipients(&msg.reply_to) {
@@ -5143,9 +6078,9 @@ fn build_message(
         .collect::<Vec<_>>()
         .join(" ");
     if !wire_references.trim().is_empty() {
-        builder = builder.header(lettre::message::header::References::from(
-            bracketed(&wire_references),
-        ));
+        builder = builder.header(lettre::message::header::References::from(bracketed(
+            &wire_references,
+        )));
     }
 
     use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
@@ -5198,7 +6133,11 @@ fn build_message(
         } else {
             PgpEntity::Multi(attachments_multipart(content, msg)?)
         };
-        let entity = if protect { protect_headers(entity, msg, &from_mailbox)? } else { entity };
+        let entity = if protect {
+            protect_headers(entity, msg, &from_mailbox)?
+        } else {
+            entity
+        };
         let wrapped = pgp_wrap(account, msg, &from_addr, entity)?;
         return Ok(builder.multipart(wrapped)?);
     }
@@ -5236,8 +6175,7 @@ fn attachments_multipart(
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| "attachment".to_string());
-        let ct = ContentType::parse(&guess_mime(&name))
-            .unwrap_or(ContentType::TEXT_PLAIN);
+        let ct = ContentType::parse(&guess_mime(&name)).unwrap_or(ContentType::TEXT_PLAIN);
         multipart = multipart.singlepart(Attachment::new(name).body(file_body(bytes), ct));
     }
     Ok(multipart)
@@ -5278,7 +6216,11 @@ const PROTECTED_SUBJECT: &str = "...";
 /// Subject and who the message is from and to, flagged so the reader takes
 /// them from there, and the Subject outside is [`PROTECTED_SUBJECT`]. Bcc
 /// stays out, as every recipient can decrypt what is inside.
-fn protect_headers(entity: PgpEntity, msg: &OutgoingMessage, from: &Mailbox) -> Result<PgpEntity, SmtpError> {
+fn protect_headers(
+    entity: PgpEntity,
+    msg: &OutgoingMessage,
+    from: &Mailbox,
+) -> Result<PgpEntity, SmtpError> {
     use lettre::message::header::{Cc, ContentType, From, ReplyTo, Subject, To};
     use lettre::message::{Mailboxes, MultiPart};
     let mut multi = match entity {
@@ -5345,7 +6287,11 @@ fn pgp_wrap(
     if msg.encrypt {
         let mut recipients: Vec<String> = [&msg.to, &msg.cc, &msg.bcc]
             .iter()
-            .flat_map(|field| parse_recipients(field).into_iter().map(|(_, addr)| addr.to_ascii_lowercase()))
+            .flat_map(|field| {
+                parse_recipients(field)
+                    .into_iter()
+                    .map(|(_, addr)| addr.to_ascii_lowercase())
+            })
             .collect();
         recipients.sort();
         recipients.dedup();
@@ -5366,13 +6312,20 @@ fn pgp_wrap(
                 recipients.push(from_addr.to_ascii_lowercase());
             }
         }
-        let signer = if msg.sign { Some(key.ok_or_else(no_key)?.fingerprint) } else { None };
+        let signer = if msg.sign {
+            Some(key.ok_or_else(no_key)?.fingerprint)
+        } else {
+            None
+        };
         let ciphertext = crate::pgp::encrypt(&gpg, &inner, &recipients, signer.as_deref())?;
         let control = SinglePart::builder()
             .header(ContentType::parse("application/pgp-encrypted").expect("static content type"))
             .body(String::from("Version: 1\r\n"));
         let payload = SinglePart::builder()
-            .header(ContentType::parse("application/octet-stream; name=\"encrypted.asc\"").expect("static content type"))
+            .header(
+                ContentType::parse("application/octet-stream; name=\"encrypted.asc\"")
+                    .expect("static content type"),
+            )
             .body(armored(ciphertext));
         return Ok(MultiPart::encrypted("application/pgp-encrypted".into())
             .singlepart(control)
@@ -5390,7 +6343,10 @@ fn pgp_wrap(
         PgpEntity::Single(s) => signed.singlepart(s),
     };
     let sig_part = SinglePart::builder()
-        .header(ContentType::parse("application/pgp-signature; name=\"signature.asc\"").expect("static content type"))
+        .header(
+            ContentType::parse("application/pgp-signature; name=\"signature.asc\"")
+                .expect("static content type"),
+        )
         .body(armored(signature));
     Ok(signed.singlepart(sig_part))
 }
@@ -5451,7 +6407,12 @@ fn extract_data_images(html: &str) -> (String, Vec<InlineImage>) {
                 out.push_str(&html[i..start]);
                 out.push_str("cid:");
                 out.push_str(&cid);
-                parts.push(InlineImage { cid, mime, data, name });
+                parts.push(InlineImage {
+                    cid,
+                    mime,
+                    data,
+                    name,
+                });
                 i = start + len;
             }
             None => {
@@ -5486,17 +6447,26 @@ fn alt_of_enclosing_tag(html: &str, uri_start: usize, uri_end: usize) -> Option<
         .replace("&amp;", "&");
     // Only ever a bare filename: `alt` is attacker-reachable through a quoted
     // reply, and it ends up in a Content-Disposition header.
-    let name = std::path::Path::new(&unescaped).file_name()?.to_str()?.to_string();
+    let name = std::path::Path::new(&unescaped)
+        .file_name()?
+        .to_str()?
+        .to_string();
     let clean = !name.is_empty()
         && name.len() <= 200
-        && !name.chars().any(|c| c.is_control() || c == '"' || c == '\\');
+        && !name
+            .chars()
+            .any(|c| c.is_control() || c == '"' || c == '\\');
     clean.then_some(name)
 }
 
 /// A Message-ID for outgoing mail: unique, and in the sender's own domain so it
 /// looks like what it is rather than like this machine.
 fn new_message_id(from: &str) -> String {
-    let domain = from.rsplit('@').next().filter(|d| !d.is_empty()).unwrap_or("localhost");
+    let domain = from
+        .rsplit('@')
+        .next()
+        .filter(|d| !d.is_empty())
+        .unwrap_or("localhost");
     let unique = crate::rng::nonce(18).unwrap_or_else(|_| {
         // Entropy is only unavailable in extremis; the clock still separates
         // one message from the next.
@@ -5535,7 +6505,11 @@ impl SmtpTls {
     /// By the port alone: 465 is implicit TLS, everything else (587, etc.)
     /// STARTTLS.
     fn by_port(port: u16, accept_hostname_mismatch: bool) -> Self {
-        SmtpTls { implicit: port == 465, accept_hostname_mismatch, accept_invalid_certs: false }
+        SmtpTls {
+            implicit: port == 465,
+            accept_hostname_mismatch,
+            accept_invalid_certs: false,
+        }
     }
 
     /// The account's own server: as GNOME Online Accounts records it where
@@ -5629,34 +6603,42 @@ async fn smtp_transport(
         // nothing of the account's tokens. The password lives in the keyring
         // and is fetched here (the in-memory config never carries it).
         let password = if alias.smtp_password.is_empty() {
-            crate::config::load_alias_smtp_password(&account.email, &alias.address())
-                .ok_or_else(|| -> SmtpError {
+            crate::config::load_alias_smtp_password(&account.email, &alias.address()).ok_or_else(
+                || -> SmtpError {
                     format!(
                         "no SMTP password stored for the alias {} — re-enter it in \
                          Accounts",
                         alias.address()
                     )
                     .into()
-                })?
+                },
+            )?
         } else {
             alias.smtp_password.clone()
         };
         let tls = SmtpTls::by_port(alias.smtp_port, account.tls_accept_hostname_mismatch);
-        return Ok(smtp_transport_builder(alias.smtp_host.trim(), alias.smtp_port, tls)?
-            .credentials(Credentials::new(alias.smtp_username.clone(), password))
-            .build());
+        return Ok(
+            smtp_transport_builder(alias.smtp_host.trim(), alias.smtp_port, tls)?
+                .credentials(Credentials::new(alias.smtp_username.clone(), password))
+                .build(),
+        );
     }
     let host = smtp_host(account);
-    let mut builder = smtp_transport_builder(&host, account.smtp_port, SmtpTls::for_account(account))?;
+    let mut builder =
+        smtp_transport_builder(&host, account.smtp_port, SmtpTls::for_account(account))?;
     if account.oauth {
         // XOAUTH2: the "password" is a fresh OAuth token from GOA.
-        let token = fetch_oauth_token(account).await.ok_or_else(|| -> SmtpError {
-            "could not get an OAuth token from GNOME Online Accounts".into()
-        })?;
+        let token = fetch_oauth_token(account)
+            .await
+            .ok_or_else(|| -> SmtpError {
+                "could not get an OAuth token from GNOME Online Accounts".into()
+            })?;
         let user = oauth_user(account);
         builder = builder
             .credentials(Credentials::new(user, token))
-            .authentication(vec![lettre::transport::smtp::authentication::Mechanism::Xoauth2]);
+            .authentication(vec![
+                lettre::transport::smtp::authentication::Mechanism::Xoauth2,
+            ]);
     } else if account.security.as_ref().is_some_and(|s| s.smtp_no_auth) {
         // GNOME Online Accounts says this server takes mail without a
         // sign-in (#254); offering one it does not advertise would fail.
@@ -5688,7 +6670,9 @@ async fn send_raw_smtp(
     let alias = envelope
         .from()
         .and_then(|f| alias_with_own_smtp(account, f.as_ref()));
-    let host = alias.map(|a| a.smtp_host.trim().to_string()).unwrap_or_else(|| smtp_host(account));
+    let host = alias
+        .map(|a| a.smtp_host.trim().to_string())
+        .unwrap_or_else(|| smtp_host(account));
     if !crate::power::reaches(&host) {
         return Err(offline_text().into());
     }
@@ -5750,13 +6734,18 @@ async fn fetch_oauth_token(account: &AccountConfig) -> Option<String> {
             return Some(token);
         }
         let account = account.clone();
-        return tokio::task::spawn_blocking(move || refreshed_access_token(&account, &settings, refresh))
-            .await
-            .ok()
-            .flatten();
+        return tokio::task::spawn_blocking(move || {
+            refreshed_access_token(&account, &settings, refresh)
+        })
+        .await
+        .ok()
+        .flatten();
     }
     let account = account.clone();
-    tokio::task::spawn_blocking(move || oauth_token_blocking(&account)).await.ok().flatten()
+    tokio::task::spawn_blocking(move || oauth_token_blocking(&account))
+        .await
+        .ok()
+        .flatten()
 }
 
 /// [`fetch_oauth_token`] for a plain thread (blocking): the composer's
@@ -5779,7 +6768,11 @@ pub(crate) fn oauth_token_blocking(account: &AccountConfig) -> Option<String> {
 }
 
 /// A new access token from the provider for `refresh` (blocking).
-fn refreshed_access_token(account: &AccountConfig, settings: &crate::config::OAuthSettings, refresh: String) -> Option<String> {
+fn refreshed_access_token(
+    account: &AccountConfig,
+    settings: &crate::config::OAuthSettings,
+    refresh: String,
+) -> Option<String> {
     let email = &account.email;
     let user = oauth_user(account);
     let fresh = crate::oauth::refresh_access_token_as(settings, &refresh, Some(&user))
@@ -5808,8 +6801,9 @@ fn refreshed_access_token(account: &AccountConfig, settings: &crate::config::OAu
 /// connection, SMTP send and Graph request asked the provider for a new one
 /// before; a token is good for an hour. Keyed by refresh token, so a fresh
 /// sign-in never picks up the old account's token.
-static ACCESS_TOKENS: std::sync::Mutex<Option<std::collections::HashMap<String, (String, std::time::Instant)>>> =
-    std::sync::Mutex::new(None);
+static ACCESS_TOKENS: std::sync::Mutex<
+    Option<std::collections::HashMap<String, (String, std::time::Instant)>>,
+> = std::sync::Mutex::new(None);
 
 /// How long before its stated expiry a token is no longer handed out, so a
 /// long sync that starts with it does not run past the end.
@@ -5829,10 +6823,16 @@ fn cached_access_token(refresh: &str) -> Option<String> {
 }
 
 fn remember_access_token(refresh: &str, token: &str, expires_in: u64) {
-    let Some(secs) = expires_in.checked_sub(ACCESS_TOKEN_MARGIN).filter(|s| *s > 0) else { return };
+    let Some(secs) = expires_in
+        .checked_sub(ACCESS_TOKEN_MARGIN)
+        .filter(|s| *s > 0)
+    else {
+        return;
+    };
     if let Ok(mut g) = ACCESS_TOKENS.lock() {
         let until = std::time::Instant::now() + Duration::from_secs(secs);
-        g.get_or_insert_with(Default::default).insert(refresh.to_string(), (token.to_string(), until));
+        g.get_or_insert_with(Default::default)
+            .insert(refresh.to_string(), (token.to_string(), until));
     }
 }
 
@@ -5842,7 +6842,9 @@ pub(crate) fn forget_access_token(account: &AccountConfig) {
     if account.goa_id.is_some() || account.oauth_settings.is_none() {
         return;
     }
-    let Some(refresh) = crate::config::load_oauth_refresh(&account.email) else { return };
+    let Some(refresh) = crate::config::load_oauth_refresh(&account.email) else {
+        return;
+    };
     if let Ok(mut g) = ACCESS_TOKENS.lock() {
         if let Some(map) = g.as_mut() {
             map.remove(&refresh);
@@ -5900,15 +6902,31 @@ async fn index_sent_copy(
     emit: &impl Fn(WorkerEvent),
 ) {
     let Some(c) = cache else { return };
-    let Some(folder_id) = c.load_folders(account_id).iter().find(|f| f.path == path).map(|f| f.id)
+    let Some(folder_id) = c
+        .load_folders(account_id)
+        .iter()
+        .find(|f| f.path == path)
+        .map(|f| f.id)
     else {
         return;
     };
-    match load_messages_retry(account_id, session, account, folder_id, path, use_envelope, cache).await
+    match load_messages_retry(
+        account_id,
+        session,
+        account,
+        folder_id,
+        path,
+        use_envelope,
+        cache,
+    )
+    .await
     {
         Ok(messages) => {
             c.upsert_messages(account_id, path, &messages);
-            emit(WorkerEvent::Messages { folder_id, messages });
+            emit(WorkerEvent::Messages {
+                folder_id,
+                messages,
+            });
         }
         Err(e) => tracing::warn!("could not list {path} after saving the sent copy: {e}"),
     }
@@ -5924,7 +6942,11 @@ async fn append_draft(
 ) -> Result<(), async_imap::error::Error> {
     // A template (#360) is no draft: another client would offer to finish
     // and send it rather than start a message from it.
-    let flags = if template { "(\\Seen)" } else { "(\\Draft \\Seen)" };
+    let flags = if template {
+        "(\\Seen)"
+    } else {
+        "(\\Draft \\Seen)"
+    };
     if append_msg(session, path, Some(flags), raw).await.is_ok() {
         return Ok(());
     }
@@ -5975,7 +6997,10 @@ fn gmail_trash(cache: Option<&Cache>, account_id: u32, account: &AccountConfig) 
     if !has_gmail_labels(account, &folders) {
         return None;
     }
-    folders.into_iter().find(|f| f.kind == FolderKind::Trash).map(|f| f.path)
+    folders
+        .into_iter()
+        .find(|f| f.kind == FolderKind::Trash)
+        .map(|f| f.path)
 }
 
 /// Erase Gmail mail from outside Trash, the way Gmail's own "Delete
@@ -6015,7 +7040,12 @@ async fn gmail_erase(
 /// several: IMAP's OR takes two keys.
 fn gmail_msgid_query(ids: &[u64]) -> String {
     let mut q = "OR ".repeat(ids.len().saturating_sub(1));
-    q.push_str(&ids.iter().map(|id| format!("X-GM-MSGID {id}")).collect::<Vec<_>>().join(" "));
+    q.push_str(
+        &ids.iter()
+            .map(|id| format!("X-GM-MSGID {id}"))
+            .collect::<Vec<_>>()
+            .join(" "),
+    );
     q
 }
 
@@ -6054,7 +7084,12 @@ where
                     _ => None,
                 }));
             }
-            Response::Done { tag, status, information, .. } if *tag == id => {
+            Response::Done {
+                tag,
+                status,
+                information,
+                ..
+            } if *tag == id => {
                 let why = information.as_deref().unwrap_or("");
                 return match status {
                     Status::Ok => {
@@ -6113,7 +7148,9 @@ fn wire(cmd: &str) {
 fn wired<T>(cmd: &str, r: &Result<T, async_imap::error::Error>) {
     match r {
         Ok(_) => tracing::debug!(target: "hylki::imap", "< OK ({})", cmd_head(cmd)),
-        Err(e) => tracing::warn!(target: "hylki::imap", "< {} ({cmd})", compact_parse_error(&e.to_string())),
+        Err(e) => {
+            tracing::warn!(target: "hylki::imap", "< {} ({cmd})", compact_parse_error(&e.to_string()))
+        }
     }
 }
 
@@ -6131,10 +7168,26 @@ pub fn is_system_keyword(keyword: &str) -> bool {
         return true;
     }
     const SYSTEM: &[&str] = &[
-        "$junk", "$notjunk", "junk", "nonjunk", "notjunk", "$autojunk",
-        "$forwarded", "$mdnsent", "$phishing", "$submitted", "$submitpending",
-        "$hasattachment", "$hasnoattachment", "$signed", "$encrypted", "$recent",
-        "$isnotification", "$ismailinglist", "$istrusted", "$notification",
+        "$junk",
+        "$notjunk",
+        "junk",
+        "nonjunk",
+        "notjunk",
+        "$autojunk",
+        "$forwarded",
+        "$mdnsent",
+        "$phishing",
+        "$submitted",
+        "$submitpending",
+        "$hasattachment",
+        "$hasnoattachment",
+        "$signed",
+        "$encrypted",
+        "$recent",
+        "$isnotification",
+        "$ismailinglist",
+        "$istrusted",
+        "$notification",
     ];
     SYSTEM.contains(&k.as_str())
         // Apple Mail's flag colors and Fastmail's internal annotations.
@@ -6142,7 +7195,10 @@ pub fn is_system_keyword(keyword: &str) -> bool {
         || k.starts_with("$x-me-")
 }
 
-async fn sel(session: &mut ImapSession, path: &str) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
+async fn sel(
+    session: &mut ImapSession,
+    path: &str,
+) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
     let cmd = format!("SELECT {}", quote_mailbox(path));
     wire(&cmd);
     session.as_mut().set_selected_folder(None);
@@ -6154,7 +7210,10 @@ async fn sel(session: &mut ImapSession, path: &str) -> Result<async_imap::types:
     r
 }
 
-async fn exam(session: &mut ImapSession, path: &str) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
+async fn exam(
+    session: &mut ImapSession,
+    path: &str,
+) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
     let cmd = format!("EXAMINE {}", quote_mailbox(path));
     wire(&cmd);
     session.as_mut().set_selected_folder(None);
@@ -6170,7 +7229,10 @@ async fn exam(session: &mut ImapSession, path: &str) -> Result<async_imap::types
 /// selected on this connection avoids a round trip for every prefetched body.
 /// List syncs and mutations still select explicitly to get current metadata
 /// and the write mode they need. A new connection starts unselected.
-async fn select_for_read(session: &mut ImapSession, path: &str) -> Result<(), async_imap::error::Error> {
+async fn select_for_read(
+    session: &mut ImapSession,
+    path: &str,
+) -> Result<(), async_imap::error::Error> {
     if !session.as_mut().is_selected(path) {
         sel(session, path).await?;
     }
@@ -6181,7 +7243,10 @@ async fn fetch_uids<'a, S1: AsRef<str>, S2: AsRef<str>>(
     session: &'a mut ImapSession,
     set: S1,
     items: S2,
-) -> Result<impl futures::Stream<Item = Result<Fetch, async_imap::error::Error>> + 'a + Send + Unpin, async_imap::error::Error> {
+) -> Result<
+    impl futures::Stream<Item = Result<Fetch, async_imap::error::Error>> + 'a + Send + Unpin,
+    async_imap::error::Error,
+> {
     let (set, items) = (set.as_ref().to_string(), items.as_ref().to_string());
     let cmd = format!("UID FETCH {set} {items}");
     wire(&cmd);
@@ -6194,7 +7259,10 @@ async fn store_uids<'a, S1: AsRef<str>, S2: AsRef<str>>(
     session: &'a mut ImapSession,
     set: S1,
     query: S2,
-) -> Result<impl futures::Stream<Item = Result<Fetch, async_imap::error::Error>> + 'a + Send + Unpin, async_imap::error::Error> {
+) -> Result<
+    impl futures::Stream<Item = Result<Fetch, async_imap::error::Error>> + 'a + Send + Unpin,
+    async_imap::error::Error,
+> {
     let (set, query) = (set.as_ref().to_string(), query.as_ref().to_string());
     let cmd = format!("UID STORE {set} {query}");
     wire(&cmd);
@@ -6203,7 +7271,11 @@ async fn store_uids<'a, S1: AsRef<str>, S2: AsRef<str>>(
     r
 }
 
-async fn copy_uids(session: &mut ImapSession, set: &str, dest: &str) -> Result<(), async_imap::error::Error> {
+async fn copy_uids(
+    session: &mut ImapSession,
+    set: &str,
+    dest: &str,
+) -> Result<(), async_imap::error::Error> {
     let cmd = format!("UID COPY {set} {}", quote_mailbox(dest));
     wire(&cmd);
     let r = session.uid_copy(set, quote_mailbox(dest)).await;
@@ -6211,7 +7283,11 @@ async fn copy_uids(session: &mut ImapSession, set: &str, dest: &str) -> Result<(
     r
 }
 
-async fn mv_uids(session: &mut ImapSession, set: &str, dest: &str) -> Result<(), async_imap::error::Error> {
+async fn mv_uids(
+    session: &mut ImapSession,
+    set: &str,
+    dest: &str,
+) -> Result<(), async_imap::error::Error> {
     let cmd = format!("UID MOVE {set} {}", quote_mailbox(dest));
     wire(&cmd);
     let r = session.uid_mv(set, dest).await;
@@ -6222,7 +7298,10 @@ async fn mv_uids(session: &mut ImapSession, set: &str, dest: &str) -> Result<(),
 async fn expunge_uids<'a, S: AsRef<str>>(
     session: &'a mut ImapSession,
     set: S,
-) -> Result<impl futures::Stream<Item = Result<u32, async_imap::error::Error>> + 'a + Send, async_imap::error::Error> {
+) -> Result<
+    impl futures::Stream<Item = Result<u32, async_imap::error::Error>> + 'a + Send,
+    async_imap::error::Error,
+> {
     let set = set.as_ref().to_string();
     let cmd = format!("UID EXPUNGE {set}");
     wire(&cmd);
@@ -6233,7 +7312,10 @@ async fn expunge_uids<'a, S: AsRef<str>>(
 
 async fn expunge_all<'a>(
     session: &'a mut ImapSession,
-) -> Result<impl futures::Stream<Item = Result<u32, async_imap::error::Error>> + 'a + Send, async_imap::error::Error> {
+) -> Result<
+    impl futures::Stream<Item = Result<u32, async_imap::error::Error>> + 'a + Send,
+    async_imap::error::Error,
+> {
     let cmd = "EXPUNGE";
     wire(cmd);
     let r = session.expunge().await;
@@ -6241,7 +7323,10 @@ async fn expunge_all<'a>(
     r
 }
 
-async fn search_uids<S: AsRef<str>>(session: &mut ImapSession, query: S) -> Result<std::collections::HashSet<u32>, async_imap::error::Error> {
+async fn search_uids<S: AsRef<str>>(
+    session: &mut ImapSession,
+    query: S,
+) -> Result<std::collections::HashSet<u32>, async_imap::error::Error> {
     let cmd = format!("UID SEARCH {}", query.as_ref());
     wire(&cmd);
     let r = session.uid_search(query.as_ref()).await;
@@ -6257,7 +7342,10 @@ async fn create_box(session: &mut ImapSession, path: &str) -> Result<(), async_i
     r
 }
 
-async fn subscribe_box(session: &mut ImapSession, path: &str) -> Result<(), async_imap::error::Error> {
+async fn subscribe_box(
+    session: &mut ImapSession,
+    path: &str,
+) -> Result<(), async_imap::error::Error> {
     let cmd = format!("SUBSCRIBE {}", quote_mailbox(path));
     wire(&cmd);
     let r = session.subscribe(path).await;
@@ -6265,7 +7353,10 @@ async fn subscribe_box(session: &mut ImapSession, path: &str) -> Result<(), asyn
     r
 }
 
-async fn unsubscribe_box(session: &mut ImapSession, path: &str) -> Result<(), async_imap::error::Error> {
+async fn unsubscribe_box(
+    session: &mut ImapSession,
+    path: &str,
+) -> Result<(), async_imap::error::Error> {
     let cmd = format!("UNSUBSCRIBE {}", quote_mailbox(path));
     wire(&cmd);
     let r = session.unsubscribe(path).await;
@@ -6273,7 +7364,11 @@ async fn unsubscribe_box(session: &mut ImapSession, path: &str) -> Result<(), as
     r
 }
 
-async fn rename_box(session: &mut ImapSession, from: &str, to: &str) -> Result<(), async_imap::error::Error> {
+async fn rename_box(
+    session: &mut ImapSession,
+    from: &str,
+    to: &str,
+) -> Result<(), async_imap::error::Error> {
     let cmd = format!("RENAME {} {}", quote_mailbox(from), quote_mailbox(to));
     wire(&cmd);
     let r = session.rename(from, to).await;
@@ -6289,7 +7384,11 @@ async fn delete_box(session: &mut ImapSession, path: &str) -> Result<(), async_i
     r
 }
 
-async fn box_status(session: &mut ImapSession, path: &str, items: &str) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
+async fn box_status(
+    session: &mut ImapSession,
+    path: &str,
+    items: &str,
+) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
     let cmd = format!("STATUS {} {items}", quote_mailbox(path));
     wire(&cmd);
     let r = session.status(path, items).await;
@@ -6299,8 +7398,11 @@ async fn box_status(session: &mut ImapSession, path: &str, items: &str) -> Resul
 
 /// The IMAP flags a message moved in from another account (#265) keeps.
 fn import_flags(seen: bool, flagged: bool) -> Option<String> {
-    let flags: Vec<&str> =
-        [(seen, "\\Seen"), (flagged, "\\Flagged")].into_iter().filter(|(on, _)| *on).map(|(_, f)| f).collect();
+    let flags: Vec<&str> = [(seen, "\\Seen"), (flagged, "\\Flagged")]
+        .into_iter()
+        .filter(|(on, _)| *on)
+        .map(|(_, f)| f)
+        .collect();
     (!flags.is_empty()).then(|| format!("({})", flags.join(" ")))
 }
 
@@ -6310,7 +7412,12 @@ async fn append_msg(
     flags: Option<&str>,
     raw: &[u8],
 ) -> Result<(), async_imap::error::Error> {
-    let cmd = format!("APPEND {} {} ({} bytes)", quote_mailbox(path), flags.unwrap_or(""), raw.len());
+    let cmd = format!(
+        "APPEND {} {} ({} bytes)",
+        quote_mailbox(path),
+        flags.unwrap_or(""),
+        raw.len()
+    );
     wire(&cmd);
     let r = session.append(path, flags, None, raw).await;
     wired(&cmd, &r);
@@ -6340,9 +7447,19 @@ fn cache_rewritten(c: &Cache, account_id: u32, path: &str, uid: u32, raw: &[u8])
 
 /// An attachment removal that did not happen (#289): the error, and word
 /// to the views showing the file as being deleted that it is not.
-fn strip_refused(emit: &impl Fn(WorkerEvent), text: String, message_id: u32, name: String, size: u64) {
+fn strip_refused(
+    emit: &impl Fn(WorkerEvent),
+    text: String,
+    message_id: u32,
+    name: String,
+    size: u64,
+) {
     emit(WorkerEvent::error(text));
-    emit(WorkerEvent::AttachmentNotDeleted { message_id, name, size });
+    emit(WorkerEvent::AttachmentNotDeleted {
+        message_id,
+        name,
+        size,
+    });
 }
 
 /// Why [`strip_imap_attachment`] failed, and whether the connection went
@@ -6354,7 +7471,10 @@ struct StripFailure {
 
 impl From<async_imap::error::Error> for StripFailure {
     fn from(e: async_imap::error::Error) -> Self {
-        StripFailure { text: e.to_string(), connection: true }
+        StripFailure {
+            text: e.to_string(),
+            connection: true,
+        }
     }
 }
 
@@ -6372,17 +7492,28 @@ async fn strip_imap_attachment(
     size: u64,
 ) -> Result<(Option<u32>, Vec<u8>), StripFailure> {
     let raw = load_raw_retry(session, account, path, uid).await?;
-    let stripped = strip::without_attachment(&raw, name, size, &strip::note_date())
-        .map_err(|e| StripFailure { text: e.text(), connection: false })?;
+    let stripped =
+        strip::without_attachment(&raw, name, size, &strip::note_date()).map_err(|e| {
+            StripFailure {
+                text: e.text(),
+                connection: false,
+            }
+        })?;
     let sess = session.as_mut().expect("session ensured before call");
     let uid_next = sel(sess, path).await?.uid_next;
-    let fetches: Vec<Fetch> =
-        fetch_uids(sess, uid.to_string(), "(UID FLAGS INTERNALDATE BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
-            .await?
-            .try_collect()
-            .await?;
+    let fetches: Vec<Fetch> = fetch_uids(
+        sess,
+        uid.to_string(),
+        "(UID FLAGS INTERNALDATE BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])",
+    )
+    .await?
+    .try_collect()
+    .await?;
     let meta = fetches.iter().find(|f| f.uid == Some(uid));
-    let flags = meta.map(|f| kept_flags(f.flags())).filter(|f| !f.is_empty()).map(|f| format!("({})", f.join(" ")));
+    let flags = meta
+        .map(|f| kept_flags(f.flags()))
+        .filter(|f| !f.is_empty())
+        .map(|f| format!("({})", f.join(" ")));
     let date = meta
         .and_then(|f| f.internal_date())
         .map(|d| format!("\"{}\"", d.format("%d-%b-%Y %H:%M:%S %z")));
@@ -6397,17 +7528,28 @@ async fn strip_imap_attachment(
 /// folder's UIDNEXT from before it, the one with its Message-ID (or, with
 /// none, the lowest). Read from the headers rather than searched for, as
 /// Stalwart's full-text index answers `SEARCH HEADER Message-ID` with nothing.
-async fn find_appended(sess: &mut ImapSession, old_uid: u32, uid_next: Option<u32>, msgid: &str) -> Option<u32> {
+async fn find_appended(
+    sess: &mut ImapSession,
+    old_uid: u32,
+    uid_next: Option<u32>,
+    msgid: &str,
+) -> Option<u32> {
     let from = uid_next.unwrap_or(0).max(old_uid + 1);
-    let fetches: Vec<Fetch> = fetch_uids(sess, format!("{from}:*"), "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
-        .await
-        .ok()?
-        .try_collect()
-        .await
-        .ok()?;
+    let fetches: Vec<Fetch> = fetch_uids(
+        sess,
+        format!("{from}:*"),
+        "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])",
+    )
+    .await
+    .ok()?
+    .try_collect()
+    .await
+    .ok()?;
     // `n:*` always takes in the highest UID, even one below `n`.
-    let mut found: Vec<(u32, String)> =
-        fetches.iter().filter_map(|f| f.uid.filter(|&u| u >= from).map(|u| (u, message_id_of(f)))).collect();
+    let mut found: Vec<(u32, String)> = fetches
+        .iter()
+        .filter_map(|f| f.uid.filter(|&u| u >= from).map(|u| (u, message_id_of(f))))
+        .collect();
     found.sort();
     match msgid {
         "" => found.first().map(|(u, _)| *u),
@@ -6488,7 +7630,10 @@ fn imap_storage_quota(quotas: &[async_imap::types::Quota]) -> Option<MailboxQuot
         .iter()
         .flat_map(|q| &q.resources)
         .find(|r| r.name == QuotaResourceName::Storage && r.limit > 0)
-        .map(|r| MailboxQuota { used: r.usage.saturating_mul(1024), limit: r.limit.saturating_mul(1024) })
+        .map(|r| MailboxQuota {
+            used: r.usage.saturating_mul(1024),
+            limit: r.limit.saturating_mul(1024),
+        })
 }
 
 /// A mailbox name as an IMAP quoted string: backslashes and quotes escaped,
@@ -6619,13 +7764,19 @@ async fn store_gmail_labels(
     labels: &[String],
     add: bool,
 ) -> Result<(), async_imap::error::Error> {
-    let quoted: Vec<String> =
-        labels.iter().map(|l| format!("\"{}\"", l.replace('\\', "\\\\").replace('"', "\\\""))).collect();
+    let quoted: Vec<String> = labels
+        .iter()
+        .map(|l| format!("\"{}\"", l.replace('\\', "\\\\").replace('"', "\\\"")))
+        .collect();
     let op = if add { "+X-GM-LABELS" } else { "-X-GM-LABELS" };
-    let _: Vec<Fetch> = store_uids(session, uid.to_string(), format!("{op} ({})", quoted.join(" ")))
-        .await?
-        .try_collect()
-        .await?;
+    let _: Vec<Fetch> = store_uids(
+        session,
+        uid.to_string(),
+        format!("{op} ({})", quoted.join(" ")),
+    )
+    .await?
+    .try_collect()
+    .await?;
     Ok(())
 }
 
@@ -6878,8 +8029,7 @@ fn imap_uses_starttls(account: &AccountConfig) -> bool {
     if let Some(sec) = &account.security {
         return sec.imap_starttls;
     }
-    account.imap_port != 993
-        && (account.imap_port == 143 || is_loopback_host(&account.imap_host))
+    account.imap_port != 993 && (account.imap_port == 143 || is_loopback_host(&account.imap_host))
 }
 
 /// Hard ceiling on one IMAP connection attempt — TCP, TLS, and authentication
@@ -6893,9 +8043,16 @@ const IMAP_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs
 /// login then left the account signing in with an empty password until Hylki
 /// restarted (#375). A keyring that cannot be read is reported as such, and
 /// no sign-in goes out without the password.
-pub(super) fn sign_in_password_blocking(account: &AccountConfig, smtp: bool) -> Result<String, String> {
+pub(super) fn sign_in_password_blocking(
+    account: &AccountConfig,
+    smtp: bool,
+) -> Result<String, String> {
     let separate = smtp && account.smtp_separate;
-    let held = if separate { &account.smtp_password } else { &account.password };
+    let held = if separate {
+        &account.smtp_password
+    } else {
+        &account.password
+    };
     if !held.is_empty() || account.oauth {
         return Ok(held.clone());
     }
@@ -6916,7 +8073,11 @@ pub(super) fn sign_in_password_blocking(account: &AccountConfig, smtp: bool) -> 
 /// [`sign_in_password_blocking`] off the async runtime's threads: a keyring
 /// that does not answer holds its caller for the whole D-Bus timeout.
 async fn sign_in_password(account: &AccountConfig, smtp: bool) -> Result<String, String> {
-    let held = if smtp && account.smtp_separate { &account.smtp_password } else { &account.password };
+    let held = if smtp && account.smtp_separate {
+        &account.smtp_password
+    } else {
+        &account.password
+    };
     if !held.is_empty() || account.oauth {
         return Ok(held.clone());
     }
@@ -6958,8 +8119,15 @@ async fn connect_inner(
         .into());
     }
     let tcp = TcpStream::connect((account.imap_host.as_str(), account.imap_port)).await?;
-    let accept_invalid = account.security.as_ref().is_some_and(|s| s.imap_accept_invalid_certs);
-    let tls = tls_connector(&account.imap_host, account.tls_accept_hostname_mismatch, accept_invalid);
+    let accept_invalid = account
+        .security
+        .as_ref()
+        .is_some_and(|s| s.imap_accept_invalid_certs);
+    let tls = tls_connector(
+        &account.imap_host,
+        account.tls_accept_hostname_mismatch,
+        accept_invalid,
+    );
     let client = if imap_uses_starttls(account) {
         let mut plain = async_imap::Client::new(tcp);
         // Consume the plaintext greeting before issuing STARTTLS. Nothing secret
@@ -6967,7 +8135,9 @@ async fn connect_inner(
         // socket has been upgraded.
         let _ = plain.read_response().await;
         plain.run_command_and_check_ok("STARTTLS", None).await?;
-        let stream = tls.connect(account.imap_host.as_str(), plain.into_inner()).await?;
+        let stream = tls
+            .connect(account.imap_host.as_str(), plain.into_inner())
+            .await?;
         // A server that accepted STARTTLS does not send a second greeting.
         async_imap::Client::new(ImapIo::new(stream))
     } else {
@@ -6990,8 +8160,15 @@ async fn connect_inner(
                 return Err("could not get an OAuth token".into());
             }
         };
-        let auth = XOAuth2 { user: oauth_user(account), token, step: 0 };
-        let r = client.authenticate("XOAUTH2", auth).await.map_err(|(e, _client)| e);
+        let auth = XOAuth2 {
+            user: oauth_user(account),
+            token,
+            step: 0,
+        };
+        let r = client
+            .authenticate("XOAUTH2", auth)
+            .await
+            .map_err(|(e, _client)| e);
         match &r {
             Ok(_) => tracing::debug!(target: "hylki::imap", "< OK (AUTHENTICATE XOAUTH2)"),
             Err(e) => {
@@ -7002,7 +8179,10 @@ async fn connect_inner(
         r?
     } else {
         tracing::debug!(target: "hylki::imap", "> LOGIN {} ****", account.username);
-        let r = client.login(&account.username, password).await.map_err(|(e, _client)| e);
+        let r = client
+            .login(&account.username, password)
+            .await
+            .map_err(|(e, _client)| e);
         match &r {
             Ok(_) => tracing::debug!(target: "hylki::imap", "< OK (LOGIN)"),
             Err(e) => tracing::warn!(target: "hylki::imap", "< {e} (LOGIN)"),
@@ -7039,7 +8219,8 @@ pub async fn test_connection(account: &AccountConfig) -> ConnTest {
 
 async fn test_pop3(account: &AccountConfig) -> Result<(), String> {
     let mut pop = Pop3::connect(account).await?;
-    pop.login(&account.username, &sign_in_password(account, false).await?).await?;
+    pop.login(&account.username, &sign_in_password(account, false).await?)
+        .await?;
     pop.quit().await;
     Ok(())
 }
@@ -7048,7 +8229,10 @@ async fn test_pop3(account: &AccountConfig) -> Result<(), String> {
 /// runtime — call it from `spawn_blocking` so the IMAP/SMTP sockets have an I/O
 /// reactor regardless of the caller's runtime.
 pub fn test_connection_blocking(account: AccountConfig) -> ConnTest {
-    match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+    match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
         Ok(rt) => rt.block_on(test_connection(&account)),
         Err(e) => ConnTest {
             incoming: Err(e.to_string()),
@@ -7074,19 +8258,43 @@ async fn test_smtp(account: &AccountConfig) -> Result<(), String> {
     // Authenticate the same way the send path does: XOAUTH2 with a fresh token
     // for OAuth accounts, otherwise the password (SMTP-specific if configured).
     if !account.oauth && account.security.as_ref().is_some_and(|s| s.smtp_no_auth) {
-        return smtp_auth_check(&host, account.smtp_port, None, &[], SmtpTls::for_account(account)).await;
+        return smtp_auth_check(
+            &host,
+            account.smtp_port,
+            None,
+            &[],
+            SmtpTls::for_account(account),
+        )
+        .await;
     }
     let (creds, mechanisms): (Credentials, &[Mechanism]) = if account.oauth {
         let token = fetch_oauth_token(account)
             .await
             .ok_or_else(|| "could not get an OAuth token".to_string())?;
-        (Credentials::new(oauth_user(account), token), &[Mechanism::Xoauth2])
+        (
+            Credentials::new(oauth_user(account), token),
+            &[Mechanism::Xoauth2],
+        )
     } else {
         let password = sign_in_password(account, true).await?;
-        let user = if account.smtp_separate { &account.smtp_username } else { &account.username };
-        (Credentials::new(user.clone(), password), &[Mechanism::Plain, Mechanism::Login])
+        let user = if account.smtp_separate {
+            &account.smtp_username
+        } else {
+            &account.username
+        };
+        (
+            Credentials::new(user.clone(), password),
+            &[Mechanism::Plain, Mechanism::Login],
+        )
     };
-    smtp_auth_check(&host, account.smtp_port, Some(&creds), mechanisms, SmtpTls::for_account(account)).await
+    smtp_auth_check(
+        &host,
+        account.smtp_port,
+        Some(&creds),
+        mechanisms,
+        SmtpTls::for_account(account),
+    )
+    .await
 }
 
 /// Test a send-as alias's own SMTP server and credentials (#34): connect,
@@ -7099,8 +8307,7 @@ pub async fn test_alias_smtp(
     use lettre::transport::smtp::authentication::Mechanism;
 
     let password = if alias.smtp_password.is_empty() {
-        crate::config::load_alias_smtp_password(account_email, &alias.address())
-            .unwrap_or_default()
+        crate::config::load_alias_smtp_password(account_email, &alias.address()).unwrap_or_default()
     } else {
         alias.smtp_password.clone()
     };
@@ -7110,7 +8317,10 @@ pub async fn test_alias_smtp(
         alias.smtp_port,
         Some(&creds),
         &[Mechanism::Plain, Mechanism::Login],
-        SmtpTls::by_port(alias.smtp_port, account_accepts_hostname_mismatch(account_email)),
+        SmtpTls::by_port(
+            alias.smtp_port,
+            account_accepts_hostname_mismatch(account_email),
+        ),
     )
     .await
 }
@@ -7131,7 +8341,10 @@ pub fn test_alias_smtp_blocking(
     account_email: String,
     alias: crate::config::AliasConfig,
 ) -> Result<(), String> {
-    match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+    match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
         Ok(rt) => rt.block_on(test_alias_smtp(&account_email, &alias)),
         Err(e) => Err(e.to_string()),
     }
@@ -7164,11 +8377,17 @@ async fn smtp_auth_check(
         let mut conn = AsyncSmtpConnection::connect_tokio1(addr, timeout, &hello, None, None)
             .await
             .map_err(|e| e.to_string())?;
-        conn.starttls(tls, &hello).await.map_err(|e| e.to_string())?;
+        conn.starttls(tls, &hello)
+            .await
+            .map_err(|e| e.to_string())?;
         conn
     };
     let result = match creds {
-        Some(creds) => conn.auth(mechanisms, creds).await.map(|_| ()).map_err(|e| e.to_string()),
+        Some(creds) => conn
+            .auth(mechanisms, creds)
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
         None => Ok(()),
     };
     let _ = conn.quit().await;
@@ -7272,7 +8491,9 @@ async fn list_folder_metadata(
 
     if let Some(cached) = cached_counts {
         for folder in &mut folders {
-            folder.unread = cached.iter().find(|f| f.path == folder.path)
+            folder.unread = cached
+                .iter()
+                .find(|f| f.path == folder.path)
                 .map_or(0, |f| f.unread);
         }
         return Ok(folders);
@@ -7282,7 +8503,11 @@ async fn list_folder_metadata(
     // downloads no message content, so this stays fast even for huge mailboxes.
     for f in folders.iter_mut() {
         if let Ok(mb) = box_status(session, &f.path, "(UNSEEN MESSAGES)").await {
-            f.unread = if chip_counts_all(f.kind) { mb.exists } else { mb.unseen.unwrap_or(0) };
+            f.unread = if chip_counts_all(f.kind) {
+                mb.exists
+            } else {
+                mb.unseen.unwrap_or(0)
+            };
         }
     }
 
@@ -7315,13 +8540,21 @@ fn auto_empty_roles(account: &AccountConfig) -> Vec<(FolderKind, &'static str, u
 
 /// The folder holding a role for this account: the manual assignment (#82)
 /// when there is one, else the folder the listing detected.
-fn role_folder_path(account: &AccountConfig, folders: &[Folder], kind: FolderKind, role: &str) -> Option<String> {
+fn role_folder_path(
+    account: &AccountConfig,
+    folders: &[Folder],
+    kind: FolderKind,
+    role: &str,
+) -> Option<String> {
     if let Some(p) = account.folder_roles.get(role) {
         if !p.is_empty() {
             return Some(p.clone());
         }
     }
-    folders.iter().find(|f| f.kind == kind).map(|f| f.path.clone())
+    folders
+        .iter()
+        .find(|f| f.kind == kind)
+        .map(|f| f.path.clone())
 }
 
 /// Whether the auto-empty is due: something is configured, and the last run
@@ -7367,7 +8600,9 @@ async fn auto_empty_imap(
     if !auto_empty_due(account, last) {
         return;
     }
-    let folders = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+    let folders = cache
+        .map(|c| c.load_folders(account_id))
+        .unwrap_or_default();
     let mut purged_any = false;
     for (kind, role, days) in auto_empty_roles(account) {
         let Some(path) = role_folder_path(account, &folders, kind, role) else {
@@ -7403,7 +8638,9 @@ async fn auto_empty_imap(
                 purged_any = true;
             }
             Err(e) => {
-                tracing::warn!("auto-empty: could not delete from {path} on account {account_id}: {e}");
+                tracing::warn!(
+                    "auto-empty: could not delete from {path} on account {account_id}: {e}"
+                );
             }
         }
     }
@@ -7434,15 +8671,24 @@ fn clean_lists_query(days: u32) -> String {
 
 /// Which of `uids` (in the selected folder) carry a List-Unsubscribe
 /// header, read 500 at a time.
-async fn with_list_header(session: &mut ImapSession, uids: &[u32]) -> Result<Vec<u32>, async_imap::error::Error> {
+async fn with_list_header(
+    session: &mut ImapSession,
+    uids: &[u32],
+) -> Result<Vec<u32>, async_imap::error::Error> {
     let mut out = Vec::new();
     for chunk in uids.chunks(500) {
-        let fetches: Vec<Fetch> = fetch_uids(session, uid_set(chunk), "(UID BODY.PEEK[HEADER.FIELDS (LIST-UNSUBSCRIBE)])")
-            .await?
-            .try_collect()
-            .await?;
+        let fetches: Vec<Fetch> = fetch_uids(
+            session,
+            uid_set(chunk),
+            "(UID BODY.PEEK[HEADER.FIELDS (LIST-UNSUBSCRIBE)])",
+        )
+        .await?
+        .try_collect()
+        .await?;
         out.extend(fetches.iter().filter_map(|f| {
-            let listed = fetched_fields(f).iter().any(|(name, value)| name.eq_ignore_ascii_case("list-unsubscribe") && !value.is_empty());
+            let listed = fetched_fields(f).iter().any(|(name, value)| {
+                name.eq_ignore_ascii_case("list-unsubscribe") && !value.is_empty()
+            });
             listed.then_some(f.uid?)
         }));
     }
@@ -7465,8 +8711,16 @@ async fn clean_lists_imap(
         return;
     }
     let days = account.clean_lists_days;
-    let folders = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
-    let Some(inbox) = folders.iter().find(|f| f.kind == FolderKind::Inbox).cloned() else { return };
+    let folders = cache
+        .map(|c| c.load_folders(account_id))
+        .unwrap_or_default();
+    let Some(inbox) = folders
+        .iter()
+        .find(|f| f.kind == FolderKind::Inbox)
+        .cloned()
+    else {
+        return;
+    };
     let Some(trash) = role_folder_path(account, &folders, FolderKind::Trash, "trash") else {
         tracing::info!("list clean-up: account {account_id} has no Trash folder");
         return;
@@ -7486,7 +8740,10 @@ async fn clean_lists_imap(
     let uids: Vec<u32> = match found {
         Ok(uids) => uids,
         Err(e) => {
-            tracing::warn!("list clean-up: could not search {} on account {account_id}: {e}", inbox.path);
+            tracing::warn!(
+                "list clean-up: could not search {} on account {account_id}: {e}",
+                inbox.path
+            );
             return;
         }
     };
@@ -7503,10 +8760,15 @@ async fn clean_lists_imap(
                 for uid in &uids {
                     c.delete_message(account_id, &inbox.path, *uid);
                 }
-                emit(WorkerEvent::Messages { folder_id: inbox.id, messages: c.load_messages(account_id, &inbox.path, inbox.id) });
+                emit(WorkerEvent::Messages {
+                    folder_id: inbox.id,
+                    messages: c.load_messages(account_id, &inbox.path, inbox.id),
+                });
             }
         }
-        Err(e) => tracing::warn!("list clean-up: could not move list mail on account {account_id}: {e}"),
+        Err(e) => {
+            tracing::warn!("list clean-up: could not move list mail on account {account_id}: {e}")
+        }
     }
 }
 
@@ -7517,10 +8779,18 @@ async fn refresh_folder_names(
     cache: Option<&Cache>,
     emit: &impl Fn(WorkerEvent),
 ) {
-    let cached = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+    let cached = cache
+        .map(|c| c.load_folders(account_id))
+        .unwrap_or_default();
     if let Ok(folders) = list_folder_metadata(
-        account_id, session, &account.folder_roles, &account.hidden_folders, Some(&cached),
-    ).await {
+        account_id,
+        session,
+        &account.folder_roles,
+        &account.hidden_folders,
+        Some(&cached),
+    )
+    .await
+    {
         if folders.is_empty() || crate::cache::folders_equal(&cached, &folders) {
             return;
         }
@@ -7538,7 +8808,14 @@ async fn refresh_folders(
     cache: Option<&Cache>,
     emit: &impl Fn(WorkerEvent),
 ) {
-    if let Ok(folders) = list_folders(account_id, session, &account.folder_roles, &account.hidden_folders).await {
+    if let Ok(folders) = list_folders(
+        account_id,
+        session,
+        &account.folder_roles,
+        &account.hidden_folders,
+    )
+    .await
+    {
         // A mailbox always has at least INBOX (RFC 3501): an empty LIST is a
         // wedged or throttled session answering nonsense, not the truth.
         // Trusting one once wiped an account's whole folder list — cached,
@@ -7606,10 +8883,18 @@ async fn refresh_keywords(
         // came and went in the tag view.
         let mut disputed: Vec<(u32, &str, bool)> = Vec::new();
         for kw in keywords {
-            let Ok(server) = search_uids(session, format!("KEYWORD {kw}")).await else { continue };
-            let cached: std::collections::HashSet<u32> =
-                cache.uids_with_keyword(account_id, &f.path, kw).into_iter().collect();
-            disputed.extend(server.symmetric_difference(&cached).map(|uid| (*uid, kw.as_str(), cached.contains(uid))));
+            let Ok(server) = search_uids(session, format!("KEYWORD {kw}")).await else {
+                continue;
+            };
+            let cached: std::collections::HashSet<u32> = cache
+                .uids_with_keyword(account_id, &f.path, kw)
+                .into_iter()
+                .collect();
+            disputed.extend(
+                server
+                    .symmetric_difference(&cached)
+                    .map(|uid| (*uid, kw.as_str(), cached.contains(uid))),
+            );
         }
         if disputed.is_empty() {
             continue;
@@ -7620,7 +8905,9 @@ async fn refresh_keywords(
                 Ok(stream) => match stream.try_collect::<Vec<Fetch>>().await {
                     Ok(fetches) => fetches
                         .iter()
-                        .filter_map(|f| Some((f.uid?, custom_flags(&f.flags().collect::<Vec<_>>()))))
+                        .filter_map(|f| {
+                            Some((f.uid?, custom_flags(&f.flags().collect::<Vec<_>>())))
+                        })
                         .collect(),
                     Err(_) => continue,
                 },
@@ -7666,7 +8953,9 @@ async fn refresh_unread_counts(
 ) -> (Vec<(FolderKind, String)>, bool) {
     let mut changed = Vec::new();
     if pending.is_empty() {
-        *pending = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+        *pending = cache
+            .map(|c| c.load_folders(account_id))
+            .unwrap_or_default();
         pending.reverse(); // popped from the back, so walked in list order
     }
     while let Some(f) = pending.last().cloned() {
@@ -7685,7 +8974,10 @@ async fn refresh_unread_counts(
         let Some(unread) = selected_chip_count(session, Some(f.kind)).await else {
             continue;
         };
-        emit(WorkerEvent::FolderUnread { folder_id: f.id, unread });
+        emit(WorkerEvent::FolderUnread {
+            folder_id: f.id,
+            unread,
+        });
         let now = (unread, mb.uid_next);
         match baseline.insert(f.path.clone(), now) {
             Some(prev) if prev != now => {
@@ -7725,7 +9017,10 @@ fn chip_count_of(kind: FolderKind, messages: &[Message]) -> u32 {
 /// counts unseen.
 async fn selected_chip_count(session: &mut ImapSession, kind: Option<FolderKind>) -> Option<u32> {
     if kind.is_some_and(chip_counts_all) {
-        search_uids(session, "ALL").await.ok().map(|uids| uids.len() as u32)
+        search_uids(session, "ALL")
+            .await
+            .ok()
+            .map(|uids| uids.len() as u32)
     } else {
         selected_unseen(session).await
     }
@@ -7772,7 +9067,11 @@ async fn emit_body_hits(
             Err(e) => tracing::warn!("filter: body search for {needle:?} failed: {e}"),
         }
     }
-    tracing::info!("filter: body search over {} messages hit {}", uids.len(), hits.len());
+    tracing::info!(
+        "filter: body search over {} messages hit {}",
+        uids.len(),
+        hits.len()
+    );
     emit(WorkerEvent::BodyHits { folder_id, hits });
 }
 
@@ -7790,14 +9089,25 @@ fn is_inbox_path(cache: Option<&Cache>, account_id: u32, path: &str) -> bool {
 /// which must lead the keys; quotes and backslashes are escaped as in any
 /// quoted string, and line breaks can never be in a quoted string at all.
 fn body_search_query(set: &str, needle: &str) -> String {
-    let clean: String = needle.chars().filter(|c| !matches!(c, '\r' | '\n')).collect();
+    let clean: String = needle
+        .chars()
+        .filter(|c| !matches!(c, '\r' | '\n'))
+        .collect();
     let quoted = clean.replace('\\', "\\\\").replace('"', "\\\"");
-    let charset = if clean.is_ascii() { "" } else { "CHARSET UTF-8 " };
+    let charset = if clean.is_ascii() {
+        ""
+    } else {
+        "CHARSET UTF-8 "
+    };
     format!("{charset}UID {set} BODY \"{quoted}\"")
 }
 
 fn cached_folder_kind(cache: Option<&Cache>, account_id: u32, path: &str) -> Option<FolderKind> {
-    cache?.load_folders(account_id).into_iter().find(|f| f.path == path).map(|f| f.kind)
+    cache?
+        .load_folders(account_id)
+        .into_iter()
+        .find(|f| f.path == path)
+        .map(|f| f.kind)
 }
 
 /// Count unseen messages in the currently-selected mailbox via SEARCH (safe on
@@ -7813,19 +9123,27 @@ async fn selected_unseen(session: &mut ImapSession) -> Option<u32> {
 /// path). Mail that lands while the connection is busy with something else
 /// is only told to the SELECT that comes before the next IDLE, never to the
 /// IDLE itself, so that SELECT has to be compared against this (#336).
-static SYNCED_UID_NEXT: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<(u32, String), u32>>> =
-    std::sync::LazyLock::new(Default::default);
+static SYNCED_UID_NEXT: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<(u32, String), u32>>,
+> = std::sync::LazyLock::new(Default::default);
 
 fn note_synced_uid_next(account_id: u32, path: &str, uid_next: Option<u32>) {
     if let Some(next) = uid_next {
-        SYNCED_UID_NEXT.lock().unwrap().insert((account_id, path.to_string()), next);
+        SYNCED_UID_NEXT
+            .lock()
+            .unwrap()
+            .insert((account_id, path.to_string()), next);
     }
 }
 
 /// Whether a folder's UIDNEXT has moved past what its last loaded list saw:
 /// mail arrived that no sync has picked up.
 fn missed_new_mail(account_id: u32, path: &str, uid_next: Option<u32>) -> bool {
-    let seen = SYNCED_UID_NEXT.lock().unwrap().get(&(account_id, path.to_string())).copied();
+    let seen = SYNCED_UID_NEXT
+        .lock()
+        .unwrap()
+        .get(&(account_id, path.to_string()))
+        .copied();
     matches!((seen, uid_next), (Some(seen), Some(now)) if now > seen)
 }
 
@@ -7861,15 +9179,29 @@ async fn load_messages(
         .map(|c| c.load_messages(account_id, path, folder_id))
         .unwrap_or_default();
     if cached.is_empty() {
-        let mut messages =
-            fetch_window(account_id, session, folder_id, total, FIRST_PAGE, use_envelope).await?;
+        let mut messages = fetch_window(
+            account_id,
+            session,
+            folder_id,
+            total,
+            FIRST_PAGE,
+            use_envelope,
+        )
+        .await?;
         let uids: Vec<u32> = messages.iter().map(|m| m.uid).collect();
         read_gmail_labels(account_id, session, path, &uids, &mut messages).await?;
         reconcile_attachment_flags(cache, account_id, path, &mut messages);
         Ok(messages)
     } else {
-        let recent =
-            fetch_window(account_id, session, folder_id, total, PAGE_SIZE, use_envelope).await?;
+        let recent = fetch_window(
+            account_id,
+            session,
+            folder_id,
+            total,
+            PAGE_SIZE,
+            use_envelope,
+        )
+        .await?;
         let window: Vec<u32> = recent.iter().map(|m| m.uid).collect();
         let mut merged = merge_index(cached, recent);
         read_gmail_labels(account_id, session, path, &window, &mut merged).await?;
@@ -7949,7 +9281,11 @@ async fn fetch_window(
     // in the UI would miss the point. Read per sync, so turning it back on takes
     // effect without a restart.
     let want_preview = inline_previews_wanted(account_id);
-    let preview_part = if want_preview { preview_fetch_items() } else { String::new() };
+    let preview_part = if want_preview {
+        preview_fetch_items()
+    } else {
+        String::new()
+    };
     let mut messages: Vec<Message> = if use_envelope {
         let query = format!(
             "(UID ENVELOPE FLAGS BODYSTRUCTURE INTERNALDATE{REFS_FETCH_ITEM}{preview_part})"
@@ -8001,10 +9337,8 @@ async fn logged_fetch(
 ) -> Result<Vec<Fetch>, async_imap::error::Error> {
     let cmd = format!("FETCH {range} {query}");
     wire(&cmd);
-    let r: Result<Vec<Fetch>, async_imap::error::Error> = async {
-        session.fetch(range, query).await?.try_collect().await
-    }
-    .await;
+    let r: Result<Vec<Fetch>, async_imap::error::Error> =
+        async { session.fetch(range, query).await?.try_collect().await }.await;
     wired(&cmd, &r);
     r
 }
@@ -8086,7 +9420,12 @@ where
                     out.insert(uid, labels);
                 }
             }
-            Response::Done { tag, status, information, .. } if *tag == id => {
+            Response::Done {
+                tag,
+                status,
+                information,
+                ..
+            } if *tag == id => {
                 let why = information.as_deref().unwrap_or("");
                 return Ok(match status {
                     Status::Ok => {
@@ -8131,7 +9470,10 @@ fn gmail_labels_of(
         AttributeValue::GmailLabels(labels) => Some(labels),
         _ => None,
     })?;
-    Some((uid, shown_gmail_labels(labels.iter().map(|l| l.as_ref()), folder)))
+    Some((
+        uid,
+        shown_gmail_labels(labels.iter().map(|l| l.as_ref()), folder),
+    ))
 }
 
 /// The labels worth a pill: not Gmail's system labels (`\Inbox`,
@@ -8165,7 +9507,9 @@ fn preview_of(fetch: &Fetch) -> String {
     }
     let charset = ctype.as_deref().and_then(charset_param);
     let encoding = section_encoding(fetch);
-    let bytes = fetch.section(&SectionPath::Part(vec![1], None)).unwrap_or_default();
+    let bytes = fetch
+        .section(&SectionPath::Part(vec![1], None))
+        .unwrap_or_default();
     let p = preview_from_part(bytes, charset.as_deref(), encoding.as_deref());
     // A preheader is built to defeat exactly this read: a marketing mail can
     // spend thousands of bytes on invisible padding before its first real
@@ -8178,7 +9522,11 @@ fn preview_of(fetch: &Fetch) -> String {
     }
     // GTK labels abort on interior NULs, and decoded message text can carry
     // them.
-    if p.contains('\0') { p.replace('\0', " ") } else { p }
+    if p.contains('\0') {
+        p.replace('\0', " ")
+    } else {
+        p
+    }
 }
 
 /// Whether a (lowercased) Content-Type can hold text to preview, or contain
@@ -8216,7 +9564,9 @@ fn section_content_type(fetch: &Fetch) -> Option<String> {
 /// The charset section 1 declares, when its headers name one — a multipart
 /// part 1 doesn't, its text parts carry their own.
 fn section_charset(fetch: &Fetch) -> Option<String> {
-    section_content_type(fetch).as_deref().and_then(charset_param)
+    section_content_type(fetch)
+        .as_deref()
+        .and_then(charset_param)
 }
 
 /// The transfer encoding section 1 declares, from the same `BODY[1.MIME]`
@@ -8279,10 +9629,14 @@ async fn redecode_garbled_previews(session: &mut ImapSession, messages: &mut [Me
     }
     tracing::info!("previews: re-reading garbled rows uids={uids:?}");
     let fetched: Result<Vec<Fetch>, _> = async {
-        fetch_uids(session, uid_set(&uids), format!("(UID{})", preview_fetch_items()))
-            .await?
-            .try_collect()
-            .await
+        fetch_uids(
+            session,
+            uid_set(&uids),
+            format!("(UID{})", preview_fetch_items()),
+        )
+        .await?
+        .try_collect()
+        .await
     }
     .await;
     let fetches = match fetched {
@@ -8294,7 +9648,10 @@ async fn redecode_garbled_previews(session: &mut ImapSession, messages: &mut [Me
     };
     let mut still_missing = Vec::new();
     for f in &fetches {
-        let Some(m) = f.uid.and_then(|uid| messages.iter_mut().find(|m| m.uid == uid)) else {
+        let Some(m) = f
+            .uid
+            .and_then(|uid| messages.iter_mut().find(|m| m.uid == uid))
+        else {
             continue;
         };
         // Whatever this read produced — including nothing, when the part
@@ -8317,19 +9674,28 @@ async fn redecode_garbled_previews(session: &mut ImapSession, messages: &mut [Me
 /// fetch the reader uses works fine), so re-ask with that and run the same
 /// MIME-prefix extraction. Callers bound the list: genuinely body-less messages
 /// stay empty and shouldn't grow the fetch each sync.
-async fn retry_missing_previews(session: &mut ImapSession, messages: &mut [Message], uids: Vec<u32>) {
+async fn retry_missing_previews(
+    session: &mut ImapSession,
+    messages: &mut [Message],
+    uids: Vec<u32>,
+) {
     // Rows the retry already answered this session are served from that
     // answer (see [`PREVIEW_RETRIED`]): the retry runs on every sync of the
     // folder, and it would otherwise cost 32 KB per row per sync for as
     // long as the row stayed among those checked.
     fn key(messages: &[Message], uid: u32) -> Option<(u32, u32, u32)> {
-        messages.iter().find(|m| m.uid == uid).map(|m| (m.account_id, m.folder_id, uid))
+        messages
+            .iter()
+            .find(|m| m.uid == uid)
+            .map(|m| (m.account_id, m.folder_id, uid))
     }
     let uids: Vec<u32> = {
         let retried = PREVIEW_RETRIED.lock().ok();
         uids.into_iter()
             .filter(|&uid| {
-                let Some(k) = key(messages, uid) else { return false };
+                let Some(k) = key(messages, uid) else {
+                    return false;
+                };
                 match retried.as_ref().and_then(|r| r.get(&k)) {
                     None => true,
                     Some(found) => {
@@ -8360,7 +9726,11 @@ async fn retry_missing_previews(session: &mut ImapSession, messages: &mut [Messa
 }
 
 /// The BODY[TEXT] retry itself, for `uids` (non-empty).
-async fn retry_missing_previews_now(session: &mut ImapSession, messages: &mut [Message], uids: &[u32]) {
+async fn retry_missing_previews_now(
+    session: &mut ImapSession,
+    messages: &mut [Message],
+    uids: &[u32],
+) {
     tracing::info!("previews: retrying via BODY[TEXT] uids={uids:?}");
     let refetched: Result<Vec<Fetch>, _> = async {
         fetch_uids(
@@ -8393,7 +9763,9 @@ async fn retry_missing_previews_now(session: &mut ImapSession, messages: &mut [M
                     .section(&SectionPath::Full(MessageSection::Text))
                     .map(|b| {
                         if binary_first {
-                            text_in_multipart(b, 0).map(finish_preview).unwrap_or_default()
+                            text_in_multipart(b, 0)
+                                .map(finish_preview)
+                                .unwrap_or_default()
                         } else {
                             preview_from_part(b, charset.as_deref(), encoding.as_deref())
                         }
@@ -8403,7 +9775,10 @@ async fn retry_missing_previews_now(session: &mut ImapSession, messages: &mut [M
                 if p.is_empty() {
                     continue;
                 }
-                if let Some(m) = f.uid.and_then(|uid| messages.iter_mut().find(|m| m.uid == uid)) {
+                if let Some(m) = f
+                    .uid
+                    .and_then(|uid| messages.iter_mut().find(|m| m.uid == uid))
+                {
                     m.preview = p;
                 }
             }
@@ -8472,8 +9847,10 @@ fn decode_text(bytes: &[u8], charset: Option<&str>) -> String {
     let charset = charset
         .map(|c| c.trim().trim_matches('"').to_ascii_lowercase())
         .filter(|c| !c.is_empty());
-    let declared_unicode =
-        matches!(charset.as_deref(), Some("utf-8" | "utf8" | "us-ascii" | "ascii"));
+    let declared_unicode = matches!(
+        charset.as_deref(),
+        Some("utf-8" | "utf8" | "us-ascii" | "ascii")
+    );
     if let Some(cs) = charset.as_deref().filter(|_| !declared_unicode) {
         if let Some(decode) = mail_parser::decoders::charsets::map::charset_decoder(cs.as_bytes()) {
             return decode(bytes);
@@ -8547,12 +9924,13 @@ fn finish_preview(decoded: String) -> String {
         .filter(|c| {
             !matches!(
                 c,
-                '\u{200b}'..='\u{200d}' // zero-width space/nbsp/joiners
+                '\u{200b}'
+                    ..='\u{200d}' // zero-width space/nbsp/joiners
                     | '\u{2060}'        // word joiner
                     | '\u{feff}'        // BOM / zero-width no-break space
                     | '\u{00ad}'        // soft hyphen
                     | '\u{034f}'        // combining grapheme joiner
-                    | '\u{2800}'        // Braille blank, another padder
+                    | '\u{2800}' // Braille blank, another padder
             )
         })
         .collect();
@@ -8647,13 +10025,19 @@ fn text_in_multipart(part: &[u8], depth: usize) -> Option<String> {
         .split(|&b| b == b'\n')
         .take(10)
         .map(|line| {
-            let end = line.iter().rposition(|b| !b.is_ascii_whitespace()).map_or(0, |i| i + 1);
+            let end = line
+                .iter()
+                .rposition(|b| !b.is_ascii_whitespace())
+                .map_or(0, |i| i + 1);
             &line[..end]
         })
         .find(|line| line.starts_with(b"--") && line.len() >= 3 && !line.contains(&b' '))?;
     let mut html: Option<String> = None;
     for chunk in split_on(part, boundary).skip(1) {
-        let start = chunk.iter().position(|b| !matches!(b, b'\r' | b'\n')).unwrap_or(chunk.len());
+        let start = chunk
+            .iter()
+            .position(|b| !matches!(b, b'\r' | b'\n'))
+            .unwrap_or(chunk.len());
         let chunk = &chunk[start..];
         if chunk.starts_with(b"--") {
             break; // closing delimiter: no more parts
@@ -8710,7 +10094,10 @@ fn split_mime_headers(part: &[u8]) -> Option<(&[u8], &[u8])> {
 fn mime_header(headers: &str, name: &str) -> Option<String> {
     // Unfold first: a parameter on a continuation line ("Content-Type:
     // text/html;\r\n\tcharset=iso-8859-2") belongs to the header above it.
-    let unfolded = headers.replace("\r\n", "\n").replace("\n ", " ").replace("\n\t", " ");
+    let unfolded = headers
+        .replace("\r\n", "\n")
+        .replace("\n ", " ")
+        .replace("\n\t", " ");
     unfolded
         .lines()
         .find(|l| {
@@ -8724,7 +10111,11 @@ fn mime_header(headers: &str, name: &str) -> Option<String> {
                 && l.as_bytes()[..name.len()].eq_ignore_ascii_case(name.as_bytes())
                 && l[name.len()..].trim_start().starts_with(':')
         })
-        .map(|l| l[name.len()..].trim_start()[1..].trim().to_ascii_lowercase())
+        .map(|l| {
+            l[name.len()..].trim_start()[1..]
+                .trim()
+                .to_ascii_lowercase()
+        })
 }
 
 /// Decode a part's body according to the encoding and charset it declares.
@@ -8798,7 +10189,9 @@ fn decode_quoted_printable(src: &[u8]) -> Vec<u8> {
                 continue;
             }
             let hex = src.get(i + 1..i + 3).and_then(|h| {
-                std::str::from_utf8(h).ok().and_then(|h| u8::from_str_radix(h, 16).ok())
+                std::str::from_utf8(h)
+                    .ok()
+                    .and_then(|h| u8::from_str_radix(h, 16).ok())
             });
             match hex {
                 Some(b) => {
@@ -8830,7 +10223,9 @@ fn summary_from_headers(account_id: u32, fetch: &Fetch, folder_id: u32) -> Messa
     let starred = flags.iter().any(|f| matches!(f, Flag::Flagged));
     let answered = flags.iter().any(|f| matches!(f, Flag::Answered));
     let keywords = custom_flags(&flags);
-    let forwarded = keywords.iter().any(|k| k.eq_ignore_ascii_case(FORWARDED_KEYWORD));
+    let forwarded = keywords
+        .iter()
+        .any(|k| k.eq_ignore_ascii_case(FORWARDED_KEYWORD));
 
     let raw = fetch.header().unwrap_or(&[]);
     let parsed = MessageParser::default().parse(raw);
@@ -8876,9 +10271,19 @@ fn summary_from_headers(account_id: u32, fetch: &Fetch, folder_id: u32) -> Messa
         .unwrap_or_else(|| internal_date_summary(fetch));
     let to = parsed.as_ref().map(|p| mp_list(p.to())).unwrap_or_default();
     let cc = parsed.as_ref().map(|p| mp_list(p.cc())).unwrap_or_default();
-    let bcc = parsed.as_ref().map(|p| mp_list(p.bcc())).unwrap_or_default();
-    let reply_to = parsed.as_ref().map(|p| mp_list(p.reply_to())).unwrap_or_default();
-    let reply_to = if reply_to.eq_ignore_ascii_case(&from_addr) { String::new() } else { reply_to };
+    let bcc = parsed
+        .as_ref()
+        .map(|p| mp_list(p.bcc()))
+        .unwrap_or_default();
+    let reply_to = parsed
+        .as_ref()
+        .map(|p| mp_list(p.reply_to()))
+        .unwrap_or_default();
+    let reply_to = if reply_to.eq_ignore_ascii_case(&from_addr) {
+        String::new()
+    } else {
+        reply_to
+    };
 
     // Best-effort attachment hint from the top-level Content-Type (BODYSTRUCTURE
     // isn't available on this path). multipart/mixed is the usual attachment case.
@@ -8933,7 +10338,11 @@ fn summary_from_headers(account_id: u32, fetch: &Fetch, folder_id: u32) -> Messa
 fn mp_thread_ids(parsed: Option<&mail_parser::Message>) -> (String, String) {
     use mail_parser::HeaderValue;
     let norm = |s: &str| {
-        let exact = s.trim().trim_start_matches('<').trim_end_matches('>').trim();
+        let exact = s
+            .trim()
+            .trim_start_matches('<')
+            .trim_end_matches('>')
+            .trim();
         crate::cache::note_msgid_case(exact);
         exact.to_ascii_lowercase()
     };
@@ -8949,7 +10358,10 @@ fn mp_thread_ids(parsed: Option<&mail_parser::Message>) -> (String, String) {
     };
     let message_id = p.message_id().map(norm).unwrap_or_default();
     let mut refs: Vec<String> = Vec::new();
-    for id in collect(p.in_reply_to()).into_iter().chain(collect(p.references())) {
+    for id in collect(p.in_reply_to())
+        .into_iter()
+        .chain(collect(p.references()))
+    {
         if !id.is_empty() && !refs.contains(&id) {
             refs.push(id);
         }
@@ -9031,7 +10443,10 @@ async fn run_one_refs_repair(
     let set = uid_set(&chunk.iter().map(|(uid, _)| *uid).collect::<Vec<_>>());
     let fetched: Result<Vec<Fetch>, _> = async {
         sel(&mut s, &path).await?;
-        fetch_uids(&mut s, &set, format!("(UID{REFS_FETCH_ITEM})")).await?.try_collect().await
+        fetch_uids(&mut s, &set, format!("(UID{REFS_FETCH_ITEM})"))
+            .await?
+            .try_collect()
+            .await
     }
     .await;
     let Ok(fetches) = fetched else {
@@ -9094,7 +10509,9 @@ async fn run_one_label_fill(
         queue.clear();
         return;
     }
-    let Some((folder_id, path)) = queue.pop_front() else { return };
+    let Some((folder_id, path)) = queue.pop_front() else {
+        return;
+    };
     let Some(mut s) = session.take() else {
         queue.push_front((folder_id, path));
         return;
@@ -9182,7 +10599,11 @@ async fn backfill_worklist(
 /// the cached folder. A `complete` listing is the whole folder; otherwise it
 /// speaks only for mail newer than the oldest it holds, the rest being the
 /// background index's to reconcile.
-fn window_gone(cached: &std::collections::HashMap<u32, i64>, listed: &[Message], complete: bool) -> Vec<u32> {
+fn window_gone(
+    cached: &std::collections::HashMap<u32, i64>,
+    listed: &[Message],
+    complete: bool,
+) -> Vec<u32> {
     let seen: std::collections::HashSet<u32> = listed.iter().map(|m| m.uid).collect();
     let oldest = listed.iter().map(|m| m.timestamp).min();
     let mut gone: Vec<u32> = cached
@@ -9299,15 +10720,24 @@ async fn run_one_backfill(
 
     let rem = job.remaining.as_mut().unwrap();
     if rem.is_empty() {
-        emit(WorkerEvent::BackfillDone { folder_id: job.folder_id });
+        emit(WorkerEvent::BackfillDone {
+            folder_id: job.folder_id,
+        });
         *session = Some(s); // done — don't requeue
         return;
     }
     let take = rem.len().min(BACKFILL_CHUNK);
     let chunk: Vec<u32> = rem.drain(..take).collect();
 
-    match fetch_summaries_by_uid(account_id, &mut s, job.folder_id, &job.path, &chunk, *use_envelope)
-        .await
+    match fetch_summaries_by_uid(
+        account_id,
+        &mut s,
+        job.folder_id,
+        &job.path,
+        &chunk,
+        *use_envelope,
+    )
+    .await
     {
         Ok(msgs) => {
             if let Some(c) = cache {
@@ -9345,7 +10775,9 @@ async fn run_one_backfill(
     if job.remaining.as_ref().is_some_and(|r| !r.is_empty()) {
         queue.push_back(job);
     } else {
-        emit(WorkerEvent::BackfillDone { folder_id: job.folder_id });
+        emit(WorkerEvent::BackfillDone {
+            folder_id: job.folder_id,
+        });
     }
 }
 
@@ -9371,7 +10803,9 @@ async fn load_body(
     // network cost. A server that hands nothing over is an error, not an
     // empty message (#226): shown as one, it read as the message being
     // blank, and was cached as such.
-    let raw = fetch_raw_message(session, uid).await?.ok_or_else(|| no_content_error(uid))?;
+    let raw = fetch_raw_message(session, uid)
+        .await?
+        .ok_or_else(|| no_content_error(uid))?;
     Ok(render_raw(&raw))
 }
 
@@ -9423,7 +10857,9 @@ fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> Message {
     let starred = flags.iter().any(|f| matches!(f, Flag::Flagged));
     let answered = flags.iter().any(|f| matches!(f, Flag::Answered));
     let keywords = custom_flags(&flags);
-    let forwarded = keywords.iter().any(|k| k.eq_ignore_ascii_case(FORWARDED_KEYWORD));
+    let forwarded = keywords
+        .iter()
+        .any(|k| k.eq_ignore_ascii_case(FORWARDED_KEYWORD));
 
     let env = fetch.envelope();
     let (from_name, from_addr) = env
@@ -9449,7 +10885,11 @@ fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> Message {
     // header is absent; storing that echo would be noise, so keep it only
     // when it actually differs.
     let reply_to = address_list(env.and_then(|e| e.reply_to.as_ref()));
-    let reply_to = if reply_to.eq_ignore_ascii_case(&from_addr) { String::new() } else { reply_to };
+    let reply_to = if reply_to.eq_ignore_ascii_case(&from_addr) {
+        String::new()
+    } else {
+        reply_to
+    };
 
     let has_attachment = fetch
         .bodystructure()
@@ -9553,7 +10993,11 @@ fn custom_flags(flags: &[Flag]) -> Vec<String> {
 /// ([`crate::cache::note_msgid_case`]).
 fn normalize_msgid(raw: &[u8]) -> String {
     let s = String::from_utf8_lossy(raw);
-    let exact = s.trim().trim_start_matches('<').trim_end_matches('>').trim();
+    let exact = s
+        .trim()
+        .trim_start_matches('<')
+        .trim_end_matches('>')
+        .trim();
     crate::cache::note_msgid_case(exact);
     exact.to_ascii_lowercase()
 }
@@ -9599,7 +11043,10 @@ fn header_fields(raw: &[u8]) -> Vec<(String, String)> {
 /// The headers a fetch that asked for [`REFS_FETCH_ITEM`] brought back.
 fn fetched_fields(fetch: &Fetch) -> Vec<(String, String)> {
     use async_imap::imap_proto::types::{MessageSection, SectionPath};
-    fetch.section(&SectionPath::Full(MessageSection::Header)).map(header_fields).unwrap_or_default()
+    fetch
+        .section(&SectionPath::Full(MessageSection::Header))
+        .map(header_fields)
+        .unwrap_or_default()
 }
 
 /// The `References:` value from a fetch that asked for [`REFS_FETCH_ITEM`],
@@ -9616,7 +11063,10 @@ fn references_of(fetch: &Fetch) -> String {
 fn importance_of(fetch: &Fetch) -> crate::models::Importance {
     let fields = fetched_fields(fetch);
     crate::models::Importance::from_headers(|name| {
-        fields.iter().find(|(n, _)| n.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
+        fields
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
     })
 }
 
@@ -9698,8 +11148,7 @@ fn structure_has_attachment(bs: &async_imap::imap_proto::types::BodyStructure) -
 
 /// Whether a BODYSTRUCTURE part is a `text/calendar` one (#223).
 fn is_calendar(common: &async_imap::imap_proto::types::BodyContentCommon) -> bool {
-    common.ty.ty.eq_ignore_ascii_case("text")
-        && common.ty.subtype.eq_ignore_ascii_case("calendar")
+    common.ty.ty.eq_ignore_ascii_case("text") && common.ty.subtype.eq_ignore_ascii_case("calendar")
 }
 
 /// Every attachment in a BODYSTRUCTURE, with what it is called, how big it is
@@ -9718,15 +11167,12 @@ fn structure_attachments(
     /// A parameter's value, matched case-insensitively as RFC 2045 requires.
     fn param(params: &async_imap::imap_proto::types::BodyParams, key: &str) -> Option<String> {
         params.as_ref()?.iter().find_map(|(k, v)| {
-            k.eq_ignore_ascii_case(key).then(|| decode_header(v.as_bytes()))
+            k.eq_ignore_ascii_case(key)
+                .then(|| decode_header(v.as_bytes()))
         })
     }
 
-    fn walk(
-        bs: &Bs,
-        section: &str,
-        out: &mut Vec<crate::models::AttachmentMeta>,
-    ) {
+    fn walk(bs: &Bs, section: &str, out: &mut Vec<crate::models::AttachmentMeta>) {
         match bs {
             Bs::Multipart { bodies, .. } => {
                 for (i, child) in bodies.iter().enumerate() {
@@ -9792,7 +11238,15 @@ fn structure_attachments(
 
     let mut out = Vec::new();
     // A message that is not multipart is one part, section 1.
-    walk(bs, if matches!(bs, Bs::Multipart { .. }) { "" } else { "1" }, &mut out);
+    walk(
+        bs,
+        if matches!(bs, Bs::Multipart { .. }) {
+            ""
+        } else {
+            "1"
+        },
+        &mut out,
+    );
     out
 }
 
@@ -9832,14 +11286,22 @@ const POP3_LIMIT: usize = 200;
 /// The POP3 conversation for the console, like the IMAP one: the command
 /// (a PASS line with its secret dropped) and the server's first reply line.
 fn pop3_wire(cmd: &str) {
-    let shown = if cmd.starts_with("PASS ") { "PASS ****" } else { cmd };
+    let shown = if cmd.starts_with("PASS ") {
+        "PASS ****"
+    } else {
+        cmd
+    };
     tracing::debug!(target: "hylki::pop3", "> {shown}");
 }
 
 fn pop3_wired(cmd: &str, reply: &[u8]) {
     let line = String::from_utf8_lossy(reply);
     let line = line.trim();
-    let shown = if cmd.starts_with("PASS ") { "PASS" } else { cmd };
+    let shown = if cmd.starts_with("PASS ") {
+        "PASS"
+    } else {
+        cmd
+    };
     if reply.starts_with(b"+OK") {
         tracing::debug!(target: "hylki::pop3", "< {} ({shown})", line.chars().take(80).collect::<String>());
     } else {
@@ -9867,11 +11329,20 @@ impl Pop3 {
             // STARTTLS: greet + STLS on the plaintext socket, then upgrade.
             let mut plain = BufReader::new(tcp);
             let mut line = Vec::new();
-            plain.read_until(b'\n', &mut line).await.map_err(|e| e.to_string())?;
-            plain.write_all(b"STLS\r\n").await.map_err(|e| e.to_string())?;
+            plain
+                .read_until(b'\n', &mut line)
+                .await
+                .map_err(|e| e.to_string())?;
+            plain
+                .write_all(b"STLS\r\n")
+                .await
+                .map_err(|e| e.to_string())?;
             plain.flush().await.map_err(|e| e.to_string())?;
             line.clear();
-            plain.read_until(b'\n', &mut line).await.map_err(|e| e.to_string())?;
+            plain
+                .read_until(b'\n', &mut line)
+                .await
+                .map_err(|e| e.to_string())?;
             if !line.starts_with(b"+OK") {
                 return Err("server refused STLS".to_string());
             }
@@ -9880,7 +11351,9 @@ impl Pop3 {
                 .map_err(|e| e.to_string())?
         };
 
-        let mut pop = Pop3 { stream: BufReader::new(stream) };
+        let mut pop = Pop3 {
+            stream: BufReader::new(stream),
+        };
         if port == 995 {
             pop.read_reply().await?; // greeting
         }
@@ -9902,8 +11375,14 @@ impl Pop3 {
 
     async fn send(&mut self, cmd: &str) -> Result<(), String> {
         use tokio::io::AsyncWriteExt;
-        self.stream.write_all(cmd.as_bytes()).await.map_err(|e| e.to_string())?;
-        self.stream.write_all(b"\r\n").await.map_err(|e| e.to_string())?;
+        self.stream
+            .write_all(cmd.as_bytes())
+            .await
+            .map_err(|e| e.to_string())?;
+        self.stream
+            .write_all(b"\r\n")
+            .await
+            .map_err(|e| e.to_string())?;
         self.stream.flush().await.map_err(|e| e.to_string())
     }
 
@@ -9937,7 +11416,11 @@ impl Pop3 {
                 break;
             }
             // Dot-stuffing: a leading '.' is doubled on the wire.
-            let content = if trimmed.starts_with(b"..") { &trimmed[1..] } else { trimmed };
+            let content = if trimmed.starts_with(b"..") {
+                &trimmed[1..]
+            } else {
+                trimmed
+            };
             out.extend_from_slice(content);
             out.extend_from_slice(b"\r\n");
         }
@@ -10054,8 +11537,15 @@ pub(crate) fn summary_from_raw(account_id: u32, folder_id: u32, uid: u32, raw: &
     let cc = addr_list(parsed.as_ref().and_then(|p| p.cc()));
     let bcc = addr_list(parsed.as_ref().and_then(|p| p.bcc()));
     let reply_to = addr_list(parsed.as_ref().and_then(|p| p.reply_to()));
-    let reply_to = if reply_to.eq_ignore_ascii_case(&from_addr) { String::new() } else { reply_to };
-    let has_attachment = parsed.as_ref().map(|p| p.attachment_count() > 0).unwrap_or(false);
+    let reply_to = if reply_to.eq_ignore_ascii_case(&from_addr) {
+        String::new()
+    } else {
+        reply_to
+    };
+    let has_attachment = parsed
+        .as_ref()
+        .map(|p| p.attachment_count() > 0)
+        .unwrap_or(false);
     let (message_id, references) = mp_thread_ids(parsed.as_ref());
 
     let mut msg = Message {
@@ -10123,7 +11613,9 @@ async fn run_pop3(
         }
     }
 
-    let cache = Cache::open().map_err(|e| tracing::warn!("cache unavailable: {e}")).ok();
+    let cache = Cache::open()
+        .map_err(|e| tracing::warn!("cache unavailable: {e}"))
+        .ok();
     const INBOX: &str = "INBOX";
     let inbox_id = 1u32;
 
@@ -10145,33 +11637,50 @@ async fn run_pop3(
             MailRequest::Locate { message_id } => {
                 // No folders to search here beyond what the cache already
                 // held: answer "not found" so the app can report the miss.
-                emit(WorkerEvent::Located { message_id: message_id.clone(), hit: None });
+                emit(WorkerEvent::Located {
+                    message_id: message_id.clone(),
+                    hit: None,
+                });
             }
             // POP3 downloads every message in full, so an attachment is either
             // already in the cache or does not exist: there is nothing a scan
             // could add.
             MailRequest::ScanAttachments { folder_path } => {
-                emit(WorkerEvent::AttachmentsScanned { folder_path, added: 0, remaining: 0 });
+                emit(WorkerEvent::AttachmentsScanned {
+                    folder_path,
+                    added: 0,
+                    remaining: 0,
+                });
             }
             // POP3 has no server-side keywords: nothing to find.
             MailRequest::FindKeywords => emit(WorkerEvent::KeywordsFound(Vec::new())),
             // POP3 has no way to say how much room is left.
             MailRequest::Quota => emit(WorkerEvent::Quota(None)),
-            MailRequest::RefreshKeywords { .. } => emit(WorkerEvent::KeywordsSynced { paths: Vec::new() }),
+            MailRequest::RefreshKeywords { .. } => {
+                emit(WorkerEvent::KeywordsSynced { paths: Vec::new() })
+            }
             // POP3 keeps everything in the inbox, so a conversation never spans
             // folders and the reader already has all of it.
             MailRequest::LoadRelated { message_id, .. } => {
-                emit(WorkerEvent::Related { message_id, messages: Vec::new() });
+                emit(WorkerEvent::Related {
+                    message_id,
+                    messages: Vec::new(),
+                });
             }
             // Same reason: everything is in the inbox, so the list's own count
             // is already the whole conversation (#222).
             MailRequest::LoadThreadSummaries { .. } => {
-                emit(WorkerEvent::ThreadSummaries { summaries: Vec::new() });
+                emit(WorkerEvent::ThreadSummaries {
+                    summaries: Vec::new(),
+                });
             }
             MailRequest::LoadMessages { folder_id, path }
             | MailRequest::SyncFolder { folder_id, path } => {
                 if path != INBOX {
-                    emit(WorkerEvent::Messages { folder_id, messages: Vec::new() });
+                    emit(WorkerEvent::Messages {
+                        folder_id,
+                        messages: Vec::new(),
+                    });
                     emit(WorkerEvent::BackfillDone { folder_id });
                     continue;
                 }
@@ -10179,32 +11688,62 @@ async fn run_pop3(
                 if let Some(c) = cache.as_ref() {
                     let cached = c.load_messages(account_id, INBOX, inbox_id);
                     if !cached.is_empty() {
-                        emit(WorkerEvent::Messages { folder_id, messages: cached });
+                        emit(WorkerEvent::Messages {
+                            folder_id,
+                            messages: cached,
+                        });
                     }
                 }
                 emit(WorkerEvent::Status(i18n("Syncing…")));
                 match pop3_sync(account_id, &account, inbox_id, cache.as_ref()).await {
                     Ok(messages) => {
                         let unread = messages.iter().filter(|m| m.unread).count() as u32;
-                        emit(WorkerEvent::Messages { folder_id, messages });
-                        emit(WorkerEvent::FolderUnread { folder_id: inbox_id, unread });
+                        emit(WorkerEvent::Messages {
+                            folder_id,
+                            messages,
+                        });
+                        emit(WorkerEvent::FolderUnread {
+                            folder_id: inbox_id,
+                            unread,
+                        });
                         // POP3 syncs the whole mailbox in one pass; no backfill
                         // follows, so the index is complete (see the Graph path).
                         emit(WorkerEvent::BackfillDone { folder_id });
                     }
                     Err(e) => {
-                        emit(WorkerEvent::net_error(i18n_f("Could not fetch mail: {e}", &[("e", &(e).to_string())])));
+                        emit(WorkerEvent::net_error(i18n_f(
+                            "Could not fetch mail: {e}",
+                            &[("e", &(e).to_string())],
+                        )));
                         emit(WorkerEvent::BackfillDone { folder_id });
                     }
                 }
                 emit(WorkerEvent::Status(String::new()));
             }
 
-            MailRequest::LoadBody { message_id, path: _, uid } => {
-                if let Some(body) = cache.as_ref().and_then(|c| c.load_body(account_id, INBOX, uid)) {
-                    emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
-                    if let Some(check) = cache.as_ref().and_then(|c| c.load_sender_check(account_id, INBOX, uid)) {
-                        emit(WorkerEvent::SenderChecked { path: INBOX.to_string(), message_id, check });
+            MailRequest::LoadBody {
+                message_id,
+                path: _,
+                uid,
+            } => {
+                if let Some(body) = cache
+                    .as_ref()
+                    .and_then(|c| c.load_body(account_id, INBOX, uid))
+                {
+                    emit(WorkerEvent::Body {
+                        message_id,
+                        path: INBOX.to_string(),
+                        body,
+                    });
+                    if let Some(check) = cache
+                        .as_ref()
+                        .and_then(|c| c.load_sender_check(account_id, INBOX, uid))
+                    {
+                        emit(WorkerEvent::SenderChecked {
+                            path: INBOX.to_string(),
+                            message_id,
+                            check,
+                        });
                     }
                     continue;
                 }
@@ -10217,10 +11756,21 @@ async fn run_pop3(
                             }
                             c.save_sender_check(account_id, INBOX, uid, &check);
                         }
-                        emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
-                        emit(WorkerEvent::SenderChecked { path: INBOX.to_string(), message_id, check });
+                        emit(WorkerEvent::Body {
+                            message_id,
+                            path: INBOX.to_string(),
+                            body,
+                        });
+                        emit(WorkerEvent::SenderChecked {
+                            path: INBOX.to_string(),
+                            message_id,
+                            check,
+                        });
                     }
-                    Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]))),
+                    Err(e) => emit(WorkerEvent::net_error(i18n_f(
+                        "Could not load message: {e}",
+                        &[("e", &(e).to_string())],
+                    ))),
                 }
             }
 
@@ -10228,12 +11778,24 @@ async fn run_pop3(
             // is the same work in a loop, saving only the per-message request hop.
             MailRequest::LoadBodies { items, path: _ } => {
                 for (message_id, uid) in items {
-                    if let Some(body) =
-                        cache.as_ref().and_then(|c| c.load_body(account_id, INBOX, uid))
+                    if let Some(body) = cache
+                        .as_ref()
+                        .and_then(|c| c.load_body(account_id, INBOX, uid))
                     {
-                        emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
-                        if let Some(check) = cache.as_ref().and_then(|c| c.load_sender_check(account_id, INBOX, uid)) {
-                            emit(WorkerEvent::SenderChecked { path: INBOX.to_string(), message_id, check });
+                        emit(WorkerEvent::Body {
+                            message_id,
+                            path: INBOX.to_string(),
+                            body,
+                        });
+                        if let Some(check) = cache
+                            .as_ref()
+                            .and_then(|c| c.load_sender_check(account_id, INBOX, uid))
+                        {
+                            emit(WorkerEvent::SenderChecked {
+                                path: INBOX.to_string(),
+                                message_id,
+                                check,
+                            });
                         }
                         continue;
                     }
@@ -10246,33 +11808,61 @@ async fn run_pop3(
                                 }
                                 c.save_sender_check(account_id, INBOX, uid, &check);
                             }
-                            emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
-                            emit(WorkerEvent::SenderChecked { path: INBOX.to_string(), message_id, check });
+                            emit(WorkerEvent::Body {
+                                message_id,
+                                path: INBOX.to_string(),
+                                body,
+                            });
+                            emit(WorkerEvent::SenderChecked {
+                                path: INBOX.to_string(),
+                                message_id,
+                                check,
+                            });
                         }
-                        Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]))),
+                        Err(e) => emit(WorkerEvent::net_error(i18n_f(
+                            "Could not load message: {e}",
+                            &[("e", &(e).to_string())],
+                        ))),
                     }
                 }
             }
 
-            MailRequest::LoadSource { message_id: _, path: _, uid } => {
-                match pop3_fetch_raw(&account, uid).await {
-                    Ok(raw) => emit(WorkerEvent::Source {
-                        text: String::from_utf8_lossy(&raw).into_owned(),
-                    }),
-                    Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load source: {e}", &[("e", &(e).to_string())]))),
-                }
-            }
+            MailRequest::LoadSource {
+                message_id: _,
+                path: _,
+                uid,
+            } => match pop3_fetch_raw(&account, uid).await {
+                Ok(raw) => emit(WorkerEvent::Source {
+                    text: String::from_utf8_lossy(&raw).into_owned(),
+                }),
+                Err(e) => emit(WorkerEvent::net_error(i18n_f(
+                    "Could not load source: {e}",
+                    &[("e", &(e).to_string())],
+                ))),
+            },
 
-            MailRequest::LoadAttachments { message_id, path: _, uid, download } => {
+            MailRequest::LoadAttachments {
+                message_id,
+                path: _,
+                uid,
+                download,
+            } => {
                 if let Some(c) = cache.as_ref() {
                     let items = c.load_attachments(account_id, INBOX, uid);
                     if !items.is_empty() {
-                        emit(WorkerEvent::Attachments { path: INBOX.to_string(), message_id, items });
+                        emit(WorkerEvent::Attachments {
+                            path: INBOX.to_string(),
+                            message_id,
+                            items,
+                        });
                         continue;
                     }
                 }
                 if !download {
-                    emit(WorkerEvent::AttachmentsPending { path: INBOX.to_string(), message_id });
+                    emit(WorkerEvent::AttachmentsPending {
+                        path: INBOX.to_string(),
+                        message_id,
+                    });
                     continue;
                 }
                 match pop3_fetch_raw(&account, uid).await {
@@ -10281,9 +11871,16 @@ async fn run_pop3(
                         if let Some(c) = cache.as_ref() {
                             c.save_attachments(account_id, INBOX, uid, &items);
                         }
-                        emit(WorkerEvent::Attachments { path: INBOX.to_string(), message_id, items });
+                        emit(WorkerEvent::Attachments {
+                            path: INBOX.to_string(),
+                            message_id,
+                            items,
+                        });
                     }
-                    Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load attachments: {e}", &[("e", &(e).to_string())]))),
+                    Err(e) => emit(WorkerEvent::net_error(i18n_f(
+                        "Could not load attachments: {e}",
+                        &[("e", &(e).to_string())],
+                    ))),
                 }
             }
 
@@ -10291,7 +11888,10 @@ async fn run_pop3(
                 if let Some(c) = cache.as_ref() {
                     c.set_unread(account_id, INBOX, uid, !seen);
                 }
-                emit(WorkerEvent::SeenSettled { path: INBOX.to_string(), uid });
+                emit(WorkerEvent::SeenSettled {
+                    path: INBOX.to_string(),
+                    uid,
+                });
             }
             MailRequest::SetFlagged { uid, flagged, .. } => {
                 if let Some(c) = cache.as_ref() {
@@ -10299,7 +11899,13 @@ async fn run_pop3(
                 }
             }
             // POP3 has no flags at all: every tag is Hylki's own.
-            MailRequest::SetKeyword { uid, message_id, keyword, add, .. } => {
+            MailRequest::SetKeyword {
+                uid,
+                message_id,
+                keyword,
+                add,
+                ..
+            } => {
                 if let Some(c) = cache.as_ref() {
                     if message_id.is_empty() {
                         c.set_keyword(account_id, INBOX, uid, &keyword, add);
@@ -10312,7 +11918,10 @@ async fn run_pop3(
                 if let Some(c) = cache.as_ref() {
                     c.mark_folder_read(account_id, INBOX);
                 }
-                emit(WorkerEvent::FolderUnread { folder_id, unread: 0 });
+                emit(WorkerEvent::FolderUnread {
+                    folder_id,
+                    unread: 0,
+                });
             }
 
             // POP3 has no folders to move between: deleting removes from the
@@ -10328,7 +11937,10 @@ async fn run_pop3(
                             c.delete_message(account_id, INBOX, uid);
                         }
                     }
-                    Err(e) => emit(WorkerEvent::error(i18n_f("Could not delete message: {e}", &[("e", &(e).to_string())]))),
+                    Err(e) => emit(WorkerEvent::error(i18n_f(
+                        "Could not delete message: {e}",
+                        &[("e", &(e).to_string())],
+                    ))),
                 }
             }
             // POP3 shows only its Inbox; there is no Trash or Junk to empty.
@@ -10348,7 +11960,9 @@ async fn run_pop3(
             // nothing to bring back. Answered all the same, so the app's
             // busy indicator stops.
             MailRequest::UndoMove { .. } => {
-                emit(WorkerEvent::error(i18n("POP3 accounts don't support folders")));
+                emit(WorkerEvent::error(i18n(
+                    "POP3 accounts don't support folders",
+                )));
                 emit(WorkerEvent::BulkComplete);
             }
 
@@ -10358,16 +11972,29 @@ async fn run_pop3(
             | MailRequest::DeleteFolder { .. }
             | MailRequest::SetHiddenFolders { .. }
             | MailRequest::SaveDraft { .. } => {
-                emit(WorkerEvent::error(i18n("POP3 accounts don't support folders")));
+                emit(WorkerEvent::error(i18n(
+                    "POP3 accounts don't support folders",
+                )));
             }
 
-            MailRequest::Send { mut message, ticket, .. } => {
+            MailRequest::Send {
+                mut message,
+                ticket,
+                ..
+            } => {
                 restore_msgid_case(cache.as_ref(), &mut message);
                 match send_smtp(&account, &message).await {
                     Ok(_) => {
                         // Kept in the cache only: POP3 has no flags.
-                        mark_answered(&mut None, cache.as_ref(), account_id, &message.in_reply_to, &message.forwards, &emit)
-                            .await;
+                        mark_answered(
+                            &mut None,
+                            cache.as_ref(),
+                            account_id,
+                            &message.in_reply_to,
+                            &message.forwards,
+                            &emit,
+                        )
+                        .await;
                         drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                         emit(WorkerEvent::Sent);
                         emit(WorkerEvent::SendDone { ticket, sent: true });
@@ -10375,15 +12002,29 @@ async fn run_pop3(
                     Err(e) => {
                         // POP3 has no Sent folder to copy to, but the message is held
                         // exactly as it is for IMAP accounts.
-                        send_failed(cache.as_ref(), account_id, &account, &message, None, &e.to_string(), smtp_refused(&e), &emit);
-                        emit(WorkerEvent::SendDone { ticket, sent: false });
+                        send_failed(
+                            cache.as_ref(),
+                            account_id,
+                            &account,
+                            &message,
+                            None,
+                            &e.to_string(),
+                            smtp_refused(&e),
+                            &emit,
+                        );
+                        emit(WorkerEvent::SendDone {
+                            ticket,
+                            sent: false,
+                        });
                     }
                 }
             }
 
             MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
 
-            MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, &emit),
+            MailRequest::DeleteOutbox { id } => {
+                delete_queued(cache.as_ref(), account_id, id, &emit)
+            }
 
             MailRequest::FlushOutbox { id } => {
                 let mut no_session = None;
@@ -10417,11 +12058,20 @@ async fn run_pop3(
             // POP3 has nowhere to put mail: it is never offered as a destination.
             MailRequest::ImportRaw { token, .. } => emit(WorkerEvent::RawImported {
                 token,
-                result: Err(i18n("A POP3 account can't receive mail from another account")),
+                result: Err(i18n(
+                    "A POP3 account can't receive mail from another account",
+                )),
             }),
-            MailRequest::DeleteAttachment { message_id, name, size, .. } => strip_refused(
+            MailRequest::DeleteAttachment {
+                message_id,
+                name,
+                size,
+                ..
+            } => strip_refused(
                 &emit,
-                i18n("POP3 cannot change a message on the server, so the attachment was not removed"),
+                i18n(
+                    "POP3 cannot change a message on the server, so the attachment was not removed",
+                ),
                 message_id,
                 name,
                 size,
@@ -10440,7 +12090,8 @@ async fn pop3_sync(
 ) -> Result<Vec<Message>, String> {
     const INBOX: &str = "INBOX";
     let mut pop = Pop3::connect(account).await?;
-    pop.login(&account.username, &sign_in_password(account, false).await?).await?;
+    pop.login(&account.username, &sign_in_password(account, false).await?)
+        .await?;
     let mut entries = pop.uidl().await?;
     // Newest first; bound how many we index.
     entries.sort_by(|a, b| b.0.cmp(&a.0));
@@ -10488,7 +12139,8 @@ async fn pop3_sync(
 /// Fetch one message's raw bytes by its hashed UID (reconnects + maps UID→num).
 async fn pop3_fetch_raw(account: &AccountConfig, uid: u32) -> Result<Vec<u8>, String> {
     let mut pop = Pop3::connect(account).await?;
-    pop.login(&account.username, &sign_in_password(account, false).await?).await?;
+    pop.login(&account.username, &sign_in_password(account, false).await?)
+        .await?;
     let num = pop
         .uidl()
         .await?
@@ -10504,7 +12156,8 @@ async fn pop3_fetch_raw(account: &AccountConfig, uid: u32) -> Result<Vec<u8>, St
 /// Delete a message from the POP3 server (DELE, committed on QUIT).
 async fn pop3_delete(account: &AccountConfig, uid: u32) -> Result<(), String> {
     let mut pop = Pop3::connect(account).await?;
-    pop.login(&account.username, &sign_in_password(account, false).await?).await?;
+    pop.login(&account.username, &sign_in_password(account, false).await?)
+        .await?;
     let num = pop
         .uidl()
         .await?
@@ -10543,7 +12196,10 @@ fn demo_attachment_files(message_id: u32) -> Vec<crate::models::Attachment> {
             name: "migration-timeline.pdf".into(),
             data: include_bytes!("../data/demo/migration-timeline.pdf").to_vec(),
         },
-        _ => crate::models::Attachment { name: "palette-hover.png".into(), data: PNG_1X1.to_vec() },
+        _ => crate::models::Attachment {
+            name: "palette-hover.png".into(),
+            data: PNG_1X1.to_vec(),
+        },
     };
     vec![
         first,
@@ -10560,7 +12216,11 @@ fn demo_attachment_files(message_id: u32) -> Vec<crate::models::Attachment> {
 fn mock_sender_check(path: &str, message_id: u32, emit: &impl Fn(WorkerEvent)) {
     if let Some(raw) = crate::backend::demo_raw(message_id) {
         let check = crate::verify::check_sender(raw.as_bytes());
-        emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
+        emit(WorkerEvent::SenderChecked {
+            path: path.to_string(),
+            message_id,
+            check,
+        });
     }
 }
 
@@ -10579,15 +12239,19 @@ async fn run_mock(
     // conversation after that long, as a sync would bring it — for
     // watching an open conversation take in a new message.
     if account_id == 1 {
-        if let Some(secs) =
-            std::env::var("HYLKI_DEMO_ARRIVAL").ok().and_then(|v| v.parse::<u64>().ok())
+        if let Some(secs) = std::env::var("HYLKI_DEMO_ARRIVAL")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
         {
             let emit = emit.clone();
             let mut messages = backend.messages(1);
             tokio::task::spawn_local(async move {
                 tokio::time::sleep(Duration::from_secs(secs)).await;
                 messages.insert(0, crate::backend::demo_arrival());
-                emit(WorkerEvent::Messages { folder_id: 1, messages });
+                emit(WorkerEvent::Messages {
+                    folder_id: 1,
+                    messages,
+                });
             });
         }
     }
@@ -10597,13 +12261,20 @@ async fn run_mock(
             MailRequest::Locate { message_id } => {
                 // No folders to search here beyond what the cache already
                 // held: answer "not found" so the app can report the miss.
-                emit(WorkerEvent::Located { message_id: message_id.clone(), hit: None });
+                emit(WorkerEvent::Located {
+                    message_id: message_id.clone(),
+                    hit: None,
+                });
             }
             // Demo mode seeds its in-memory cache up front (see
             // `backend::seed_demo_cache`), so every attachment is already
             // described and there is nothing to ask a server about.
             MailRequest::ScanAttachments { folder_path } => {
-                emit(WorkerEvent::AttachmentsScanned { folder_path, added: 0, remaining: 0 });
+                emit(WorkerEvent::AttachmentsScanned {
+                    folder_path,
+                    added: 0,
+                    remaining: 0,
+                });
             }
             MailRequest::Quota => emit(WorkerEvent::Quota(Some(MailboxQuota {
                 used: 2_310_000_000,
@@ -10629,7 +12300,10 @@ async fn run_mock(
                 ]));
             }
             MailRequest::LoadRelated { message_id, .. } => {
-                emit(WorkerEvent::Related { message_id, messages: Vec::new() });
+                emit(WorkerEvent::Related {
+                    message_id,
+                    messages: Vec::new(),
+                });
             }
             MailRequest::LoadThreadSummaries { groups } => {
                 emit(WorkerEvent::ThreadSummaries {
@@ -10643,7 +12317,10 @@ async fn run_mock(
                 // app never asks for one: the verdicts that would come with
                 // a fetched body are served with the listing instead.
                 let ids: Vec<u32> = messages.iter().map(|m| m.id).collect();
-                emit(WorkerEvent::Messages { folder_id, messages });
+                emit(WorkerEvent::Messages {
+                    folder_id,
+                    messages,
+                });
                 let path = backend
                     .folders(account_id)
                     .into_iter()
@@ -10670,14 +12347,31 @@ async fn run_mock(
                     None => emit(WorkerEvent::FolderSynced { folder_id }),
                 }
             }
-            MailRequest::LoadBody { message_id, ref path, .. } => {
-                let body = backend.message(message_id).map(|m| m.body).unwrap_or_default();
-                emit(WorkerEvent::Body { message_id, path: path.clone(), body });
+            MailRequest::LoadBody {
+                message_id,
+                ref path,
+                ..
+            } => {
+                let body = backend
+                    .message(message_id)
+                    .map(|m| m.body)
+                    .unwrap_or_default();
+                emit(WorkerEvent::Body {
+                    message_id,
+                    path: path.clone(),
+                    body,
+                });
                 mock_sender_check(path, message_id, &emit);
             }
-            MailRequest::LoadBodies { ref items, ref path } => {
+            MailRequest::LoadBodies {
+                ref items,
+                ref path,
+            } => {
                 for (message_id, _) in items {
-                    let body = backend.message(*message_id).map(|m| m.body).unwrap_or_default();
+                    let body = backend
+                        .message(*message_id)
+                        .map(|m| m.body)
+                        .unwrap_or_default();
                     emit(WorkerEvent::Body {
                         message_id: *message_id,
                         path: path.clone(),
@@ -10687,10 +12381,17 @@ async fn run_mock(
                 }
             }
             MailRequest::LoadSource { message_id, .. } => {
-                let text = backend.message(message_id).map(|m| m.body).unwrap_or_default();
+                let text = backend
+                    .message(message_id)
+                    .map(|m| m.body)
+                    .unwrap_or_default();
                 emit(WorkerEvent::Source { text });
             }
-            MailRequest::LoadAttachments { message_id, ref path, .. } => {
+            MailRequest::LoadAttachments {
+                message_id,
+                ref path,
+                ..
+            } => {
                 // A demo message flagged as carrying attachments gets two
                 // small files, so the reader's per-card rows and the drawer
                 // have something to show (#213).
@@ -10703,12 +12404,19 @@ async fn run_mock(
                         name: "invite.ics".to_string(),
                         data: inv.ics.into_bytes(),
                     }]
-                } else if backend.message(message_id).is_some_and(|m| m.has_attachment) {
+                } else if backend
+                    .message(message_id)
+                    .is_some_and(|m| m.has_attachment)
+                {
                     demo_attachment_files(message_id)
                 } else {
                     Vec::new()
                 };
-                emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
+                emit(WorkerEvent::Attachments {
+                    path: path.to_string(),
+                    message_id,
+                    items,
+                });
             }
             // Mutations are no-ops offline; the UI updates optimistically.
             MailRequest::SetSeen { .. }
@@ -10729,8 +12437,14 @@ async fn run_mock(
             | MailRequest::Reconnect => {}
             // The demo's folders are fixed, but an emptied one reads as empty.
             MailRequest::EmptyFolder { folder_id, .. } => {
-                emit(WorkerEvent::Messages { folder_id, messages: Vec::new() });
-                emit(WorkerEvent::FolderUnread { folder_id, unread: 0 });
+                emit(WorkerEvent::Messages {
+                    folder_id,
+                    messages: Vec::new(),
+                });
+                emit(WorkerEvent::FolderUnread {
+                    folder_id,
+                    unread: 0,
+                });
             }
             // The demo backend sends nothing, so its Outbox is always empty.
             MailRequest::LoadOutbox => emit(WorkerEvent::Outbox { items: Vec::new() }),
@@ -10738,12 +12452,11 @@ async fn run_mock(
             MailRequest::MoveMessages { .. }
             | MailRequest::MarkHamMany { .. }
             | MailRequest::PurgeMessages { .. }
-            | MailRequest::UndoMove { .. } => {
-                emit(WorkerEvent::BulkComplete)
-            }
-            MailRequest::SaveDraft { autosave, .. } => {
-                emit(WorkerEvent::DraftSaved { autosave, message_id: None })
-            }
+            | MailRequest::UndoMove { .. } => emit(WorkerEvent::BulkComplete),
+            MailRequest::SaveDraft { autosave, .. } => emit(WorkerEvent::DraftSaved {
+                autosave,
+                message_id: None,
+            }),
             MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
             MailRequest::ExportRaw { token, uid, .. } => emit(WorkerEvent::RawExported {
                 token,
@@ -10761,10 +12474,24 @@ async fn run_mock(
                     .map(String::into_bytes)
                     .ok_or_else(|| "no such demo message".to_string()),
             }),
-            MailRequest::ImportRaw { token, .. } => emit(WorkerEvent::RawImported { token, result: Ok(()) }),
-            MailRequest::DeleteAttachment { message_id, path, uid, name, size } => {
-                emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid: Some(uid), name, size })
-            }
+            MailRequest::ImportRaw { token, .. } => emit(WorkerEvent::RawImported {
+                token,
+                result: Ok(()),
+            }),
+            MailRequest::DeleteAttachment {
+                message_id,
+                path,
+                uid,
+                name,
+                size,
+            } => emit(WorkerEvent::AttachmentDeleted {
+                message_id,
+                path,
+                uid,
+                new_uid: Some(uid),
+                name,
+                size,
+            }),
             // Pretend the send succeeded so the compose flow is demoable offline.
             MailRequest::Send { ticket, .. } => {
                 emit(WorkerEvent::Sent);
@@ -10783,7 +12510,11 @@ async fn run_mock(
 /// `list_folders` prefer the real special-use folder when a server also exposes a
 /// stray folder that merely *looks* like it fills the same role — e.g. Gmail's
 /// real `[Gmail]/Trash` (\Trash) next to a plain top-level `Trash` label.
-fn classify_with_source(path: &str, delimiter: Option<&str>, attrs: &[NameAttribute]) -> (FolderKind, bool) {
+fn classify_with_source(
+    path: &str,
+    delimiter: Option<&str>,
+    attrs: &[NameAttribute],
+) -> (FolderKind, bool) {
     // Prefer RFC 6154 SPECIAL-USE attributes; fall back to name matching.
     for a in attrs {
         match a {
@@ -10875,8 +12606,16 @@ fn address_list(addrs: Option<&Vec<async_imap::imap_proto::types::Address>>) -> 
 }
 
 fn address_parts(addr: &async_imap::imap_proto::types::Address) -> (String, String) {
-    let mailbox = addr.mailbox.as_deref().map(bytes_to_string).unwrap_or_default();
-    let host = addr.host.as_deref().map(bytes_to_string).unwrap_or_default();
+    let mailbox = addr
+        .mailbox
+        .as_deref()
+        .map(bytes_to_string)
+        .unwrap_or_default();
+    let host = addr
+        .host
+        .as_deref()
+        .map(bytes_to_string)
+        .unwrap_or_default();
     let email = if host.is_empty() {
         mailbox.clone()
     } else {
@@ -11262,7 +13001,12 @@ fn inline_cid_images(
 /// looking back past the quote and any whitespace around the `=`.
 fn is_href(bytes: &[u8], at: usize) -> bool {
     let mut j = at;
-    while j > 0 && matches!(bytes[j - 1], b'"' | b'\'' | b'=' | b' ' | b'\t' | b'\r' | b'\n') {
+    while j > 0
+        && matches!(
+            bytes[j - 1],
+            b'"' | b'\'' | b'=' | b' ' | b'\t' | b'\r' | b'\n'
+        )
+    {
         j -= 1;
     }
     j >= 4 && bytes[j - 4..j].eq_ignore_ascii_case(b"href")
@@ -11331,15 +13075,18 @@ fn next_url(text: &str, from: usize) -> Option<(usize, usize, String)> {
         // Only match at a boundary — the start, after whitespace, or after an
         // opening bracket/quote — so "shttp://", "awww." and "hi@www.x" (an email)
         // aren't linked.
-        let boundary = text[..i]
-            .chars()
-            .next_back()
-            .is_none_or(|c| c.is_whitespace() || matches!(c, '(' | '<' | '[' | '{' | '"' | '\'' | '|'));
+        let boundary = text[..i].chars().next_back().is_none_or(|c| {
+            c.is_whitespace() || matches!(c, '(' | '<' | '[' | '{' | '"' | '\'' | '|')
+        });
         let end = consume_url(text, i);
         // Reject a scheme with nothing (usable) after it.
         if boundary && end > i + prefix.len() {
             let url = &text[i..end];
-            let href = if add_https { format!("https://{url}") } else { url.to_string() };
+            let href = if add_https {
+                format!("https://{url}")
+            } else {
+                url.to_string()
+            };
             return Some((i, end, href));
         }
         i += prefix.len();
@@ -11429,9 +13176,15 @@ mod hostname_mismatch_tests {
         assert!(is_hostname_mismatch(
             "error:0A000086:SSL routines:tls_post_process_server_certificate:certificate verify failed: Hostname mismatch"
         ));
-        assert!(is_hostname_mismatch("The certificate's CN name does not match the passed value"));
-        assert!(!is_hostname_mismatch("certificate verify failed: self-signed certificate"));
-        assert!(!is_hostname_mismatch("connecting to imap.example.org timed out after 30 seconds"));
+        assert!(is_hostname_mismatch(
+            "The certificate's CN name does not match the passed value"
+        ));
+        assert!(!is_hostname_mismatch(
+            "certificate verify failed: self-signed certificate"
+        ));
+        assert!(!is_hostname_mismatch(
+            "connecting to imap.example.org timed out after 30 seconds"
+        ));
     }
 }
 
@@ -11481,11 +13234,17 @@ mod recipient_tests {
     fn a_comma_in_a_name_does_not_split_it() {
         assert_eq!(
             parse_recipients("\"Martin, Jason\" <j@x.example>, b@x.example"),
-            vec![pair("Martin, Jason", "j@x.example"), pair("", "b@x.example")]
+            vec![
+                pair("Martin, Jason", "j@x.example"),
+                pair("", "b@x.example")
+            ]
         );
         assert_eq!(
             parse_recipients("Martin, Jason <j@x.example>, Ann <a@x.example>,"),
-            vec![pair("Martin, Jason", "j@x.example"), pair("Ann", "a@x.example")]
+            vec![
+                pair("Martin, Jason", "j@x.example"),
+                pair("Ann", "a@x.example")
+            ]
         );
         assert_eq!(
             parse_recipients("\"a \\\"b\\\" c\" <q@x.example>"),
@@ -11510,7 +13269,10 @@ mod recipient_tests {
             );
         }
         assert_eq!(format_recipient("", "j@x.example"), "j@x.example");
-        assert_eq!(format_recipient("Jason Martin", "j@x.example"), "Jason Martin <j@x.example>");
+        assert_eq!(
+            format_recipient("Jason Martin", "j@x.example"),
+            "Jason Martin <j@x.example>"
+        );
     }
 }
 
@@ -11634,8 +13396,12 @@ mod tests {
         let line = b"* 1 FETCH (ENVELOPE (NIL \"S\" ((\"\\\"Sender Name\\\"\" NIL \"some\" \"mail.tld\")) \
 NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let (_, resp) = async_imap::imap_proto::parser::parse_response(line).unwrap();
-        let Response::Fetch(_, attrs) = resp else { panic!("not a FETCH") };
-        let Some(AttributeValue::Envelope(env)) = attrs.first() else { panic!("no ENVELOPE") };
+        let Response::Fetch(_, attrs) = resp else {
+            panic!("not a FETCH")
+        };
+        let Some(AttributeValue::Envelope(env)) = attrs.first() else {
+            panic!("no ENVELOPE")
+        };
         let from = env.from.as_ref().unwrap();
         assert_eq!(
             address_parts(&from[0]),
@@ -11649,14 +13415,32 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let quotas = vec![Quota {
             root_name: String::new(),
             resources: vec![
-                QuotaResource { name: QuotaResourceName::Message, usage: 12, limit: 1000 },
-                QuotaResource { name: QuotaResourceName::Storage, usage: 1024, limit: 4096 },
+                QuotaResource {
+                    name: QuotaResourceName::Message,
+                    usage: 12,
+                    limit: 1000,
+                },
+                QuotaResource {
+                    name: QuotaResourceName::Storage,
+                    usage: 1024,
+                    limit: 4096,
+                },
             ],
         }];
-        assert_eq!(imap_storage_quota(&quotas), Some(MailboxQuota { used: 1024 * 1024, limit: 4096 * 1024 }));
+        assert_eq!(
+            imap_storage_quota(&quotas),
+            Some(MailboxQuota {
+                used: 1024 * 1024,
+                limit: 4096 * 1024
+            })
+        );
         let unlimited = vec![Quota {
             root_name: String::new(),
-            resources: vec![QuotaResource { name: QuotaResourceName::Storage, usage: 5, limit: 0 }],
+            resources: vec![QuotaResource {
+                name: QuotaResourceName::Storage,
+                usage: 5,
+                limit: 0,
+            }],
         }];
         assert_eq!(imap_storage_quota(&unlimited), None);
     }
@@ -11672,8 +13456,15 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             ..sample_account()
         };
         assert_eq!(sign_in_password_blocking(&held, false).as_deref(), Ok("pw"));
-        assert_eq!(sign_in_password_blocking(&held, true).as_deref(), Ok("smtp"));
-        let oauth = AccountConfig { oauth: true, password: String::new(), ..sample_account() };
+        assert_eq!(
+            sign_in_password_blocking(&held, true).as_deref(),
+            Ok("smtp")
+        );
+        let oauth = AccountConfig {
+            oauth: true,
+            password: String::new(),
+            ..sample_account()
+        };
         assert_eq!(sign_in_password_blocking(&oauth, false).as_deref(), Ok(""));
     }
 
@@ -11687,7 +13478,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     #[ignore]
     fn live_keyring_read_again() {
-        let (Ok(spec), Ok(_)) = (std::env::var("IMAP_LIVE"), std::env::var("KEYRING_LIVE")) else { return };
+        let (Ok(spec), Ok(_)) = (std::env::var("IMAP_LIVE"), std::env::var("KEYRING_LIVE")) else {
+            return;
+        };
         let scratch = std::env::var("XDG_DATA_HOME").unwrap_or_default();
         let runtime = std::env::var("XDG_RUNTIME_DIR").unwrap_or_default();
         assert!(
@@ -11712,8 +13505,15 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let keyrings = std::path::Path::new(&scratch).join("keyrings");
         std::fs::create_dir_all(&keyrings).unwrap();
         std::fs::write(keyrings.join("default"), "login").unwrap();
-        let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
-        let err = rt.block_on(connect(&account)).err().expect("no keyring, no sign-in").to_string();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let err = rt
+            .block_on(connect(&account))
+            .err()
+            .expect("no keyring, no sign-in")
+            .to_string();
         assert!(err.contains("keyring"), "{err}");
 
         use std::io::Write;
@@ -11723,7 +13523,12 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             .stdout(std::process::Stdio::null())
             .spawn()
             .expect("gnome-keyring-daemon");
-        daemon.stdin.take().unwrap().write_all(b"scratch\n").unwrap();
+        daemon
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(b"scratch\n")
+            .unwrap();
         daemon.wait().unwrap();
         let mut stored = crate::config::store_password(&account.email, p[3]);
         for _ in 0..20 {
@@ -11734,7 +13539,8 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             stored = crate::config::store_password(&account.email, p[3]);
         }
         stored.expect("store");
-        rt.block_on(connect(&account)).expect("signs in with the keyring's password");
+        rt.block_on(connect(&account))
+            .expect("signs in with the keyring's password");
     }
 
     /// Removing an attachment on a real server (#289), with
@@ -11745,7 +13551,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     #[ignore]
     fn live_strip_attachment() {
-        let Ok(spec) = std::env::var("IMAP_LIVE") else { return };
+        let Ok(spec) = std::env::var("IMAP_LIVE") else {
+            return;
+        };
         let p: Vec<&str> = spec.splitn(4, ',').collect();
         let account = AccountConfig {
             imap_host: p[0].into(),
@@ -11761,41 +13569,83 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         };
         let msgid = format!("strip-{}@hylki.test", crate::datefmt::now());
         let raw = strip::MIXED.replace("r1@example.org", &msgid);
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async {
             let mut sess = connect(&account).await.expect("connect");
             let uid_next = sel(&mut sess, "INBOX").await.expect("select").uid_next;
-            append_dated(&mut sess, "INBOX", Some("(\\Seen \\Flagged $label1)"), Some("\"01-Jan-2020 10:00:00 +0000\""), raw.as_bytes())
-                .await
-                .expect("append");
+            append_dated(
+                &mut sess,
+                "INBOX",
+                Some("(\\Seen \\Flagged $label1)"),
+                Some("\"01-Jan-2020 10:00:00 +0000\""),
+                raw.as_bytes(),
+            )
+            .await
+            .expect("append");
             let wanted = normalize_msgid(format!("<{msgid}>").as_bytes());
-            let uid = find_appended(&mut sess, 0, uid_next, &wanted).await.expect("stored");
+            let uid = find_appended(&mut sess, 0, uid_next, &wanted)
+                .await
+                .expect("stored");
             let mut session = Some(sess);
-            let (new_uid, _) = match strip_imap_attachment(&mut session, &account, "INBOX", uid, "report.pdf", 18).await {
-                Ok(done) => done,
-                Err(e) => panic!("strip: {}", e.text),
-            };
+            let (new_uid, _) =
+                match strip_imap_attachment(&mut session, &account, "INBOX", uid, "report.pdf", 18)
+                    .await
+                {
+                    Ok(done) => done,
+                    Err(e) => panic!("strip: {}", e.text),
+                };
             let new_uid = new_uid.expect("the copy is found again");
             assert_ne!(new_uid, uid);
             let sess = session.as_mut().unwrap();
             sel(sess, "INBOX").await.expect("select");
-            let left: Vec<Fetch> = fetch_uids(sess, uid.to_string(), "(UID FLAGS)").await.expect("fetch").try_collect().await.expect("fetch");
-            assert!(left.iter().all(|f| f.uid != Some(uid)), "the original is gone");
-            let fetches: Vec<Fetch> = fetch_uids(sess, new_uid.to_string(), "(UID FLAGS INTERNALDATE BODY.PEEK[])")
+            let left: Vec<Fetch> = fetch_uids(sess, uid.to_string(), "(UID FLAGS)")
                 .await
                 .expect("fetch")
                 .try_collect()
                 .await
                 .expect("fetch");
-            let f = fetches.iter().find(|f| f.uid == Some(new_uid)).expect("the copy");
+            assert!(
+                left.iter().all(|f| f.uid != Some(uid)),
+                "the original is gone"
+            );
+            let fetches: Vec<Fetch> = fetch_uids(
+                sess,
+                new_uid.to_string(),
+                "(UID FLAGS INTERNALDATE BODY.PEEK[])",
+            )
+            .await
+            .expect("fetch")
+            .try_collect()
+            .await
+            .expect("fetch");
+            let f = fetches
+                .iter()
+                .find(|f| f.uid == Some(new_uid))
+                .expect("the copy");
             let flags = kept_flags(f.flags());
-            println!("copy {new_uid}: flags {flags:?} date {:?}", f.internal_date());
-            assert!(flags.contains(&"\\Seen".to_string()) && flags.contains(&"\\Flagged".to_string()));
+            println!(
+                "copy {new_uid}: flags {flags:?} date {:?}",
+                f.internal_date()
+            );
+            assert!(
+                flags.contains(&"\\Seen".to_string()) && flags.contains(&"\\Flagged".to_string())
+            );
             assert!(flags.contains(&"$label1".to_string()));
-            assert_eq!(f.internal_date().map(|d| d.timestamp()), Some(1_577_872_800));
-            let names: Vec<String> = extract_attachments(f.body().expect("body")).into_iter().map(|a| a.name).collect();
+            assert_eq!(
+                f.internal_date().map(|d| d.timestamp()),
+                Some(1_577_872_800)
+            );
+            let names: Vec<String> = extract_attachments(f.body().expect("body"))
+                .into_iter()
+                .map(|a| a.name)
+                .collect();
             assert_eq!(names, vec!["data.csv"]);
-            purge_messages(sess, "INBOX", &[new_uid]).await.expect("clean up");
+            purge_messages(sess, "INBOX", &[new_uid])
+                .await
+                .expect("clean up");
         });
     }
 
@@ -11813,7 +13663,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     #[ignore]
     fn live_draft_comes_back_whole() {
-        let Ok(spec) = std::env::var("IMAP_LIVE") else { return };
+        let Ok(spec) = std::env::var("IMAP_LIVE") else {
+            return;
+        };
         let p: Vec<&str> = spec.splitn(4, ',').collect();
         let account = AccountConfig {
             imap_host: p[0].into(),
@@ -11841,12 +13693,23 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             ..sample_outgoing()
         };
         let raw = build_draft(&account, &msg).expect("builds").formatted();
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async {
             let mut sess = connect(&account).await.expect("connect");
-            append_draft(&mut sess, "Drafts", &raw, false).await.expect("append");
-            let listed = load_messages(7, &mut sess, 1, "Drafts", true, None).await.expect("load");
-            let uid = listed.iter().find(|m| m.subject == subject).expect("listed").uid;
+            append_draft(&mut sess, "Drafts", &raw, false)
+                .await
+                .expect("append");
+            let listed = load_messages(7, &mut sess, 1, "Drafts", true, None)
+                .await
+                .expect("load");
+            let uid = listed
+                .iter()
+                .find(|m| m.subject == subject)
+                .expect("listed")
+                .uid;
             let back = load_raw(&mut sess, "Drafts", uid).await.expect("raw");
             delete_draft(&mut sess, "Drafts", uid).await.ok();
             let e = editable_from_raw(&back, &[]);
@@ -11865,7 +13728,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     #[ignore]
     fn live_template_is_saved_as_read_mail() {
-        let Ok(spec) = std::env::var("IMAP_LIVE") else { return };
+        let Ok(spec) = std::env::var("IMAP_LIVE") else {
+            return;
+        };
         let p: Vec<&str> = spec.splitn(4, ',').collect();
         let account = AccountConfig {
             imap_host: p[0].into(),
@@ -11881,18 +13746,41 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         };
         let folder = format!("Templates-{}", std::process::id());
         let subject = format!("hylki-360-{}", std::process::id());
-        let msg = OutgoingMessage { subject: subject.clone(), html: "<p>template text</p>".into(), ..sample_outgoing() };
+        let msg = OutgoingMessage {
+            subject: subject.clone(),
+            html: "<p>template text</p>".into(),
+            ..sample_outgoing()
+        };
         let raw = build_draft(&account, &msg).expect("builds").formatted();
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async {
             let mut sess = connect(&account).await.expect("connect");
-            append_draft(&mut sess, &folder, &raw, true).await.expect("append makes the folder");
-            let listed = load_messages(7, &mut sess, 1, &folder, true, None).await.expect("load");
-            let uid = listed.iter().find(|m| m.subject == subject).expect("listed").uid;
+            append_draft(&mut sess, &folder, &raw, true)
+                .await
+                .expect("append makes the folder");
+            let listed = load_messages(7, &mut sess, 1, &folder, true, None)
+                .await
+                .expect("load");
+            let uid = listed
+                .iter()
+                .find(|m| m.subject == subject)
+                .expect("listed")
+                .uid;
             sel(&mut sess, &folder).await.expect("select");
-            let fetches: Vec<Fetch> =
-                fetch_uids(&mut sess, uid.to_string(), "(UID FLAGS)").await.expect("fetch").try_collect().await.expect("fetch");
-            let flags: Vec<String> = fetches.iter().flat_map(|f| f.flags()).map(|f| format!("{f:?}")).collect();
+            let fetches: Vec<Fetch> = fetch_uids(&mut sess, uid.to_string(), "(UID FLAGS)")
+                .await
+                .expect("fetch")
+                .try_collect()
+                .await
+                .expect("fetch");
+            let flags: Vec<String> = fetches
+                .iter()
+                .flat_map(|f| f.flags())
+                .map(|f| format!("{f:?}"))
+                .collect();
             println!("template {uid}: flags {flags:?}");
             assert!(flags.iter().any(|f| f == "Seen"), "{flags:?}");
             assert!(!flags.iter().any(|f| f == "Draft"), "{flags:?}");
@@ -11908,7 +13796,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     #[ignore]
     fn live_reply_is_filed_beside_its_original() {
-        let (Ok(spec), Ok(smtp)) = (std::env::var("IMAP_LIVE"), std::env::var("SMTP_LIVE")) else { return };
+        let (Ok(spec), Ok(smtp)) = (std::env::var("IMAP_LIVE"), std::env::var("SMTP_LIVE")) else {
+            return;
+        };
         let p: Vec<&str> = spec.splitn(4, ',').collect();
         let (smtp_host, smtp_port) = smtp.split_once(',').expect("host,port");
         let account = AccountConfig {
@@ -11937,17 +13827,36 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
              Date: Fri, 16 Oct 2026 10:00:00 +0000\r\n\r\nShall we plan?\r\n",
             account.email
         );
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async {
             let cache = Cache::in_memory().unwrap();
             let mut sess = connect(&account).await.expect("connect");
             create_box(&mut sess, &folder).await.expect("create");
-            append_to_sent(&mut sess, &folder, original.as_bytes()).await.expect("original filed");
-            let folders = list_folders(1, &mut sess, &account.folder_roles, &account.hidden_folders).await.expect("list");
+            append_to_sent(&mut sess, &folder, original.as_bytes())
+                .await
+                .expect("original filed");
+            let folders =
+                list_folders(1, &mut sess, &account.folder_roles, &account.hidden_folders)
+                    .await
+                    .expect("list");
             cache.save_folders(1, &folders);
-            let folder_id = folders.iter().find(|f| f.path == folder).expect("listed").id;
-            let sent = folders.iter().find(|f| f.kind == FolderKind::Sent).expect("a Sent folder").path.clone();
-            let listed = load_messages(1, &mut sess, folder_id, &folder, true, Some(&cache)).await.expect("load");
+            let folder_id = folders
+                .iter()
+                .find(|f| f.path == folder)
+                .expect("listed")
+                .id;
+            let sent = folders
+                .iter()
+                .find(|f| f.kind == FolderKind::Sent)
+                .expect("a Sent folder")
+                .path
+                .clone();
+            let listed = load_messages(1, &mut sess, folder_id, &folder, true, Some(&cache))
+                .await
+                .expect("load");
             cache.upsert_messages(1, &folder, &listed);
 
             let reply = OutgoingMessage {
@@ -11961,26 +13870,49 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             let raw = send_smtp(&account, &reply).await.expect("sent");
             let dest = super::reply_copy_path(&account, 1, Some(&cache), &reply.in_reply_to);
             assert_eq!(dest.as_deref(), Some(folder.as_str()));
-            let took = file_sent_copy(&mut sess, dest.as_deref(), Some(&sent), &raw).await.expect("filed");
+            let took = file_sent_copy(&mut sess, dest.as_deref(), Some(&sent), &raw)
+                .await
+                .expect("filed");
             assert_eq!(took.as_deref(), Some(folder.as_str()));
-            let after = load_messages(1, &mut sess, folder_id, &folder, true, None).await.expect("load");
-            let copy = after.iter().find(|m| m.subject == reply.subject).expect("the copy is beside its original");
+            let after = load_messages(1, &mut sess, folder_id, &folder, true, None)
+                .await
+                .expect("load");
+            let copy = after
+                .iter()
+                .find(|m| m.subject == reply.subject)
+                .expect("the copy is beside its original");
             assert!(copy.references.contains(&parent), "{:?}", copy.references);
-            println!("{folder}: {:?}", after.iter().map(|m| &m.subject).collect::<Vec<_>>());
+            println!(
+                "{folder}: {:?}",
+                after.iter().map(|m| &m.subject).collect::<Vec<_>>()
+            );
 
             // A folder gone from the server since: Sent takes it.
             let gone = format!("Gone-{pid}");
-            let took = file_sent_copy(&mut sess, Some(&gone), Some(&sent), &raw).await.expect("filed");
+            let took = file_sent_copy(&mut sess, Some(&gone), Some(&sent), &raw)
+                .await
+                .expect("filed");
             assert_eq!(took.as_deref(), Some(sent.as_str()));
             let sent_id = folders.iter().find(|f| f.path == sent).unwrap().id;
-            let in_sent = load_messages(1, &mut sess, sent_id, &sent, true, None).await.expect("load");
-            let fallback = in_sent.iter().find(|m| m.subject == reply.subject).expect("the copy went to Sent");
-            delete_draft(&mut sess, &sent, fallback.uid).await.expect("clean up Sent");
+            let in_sent = load_messages(1, &mut sess, sent_id, &sent, true, None)
+                .await
+                .expect("load");
+            let fallback = in_sent
+                .iter()
+                .find(|m| m.subject == reply.subject)
+                .expect("the copy went to Sent");
+            delete_draft(&mut sess, &sent, fallback.uid)
+                .await
+                .expect("clean up Sent");
             // The reply went to the account itself: take it out of the Inbox.
             for _ in 0..10 {
-                let inbox = load_messages(1, &mut sess, 1, "INBOX", true, None).await.expect("load");
+                let inbox = load_messages(1, &mut sess, 1, "INBOX", true, None)
+                    .await
+                    .expect("load");
                 if let Some(m) = inbox.iter().find(|m| m.subject == reply.subject) {
-                    delete_draft(&mut sess, "INBOX", m.uid).await.expect("clean up the Inbox");
+                    delete_draft(&mut sess, "INBOX", m.uid)
+                        .await
+                        .expect("clean up the Inbox");
                     break;
                 }
                 tokio::time::sleep(Duration::from_millis(500)).await;
@@ -11993,7 +13925,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     #[ignore]
     fn live_idle_catches_mail_that_landed_between_commands() {
-        let Ok(spec) = std::env::var("IMAP_LIVE") else { return };
+        let Ok(spec) = std::env::var("IMAP_LIVE") else {
+            return;
+        };
         let p: Vec<&str> = spec.splitn(4, ',').collect();
         let account = AccountConfig {
             imap_host: p[0].into(),
@@ -12007,7 +13941,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             }),
             ..sample_account()
         };
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async {
             let mut sess = connect(&account).await.expect("connect");
             load_messages(7, &mut sess, 1, "INBOX", true, None).await.expect("load");
@@ -12036,7 +13973,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
 
     #[ignore]
     fn live_rename_moves_subscriptions() {
-        let Ok(spec) = std::env::var("IMAP_LIVE") else { return };
+        let Ok(spec) = std::env::var("IMAP_LIVE") else {
+            return;
+        };
         let p: Vec<&str> = spec.splitn(4, ',').collect();
         let account = AccountConfig {
             imap_host: p[0].into(),
@@ -12050,12 +13989,18 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             }),
             ..sample_account()
         };
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async {
             let mut sess = connect(&account).await.expect("connect");
             let delim = session_delimiter(&mut sess).await;
             let (old, sub) = ("Hylki Rig".to_string(), format!("Hylki Rig{delim}Sub one"));
-            let (new, new_sub) = ("Hylki Rig Moved".to_string(), format!("Hylki Rig Moved{delim}Sub one"));
+            let (new, new_sub) = (
+                "Hylki Rig Moved".to_string(),
+                format!("Hylki Rig Moved{delim}Sub one"),
+            );
             for f in [&old, &sub] {
                 create_box(&mut sess, f).await.expect("create");
                 subscribe_box(&mut sess, f).await.expect("subscribe");
@@ -12096,7 +14041,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     /// state as IMAP flags, and asks for none when it had neither (#265).
     #[test]
     fn imported_mail_keeps_its_flags() {
-        assert_eq!(import_flags(true, true).as_deref(), Some("(\\Seen \\Flagged)"));
+        assert_eq!(
+            import_flags(true, true).as_deref(),
+            Some("(\\Seen \\Flagged)")
+        );
         assert_eq!(import_flags(true, false).as_deref(), Some("(\\Seen)"));
         assert_eq!(import_flags(false, true).as_deref(), Some("(\\Flagged)"));
         assert_eq!(import_flags(false, false), None);
@@ -12110,7 +14058,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[ignore]
     fn open_timing() {
         use std::time::{Duration, Instant};
-        let Ok(dir) = std::env::var("HYLKI_OPEN_TIMING") else { return };
+        let Ok(dir) = std::env::var("HYLKI_OPEN_TIMING") else {
+            return;
+        };
         let mut paths: Vec<_> = std::fs::read_dir(&dir)
             .unwrap()
             .flatten()
@@ -12118,7 +14068,15 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             .filter(|p| p.extension().is_some_and(|x| x == "eml"))
             .collect();
         paths.sort();
-        const STEPS: [&str; 7] = ["parse", "unsubscribe", "invite", "check", "pgp", "body", "attach"];
+        const STEPS: [&str; 7] = [
+            "parse",
+            "unsubscribe",
+            "invite",
+            "check",
+            "pgp",
+            "body",
+            "attach",
+        ];
         let mut total = [Duration::ZERO; 7];
         let mut whole: Vec<(Duration, [Duration; 7], String, usize)> = Vec::new();
         for p in &paths {
@@ -12130,7 +14088,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
                 t[i] = at.elapsed();
             };
             let mut parsed = None;
-            lap(0, &mut || parsed = mail_parser::MessageParser::default().parse(&raw[..]));
+            lap(0, &mut || {
+                parsed = mail_parser::MessageParser::default().parse(&raw[..])
+            });
             if let Some(m) = parsed.as_ref() {
                 lap(1, &mut || drop(crate::unsubscribe::detect(m)));
                 lap(2, &mut || drop(crate::invite::detect(m)));
@@ -12143,12 +14103,21 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
                 total[i] += t[i];
             }
             let sum: Duration = [t[3], t[4], t[5], t[6]].iter().sum();
-            whole.push((sum, t, p.file_name().unwrap().to_string_lossy().into_owned(), raw.len()));
+            whole.push((
+                sum,
+                t,
+                p.file_name().unwrap().to_string_lossy().into_owned(),
+                raw.len(),
+            ));
         }
         let n = paths.len().max(1) as u32;
         println!("{} messages", paths.len());
         for (i, step) in STEPS.iter().enumerate() {
-            println!("{step:>12}: total {:>9.1?}  mean {:>8.2?}", total[i], total[i] / n);
+            println!(
+                "{step:>12}: total {:>9.1?}  mean {:>8.2?}",
+                total[i],
+                total[i] / n
+            );
         }
         whole.sort_by(|a, b| b.0.cmp(&a.0));
         println!("slowest (render_raw ~ check+pgp+body+attach):");
@@ -12206,8 +14175,17 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         cache.upsert_messages(2, "INBOX", &[copy(2, 1, "a@x")]);
         let mut found = answered_copies(Some(&cache), 1, "<A@x>", "");
         found.sort();
-        assert_eq!(found, [("Archive".to_string(), 7, false), ("INBOX".to_string(), 1, false)]);
-        assert_eq!(answered_copies(Some(&cache), 1, "", "b@x"), [("INBOX".to_string(), 2, true)]);
+        assert_eq!(
+            found,
+            [
+                ("Archive".to_string(), 7, false),
+                ("INBOX".to_string(), 1, false)
+            ]
+        );
+        assert_eq!(
+            answered_copies(Some(&cache), 1, "", "b@x"),
+            [("INBOX".to_string(), 2, true)]
+        );
         assert!(answered_copies(Some(&cache), 1, "", "").is_empty());
         assert!(answered_copies(Some(&cache), 1, "gone@x", "").is_empty());
         assert!(answered_copies(None, 1, "a@x", "").is_empty());
@@ -12219,11 +14197,20 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     fn merging_a_recent_window_keeps_the_cached_previews() {
         let cached: Vec<Message> = (1..=3)
-            .map(|uid| Message { preview: format!("text {uid}"), ..flagged_message(uid) })
+            .map(|uid| Message {
+                preview: format!("text {uid}"),
+                ..flagged_message(uid)
+            })
             .collect();
         let recent = vec![
-            Message { unread: false, ..flagged_message(3) },
-            Message { preview: "new text".into(), ..flagged_message(2) },
+            Message {
+                unread: false,
+                ..flagged_message(3)
+            },
+            Message {
+                preview: "new text".into(),
+                ..flagged_message(2)
+            },
         ];
         let merged = merge_index(cached, recent);
         let previews: Vec<&str> = merged.iter().map(|m| m.preview.as_str()).collect();
@@ -12236,11 +14223,21 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     fn merging_a_recent_window_keeps_the_cached_labels() {
         let cached: Vec<Message> = (1..=2)
-            .map(|uid| Message { labels: vec![format!("Label {uid}")], ..flagged_message(uid) })
+            .map(|uid| Message {
+                labels: vec![format!("Label {uid}")],
+                ..flagged_message(uid)
+            })
             .collect();
         let merged = merge_index(cached, vec![flagged_message(2), flagged_message(3)]);
         let labels: Vec<Vec<String>> = merged.iter().map(|m| m.labels.clone()).collect();
-        assert_eq!(labels, [vec![], vec!["Label 2".to_string()], vec!["Label 1".to_string()]]);
+        assert_eq!(
+            labels,
+            [
+                vec![],
+                vec!["Label 2".to_string()],
+                vec!["Label 1".to_string()]
+            ]
+        );
     }
 
     fn fetch_attrs(raw: &[u8]) -> Vec<async_imap::imap_proto::AttributeValue<'_>> {
@@ -12271,7 +14268,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let none = fetch_attrs(b"* 4 FETCH (UID 8 X-GM-LABELS ())\r\n");
         assert_eq!(gmail_labels_of(&none, "INBOX"), Some((8, Vec::new())));
         let system_only = fetch_attrs(b"* 4 FETCH (UID 8 X-GM-LABELS (\\Sent \\Draft))\r\n");
-        assert_eq!(gmail_labels_of(&system_only, "INBOX"), Some((8, Vec::new())));
+        assert_eq!(
+            gmail_labels_of(&system_only, "INBOX"),
+            Some((8, Vec::new()))
+        );
         // A flag change Gmail volunteers says nothing about labels.
         let flags = fetch_attrs(b"* 5 FETCH (UID 9 FLAGS (\\Seen))\r\n");
         assert_eq!(gmail_labels_of(&flags, "INBOX"), None);
@@ -12286,7 +14286,11 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let msgs = vec![flagged_message(2383), flagged_message(2372)];
         let mut queue = std::collections::VecDeque::new();
         queue_attachment_prefetch(&mut queue, "INBOX", &msgs, None, 7);
-        assert_eq!(queue.len(), 2, "both flagged rows are queued the first time");
+        assert_eq!(
+            queue.len(),
+            2,
+            "both flagged rows are queued the first time"
+        );
 
         // The prefetch pops 2383 and notes the attempt, as run_one_prefetch does
         // before anything can go wrong with the read.
@@ -12296,12 +14300,14 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
 
         // The resync that follows sees the same rows: 2383 must stay out.
         queue_attachment_prefetch(&mut queue, "INBOX", &msgs, None, 7);
-        assert_eq!(queue.iter().map(|(_, u)| *u).collect::<Vec<_>>(), vec![2372]);
+        assert_eq!(
+            queue.iter().map(|(_, u)| *u).collect::<Vec<_>>(),
+            vec![2372]
+        );
 
         // Another account's row with the same uid and path is its own attempt.
         assert!(!attachment_prefetch_tried(8, "INBOX", 2383));
     }
-
 
     pub(super) fn sample_outgoing() -> OutgoingMessage {
         OutgoingMessage {
@@ -12351,19 +14357,40 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         msg.to = "ann@example.com".into();
         msg.attachments = vec!["/nonexistent/hylki-test/moved.pdf".into()];
         let events = std::cell::RefCell::new(Vec::new());
-        send_failed(Some(&cache), 1, &account, &msg, None, "could not read the attachment", false, &|e| {
-            events.borrow_mut().push(e)
-        });
+        send_failed(
+            Some(&cache),
+            1,
+            &account,
+            &msg,
+            None,
+            "could not read the attachment",
+            false,
+            &|e| events.borrow_mut().push(e),
+        );
         let events = events.into_inner();
         assert!(
-            events.iter().any(|e| matches!(e, WorkerEvent::Unsent(m) if m.subject == "Subject")),
+            events
+                .iter()
+                .any(|e| matches!(e, WorkerEvent::Unsent(m) if m.subject == "Subject")),
             "{events:?}"
         );
         // A message that does build is queued and not handed back.
         msg.attachments.clear();
         let events = std::cell::RefCell::new(Vec::new());
-        send_failed(Some(&cache), 1, &account, &msg, None, "offline", false, &|e| events.borrow_mut().push(e));
-        assert!(!events.into_inner().iter().any(|e| matches!(e, WorkerEvent::Unsent(_))));
+        send_failed(
+            Some(&cache),
+            1,
+            &account,
+            &msg,
+            None,
+            "offline",
+            false,
+            &|e| events.borrow_mut().push(e),
+        );
+        assert!(!events
+            .into_inner()
+            .iter()
+            .any(|e| matches!(e, WorkerEvent::Unsent(_))));
     }
 
     /// #442: a message sent with no network waits in the Outbox with a
@@ -12375,12 +14402,27 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let mut msg = sample_outgoing();
         msg.to = "ann@example.com".into();
         let events = std::cell::RefCell::new(Vec::new());
-        send_failed(Some(&cache), 1, &account, &msg, None, &offline_text(), false, &|e| {
-            events.borrow_mut().push(e)
-        });
+        send_failed(
+            Some(&cache),
+            1,
+            &account,
+            &msg,
+            None,
+            &offline_text(),
+            false,
+            &|e| events.borrow_mut().push(e),
+        );
         let events = events.into_inner();
-        assert!(events.iter().any(|e| matches!(e, WorkerEvent::Notice(_))), "{events:?}");
-        assert!(!events.iter().any(|e| matches!(e, WorkerEvent::Error { .. })), "{events:?}");
+        assert!(
+            events.iter().any(|e| matches!(e, WorkerEvent::Notice(_))),
+            "{events:?}"
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, WorkerEvent::Error { .. })),
+            "{events:?}"
+        );
         assert_eq!(cache.outbox_items(1).len(), 1);
     }
 
@@ -12393,10 +14435,20 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let mut msg = sample_outgoing();
         msg.to = "ann@example.com".into();
         let events = std::cell::RefCell::new(Vec::new());
-        send_failed(Some(&cache), 1, &account, &msg, None, "550 no such user", true, &|e| {
-            events.borrow_mut().push(e)
-        });
-        assert!(events.into_inner().iter().any(|e| matches!(e, WorkerEvent::Unsent(_))));
+        send_failed(
+            Some(&cache),
+            1,
+            &account,
+            &msg,
+            None,
+            "550 no such user",
+            true,
+            &|e| events.borrow_mut().push(e),
+        );
+        assert!(events
+            .into_inner()
+            .iter()
+            .any(|e| matches!(e, WorkerEvent::Unsent(_))));
         assert!(cache.outbox_items(1).is_empty());
     }
 
@@ -12405,19 +14457,36 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     fn pasted_addresses_lose_invisible_characters() {
         assert_eq!(
-            parse_recipients("\u{200b}ann\u{200b}@example.com\u{200e}, Bob <\u{feff}bob@example.com\u{a0}>"),
-            vec![(String::new(), "ann@example.com".to_string()), ("Bob".to_string(), "bob@example.com".to_string())],
+            parse_recipients(
+                "\u{200b}ann\u{200b}@example.com\u{200e}, Bob <\u{feff}bob@example.com\u{a0}>"
+            ),
+            vec![
+                (String::new(), "ann@example.com".to_string()),
+                ("Bob".to_string(), "bob@example.com".to_string())
+            ],
         );
         let persian = "\u{0645}\u{06cc}\u{200c}\u{0631}\u{0648}\u{062f}";
-        assert_eq!(parse_recipients(&format!("{persian} <a@b.com>"))[0].0, persian);
+        assert_eq!(
+            parse_recipients(&format!("{persian} <a@b.com>"))[0].0,
+            persian
+        );
         assert_eq!(
             clean_recipient_field("ann\u{200b}@example.com, Bob <bob@example.com>").as_deref(),
             Some("ann@example.com, Bob <bob@example.com>")
         );
         assert_eq!(clean_recipient_field("ann@example.com"), None);
-        assert_eq!(invalid_recipient("ann@example.com, Bob <bob@example.com>"), None);
-        assert_eq!(invalid_recipient("ann@example.com, bob@"), Some("bob@".to_string()));
-        assert_eq!(invalid_recipient("ann example.com"), Some("ann example.com".to_string()));
+        assert_eq!(
+            invalid_recipient("ann@example.com, Bob <bob@example.com>"),
+            None
+        );
+        assert_eq!(
+            invalid_recipient("ann@example.com, bob@"),
+            Some("bob@".to_string())
+        );
+        assert_eq!(
+            invalid_recipient("ann example.com"),
+            Some("ann example.com".to_string())
+        );
     }
 
     /// A draft saved before any address is typed: the bytes build without a
@@ -12427,11 +14496,15 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let account = sample_account();
         let mut msg = sample_outgoing();
         msg.body = "half-written".into();
-        let raw = build_draft(&account, &msg).expect("draft builds").formatted();
+        let raw = build_draft(&account, &msg)
+            .expect("draft builds")
+            .formatted();
         let text = String::from_utf8_lossy(&raw);
         assert!(!text.contains("\r\nTo:"), "no To header: {text}");
         assert!(text.contains("half-written"), "{text}");
-        let err = build_email(&account, &msg).expect_err("send needs a recipient").to_string();
+        let err = build_email(&account, &msg)
+            .expect_err("send needs a recipient")
+            .to_string();
         assert!(err.contains("missing destination"), "{err}");
         // With a recipient the draft is built the ordinary way.
         msg.to = "Peer <peer@hylki.invalid>".into();
@@ -12463,8 +14536,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let gpg = crate::pgp::Gpg::system();
         let mut account = sample_account();
         account.email = "sender@hylki.invalid".into();
-        let fpr = crate::pgp::generate_key(&gpg, "Sender", "sender@hylki.invalid", "never", "").expect("own key");
-        crate::pgp::generate_key(&gpg, "Peer", "peer@hylki.invalid", "never", "").expect("peer key");
+        let fpr = crate::pgp::generate_key(&gpg, "Sender", "sender@hylki.invalid", "never", "")
+            .expect("own key");
+        crate::pgp::generate_key(&gpg, "Peer", "peer@hylki.invalid", "never", "")
+            .expect("peer key");
 
         let mut msg = sample_outgoing();
         msg.to = "Peer <peer@hylki.invalid>".into();
@@ -12476,7 +14551,11 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert!(text.contains("micalg=\"pgp-sha"), "{text}");
         assert!(!has_bare_lf(&raw), "{text}");
         let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
-        assert!(matches!(u.status.signature, crate::models::PgpSignature::Good { .. }), "{:?}", u.status);
+        assert!(
+            matches!(u.status.signature, crate::models::PgpSignature::Good { .. }),
+            "{:?}",
+            u.status
+        );
         assert!(!u.status.encrypted);
         let inner = String::from_utf8_lossy(&u.inner.unwrap()).to_string();
         assert!(inner.contains("signed body text"), "{inner}");
@@ -12487,7 +14566,11 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         msg.attachments = vec![path.to_string_lossy().to_string()];
         let raw = build_email(&account, &msg).expect("builds").formatted();
         let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
-        assert!(matches!(u.status.signature, crate::models::PgpSignature::Good { .. }), "{:?}", u.status);
+        assert!(
+            matches!(u.status.signature, crate::models::PgpSignature::Good { .. }),
+            "{:?}",
+            u.status
+        );
         assert!(!extract_attachments(&u.inner.unwrap()).is_empty());
 
         // Encrypted and signed: readable by the peer and by the sender.
@@ -12499,51 +14582,90 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let raw = build_email(&account, &msg).expect("builds").formatted();
         let text = String::from_utf8_lossy(&raw);
         assert!(text.contains("multipart/encrypted"), "{text}");
-        assert!(!text.contains("secret body text"), "plaintext must not appear: {text}");
+        assert!(
+            !text.contains("secret body text"),
+            "plaintext must not appear: {text}"
+        );
         // Protected headers (#493): the subject is inside, "..." outside.
-        assert!(!text.contains("Secret plans"), "the subject must not appear: {text}");
+        assert!(
+            !text.contains("Secret plans"),
+            "the subject must not appear: {text}"
+        );
         assert!(text.contains("Subject: ...\r\n"), "{text}");
         assert!(!has_bare_lf(&raw), "{text}");
         let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
         assert!(u.status.encrypted && u.status.decrypted, "{:?}", u.status);
-        assert!(matches!(u.status.signature, crate::models::PgpSignature::Good { .. }), "{:?}", u.status);
+        assert!(
+            matches!(u.status.signature, crate::models::PgpSignature::Good { .. }),
+            "{:?}",
+            u.status
+        );
         assert_eq!(u.status.subject.as_deref(), Some("Secret plans"));
         let inner = String::from_utf8_lossy(&u.inner.unwrap()).to_string();
         assert!(inner.contains("secret body text"), "{inner}");
         assert!(inner.contains("protected-headers=\"v1\""), "{inner}");
-        assert!(inner.contains("peer@hylki.invalid"), "the To travels inside: {inner}");
-        assert!(!inner.contains("Hidden"), "Bcc must stay out of what every recipient reads: {inner}");
-        assert_eq!(extract_body(inner.as_bytes()).matches("secret body text").count(), 1);
+        assert!(
+            inner.contains("peer@hylki.invalid"),
+            "the To travels inside: {inner}"
+        );
+        assert!(
+            !inner.contains("Hidden"),
+            "Bcc must stay out of what every recipient reads: {inner}"
+        );
+        assert_eq!(
+            extract_body(inner.as_bytes())
+                .matches("secret body text")
+                .count(),
+            1
+        );
         msg.bcc.clear();
         // An account that leaves the subject readable (#493) sends it outside.
         account.plain_subject = true;
         let raw = build_email(&account, &msg).expect("builds").formatted();
         let text = String::from_utf8_lossy(&raw);
         assert!(text.contains("Subject: Secret plans\r\n"), "{text}");
-        assert!(!text.contains("secret body text"), "plaintext must not appear: {text}");
+        assert!(
+            !text.contains("secret body text"),
+            "plaintext must not appear: {text}"
+        );
         let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
-        assert!(u.status.decrypted && u.status.subject.is_none(), "{:?}", u.status);
+        assert!(
+            u.status.decrypted && u.status.subject.is_none(),
+            "{:?}",
+            u.status
+        );
         account.plain_subject = false;
 
         // A recipient without a key is refused by name; a From without a key too.
         msg.cc = "nobody@hylki.invalid".into();
-        let err = build_email(&account, &msg).expect_err("no key for nobody").to_string();
+        let err = build_email(&account, &msg)
+            .expect_err("no key for nobody")
+            .to_string();
         assert!(err.contains("nobody@hylki.invalid"), "{err}");
         msg.cc.clear();
         account.email = "keyless@hylki.invalid".into();
-        let err = build_email(&account, &msg).expect_err("no own key").to_string();
+        let err = build_email(&account, &msg)
+            .expect_err("no own key")
+            .to_string();
         assert!(err.contains("keyless@hylki.invalid"), "{err}");
         // The account's chosen key overrides the address match.
         account.pgp_key = Some(fpr);
         build_email(&account, &msg).expect("chosen key signs");
 
         // A draft of the same message stays plain.
-        let plain = OutgoingMessage { sign: false, encrypt: false, ..msg.clone() };
+        let plain = OutgoingMessage {
+            sign: false,
+            encrypt: false,
+            ..msg.clone()
+        };
         let raw = build_email(&account, &plain).expect("builds").formatted();
         assert!(String::from_utf8_lossy(&raw).contains("secret body text"));
 
         std::env::remove_var("HYLKI_GNUPGHOME");
-        let _ = std::process::Command::new("gpgconf").env("GNUPGHOME", &home).args(["--kill", "all"]).status();
+        let _ = std::process::Command::new("gpgconf")
+            .env("GNUPGHOME", &home)
+            .args(["--kill", "all"])
+            .status();
         let _ = std::fs::remove_dir_all(&home);
     }
 
@@ -12586,22 +14708,33 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     /// machine's hostname.
     #[test]
     fn outgoing_mail_carries_a_message_id_in_the_senders_domain() {
-        let account = AccountConfig { email: "me@example.com".into(), ..sample_account() };
-        let msg = OutgoingMessage { to: "you@example.org".into(), ..sample_outgoing() };
-        let raw = String::from_utf8_lossy(
-            &build_email(&account, &msg).expect("builds").formatted(),
-        )
-        .to_string();
+        let account = AccountConfig {
+            email: "me@example.com".into(),
+            ..sample_account()
+        };
+        let msg = OutgoingMessage {
+            to: "you@example.org".into(),
+            ..sample_outgoing()
+        };
+        let raw =
+            String::from_utf8_lossy(&build_email(&account, &msg).expect("builds").formatted())
+                .to_string();
         let line = raw
             .lines()
             .find(|l| l.starts_with("Message-ID:"))
             .expect(&format!("a Message-ID is set: {raw}"));
-        assert!(line.contains("@example.com>"), "in the sender's domain: {line}");
+        assert!(
+            line.contains("@example.com>"),
+            "in the sender's domain: {line}"
+        );
     }
 
     #[test]
     fn a_new_message_carries_no_threading_headers() {
-        let msg = OutgoingMessage { to: "someone@example.com".into(), ..sample_outgoing() };
+        let msg = OutgoingMessage {
+            to: "someone@example.com".into(),
+            ..sample_outgoing()
+        };
         let email = build_email(&sample_account(), &msg).expect("builds");
         let raw = String::from_utf8_lossy(&email.formatted()).to_string();
         assert!(!raw.contains("In-Reply-To"), "{raw}");
@@ -12665,8 +14798,12 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             ..sample_outgoing()
         };
         let email = build_email(&account, &msg).expect("builds");
-        let rcpts: Vec<String> =
-            email.envelope().to().iter().map(|a| a.to_string()).collect();
+        let rcpts: Vec<String> = email
+            .envelope()
+            .to()
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
         let raw = email.formatted();
 
         // lettre drops Bcc from the wire format, so the envelope is the only
@@ -12679,8 +14816,16 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert_eq!(editable.bcc, "hidden@example.com");
         assert_eq!(editable.subject, "Quarterly numbers");
         // A plain-text body is escaped into HTML for the editor, keeping its lines.
-        assert!(editable.body_html.contains("First line"), "{}", editable.body_html);
-        assert!(editable.body_html.contains("Second line"), "{}", editable.body_html);
+        assert!(
+            editable.body_html.contains("First line"),
+            "{}",
+            editable.body_html
+        );
+        assert!(
+            editable.body_html.contains("Second line"),
+            "{}",
+            editable.body_html
+        );
         assert!(editable.attachments.is_empty());
     }
 
@@ -12697,7 +14842,12 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             ..sample_outgoing()
         };
         let email = build_email(&sample_account(), &msg).expect("builds");
-        let rcpts: Vec<String> = email.envelope().to().iter().map(|a| a.to_string()).collect();
+        let rcpts: Vec<String> = email
+            .envelope()
+            .to()
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
         let raw = email.formatted();
         assert!(!String::from_utf8_lossy(&raw).contains("hidden@example.com"));
 
@@ -12707,8 +14857,13 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         // Nothing else about the message changes: the bytes that went out
         // follow the one header put in front of them.
         assert!(copy.ends_with(&raw));
-        let parsed = mail_parser::MessageParser::default().parse(&copy).expect("parses");
-        assert_eq!(parsed.bcc().and_then(|a| a.first()).and_then(|a| a.name()), Some("Hidden Person"));
+        let parsed = mail_parser::MessageParser::default()
+            .parse(&copy)
+            .expect("parses");
+        assert_eq!(
+            parsed.bcc().and_then(|a| a.first()).and_then(|a| a.name()),
+            Some("Hidden Person")
+        );
         assert_eq!(parsed.subject(), Some("Quarterly numbers"));
 
         let queued = queued_with_bcc(&raw, &rcpts);
@@ -12736,15 +14891,26 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             ..sample_outgoing()
         };
         let email = build_email(&sample_account(), &msg).expect("builds");
-        let rcpts: Vec<String> =
-            email.envelope().to().iter().map(|a| a.to_string()).collect();
+        let rcpts: Vec<String> = email
+            .envelope()
+            .to()
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
         let editable = editable_from_raw(&email.formatted(), &rcpts);
 
         // The HTML alternative is what the composer edits, not the plain fallback.
-        assert!(editable.body_html.contains("rich <b>body</b>"), "{}", editable.body_html);
+        assert!(
+            editable.body_html.contains("rich <b>body</b>"),
+            "{}",
+            editable.body_html
+        );
         assert_eq!(editable.attachments.len(), 1);
         assert_eq!(editable.attachments[0].name, "report.pdf");
-        assert_eq!(editable.attachments[0].data, [0x25, 0x50, 0x44, 0x46, 0x00, 0xff]);
+        assert_eq!(
+            editable.attachments[0].data,
+            [0x25, 0x50, 0x44, 0x46, 0x00, 0xff]
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -12769,16 +14935,30 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             references: "first@example.com Orig@Example.com".into(),
             ..sample_outgoing()
         };
-        let raw = build_draft(&sample_account(), &msg).expect("builds").formatted();
+        let raw = build_draft(&sample_account(), &msg)
+            .expect("builds")
+            .formatted();
         let editable = editable_from_raw(&raw, &[]);
 
         assert_eq!(editable.from, "Work <work@example.com>");
         assert_eq!(editable.bcc, "hidden@example.com");
         assert_eq!(editable.in_reply_to, "Orig@Example.com");
         assert_eq!(editable.references, "first@example.com Orig@Example.com");
-        assert!(editable.body_html.contains("data:image/png;base64,"), "{}", editable.body_html);
-        assert!(!editable.body_html.contains("cid:"), "{}", editable.body_html);
-        assert_eq!(editable.attachments.len(), 1, "the picture is in the text, not a file");
+        assert!(
+            editable.body_html.contains("data:image/png;base64,"),
+            "{}",
+            editable.body_html
+        );
+        assert!(
+            !editable.body_html.contains("cid:"),
+            "{}",
+            editable.body_html
+        );
+        assert_eq!(
+            editable.attachments.len(),
+            1,
+            "the picture is in the text, not a file"
+        );
         assert_eq!(editable.attachments[0].name, "notes.txt");
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -12816,7 +14996,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert_eq!(preview_from_part(b64.as_bytes(), None, None), "");
         assert_eq!(preview_from_part(zip, None, Some("binary")), "");
         // Ordinary text with a tab and line breaks is not "binary".
-        assert_eq!(preview_from_part(b"Hello\tthere\r\nSecond line", None, None), "Hello there Second line");
+        assert_eq!(
+            preview_from_part(b"Hello\tthere\r\nSecond line", None, None),
+            "Hello there Second line"
+        );
         assert!(!text_like("application/zip"));
         assert!(text_like("multipart/mixed; boundary=x"));
     }
@@ -12824,7 +15007,11 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     fn preview_drops_rendered_links_but_keeps_their_text() {
         assert_eq!(
-            preview_from_part(b"Generate your Access Token ( https://example.com/api?a=1 )Got questions?", None, None),
+            preview_from_part(
+                b"Generate your Access Token ( https://example.com/api?a=1 )Got questions?",
+                None,
+                None
+            ),
             "Generate your Access Token Got questions?"
         );
         // Brackets that are not a link are left exactly as written.
@@ -12878,7 +15065,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             "<div>Only markup here</div>\r\n",
             "--x--\r\n",
         );
-        assert_eq!(preview_from_part(html_only.as_bytes(), None, None), "Only markup here");
+        assert_eq!(
+            preview_from_part(html_only.as_bytes(), None, None),
+            "Only markup here"
+        );
         // Two levels of nesting — mixed(alternative(...)) — are followed.
         let nested = concat!(
             "--outer\r\n",
@@ -12891,7 +15081,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             "--inner--\r\n",
             "--outer--\r\n",
         );
-        assert_eq!(preview_from_part(nested.as_bytes(), None, None), "Buried but readable");
+        assert_eq!(
+            preview_from_part(nested.as_bytes(), None, None),
+            "Buried but readable"
+        );
     }
 
     #[test]
@@ -12901,7 +15094,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             preview_from_part(b"-- \r\nRegards,\r\nSteve", None, None),
             "-- Regards, Steve"
         );
-        assert_eq!(preview_from_part(b"--\r\nsigned off", None, None), "-- signed off");
+        assert_eq!(
+            preview_from_part(b"--\r\nsigned off", None, None),
+            "-- signed off"
+        );
     }
 
     /// A PGP/MIME message's first part is the "Version: 1" stub, and an
@@ -12912,7 +15108,11 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert_eq!(preview_from_part(b"Version: 1\r\n", None, None), marker);
         assert_eq!(preview_from_part(b"version: 1", None, None), marker);
         assert_eq!(
-            preview_from_part(b"-----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA3\r\n-----END PGP MESSAGE-----\r\n", None, None),
+            preview_from_part(
+                b"-----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA3\r\n-----END PGP MESSAGE-----\r\n",
+                None,
+                None
+            ),
             marker
         );
         assert!(crate::models::preview_is_encrypted(marker));
@@ -12954,7 +15154,8 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         // The account says Inbox now; the message was queued for Sent. It goes
         // where the account says today, not where it said last week.
         assert_eq!(
-            super::pick_queued_sent_copy(&account(Some("INBOX")), &folders, Some("Sent")).as_deref(),
+            super::pick_queued_sent_copy(&account(Some("INBOX")), &folders, Some("Sent"))
+                .as_deref(),
             Some("INBOX"),
         );
         // Turned back off since queuing: back to the Sent folder.
@@ -12980,8 +15181,14 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             server_saves_sent: true,
             ..sample_account()
         };
-        assert_eq!(super::pick_queued_sent_copy(&server_saves, &folders, Some("Sent")), None);
-        assert_eq!(super::pick_queued_sent_copy(&server_saves, &[], Some("Sent")), None);
+        assert_eq!(
+            super::pick_queued_sent_copy(&server_saves, &folders, Some("Sent")),
+            None
+        );
+        assert_eq!(
+            super::pick_queued_sent_copy(&server_saves, &[], Some("Sent")),
+            None
+        );
     }
 
     #[test]
@@ -13003,16 +15210,30 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             folder(5, "Trash", FolderKind::Trash),
         ];
         let held = |paths: &[&str]| paths.iter().map(|p| p.to_string()).collect::<Vec<_>>();
-        let pick = |choice, paths: &[&str]| super::pick_reply_folder(choice, &folders, &held(paths));
-        assert_eq!(pick(ReplyCopies::Original, &["Projects/Hylki"]).as_deref(), Some("Projects/Hylki"));
-        assert_eq!(pick(ReplyCopies::Original, &["INBOX"]).as_deref(), Some("INBOX"));
+        let pick =
+            |choice, paths: &[&str]| super::pick_reply_folder(choice, &folders, &held(paths));
+        assert_eq!(
+            pick(ReplyCopies::Original, &["Projects/Hylki"]).as_deref(),
+            Some("Projects/Hylki")
+        );
+        assert_eq!(
+            pick(ReplyCopies::Original, &["INBOX"]).as_deref(),
+            Some("INBOX")
+        );
         assert_eq!(pick(ReplyCopies::OriginalNotInbox, &["INBOX"]), None);
         // Gmail's copies under a label, All Mail and the Inbox: the label.
         assert_eq!(
-            pick(ReplyCopies::OriginalNotInbox, &["INBOX", "[Gmail]/All Mail", "Projects/Hylki"]).as_deref(),
+            pick(
+                ReplyCopies::OriginalNotInbox,
+                &["INBOX", "[Gmail]/All Mail", "Projects/Hylki"]
+            )
+            .as_deref(),
             Some("Projects/Hylki"),
         );
-        assert_eq!(pick(ReplyCopies::Original, &["INBOX", "[Gmail]/All Mail"]).as_deref(), Some("[Gmail]/All Mail"));
+        assert_eq!(
+            pick(ReplyCopies::Original, &["INBOX", "[Gmail]/All Mail"]).as_deref(),
+            Some("[Gmail]/All Mail")
+        );
         // Binned, already in Sent, or in a folder deleted since: with sent mail.
         assert_eq!(pick(ReplyCopies::Original, &["Trash"]), None);
         assert_eq!(pick(ReplyCopies::Original, &["Sent"]), None);
@@ -13027,9 +15248,28 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         };
         let cache = Cache::in_memory().unwrap();
         cache.save_folders(1, &folders);
-        assert_eq!(super::reply_copy_path(&account(ReplyCopies::WithSent, false), 1, Some(&cache), "a@b"), None);
-        assert_eq!(super::reply_copy_path(&account(ReplyCopies::Original, true), 1, Some(&cache), "a@b"), None);
-        assert_eq!(super::reply_copy_path(&account(ReplyCopies::Original, false), 1, Some(&cache), ""), None);
+        assert_eq!(
+            super::reply_copy_path(
+                &account(ReplyCopies::WithSent, false),
+                1,
+                Some(&cache),
+                "a@b"
+            ),
+            None
+        );
+        assert_eq!(
+            super::reply_copy_path(
+                &account(ReplyCopies::Original, true),
+                1,
+                Some(&cache),
+                "a@b"
+            ),
+            None
+        );
+        assert_eq!(
+            super::reply_copy_path(&account(ReplyCopies::Original, false), 1, Some(&cache), ""),
+            None
+        );
         // On: the original is found by its Message-ID, spelled as the
         // reply spells it, and only among this account's folders.
         let original = Message {
@@ -13066,13 +15306,20 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             super::reply_copy_path(&on, 1, Some(&cache), "<Parent@Example.com>").as_deref(),
             Some("Projects/Hylki"),
         );
-        assert_eq!(super::reply_copy_path(&on, 2, Some(&cache), "parent@example.com"), None);
-        assert_eq!(super::reply_copy_path(&on, 1, Some(&cache), "other@example.com"), None);
+        assert_eq!(
+            super::reply_copy_path(&on, 2, Some(&cache), "parent@example.com"),
+            None
+        );
+        assert_eq!(
+            super::reply_copy_path(&on, 1, Some(&cache), "other@example.com"),
+            None
+        );
     }
 
     #[test]
     fn a_queued_reply_names_what_it_answers() {
-        let raw = b"From: a@example.com\r\nTo: b@example.com\r\nIn-Reply-To: <Parent@Example.com>\r\n\
+        let raw =
+            b"From: a@example.com\r\nTo: b@example.com\r\nIn-Reply-To: <Parent@Example.com>\r\n\
                     Subject: Re: x\r\n\r\nbody\r\n";
         assert_eq!(super::raw_in_reply_to(raw), "Parent@Example.com");
         assert_eq!(super::raw_in_reply_to(b"Subject: x\r\n\r\nbody\r\n"), "");
@@ -13092,11 +15339,17 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         }
         part.extend_from_slice(b"Updates to managing AI crawlers on your account");
 
-        assert!(!super::looks_like_base64(&part), "padding runs are not base64");
+        assert!(
+            !super::looks_like_base64(&part),
+            "padding runs are not base64"
+        );
 
         // Told what it is, which is what the part's own MIME headers say.
         let told = super::preview_from_part(&part, Some("UTF-8"), Some("quoted-printable"));
-        assert!(!told.contains('\u{fffd}'), "no replacement characters: {told}");
+        assert!(
+            !told.contains('\u{fffd}'),
+            "no replacement characters: {told}"
+        );
         assert!(told.starts_with("AI Bot Controls"), "{told}");
         assert!(told.contains("Updates to managing AI crawlers"), "{told}");
 
@@ -13107,13 +15360,18 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         // Real base64 still reads as base64, truncated (no padding) or whole.
         let whole = b"VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZywgdHdpY2Uu";
         assert!(super::looks_like_base64(whole));
-        assert!(super::looks_like_base64(b"VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZz0="));
+        assert!(super::looks_like_base64(
+            b"VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZz0="
+        ));
 
         // The slice a preview reads ends on a byte count, routinely mid-escape.
         // The stub is dropped rather than shown as text.
         let cut = b"AI Bot Controls =E2=80=87=CD=8F =E";
         let out = super::preview_from_part(cut, Some("UTF-8"), Some("quoted-printable"));
-        assert!(!out.contains('='), "no half-decoded escape left behind: {out:?}");
+        assert!(
+            !out.contains('='),
+            "no half-decoded escape left behind: {out:?}"
+        );
         assert_eq!(out.trim(), "AI Bot Controls");
         let cut = b"AI Bot Controls =E2=80=87=CD=8F =";
         let out = super::preview_from_part(cut, Some("UTF-8"), Some("quoted-printable"));
@@ -13143,7 +15401,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             "the padding is stepped over, not shown: {preview:?}",
         );
         assert!(!preview.contains('\u{fffd}'), "{preview:?}");
-        assert!(!preview.contains('\u{034f}'), "joiners are dropped: {preview:?}");
+        assert!(
+            !preview.contains('\u{034f}'),
+            "joiners are dropped: {preview:?}"
+        );
     }
 
     #[test]
@@ -13151,7 +15412,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         // The fetch asks for body bytes only, so the encoding has to be inferred.
         // Quoted-printable, including a soft line break mid-sentence:
         let qp = b"Caf=C3=A9 meeting at 3pm =\r\nsharp, bring the numbers";
-        assert_eq!(preview_from_part(qp, None, None), "Café meeting at 3pm sharp, bring the numbers");
+        assert_eq!(
+            preview_from_part(qp, None, None),
+            "Café meeting at 3pm sharp, bring the numbers"
+        );
 
         // Base64 — shown raw this would be gibberish in the list.
         let encoded = crate::oauth::base64_encode(
@@ -13167,7 +15431,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     fn preview_survives_being_cut_off_mid_stream() {
         // 2KB of a base64 part almost never lands on a group boundary; the
         // incomplete tail is dropped rather than decoded into noise.
-        let full = crate::oauth::base64_encode(&b"The quick brown fox jumps over the lazy dog. ".repeat(4));
+        let full = crate::oauth::base64_encode(
+            &b"The quick brown fox jumps over the lazy dog. ".repeat(4),
+        );
         let truncated = &full[..full.len() - 3];
         let preview = preview_from_part(truncated.as_bytes(), None, None);
         assert!(preview.starts_with("The quick brown fox"), "{preview}");
@@ -13185,7 +15451,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     fn preview_reads_html_and_skips_quoted_replies() {
         let html = b"<html><body><p>Meeting moved to <b>Tuesday</b>.</p></body></html>";
-        assert_eq!(preview_from_part(html, None, None), "Meeting moved to Tuesday.");
+        assert_eq!(
+            preview_from_part(html, None, None),
+            "Meeting moved to Tuesday."
+        );
         let reply = b"Sounds good to me.\r\n\r\n> On Monday, Ada wrote:\r\n> the original text\r\n";
         assert_eq!(preview_from_part(reply, None, None), "Sounds good to me.");
     }
@@ -13193,7 +15462,12 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     fn preview_is_capped() {
         let long = "word ".repeat(200);
-        assert_eq!(preview_from_part(long.as_bytes(), None, None).chars().count(), PREVIEW_CHARS);
+        assert_eq!(
+            preview_from_part(long.as_bytes(), None, None)
+                .chars()
+                .count(),
+            PREVIEW_CHARS
+        );
     }
 
     #[test]
@@ -13214,17 +15488,30 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         );
         // The 8-bit bytes as they are, no transfer encoding; label case and
         // quotes as servers send them.
-        assert_eq!(preview_from_part(b"\xD5rizze meg", Some("\"ISO-8859-2\""), None), "Őrizze meg");
-        assert_eq!(preview_from_part(b"\xF5rizze", Some("windows-1250"), None), "őrizze");
+        assert_eq!(
+            preview_from_part(b"\xD5rizze meg", Some("\"ISO-8859-2\""), None),
+            "Őrizze meg"
+        );
+        assert_eq!(
+            preview_from_part(b"\xF5rizze", Some("windows-1250"), None),
+            "őrizze"
+        );
         // Base64 is decoded to bytes first, then read in the charset.
-        let b64 = crate::oauth::base64_encode(b"Caf\xE9 meeting at three, bring the numbers please.");
+        let b64 =
+            crate::oauth::base64_encode(b"Caf\xE9 meeting at three, bring the numbers please.");
         assert_eq!(
             preview_from_part(b64.as_bytes(), Some("iso-8859-1"), None),
             "Café meeting at three, bring the numbers please."
         );
         // UTF-8 still reads as UTF-8 whatever it is called.
-        assert_eq!(preview_from_part("Café".as_bytes(), Some("UTF-8"), None), "Café");
-        assert_eq!(preview_from_part("Café".as_bytes(), Some("utf8"), None), "Café");
+        assert_eq!(
+            preview_from_part("Café".as_bytes(), Some("UTF-8"), None),
+            "Café"
+        );
+        assert_eq!(
+            preview_from_part("Café".as_bytes(), Some("utf8"), None),
+            "Café"
+        );
     }
 
     #[test]
@@ -13247,30 +15534,48 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             Content-Type: text/plain\r\n\r\nThe photo from Sunday\r\n--b1--\r\n";
         assert_eq!(preview_from_part(body, None, None), "The photo from Sunday");
         // But plain text that merely mentions a dashed line is still text.
-        assert_eq!(preview_from_part(b"Hello\r\n--foo\r\nbar", None, None), "Hello --foo bar");
+        assert_eq!(
+            preview_from_part(b"Hello\r\n--foo\r\nbar", None, None),
+            "Hello --foo bar"
+        );
     }
 
     #[test]
     fn preview_copes_with_bytes_that_are_not_utf8() {
         // Undeclared 8-bit text reads as Windows-1252, the way browsers do.
-        assert_eq!(preview_from_part(b"Caf\xE9 au lait", None, None), "Café au lait");
+        assert_eq!(
+            preview_from_part(b"Caf\xE9 au lait", None, None),
+            "Café au lait"
+        );
         // A slice that ends mid-character drops the fragment, not the row.
         let cut = &"Café".as_bytes()[..4];
         assert_eq!(preview_from_part(cut, None, None), "Caf");
         assert_eq!(preview_from_part(cut, Some("utf-8"), None), "Caf");
         // Declared UTF-8 that isn't: the damage shows as replacement characters.
-        assert_eq!(preview_from_part(b"a\xFFb", Some("utf-8"), None), "a\u{fffd}b");
+        assert_eq!(
+            preview_from_part(b"a\xFFb", Some("utf-8"), None),
+            "a\u{fffd}b"
+        );
     }
 
     #[test]
     fn charset_param_is_read_from_a_content_type() {
-        assert_eq!(charset_param("text/html; charset=\"iso-8859-2\""), Some("iso-8859-2".into()));
-        assert_eq!(charset_param("text/plain; format=flowed; charset=utf-8"), Some("utf-8".into()));
+        assert_eq!(
+            charset_param("text/html; charset=\"iso-8859-2\""),
+            Some("iso-8859-2".into())
+        );
+        assert_eq!(
+            charset_param("text/plain; format=flowed; charset=utf-8"),
+            Some("utf-8".into())
+        );
         assert_eq!(charset_param("multipart/alternative; boundary=b1"), None);
         assert_eq!(
-            mime_header("Content-Type: text/plain;\r\n\tcharset=us-ascii\r\nX: y", "content-type")
-                .as_deref()
-                .and_then(charset_param),
+            mime_header(
+                "Content-Type: text/plain;\r\n\tcharset=us-ascii\r\nX: y",
+                "content-type"
+            )
+            .as_deref()
+            .and_then(charset_param),
             Some("us-ascii".into())
         );
     }
@@ -13283,7 +15588,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         // "content-transfer-encoding" is 25 bytes, and byte 25 of this line
         // sits inside the two-byte character that starts at byte 24.
         let headers = "Content-Description: abc\u{f3}de\r\nContent-Transfer-Encoding: base64\r\n";
-        assert_eq!(mime_header(headers, "content-transfer-encoding").as_deref(), Some("base64"));
+        assert_eq!(
+            mime_header(headers, "content-transfer-encoding").as_deref(),
+            Some("base64")
+        );
         assert_eq!(mime_header(headers, "content-type"), None);
     }
 
@@ -13298,7 +15606,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             "Hello.\r\n",
             "--b1--\r\n",
         );
-        assert_eq!(preview_from_part(part.as_bytes(), None, None).trim(), "Hello.");
+        assert_eq!(
+            preview_from_part(part.as_bytes(), None, None).trim(),
+            "Hello."
+        );
     }
 
     /// Issue #9's message: an Apple Mail PDF marked `inline` with a filename and
@@ -13357,10 +15668,14 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             mail_parser::MessageParser::default()
                 .parse(raw.as_bytes())
                 .and_then(|p| {
-                    p.header("Content-Type").and_then(|h| h.as_content_type()).map(|ct| {
-                        ct.ctype().eq_ignore_ascii_case("multipart")
-                            && ct.subtype().is_some_and(|s| s.eq_ignore_ascii_case("mixed"))
-                    })
+                    p.header("Content-Type")
+                        .and_then(|h| h.as_content_type())
+                        .map(|ct| {
+                            ct.ctype().eq_ignore_ascii_case("multipart")
+                                && ct
+                                    .subtype()
+                                    .is_some_and(|s| s.eq_ignore_ascii_case("mixed"))
+                        })
                 })
                 .unwrap_or(false)
         };
@@ -13395,9 +15710,16 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         // headers would silently drop those recipients.
         let item = queued("me@example.com", &["ada@example.com", "bcc@example.com"]);
         let envelope = outbox_envelope(&item).expect("envelope rebuilds");
-        assert_eq!(envelope.from().map(|f| f.to_string()).as_deref(), Some("me@example.com"));
         assert_eq!(
-            envelope.to().iter().map(|a| a.to_string()).collect::<Vec<_>>(),
+            envelope.from().map(|f| f.to_string()).as_deref(),
+            Some("me@example.com")
+        );
+        assert_eq!(
+            envelope
+                .to()
+                .iter()
+                .map(|a| a.to_string())
+                .collect::<Vec<_>>(),
             ["ada@example.com", "bcc@example.com"]
         );
     }
@@ -13420,12 +15742,27 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         msg.from_alias = Some("Ann Work <ann@work.example>".into());
         let email = build_email(&account, &msg).expect("builds");
         let wire = String::from_utf8(email.formatted()).expect("utf8");
-        let from_line = wire.lines().find(|l| l.starts_with("From:")).expect("From header");
-        assert!(from_line.contains("ann@work.example"), "alias address on the wire: {from_line}");
-        assert!(!from_line.contains(&account.email), "account address replaced: {from_line}");
+        let from_line = wire
+            .lines()
+            .find(|l| l.starts_with("From:"))
+            .expect("From header");
+        assert!(
+            from_line.contains("ann@work.example"),
+            "alias address on the wire: {from_line}"
+        );
+        assert!(
+            !from_line.contains(&account.email),
+            "account address replaced: {from_line}"
+        );
         // The Message-ID follows the alias's domain, so replies thread back.
-        let id_line = wire.lines().find(|l| l.starts_with("Message-ID:")).expect("id");
-        assert!(id_line.contains("@work.example"), "id in alias domain: {id_line}");
+        let id_line = wire
+            .lines()
+            .find(|l| l.starts_with("Message-ID:"))
+            .expect("id");
+        assert!(
+            id_line.contains("@work.example"),
+            "id in alias domain: {id_line}"
+        );
     }
 
     #[test]
@@ -13434,7 +15771,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let account = AccountConfig {
             email: "me@example.com".into(),
             aliases: vec![
-                AliasConfig { identity: "Plain <plain@fwd.example>".into(), ..Default::default() },
+                AliasConfig {
+                    identity: "Plain <plain@fwd.example>".into(),
+                    ..Default::default()
+                },
                 AliasConfig {
                     identity: "Ann Work <ann@work.example>".into(),
                     smtp_host: "smtp.work.example".into(),
@@ -13466,8 +15806,13 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         std::fs::create_dir_all(&dir).expect("temp dir");
         let file = dir.join("Meeting notes, final.pdf");
         // Binary, so the encoder has to base64 it — as it would a real PDF.
-        std::fs::write(&file, [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x00, 0x80, 0xff])
-            .expect("write attachment");
+        std::fs::write(
+            &file,
+            [
+                0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x00, 0x80, 0xff,
+            ],
+        )
+        .expect("write attachment");
 
         let account = AccountConfig {
             name: "Powers, Benny".into(),
@@ -13486,7 +15831,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert!(raw.contains("multipart/mixed"), "{raw}");
         assert!(raw.contains("application/pdf"), "{raw}");
         // The filename has a comma and a space, so it has to be quoted or encoded.
-        assert!(raw.contains("Meeting notes, final.pdf") || raw.contains("Meeting%20notes"), "{raw}");
+        assert!(
+            raw.contains("Meeting notes, final.pdf") || raw.contains("Meeting%20notes"),
+            "{raw}"
+        );
         // Base64 of the bytes written above.
         assert!(raw.contains("base64"), "{raw}");
         assert!(raw.contains("JVBERi0xLjQAgP8="), "{raw}");
@@ -13496,7 +15844,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     /// Every line on the wire ends CRLF: JMAP servers refuse a message with a
     /// lone LF anywhere in it (#414).
     fn has_bare_lf(raw: &[u8]) -> bool {
-        raw.iter().enumerate().any(|(i, &b)| b == b'\n' && (i == 0 || raw[i - 1] != b'\r'))
+        raw.iter()
+            .enumerate()
+            .any(|(i, &b)| b == b'\n' && (i == 0 || raw[i - 1] != b'\r'))
     }
 
     /// #412: plain text with nothing attached still says it is UTF-8 text,
@@ -13508,13 +15858,23 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             body: "Plain text with öäü and 🙂\nsecond line".into(),
             ..sample_outgoing()
         };
-        let raw = build_email(&sample_account(), &msg).expect("email builds").formatted();
+        let raw = build_email(&sample_account(), &msg)
+            .expect("email builds")
+            .formatted();
         let text = String::from_utf8_lossy(&raw);
         assert!(text.contains("MIME-Version: 1.0\r\n"), "{text}");
-        assert!(text.contains("Content-Type: text/plain; charset=utf-8\r\n"), "{text}");
+        assert!(
+            text.contains("Content-Type: text/plain; charset=utf-8\r\n"),
+            "{text}"
+        );
         assert!(!has_bare_lf(&raw), "{text}");
-        let parsed = mail_parser::MessageParser::default().parse(&raw).expect("parses");
-        assert_eq!(parsed.body_text(0).as_deref().map(str::trim_end), Some("Plain text with öäü and 🙂\r\nsecond line"));
+        let parsed = mail_parser::MessageParser::default()
+            .parse(&raw)
+            .expect("parses");
+        assert_eq!(
+            parsed.body_text(0).as_deref().map(str::trim_end),
+            Some("Plain text with öäü and 🙂\r\nsecond line")
+        );
     }
 
     /// #414: a text file with Unix line endings goes out as base64, so its
@@ -13530,10 +15890,17 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             attachments: vec![file.to_string_lossy().to_string()],
             ..sample_outgoing()
         };
-        let raw = build_email(&sample_account(), &msg).expect("email builds").formatted();
+        let raw = build_email(&sample_account(), &msg)
+            .expect("email builds")
+            .formatted();
         assert!(!has_bare_lf(&raw), "{}", String::from_utf8_lossy(&raw));
-        let parsed = mail_parser::MessageParser::default().parse(&raw).expect("parses");
-        assert_eq!(parsed.attachment(0).map(|a| a.contents()), Some(&b"one\ntwo\n"[..]));
+        let parsed = mail_parser::MessageParser::default()
+            .parse(&raw)
+            .expect("parses");
+        assert_eq!(
+            parsed.attachment(0).map(|a| a.contents()),
+            Some(&b"one\ntwo\n"[..])
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -13543,8 +15910,13 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     /// attachment list — with no data: URI left behind.
     #[test]
     fn pasted_images_go_out_as_inline_cid_parts() {
-        let png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01, 0x02];
-        let uri = format!("data:image/png;base64,{}", crate::oauth::base64_encode(&png));
+        let png = [
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01, 0x02,
+        ];
+        let uri = format!(
+            "data:image/png;base64,{}",
+            crate::oauth::base64_encode(&png)
+        );
         let msg = OutgoingMessage {
             to: "ada@example.com".into(),
             body: "see picture".into(),
@@ -13566,7 +15938,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     fn an_images_own_filename_reaches_the_inline_part() {
         let png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00];
-        let uri = format!("data:image/png;base64,{}", crate::oauth::base64_encode(&png));
+        let uri = format!(
+            "data:image/png;base64,{}",
+            crate::oauth::base64_encode(&png)
+        );
         let raw_for = |img: String| {
             let msg = OutgoingMessage {
                 to: "ada@example.com".into(),
@@ -13580,7 +15955,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let named = raw_for(format!("<img src=\"{uri}\" alt=\"holiday snap.png\">"));
         assert!(named.contains("holiday snap.png"), "{named}");
         let anonymous = raw_for(format!("<img src=\"{uri}\">"));
-        assert!(anonymous.contains("Content-Disposition: inline"), "{anonymous}");
+        assert!(
+            anonymous.contains("Content-Disposition: inline"),
+            "{anonymous}"
+        );
         assert!(!anonymous.contains("filename"), "{anonymous}");
     }
 
@@ -13629,8 +16007,7 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert!(imgs.is_empty());
 
         // Single-quoted attributes lift too.
-        let (out, imgs) =
-            extract_data_images("<img src='data:image/jpeg;base64,AAAA'>");
+        let (out, imgs) = extract_data_images("<img src='data:image/jpeg;base64,AAAA'>");
         assert!(out.contains("src='cid:"), "{out}");
         assert_eq!(imgs.len(), 1);
         assert_eq!(imgs[0].mime, "image/jpeg");
@@ -13667,12 +16044,24 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
 
     #[test]
     fn only_this_machine_counts_as_a_local_bridge() {
-        for host in ["127.0.0.1", "localhost", "LocalHost", "::1", "[::1]", "127.1.2.3"] {
+        for host in [
+            "127.0.0.1",
+            "localhost",
+            "LocalHost",
+            "::1",
+            "[::1]",
+            "127.1.2.3",
+        ] {
             assert!(is_loopback_host(host), "{host} should be loopback");
         }
         // A remote host must keep full certificate verification, however it is
         // named — including anything merely containing "localhost".
-        for host in ["imap.gmail.com", "127.0.0.1.example.com", "localhost.evil.com", "10.0.1.14"] {
+        for host in [
+            "imap.gmail.com",
+            "127.0.0.1.example.com",
+            "localhost.evil.com",
+            "10.0.1.14",
+        ] {
             assert!(!is_loopback_host(host), "{host} should not be loopback");
         }
     }
@@ -13704,7 +16093,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert!(!imap_uses_starttls(&account));
         assert!(SmtpTls::for_account(&account).implicit);
         // Without GOA's word, the ports decide as before.
-        let account = AccountConfig { security: None, ..account };
+        let account = AccountConfig {
+            security: None,
+            ..account
+        };
         assert!(imap_uses_starttls(&account));
         assert!(!SmtpTls::for_account(&account).implicit);
         // An accepted certificate reaches SMTP; the name waiver stays the
@@ -13769,7 +16161,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
 
     #[test]
     fn decode_header_leaves_plain_text_untouched() {
-        assert_eq!(decode_header(b"Just a normal subject"), "Just a normal subject");
+        assert_eq!(
+            decode_header(b"Just a normal subject"),
+            "Just a normal subject"
+        );
     }
 
     #[test]
@@ -13793,12 +16188,19 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
     #[test]
     fn header_fields_unfold_each_requested_header() {
         // #334: References and the priority headers come back in one block.
-        let raw = b"References: <a@x>\r\n <b@y>\r\nX-Priority: 1 (Highest)\r\nImportance: high\r\n\r\n";
+        let raw =
+            b"References: <a@x>\r\n <b@y>\r\nX-Priority: 1 (Highest)\r\nImportance: high\r\n\r\n";
         let fields = header_fields(raw);
         assert_eq!(fields.len(), 3);
-        assert_eq!(fields[0], ("References".to_string(), "<a@x> <b@y>".to_string()));
+        assert_eq!(
+            fields[0],
+            ("References".to_string(), "<a@x> <b@y>".to_string())
+        );
         assert_eq!(normalize_msgids(fields[0].1.as_bytes()), "a@x b@y");
-        assert_eq!(fields[1], ("X-Priority".to_string(), "1 (Highest)".to_string()));
+        assert_eq!(
+            fields[1],
+            ("X-Priority".to_string(), "1 (Highest)".to_string())
+        );
         assert!(header_fields(b"").is_empty());
     }
 
@@ -13908,7 +16310,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             role_folder_path(&acc, &folders, FolderKind::Trash, "trash").as_deref(),
             Some("Deleted Messages")
         );
-        assert_eq!(role_folder_path(&acc, &folders, FolderKind::Junk, "junk"), None);
+        assert_eq!(
+            role_folder_path(&acc, &folders, FolderKind::Junk, "junk"),
+            None
+        );
         acc.folder_roles.insert("trash".into(), "INBOX.Bin".into());
         assert_eq!(
             role_folder_path(&acc, &folders, FolderKind::Trash, "trash").as_deref(),
@@ -13955,7 +16360,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert_eq!(parts.len(), 3, "{imap}");
         assert_eq!(parts[1].len(), 3, "{imap}");
         let graph = graph_before_date(30);
-        assert!(chrono::DateTime::parse_from_rfc3339(&graph).is_ok(), "{graph}");
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(&graph).is_ok(),
+            "{graph}"
+        );
         assert!(graph < chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string());
     }
 
@@ -13977,7 +16385,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             let body = extract_body(raw.as_bytes());
             assert!(body.contains("See you there."), "{body}");
             assert!(!body.contains("Subject: Plans"), "{legacy_type}: {body}");
-            assert!(extract_attachments(raw.as_bytes()).is_empty(), "{legacy_type}");
+            assert!(
+                extract_attachments(raw.as_bytes()).is_empty(),
+                "{legacy_type}"
+            );
         }
         // The same first part without the flag on the root is ordinary text.
         let raw = entity("text/plain; charset=UTF-8").replacen("; protected-headers=\"v1\"", "", 1);
@@ -14043,7 +16454,10 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         // message blank.
         assert!(body.contains("Sent from my iPhone"), "body was: {body}");
         // The photo is embedded, not dropped or fetched from the network.
-        assert!(body.contains("src=\"data:image/jpeg;base64,/9j/4AAQ"), "body was: {body}");
+        assert!(
+            body.contains("src=\"data:image/jpeg;base64,/9j/4AAQ"),
+            "body was: {body}"
+        );
     }
 
     #[test]
@@ -14151,7 +16565,11 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let raw = gmail_mail_with_files(&[
             ("first.pdf", "application/pdf", 16_384),
             ("second.pdf", "application/pdf", 40_960),
-            ("large.bin", "application/octet-stream", INLINE_ATTACHMENT_MIN + 1),
+            (
+                "large.bin",
+                "application/octet-stream",
+                INLINE_ATTACHMENT_MIN + 1,
+            ),
         ]);
         let found = extract_attachments(raw.as_bytes());
         let names: Vec<&str> = found.iter().map(|a| a.name.as_str()).collect();
@@ -14261,7 +16679,11 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         // The rest of the sender's markup survives the rewrite.
         assert!(body.contains("width=\"420\""), "body was: {body}");
         // The image is rendered in place, so it isn't appended a second time.
-        assert_eq!(body.matches("/9j/4AAQSkZJRg==").count(), 1, "body was: {body}");
+        assert_eq!(
+            body.matches("/9j/4AAQSkZJRg==").count(),
+            1,
+            "body was: {body}"
+        );
     }
 
     #[test]
@@ -14269,9 +16691,18 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         // #191: ASCII needles go as a plain quoted string over the listed
         // uids; quotes and backslashes are escaped; anything beyond ASCII
         // puts CHARSET UTF-8 at the head of the keys; line breaks vanish.
-        assert_eq!(body_search_query("1:5,9", "unsubscribe"), r#"UID 1:5,9 BODY "unsubscribe""#);
-        assert_eq!(body_search_query("1", r#"say "hi" \now"#), r#"UID 1 BODY "say \"hi\" \\now""#);
-        assert_eq!(body_search_query("1", "café"), r#"CHARSET UTF-8 UID 1 BODY "café""#);
+        assert_eq!(
+            body_search_query("1:5,9", "unsubscribe"),
+            r#"UID 1:5,9 BODY "unsubscribe""#
+        );
+        assert_eq!(
+            body_search_query("1", r#"say "hi" \now"#),
+            r#"UID 1 BODY "say \"hi\" \\now""#
+        );
+        assert_eq!(
+            body_search_query("1", "café"),
+            r#"CHARSET UTF-8 UID 1 BODY "café""#
+        );
         assert_eq!(body_search_query("1", "a\r\nb"), r#"UID 1 BODY "ab""#);
     }
 
@@ -14445,7 +16876,9 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             }),
             ..sample_outgoing()
         };
-        let raw = build_message(&account, &msg, false).expect("builds").formatted();
+        let raw = build_message(&account, &msg, false)
+            .expect("builds")
+            .formatted();
         let text = String::from_utf8_lossy(&raw);
         assert!(text.contains("multipart/alternative"), "{text}");
         assert!(
@@ -14453,14 +16886,19 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             "the method rides on the part: {text}"
         );
         assert!(text.contains("METHOD:REPLY"), "{text}");
-        assert!(text.contains("Jason has accepted this invitation."), "{text}");
+        assert!(
+            text.contains("Jason has accepted this invitation."),
+            "{text}"
+        );
     }
 
     #[test]
     fn image_mime_rejects_a_hostile_subtype() {
         // Guards the `data:` URI against a subtype that would break out of it.
         let raw = b"Content-Type: image/\"onerror=alert(1)\r\n\r\nx";
-        let parsed = mail_parser::MessageParser::default().parse(raw.as_slice()).unwrap();
+        let parsed = mail_parser::MessageParser::default()
+            .parse(raw.as_slice())
+            .unwrap();
         let part = parsed.html_bodies().next().unwrap();
         assert!(image_mime(part).is_none());
     }
@@ -14481,13 +16919,20 @@ mod uid_set_tests {
     fn listed_names_go_back_to_the_server_as_listed() {
         use async_imap::imap_proto::{MailboxDatum, Response};
         let line = b"* LIST (\\HasNoChildren) \"\\\\\" \"\\\\All\"\r\n";
-        let Ok((_, Response::MailboxData(MailboxDatum::List { delimiter, name, .. }))) =
-            async_imap::imap_proto::parser::parse_response(line)
+        let Ok((
+            _,
+            Response::MailboxData(MailboxDatum::List {
+                delimiter, name, ..
+            }),
+        )) = async_imap::imap_proto::parser::parse_response(line)
         else {
             panic!("LIST did not parse");
         };
         assert_eq!(imap_unquote(&name), "\\All");
-        assert_eq!(delimiter.as_deref().map(imap_unquote).as_deref(), Some("\\"));
+        assert_eq!(
+            delimiter.as_deref().map(imap_unquote).as_deref(),
+            Some("\\")
+        );
         assert_eq!(quote_mailbox(&imap_unquote(&name)), "\"\\\\All\"");
         assert_eq!(imap_unquote("[Gmail]/All Mail"), "[Gmail]/All Mail");
         assert_eq!(imap_unquote("a\\\"b\\x"), "a\"b\\x");
@@ -14506,12 +16951,16 @@ mod uid_set_tests {
 mod attachment_scan_tests {
     use super::{mime_extension, structure_attachments, INLINE_ATTACHMENT_MIN};
     use async_imap::imap_proto::types::{
-        BodyContentCommon, BodyContentSinglePart, BodyStructure, ContentDisposition, ContentEncoding,
-        ContentType,
+        BodyContentCommon, BodyContentSinglePart, BodyStructure, ContentDisposition,
+        ContentEncoding, ContentType,
     };
     use std::borrow::Cow;
 
-    fn ctype(ty: &'static str, subtype: &'static str, name: Option<&'static str>) -> ContentType<'static> {
+    fn ctype(
+        ty: &'static str,
+        subtype: &'static str,
+        name: Option<&'static str>,
+    ) -> ContentType<'static> {
         ContentType {
             ty: Cow::Borrowed(ty),
             subtype: Cow::Borrowed(subtype),
@@ -14519,7 +16968,10 @@ mod attachment_scan_tests {
         }
     }
 
-    fn disposition(ty: &'static str, filename: Option<&'static str>) -> ContentDisposition<'static> {
+    fn disposition(
+        ty: &'static str,
+        filename: Option<&'static str>,
+    ) -> ContentDisposition<'static> {
         ContentDisposition {
             ty: Cow::Borrowed(ty),
             params: filename.map(|f| vec![(Cow::Borrowed("filename"), Cow::Borrowed(f))]),
@@ -14608,7 +17060,10 @@ mod attachment_scan_tests {
         assert_eq!(found[0].name, "report.pdf");
         assert_eq!(found[0].mime, "application/pdf");
         assert_eq!(found[0].section, "2", "the second part of the multipart");
-        assert_eq!(found[0].size, 3000, "base64 inflates by 4/3, so decode it back");
+        assert_eq!(
+            found[0].size, 3000,
+            "base64 inflates by 4/3, so decode it back"
+        );
     }
 
     /// A newsletter's logo: inline, small, with a Content-ID. Decoration, not a
@@ -14617,7 +17072,15 @@ mod attachment_scan_tests {
     fn a_small_inline_image_with_a_content_id_is_decoration() {
         let bs = multipart(vec![
             text("html", 900),
-            single("image", "png", 2000, ContentEncoding::Base64, None, Some("logo@x"), None),
+            single(
+                "image",
+                "png",
+                2000,
+                ContentEncoding::Base64,
+                None,
+                Some("logo@x"),
+                None,
+            ),
         ]);
         assert!(structure_attachments(&bs).is_empty());
     }
@@ -14629,11 +17092,22 @@ mod attachment_scan_tests {
         let octets = (INLINE_ATTACHMENT_MIN as u32 + 1) * 4 / 3 + 8;
         let bs = multipart(vec![
             text("plain", 40),
-            single("image", "jpeg", octets, ContentEncoding::Base64, None, Some("img@x"), None),
+            single(
+                "image",
+                "jpeg",
+                octets,
+                ContentEncoding::Base64,
+                None,
+                Some("img@x"),
+                None,
+            ),
         ]);
         let found = structure_attachments(&bs);
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].name, "attachment-1.jpg", "unnamed, so named by its type");
+        assert_eq!(
+            found[0].name, "attachment-1.jpg",
+            "unnamed, so named by its type"
+        );
     }
 
     /// Nested multiparts number their sections through: this is what an
@@ -14716,7 +17190,10 @@ mod attachment_scan_tests {
                 "pdf",
                 600,
                 ContentEncoding::SevenBit,
-                Some(disposition("attachment", Some("=?utf-8?Q?rapport=20final?="))),
+                Some(disposition(
+                    "attachment",
+                    Some("=?utf-8?Q?rapport=20final?="),
+                )),
                 None,
                 None,
             ),
@@ -14758,15 +17235,24 @@ mod fetch_mode_tests {
     fn readable_error_keeps_the_first_line_of_the_reply() {
         let text = "Could not load INBOX: io: Error(Error { input: [42, 32, 55, 57, 56, 32, 70], code: Tag }) during parsing of \"* 798 FETCH (FLAGS (\\\\Seen) UID 4321 BODY[HEADER] {9821}\\r\\nReceived: from a\\r\\n\"";
         let out = readable_error(text);
-        assert!(out.starts_with("Could not load INBOX: the server's reply could not be read"), "{out}");
-        assert!(out.contains("* 798 FETCH (FLAGS (\\\\Seen) UID 4321 BODY[HEADER] {9821}"), "{out}");
+        assert!(
+            out.starts_with("Could not load INBOX: the server's reply could not be read"),
+            "{out}"
+        );
+        assert!(
+            out.contains("* 798 FETCH (FLAGS (\\\\Seen) UID 4321 BODY[HEADER] {9821}"),
+            "{out}"
+        );
         assert!(!out.contains("Received:"), "{out}");
         assert!(!out.contains("42, 32"), "{out}");
     }
 
     #[test]
     fn readable_error_leaves_other_errors_alone() {
-        assert_eq!(readable_error("Could not load INBOX: connection lost"), "Could not load INBOX: connection lost");
+        assert_eq!(
+            readable_error("Could not load INBOX: connection lost"),
+            "Could not load INBOX: connection lost"
+        );
     }
 
     #[test]
@@ -14795,43 +17281,94 @@ mod reader_preemption_tests {
     use super::*;
 
     fn body() -> MailRequest {
-        MailRequest::LoadBody { message_id: 42, path: "INBOX".into(), uid: 42 }
+        MailRequest::LoadBody {
+            message_id: 42,
+            path: "INBOX".into(),
+            uid: 42,
+        }
     }
 
     #[test]
     fn a_refresh_tick_does_not_leave_a_folder_sync_ahead_of_the_reader() {
         let (tx, mut rx) = mpsc::unbounded_channel();
         tx.send(MailRequest::RefreshUnread).unwrap();
-        tx.send(MailRequest::LoadMessages { folder_id: 1, path: "INBOX".into() }).unwrap();
+        tx.send(MailRequest::LoadMessages {
+            folder_id: 1,
+            path: "INBOX".into(),
+        })
+        .unwrap();
         tx.send(body()).unwrap();
         let mut backlog = std::collections::VecDeque::new();
         let first = reorder_reader_loads(
-            MailRequest::SyncFolder { folder_id: 1, path: "INBOX".into() }, &mut rx, &mut backlog,
+            MailRequest::SyncFolder {
+                folder_id: 1,
+                path: "INBOX".into(),
+            },
+            &mut rx,
+            &mut backlog,
         );
         assert!(matches!(first, MailRequest::LoadBody { .. }));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::SyncFolder { .. })));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::RefreshUnread)));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::LoadMessages { .. })));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::SyncFolder { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::RefreshUnread)
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadMessages { .. })
+        ));
     }
 
     #[test]
     fn overtaking_refresh_ticks_still_preserves_mutation_order() {
         let (tx, mut rx) = mpsc::unbounded_channel();
         tx.send(MailRequest::RefreshUnread).unwrap();
-        tx.send(MailRequest::SetSeen { path: "INBOX".into(), uid: 42, seen: true }).unwrap();
-        tx.send(MailRequest::LoadMessages { folder_id: 1, path: "INBOX".into() }).unwrap();
+        tx.send(MailRequest::SetSeen {
+            path: "INBOX".into(),
+            uid: 42,
+            seen: true,
+        })
+        .unwrap();
+        tx.send(MailRequest::LoadMessages {
+            folder_id: 1,
+            path: "INBOX".into(),
+        })
+        .unwrap();
         tx.send(MailRequest::RefreshUnread).unwrap();
         tx.send(body()).unwrap();
         let mut backlog = std::collections::VecDeque::new();
         let first = reorder_reader_loads(
-            MailRequest::SyncFolder { folder_id: 1, path: "INBOX".into() }, &mut rx, &mut backlog,
+            MailRequest::SyncFolder {
+                folder_id: 1,
+                path: "INBOX".into(),
+            },
+            &mut rx,
+            &mut backlog,
         );
         assert!(matches!(first, MailRequest::SyncFolder { .. }));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::RefreshUnread)));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::SetSeen { .. })));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::LoadBody { .. })));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::LoadMessages { .. })));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::RefreshUnread)));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::RefreshUnread)
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::SetSeen { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadMessages { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::RefreshUnread)
+        ));
     }
 
     #[tokio::test(start_paused = true)]
@@ -14844,42 +17381,77 @@ mod reader_preemption_tests {
         });
         let start = tokio::time::Instant::now();
         let result = interrupt_read_for_reader(
-            tokio::time::sleep(Duration::from_secs(10)), &mut rx, &mut backlog,
-        ).await;
+            tokio::time::sleep(Duration::from_secs(10)),
+            &mut rx,
+            &mut backlog,
+        )
+        .await;
         assert!(result.is_none());
         assert_eq!(start.elapsed(), Duration::from_millis(20));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::LoadBody { uid: 42, .. })));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { uid: 42, .. })
+        ));
     }
 
     #[tokio::test(start_paused = true)]
     async fn a_reader_does_not_overtake_a_queued_mutation() {
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let mut backlog = std::collections::VecDeque::from([
-            MailRequest::SetSeen { path: "INBOX".into(), uid: 42, seen: true },
-        ]);
+        let mut backlog = std::collections::VecDeque::from([MailRequest::SetSeen {
+            path: "INBOX".into(),
+            uid: 42,
+            seen: true,
+        }]);
         tx.send(body()).unwrap();
-        let result = interrupt_read_for_reader(async {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            7
-        }, &mut rx, &mut backlog).await;
+        let result = interrupt_read_for_reader(
+            async {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                7
+            },
+            &mut rx,
+            &mut backlog,
+        )
+        .await;
         assert_eq!(result, Some(7));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::SetSeen { .. })));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::LoadBody { .. })));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::SetSeen { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { .. })
+        ));
     }
 
     #[tokio::test(start_paused = true)]
     async fn an_arriving_mutation_remains_a_barrier_to_a_later_reader() {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let mut backlog = std::collections::VecDeque::new();
-        tx.send(MailRequest::SetSeen { path: "INBOX".into(), uid: 42, seen: true }).unwrap();
+        tx.send(MailRequest::SetSeen {
+            path: "INBOX".into(),
+            uid: 42,
+            seen: true,
+        })
+        .unwrap();
         tx.send(body()).unwrap();
-        let result = interrupt_read_for_reader(async {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            7
-        }, &mut rx, &mut backlog).await;
+        let result = interrupt_read_for_reader(
+            async {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                7
+            },
+            &mut rx,
+            &mut backlog,
+        )
+        .await;
         assert_eq!(result, Some(7));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::SetSeen { .. })));
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::LoadBody { .. })));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::SetSeen { .. })
+        ));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { .. })
+        ));
     }
 
     #[tokio::test(start_paused = true)]
@@ -14893,23 +17465,34 @@ mod reader_preemption_tests {
             tokio::time::sleep(Duration::from_millis(20)).await;
             tx.send(body()).unwrap();
         });
-        let result = interrupt_read_for_reader(async {
-            let mut owned = session.take().unwrap();
-            let result = owned.read(&mut [0]).await;
-            session = Some(owned);
-            result
-        }, &mut rx, &mut backlog).await;
+        let result = interrupt_read_for_reader(
+            async {
+                let mut owned = session.take().unwrap();
+                let result = owned.read(&mut [0]).await;
+                session = Some(owned);
+                result
+            },
+            &mut rx,
+            &mut backlog,
+        )
+        .await;
         assert!(result.is_none());
         assert!(session.is_none());
         // EOF proves the reader cannot accidentally reuse an interrupted stream.
         assert_eq!(server.read(&mut [0]).await.unwrap(), 0);
-        assert!(matches!(backlog.pop_front(), Some(MailRequest::LoadBody { .. })));
+        assert!(matches!(
+            backlog.pop_front(),
+            Some(MailRequest::LoadBody { .. })
+        ));
     }
 
     #[tokio::test(start_paused = true)]
     async fn cancelled_backfill_restores_drained_uids_without_duplicate_jobs() {
         let job = Backfill {
-            folder_id: 1, path: "INBOX".into(), remaining: Some(vec![3, 2, 1]), gallery: false,
+            folder_id: 1,
+            path: "INBOX".into(),
+            remaining: Some(vec![3, 2, 1]),
+            gallery: false,
         };
         let mut queue = std::collections::VecDeque::from([job.clone()]);
         // Cancellation before the future's first poll leaves the job queued.
@@ -14920,26 +17503,39 @@ mod reader_preemption_tests {
             tokio::time::sleep(Duration::from_millis(20)).await;
             tx.send(body()).unwrap();
         });
-        let result = interrupt_read_for_reader(async {
-            let mut owned = queue.pop_front().unwrap();
-            owned.remaining.as_mut().unwrap().drain(..2);
-            std::future::pending::<()>().await;
-        }, &mut rx, &mut Default::default()).await;
+        let result = interrupt_read_for_reader(
+            async {
+                let mut owned = queue.pop_front().unwrap();
+                owned.remaining.as_mut().unwrap().drain(..2);
+                std::future::pending::<()>().await;
+            },
+            &mut rx,
+            &mut Default::default(),
+        )
+        .await;
         assert!(result.is_none());
         assert!(queue.is_empty());
         restore_interrupted_backfill(&mut queue, job);
         assert_eq!(queue.len(), 1);
-        assert_eq!(queue.front().unwrap().remaining.as_deref(), Some([3, 2, 1].as_slice()));
+        assert_eq!(
+            queue.front().unwrap().remaining.as_deref(),
+            Some([3, 2, 1].as_slice())
+        );
     }
 
     #[tokio::test(start_paused = true)]
     async fn a_closed_queue_does_not_spin_or_cancel_the_read() {
         let (tx, mut rx) = mpsc::unbounded_channel();
         drop(tx);
-        let result = interrupt_read_for_reader(async {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            7
-        }, &mut rx, &mut Default::default()).await;
+        let result = interrupt_read_for_reader(
+            async {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                7
+            },
+            &mut rx,
+            &mut Default::default(),
+        )
+        .await;
         assert_eq!(result, Some(7));
     }
 }
@@ -14951,11 +17547,19 @@ mod gmail_label_tests {
 
     async fn session() -> (Session<DuplexStream>, BufReader<DuplexStream>) {
         let (client, server) = tokio::io::duplex(4096);
-        let login =
-            tokio::spawn(async move { async_imap::Client::new(client).login("test", "test").await.unwrap() });
+        let login = tokio::spawn(async move {
+            async_imap::Client::new(client)
+                .login("test", "test")
+                .await
+                .unwrap()
+        });
         let mut server = BufReader::new(server);
         let tag = command(&mut server, "LOGIN").await;
-        server.get_mut().write_all(format!("{tag} OK logged in\r\n").as_bytes()).await.unwrap();
+        server
+            .get_mut()
+            .write_all(format!("{tag} OK logged in\r\n").as_bytes())
+            .await
+            .unwrap();
         (login.await.unwrap(), server)
     }
 
@@ -15014,8 +17618,15 @@ mod gmail_label_tests {
             let (mut client, mut server) = session().await;
             let task = tokio::spawn(async move { fetch_gmail_msgids(&mut client, &[7, 8]).await });
             let tag = command(&mut server, "UID FETCH 7:8 (UID X-GM-MSGID)").await;
-            server.get_mut().write_all(reply.replace("{tag}", &tag).as_bytes()).await.unwrap();
-            let got = tokio::time::timeout(Duration::from_secs(5), task).await.expect("the read finished").unwrap();
+            server
+                .get_mut()
+                .write_all(reply.replace("{tag}", &tag).as_bytes())
+                .await
+                .unwrap();
+            let got = tokio::time::timeout(Duration::from_secs(5), task)
+                .await
+                .expect("the read finished")
+                .unwrap();
             assert_eq!(got.expect("read"), want);
         }
     }
@@ -15023,22 +17634,40 @@ mod gmail_label_tests {
     #[test]
     fn gmail_msgid_search_pairs_its_keys() {
         assert_eq!(gmail_msgid_query(&[1]), "X-GM-MSGID 1");
-        assert_eq!(gmail_msgid_query(&[1, 2, 3]), "OR OR X-GM-MSGID 1 X-GM-MSGID 2 X-GM-MSGID 3");
+        assert_eq!(
+            gmail_msgid_query(&[1, 2, 3]),
+            "OR OR X-GM-MSGID 1 X-GM-MSGID 2 X-GM-MSGID 3"
+        );
     }
 
     /// Read the labels for UIDs 7, 8 and 9 against a server that answers
     /// with `reply` (`{tag}` standing for the command's tag).
-    async fn read(account_id: u32, reply: &str) -> (Result<(), async_imap::error::Error>, Vec<Message>) {
+    async fn read(
+        account_id: u32,
+        reply: &str,
+    ) -> (Result<(), async_imap::error::Error>, Vec<Message>) {
         GMAIL_LABELS.lock().unwrap().insert(account_id, true);
         let (mut client, mut server) = session().await;
-        let mut msgs = vec![labelled(7, &["Old"]), labelled(8, &["Gone"]), labelled(9, &["Kept"])];
+        let mut msgs = vec![
+            labelled(7, &["Old"]),
+            labelled(8, &["Gone"]),
+            labelled(9, &["Kept"]),
+        ];
         let task = tokio::spawn(async move {
-            let r = read_gmail_labels(account_id, &mut client, "INBOX", &[7, 8, 9], &mut msgs).await;
+            let r =
+                read_gmail_labels(account_id, &mut client, "INBOX", &[7, 8, 9], &mut msgs).await;
             (r, msgs)
         });
         let tag = command(&mut server, "UID FETCH 7:9 (UID X-GM-LABELS)").await;
-        server.get_mut().write_all(reply.replace("{tag}", &tag).as_bytes()).await.unwrap();
-        tokio::time::timeout(Duration::from_secs(5), task).await.expect("the read finished").unwrap()
+        server
+            .get_mut()
+            .write_all(reply.replace("{tag}", &tag).as_bytes())
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .expect("the read finished")
+            .unwrap()
     }
 
     fn labels_of(msgs: &[Message]) -> Vec<Vec<String>> {
@@ -15060,7 +17689,14 @@ mod gmail_label_tests {
         )
         .await;
         r.expect("read");
-        assert_eq!(labels_of(&msgs), [vec!["My Label".to_string()], vec![], vec!["Kept".to_string()]]);
+        assert_eq!(
+            labels_of(&msgs),
+            [
+                vec!["My Label".to_string()],
+                vec![],
+                vec!["Kept".to_string()]
+            ]
+        );
         assert!(gmail_labels_wanted(account_id));
     }
 
@@ -15073,7 +17709,11 @@ mod gmail_label_tests {
         r.expect("a refusal is no error");
         assert_eq!(
             labels_of(&msgs),
-            [vec!["Old".to_string()], vec!["Gone".to_string()], vec!["Kept".to_string()]]
+            [
+                vec!["Old".to_string()],
+                vec!["Gone".to_string()],
+                vec!["Kept".to_string()]
+            ]
         );
         assert!(!gmail_labels_wanted(account_id));
     }
@@ -15085,14 +17725,19 @@ mod gmail_label_tests {
     #[tokio::test]
     async fn an_unreadable_reply_asks_for_a_reconnect_without_labels() {
         let account_id = 900_376;
-        let (r, mut msgs) =
-            read(account_id, "* 3 FETCH (UID 7 X-GM-LABELS ({5}\r\nHello))\r\n{tag} OK Success\r\n").await;
+        let (r, mut msgs) = read(
+            account_id,
+            "* 3 FETCH (UID 7 X-GM-LABELS ({5}\r\nHello))\r\n{tag} OK Success\r\n",
+        )
+        .await;
         let e = r.expect_err("the stream cannot be trusted");
         assert!(!is_parse_error(&e), "{e}");
         assert_eq!(labels_of(&msgs)[0], ["Old"]);
         assert!(!gmail_labels_wanted(account_id));
         // The retry on a fresh connection sends the server nothing.
         let (mut client, _server) = session().await;
-        read_gmail_labels(account_id, &mut client, "INBOX", &[7], &mut msgs).await.expect("skipped");
+        read_gmail_labels(account_id, &mut client, "INBOX", &[7], &mut msgs)
+            .await
+            .expect("skipped");
     }
 }

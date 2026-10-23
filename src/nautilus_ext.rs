@@ -45,7 +45,9 @@ pub fn path() -> Option<PathBuf> {
 }
 
 pub fn status() -> Status {
-    path().map(|p| status_at(&p)).unwrap_or(Status::NotInstalled)
+    path()
+        .map(|p| status_at(&p))
+        .unwrap_or(Status::NotInstalled)
 }
 
 /// Everything the settings row shows, read in one go.
@@ -65,7 +67,11 @@ impl State {
         let status = status();
         let loaded = status == Status::Installed
             && path().is_some_and(|p| loaded_at(&p.with_file_name(LOADED_MARKER)));
-        Self { status, loaded, loader: loader_present() }
+        Self {
+            status,
+            loaded,
+            loader: loader_present(),
+        }
     }
 }
 
@@ -96,7 +102,9 @@ pub fn loader_present() -> Option<bool> {
     Some(DIRS.iter().any(|d| {
         std::fs::read_dir(d).is_ok_and(|entries| {
             entries.flatten().any(|e| {
-                e.file_name().to_string_lossy().starts_with("libnautilus-python")
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("libnautilus-python")
             })
         })
     }))
@@ -123,7 +131,9 @@ fn launcher_record() -> Option<PathBuf> {
 /// Hylki runs as anything else, so a later packaged install does not leave
 /// the extension chasing a bundle that is gone.
 pub fn record_launcher() {
-    let Some(path) = launcher_record() else { return };
+    let Some(path) = launcher_record() else {
+        return;
+    };
     let Some(bundle) = crate::platform::appimage() else {
         let _ = std::fs::remove_file(&path);
         return;
@@ -132,7 +142,10 @@ pub fn record_launcher() {
         let _ = std::fs::create_dir_all(dir);
     }
     if let Err(e) = std::fs::write(&path, bundle.as_os_str().as_encoded_bytes()) {
-        tracing::warn!("could not record the AppImage path at {}: {e}", path.display());
+        tracing::warn!(
+            "could not record the AppImage path at {}: {e}",
+            path.display()
+        );
     }
 }
 
@@ -195,8 +208,9 @@ pub fn quit_files() -> Result<(), String> {
     ) {
         Ok(_) => Ok(()),
         // Not running: nothing to restart, and nothing to report.
-        Err(e) if e.matches(gtk::gio::DBusError::ServiceUnknown)
-            || e.matches(gtk::gio::DBusError::NameHasNoOwner) =>
+        Err(e)
+            if e.matches(gtk::gio::DBusError::ServiceUnknown)
+                || e.matches(gtk::gio::DBusError::NameHasNoOwner) =>
         {
             Ok(())
         }
@@ -229,7 +243,8 @@ mod tests {
 
     #[test]
     fn loaded_marker_must_carry_this_copys_hash() {
-        let dir = std::env::temp_dir().join(format!("hylki-nautilus-marker-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("hylki-nautilus-marker-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let marker = dir.join(LOADED_MARKER);
         assert!(!loaded_at(&marker));

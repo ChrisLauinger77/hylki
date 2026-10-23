@@ -98,6 +98,9 @@ mod tests {
         let a = token(32).expect("entropy");
         let b = token(32).expect("entropy");
         assert_ne!(a, b);
-        assert!(a.chars().collect::<std::collections::HashSet<_>>().len() > 4, "{a}");
+        assert!(
+            a.chars().collect::<std::collections::HashSet<_>>().len() > 4,
+            "{a}"
+        );
     }
 }

@@ -62,7 +62,11 @@ pub fn usable(account: &AccountConfig) -> bool {
 
 /// The configured accounts a search would ask (reads the accounts file).
 pub fn accounts() -> Vec<AccountConfig> {
-    crate::config::load().unwrap_or_default().into_iter().filter(usable).collect()
+    crate::config::load()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(usable)
+        .collect()
 }
 
 /// A `$search` term: Graph's quoted string, with its quote and backslash
@@ -81,7 +85,11 @@ fn people_url(typed: &str) -> String {
 /// The tenant's users whose name or address starts with a word of `typed`.
 /// `$search` on directory objects needs `ConsistencyLevel: eventual`.
 fn users_url(typed: &str) -> String {
-    let term = format!("{} OR {}", quoted(&format!("displayName:{typed}")), quoted(&format!("mail:{typed}")));
+    let term = format!(
+        "{} OR {}",
+        quoted(&format!("displayName:{typed}")),
+        quoted(&format!("mail:{typed}"))
+    );
     format!(
         "{GRAPH}/users?$search={}&$select=displayName,mail&$top={TOP}",
         crate::percent::encode(&term)
@@ -95,7 +103,11 @@ fn suggestion(name: &str, address: &str) -> Option<Suggestion> {
     }
     let name = name.trim();
     Some(Suggestion {
-        name: if name.is_empty() { address.to_string() } else { name.to_string() },
+        name: if name.is_empty() {
+            address.to_string()
+        } else {
+            name.to_string()
+        },
         email: address.to_string(),
         from_contacts: true,
         from_directory: true,
@@ -111,8 +123,15 @@ fn parse_people(json: &serde_json::Value) -> Vec<Suggestion> {
     let mut out = Vec::new();
     for person in json["value"].as_array().into_iter().flatten() {
         let name = person["displayName"].as_str().unwrap_or_default();
-        for scored in person["scoredEmailAddresses"].as_array().into_iter().flatten() {
-            out.extend(suggestion(name, scored["address"].as_str().unwrap_or_default()));
+        for scored in person["scoredEmailAddresses"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            out.extend(suggestion(
+                name,
+                scored["address"].as_str().unwrap_or_default(),
+            ));
         }
     }
     out
@@ -125,7 +144,12 @@ fn parse_users(json: &serde_json::Value) -> Vec<Suggestion> {
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|u| suggestion(u["displayName"].as_str().unwrap_or_default(), u["mail"].as_str().unwrap_or_default()))
+        .filter_map(|u| {
+            suggestion(
+                u["displayName"].as_str().unwrap_or_default(),
+                u["mail"].as_str().unwrap_or_default(),
+            )
+        })
         .collect()
 }
 
@@ -150,7 +174,9 @@ fn merge(into: &mut Vec<Suggestion>, more: Vec<Suggestion>) {
 fn still_matches(s: &Suggestion, query: &str) -> bool {
     let name = s.name.to_lowercase();
     let email = s.email.to_lowercase();
-    query.split_whitespace().all(|w| name.contains(w) || email.contains(w))
+    query
+        .split_whitespace()
+        .all(|w| name.contains(w) || email.contains(w))
 }
 
 /// One account's answer to a query.
@@ -190,11 +216,18 @@ impl State {
             .iter()
             .filter(|((acc, q), a)| acc == account && a.complete && query.starts_with(q.as_str()))
             .max_by_key(|((_, q), _)| q.len())
-            .map(|(_, a)| a.found.iter().filter(|s| still_matches(s, query)).cloned().collect())
+            .map(|(_, a)| {
+                a.found
+                    .iter()
+                    .filter(|s| still_matches(s, query))
+                    .cloned()
+                    .collect()
+            })
     }
 
     fn keep(&mut self, account: &str, query: &str, answer: Answer) {
-        self.answers.insert((account.to_string(), query.to_string()), answer);
+        self.answers
+            .insert((account.to_string(), query.to_string()), answer);
     }
 }
 
@@ -221,16 +254,23 @@ fn failure(e: ureq::Error) -> Failure {
     match e {
         ureq::Error::Status(401, _) => Failure::Unauthorized,
         ureq::Error::Status(429, resp) => Failure::Throttled(
-            resp.header("Retry-After").and_then(|v| v.trim().parse().ok()).unwrap_or(DEFAULT_RETRY_AFTER),
+            resp.header("Retry-After")
+                .and_then(|v| v.trim().parse().ok())
+                .unwrap_or(DEFAULT_RETRY_AFTER),
         ),
-        ureq::Error::Status(code, resp) => status_failure(code, &resp.into_string().unwrap_or_default()),
+        ureq::Error::Status(code, resp) => {
+            status_failure(code, &resp.into_string().unwrap_or_default())
+        }
         other => Failure::Failed(other.to_string()),
     }
 }
 
 fn status_failure(code: u16, body: &str) -> Failure {
     let v = serde_json::from_str::<serde_json::Value>(body).unwrap_or_default();
-    let what = v["error"]["code"].as_str().or(v["error"]["message"].as_str()).unwrap_or_default();
+    let what = v["error"]["code"]
+        .as_str()
+        .or(v["error"]["message"].as_str())
+        .unwrap_or_default();
     let why = format!("HTTP {code} {what}").trim_end().to_string();
     // Authorization_RequestDenied, ErrorAccessDenied: the tenant's answer,
     // which the next query will get as well. A 400 that names its error
@@ -250,7 +290,9 @@ fn get(token: &str, endpoint: Endpoint, typed: &str) -> Result<serde_json::Value
     };
     // The query is a person's name, so the log names only the list asked.
     tracing::debug!(target: "hylki::graph", "> GET {} (directory search)", endpoint.name());
-    let mut req = agent().get(&url).set("Authorization", &format!("Bearer {token}"));
+    let mut req = agent()
+        .get(&url)
+        .set("Authorization", &format!("Bearer {token}"));
     if let Some(level) = consistency {
         req = req.set("ConsistencyLevel", level);
     }
@@ -279,7 +321,9 @@ fn search_account(account: &AccountConfig, typed: &str, query: &str) -> Vec<Sugg
     let email = account.email.as_str();
     let now = Instant::now();
     {
-        let Ok(mut st) = state().lock() else { return Vec::new() };
+        let Ok(mut st) = state().lock() else {
+            return Vec::new();
+        };
         if let Some(found) = st.recall(email, query, now) {
             return found;
         }
@@ -300,7 +344,10 @@ fn search_account(account: &AccountConfig, typed: &str, query: &str) -> Vec<Sugg
             complete = false;
             break;
         }
-        if state().lock().is_ok_and(|st| st.refused.contains(&(email.to_string(), endpoint))) {
+        if state()
+            .lock()
+            .is_ok_and(|st| st.refused.contains(&(email.to_string(), endpoint)))
+        {
             complete = false;
             continue;
         }
@@ -343,7 +390,10 @@ fn search_account(account: &AccountConfig, typed: &str, query: &str) -> Vec<Sugg
             Err(Failure::Throttled(secs)) => {
                 tracing::warn!(target: "hylki::graph", "directory search: throttled for {email}, waiting {secs} s");
                 if let Ok(mut st) = state().lock() {
-                    st.paused.insert(email.to_string(), Instant::now() + Duration::from_secs(secs));
+                    st.paused.insert(
+                        email.to_string(),
+                        Instant::now() + Duration::from_secs(secs),
+                    );
                 }
                 complete = false;
                 keep = false;
@@ -363,7 +413,15 @@ fn search_account(account: &AccountConfig, typed: &str, query: &str) -> Vec<Sugg
     }
     if keep {
         if let Ok(mut st) = state().lock() {
-            st.keep(email, query, Answer { at: Instant::now(), found: found.clone(), complete });
+            st.keep(
+                email,
+                query,
+                Answer {
+                    at: Instant::now(),
+                    found: found.clone(),
+                    complete,
+                },
+            );
         }
     }
     found
@@ -395,9 +453,21 @@ mod tests {
              &$top=10&$select=displayName,scoredEmailAddresses"
         );
         let url = users_url("o'br&en");
-        assert!(url.starts_with("https://graph.microsoft.com/v1.0/users?$search="), "{url}");
-        let term = url.split("$search=").nth(1).unwrap().split('&').next().unwrap();
-        assert_eq!(crate::percent::decode(term, false), r#""displayName:o'br&en" OR "mail:o'br&en""#);
+        assert!(
+            url.starts_with("https://graph.microsoft.com/v1.0/users?$search="),
+            "{url}"
+        );
+        let term = url
+            .split("$search=")
+            .nth(1)
+            .unwrap()
+            .split('&')
+            .next()
+            .unwrap();
+        assert_eq!(
+            crate::percent::decode(term, false),
+            r#""displayName:o'br&en" OR "mail:o'br&en""#
+        );
         assert!(url.ends_with("&$select=displayName,mail&$top=10"), "{url}");
     }
 
@@ -433,7 +503,10 @@ mod tests {
         )
         .unwrap();
         let found = parse_people(&json);
-        let got: Vec<(&str, &str)> = found.iter().map(|s| (s.name.as_str(), s.email.as_str())).collect();
+        let got: Vec<(&str, &str)> = found
+            .iter()
+            .map(|s| (s.name.as_str(), s.email.as_str()))
+            .collect();
         assert_eq!(
             got,
             [
@@ -466,12 +539,22 @@ mod tests {
 
     #[test]
     fn one_suggestion_per_address() {
-        let mut found = vec![s("adelev@contoso.com", "adelev@contoso.com"), s("Alex Wilber", "AlexW@contoso.com")];
+        let mut found = vec![
+            s("adelev@contoso.com", "adelev@contoso.com"),
+            s("Alex Wilber", "AlexW@contoso.com"),
+        ];
         merge(
             &mut found,
-            vec![s("Adele Vance", "AdeleV@Contoso.com"), s("Someone Else", "alexw@contoso.com"), s("Diego", "diegos@contoso.com")],
+            vec![
+                s("Adele Vance", "AdeleV@Contoso.com"),
+                s("Someone Else", "alexw@contoso.com"),
+                s("Diego", "diegos@contoso.com"),
+            ],
         );
-        let got: Vec<(&str, &str)> = found.iter().map(|s| (s.name.as_str(), s.email.as_str())).collect();
+        let got: Vec<(&str, &str)> = found
+            .iter()
+            .map(|s| (s.name.as_str(), s.email.as_str()))
+            .collect();
         assert_eq!(
             got,
             [
@@ -486,26 +569,59 @@ mod tests {
     fn a_whole_answer_serves_longer_queries() {
         let mut st = State::default();
         let t0 = Instant::now();
-        let found = vec![s("Adele Vance", "adelev@contoso.com"), s("Alex Wilber", "alexw@contoso.com")];
-        st.keep("me@contoso.com", "ade", Answer { at: t0, found: found.clone(), complete: true });
-        assert_eq!(st.recall("me@contoso.com", "ade", t0).map(|f| f.len()), Some(2));
+        let found = vec![
+            s("Adele Vance", "adelev@contoso.com"),
+            s("Alex Wilber", "alexw@contoso.com"),
+        ];
+        st.keep(
+            "me@contoso.com",
+            "ade",
+            Answer {
+                at: t0,
+                found: found.clone(),
+                complete: true,
+            },
+        );
+        assert_eq!(
+            st.recall("me@contoso.com", "ade", t0).map(|f| f.len()),
+            Some(2)
+        );
         let narrowed = st.recall("me@contoso.com", "adele v", t0).unwrap();
         assert_eq!(narrowed.len(), 1);
         assert_eq!(narrowed[0].email, "adelev@contoso.com");
-        assert!(st.recall("other@contoso.com", "adele", t0).is_none(), "answers are the account's own");
+        assert!(
+            st.recall("other@contoso.com", "adele", t0).is_none(),
+            "answers are the account's own"
+        );
         // A first page says nothing about what a longer query would find.
-        st.keep("me@contoso.com", "ale", Answer { at: t0, found, complete: false });
+        st.keep(
+            "me@contoso.com",
+            "ale",
+            Answer {
+                at: t0,
+                found,
+                complete: false,
+            },
+        );
         assert!(st.recall("me@contoso.com", "alex", t0).is_none());
         // And nothing is kept past its time.
-        assert!(st.recall("me@contoso.com", "ade", t0 + KEEP + Duration::from_secs(1)).is_none());
+        assert!(st
+            .recall("me@contoso.com", "ade", t0 + KEEP + Duration::from_secs(1))
+            .is_none());
         assert!(st.answers.is_empty());
     }
 
     #[test]
     fn a_list_the_account_cannot_have_is_not_asked_again() {
         assert!(matches!(status_failure(400, ""), Failure::Refused(_)));
-        assert!(matches!(status_failure(403, r#"{"error":{"code":"Authorization_RequestDenied"}}"#), Failure::Refused(_)));
-        assert!(matches!(status_failure(400, r#"{"error":{"code":"Request_BadRequest"}}"#), Failure::Failed(_)));
+        assert!(matches!(
+            status_failure(403, r#"{"error":{"code":"Authorization_RequestDenied"}}"#),
+            Failure::Refused(_)
+        ));
+        assert!(matches!(
+            status_failure(400, r#"{"error":{"code":"Request_BadRequest"}}"#),
+            Failure::Failed(_)
+        ));
         assert!(matches!(status_failure(503, ""), Failure::Failed(_)));
     }
 
@@ -518,10 +634,22 @@ mod tests {
             ..crate::ui::welcome::blank_account()
         };
         assert!(usable(&acc));
-        assert!(!usable(&AccountConfig { goa_id: Some("account_1".into()), ..acc.clone() }));
-        assert!(!usable(&AccountConfig { graph_directory: false, ..acc.clone() }));
-        assert!(!usable(&AccountConfig { protocol: Protocol::Imap, ..acc.clone() }));
-        assert!(!usable(&AccountConfig { enabled: false, ..acc }));
+        assert!(!usable(&AccountConfig {
+            goa_id: Some("account_1".into()),
+            ..acc.clone()
+        }));
+        assert!(!usable(&AccountConfig {
+            graph_directory: false,
+            ..acc.clone()
+        }));
+        assert!(!usable(&AccountConfig {
+            protocol: Protocol::Imap,
+            ..acc.clone()
+        }));
+        assert!(!usable(&AccountConfig {
+            enabled: false,
+            ..acc
+        }));
         assert!(search("ad", &[]).is_empty());
     }
 }

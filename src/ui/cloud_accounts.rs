@@ -46,7 +46,10 @@ pub enum CloudAccountsInput {
     ConfirmRemove(usize),
     /// A row's switch: keep the account, but offer it (or not) in the
     /// composer.
-    ToggleEnabled { index: usize, enabled: bool },
+    ToggleEnabled {
+        index: usize,
+        enabled: bool,
+    },
     Remove(usize),
     /// The editor page's Save button.
     SaveClicked,
@@ -55,12 +58,19 @@ pub enum CloudAccountsInput {
     CloseEditor,
     /// The editor's Save: `index` is the row being replaced, or none for a
     /// new account. The password is stored only when given.
-    Save { index: Option<usize>, account: CloudAccount, password: String },
+    Save {
+        index: Option<usize>,
+        account: CloudAccount,
+        password: String,
+    },
     /// A sign-in the editor finished after closing went wrong.
     Failed(String),
     /// A server said which product it is (`cloud::detect_product`), for
     /// the account with that keyring key.
-    ProductDetected { key: String, product: String },
+    ProductDetected {
+        key: String,
+        product: String,
+    },
 }
 
 #[derive(Debug)]
@@ -217,7 +227,10 @@ impl SimpleComponent for CloudAccounts {
             let save_action = model.save_action.clone();
             let slot = widgets.editor_slot.clone();
             widgets.nav.connect_visible_page_notify(move |nav| {
-                let editor = nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor");
+                let editor = nav
+                    .visible_page()
+                    .and_then(|p| p.tag())
+                    .is_some_and(|t| t == "editor");
                 if !editor {
                     // The form is done with: drop it and what Save would do.
                     *save_action.borrow_mut() = None;
@@ -248,7 +261,9 @@ impl SimpleComponent for CloudAccounts {
 
     fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>) {
         match message {
-            CloudAccountsInput::Add => sender.input(CloudAccountsInput::AddOf(CloudKind::Nextcloud)),
+            CloudAccountsInput::Add => {
+                sender.input(CloudAccountsInput::AddOf(CloudKind::Nextcloud))
+            }
             CloudAccountsInput::AddOf(kind) => {
                 let mut a = CloudAccount::empty();
                 a.kind = kind;
@@ -273,8 +288,14 @@ impl SimpleComponent for CloudAccounts {
                 }
             }
             CloudAccountsInput::ConfirmRemove(i) => {
-                let Some(a) = self.accounts.get(i) else { return };
-                let name = if a.name.trim().is_empty() { a.where_shown() } else { a.name.clone() };
+                let Some(a) = self.accounts.get(i) else {
+                    return;
+                };
+                let name = if a.name.trim().is_empty() {
+                    a.where_shown()
+                } else {
+                    a.name.clone()
+                };
                 let parent = relm4::main_application().active_window();
                 let dialog = adw::MessageDialog::new(
                     parent.as_ref(),
@@ -302,7 +323,9 @@ impl SimpleComponent for CloudAccounts {
                     }
                     let a = self.accounts.remove(i);
                     let key = a.key();
-                    crate::config::keyring_later(move || crate::config::delete_cloud_password(&key));
+                    crate::config::keyring_later(move || {
+                        crate::config::delete_cloud_password(&key)
+                    });
                     cloud::save_accounts(&self.accounts);
                     self.rebuild(&sender);
                     self.toast(&i18n_f("Removed {name}", &[("name", &a.name)]));
@@ -320,7 +343,11 @@ impl SimpleComponent for CloudAccounts {
             CloudAccountsInput::Failed(e) => self.toast(&e),
             CloudAccountsInput::ProductDetected { key, product } => {
                 let mut changed = false;
-                for a in self.accounts.iter_mut().filter(|a| a.key() == key && a.product.is_empty()) {
+                for a in self
+                    .accounts
+                    .iter_mut()
+                    .filter(|a| a.key() == key && a.product.is_empty())
+                {
                     a.product = product.clone();
                     changed = true;
                 }
@@ -329,14 +356,21 @@ impl SimpleComponent for CloudAccounts {
                     self.rebuild(&sender);
                 }
             }
-            CloudAccountsInput::Save { index, account, password } => {
+            CloudAccountsInput::Save {
+                index,
+                account,
+                password,
+            } => {
                 // On the keyring thread, in order: the new entry, then the
                 // old one dropped.
                 if !password.is_empty() && account.has_secret() {
                     let key = account.key();
                     let s = sender.input_sender().clone();
                     crate::config::keyring_then(
-                        move || crate::config::store_cloud_password(&key, &password).map_err(|e| e.to_string()),
+                        move || {
+                            crate::config::store_cloud_password(&key, &password)
+                                .map_err(|e| e.to_string())
+                        },
                         move |stored| {
                             if let Err(e) = stored {
                                 s.emit(CloudAccountsInput::Failed(i18n_f(
@@ -353,7 +387,9 @@ impl SimpleComponent for CloudAccounts {
                         // entry: drop the old one.
                         if self.accounts[i].key() != account.key() {
                             let old = self.accounts[i].key();
-                            crate::config::keyring_later(move || crate::config::delete_cloud_password(&old));
+                            crate::config::keyring_later(move || {
+                                crate::config::delete_cloud_password(&old)
+                            });
                         }
                         self.accounts[i] = account;
                     }
@@ -374,9 +410,21 @@ impl CloudAccounts {
     }
 
     /// Slide the editor page in with the form for `account`.
-    fn open_editor(&mut self, index: Option<usize>, account: CloudAccount, sender: &ComponentSender<Self>) {
-        let (Some(nav), Some(page), Some(slot)) = (&self.nav, &self.editor_page, &self.editor_slot) else { return };
-        page.set_title(&if index.is_some() { i18n("Edit Cloud Account") } else { i18n("Add Cloud Account") });
+    fn open_editor(
+        &mut self,
+        index: Option<usize>,
+        account: CloudAccount,
+        sender: &ComponentSender<Self>,
+    ) {
+        let (Some(nav), Some(page), Some(slot)) = (&self.nav, &self.editor_page, &self.editor_slot)
+        else {
+            return;
+        };
+        page.set_title(&if index.is_some() {
+            i18n("Edit Cloud Account")
+        } else {
+            i18n("Add Cloud Account")
+        });
         self.editing = index;
         if let Some(b) = &self.remove_btn {
             b.set_visible(index.is_some());
@@ -384,7 +432,11 @@ impl CloudAccounts {
         let (form, save) = build_editor(index, account, sender.input_sender().clone());
         slot.set_child(Some(&form));
         *self.save_action.borrow_mut() = Some(save);
-        if nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor") {
+        if nav
+            .visible_page()
+            .and_then(|p| p.tag())
+            .is_some_and(|t| t == "editor")
+        {
             return;
         }
         nav.push_by_tag("editor");
@@ -392,7 +444,11 @@ impl CloudAccounts {
 
     fn close_editor(&self) {
         if let Some(nav) = &self.nav {
-            if nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor") {
+            if nav
+                .visible_page()
+                .and_then(|p| p.tag())
+                .is_some_and(|t| t == "editor")
+            {
                 nav.pop();
             }
         }
@@ -413,13 +469,23 @@ impl CloudAccounts {
             let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
             vbox.set_hexpand(true);
             vbox.set_valign(gtk::Align::Center);
-            let title = gtk::Label::new(Some(&if a.name.trim().is_empty() { a.where_shown() } else { a.name.clone() }));
+            let title = gtk::Label::new(Some(&if a.name.trim().is_empty() {
+                a.where_shown()
+            } else {
+                a.name.clone()
+            }));
             title.set_halign(gtk::Align::Start);
             title.set_ellipsize(gtk::pango::EllipsizeMode::End);
             title.add_css_class("account-name");
             let mut sub = format!("{} · {}", a.where_shown(), a.user);
             if a.expire_days > 0 {
-                sub.push_str(&format!(" · {}", i18n_f("links expire after {n} days", &[("n", &a.expire_days.to_string())])));
+                sub.push_str(&format!(
+                    " · {}",
+                    i18n_f(
+                        "links expire after {n} days",
+                        &[("n", &a.expire_days.to_string())]
+                    )
+                ));
             }
             if a.password {
                 sub.push_str(&format!(" · {}", i18n("password-protected")));
@@ -434,7 +500,8 @@ impl CloudAccounts {
             // A server from before the picker told Nextcloud, ownCloud and
             // OpenCloud apart: ask it once, in the background, and fill in
             // its mark when it answers.
-            if a.kind == CloudKind::Nextcloud && a.product.is_empty() && self.probed.insert(a.key()) {
+            if a.kind == CloudKind::Nextcloud && a.product.is_empty() && self.probed.insert(a.key())
+            {
                 let (key, base) = (a.key(), a.base());
                 let s = sender.input_sender().clone();
                 std::thread::spawn(move || {
@@ -450,7 +517,10 @@ impl CloudAccounts {
             toggle.set_active(a.enabled);
             let s = sender.input_sender().clone();
             toggle.connect_state_set(move |_, state| {
-                let _ = s.send(CloudAccountsInput::ToggleEnabled { index: i, enabled: state });
+                let _ = s.send(CloudAccountsInput::ToggleEnabled {
+                    index: i,
+                    enabled: state,
+                });
                 gtk::glib::Propagation::Proceed
             });
             hbox.append(&toggle);
@@ -496,12 +566,22 @@ fn build_editor(
         }
     });
     factory.connect_bind(|_, item| {
-        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
         // By name, not position: the row's own selected-value slot is a
         // list item with no position.
-        let name = item.item().and_downcast::<gtk::StringObject>().map(|s| s.string().to_string()).unwrap_or_default();
-        let Some(service) = cloud::SERVICES.iter().find(|s| s.name == name) else { return };
-        let Some(bx) = item.child().and_downcast::<gtk::Box>() else { return };
+        let name = item
+            .item()
+            .and_downcast::<gtk::StringObject>()
+            .map(|s| s.string().to_string())
+            .unwrap_or_default();
+        let Some(service) = cloud::SERVICES.iter().find(|s| s.name == name) else {
+            return;
+        };
+        let Some(bx) = item.child().and_downcast::<gtk::Box>() else {
+            return;
+        };
         // (image, label): swap the image for the service's mark, name the label.
         let Some(old) = bx.first_child() else { return };
         let label = old.next_sibling().and_downcast::<gtk::Label>();
@@ -520,11 +600,9 @@ fn build_editor(
     header_mark.set_margin_bottom(18);
     let set_header_mark = {
         let header_mark = header_mark.clone();
-        move |id: &str| {
-            match crate::brand::texture(id, 112) {
-                Some(t) => header_mark.set_paintable(Some(&t)),
-                None => header_mark.set_icon_name(Some("cloud-symbolic")),
-            }
+        move |id: &str| match crate::brand::texture(id, 112) {
+            Some(t) => header_mark.set_paintable(Some(&t)),
+            None => header_mark.set_icon_name(Some("cloud-symbolic")),
         }
     };
     set_header_mark(account.brand());
@@ -596,7 +674,9 @@ fn build_editor(
     expire.set_value(account.expire_days as f64);
     let protect = adw::SwitchRow::new();
     protect.set_title(&i18n("Protect links with a password"));
-    protect.set_subtitle(&i18n("Each file gets its own password, shown to you to pass on."));
+    protect.set_subtitle(&i18n(
+        "Each file gets its own password, shown to you to pass on.",
+    ));
     protect.set_active(account.password);
     group.add(&kind);
     group.add(&name);
@@ -619,7 +699,6 @@ fn build_editor(
     defaults.set_margin_top(28);
     defaults.add(&expire);
     defaults.add(&protect);
-
 
     let check_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     check_box.set_margin_top(8);
@@ -652,7 +731,12 @@ fn build_editor(
 
     let selected_service = {
         let kind = kind.clone();
-        move || cloud::SERVICES.get(kind.selected() as usize).copied().unwrap_or(cloud::SERVICES[0])
+        move || {
+            cloud::SERVICES
+                .get(kind.selected() as usize)
+                .copied()
+                .unwrap_or(cloud::SERVICES[0])
+        }
     };
     let selected_kind = {
         let selected_service = selected_service.clone();
@@ -661,18 +745,34 @@ fn build_editor(
 
     // The GOA accounts the picker currently lists (those of the kind's
     // provider), in row order.
-    let goa_listed: Rc<RefCell<Vec<crate::goa::GoaFilesAccount>>> = Rc::new(RefCell::new(Vec::new()));
+    let goa_listed: Rc<RefCell<Vec<crate::goa::GoaFilesAccount>>> =
+        Rc::new(RefCell::new(Vec::new()));
     let fill_goa = {
-        let (goa_row, goa_hint, goa_accounts, goa_listed) =
-            (goa_row.clone(), goa_hint.clone(), goa_accounts.clone(), goa_listed.clone());
+        let (goa_row, goa_hint, goa_accounts, goa_listed) = (
+            goa_row.clone(),
+            goa_hint.clone(),
+            goa_accounts.clone(),
+            goa_listed.clone(),
+        );
         let existing_goa = account.goa_id.clone();
         move |k: CloudKind| {
-            let Some(provider) = k.goa_provider() else { return };
-            let listed: Vec<crate::goa::GoaFilesAccount> =
-                goa_accounts.iter().filter(|a| a.provider_type == provider).cloned().collect();
+            let Some(provider) = k.goa_provider() else {
+                return;
+            };
+            let listed: Vec<crate::goa::GoaFilesAccount> = goa_accounts
+                .iter()
+                .filter(|a| a.provider_type == provider)
+                .cloned()
+                .collect();
             let labels: Vec<String> = listed
                 .iter()
-                .map(|a| if a.files_enabled { a.email.clone() } else { i18n_f("{email} (Files is off)", &[("email", &a.email)]) })
+                .map(|a| {
+                    if a.files_enabled {
+                        a.email.clone()
+                    } else {
+                        i18n_f("{email} (Files is off)", &[("email", &a.email)])
+                    }
+                })
                 .collect();
             let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
             goa_row.set_model(Some(&gtk::StringList::new(&refs)));
@@ -714,7 +814,21 @@ fn build_editor(
 
     // The fields each kind wants.
     let apply_kind = {
-        let (url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect, expire, goa_row, goa_hint) = (
+        let (
+            url,
+            user,
+            pass,
+            code,
+            seafile_hint,
+            app_key,
+            app_key_hint,
+            library,
+            check,
+            protect,
+            expire,
+            goa_row,
+            goa_hint,
+        ) = (
             url.clone(),
             user.clone(),
             pass.clone(),
@@ -754,7 +868,9 @@ fn build_editor(
             if goa {
                 fill_goa(k);
                 check.set_label(&i18n("Check Connection"));
-                expire.set_subtitle(&i18n("Days. 0 keeps links forever. Needs Microsoft 365 or OneDrive for Business."));
+                expire.set_subtitle(&i18n(
+                    "Days. 0 keeps links forever. Needs Microsoft 365 or OneDrive for Business.",
+                ));
                 protect.set_subtitle(&i18n("Each file gets its own password, shown to you to pass on. Needs Microsoft 365 or OneDrive for Business."));
                 // A new OneDrive account starts with both off, so a free
                 // personal OneDrive works as it is.
@@ -772,14 +888,26 @@ fn build_editor(
             match k {
                 CloudKind::Nextcloud => {
                     user.set_title(&i18n("User name"));
-                    pass.set_title(&if editing { i18n("App password (leave empty to keep)") } else { i18n("App password") });
-                    protect.set_subtitle(&i18n("Each file gets its own password, shown to you to pass on."));
+                    pass.set_title(&if editing {
+                        i18n("App password (leave empty to keep)")
+                    } else {
+                        i18n("App password")
+                    });
+                    protect.set_subtitle(&i18n(
+                        "Each file gets its own password, shown to you to pass on.",
+                    ));
                     check.set_label(&i18n("Check Connection"));
                 }
                 CloudKind::Seafile => {
                     user.set_title(&i18n("E-mail"));
-                    pass.set_title(&if editing { i18n("Password (leave empty to keep)") } else { i18n("Password") });
-                    protect.set_subtitle(&i18n("Each file gets its own password, shown to you to pass on."));
+                    pass.set_title(&if editing {
+                        i18n("Password (leave empty to keep)")
+                    } else {
+                        i18n("Password")
+                    });
+                    protect.set_subtitle(&i18n(
+                        "Each file gets its own password, shown to you to pass on.",
+                    ));
                     check.set_label(&i18n("Check Connection"));
                 }
                 // Handled above, before the return.
@@ -829,15 +957,22 @@ fn build_editor(
             let service = selected_service();
             let kind = service.kind;
             let goa = if kind.via_goa() {
-                goa_listed.borrow().get(goa_row.selected() as usize).map(|a| (a.id.clone(), a.email.clone()))
+                goa_listed
+                    .borrow()
+                    .get(goa_row.selected() as usize)
+                    .map(|a| (a.id.clone(), a.email.clone()))
             } else {
                 None
             };
             let user = match (kind, dropbox_login.borrow().as_ref()) {
                 (CloudKind::Dropbox, Some((_, email, _))) => email.clone(),
-                (CloudKind::Dropbox, None) if existing.kind == CloudKind::Dropbox => existing.user.clone(),
+                (CloudKind::Dropbox, None) if existing.kind == CloudKind::Dropbox => {
+                    existing.user.clone()
+                }
                 (CloudKind::Dropbox, None) => String::new(),
-                (CloudKind::OneDrive, _) => goa.as_ref().map(|(_, e)| e.clone()).unwrap_or_default(),
+                (CloudKind::OneDrive, _) => {
+                    goa.as_ref().map(|(_, e)| e.clone()).unwrap_or_default()
+                }
                 _ => user.text().trim().to_string(),
             };
             let mut a = CloudAccount {
@@ -1043,7 +1178,11 @@ fn build_editor(
                     if let Ok(t) = cloud::probe_link_terms(&a, "") {
                         a.set_link_terms(t.as_ref());
                     }
-                    let _ = sender.send(CloudAccountsInput::Save { index, account: a, password: String::new() });
+                    let _ = sender.send(CloudAccountsInput::Save {
+                        index,
+                        account: a,
+                        password: String::new(),
+                    });
                 });
                 return true;
             }
@@ -1071,7 +1210,11 @@ fn build_editor(
                     let sender = sender.clone();
                     std::thread::spawn(move || {
                         let _ = sender.send(match cloud::seafile_login_with_code(&a, &pw, &otp) {
-                            Ok((token, _)) => CloudAccountsInput::Save { index, account: a, password: token },
+                            Ok((token, _)) => CloudAccountsInput::Save {
+                                index,
+                                account: a,
+                                password: token,
+                            },
                             Err(e) => CloudAccountsInput::Failed(e),
                         });
                     });
@@ -1080,7 +1223,11 @@ fn build_editor(
                 _ => pass.text().to_string(),
             }
         };
-        let _ = sender.send(CloudAccountsInput::Save { index, account: a, password: secret });
+        let _ = sender.send(CloudAccountsInput::Save {
+            index,
+            account: a,
+            password: secret,
+        });
         true
     });
     (bx.upcast(), save)

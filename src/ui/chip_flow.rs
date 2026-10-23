@@ -78,7 +78,12 @@ mod imp {
             let gap = obj.gap_size(&chips);
             if orientation == gtk::Orientation::Horizontal {
                 // Narrowest: one chip per row. Natural: the whole row.
-                let widest = chips.iter().map(|(_, w, _)| *w).max().unwrap_or(0).max(gap.0);
+                let widest = chips
+                    .iter()
+                    .map(|(_, w, _)| *w)
+                    .max()
+                    .unwrap_or(0)
+                    .max(gap.0);
                 let mut nat = chips.iter().map(|(_, w, _)| w + SPACING).sum::<i32>();
                 if self.gap.get().is_some() {
                     nat += gap.0 + SPACING;
@@ -129,7 +134,10 @@ mod imp {
                     continue;
                 };
                 let (x, y) = pos.get(child).copied().unwrap_or((s.x as f64, s.y as f64));
-                child.size_allocate(&gtk::Allocation::new(x.round() as i32, y.round() as i32, s.w, s.h), -1);
+                child.size_allocate(
+                    &gtk::Allocation::new(x.round() as i32, y.round() as i32, s.w, s.h),
+                    -1,
+                );
             }
         }
     }
@@ -249,13 +257,33 @@ impl ChipFlow {
     /// largest chip known (for an empty zone's height).
     fn gap_size(&self, chips: &[(gtk::Widget, i32, i32)]) -> (i32, i32) {
         let imp = self.imp();
-        let dragging = imp.drag_size.borrow().as_ref().map(|s| s.get()).unwrap_or((0, 0));
+        let dragging = imp
+            .drag_size
+            .borrow()
+            .as_ref()
+            .map(|s| s.get())
+            .unwrap_or((0, 0));
         if dragging.0 > 0 && dragging.1 > 0 {
             return dragging;
         }
-        let shared = imp.chip_size.borrow().as_ref().map(|s| s.get()).unwrap_or((0, 0));
-        let w = chips.iter().map(|(_, w, _)| *w).max().unwrap_or(0).max(shared.0);
-        let h = chips.iter().map(|(_, _, h)| *h).max().unwrap_or(0).max(shared.1);
+        let shared = imp
+            .chip_size
+            .borrow()
+            .as_ref()
+            .map(|s| s.get())
+            .unwrap_or((0, 0));
+        let w = chips
+            .iter()
+            .map(|(_, w, _)| *w)
+            .max()
+            .unwrap_or(0)
+            .max(shared.0);
+        let h = chips
+            .iter()
+            .map(|(_, _, h)| *h)
+            .max()
+            .unwrap_or(0)
+            .max(shared.1);
         (if w > 0 { w } else { 72 }, if h > 0 { h } else { 48 })
     }
 
@@ -272,9 +300,16 @@ impl ChipFlow {
 
     fn flow(&self, width: i32, chips: &[(gtk::Widget, i32, i32)]) -> (Vec<Slot>, i32) {
         let gap = self.gap_size(chips);
-        let row_h = chips.iter().map(|(_, _, h)| *h).max().unwrap_or(0).max(gap.1);
-        let mut entries: Vec<(Option<gtk::Widget>, i32, i32)> =
-            chips.iter().map(|(c, w, h)| (Some(c.clone()), *w, *h)).collect();
+        let row_h = chips
+            .iter()
+            .map(|(_, _, h)| *h)
+            .max()
+            .unwrap_or(0)
+            .max(gap.1);
+        let mut entries: Vec<(Option<gtk::Widget>, i32, i32)> = chips
+            .iter()
+            .map(|(c, w, h)| (Some(c.clone()), *w, *h))
+            .collect();
         if let Some(i) = self.imp().gap.get() {
             entries.insert(i.min(entries.len()), (None, gap.0, gap.1));
         }
@@ -286,7 +321,13 @@ impl ChipFlow {
                 y += row_h + SPACING;
             }
             // Chips sit centred in their row.
-            out.push(Slot { child, x, y: y + (row_h - h) / 2, w, h });
+            out.push(Slot {
+                child,
+                x,
+                y: y + (row_h - h) / 2,
+                w,
+                h,
+            });
             x += w + SPACING;
         }
         (out, y + row_h)
@@ -305,10 +346,10 @@ impl ChipFlow {
             let Some(flow) = weak.upgrade() else {
                 return;
             };
-            flow.imp()
-                .pos
-                .borrow_mut()
-                .insert(c.clone(), (from.0 + (tx - from.0) * v, from.1 + (ty - from.1) * v));
+            flow.imp().pos.borrow_mut().insert(
+                c.clone(),
+                (from.0 + (tx - from.0) * v, from.1 + (ty - from.1) * v),
+            );
             flow.queue_allocate();
         });
         let anim = adw::TimedAnimation::new(self, 0.0, 1.0, ANIM_MS, target);

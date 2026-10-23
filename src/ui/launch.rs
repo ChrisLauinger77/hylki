@@ -70,14 +70,19 @@ pub struct Browser {
 pub fn browsers() -> Vec<Browser> {
     let mut found: Vec<Browser> = Vec::new();
     for info in gio::AppInfo::all_for_type("x-scheme-handler/https") {
-        let Some(id) = info.id().map(|s| s.to_string()) else { continue };
+        let Some(id) = info.id().map(|s| s.to_string()) else {
+            continue;
+        };
         if id.starts_with(crate::APP_ID) || !info.should_show() {
             continue;
         }
         if found.iter().any(|b| b.id == id) {
             continue;
         }
-        found.push(Browser { id, name: info.display_name().to_string() });
+        found.push(Browser {
+            id,
+            name: info.display_name().to_string(),
+        });
     }
     found.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     found
@@ -90,21 +95,23 @@ pub fn open_link(uri: &str, parent: Option<&gtk::Window>) {
     let choice = BROWSER.with(|b| b.borrow().clone());
     // A mailto: link is not a browser's business: it goes to whatever the
     // desktop opens mail with, whichever browser was chosen for the web.
-    let web = !uri.split(':').next().unwrap_or("").eq_ignore_ascii_case("mailto");
+    let web = !uri
+        .split(':')
+        .next()
+        .unwrap_or("")
+        .eq_ignore_ascii_case("mailto");
     if web && choice == ASK {
         portal_open_uri(uri.to_string(), true, parent.cloned());
         return;
     }
     if web && !choice.is_empty() {
         match gio::DesktopAppInfo::new(&choice) {
-            Some(info) => {
-                match info.launch_uris(&[uri], gio::AppLaunchContext::NONE) {
-                    Ok(()) => return,
-                    Err(e) => tracing::warn!(
-                        "link: {choice} could not be launched ({e}); falling back to the default"
-                    ),
-                }
-            }
+            Some(info) => match info.launch_uris(&[uri], gio::AppLaunchContext::NONE) {
+                Ok(()) => return,
+                Err(e) => tracing::warn!(
+                    "link: {choice} could not be launched ({e}); falling back to the default"
+                ),
+            },
             // The chosen browser is not here: a sandbox that cannot see the
             // host's applications, or an entry that has since been removed.
             None => tracing::warn!("link: {choice} is not available here; using the default"),
@@ -139,7 +146,11 @@ fn describe(uri: &str) -> String {
     if scheme.eq_ignore_ascii_case("mailto") {
         return "a mailto: link".to_string();
     }
-    let host = rest.trim_start_matches('/').split(['/', '?', '#']).next().unwrap_or("");
+    let host = rest
+        .trim_start_matches('/')
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or("");
     format!("{scheme}://{host}")
 }
 
@@ -178,7 +189,10 @@ fn portal_open_uri(uri: String, ask: bool, parent: Option<gtk::Window>) {
         }
         Ok(code) => link_failed_dialog(
             retry_parent.as_ref(),
-            &i18n_f("the portal answered response code {code}", &[("code", &code.to_string())]),
+            &i18n_f(
+                "the portal answered response code {code}",
+                &[("code", &code.to_string())],
+            ),
         ),
     });
 }
@@ -282,8 +296,14 @@ mod tests {
 
     #[test]
     fn a_link_is_logged_by_its_host_only() {
-        assert_eq!(describe("https://shop.example/unsubscribe?t=SECRET"), "https://shop.example");
+        assert_eq!(
+            describe("https://shop.example/unsubscribe?t=SECRET"),
+            "https://shop.example"
+        );
         assert_eq!(describe("http://a.example#frag"), "http://a.example");
-        assert_eq!(describe("mailto:someone@example.com?subject=x"), "a mailto: link");
+        assert_eq!(
+            describe("mailto:someone@example.com?subject=x"),
+            "a mailto: link"
+        );
     }
 }

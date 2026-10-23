@@ -10,8 +10,8 @@ use adw::prelude::*;
 use relm4::prelude::*;
 use webkit6::prelude::{PolicyDecisionExt, WebViewExt};
 
-use crate::models::Message;
 use crate::i18n::{i18n, i18n_f, ni18n_f};
+use crate::models::Message;
 
 pub struct MessageView {
     /// Render a lone message as an inset card, same as a conversation's
@@ -267,7 +267,9 @@ impl MessageView {
 
     /// Light the header seal for one member with its verdict class + tooltip.
     fn patch_verify_badge(&self, account_id: u32, id: u32) {
-        let Some(check) = self.member_checks.get(&(account_id, id)) else { return };
+        let Some(check) = self.member_checks.get(&(account_id, id)) else {
+            return;
+        };
         // The OpenPGP chip (#133) rides the same patch: shown with its
         // lock/shield and color once a verdict exists.
         let pgp = match &check.pgp {
@@ -315,7 +317,11 @@ impl MessageView {
     /// already left.
     fn unsub_inner_html(&self, m: &Message) -> String {
         let key = (m.account_id, m.id);
-        let Some(info) = self.member_checks.get(&key).and_then(|c| c.unsubscribe.as_ref()) else {
+        let Some(info) = self
+            .member_checks
+            .get(&key)
+            .and_then(|c| c.unsubscribe.as_ref())
+        else {
             return String::new();
         };
         let button = |label: &str, title: &str| {
@@ -353,17 +359,29 @@ impl MessageView {
                     None => i18n("This message has an unsubscribe link."),
                 };
                 let btn = if info.one_click.is_some() {
-                    button(&i18n("Unsubscribe"), &i18n("Asks the list to stop sending you mail"))
+                    button(
+                        &i18n("Unsubscribe"),
+                        &i18n("Asks the list to stop sending you mail"),
+                    )
                 } else if info.direct() {
-                    button(&i18n("Unsubscribe"), &i18n("Sends an unsubscribe request by email"))
+                    button(
+                        &i18n("Unsubscribe"),
+                        &i18n("Sends an unsubscribe request by email"),
+                    )
                 } else {
                     // Nothing but a web page on offer: the button says so.
-                    button(&i18n("Unsubscribe…"), &i18n("Opens the list's unsubscribe page in your browser"))
+                    button(
+                        &i18n("Unsubscribe…"),
+                        &i18n("Opens the list's unsubscribe page in your browser"),
+                    )
                 };
                 (text, btn)
             }
         };
-        format!("<span class=\"hylki-unsub-text\">{}</span>{btn}", escape_text(&text))
+        format!(
+            "<span class=\"hylki-unsub-text\">{}</span>{btn}",
+            escape_text(&text)
+        )
     }
 
     /// Redraw one card's Unsubscribe banner in the live document.
@@ -371,7 +389,11 @@ impl MessageView {
         if !self.webview_ready || self.current.is_none() {
             return;
         }
-        let Some(m) = self.thread.iter().find(|m| m.account_id == account_id && m.id == id) else {
+        let Some(m) = self
+            .thread
+            .iter()
+            .find(|m| m.account_id == account_id && m.id == id)
+        else {
             return;
         };
         let html = self.unsub_inner_html(m);
@@ -383,7 +405,6 @@ impl MessageView {
         self.webview
             .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
     }
-
 
     /// A message's subject as shown: translated while its translation is
     /// (#327).
@@ -417,7 +438,12 @@ impl MessageView {
                 escape_text(label),
             )
         };
-        let line = |text: &str, btn: String| format!("<span class=\"hylki-tr-text\">{}</span>{btn}", escape_text(text));
+        let line = |text: &str, btn: String| {
+            format!(
+                "<span class=\"hylki-tr-text\">{}</span>{btn}",
+                escape_text(text)
+            )
+        };
         let name = crate::translate::language_name;
         match self.translations.get(&key) {
             Some(TrState::Working) => line(&i18n("Translating…"), String::new()),
@@ -431,20 +457,34 @@ impl MessageView {
                         "Translated from {language} by {service}.",
                         &[("language", &name(from)), ("service", &t.service.name())],
                     ),
-                    None => i18n_f("Translated by {service}.", &[("service", &t.service.name())]),
+                    None => i18n_f(
+                        "Translated by {service}.",
+                        &[("service", &t.service.name())],
+                    ),
                 };
                 line(&text, button(&i18n("Show Original")))
             }
-            Some(TrState::Original(_)) => line(&i18n("Showing the original."), button(&i18n("Show Translation"))),
+            Some(TrState::Original(_)) => line(
+                &i18n("Showing the original."),
+                button(&i18n("Show Translation")),
+            ),
             None => {
-                if !(settings.enabled() && settings.offer) || self.encrypted(key) || m.body.trim().is_empty() {
+                if !(settings.enabled() && settings.offer)
+                    || self.encrypted(key)
+                    || m.body.trim().is_empty()
+                {
                     return String::new();
                 }
                 match self.detected_language(m) {
-                    Some(lang) if crate::translate::differs(&lang, &settings.target_language()) => line(
-                        &i18n_f("This message is in {language}.", &[("language", &name(&lang))]),
-                        button(&i18n("Translate")),
-                    ),
+                    Some(lang) if crate::translate::differs(&lang, &settings.target_language()) => {
+                        line(
+                            &i18n_f(
+                                "This message is in {language}.",
+                                &[("language", &name(&lang))],
+                            ),
+                            button(&i18n("Translate")),
+                        )
+                    }
                     _ => String::new(),
                 }
             }
@@ -458,9 +498,19 @@ impl MessageView {
         if n > 0 {
             let count = n.to_string();
             if self.checked.1 {
-                ni18n_f("{n} conversation selected", "{n} conversations selected", n as u32, &[("n", &count)])
+                ni18n_f(
+                    "{n} conversation selected",
+                    "{n} conversations selected",
+                    n as u32,
+                    &[("n", &count)],
+                )
             } else {
-                ni18n_f("{n} message selected", "{n} messages selected", n as u32, &[("n", &count)])
+                ni18n_f(
+                    "{n} message selected",
+                    "{n} messages selected",
+                    n as u32,
+                    &[("n", &count)],
+                )
             }
         } else if self.drafts_view {
             i18n("No draft selected")
@@ -479,7 +529,11 @@ impl MessageView {
         if self.thread.len() <= 1 {
             return Default::default();
         }
-        let newest = self.thread.iter().max_by_key(|m| (m.timestamp, m.id)).map(|m| (m.account_id, m.id));
+        let newest = self
+            .thread
+            .iter()
+            .max_by_key(|m| (m.timestamp, m.id))
+            .map(|m| (m.account_id, m.id));
         self.thread
             .iter()
             .map(|m| (m.account_id, m.id, m.unread))
@@ -503,7 +557,11 @@ impl MessageView {
     /// it carries files, and the day. A click on it opens the card.
     fn fold_bar_html(&self, m: &Message) -> String {
         let key = (m.account_id, m.id);
-        let from = if m.from_name.trim().is_empty() { &m.from_addr } else { &m.from_name };
+        let from = if m.from_name.trim().is_empty() {
+            &m.from_addr
+        } else {
+            &m.from_name
+        };
         let icon = |name: &str, title: &str| {
             format!(
                 "<span class=\"hylki-fbar-ico\" title=\"{}\">{}</span>",
@@ -559,7 +617,11 @@ impl MessageView {
         if !self.webview_ready || self.thread.len() <= 1 {
             return;
         }
-        let keys: Vec<String> = self.folded_cards().iter().map(|(a, i)| format!("{a}:{i}")).collect();
+        let keys: Vec<String> = self
+            .folded_cards()
+            .iter()
+            .map(|(a, i)| format!("{a}:{i}"))
+            .collect();
         let js = format!(
             "(function(k){{var ms=document.querySelectorAll('.hylki-msg');\
              for(var i=0;i<ms.length;i++){{var on=k.indexOf(ms[i].dataset.key)>=0;\
@@ -568,7 +630,8 @@ impl MessageView {
              if(!on){{var f=ms[i].querySelector('iframe.hylki-frame');if(f){{f._h=0;s(f);}}}}}}}})({})",
             serde_json::to_string(&keys).unwrap_or_else(|_| "[]".into()),
         );
-        self.webview.evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+        self.webview
+            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
     }
 
     /// Which language a card's message is in, remembered per body.
@@ -580,14 +643,19 @@ impl MessageView {
             }
         }
         let lang = crate::translate::detect(&crate::reader::extract(&m.body));
-        self.detected.borrow_mut().insert(key, (m.body.len(), lang.clone()));
+        self.detected
+            .borrow_mut()
+            .insert(key, (m.body.len(), lang.clone()));
         lang
     }
 
     /// Whether a card's message came encrypted: its text is never sent to
     /// a translation service.
     fn encrypted(&self, key: (u32, u32)) -> bool {
-        self.member_checks.get(&key).and_then(|c| c.pgp.as_ref()).is_some_and(|p| p.encrypted)
+        self.member_checks
+            .get(&key)
+            .and_then(|c| c.pgp.as_ref())
+            .is_some_and(|p| p.encrypted)
             || self
                 .thread
                 .iter()
@@ -600,7 +668,11 @@ impl MessageView {
         if !self.webview_ready || self.current.is_none() {
             return;
         }
-        let Some(m) = self.thread.iter().find(|m| m.account_id == account_id && m.id == id) else {
+        let Some(m) = self
+            .thread
+            .iter()
+            .find(|m| m.account_id == account_id && m.id == id)
+        else {
             return;
         };
         let html = self.translate_inner_html(m, &crate::translate::load());
@@ -619,7 +691,11 @@ impl MessageView {
     /// a line saying where the answer stands.
     fn invite_inner_html(&self, m: &Message) -> String {
         let key = (m.account_id, m.id);
-        let Some(inv) = self.member_checks.get(&key).and_then(|c| c.invite.as_deref()) else {
+        let Some(inv) = self
+            .member_checks
+            .get(&key)
+            .and_then(|c| c.invite.as_deref())
+        else {
             return String::new();
         };
         let row = |text: &str| {
@@ -718,7 +794,11 @@ impl MessageView {
                     key.1,
                     attr_escape(&title),
                     escape_text(&label),
-                    on = if answered.map(|(a, _)| a) == Some(rsvp) { " on" } else { "" },
+                    on = if answered.map(|(a, _)| a) == Some(rsvp) {
+                        " on"
+                    } else {
+                        ""
+                    },
                 )
             };
             buttons.push_str(&answer(
@@ -743,7 +823,8 @@ impl MessageView {
         // Handing the event to a calendar is worth offering for anything
         // that is still an event — including a published one nobody is
         // asking about.
-        if !inv.cancelled && inv.method != "CANCEL" && inv.method != "REPLY" && !inv.ics.is_empty() {
+        if !inv.cancelled && inv.method != "CANCEL" && inv.method != "REPLY" && !inv.ics.is_empty()
+        {
             buttons.push_str(&format!(
                 "<button type=\"button\" class=\"hylki-inv-btn cal\" data-key=\"{}:{}\" \
                  data-inv=\"cal\" title=\"{}\">{}</button>",
@@ -762,12 +843,19 @@ impl MessageView {
                </div>{when}{where_}{who}{note}{acts}\
              </div>",
             icon = inline_icon_svg("x-office-calendar-symbolic"),
-            struck = if inv.cancelled || inv.method == "CANCEL" { " off" } else { "" },
+            struck = if inv.cancelled || inv.method == "CANCEL" {
+                " off"
+            } else {
+                ""
+            },
             title = escape_text(&title),
             kind = if kind.is_empty() {
                 String::new()
             } else {
-                format!("<span class=\"hylki-inv-kind\">{}</span>", escape_text(&kind))
+                format!(
+                    "<span class=\"hylki-inv-kind\">{}</span>",
+                    escape_text(&kind)
+                )
             },
             when = row(&when),
             where_ = row(&inv.location),
@@ -811,7 +899,11 @@ impl MessageView {
         if !self.webview_ready || self.current.is_none() {
             return;
         }
-        let Some(m) = self.thread.iter().find(|m| m.account_id == account_id && m.id == id) else {
+        let Some(m) = self
+            .thread
+            .iter()
+            .find(|m| m.account_id == account_id && m.id == id)
+        else {
             return;
         };
         let html = self.invite_inner_html(m);
@@ -850,7 +942,9 @@ impl MessageView {
         page_width: f64,
         sender: &ComponentSender<Self>,
     ) {
-        let Some(check) = self.member_checks.get(&(account_id, id)) else { return };
+        let Some(check) = self.member_checks.get(&(account_id, id)) else {
+            return;
+        };
         let popover = gtk::Popover::new();
         let widget_width = self.webview.width() as f64;
         let ratio = if page_width > 0.0 && widget_width > 0.0 {
@@ -858,7 +952,12 @@ impl MessageView {
         } else {
             1.0
         };
-        let rect = (rect.0 * ratio, rect.1 * ratio, rect.2 * ratio, rect.3 * ratio);
+        let rect = (
+            rect.0 * ratio,
+            rect.1 * ratio,
+            rect.2 * ratio,
+            rect.3 * ratio,
+        );
         let content = gtk::Box::new(gtk::Orientation::Vertical, 10);
         content.add_css_class("sender-detail");
         // The OpenPGP verdict (#133) leads when there is one: what the
@@ -885,9 +984,15 @@ impl MessageView {
             }
             // The way out of the two doubts, without a terminal (#133).
             let action = if pgp.key_missing() {
-                Some((i18n("Fetch the sender's key"), MessageViewInput::PgpFetchKey { account_id, id }))
+                Some((
+                    i18n("Fetch the sender's key"),
+                    MessageViewInput::PgpFetchKey { account_id, id },
+                ))
             } else if pgp.key_untrusted() {
-                Some((i18n("Trust this key…"), MessageViewInput::PgpTrustKey { account_id, id }))
+                Some((
+                    i18n("Trust this key…"),
+                    MessageViewInput::PgpTrustKey { account_id, id },
+                ))
             } else {
                 None
             };
@@ -929,7 +1034,8 @@ impl MessageView {
             content.append(&findings);
         }
         let footnote = gtk::Label::new(Some(
-            i18n("A pass proves the address wasn't forged — not that the message is safe.").as_str(),
+            i18n("A pass proves the address wasn't forged — not that the message is safe.")
+                .as_str(),
         ));
         footnote.set_halign(gtk::Align::Start);
         footnote.set_wrap(true);
@@ -998,15 +1104,24 @@ pub enum MessageViewInput {
     /// Which messages of a conversation open folded (#326).
     SetFoldMessages(crate::config::FoldMessages),
     /// What a folded card shows, from the message list's look (#326).
-    SetFoldLook { preview_lines: u32 },
+    SetFoldLook {
+        preview_lines: u32,
+    },
     /// A card's header folded or opened it (#326).
-    Folded { account_id: u32, id: u32, folded: bool },
+    Folded {
+        account_id: u32,
+        id: u32,
+        folded: bool,
+    },
     /// Expand All (false) or Collapse All (true) from the reading pane's
     /// menu (#326).
     FoldAll(bool),
     /// How many rows Gmail's x has checked (#392), and whether threading
     /// makes them conversations.
-    SetChecked { count: usize, conversations: bool },
+    SetChecked {
+        count: usize,
+        conversations: bool,
+    },
     /// The view came on screen (#332).
     Mapped,
     /// The OpenPGP chip's words on or off (#300), applied to the open
@@ -1020,9 +1135,17 @@ pub enum MessageViewInput {
     /// Preference: the attachment drawer is in use (#213).
     SetAttachmentDrawer(bool),
     /// Scroll a card's attachment row into view and flash it (#213).
-    ScrollToAttachments { account_id: u32, id: u32 },
+    ScrollToAttachments {
+        account_id: u32,
+        id: u32,
+    },
     /// A card's attachment chip was clicked (open) or its save button (#213).
-    AttachmentAction { account_id: u32, id: u32, index: usize, save: bool },
+    AttachmentAction {
+        account_id: u32,
+        id: u32,
+        index: usize,
+        save: bool,
+    },
     Show {
         /// The conversation, newest first. A single message for a normal open;
         /// several for a threaded conversation.
@@ -1057,7 +1180,10 @@ pub enum MessageViewInput {
     AllowSenderAlways,
     /// A card's remote-content button: show what is blocked, or put the block
     /// back. The banner does the first half and can be switched off entirely.
-    ToggleRemote { account_id: u32, id: u32 },
+    ToggleRemote {
+        account_id: u32,
+        id: u32,
+    },
     /// The system/app light-dark preference changed; re-render to match.
     ThemeChanged,
     /// What one of the user's own mailboxes shows has changed — a Gravatar
@@ -1075,7 +1201,10 @@ pub enum MessageViewInput {
     SetReaderStyle(crate::config::ReaderStyle),
     /// The card's "sender's formatting" toggle: show that one message as its
     /// sender formatted it, or back under the reader's style.
-    ToggleSenderStyle { account_id: u32, id: u32 },
+    ToggleSenderStyle {
+        account_id: u32,
+        id: u32,
+    },
     /// Reader View on or off (the header's toggle): re-renders the whole
     /// conversation stripped to its content, or back as sent.
     SetReaderMode(bool),
@@ -1096,34 +1225,66 @@ pub enum MessageViewInput {
     SetReaderDefault(crate::config::ReaderDefault),
     /// The popover's "Fetch the sender's key" (#133): the Autocrypt key in
     /// the message first, then WKD and the keyservers.
-    PgpFetchKey { account_id: u32, id: u32 },
+    PgpFetchKey {
+        account_id: u32,
+        id: u32,
+    },
     /// The popover's "Trust this key": vouch for the signing key.
-    PgpTrustKey { account_id: u32, id: u32 },
+    PgpTrustKey {
+        account_id: u32,
+        id: u32,
+    },
     /// The trust dialog was answered with Trust.
-    PgpTrustConfirmed { account_id: u32, id: u32, fingerprint: String },
+    PgpTrustConfirmed {
+        account_id: u32,
+        id: u32,
+        fingerprint: String,
+    },
     /// A key action finished: what to say, and whether to re-verify.
-    PgpDone { account_id: u32, id: u32, result: Result<String, String> },
+    PgpDone {
+        account_id: u32,
+        id: u32,
+        result: Result<String, String>,
+    },
     /// The WebView finished loading the current document — reveal it.
     Rendered,
     /// The sender-authentication verdict for the message now on screen.
     SetSenderCheck(Box<crate::models::SenderCheck>),
     /// A member's sender verdict, for its header seal (#88). Patched into the
     /// live document; queued until the document reports ready.
-    SenderCheckFor { account_id: u32, id: u32, check: Box<crate::models::SenderCheck> },
+    SenderCheckFor {
+        account_id: u32,
+        id: u32,
+        check: Box<crate::models::SenderCheck>,
+    },
     /// The lists left so far (key → unix seconds), from the app; the cards'
     /// banners are patched to match.
     SetUnsubscribed(std::collections::HashMap<String, i64>),
     /// A card's Unsubscribe button was clicked.
-    Unsubscribe { account_id: u32, id: u32 },
+    Unsubscribe {
+        account_id: u32,
+        id: u32,
+    },
     /// A card's Translate button or its translation banner (#327): start a
     /// translation, or switch between it and the original.
-    Translate { account_id: u32, id: u32 },
+    Translate {
+        account_id: u32,
+        id: u32,
+    },
     /// A translation came back, or failed.
-    Translated { account_id: u32, id: u32, result: Result<crate::translate::Translated, String> },
+    Translated {
+        account_id: u32,
+        id: u32,
+        result: Result<crate::translate::Translated, String>,
+    },
     /// The app reports where a card's unsubscribe request stands: under way,
     /// failed, or over (`None` — the banner goes back to its resting state,
     /// which says "unsubscribed" once `SetUnsubscribed` carries the list).
-    UnsubscribeState { account_id: u32, id: u32, state: Option<UnsubState> },
+    UnsubscribeState {
+        account_id: u32,
+        id: u32,
+        state: Option<UnsubState>,
+    },
     /// The addresses each account answers to, so an invitation's attendee
     /// list can be searched for the reader (#223).
     SetIdentities(std::collections::HashMap<u32, Vec<String>>),
@@ -1131,21 +1292,40 @@ pub enum MessageViewInput {
     /// from the app; the cards' banners are patched to match (#223).
     SetInviteAnswers(std::collections::HashMap<String, (String, i64)>),
     /// One of a card's invitation buttons was pressed (#223).
-    InviteAction { account_id: u32, id: u32, action: InviteAction },
+    InviteAction {
+        account_id: u32,
+        id: u32,
+        action: InviteAction,
+    },
     /// The header seal was clicked — show the verdict details anchored on the
     /// seal's own rect (x, y, w, h in document coordinates).
-    SenderInfoAt { account_id: u32, id: u32, rect: (f64, f64, f64, f64), page_width: f64 },
+    SenderInfoAt {
+        account_id: u32,
+        id: u32,
+        rect: (f64, f64, f64, f64),
+        page_width: f64,
+    },
     /// A conversation message header was double-clicked — open that message in
     /// its own window.
-    OpenHeader { account_id: u32, id: u32 },
+    OpenHeader {
+        account_id: u32,
+        id: u32,
+    },
     /// The user marked this conversation message unread: keep the mark until the
     /// conversation is opened again, rather than clearing it the moment the
     /// message happens to be in view.
-    SuppressAutoRead { account_id: u32, id: u32 },
+    SuppressAutoRead {
+        account_id: u32,
+        id: u32,
+    },
     /// The page around the cards was clicked — nothing is selected any more.
     ClearCards,
     /// A card was clicked, with whatever modifier was held.
-    CardClicked { account_id: u32, id: u32, mode: SelectMode },
+    CardClicked {
+        account_id: u32,
+        id: u32,
+        mode: SelectMode,
+    },
     /// Ctrl+A in the conversation — select every card.
     SelectAllCards,
     /// Step to the next or previous card of the conversation, opening a
@@ -1166,10 +1346,17 @@ pub enum MessageViewInput {
     SetSelectedCards(Vec<(u32, u32)>),
     /// A message's frame measured this tall, so reopening it can lay out at that
     /// height instead of settling into it.
-    FrameSized { account_id: u32, id: u32, height: u32 },
+    FrameSized {
+        account_id: u32,
+        id: u32,
+        height: u32,
+    },
     /// One conversation message has been scrolled all the way through, so it
     /// has been read.
-    MarkSeen { account_id: u32, id: u32 },
+    MarkSeen {
+        account_id: u32,
+        id: u32,
+    },
     /// Reply / Reply all / Forward chosen on one card's header, so the action
     /// applies to that message rather than to whichever the reader calls primary.
     CardAction {
@@ -1178,21 +1365,44 @@ pub enum MessageViewInput {
         id: u32,
     },
     /// The card's "Add sender to Contacts" button.
-    CardContact { account_id: u32, id: u32 },
+    CardContact {
+        account_id: u32,
+        id: u32,
+    },
     /// A right-click at webview point (x, y), on the card `key` names (the
     /// nearest one when it landed between cards; `None` when the page could
     /// not say): the app shows that message's menu, led by what `hit` offers.
-    CardMenuAt { key: Option<(u32, u32)>, x: f64, y: f64, hit: MenuHit },
+    CardMenuAt {
+        key: Option<(u32, u32)>,
+        x: f64,
+        y: f64,
+        hit: MenuHit,
+    },
     /// A card's Move to… button, at page point (x, y) in CSS pixels of a
     /// page `page_width` wide: the app opens the folder picker there.
-    CardMoveAt { account_id: u32, id: u32, x: f64, y: f64, page_width: f64 },
+    CardMoveAt {
+        account_id: u32,
+        id: u32,
+        x: f64,
+        y: f64,
+        page_width: f64,
+    },
     /// The card's ⋯, acting as a menu, was clicked at page point (x, y) in
     /// CSS pixels of a page `page_width` wide: the app shows that message's
     /// menu there.
-    CardMenuFrom { account_id: u32, id: u32, x: f64, y: f64, page_width: f64 },
+    CardMenuFrom {
+        account_id: u32,
+        id: u32,
+        x: f64,
+        y: f64,
+        page_width: f64,
+    },
     /// Preferences: how card actions show — behind the ⋯ toggle, automatically
     /// on hover, or always.
-    SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
+    SetCardActionsMode {
+        hover_toggle: bool,
+        hover_auto: bool,
+    },
     /// Preferences: seconds an opened card palette lingers after the pointer
     /// leaves. The cards' own timeout; the list keeps a separate one.
     SetPaletteCollapse(u64),
@@ -1201,13 +1411,25 @@ pub enum MessageViewInput {
     SetCardPaletteMenu(bool),
     /// A conversation message was read: clear its card's unread dot in place,
     /// without reloading the document.
-    ClearDot { account_id: u32, id: u32 },
+    ClearDot {
+        account_id: u32,
+        id: u32,
+    },
     /// A message's star changed outside the card (list row, toolbar): sync
     /// the card's star button without a re-render.
-    SetCardStar { account_id: u32, id: u32, starred: bool },
+    SetCardStar {
+        account_id: u32,
+        id: u32,
+        starred: bool,
+    },
     /// A message's keywords changed (#71): the card's chips are patched in
     /// place, like the star.
-    SetCardKeywords { account_id: u32, id: u32, keywords: Vec<String>, labels: Vec<String> },
+    SetCardKeywords {
+        account_id: u32,
+        id: u32,
+        keywords: Vec<String>,
+        labels: Vec<String>,
+    },
     /// The tag definitions changed: re-render with the new names and colors.
     SetTags(Vec<crate::config::Tag>),
     /// Read-marking policy changed (#100).
@@ -1218,34 +1440,54 @@ pub enum MessageViewInput {
     FindChanged(String),
     FindNext,
     FindPrev,
-    FindCounted { current: u32, total: u32 },
+    FindCounted {
+        current: u32,
+        total: u32,
+    },
     /// A split reply opened for this message (#86): scroll its card to the
     /// top of the (now shorter) reader and give it the selection outline, so
     /// the message being answered is the one in view.
-    FocusCard { account_id: u32, id: u32 },
+    FocusCard {
+        account_id: u32,
+        id: u32,
+    },
     /// Drop the reply-target outline (the composer closed without sending).
     BlurCard,
     /// The wrapper document reported its scroll anchor (throttled): the card at
     /// the viewport top and the offset into it — kept so a re-render can put
     /// the reader back where they were.
-    ScrollAnchor { account_id: u32, id: u32, offset: u32 },
+    ScrollAnchor {
+        account_id: u32,
+        id: u32,
+        offset: u32,
+    },
     /// A sent reply's card is joining the conversation: the next document
     /// pins it in view, below the page's top gutter, and goes in without the
     /// page crossfade.
-    PinArrival { account_id: u32, id: u32 },
+    PinArrival {
+        account_id: u32,
+        id: u32,
+    },
     /// The list shows Drafts (or not): the empty pane's wording follows.
     SetDraftsView(bool),
     /// Which folders are Templates folders, as (account, folder) (#360).
     SetTemplateFolders(std::collections::HashSet<(u32, u32)>),
     /// A template banner's button: start a new message from the template,
     /// or edit it.
-    TemplateAction { account_id: u32, id: u32, edit: bool },
+    TemplateAction {
+        account_id: u32,
+        id: u32,
+        edit: bool,
+    },
     /// Keep the pane where it is through the next render (a reply just
     /// arrived for the conversation on screen): when no scrolled-to place
     /// is recorded yet, the card at the top of the pane is pinned there,
     /// below the gutter, so a card inserted above it does not move what is
     /// on screen. A recorded place is kept as it is.
-    HoldPlace { account_id: u32, id: u32 },
+    HoldPlace {
+        account_id: u32,
+        id: u32,
+    },
 }
 
 /// How a click on a conversation card changes the selection, mirroring what the
@@ -1281,18 +1523,36 @@ pub enum MessageViewOutput {
     /// Remote content shown or blocked for one message, from the banner's
     /// Load or the card's own toggle. Reported so the choice is remembered
     /// and a repaint doesn't undo it.
-    SetRemote { account_id: u32, id: u32, show: bool },
+    SetRemote {
+        account_id: u32,
+        id: u32,
+        show: bool,
+    },
     /// A card's "Add sender to Contacts" button — add this message's sender.
     ContactSender(Box<Message>),
     /// A card's attachment chip (#213): open the file at `index` of that
     /// message's attachments, or save it.
-    AttachmentAction { account_id: u32, id: u32, index: usize, save: bool },
+    AttachmentAction {
+        account_id: u32,
+        id: u32,
+        index: usize,
+        save: bool,
+    },
     /// A right-click on a card: the app shows the message's full menu (the
     /// list row's) at window point (x, y), with `hit`'s entries first.
-    CardMenu { message: Box<Message>, x: f64, y: f64, hit: MenuHit },
+    CardMenu {
+        message: Box<Message>,
+        x: f64,
+        y: f64,
+        hit: MenuHit,
+    },
     /// A card's Move to… button: the folder picker for that message, at
     /// window point (x, y).
-    CardMoveTo { message: Box<Message>, x: f64, y: f64 },
+    CardMoveTo {
+        message: Box<Message>,
+        x: f64,
+        y: f64,
+    },
     /// An email address in a card header was clicked — open a composer to it.
     ComposeTo(String),
     /// "Add to Contacts" picked on an address's right-click menu.
@@ -1310,7 +1570,10 @@ pub enum MessageViewOutput {
     Zoom(i8),
     /// A card's Unsubscribe button: leave the list this message came from,
     /// by the handles its headers offered.
-    Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    Unsubscribe {
+        message: Box<Message>,
+        info: Box<crate::models::Unsubscribe>,
+    },
     /// A card's invitation button (#223): answer the organiser, or hand the
     /// meeting to a calendar application.
     InviteAction {
@@ -1347,7 +1610,6 @@ pub enum TrState {
     Failed(String),
 }
 
-
 /// What a card's invitation banner can be asked to do (#223).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InviteAction {
@@ -1363,7 +1625,10 @@ impl MessageView {
     fn header_tags_shown(&self) -> bool {
         self.thread.len() == 1
             && !self.single_message_card
-            && self.current.as_ref().is_some_and(|c| !c.pills(&self.tags).is_empty())
+            && self
+                .current
+                .as_ref()
+                .is_some_and(|c| !c.pills(&self.tags).is_empty())
     }
 
     /// Rebuild the GTK header's chips when the shown message's keywords or
@@ -1420,13 +1685,24 @@ fn template_row_html(key: (u32, u32)) -> String {
     format!(
         "<div class=\"hylki-unsub hylki-tpl\"><span class=\"hylki-unsub-text\">{}</span>{}{}</div>",
         escape_text(&i18n("This message is a template.")),
-        button("edit", &i18n("Edit Template"), &i18n("Change the template itself")),
-        button("use", &i18n("Use Template"), &i18n("Start a new message from a copy of the template")),
+        button(
+            "edit",
+            &i18n("Edit Template"),
+            &i18n("Change the template itself")
+        ),
+        button(
+            "use",
+            &i18n("Use Template"),
+            &i18n("Start a new message from a copy of the template")
+        ),
     )
 }
 
 fn unsub_row_html(key: (u32, u32), inner: &str) -> String {
-    format!("<div class=\"hylki-unsub\" data-key=\"{}:{}\">{inner}</div>", key.0, key.1)
+    format!(
+        "<div class=\"hylki-unsub\" data-key=\"{}:{}\">{inner}</div>",
+        key.0, key.1
+    )
 }
 
 /// A card's invitation banner (#223): the container, always emitted so a
@@ -1434,7 +1710,10 @@ fn unsub_row_html(key: (u32, u32), inner: &str) -> String {
 /// by the stylesheet). `inner` is what [`MessageView::invite_inner_html`]
 /// rendered.
 fn invite_row_html(key: (u32, u32), inner: &str) -> String {
-    format!("<div class=\"hylki-inv\" data-key=\"{}:{}\">{inner}</div>", key.0, key.1)
+    format!(
+        "<div class=\"hylki-inv\" data-key=\"{}:{}\">{inner}</div>",
+        key.0, key.1
+    )
 }
 
 /// "Repeats weekly", from the event's `RRULE`. Only the frequency and the
@@ -1448,7 +1727,9 @@ fn repeat_text(rrule: &str) -> Option<String> {
     let mut freq = "";
     let mut interval: u32 = 1;
     for part in rrule.split(';') {
-        let Some((k, v)) = part.split_once('=') else { continue };
+        let Some((k, v)) = part.split_once('=') else {
+            continue;
+        };
         match k.trim().to_ascii_uppercase().as_str() {
             "FREQ" => freq = v.trim(),
             "INTERVAL" => interval = v.trim().parse().unwrap_or(1),
@@ -1483,9 +1764,10 @@ fn reply_note(inv: &crate::models::Invite) -> String {
     let name = who.label();
     match Rsvp::from_partstat(&who.status) {
         Some(Rsvp::Accepted) => i18n_f("{name} accepted this invitation.", &[("name", name)]),
-        Some(Rsvp::Tentative) => {
-            i18n_f("{name} answered maybe to this invitation.", &[("name", name)])
-        }
+        Some(Rsvp::Tentative) => i18n_f(
+            "{name} answered maybe to this invitation.",
+            &[("name", name)],
+        ),
         Some(Rsvp::Declined) => i18n_f("{name} declined this invitation.", &[("name", name)]),
         None => i18n("Somebody answered this invitation."),
     }
@@ -1687,7 +1969,10 @@ impl PageFade {
         // A page that never reports in must not leave the still up.
         let fade = self.clone();
         gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(1), move || {
-            if fade.generation.get() == generation && fade.anim.borrow().is_none() && fade.cover.is_visible() {
+            if fade.generation.get() == generation
+                && fade.anim.borrow().is_none()
+                && fade.cover.is_visible()
+            {
                 fade.held.set(false);
                 fade.fade_out();
             }
@@ -2234,30 +2519,38 @@ impl Component for MessageView {
             if event == webkit6::LoadEvent::Finished {
                 page_fade.release(view);
                 let s = ready_sender.clone();
-                gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
-                    s.input_sender().emit(MessageViewInput::Rendered);
-                });
+                gtk::glib::timeout_add_local_once(
+                    std::time::Duration::from_millis(600),
+                    move || {
+                        s.input_sender().emit(MessageViewInput::Rendered);
+                    },
+                );
                 if click_link && !clicked.get() {
                     let view = view.clone();
                     let clicked = clicked.clone();
-                    gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(4), move || {
-                        view.evaluate_javascript(
-                            CLICK_LINK_PROBE,
-                            None,
-                            None,
-                            None::<&gtk::gio::Cancellable>,
-                            move |r| match r {
-                                Ok(v) => {
-                                    let text = v.to_str().to_string();
-                                    if text.starts_with("clicked") {
-                                        clicked.set(true);
+                    gtk::glib::timeout_add_local_once(
+                        std::time::Duration::from_secs(4),
+                        move || {
+                            view.evaluate_javascript(
+                                CLICK_LINK_PROBE,
+                                None,
+                                None,
+                                None::<&gtk::gio::Cancellable>,
+                                move |r| match r {
+                                    Ok(v) => {
+                                        let text = v.to_str().to_string();
+                                        if text.starts_with("clicked") {
+                                            clicked.set(true);
+                                        }
+                                        tracing::info!("showcase: click-link probe: {text}");
                                     }
-                                    tracing::info!("showcase: click-link probe: {text}");
-                                }
-                                Err(e) => tracing::warn!("showcase: click-link probe failed: {e}"),
-                            },
-                        );
-                    });
+                                    Err(e) => {
+                                        tracing::warn!("showcase: click-link probe failed: {e}")
+                                    }
+                                },
+                            );
+                        },
+                    );
                 }
             }
         });
@@ -2293,7 +2586,11 @@ impl Component for MessageView {
                         .flatten()
                         .map(|u| u.to_string())
                         .filter(|u| is_launchable_uri(u)),
-                    image: hit.context_is_image().then(|| hit.image_uri()).flatten().map(|u| u.to_string()),
+                    image: hit
+                        .context_is_image()
+                        .then(|| hit.image_uri())
+                        .flatten()
+                        .map(|u| u.to_string()),
                     selection: None,
                     translate: None,
                     folds: None,
@@ -2316,7 +2613,12 @@ impl Component for MessageView {
                         if selected {
                             target.selection = text;
                         }
-                        s.input_sender().emit(MessageViewInput::CardMenuAt { key, x, y, hit: target });
+                        s.input_sender().emit(MessageViewInput::CardMenuAt {
+                            key,
+                            x,
+                            y,
+                            hit: target,
+                        });
                     },
                 );
                 true
@@ -2332,8 +2634,7 @@ impl Component for MessageView {
                 use crate::ui::message_list::RowAction;
                 let msg = value.to_str().to_string();
                 let mut parts = msg.splitn(4, ':');
-                let (Some(verb), Some(a), Some(i)) =
-                    (parts.next(), parts.next(), parts.next())
+                let (Some(verb), Some(a), Some(i)) = (parts.next(), parts.next(), parts.next())
                 else {
                     return;
                 };
@@ -2345,8 +2646,12 @@ impl Component for MessageView {
                     // Every message frame has loaded and been sized: the layout
                     // has settled, so there is something worth revealing.
                     "ready" => open_sender.input_sender().emit(MessageViewInput::Rendered),
-                    "desel" => open_sender.input_sender().emit(MessageViewInput::ClearCards),
-                    "selall" => open_sender.input_sender().emit(MessageViewInput::SelectAllCards),
+                    "desel" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::ClearCards),
+                    "selall" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::SelectAllCards),
                     // Ctrl+C over a body frame the engine would not copy from
                     // itself: the selected text, for the clipboard.
                     "copy" => {
@@ -2360,13 +2665,17 @@ impl Component for MessageView {
                     // little menu) — compose to it. `extra` is the bare address.
                     "composeto" => {
                         if let Some(addr) = extra.map(str::trim).filter(|a| !a.is_empty()) {
-                            open_sender.input_sender().emit(MessageViewInput::ComposeTo(addr.to_string()));
+                            open_sender
+                                .input_sender()
+                                .emit(MessageViewInput::ComposeTo(addr.to_string()));
                         }
                     }
                     // "Add to Contacts" from the address menu.
                     "addcontact" => {
                         if let Some(addr) = extra.map(str::trim).filter(|a| !a.is_empty()) {
-                            open_sender.input_sender().emit(MessageViewInput::AddContact(addr.to_string()));
+                            open_sender
+                                .input_sender()
+                                .emit(MessageViewInput::AddContact(addr.to_string()));
                         }
                     }
                     // "Copy Address" from the address menu.
@@ -2388,12 +2697,14 @@ impl Component for MessageView {
                             .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
                             .unwrap_or_default();
                         if let [x, y, w, h, vw] = nums[..] {
-                            open_sender.input_sender().emit(MessageViewInput::SenderInfoAt {
-                                account_id,
-                                id,
-                                rect: (x, y, w, h),
-                                page_width: vw,
-                            });
+                            open_sender
+                                .input_sender()
+                                .emit(MessageViewInput::SenderInfoAt {
+                                    account_id,
+                                    id,
+                                    rect: (x, y, w, h),
+                                    page_width: vw,
+                                });
                         }
                     }
                     "sel" => {
@@ -2402,30 +2713,42 @@ impl Component for MessageView {
                             Some("r") => SelectMode::Range,
                             _ => SelectMode::Plain,
                         };
-                        open_sender.input_sender().emit(MessageViewInput::CardClicked {
-                            account_id,
-                            id,
-                            mode,
-                        });
+                        open_sender
+                            .input_sender()
+                            .emit(MessageViewInput::CardClicked {
+                                account_id,
+                                id,
+                                mode,
+                            });
                     }
                     "size" => {
                         if let Some(Ok(height)) = extra.map(|h| h.parse::<u32>()) {
-                            open_sender.input_sender().emit(MessageViewInput::FrameSized {
-                                account_id,
-                                id,
-                                height,
-                            });
+                            open_sender
+                                .input_sender()
+                                .emit(MessageViewInput::FrameSized {
+                                    account_id,
+                                    id,
+                                    height,
+                                });
                         }
                     }
-                    "open" => open_sender.input_sender().emit(MessageViewInput::OpenHeader { account_id, id }),
-                    "seen" => open_sender.input_sender().emit(MessageViewInput::MarkSeen { account_id, id }),
-                    "unsub" => open_sender.input_sender().emit(MessageViewInput::Unsubscribe { account_id, id }),
+                    "open" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::OpenHeader { account_id, id }),
+                    "seen" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::MarkSeen { account_id, id }),
+                    "unsub" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::Unsubscribe { account_id, id }),
                     // A card's template banner (#360); `extra` is the button.
-                    "tpl" => open_sender.input_sender().emit(MessageViewInput::TemplateAction {
-                        account_id,
-                        id,
-                        edit: extra.map(str::trim) == Some("edit"),
-                    }),
+                    "tpl" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::TemplateAction {
+                            account_id,
+                            id,
+                            edit: extra.map(str::trim) == Some("edit"),
+                        }),
                     // A card's invitation banner (#223); `extra` is which
                     // button was pressed.
                     "invite" => {
@@ -2438,22 +2761,28 @@ impl Component for MessageView {
                             _ => None,
                         };
                         if let Some(action) = action {
-                            open_sender.input_sender().emit(MessageViewInput::InviteAction {
-                                account_id,
-                                id,
-                                action,
-                            });
+                            open_sender
+                                .input_sender()
+                                .emit(MessageViewInput::InviteAction {
+                                    account_id,
+                                    id,
+                                    action,
+                                });
                         }
                     }
                     // A card's attachment chip (#213); `extra` is the index.
                     "attopen" | "attsave" => {
-                        let index = extra.and_then(|x| x.trim().parse::<usize>().ok()).unwrap_or(0);
-                        open_sender.input_sender().emit(MessageViewInput::AttachmentAction {
-                            account_id,
-                            id,
-                            index,
-                            save: verb == "attsave",
-                        });
+                        let index = extra
+                            .and_then(|x| x.trim().parse::<usize>().ok())
+                            .unwrap_or(0);
+                        open_sender
+                            .input_sender()
+                            .emit(MessageViewInput::AttachmentAction {
+                                account_id,
+                                id,
+                                index,
+                                save: verb == "attsave",
+                            });
                     }
                     "found" => {
                         let (cur, total) = extra
@@ -2461,41 +2790,57 @@ impl Component for MessageView {
                             .and_then(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?)))
                             .unwrap_or((0, 0));
                         open_sender
-                            .input_sender().emit(MessageViewInput::FindCounted { current: cur, total });
+                            .input_sender()
+                            .emit(MessageViewInput::FindCounted {
+                                current: cur,
+                                total,
+                            });
                     }
-                    "reply" => open_sender.input_sender().emit(MessageViewInput::CardAction {
-                        action: RowAction::Reply,
-                        account_id,
-                        id,
-                    }),
-                    "replyall" => open_sender.input_sender().emit(MessageViewInput::CardAction {
-                        action: RowAction::ReplyAll,
-                        account_id,
-                        id,
-                    }),
-                    "forward" => open_sender.input_sender().emit(MessageViewInput::CardAction {
-                        action: RowAction::Forward,
-                        account_id,
-                        id,
-                    }),
-                    "star" => open_sender.input_sender().emit(MessageViewInput::CardAction {
-                        action: RowAction::ToggleStar,
-                        account_id,
-                        id,
-                    }),
-                    "spam" => open_sender.input_sender().emit(MessageViewInput::CardAction {
-                        action: RowAction::Spam,
-                        account_id,
-                        id,
-                    }),
-                    "remote" => {
-                        open_sender.input_sender().emit(MessageViewInput::ToggleRemote { account_id, id })
-                    }
-                    "archive" => open_sender.input_sender().emit(MessageViewInput::CardAction {
-                        action: RowAction::Archive,
-                        account_id,
-                        id,
-                    }),
+                    "reply" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardAction {
+                            action: RowAction::Reply,
+                            account_id,
+                            id,
+                        }),
+                    "replyall" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardAction {
+                            action: RowAction::ReplyAll,
+                            account_id,
+                            id,
+                        }),
+                    "forward" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardAction {
+                            action: RowAction::Forward,
+                            account_id,
+                            id,
+                        }),
+                    "star" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardAction {
+                            action: RowAction::ToggleStar,
+                            account_id,
+                            id,
+                        }),
+                    "spam" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardAction {
+                            action: RowAction::Spam,
+                            account_id,
+                            id,
+                        }),
+                    "remote" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::ToggleRemote { account_id, id }),
+                    "archive" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardAction {
+                            action: RowAction::Archive,
+                            account_id,
+                            id,
+                        }),
                     // The ⋯ acting as a menu: the button's bottom-left corner
                     // and the page width, the same shape "moveto" sends.
                     "cardmenu" => {
@@ -2503,13 +2848,15 @@ impl Component for MessageView {
                             .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
                             .unwrap_or_default();
                         if let [x, y, vw] = nums[..] {
-                            open_sender.input_sender().emit(MessageViewInput::CardMenuFrom {
-                                account_id,
-                                id,
-                                x,
-                                y,
-                                page_width: vw,
-                            });
+                            open_sender
+                                .input_sender()
+                                .emit(MessageViewInput::CardMenuFrom {
+                                    account_id,
+                                    id,
+                                    x,
+                                    y,
+                                    page_width: vw,
+                                });
                         }
                     }
                     // Move to… on a card: extra is the button's bottom-centre
@@ -2519,52 +2866,64 @@ impl Component for MessageView {
                             .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
                             .unwrap_or_default();
                         if let [x, y, vw] = nums[..] {
-                            open_sender.input_sender().emit(MessageViewInput::CardMoveAt {
-                                account_id,
-                                id,
-                                x,
-                                y,
-                                page_width: vw,
-                            });
+                            open_sender
+                                .input_sender()
+                                .emit(MessageViewInput::CardMoveAt {
+                                    account_id,
+                                    id,
+                                    x,
+                                    y,
+                                    page_width: vw,
+                                });
                         }
                     }
-                    "delete" => open_sender.input_sender().emit(MessageViewInput::CardAction {
-                        action: RowAction::Delete,
-                        account_id,
-                        id,
-                    }),
-                    "toggleread" => open_sender.input_sender().emit(MessageViewInput::CardAction {
-                        action: RowAction::ToggleRead,
-                        account_id,
-                        id,
-                    }),
+                    "delete" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardAction {
+                            action: RowAction::Delete,
+                            account_id,
+                            id,
+                        }),
+                    "toggleread" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardAction {
+                            action: RowAction::ToggleRead,
+                            account_id,
+                            id,
+                        }),
                     // Translate on a card, or its banner's button (#327).
-                    "translate" | "tr" => open_sender.input_sender().emit(MessageViewInput::Translate { account_id, id }),
+                    "translate" | "tr" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::Translate { account_id, id }),
                     // A header folded or opened its card (#326).
                     "fold" => open_sender.input_sender().emit(MessageViewInput::Folded {
                         account_id,
                         id,
                         folded: extra == Some("1"),
                     }),
-                    "viewsource" => open_sender.input_sender().emit(MessageViewInput::CardAction {
-                        action: RowAction::ViewSource,
-                        account_id,
-                        id,
-                    }),
-                    "contact" => {
-                        open_sender.input_sender().emit(MessageViewInput::CardContact { account_id, id })
-                    }
-                    "senderfmt" => {
-                        open_sender.input_sender().emit(MessageViewInput::ToggleSenderStyle { account_id, id })
-                    }
+                    "viewsource" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardAction {
+                            action: RowAction::ViewSource,
+                            account_id,
+                            id,
+                        }),
+                    "contact" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::CardContact { account_id, id }),
+                    "senderfmt" => open_sender
+                        .input_sender()
+                        .emit(MessageViewInput::ToggleSenderStyle { account_id, id }),
                     // "scrollat:<aid>:<id>:<offset>" — the topmost visible card.
                     "scrollat" => {
                         if let Some(Ok(offset)) = extra.map(|o| o.parse::<u32>()) {
-                            open_sender.input_sender().emit(MessageViewInput::ScrollAnchor {
-                                account_id,
-                                id,
-                                offset,
-                            });
+                            open_sender
+                                .input_sender()
+                                .emit(MessageViewInput::ScrollAnchor {
+                                    account_id,
+                                    id,
+                                    offset,
+                                });
                         }
                     }
                     _ => {}
@@ -2649,9 +3008,11 @@ impl Component for MessageView {
                 let shown = primary.map(|p| *p).or_else(|| thread.first().cloned());
                 // A new message: the previous message's verdict must not linger
                 // on screen while this one's is still being fetched.
-                let same_message = self.current.as_ref().zip(shown.as_ref()).is_some_and(
-                    |(a, b)| a.id == b.id && a.account_id == b.account_id,
-                );
+                let same_message = self
+                    .current
+                    .as_ref()
+                    .zip(shown.as_ref())
+                    .is_some_and(|(a, b)| a.id == b.id && a.account_id == b.account_id);
                 if !same_message {
                     self.sender_check = None;
                     self.member_checks.clear();
@@ -2662,7 +3023,11 @@ impl Component for MessageView {
                 // is the same document, read on from where it was.
                 let card_left = !same_message
                     && thread.len() < self.thread.len()
-                    && thread.iter().all(|m| self.thread.iter().any(|t| (t.account_id, t.id) == (m.account_id, m.id)));
+                    && thread.iter().all(|m| {
+                        self.thread
+                            .iter()
+                            .any(|t| (t.account_id, t.id) == (m.account_id, m.id))
+                    });
                 // What was done to a card (translated, folded) holds while it
                 // stays in the conversation on screen: stepping to another of
                 // its messages must not undo it. The message stepped to opens.
@@ -2702,21 +3067,24 @@ impl Component for MessageView {
                 if let Some(color) = &account_color {
                     let class = format!(
                         "chip-{}",
-                        color.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>()
+                        color
+                            .chars()
+                            .filter(|c| c.is_ascii_alphanumeric())
+                            .collect::<String>()
                     );
                     self.chip_rules.set(vec![(
                         format!(".hylki-account-chip.{class}"),
-                        format!("background-color: {}; color: {color};", crate::color::pale(color, 0.18)),
+                        format!(
+                            "background-color: {}; color: {color};",
+                            crate::color::pale(color, 0.18)
+                        ),
                     )]);
                     if let Some(chip) = &self.account_chip {
                         wear_class(chip, "chip-", &class);
                     }
                 }
                 self.remote_allowed = allow_remote;
-                let has_remote = self
-                    .thread
-                    .iter()
-                    .any(|m| has_remote_resources(&m.body));
+                let has_remote = self.thread.iter().any(|m| has_remote_resources(&m.body));
                 self.blocked = has_remote && !allow_remote;
                 // Repaint the cover for what is arriving, even when the spinner
                 // is about to be shown instead of a document: the whole point is
@@ -2749,7 +3117,11 @@ impl Component for MessageView {
                 let show = !self.remote_allowed;
                 self.remote_allowed = show;
                 self.blocked = !show && self.thread.iter().any(|m| has_remote_resources(&m.body));
-                let _ = sender.output(MessageViewOutput::SetRemote { account_id, id, show });
+                let _ = sender.output(MessageViewOutput::SetRemote {
+                    account_id,
+                    id,
+                    show,
+                });
                 // The app records it and re-shows the message; that render is
                 // free (the fingerprint already matches), so paint now.
                 self.render();
@@ -2814,16 +3186,26 @@ impl Component for MessageView {
                     self.render();
                 }
             }
-            MessageViewInput::Folded { account_id, id, folded } => {
+            MessageViewInput::Folded {
+                account_id,
+                id,
+                folded,
+            } => {
                 self.folds.insert((account_id, id), folded);
             }
             MessageViewInput::Mapped => {
-                if std::mem::take(&mut self.painted_hidden) && self.current.is_some() && !self.loading {
+                if std::mem::take(&mut self.painted_hidden)
+                    && self.current.is_some()
+                    && !self.loading
+                {
                     self.shown_fingerprint = None;
                     self.render();
                 }
             }
-            MessageViewInput::SetChecked { count, conversations } => self.checked = (count, conversations),
+            MessageViewInput::SetChecked {
+                count,
+                conversations,
+            } => self.checked = (count, conversations),
             MessageViewInput::FoldAll(folded) => {
                 for m in &self.thread {
                     self.folds.insert((m.account_id, m.id), folded);
@@ -2839,7 +3221,13 @@ impl Component for MessageView {
                     "document.body&&document.body.toggleAttribute('data-hylki-pgpicons',{})",
                     !on
                 );
-                self.webview.evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+                self.webview.evaluate_javascript(
+                    &js,
+                    None,
+                    None,
+                    None::<&gtk::gio::Cancellable>,
+                    |_| {},
+                );
             }
             MessageViewInput::SetCardAttachments(map) => {
                 self.card_atts = map;
@@ -2875,10 +3263,20 @@ impl Component for MessageView {
                      if(d){{d.classList.remove('flash');void d.offsetWidth;d.classList.add('flash');\
                      setTimeout(function(){{d.classList.remove('flash');}},1300);}}}})()"
                 );
-                self.webview
-                    .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+                self.webview.evaluate_javascript(
+                    &js,
+                    None,
+                    None,
+                    None::<&gtk::gio::Cancellable>,
+                    |_| {},
+                );
             }
-            MessageViewInput::AttachmentAction { account_id, id, index, save } => {
+            MessageViewInput::AttachmentAction {
+                account_id,
+                id,
+                index,
+                save,
+            } => {
                 let _ = sender.output(MessageViewOutput::AttachmentAction {
                     account_id,
                     id,
@@ -2920,7 +3318,9 @@ impl Component for MessageView {
                 if self.message_flipped() == on {
                     return;
                 }
-                let Some(key) = self.current.as_ref().map(|m| (m.account_id, m.id)) else { return };
+                let Some(key) = self.current.as_ref().map(|m| (m.account_id, m.id)) else {
+                    return;
+                };
                 // Off forgets the choice: the message follows the theme again.
                 if on {
                     self.theme_picks.insert(key, !self.theme_dark());
@@ -2943,9 +3343,17 @@ impl Component for MessageView {
                     // remembered for the old one would only make them lurch.
                     self.frame_heights.clear();
                     if self.current.is_some() && !self.loading {
-                        let js = format!("if(window.vfZoom)window.vfZoom({});", percent as f64 / 100.0);
-                        self.webview
-                            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+                        let js = format!(
+                            "if(window.vfZoom)window.vfZoom({});",
+                            percent as f64 / 100.0
+                        );
+                        self.webview.evaluate_javascript(
+                            &js,
+                            None,
+                            None,
+                            None::<&gtk::gio::Cancellable>,
+                            |_| {},
+                        );
                     }
                 }
             }
@@ -2974,7 +3382,11 @@ impl Component for MessageView {
                 self.sender_check = Some(*check);
             }
 
-            MessageViewInput::SenderCheckFor { account_id, id, check } => {
+            MessageViewInput::SenderCheckFor {
+                account_id,
+                id,
+                check,
+            } => {
                 self.member_checks.insert((account_id, id), *check);
                 if self.webview_ready {
                     self.patch_verify_badge(account_id, id);
@@ -2984,7 +3396,8 @@ impl Component for MessageView {
             }
             MessageViewInput::SetUnsubscribed(lists) => {
                 self.unsubscribed = lists;
-                let keys: Vec<(u32, u32)> = self.thread.iter().map(|m| (m.account_id, m.id)).collect();
+                let keys: Vec<(u32, u32)> =
+                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
                 for (account_id, id) in keys {
                     self.patch_unsub(account_id, id);
                 }
@@ -3002,14 +3415,21 @@ impl Component for MessageView {
                         self.render();
                     }
                     None | Some(TrState::Failed(_)) => {
-                        let Some(m) = self.thread.iter().find(|m| (m.account_id, m.id) == key).cloned() else {
+                        let Some(m) = self
+                            .thread
+                            .iter()
+                            .find(|m| (m.account_id, m.id) == key)
+                            .cloned()
+                        else {
                             return;
                         };
                         let settings = crate::translate::load();
                         let refused = if self.encrypted(key) {
                             Some(i18n("Encrypted messages are not sent for translation."))
                         } else if !settings.enabled() {
-                            Some(i18n("Choose a translation service in Settings → Translation first."))
+                            Some(i18n(
+                                "Choose a translation service in Settings → Translation first.",
+                            ))
                         } else if m.body.trim().is_empty() {
                             Some(i18n("The message has not loaded yet."))
                         } else {
@@ -3022,7 +3442,11 @@ impl Component for MessageView {
                         }
                         let cache = crate::translate::cache_key(
                             account_id,
-                            if m.message_id.is_empty() { &m.body } else { &m.message_id },
+                            if m.message_id.is_empty() {
+                                &m.body
+                            } else {
+                                &m.message_id
+                            },
                             &settings,
                         );
                         // Already translated this session: no second request.
@@ -3035,14 +3459,25 @@ impl Component for MessageView {
                         self.patch_translate(account_id, id);
                         let input = sender.input_sender().clone();
                         std::thread::spawn(move || {
-                            let api_key = crate::translate::load_key(settings.service).unwrap_or_default();
-                            let result = crate::translate::translate(&settings, &api_key, &m.body, &m.subject, &cache);
-                            input.emit(MessageViewInput::Translated { account_id, id, result });
+                            let api_key =
+                                crate::translate::load_key(settings.service).unwrap_or_default();
+                            let result = crate::translate::translate(
+                                &settings, &api_key, &m.body, &m.subject, &cache,
+                            );
+                            input.emit(MessageViewInput::Translated {
+                                account_id,
+                                id,
+                                result,
+                            });
                         });
                     }
                 }
             }
-            MessageViewInput::Translated { account_id, id, result } => {
+            MessageViewInput::Translated {
+                account_id,
+                id,
+                result,
+            } => {
                 let key = (account_id, id);
                 // The reader moved on to another message meanwhile.
                 if self.translations.get(&key) != Some(&TrState::Working) {
@@ -3077,7 +3512,11 @@ impl Component for MessageView {
                     });
                 }
             }
-            MessageViewInput::UnsubscribeState { account_id, id, state } => {
+            MessageViewInput::UnsubscribeState {
+                account_id,
+                id,
+                state,
+            } => {
                 match state {
                     Some(s) => {
                         self.unsub_state.insert((account_id, id), s);
@@ -3107,7 +3546,11 @@ impl Component for MessageView {
                     self.patch_invite(account_id, id);
                 }
             }
-            MessageViewInput::InviteAction { account_id, id, action } => {
+            MessageViewInput::InviteAction {
+                account_id,
+                id,
+                action,
+            } => {
                 let invite = self
                     .member_checks
                     .get(&(account_id, id))
@@ -3126,11 +3569,20 @@ impl Component for MessageView {
                 }
             }
 
-            MessageViewInput::SenderInfoAt { account_id, id, rect, page_width } => {
+            MessageViewInput::SenderInfoAt {
+                account_id,
+                id,
+                rect,
+                page_width,
+            } => {
                 self.show_sender_popover(account_id, id, rect, page_width, &sender);
             }
             MessageViewInput::PgpFetchKey { account_id, id } => {
-                let Some(pgp) = self.member_checks.get(&(account_id, id)).and_then(|c| c.pgp.clone()) else {
+                let Some(pgp) = self
+                    .member_checks
+                    .get(&(account_id, id))
+                    .and_then(|c| c.pgp.clone())
+                else {
                     return;
                 };
                 let input = sender.input_sender().clone();
@@ -3138,14 +3590,23 @@ impl Component for MessageView {
                     let result = tokio::task::spawn_blocking(move || fetch_sender_key(&pgp))
                         .await
                         .unwrap_or_else(|_| Err("task failed".into()));
-                    let _ = input.send(MessageViewInput::PgpDone { account_id, id, result });
+                    let _ = input.send(MessageViewInput::PgpDone {
+                        account_id,
+                        id,
+                        result,
+                    });
                 });
             }
             MessageViewInput::PgpTrustKey { account_id, id } => {
-                let Some(pgp) = self.member_checks.get(&(account_id, id)).and_then(|c| c.pgp.clone()) else {
+                let Some(pgp) = self
+                    .member_checks
+                    .get(&(account_id, id))
+                    .and_then(|c| c.pgp.clone())
+                else {
                     return;
                 };
-                let crate::models::PgpSignature::Good { signer, key_id, .. } = &pgp.signature else {
+                let crate::models::PgpSignature::Good { signer, key_id, .. } = &pgp.signature
+                else {
                     return;
                 };
                 // gpg on a worker thread: a stale keyring lock makes it
@@ -3155,18 +3616,26 @@ impl Component for MessageView {
                 let parent = self.webview.root().and_downcast::<gtk::Window>();
                 let s = sender.clone();
                 gtk::glib::spawn_future_local(async move {
-                    let key = gtk::gio::spawn_blocking(move || crate::pgp::key_by_fingerprint(&crate::pgp::Gpg::system(), &key_id))
-                        .await
-                        .ok()
-                        .flatten();
+                    let key = gtk::gio::spawn_blocking(move || {
+                        crate::pgp::key_by_fingerprint(&crate::pgp::Gpg::system(), &key_id)
+                    })
+                    .await
+                    .ok()
+                    .flatten();
                     let Some(key) = key else {
-                        let _ = s.output(MessageViewOutput::Notice(i18n("That key is no longer in your keyring.")));
+                        let _ = s.output(MessageViewOutput::Notice(i18n(
+                            "That key is no longer in your keyring.",
+                        )));
                         return;
                     };
                     confirm_trust(parent.as_ref(), &signer, &key, s, account_id, id);
                 });
             }
-            MessageViewInput::PgpTrustConfirmed { account_id, id, fingerprint } => {
+            MessageViewInput::PgpTrustConfirmed {
+                account_id,
+                id,
+                fingerprint,
+            } => {
                 let input = sender.input_sender().clone();
                 sender.oneshot_command(async move {
                     let result = tokio::task::spawn_blocking(move || crate::pgp::trust_key(&crate::pgp::Gpg::system(), &fingerprint, None))
@@ -3183,19 +3652,25 @@ impl Component for MessageView {
                     let _ = input.send(MessageViewInput::PgpDone { account_id, id, result });
                 });
             }
-            MessageViewInput::PgpDone { account_id, id, result } => {
-                match result {
-                    Ok(text) => {
-                        let _ = sender.output(MessageViewOutput::Notice(text));
-                        if let Some(m) = self.thread.iter().find(|m| m.account_id == account_id && m.id == id) {
-                            let _ = sender.output(MessageViewOutput::ReloadBody(Box::new(m.clone())));
-                        }
-                    }
-                    Err(e) => {
-                        let _ = sender.output(MessageViewOutput::Notice(e));
+            MessageViewInput::PgpDone {
+                account_id,
+                id,
+                result,
+            } => match result {
+                Ok(text) => {
+                    let _ = sender.output(MessageViewOutput::Notice(text));
+                    if let Some(m) = self
+                        .thread
+                        .iter()
+                        .find(|m| m.account_id == account_id && m.id == id)
+                    {
+                        let _ = sender.output(MessageViewOutput::ReloadBody(Box::new(m.clone())));
                     }
                 }
-            }
+                Err(e) => {
+                    let _ = sender.output(MessageViewOutput::Notice(e));
+                }
+            },
 
             MessageViewInput::Rendered => {
                 self.webview_ready = true;
@@ -3232,12 +3707,17 @@ impl Component for MessageView {
                      var f=h.querySelector('.hylki-from');\
                      if(f)f.parentNode.insertBefore(d,f);else h.appendChild(d);}})()"
                 );
-                self.webview
-                    .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
+                self.webview.evaluate_javascript(
+                    &js,
+                    None,
+                    None,
+                    None::<&gtk::gio::Cancellable>,
+                    |r| {
                         if let Err(e) = r {
                             tracing::warn!("unread-dot patch failed: {e}");
                         }
-                    });
+                    },
+                );
             }
             MessageViewInput::ClearCards => {
                 if !self.selected_cards.is_empty() {
@@ -3246,7 +3726,11 @@ impl Component for MessageView {
                     let _ = sender.output(MessageViewOutput::SelectCards(Vec::new()));
                 }
             }
-            MessageViewInput::CardClicked { account_id, id, mode } => {
+            MessageViewInput::CardClicked {
+                account_id,
+                id,
+                mode,
+            } => {
                 // Only meaningful in a conversation: a lone message is already
                 // the selection.
                 if self.thread.len() <= 1 {
@@ -3273,9 +3757,7 @@ impl Component for MessageView {
                             .selected_cards
                             .first()
                             .and_then(|a| order.iter().position(|x| x == a))
-                            .unwrap_or_else(|| {
-                                order.iter().position(|x| *x == key).unwrap_or(0)
-                            });
+                            .unwrap_or_else(|| order.iter().position(|x| *x == key).unwrap_or(0));
                         let here = order.iter().position(|x| *x == key).unwrap_or(anchor);
                         let (lo, hi) = (anchor.min(here), anchor.max(here));
                         order[lo..=hi].to_vec()
@@ -3329,7 +3811,8 @@ impl Component for MessageView {
                 if self.thread.len() <= 1 {
                     return;
                 }
-                let order: Vec<(u32, u32)> = self.thread.iter().map(|m| (m.account_id, m.id)).collect();
+                let order: Vec<(u32, u32)> =
+                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
                 let from = match self.selected_cards.as_slice() {
                     [key] => order.iter().position(|k| k == key),
                     _ => None,
@@ -3361,7 +3844,13 @@ impl Component for MessageView {
                      if(s)s.scrollIntoView({{behavior:'smooth',block:'start'}});}})()",
                     key.0, key.1
                 );
-                self.webview.evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+                self.webview.evaluate_javascript(
+                    &js,
+                    None,
+                    None,
+                    None::<&gtk::gio::Cancellable>,
+                    |_| {},
+                );
             }
             MessageViewInput::FocusBody => {
                 if self.current.is_some() {
@@ -3396,7 +3885,11 @@ impl Component for MessageView {
                     self.apply_card_selection();
                 }
             }
-            MessageViewInput::FrameSized { account_id, id, height } => {
+            MessageViewInput::FrameSized {
+                account_id,
+                id,
+                height,
+            } => {
                 // A few hundred numbers at most, and only for messages actually
                 // opened; the store is trimmed rather than allowed to creep.
                 if self.frame_heights.len() > 512 {
@@ -3430,7 +3923,11 @@ impl Component for MessageView {
                     let _ = sender.output(MessageViewOutput::MarkSeen { account_id, id });
                 }
             }
-            MessageViewInput::CardAction { action, account_id, id } => {
+            MessageViewInput::CardAction {
+                action,
+                account_id,
+                id,
+            } => {
                 if let Some(m) = self
                     .thread
                     .iter()
@@ -3458,11 +3955,18 @@ impl Component for MessageView {
                         Some(TrState::Original(_)) => i18n("Show Translation"),
                         _ => i18n("Translate"),
                     };
-                    hit.translate = Some(TranslateEntry { label, reader: sender.input_sender().clone() });
+                    hit.translate = Some(TranslateEntry {
+                        label,
+                        reader: sender.input_sender().clone(),
+                    });
                 }
                 if self.thread.len() > 1 {
                     let folded = self.folded_cards();
-                    hit.folds = Some((!folded.is_empty(), folded.len() < self.thread.len(), sender.input_sender().clone()));
+                    hit.folds = Some((
+                        !folded.is_empty(),
+                        folded.len() < self.thread.len(),
+                        sender.input_sender().clone(),
+                    ));
                 }
                 let point = self.webview.root().and_then(|root| {
                     let root: gtk::Widget = root.upcast();
@@ -3477,7 +3981,13 @@ impl Component for MessageView {
                     hit,
                 });
             }
-            MessageViewInput::CardMenuFrom { account_id, id, x, y, page_width } => {
+            MessageViewInput::CardMenuFrom {
+                account_id,
+                id,
+                x,
+                y,
+                page_width,
+            } => {
                 // CSS pixels → widget pixels (the page may be zoomed); from
                 // there it is the same menu the right-click path opens.
                 let ratio = self.webview.width() as f64 / page_width.max(1.0);
@@ -3488,7 +3998,13 @@ impl Component for MessageView {
                     hit: MenuHit::default(),
                 });
             }
-            MessageViewInput::CardMoveAt { account_id, id, x, y, page_width } => {
+            MessageViewInput::CardMoveAt {
+                account_id,
+                id,
+                x,
+                y,
+                page_width,
+            } => {
                 let Some(m) = self
                     .thread
                     .iter()
@@ -3507,12 +4023,17 @@ impl Component for MessageView {
                         .compute_point(&root, &gtk::graphene::Point::new(vx as f32, vy as f32))
                 });
                 let (wx, wy) = point.map_or((vx, vy), |p| (p.x() as f64, p.y() as f64));
-                let _ = sender.output(MessageViewOutput::CardMoveTo { message: Box::new(m), x: wx, y: wy });
+                let _ = sender.output(MessageViewOutput::CardMoveTo {
+                    message: Box::new(m),
+                    x: wx,
+                    y: wy,
+                });
             }
-            MessageViewInput::SetCardActionsMode { hover_toggle, hover_auto } => {
-                if self.card_actions_hover != hover_toggle
-                    || self.card_actions_auto != hover_auto
-                {
+            MessageViewInput::SetCardActionsMode {
+                hover_toggle,
+                hover_auto,
+            } => {
+                if self.card_actions_hover != hover_toggle || self.card_actions_auto != hover_auto {
                     self.card_actions_hover = hover_toggle;
                     self.card_actions_auto = hover_auto;
                     if self.current.is_some() && !self.loading {
@@ -3549,12 +4070,17 @@ impl Component for MessageView {
                      var s=document.querySelector('.hylki-msg[data-key=\"{account_id}:{id}\"]');\
                      if(s)s.classList.remove('unread');}})()"
                 );
-                self.webview
-                    .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
+                self.webview.evaluate_javascript(
+                    &js,
+                    None,
+                    None,
+                    None::<&gtk::gio::Cancellable>,
+                    |r| {
                         if let Err(e) = r {
                             tracing::warn!("clear-dot patch failed: {e}");
                         }
-                    });
+                    },
+                );
             }
             MessageViewInput::SetReadMark(policy) => {
                 if self.read_mark != policy {
@@ -3620,7 +4146,12 @@ impl Component for MessageView {
                     }
                 }
             }
-            MessageViewInput::SetCardKeywords { account_id, id, keywords, labels } => {
+            MessageViewInput::SetCardKeywords {
+                account_id,
+                id,
+                keywords,
+                labels,
+            } => {
                 for m in self.thread.iter_mut() {
                     if m.account_id == account_id && m.id == id {
                         m.keywords = keywords.clone();
@@ -3640,14 +4171,23 @@ impl Component for MessageView {
                      if(t)t.innerHTML={chips};}})()",
                     chips = serde_json::to_string(&chips).unwrap_or_else(|_| "''".into()),
                 );
-                self.webview
-                    .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
+                self.webview.evaluate_javascript(
+                    &js,
+                    None,
+                    None,
+                    None::<&gtk::gio::Cancellable>,
+                    |r| {
                         if let Err(e) = r {
                             tracing::warn!("card tag patch failed: {e}");
                         }
-                    });
+                    },
+                );
             }
-            MessageViewInput::SetCardStar { account_id, id, starred } => {
+            MessageViewInput::SetCardStar {
+                account_id,
+                id,
+                starred,
+            } => {
                 for m in self.thread.iter_mut() {
                     if m.account_id == account_id && m.id == id {
                         m.starred = starred;
@@ -3659,12 +4199,17 @@ impl Component for MessageView {
                      if(b)b.classList.{}('on');}})()",
                     if starred { "add" } else { "remove" },
                 );
-                self.webview
-                    .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
+                self.webview.evaluate_javascript(
+                    &js,
+                    None,
+                    None,
+                    None::<&gtk::gio::Cancellable>,
+                    |r| {
                         if let Err(e) = r {
                             tracing::warn!("card star patch failed: {e}");
                         }
-                    });
+                    },
+                );
             }
             MessageViewInput::FocusCard { account_id, id } => {
                 let webview = self.webview.clone();
@@ -3723,7 +4268,11 @@ impl Component for MessageView {
                 // Cards the list still has selected keep their outline.
                 self.apply_card_selection();
             }
-            MessageViewInput::ScrollAnchor { account_id, id, offset } => {
+            MessageViewInput::ScrollAnchor {
+                account_id,
+                id,
+                offset,
+            } => {
                 self.saved_anchor = Some((account_id, id, offset));
                 self.anchor_gutter = false;
             }
@@ -3740,7 +4289,9 @@ impl Component for MessageView {
             MessageViewInput::SetTemplateFolders(folders) => {
                 if self.template_folders != folders {
                     let shown = |set: &std::collections::HashSet<(u32, u32)>| {
-                        self.thread.iter().any(|m| set.contains(&(m.account_id, m.folder_id)))
+                        self.thread
+                            .iter()
+                            .any(|m| set.contains(&(m.account_id, m.folder_id)))
                     };
                     let redraw = shown(&self.template_folders) || shown(&folders);
                     self.template_folders = folders;
@@ -3749,12 +4300,27 @@ impl Component for MessageView {
                     }
                 }
             }
-            MessageViewInput::TemplateAction { account_id, id, edit } => {
-                let message = self.thread.iter().find(|m| m.account_id == account_id && m.id == id).cloned();
+            MessageViewInput::TemplateAction {
+                account_id,
+                id,
+                edit,
+            } => {
+                let message = self
+                    .thread
+                    .iter()
+                    .find(|m| m.account_id == account_id && m.id == id)
+                    .cloned();
                 if let Some(message) = message {
                     use crate::ui::message_list::RowAction;
-                    let action = if edit { RowAction::EditTemplate } else { RowAction::EditAsNew };
-                    let _ = sender.output(MessageViewOutput::CardAction { action, message: Box::new(message) });
+                    let action = if edit {
+                        RowAction::EditTemplate
+                    } else {
+                        RowAction::EditAsNew
+                    };
+                    let _ = sender.output(MessageViewOutput::CardAction {
+                        action,
+                        message: Box::new(message),
+                    });
                 }
             }
             MessageViewInput::HoldPlace { account_id, id } => {
@@ -3769,8 +4335,7 @@ impl Component for MessageView {
                     .iter()
                     .find(|m| m.account_id == account_id && m.id == id)
                 {
-                    let _ =
-                        sender.output(MessageViewOutput::ContactSender(Box::new(m.clone())));
+                    let _ = sender.output(MessageViewOutput::ContactSender(Box::new(m.clone())));
                 }
             }
             MessageViewInput::OpenHeader { account_id, id } => {
@@ -3784,7 +4349,6 @@ impl Component for MessageView {
             }
         }
     }
-
 }
 
 impl MessageView {
@@ -3862,7 +4426,10 @@ impl MessageView {
         let mut js = String::from("(function(){");
         for key in keys {
             let html = if shown {
-                att_chips_html(*key, self.card_atts.get(key).map(|v| v.as_slice()).unwrap_or(&[]))
+                att_chips_html(
+                    *key,
+                    self.card_atts.get(key).map(|v| v.as_slice()).unwrap_or(&[]),
+                )
             } else {
                 String::new()
             };
@@ -3919,7 +4486,11 @@ impl MessageView {
         // gets the conversation's open scroll, unless the reader has been
         // scrolled meanwhile: otherwise it stays at the top, on the oldest
         // part, often the user's own sent original (#351).
-        if self.did_autoscroll && self.autoscroll_lone && self.thread.len() > 1 && self.saved_anchor.is_none() {
+        if self.did_autoscroll
+            && self.autoscroll_lone
+            && self.thread.len() > 1
+            && self.saved_anchor.is_none()
+        {
             self.did_autoscroll = false;
         }
         // A conversation opened behind the loading cover spends its open
@@ -3972,7 +4543,11 @@ impl MessageView {
             ""
         };
         // The OpenPGP chip as its icons alone, without the words (#300).
-        let pgp_icons = if self.pgp_labels { "" } else { " data-hylki-pgpicons" };
+        let pgp_icons = if self.pgp_labels {
+            ""
+        } else {
+            " data-hylki-pgpicons"
+        };
         // The newest member, for the open-scroll fallback (#101): with no
         // unread mail the reader lands on the newest message rather than
         // wherever the document happens to start.
@@ -3990,10 +4565,15 @@ impl MessageView {
             crate::config::ReadMark::Delay => " data-hylki-readmark=\"2000\"",
             crate::config::ReadMark::Manual => "",
         };
-        let copied = format!(" data-hylki-copied=\"{}\"", i18n("Copied").replace('"', "&quot;"));
+        let copied = format!(
+            " data-hylki-copied=\"{}\"",
+            i18n("Copied").replace('"', "&quot;")
+        );
         let html = html.replacen(
             "<body",
-            &format!("<body{noscroll}{hover}{delay}{acts_menu}{pgp_icons}{newest}{readmark}{copied}"),
+            &format!(
+                "<body{noscroll}{hover}{delay}{acts_menu}{pgp_icons}{newest}{readmark}{copied}"
+            ),
             1,
         );
         self.did_autoscroll = true;
@@ -4048,7 +4628,10 @@ impl MessageView {
                 }
             }
         });
-        let clock = self.webview.frame_clock().filter(|_| self.webview.is_mapped());
+        let clock = self
+            .webview
+            .frame_clock()
+            .filter(|_| self.webview.is_mapped());
         let Some(clock) = clock else {
             // Nothing on screen, so no frame to wait for or to flash.
             load();
@@ -4096,7 +4679,9 @@ impl MessageView {
     /// While a document loads, keep the keyboard on the loading page rather
     /// than in the web view, and give it back once the document is shown.
     fn hold_focus_while_loading(&self) {
-        let Some(page) = &self.loading_page else { return };
+        let Some(page) = &self.loading_page else {
+            return;
+        };
         let web: &gtk::Widget = self.webview.upcast_ref();
         let focus = web.root().and_then(|r| r.focus());
         if self.body_page() == "loading" {
@@ -4104,7 +4689,9 @@ impl MessageView {
                 page.grab_focus();
                 self.focus_held.set(true);
             }
-        } else if self.focus_held.replace(false) && focus.is_some_and(|f| f == *page.upcast_ref::<gtk::Widget>()) {
+        } else if self.focus_held.replace(false)
+            && focus.is_some_and(|f| f == *page.upcast_ref::<gtk::Widget>())
+        {
             self.webview.grab_focus();
         }
     }
@@ -4175,7 +4762,9 @@ impl MessageView {
             self.no_autoread.contains(&key).hash(&mut h);
             self.sender_style.contains(&key).hash(&mut h);
             self.folder_labels.get(&key).hash(&mut h);
-            self.template_folders.contains(&(m.account_id, m.folder_id)).hash(&mut h);
+            self.template_folders
+                .contains(&(m.account_id, m.folder_id))
+                .hash(&mut h);
             // Tags are patched into a card live; Gmail labels (#374) only
             // change with a sync, and are drawn with the card.
             m.labels.hash(&mut h);
@@ -4189,8 +4778,11 @@ impl MessageView {
         LIVE_GROUNDS.with(|g| *g.borrow_mut() = Some(self.theme_grounds(dark)));
         LIVE_TAGS.with(|t| *t.borrow_mut() = self.tags.clone());
         LIVE_ATTS.with(|a| {
-            *a.borrow_mut() =
-                if self.chips_shown() { self.card_atts.clone() } else { Default::default() }
+            *a.borrow_mut() = if self.chips_shown() {
+                self.card_atts.clone()
+            } else {
+                Default::default()
+            }
         });
         LIVE_UNSUB.with(|u| {
             *u.borrow_mut() = self
@@ -4217,7 +4809,10 @@ impl MessageView {
         });
         LIVE_FOLDBAR.with(|b| {
             *b.borrow_mut() = if self.thread.len() > 1 {
-                self.thread.iter().map(|m| ((m.account_id, m.id), self.fold_bar_html(m))).collect()
+                self.thread
+                    .iter()
+                    .map(|m| ((m.account_id, m.id), self.fold_bar_html(m)))
+                    .collect()
             } else {
                 Default::default()
             }
@@ -4297,7 +4892,11 @@ impl MessageView {
             // A card showing its translation (#327): the message with its
             // text replaced, or for plain text a Reader View fragment.
             let (translated, translated_reader) = LIVE_TRANSLATE
-                .with(|t| t.borrow().get(&(m.account_id, m.id)).and_then(|(_, shown)| shown.clone()))
+                .with(|t| {
+                    t.borrow()
+                        .get(&(m.account_id, m.id))
+                        .and_then(|(_, shown)| shown.clone())
+                })
                 .map_or((None, false), |(html, reader)| (Some(html), reader));
             let body = if m.body.trim().is_empty() && translated.is_none() {
                 "<div class=\"hylki-loading\">Loading…</div>".to_string()
@@ -4694,19 +5293,22 @@ impl MessageView {
         // there's no white flash before each message's content renders. The live
         // theme's grounds when the reader set them (issue #62); the stock GNOME
         // values otherwise (tests).
-        let (bg, deep, chrome) = LIVE_GROUNDS.with(|g| g.borrow().clone()).unwrap_or_else(|| {
-            let (g, p, c) = if dark {
-                (GROUND.1, PAGE.1, CHROME.1)
-            } else {
-                (GROUND.0, PAGE.0, CHROME.0)
-            };
-            (g.to_string(), p.to_string(), c.to_string())
-        });
+        let (bg, deep, chrome) = LIVE_GROUNDS
+            .with(|g| g.borrow().clone())
+            .unwrap_or_else(|| {
+                let (g, p, c) = if dark {
+                    (GROUND.1, PAGE.1, CHROME.1)
+                } else {
+                    (GROUND.0, PAGE.0, CHROME.0)
+                };
+                (g.to_string(), p.to_string(), c.to_string())
+            });
         // Each message card only reads as a card against a slightly deeper
         // ground than its own; a full-bleed single message sits on its own
         // ground — the chrome ground when it paints no background (see
         // `plain_css` below) — so the whole view is one color.
-        let single_ground = if !carded && thread.len() == 1
+        let single_ground = if !carded
+            && thread.len() == 1
             && (reader || !paints_own_background(&thread[0].body))
         {
             chrome.clone()
@@ -4742,9 +5344,10 @@ impl MessageView {
         let sizer = match &nonce {
             Some(n) => {
                 // The fold's tooltips, in the user's language.
-                let qt = serde_json::to_string(&[i18n("Show quoted text"), i18n("Hide quoted text")])
-                    .unwrap_or_default()
-                    .replace("</", "<\\/");
+                let qt =
+                    serde_json::to_string(&[i18n("Show quoted text"), i18n("Hide quoted text")])
+                        .unwrap_or_default()
+                        .replace("</", "<\\/");
                 format!("<script nonce=\"{n}\">var vireoQT={qt};{SIZE_SCRIPT}</script>")
             }
             None => String::new(),
@@ -4769,7 +5372,11 @@ impl MessageView {
         // The headers around the messages are the window's own chrome, so
         // they follow its direction; the messages inside their frames take
         // their own (#366).
-        let dir = if crate::i18n::is_rtl() { " dir=\"rtl\"" } else { "" };
+        let dir = if crate::i18n::is_rtl() {
+            " dir=\"rtl\""
+        } else {
+            ""
+        };
         format!(
             "<!doctype html><html{dir}><head><meta charset=\"utf-8\">{csp}\
              <meta name=\"color-scheme\" content=\"{scheme}\">\
@@ -5170,7 +5777,11 @@ impl MessageView {
                 } else {
                     body_html(&m.body)
                 };
-                let doc = if self.remote_allowed { doc } else { strip_remote(&doc) };
+                let doc = if self.remote_allowed {
+                    doc
+                } else {
+                    strip_remote(&doc)
+                };
                 // The reader's own fonts and colors (#56) reach paper too,
                 // scoped to this message's block; a card shown with the
                 // sender's formatting prints that way as well.
@@ -5197,10 +5808,14 @@ impl MessageView {
 
     /// The header block that only appears on paper (see [`print_header_html`]).
     fn print_header_html(&self) -> String {
-        let first = self.thread.first().or(self.current.as_ref()).map(|m| Message {
-            subject: self.real_subject(m),
-            ..m.clone()
-        });
+        let first = self
+            .thread
+            .first()
+            .or(self.current.as_ref())
+            .map(|m| Message {
+                subject: self.real_subject(m),
+                ..m.clone()
+            });
         print_header_html(first.as_ref())
     }
 
@@ -5218,13 +5833,16 @@ impl MessageView {
         // The cover matches it so the spinner gives way to the document
         // without a change of color.
         let (ground, page, chrome) = self.theme_grounds(dark);
-        let (bg, kind) = if self.thread.len() > 1 || (!self.thread.is_empty() && self.single_message_card) {
-            (&page, "page")
-        } else if self.thread.len() == 1 && (self.reader_mode || !paints_own_background(&self.thread[0].body)) {
-            (&chrome, "chrome")
-        } else {
-            (&ground, "ground")
-        };
+        let (bg, kind) =
+            if self.thread.len() > 1 || (!self.thread.is_empty() && self.single_message_card) {
+                (&page, "page")
+            } else if self.thread.len() == 1
+                && (self.reader_mode || !paints_own_background(&self.thread[0].body))
+            {
+                (&chrome, "chrome")
+            } else {
+                (&ground, "ground")
+            };
         self.webview.set_background_color(&ground_rgba(bg));
         // The spinner and the cover stand in for the message, so they answer to
         // the message's theme: #1e1e1e matches the document's own dark ground,
@@ -5238,10 +5856,16 @@ impl MessageView {
         // All three grounds at once, so moving between kinds of message
         // never loads the rules again.
         let cover = format!(".reader-cover.cover-side-{side}");
-        let mut rules: Vec<(String, String)> = [("page", &page), ("chrome", &chrome), ("ground", &ground)]
-            .iter()
-            .map(|(k, c)| (format!("{cover}.cover-ground-{k}"), format!("background-color: {c};")))
-            .collect();
+        let mut rules: Vec<(String, String)> =
+            [("page", &page), ("chrome", &chrome), ("ground", &ground)]
+                .iter()
+                .map(|(k, c)| {
+                    (
+                        format!("{cover}.cover-ground-{k}"),
+                        format!("background-color: {c};"),
+                    )
+                })
+                .collect();
         rules.push((
             format!("{cover} .reader-loading label, {cover} .reader-loading spinner"),
             format!("color: {fg};"),
@@ -5266,14 +5890,22 @@ struct ClassRules {
 
 impl ClassRules {
     fn new() -> Self {
-        ClassRules { css: crate::ui::DisplayCss::new(), rules: Default::default() }
+        ClassRules {
+            css: crate::ui::DisplayCss::new(),
+            rules: Default::default(),
+        }
     }
 
     /// Add or replace rules, as (selector, declarations).
     fn set(&self, new: Vec<(String, String)>) {
         let mut rules = self.rules.borrow_mut();
         rules.extend(new);
-        self.css.load(rules.iter().map(|(s, d)| format!("{s} {{ {d} }}\n")).collect());
+        self.css.load(
+            rules
+                .iter()
+                .map(|(s, d)| format!("{s} {{ {d} }}\n"))
+                .collect(),
+        );
     }
 }
 
@@ -5495,7 +6127,8 @@ fn build_webview(role: &'static str) -> webkit6::WebView {
 /// The HYLKI_SHOWCASE_CLICK_LINK probe: find the first web link in any
 /// message frame, say what the top document has at that point (the frame
 /// itself when nothing covers it), and click the link.
-const CLICK_LINK_PROBE: &str = "(function(){var fs=document.querySelectorAll('iframe.hylki-frame');\
+const CLICK_LINK_PROBE: &str =
+    "(function(){var fs=document.querySelectorAll('iframe.hylki-frame');\
 for(var i=0;i<fs.length;i++){var d=fs[i].contentDocument;if(!d)continue;\
 var a=d.querySelector('a[href^=\"http\"]');if(!a)continue;a.scrollIntoView({block:'center'});\
 var fr=fs[i].getBoundingClientRect(),r=a.getBoundingClientRect();\
@@ -5521,7 +6154,10 @@ fn is_launchable_uri(uri: &str) -> bool {
 /// oldest phishing trick there is (`click here: paypal.com` pointing elsewhere).
 fn link_destination(uri: &str, label: Option<&str>) -> String {
     match label.and_then(|l| mismatched_host(uri, l)) {
-        Some(claimed) => format!("{uri}  ⚠ looks like \"{claimed}\" but goes to {}", host_of(uri).unwrap_or_default()),
+        Some(claimed) => format!(
+            "{uri}  ⚠ looks like \"{claimed}\" but goes to {}",
+            host_of(uri).unwrap_or_default()
+        ),
         None => uri.to_string(),
     }
 }
@@ -5578,7 +6214,9 @@ fn host_of(text: &str) -> Option<String> {
 /// Returns `None` for any other scheme, or for a `data:` URI that isn't base64
 /// (the reader only ever emits base64 ones).
 fn decode_data_uri(uri: &str) -> Option<(String, Vec<u8>)> {
-    let rest = uri.strip_prefix("data:").or_else(|| uri.strip_prefix("DATA:"))?;
+    let rest = uri
+        .strip_prefix("data:")
+        .or_else(|| uri.strip_prefix("DATA:"))?;
     let (meta, payload) = rest.split_once(',')?;
     let mime = meta.strip_suffix(";base64")?;
     let data = gtk::glib::base64_decode(payload);
@@ -5632,7 +6270,13 @@ fn confirm_trust(
     let fingerprint = key.fingerprint.clone();
     dialog.connect_response(None, move |_, resp| {
         if resp == "trust" {
-            sender.input_sender().emit(MessageViewInput::PgpTrustConfirmed { account_id, id, fingerprint: fingerprint.clone() });
+            sender
+                .input_sender()
+                .emit(MessageViewInput::PgpTrustConfirmed {
+                    account_id,
+                    id,
+                    fingerprint: fingerprint.clone(),
+                });
         }
     });
     dialog.present();
@@ -5684,8 +6328,7 @@ const PGP_LOCK_ICON: &str = "channel-secure-symbolic";
 /// paths carry no fill, so the document's `fill:currentColor` recolors it);
 /// empty when the resource bundle isn't registered (tests).
 fn inline_icon_svg(icon: &str) -> String {
-    let path =
-        format!("/co/hyprlab/Hylki/icons/scalable/actions/{icon}.svg");
+    let path = format!("/co/hyprlab/Hylki/icons/scalable/actions/{icon}.svg");
     gtk::gio::resources_lookup_data(&path, gtk::gio::ResourceLookupFlags::NONE)
         .ok()
         .and_then(|b| String::from_utf8(b.to_vec()).ok())
@@ -5701,9 +6344,14 @@ fn inline_icon_svg(icon: &str) -> String {
 /// forms keep prose that merely mentions "background" from counting.
 fn paints_own_background(body: &str) -> bool {
     let lower = body.to_ascii_lowercase();
-    ["background:", "background-color:", "background-image:", "bgcolor="]
-        .iter()
-        .any(|needle| lower.contains(needle))
+    [
+        "background:",
+        "background-color:",
+        "background-image:",
+        "bgcolor=",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
 }
 
 /// How many addresses a message's To, Cc and Bcc headers name.
@@ -5721,7 +6369,11 @@ fn recipient_count(m: &Message) -> usize {
 /// copy (#476).
 fn recipients_html(m: &Message, always_shown: bool) -> String {
     let mut lines = String::new();
-    for (label, list) in [("To", m.to.trim()), ("Cc", m.cc.trim()), ("Bcc", m.bcc.trim())] {
+    for (label, list) in [
+        ("To", m.to.trim()),
+        ("Cc", m.cc.trim()),
+        ("Bcc", m.bcc.trim()),
+    ] {
         if list.is_empty() {
             continue;
         }
@@ -5816,9 +6468,7 @@ fn remote_url_spans(html: &str) -> Vec<(usize, usize)> {
                 continue;
             }
             let an_start = j;
-            while j < b.len()
-                && !matches!(b[j], b'=' | b'>' | b'/')
-                && !b[j].is_ascii_whitespace()
+            while j < b.len() && !matches!(b[j], b'=' | b'>' | b'/') && !b[j].is_ascii_whitespace()
             {
                 j += 1;
             }
@@ -6018,7 +6668,9 @@ pub struct TranslateEntry {
 
 impl std::fmt::Debug for TranslateEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TranslateEntry").field("label", &self.label).finish()
+        f.debug_struct("TranslateEntry")
+            .field("label", &self.label)
+            .finish()
     }
 }
 
@@ -6038,7 +6690,11 @@ pub(crate) fn hit_menu_entries(
     }
     let mut out = Vec::new();
     if let Some(text) = &hit.selection {
-        out.push(MenuEntry::new(i18n("Copy"), copy(text.clone())).icon("edit-copy-symbolic").accel("<Control>c"));
+        out.push(
+            MenuEntry::new(i18n("Copy"), copy(text.clone()))
+                .icon("edit-copy-symbolic")
+                .accel("<Control>c"),
+        );
     }
     if let Some(uri) = &hit.link {
         let (open, w) = (uri.clone(), window.clone());
@@ -6053,19 +6709,20 @@ pub(crate) fn hit_menu_entries(
             .split_once(':')
             .filter(|(scheme, _)| scheme.eq_ignore_ascii_case("mailto"))
             .map(|(_, rest)| crate::percent::decode(rest.split('?').next().unwrap_or(""), false));
-        out.push(match address {
-            Some(a) => MenuEntry::new(i18n("Copy Email Address"), copy(a)),
-            None => MenuEntry::new(i18n("Copy Link Address"), copy(uri.clone())),
-        }
-        .icon("edit-copy-symbolic"));
+        out.push(
+            match address {
+                Some(a) => MenuEntry::new(i18n("Copy Email Address"), copy(a)),
+                None => MenuEntry::new(i18n("Copy Link Address"), copy(uri.clone())),
+            }
+            .icon("edit-copy-symbolic"),
+        );
     }
     if let Some(uri) = &hit.image {
         // The mail's own pictures are `data:` URIs with their bytes in hand;
         // a remote one is only an address here.
         match decode_data_uri(uri) {
             Some((mime, data)) => {
-                let texture =
-                    gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from(&data)).ok();
+                let texture = gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from(&data)).ok();
                 let bytes = data.clone();
                 out.push(
                     MenuEntry::new(i18n("Save Image As…"), move || {
@@ -6112,7 +6769,10 @@ fn menu_lookup(json: &str) -> (Option<(u32, u32)>, Option<String>) {
         let (a, i) = k.split_once(':')?;
         Some((a.parse().ok()?, i.parse().ok()?))
     });
-    let sel = v["sel"].as_str().filter(|s| !s.trim().is_empty()).map(str::to_string);
+    let sel = v["sel"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .map(str::to_string);
     (key, sel)
 }
 
@@ -6122,7 +6782,10 @@ fn menu_lookup(json: &str) -> (Option<(u32, u32)>, Option<String>) {
 pub(crate) fn strip_navigation_items(menu: &webkit6::ContextMenu) {
     use webkit6::ContextMenuAction as A;
     for item in menu.items() {
-        if matches!(item.stock_action(), A::GoBack | A::GoForward | A::Stop | A::Reload) {
+        if matches!(
+            item.stock_action(),
+            A::GoBack | A::GoForward | A::Stop | A::Reload
+        ) {
             menu.remove(&item);
         }
     }
@@ -6140,12 +6803,17 @@ fn is_remote_url(u: &[u8]) -> bool {
         return true;
     }
     match u.split_once(':') {
-        Some((scheme, _)) if !scheme.is_empty() && scheme.chars().all(|c| {
-            c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')
-        }) => !matches!(
-            scheme.to_ascii_lowercase().as_str(),
-            "data" | "cid" | "blocked" | "mailto" | "tel" | "about" | "javascript"
-        ),
+        Some((scheme, _))
+            if !scheme.is_empty()
+                && scheme
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')) =>
+        {
+            !matches!(
+                scheme.to_ascii_lowercase().as_str(),
+                "data" | "cid" | "blocked" | "mailto" | "tel" | "about" | "javascript"
+            )
+        }
         _ => false,
     }
 }
@@ -6219,9 +6887,13 @@ fn parse_css_color(token: &str, bare_hex: bool) -> Option<[f32; 4]> {
     let t = token.trim();
     let hex = |s: &str| -> Option<[f32; 4]> {
         let v = |i: usize, n: usize| {
-            u8::from_str_radix(&s[i..i + n], 16)
-                .ok()
-                .map(|b| if n == 1 { (b * 17) as f32 / 255.0 } else { b as f32 / 255.0 })
+            u8::from_str_radix(&s[i..i + n], 16).ok().map(|b| {
+                if n == 1 {
+                    (b * 17) as f32 / 255.0
+                } else {
+                    b as f32 / 255.0
+                }
+            })
         };
         match s.len() {
             3 => Some([v(0, 1)?, v(1, 1)?, v(2, 1)?, 1.0]),
@@ -6262,7 +6934,11 @@ fn parse_css_color(token: &str, bare_hex: bool) -> Option<[f32; 4]> {
             chan(parts[0])?.clamp(0.0, 1.0),
             chan(parts[1])?.clamp(0.0, 1.0),
             chan(parts[2])?.clamp(0.0, 1.0),
-            parts.get(3).and_then(|s| alpha(s)).unwrap_or(1.0).clamp(0.0, 1.0),
+            parts
+                .get(3)
+                .and_then(|s| alpha(s))
+                .unwrap_or(1.0)
+                .clamp(0.0, 1.0),
         ]);
     }
     let named: Option<u32> = match lower.as_str() {
@@ -6313,7 +6989,11 @@ fn rgb_to_hsl(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
         return (0.0, 0.0, l);
     }
     let d = max - min;
-    let s = if l > 0.5 { d / (2.0 - max - min) } else { d / (max + min) };
+    let s = if l > 0.5 {
+        d / (2.0 - max - min)
+    } else {
+        d / (max + min)
+    };
     let h = if (max - r).abs() < f32::EPSILON {
         ((g - b) / d).rem_euclid(6.0)
     } else if (max - g).abs() < f32::EPSILON {
@@ -6328,7 +7008,11 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
     if s <= 0.0 {
         return (l, l, l);
     }
-    let q = if l < 0.5 { l * (1.0 + s) } else { l + s - l * s };
+    let q = if l < 0.5 {
+        l * (1.0 + s)
+    } else {
+        l + s - l * s
+    };
     let p = 2.0 * l - q;
     let f = |mut t: f32| {
         t = t.rem_euclid(1.0);
@@ -6390,7 +7074,10 @@ fn rewrite_declarations(decls: &str) -> String {
         // Comments may contain `;` — `/* background: #fff; */` must not split
         // the declaration after it in half (seen in the wild, issue #35).
         if quote.is_none() && decls[i..].starts_with("/*") {
-            i += decls[i..].find("*/").map(|r| r + 2).unwrap_or(decls.len() - i);
+            i += decls[i..]
+                .find("*/")
+                .map(|r| r + 2)
+                .unwrap_or(decls.len() - i);
             continue;
         }
         match (quote, c) {
@@ -6433,7 +7120,9 @@ fn rewrite_one_declaration(decl: &str) -> String {
         }
     }
     let (head, decl_body) = decl.split_at(p);
-    let Some(colon) = decl_body.find(':') else { return decl.to_string() };
+    let Some(colon) = decl_body.find(':') else {
+        return decl.to_string();
+    };
     let prop = decl_body[..colon].trim().to_ascii_lowercase();
     let value = &decl_body[colon + 1..];
     let background = match prop.as_str() {
@@ -6629,19 +7318,18 @@ fn rewrite_tag_attrs(tag: &str) -> String {
         while v < tag.len() && tag.as_bytes()[v].is_ascii_whitespace() {
             v += 1;
         }
-        let (val_start, val_end, quoted) = if v < tag.len()
-            && (tag.as_bytes()[v] == b'"' || tag.as_bytes()[v] == b'\'')
-        {
-            let q = tag.as_bytes()[v] as char;
-            let end = tag[v + 1..].find(q).map(|r| v + 1 + r).unwrap_or(tag.len());
-            (v + 1, end, true)
-        } else {
-            let end = tag[v..]
-                .find(|c: char| c.is_ascii_whitespace() || c == '>' || c == '/')
-                .map(|r| v + r)
-                .unwrap_or(tag.len());
-            (v, end, false)
-        };
+        let (val_start, val_end, quoted) =
+            if v < tag.len() && (tag.as_bytes()[v] == b'"' || tag.as_bytes()[v] == b'\'') {
+                let q = tag.as_bytes()[v] as char;
+                let end = tag[v + 1..].find(q).map(|r| v + 1 + r).unwrap_or(tag.len());
+                (v + 1, end, true)
+            } else {
+                let end = tag[v..]
+                    .find(|c: char| c.is_ascii_whitespace() || c == '>' || c == '/')
+                    .map(|r| v + r)
+                    .unwrap_or(tag.len());
+                (v, end, false)
+            };
         let value = &tag[val_start..val_end];
         let new = match *attr {
             "style" => rewrite_declarations(value),
@@ -6795,7 +7483,12 @@ fn adapt_colors_for_dark(doc: &str) -> String {
 /// text on a transparent ground (the frame paints the card's), links in the
 /// accent; `img` carries no color, so pictures stand. Background images
 /// go with the backgrounds: they are decoration in the same sense.
-fn reader_style_css(style: &crate::config::ReaderStyle, dark: bool, accent: &str, scope: &str) -> String {
+fn reader_style_css(
+    style: &crate::config::ReaderStyle,
+    dark: bool,
+    accent: &str,
+    scope: &str,
+) -> String {
     if !style.active() {
         return String::new();
     }
@@ -6868,7 +7561,11 @@ fn css_font(desc: &str) -> (String, String, String) {
         .filter(|f| !f.is_empty())
         .map(|f| format!("\"{}\"", f.replace('\\', "").replace('"', "")))
         .collect();
-    let generic = if family.to_ascii_lowercase().contains("mono") { "monospace" } else { "sans-serif" };
+    let generic = if family.to_ascii_lowercase().contains("mono") {
+        "monospace"
+    } else {
+        "sans-serif"
+    };
     let family = format!("{},{generic}", families.join(","));
     let units = fd.size();
     let size = if units <= 0 {
@@ -6883,7 +7580,10 @@ fn css_font(desc: &str) -> (String, String, String) {
     let weight = fd.weight().into_glib();
     if weight != gtk::pango::Weight::Normal.into_glib() {
         // CSS takes 1–1000; Pango's scale is the same, `Ultraheavy` = 1000.
-        face.push_str(&format!("font-weight:{} !important;", weight.clamp(1, 1000)));
+        face.push_str(&format!(
+            "font-weight:{} !important;",
+            weight.clamp(1, 1000)
+        ));
     }
     match fd.style() {
         gtk::pango::Style::Italic => face.push_str("font-style:italic !important;"),
@@ -6929,7 +7629,11 @@ fn inject_reader_style(doc: &str, css: &str) -> String {
 fn find_tag(lower: &str, tag: &str) -> Option<usize> {
     let mut from = 0;
     while let Some(at) = lower[from..].find(tag).map(|i| from + i) {
-        let next = lower.as_bytes().get(at + tag.len()).copied().unwrap_or(b'>');
+        let next = lower
+            .as_bytes()
+            .get(at + tag.len())
+            .copied()
+            .unwrap_or(b'>');
         if next == b'>' || next == b'/' || next.is_ascii_whitespace() {
             return Some(at);
         }
@@ -7063,7 +7767,8 @@ pub fn theme_grounds_for(widget: &impl IsA<gtk::Widget>, dark: bool) -> (String,
     let style = widget.style_context();
     if dark == adw::StyleManager::default().is_dark() {
         if let Some(c) = style.lookup_color("view_bg_color") {
-            let hex = |r: f32, g: f32, b: f32| crate::color::to_hex(&gtk::gdk::RGBA::new(r, g, b, 1.0));
+            let hex =
+                |r: f32, g: f32, b: f32| crate::color::to_hex(&gtk::gdk::RGBA::new(r, g, b, 1.0));
             // The stock pairs' own ratios: #1e1e1e→#141414 and #fff→#f1f1f1.
             let f = if dark { 0.667 } else { 0.945 };
             let ground = hex(c.red(), c.green(), c.blue());
@@ -7138,9 +7843,7 @@ thread_local! {
 
 /// That ground as a color the WebView itself can be painted with.
 fn ground_rgba(hex: &str) -> gtk::gdk::RGBA {
-    let v = |i: usize| {
-        u8::from_str_radix(&hex[i..i + 2], 16).unwrap_or(0) as f32 / 255.0
-    };
+    let v = |i: usize| u8::from_str_radix(&hex[i..i + 2], 16).unwrap_or(0) as f32 / 255.0;
     gtk::gdk::RGBA::new(v(1), v(3), v(5), 1.0)
 }
 
@@ -7592,10 +8295,17 @@ fn message_frame(
     // reader's own sheet. It carries no colors of the sender's to adapt
     // and needs none of the reader's color override over it; the reader's
     // font choice (#56) still applies, below.
-    let doc = if reader { crate::reader::render(body, dark, accent) } else { body_html(body) };
+    let doc = if reader {
+        crate::reader::render(body, dark, accent)
+    } else {
+        body_html(body)
+    };
     let own_style;
     let style = if reader {
-        own_style = crate::config::ReaderStyle { colors: false, ..style.clone() };
+        own_style = crate::config::ReaderStyle {
+            colors: false,
+            ..style.clone()
+        };
         &own_style
     } else {
         style
@@ -7606,7 +8316,11 @@ fn message_frame(
     // that sets explicit dark text without a background needs its colors
     // transformed, and the sandboxed frames run no JS to do it live. Moot
     // when the reader's own colors are laid over the message anyway.
-    let doc = if dark && !style.colors && !reader { adapt_colors_for_dark(&doc) } else { doc };
+    let doc = if dark && !style.colors && !reader {
+        adapt_colors_for_dark(&doc)
+    } else {
+        doc
+    };
     // Make the email's own light/dark rules follow the ground we chose rather
     // than the desktop's preference (see `pin_color_scheme`). Runs after the
     // dark adaptation so a message's hand-authored dark palette is used as-is,
@@ -7771,10 +8485,14 @@ fn scope_selectors(prelude: &str, block: &str) -> String {
             .into_iter()
             .find(|w| prelude[i..].to_ascii_lowercase().starts_with(w));
         // A tag name, not part of `.body`, `#body` or `bodyguard`.
-        let boundary_before = i == 0 || !matches!(bytes[i - 1], b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'#' | b'%');
+        let boundary_before = i == 0
+            || !matches!(bytes[i - 1], b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'#' | b'%');
         if let Some(word) = word {
             let after = bytes.get(i + word.len()).copied();
-            let boundary_after = !matches!(after, Some(b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_'));
+            let boundary_after = !matches!(
+                after,
+                Some(b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_')
+            );
             if boundary_before && boundary_after {
                 out.push_str(block);
                 i += word.len();
@@ -7819,11 +8537,7 @@ fn print_block_class(n: usize) -> String {
 }
 
 /// Assemble the printed page: the header, then every message inlined into it.
-fn print_document(
-    header: &str,
-    messages: &[(String, String)],
-    allow_remote: bool,
-) -> String {
+fn print_document(header: &str, messages: &[(String, String)], allow_remote: bool) -> String {
     let mut body = header.to_string();
     for (n, (head, doc)) in messages.iter().enumerate() {
         let block = print_block_class(n);
@@ -7941,7 +8655,13 @@ fn body_html(body: &str) -> String {
 fn sanitize_filename(subject: &str) -> String {
     let cleaned: String = subject
         .chars()
-        .map(|c| if c.is_control() || "/\\:*?\"<>|".contains(c) { '-' } else { c })
+        .map(|c| {
+            if c.is_control() || "/\\:*?\"<>|".contains(c) {
+                '-'
+            } else {
+                c
+            }
+        })
         .collect();
     // Leading dots would make a hidden file; leading dashes are what a stripped
     // path separator leaves behind, and look like a command-line flag.
@@ -7949,7 +8669,12 @@ fn sanitize_filename(subject: &str) -> String {
     if cleaned.is_empty() {
         return "Message".to_string();
     }
-    cleaned.chars().take(120).collect::<String>().trim_end().to_string()
+    cleaned
+        .chars()
+        .take(120)
+        .collect::<String>()
+        .trim_end()
+        .to_string()
 }
 
 #[cfg(test)]
@@ -7960,15 +8685,24 @@ mod tests {
     #[test]
     fn a_message_takes_its_own_direction() {
         let plain = auto_direction(&body_html("سلام\nHello"));
-        assert!(plain.contains("<body dir=\"auto\" class=\"hylki-plain\">"), "{plain}");
-        assert!(plain.contains("body,.hylki-plain{unicode-bidi:plaintext;}"), "{plain}");
+        assert!(
+            plain.contains("<body dir=\"auto\" class=\"hylki-plain\">"),
+            "{plain}"
+        );
+        assert!(
+            plain.contains("body,.hylki-plain{unicode-bidi:plaintext;}"),
+            "{plain}"
+        );
 
         let html = auto_direction("<html><head></head><body class=\"x\"><p>x</p></body></html>");
         assert!(html.contains("<body dir=\"auto\" class=\"x\">"), "{html}");
         assert!(!html.contains("unicode-bidi"), "{html}");
 
         let parts = auto_direction("<html><body><div class=\"hylki-plain\">a</div></body></html>");
-        assert!(parts.contains(".hylki-plain{unicode-bidi:plaintext;}"), "{parts}");
+        assert!(
+            parts.contains(".hylki-plain{unicode-bidi:plaintext;}"),
+            "{parts}"
+        );
         assert!(!parts.contains("body,.hylki-plain"), "{parts}");
 
         // The sender's own direction stands, on either element.
@@ -7980,8 +8714,12 @@ mod tests {
             assert_eq!(auto_direction(own), own);
         }
         // Not a dir attribute, and not a body tag.
-        let tricky = auto_direction("<html><body data-dir=\"x\"><bodyguard>y</bodyguard></body></html>");
-        assert!(tricky.contains("<body dir=\"auto\" data-dir=\"x\">"), "{tricky}");
+        let tricky =
+            auto_direction("<html><body data-dir=\"x\"><bodyguard>y</bodyguard></body></html>");
+        assert!(
+            tricky.contains("<body dir=\"auto\" data-dir=\"x\">"),
+            "{tricky}"
+        );
         // No body tag: the root carries it.
         let bare = auto_direction("<html><p>x</p></html>");
         assert!(bare.starts_with("<html dir=\"auto\">"), "{bare}");
@@ -8011,7 +8749,9 @@ mod tests {
         m.bcc = "hidden@example.com".into();
         let html = recipients_html(&m, true);
         assert!(
-            html.contains("<b>Bcc:</b> <span class=\"hylki-mail\" data-mail=\"hidden@example.com\">"),
+            html.contains(
+                "<b>Bcc:</b> <span class=\"hylki-mail\" data-mail=\"hidden@example.com\">"
+            ),
             "{html}"
         );
         assert!(html.find("<b>Cc:</b>") < html.find("<b>Bcc:</b>"));
@@ -8038,8 +8778,13 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
-        assert!(doc.contains("<div class=\"hylki-inv\" data-key=\"1:1\"></div>"), "{doc}");
+            false,
+            100,
+        );
+        assert!(
+            doc.contains("<div class=\"hylki-inv\" data-key=\"1:1\"></div>"),
+            "{doc}"
+        );
         // And above the body, not below it: the meeting is the point of the
         // message, and the calendar's own prose repeats it underneath.
         let inv = doc.find("<div class=\"hylki-inv\"").expect("the container");
@@ -8061,12 +8806,18 @@ mod tests {
     #[test]
     fn a_repeating_meeting_is_summarised_not_spelled_out() {
         assert_eq!(repeat_text(""), None);
-        assert_eq!(repeat_text("FREQ=WEEKLY"), Some("Repeats weekly".to_string()));
+        assert_eq!(
+            repeat_text("FREQ=WEEKLY"),
+            Some("Repeats weekly".to_string())
+        );
         assert_eq!(
             repeat_text("FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH;UNTIL=20270101T000000Z"),
             Some("Repeats every 2 weeks".to_string())
         );
-        assert_eq!(repeat_text("FREQ=MONTHLY;BYSETPOS=-1"), Some("Repeats monthly".to_string()));
+        assert_eq!(
+            repeat_text("FREQ=MONTHLY;BYSETPOS=-1"),
+            Some("Repeats monthly".to_string())
+        );
         // A rule in a form we don't spell out still says that it repeats.
         assert_eq!(repeat_text("FREQ=SECONDLY"), Some("Repeats".to_string()));
     }
@@ -8081,9 +8832,15 @@ mod tests {
             rsvp: false,
             resource: false,
         };
-        let mut inv = crate::models::Invite { method: "REPLY".into(), ..Default::default() };
+        let mut inv = crate::models::Invite {
+            method: "REPLY".into(),
+            ..Default::default()
+        };
         // The organizer's own line carries no answer; the guest's does.
-        inv.attendees = vec![person("Chair", "NEEDS-ACTION"), person("Marcus Chen", "DECLINED")];
+        inv.attendees = vec![
+            person("Chair", "NEEDS-ACTION"),
+            person("Marcus Chen", "DECLINED"),
+        ];
         assert_eq!(reply_note(&inv), "Marcus Chen declined this invitation.");
         inv.attendees = vec![person("Marcus Chen", "ACCEPTED")];
         assert_eq!(reply_note(&inv), "Marcus Chen accepted this invitation.");
@@ -8107,14 +8864,32 @@ mod tests {
             ..Default::default()
         };
         assert!(base.asks_for_an_answer());
-        assert!(!crate::models::Invite { cancelled: true, ..base.clone() }.asks_for_an_answer());
-        assert!(!crate::models::Invite { method: "REPLY".into(), ..base.clone() }
-            .asks_for_an_answer());
-        assert!(!crate::models::Invite { method: "PUBLISH".into(), ..base.clone() }
-            .asks_for_an_answer());
-        assert!(!crate::models::Invite { organizer: None, ..base.clone() }.asks_for_an_answer());
+        assert!(!crate::models::Invite {
+            cancelled: true,
+            ..base.clone()
+        }
+        .asks_for_an_answer());
+        assert!(!crate::models::Invite {
+            method: "REPLY".into(),
+            ..base.clone()
+        }
+        .asks_for_an_answer());
+        assert!(!crate::models::Invite {
+            method: "PUBLISH".into(),
+            ..base.clone()
+        }
+        .asks_for_an_answer());
+        assert!(!crate::models::Invite {
+            organizer: None,
+            ..base.clone()
+        }
+        .asks_for_an_answer());
         // No UID: nothing an answer could name.
-        assert!(!crate::models::Invite { uid: String::new(), ..base }.asks_for_an_answer());
+        assert!(!crate::models::Invite {
+            uid: String::new(),
+            ..base
+        }
+        .asks_for_an_answer());
     }
 
     // ===== Per-card attachment rows (#213) =====
@@ -8126,20 +8901,41 @@ mod tests {
     #[test]
     fn a_cards_attachment_row_lists_its_own_files() {
         let atts = vec![
-            CardAttachment { name: "report.pdf".into(), size: 2048 },
-            CardAttachment { name: "<b>x</b>.png".into(), size: 10 },
+            CardAttachment {
+                name: "report.pdf".into(),
+                size: 2048,
+            },
+            CardAttachment {
+                name: "<b>x</b>.png".into(),
+                size: 10,
+            },
         ];
         let row = att_row_html((1, 7), Some(&atts));
-        assert!(row.starts_with("<div class=\"hylki-atts\" data-key=\"1:7\">"), "{row}");
+        assert!(
+            row.starts_with("<div class=\"hylki-atts\" data-key=\"1:7\">"),
+            "{row}"
+        );
         assert_eq!(row.matches("class=\"hylki-attc ").count(), 2, "{row}");
-        assert!(row.contains("class=\"hylki-attc ftype-pdf\" data-key=\"1:7\" data-idx=\"0\""), "{row}");
-        assert!(row.contains("class=\"hylki-attc ftype-image\" data-key=\"1:7\" data-idx=\"1\""), "{row}");
-        assert!(row.contains("class=\"hylki-attsave\" data-key=\"1:7\" data-idx=\"1\""), "{row}");
+        assert!(
+            row.contains("class=\"hylki-attc ftype-pdf\" data-key=\"1:7\" data-idx=\"0\""),
+            "{row}"
+        );
+        assert!(
+            row.contains("class=\"hylki-attc ftype-image\" data-key=\"1:7\" data-idx=\"1\""),
+            "{row}"
+        );
+        assert!(
+            row.contains("class=\"hylki-attsave\" data-key=\"1:7\" data-idx=\"1\""),
+            "{row}"
+        );
         assert!(row.contains(&crate::models::human_size(2048)), "{row}");
         assert!(!row.contains("<b>x</b>"), "filename is escaped: {row}");
         assert!(row.contains("&lt;b&gt;x&lt;/b&gt;.png"), "{row}");
         // Nothing attached: the row is there, and empty.
-        assert_eq!(att_row_html((1, 8), None), "<div class=\"hylki-atts\" data-key=\"1:8\"></div>");
+        assert_eq!(
+            att_row_html((1, 8), None),
+            "<div class=\"hylki-atts\" data-key=\"1:8\"></div>"
+        );
     }
 
     // ===== Dark-mode color adaptation (issue #35) =====
@@ -8205,12 +9001,18 @@ mod tests {
         let css = "@media only screen and (prefers-color-scheme: dark){.a{color:#9aa0a6}}\
                    @media (prefers-color-scheme:light){.b{color:#000}}";
         let light = pin_color_scheme(css, false);
-        assert!(light.contains("only screen and (min-width:999999px){.a"), "dark off: {light}");
+        assert!(
+            light.contains("only screen and (min-width:999999px){.a"),
+            "dark off: {light}"
+        );
         assert!(light.contains("(min-width:0px){.b"), "light on: {light}");
 
         let dark = pin_color_scheme(css, true);
         assert!(dark.contains("(min-width:0px){.a"), "dark on: {dark}");
-        assert!(dark.contains("(min-width:999999px){.b"), "light off: {dark}");
+        assert!(
+            dark.contains("(min-width:999999px){.b"),
+            "light off: {dark}"
+        );
     }
 
     /// The rewrite keys off the real media feature, not the substring: a class
@@ -8252,7 +9054,10 @@ mod tests {
         let doc = "<style>.t{ /* background-color: #f0f2f5; */ background-color: #fff; }</style>";
         let out = adapt_colors_for_dark(doc);
         assert!(out.contains("background-color: #141414;"), "{out}");
-        assert!(out.contains("/* background-color: #f0f2f5; */"), "comment kept: {out}");
+        assert!(
+            out.contains("/* background-color: #f0f2f5; */"),
+            "comment kept: {out}"
+        );
         let out = adapt_colors_for_dark(r#"<p style="/* x; */ color: #000">x</p>"#);
         assert!(out.contains("/* x; */ color: #ffffff"), "{out}");
     }
@@ -8268,16 +9073,46 @@ mod tests {
     #[test]
     fn light_mode_frames_are_untouched() {
         let body = r#"<p style="color:#000">x</p>"#;
-        let frame = message_frame(body, true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false, 100);
+        let frame = message_frame(
+            body,
+            true,
+            false,
+            (1, 1),
+            None,
+            &crate::config::ReaderStyle::NONE,
+            "#3584e4",
+            false,
+            100,
+        );
         assert!(frame.contains("color:#000"), "{frame}");
-        let frame = message_frame(body, true, true, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false, 100);
+        let frame = message_frame(
+            body,
+            true,
+            true,
+            (1, 1),
+            None,
+            &crate::config::ReaderStyle::NONE,
+            "#3584e4",
+            false,
+            100,
+        );
         assert!(!frame.contains("color:#000"), "{frame}");
     }
 
     /// With nothing overridden the frame carries no reader stylesheet.
     #[test]
     fn reader_style_none_adds_nothing() {
-        let frame = message_frame("<p>x</p>", true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false, 100);
+        let frame = message_frame(
+            "<p>x</p>",
+            true,
+            false,
+            (1, 1),
+            None,
+            &crate::config::ReaderStyle::NONE,
+            "#3584e4",
+            false,
+            100,
+        );
         assert!(!frame.contains(":not(#hylki-a)"), "{frame}");
         assert_eq!(inject_reader_style("<p>x</p>", ""), "<p>x</p>");
     }
@@ -8287,15 +9122,34 @@ mod tests {
     /// and code kept monospaced.
     #[test]
     fn reader_font_lands_after_the_senders_css() {
-        let style = crate::config::ReaderStyle { font: Some("DejaVu Serif 12".into()), colors: false, plain_font: None };
+        let style = crate::config::ReaderStyle {
+            font: Some("DejaVu Serif 12".into()),
+            colors: false,
+            plain_font: None,
+        };
         let body = "<html><head><style>p{font-family:Comic Sans MS}</style></head>\
                     <body><p style=\"font-size:30px\">x</p></body></html>";
-        let frame = message_frame(body, true, false, (1, 1), None, &style, "#3584e4", false, 100);
-        let ours = frame.find(":root :not(#hylki-a):not(#hylki-b):not(#hylki-c)").expect("override sheet");
+        let frame = message_frame(
+            body,
+            true,
+            false,
+            (1, 1),
+            None,
+            &style,
+            "#3584e4",
+            false,
+            100,
+        );
+        let ours = frame
+            .find(":root :not(#hylki-a):not(#hylki-b):not(#hylki-c)")
+            .expect("override sheet");
         let theirs = frame.find("Comic Sans").expect("sender css kept");
         assert!(ours > theirs, "the reader's sheet must come last: {frame}");
         // srcdoc attribute: quotes are escaped, so match the family unquoted.
-        assert!(frame.contains("DejaVu Serif&quot;,sans-serif !important;font-size:12pt !important"), "{frame}");
+        assert!(
+            frame.contains("DejaVu Serif&quot;,sans-serif !important;font-size:12pt !important"),
+            "{frame}"
+        );
         assert!(frame.contains("h1:not(#hylki-a):not(#hylki-b):not(#hylki-c){font-size:calc(12pt * 1.6) !important"), "{frame}");
         assert!(frame.contains(":is(pre,code,kbd,samp,tt):not(#hylki-a):not(#hylki-b):not(#hylki-c){font-family:monospace !important"), "{frame}");
         // Colors untouched: no color rule was asked for.
@@ -8307,15 +9161,46 @@ mod tests {
     /// skipped, since the sender's colors are not shown anyway.
     #[test]
     fn reader_colors_force_text_and_links() {
-        let style = crate::config::ReaderStyle { font: None, colors: true, plain_font: None };
-        let body = r#"<p style="color:#000;background:#ff0">x <a href="https://e.example">l</a></p>"#;
-        let light = message_frame(body, true, false, (1, 1), None, &style, "#3584e4", false, 100);
+        let style = crate::config::ReaderStyle {
+            font: None,
+            colors: true,
+            plain_font: None,
+        };
+        let body =
+            r#"<p style="color:#000;background:#ff0">x <a href="https://e.example">l</a></p>"#;
+        let light = message_frame(
+            body,
+            true,
+            false,
+            (1, 1),
+            None,
+            &style,
+            "#3584e4",
+            false,
+            100,
+        );
         assert!(light.contains("color:#1a1a1a !important;-webkit-text-fill-color:#1a1a1a !important;background-color:transparent !important;background-image:none !important"), "{light}");
         assert!(light.contains(":root a:not(#hylki-a):not(#hylki-b):not(#hylki-c),:root a:not(#hylki-a):not(#hylki-b):not(#hylki-c) *{color:#3584e4 !important"), "{light}");
-        assert!(!light.contains("font-family"), "no font rule was asked for: {light}");
-        let dark = message_frame(body, true, true, (1, 1), None, &style, "#3584e4", false, 100);
+        assert!(
+            !light.contains("font-family"),
+            "no font rule was asked for: {light}"
+        );
+        let dark = message_frame(
+            body,
+            true,
+            true,
+            (1, 1),
+            None,
+            &style,
+            "#3584e4",
+            false,
+            100,
+        );
         assert!(dark.contains("color:#e6e6e6 !important"), "{dark}");
-        assert!(dark.contains("color:#000"), "sender colors left as written when overridden: {dark}");
+        assert!(
+            dark.contains("color:#000"),
+            "sender colors left as written when overridden: {dark}"
+        );
     }
 
     /// Pango descriptions become a quoted CSS family list with a generic
@@ -8323,17 +9208,34 @@ mod tests {
     #[test]
     fn css_font_reads_pango_descriptions() {
         let s = |v: &str| v.to_string();
-        assert_eq!(css_font("Cantarell 11"), (s("\"Cantarell\",sans-serif"), s("11pt"), s("")));
+        assert_eq!(
+            css_font("Cantarell 11"),
+            (s("\"Cantarell\",sans-serif"), s("11pt"), s(""))
+        );
         assert_eq!(
             css_font("JetBrains Mono Bold 10"),
-            (s("\"JetBrains Mono\",monospace"), s("10pt"), s("font-weight:700 !important;"))
+            (
+                s("\"JetBrains Mono\",monospace"),
+                s("10pt"),
+                s("font-weight:700 !important;")
+            )
         );
-        assert_eq!(css_font("Sans"), (s("\"Sans\",sans-serif"), s("11pt"), s("")));
-        assert_eq!(css_font("Noto Serif 10.5"), (s("\"Noto Serif\",sans-serif"), s("10.5pt"), s("")));
+        assert_eq!(
+            css_font("Sans"),
+            (s("\"Sans\",sans-serif"), s("11pt"), s(""))
+        );
+        assert_eq!(
+            css_font("Noto Serif 10.5"),
+            (s("\"Noto Serif\",sans-serif"), s("10.5pt"), s(""))
+        );
         // The face the user picked reaches the page: black, italic, condensed.
         assert_eq!(
             css_font("Adwaita Sans Black 16"),
-            (s("\"Adwaita Sans\",sans-serif"), s("16pt"), s("font-weight:900 !important;"))
+            (
+                s("\"Adwaita Sans\",sans-serif"),
+                s("16pt"),
+                s("font-weight:900 !important;")
+            )
         );
         assert_eq!(
             css_font("Cantarell Condensed Light Italic 12").2,
@@ -8351,7 +9253,11 @@ mod tests {
         let mut b = msg_for_print();
         b.id = 2;
         b.body = "<p>two</p>".into();
-        let style = crate::config::ReaderStyle { font: Some("Cantarell 11".into()), colors: false, plain_font: None };
+        let style = crate::config::ReaderStyle {
+            font: Some("Cantarell 11".into()),
+            colors: false,
+            plain_font: None,
+        };
         let mut escaped = std::collections::HashSet::new();
         escaped.insert((a.account_id, a.id));
         let doc = MessageView::conversation_document(
@@ -8367,10 +9273,21 @@ mod tests {
             false,
             &style,
             &escaped,
-            false, 100);
+            false,
+            100,
+        );
         assert_eq!(doc.matches("data-act=\"senderfmt\"").count(), 2, "{doc}");
-        assert_eq!(doc.matches("class=\"hylki-act on\" data-act=\"senderfmt\"").count(), 1, "{doc}");
-        assert_eq!(doc.matches(":root :not(#hylki-a)").count(), 1, "only the other card is styled: {doc}");
+        assert_eq!(
+            doc.matches("class=\"hylki-act on\" data-act=\"senderfmt\"")
+                .count(),
+            1,
+            "{doc}"
+        );
+        assert_eq!(
+            doc.matches(":root :not(#hylki-a)").count(),
+            1,
+            "only the other card is styled: {doc}"
+        );
 
         // No override: no toggle, nothing injected.
         let plain = MessageView::conversation_document(
@@ -8386,7 +9303,9 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &escaped,
-            false, 100);
+            false,
+            100,
+        );
         assert!(!plain.contains("senderfmt"), "{plain}");
         assert!(!plain.contains(":not(#hylki-a)"), "{plain}");
     }
@@ -8403,7 +9322,10 @@ mod tests {
             inject_reader_style("<html><p>x</p></HTML>", "p{}"),
             "<html><p>x</p><style>p{}</style></HTML>"
         );
-        assert_eq!(inject_reader_style("<p>x</p>", "p{}"), "<p>x</p><style>p{}</style>");
+        assert_eq!(
+            inject_reader_style("<p>x</p>", "p{}"),
+            "<p>x</p><style>p{}</style>"
+        );
     }
 
     fn msg_for_print() -> Message {
@@ -8461,7 +9383,9 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
+            false,
+            100,
+        );
         assert_eq!(
             doc.matches("<section class=\"hylki-msg\"").count(),
             2,
@@ -8470,10 +9394,16 @@ mod tests {
         let ada = doc.find("Ada Lovelace").expect("first sender present");
         let grace = doc.find("Grace Hopper").expect("second sender present");
         assert!(ada < grace, "cards must keep the order they were handed");
-        assert!(doc.contains("<body class=\"hylki-conv\">"), "conversation padding");
+        assert!(
+            doc.contains("<body class=\"hylki-conv\">"),
+            "conversation padding"
+        );
         // The cards sit on the deeper page — the same color the spinner and the
         // cover behind the WebView are painted, so the handover is invisible.
-        assert!(doc.contains(&format!("background:{}", PAGE.0)), "page ground: {doc}");
+        assert!(
+            doc.contains(&format!("background:{}", PAGE.0)),
+            "page ground: {doc}"
+        );
     }
 
     /// A card from a mailbox of your own wears the face that mailbox was given
@@ -8499,7 +9429,9 @@ mod tests {
                 false,
                 &crate::config::ReaderStyle::NONE,
                 &Default::default(),
-                false, 100)
+                false,
+                100,
+            )
         };
 
         crate::avatar::set_own_faces([(
@@ -8522,15 +9454,19 @@ mod tests {
         assert!(!doc.contains("hsl("), "and not the per-sender tint: {doc}");
         // Someone else's card is untouched by any of this.
         let doc = build(&[msg_for_print()]);
-        assert!(!doc.contains("\u{1F98A}"), "another sender keeps their own circle: {doc}");
+        assert!(
+            !doc.contains("\u{1F98A}"),
+            "another sender keeps their own circle: {doc}"
+        );
 
         // A picture wins over the emoji, and rides along embedded: the
         // document is handed the image, never a path it could go and read.
         let dir = std::env::temp_dir().join(format!("hylki-own-face-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("a directory to write the picture in");
         let path = dir.join("avatar.png");
-        let pixbuf = gtk::gdk_pixbuf::Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 64, 64)
-            .expect("a pixbuf");
+        let pixbuf =
+            gtk::gdk_pixbuf::Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 64, 64)
+                .expect("a pixbuf");
         pixbuf.fill(0xe661_00ff);
         pixbuf.savev(&path, "png", &[]).expect("a picture on disk");
         crate::avatar::set_own_faces([(
@@ -8547,7 +9483,10 @@ mod tests {
             doc.contains("<img class=\"hylki-ava\" src=\"data:image/png;base64,"),
             "the picture is embedded in the card: {doc}"
         );
-        assert!(!doc.contains("\u{1F98A}"), "the picture wins over the emoji: {doc}");
+        assert!(
+            !doc.contains("\u{1F98A}"),
+            "the picture wins over the emoji: {doc}"
+        );
         assert!(
             !doc.contains(path.to_string_lossy().as_ref()),
             "the file is never linked: {doc}"
@@ -8581,7 +9520,9 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
+            false,
+            100,
+        );
         assert_eq!(
             doc.matches("class=\"hylki-rcpt\" hidden").count(),
             2,
@@ -8593,10 +9534,22 @@ mod tests {
             "each card gets a recipients chip: {doc}"
         );
         // 3 addresses on the first card (2 To + 1 Cc), 1 on the second.
-        assert!(doc.contains(">3 recipients<"), "recipient count on the chip: {doc}");
-        assert!(doc.contains(">1 recipient<"), "singular for one recipient: {doc}");
-        assert!(!doc.contains("<script>alert(1)</script>"), "recipients must be escaped: {doc}");
-        assert!(doc.contains("&lt;script&gt;"), "escaped form present: {doc}");
+        assert!(
+            doc.contains(">3 recipients<"),
+            "recipient count on the chip: {doc}"
+        );
+        assert!(
+            doc.contains(">1 recipient<"),
+            "singular for one recipient: {doc}"
+        );
+        assert!(
+            !doc.contains("<script>alert(1)</script>"),
+            "recipients must be escaped: {doc}"
+        );
+        assert!(
+            doc.contains("&lt;script&gt;"),
+            "escaped form present: {doc}"
+        );
     }
 
     /// A message that names no recipients at all gets neither chip nor block.
@@ -8620,9 +9573,12 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
+            false,
+            100,
+        );
         assert_eq!(
-            doc.matches("<button type=\"button\" class=\"hylki-rcpt-toggle\"").count(),
+            doc.matches("<button type=\"button\" class=\"hylki-rcpt-toggle\"")
+                .count(),
             1,
             "only the second card: {doc}"
         );
@@ -8649,18 +9605,30 @@ mod tests {
                 false,
                 &crate::config::ReaderStyle::NONE,
                 &Default::default(),
-                false, 100)
+                false,
+                100,
+            )
         };
         // Only the card with something to load carries the button.
         let blocked = doc_for(true);
-        assert_eq!(blocked.matches("data-act=\"remote\"").count(), 1, "{blocked}");
+        assert_eq!(
+            blocked.matches("data-act=\"remote\"").count(),
+            1,
+            "{blocked}"
+        );
         assert!(blocked.contains("Show remote content"), "{blocked}");
-        assert!(!blocked.contains("class=\"hylki-act on\" data-act=\"remote\""), "not lit while blocked");
+        assert!(
+            !blocked.contains("class=\"hylki-act on\" data-act=\"remote\""),
+            "not lit while blocked"
+        );
         // Showing it, the same button offers to put the block back, and is lit.
         let shown = doc_for(false);
         assert_eq!(shown.matches("data-act=\"remote\"").count(), 1, "{shown}");
         assert!(shown.contains("Block remote content"), "{shown}");
-        assert!(shown.contains("class=\"hylki-act on\" data-act=\"remote\""), "lit while showing: {shown}");
+        assert!(
+            shown.contains("class=\"hylki-act on\" data-act=\"remote\""),
+            "lit while showing: {shown}"
+        );
     }
 
     /// Each card carries its own Reply/Reply all/Forward, keyed to that message
@@ -8684,7 +9652,9 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
+            false,
+            100,
+        );
         for act in ["reply", "replyall", "forward"] {
             assert_eq!(
                 doc.matches(&format!("data-act=\"{act}\"")).count(),
@@ -8719,11 +9689,24 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
-        assert_eq!(doc.matches("class=\"hylki-dot\"").count(), 1, "one dot: {doc}");
-        assert_eq!(doc.matches("class=\"hylki-end\"").count(), 0, "no sentinel: {doc}");
+            false,
+            100,
+        );
+        assert_eq!(
+            doc.matches("class=\"hylki-dot\"").count(),
+            1,
+            "one dot: {doc}"
+        );
+        assert_eq!(
+            doc.matches("class=\"hylki-end\"").count(),
+            0,
+            "no sentinel: {doc}"
+        );
         // Keyed to the unread message, so reading it can't clear another's.
-        assert!(doc.contains("class=\"hylki-dot\" data-key=\"1:2\""), "{doc}");
+        assert!(
+            doc.contains("class=\"hylki-dot\" data-key=\"1:2\""),
+            "{doc}"
+        );
     }
 
     /// Marking a message unread while its conversation is open must survive the
@@ -8750,9 +9733,19 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
-        assert_eq!(doc.matches("class=\"hylki-dot\"").count(), 1, "still marked: {doc}");
-        assert_eq!(doc.matches("class=\"hylki-end\"").count(), 0, "no sentinel: {doc}");
+            false,
+            100,
+        );
+        assert_eq!(
+            doc.matches("class=\"hylki-dot\"").count(),
+            1,
+            "still marked: {doc}"
+        );
+        assert_eq!(
+            doc.matches("class=\"hylki-end\"").count(),
+            0,
+            "no sentinel: {doc}"
+        );
     }
 
     /// A frame opens at the height it had last time, so a reopened conversation
@@ -8777,11 +9770,20 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
-        assert!(doc.contains("style=\"height:640px\""), "known height used: {doc}");
+            false,
+            100,
+        );
+        assert!(
+            doc.contains("style=\"height:640px\""),
+            "known height used: {doc}"
+        );
         // The unmeasured one opens collapsed rather than at the browser's
         // 150px default, so its card shows nothing until its document is in.
-        assert_eq!(doc.matches("style=\"height:0px\"").count(), 1, "unknown one collapsed: {doc}");
+        assert_eq!(
+            doc.matches("style=\"height:0px\"").count(),
+            1,
+            "unknown one collapsed: {doc}"
+        );
         assert_eq!(doc.matches("style=\"height:").count(), 2, "one each");
         // Keyed per message, so a height can't be applied to the wrong frame.
         assert!(doc.contains("data-key=\"1:2\""), "{doc}");
@@ -8806,10 +9808,22 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
-        assert!(doc.contains("class=\"hylki-msg selected\" data-key=\"1:2\""), "{doc}");
-        assert_eq!(doc.matches("hylki-msg selected").count(), 1, "only the selected one");
-        assert!(doc.contains("box-shadow:0 0 0 2px #ff8800"), "outlined in the accent: {doc}");
+            false,
+            100,
+        );
+        assert!(
+            doc.contains("class=\"hylki-msg selected\" data-key=\"1:2\""),
+            "{doc}"
+        );
+        assert_eq!(
+            doc.matches("hylki-msg selected").count(),
+            1,
+            "only the selected one"
+        );
+        assert!(
+            doc.contains("box-shadow:0 0 0 2px #ff8800"),
+            "outlined in the accent: {doc}"
+        );
     }
 
     /// A lone message gets the same in-document header a conversation card
@@ -8831,13 +9845,30 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
-        assert!(doc.contains("<section class=\"hylki-msg\""), "message chrome: {doc}");
-        assert!(doc.contains("class=\"hylki-msg-hdr\""), "in-document header: {doc}");
-        assert!(!doc.contains("<body class=\"hylki-conv\">"), "no card gutter: {doc}");
-        assert!(doc.contains("data-act=\"reply\""), "card actions present: {doc}");
+            false,
+            100,
+        );
+        assert!(
+            doc.contains("<section class=\"hylki-msg\""),
+            "message chrome: {doc}"
+        );
+        assert!(
+            doc.contains("class=\"hylki-msg-hdr\""),
+            "in-document header: {doc}"
+        );
+        assert!(
+            !doc.contains("<body class=\"hylki-conv\">"),
+            "no card gutter: {doc}"
+        );
+        assert!(
+            doc.contains("data-act=\"reply\""),
+            "card actions present: {doc}"
+        );
         // Full-bleed also means the plain ground, not the cards' deeper page.
-        assert!(doc.contains(&format!("background:{}", GROUND.0)), "plain ground: {doc}");
+        assert!(
+            doc.contains(&format!("background:{}", GROUND.0)),
+            "plain ground: {doc}"
+        );
     }
 
     /// With the "single messages as cards" preference on (#57), a lone
@@ -8858,9 +9889,17 @@ mod tests {
             true,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
-            false, 100);
-        assert!(doc.contains("<body class=\"hylki-conv\">"), "card gutter: {doc}");
-        assert!(doc.contains(&format!("background:{}", PAGE.0)), "deeper page ground: {doc}");
+            false,
+            100,
+        );
+        assert!(
+            doc.contains("<body class=\"hylki-conv\">"),
+            "card gutter: {doc}"
+        );
+        assert!(
+            doc.contains(&format!("background:{}", PAGE.0)),
+            "deeper page ground: {doc}"
+        );
     }
 
     #[test]
@@ -8870,7 +9909,22 @@ mod tests {
         b.id = 2;
         b.folder_id = 3; // pulled in from Sent
         let labels = std::collections::HashMap::from([((1u32, 2u32), "Sent".to_string())]);
-        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false, 100);
+        let doc = MessageView::conversation_document(
+            &[a, b],
+            &labels,
+            &Default::default(),
+            &Default::default(),
+            &[],
+            "#3584e4",
+            true,
+            false,
+            false,
+            false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
+            false,
+            100,
+        );
         assert_eq!(
             doc.matches("class=\"hylki-folder\"").count(),
             // on the message that came from Sent, and never on the one the
@@ -8878,7 +9932,10 @@ mod tests {
             1,
             "only the message from another folder should carry a folder badge"
         );
-        assert!(doc.contains(">Sent</span>"), "the badge should name the folder");
+        assert!(
+            doc.contains(">Sent</span>"),
+            "the badge should name the folder"
+        );
     }
 
     #[test]
@@ -8888,10 +9945,30 @@ mod tests {
         let a = msg_for_print();
         let mut b = msg_for_print();
         b.id = 2;
-        let labels =
-            std::collections::HashMap::from([((1u32, 2u32), "<img src=x onerror=alert(1)>".into())]);
-        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false, 100);
-        assert!(!doc.contains("<img src=x"), "the label must be escaped, not rendered");
+        let labels = std::collections::HashMap::from([(
+            (1u32, 2u32),
+            "<img src=x onerror=alert(1)>".into(),
+        )]);
+        let doc = MessageView::conversation_document(
+            &[a, b],
+            &labels,
+            &Default::default(),
+            &Default::default(),
+            &[],
+            "#3584e4",
+            true,
+            false,
+            false,
+            false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
+            false,
+            100,
+        );
+        assert!(
+            !doc.contains("<img src=x"),
+            "the label must be escaped, not rendered"
+        );
         assert!(doc.contains("&lt;img src=x"));
     }
 
@@ -8908,8 +9985,22 @@ mod tests {
         let mut b = msg_for_print();
         b.id = 2;
         // Two messages: the per-message headers only render in conversation mode.
-        let doc = MessageView::conversation_document(&[a, b], &Default::default(), &Default::default(), &Default::default(),
-            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false, 100);
+        let doc = MessageView::conversation_document(
+            &[a, b],
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &[],
+            "#3584e4",
+            true,
+            false,
+            false,
+            false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
+            false,
+            100,
+        );
 
         assert!(!doc.contains("<script>x=1"), "{doc}");
         assert!(!doc.contains("<img src=y"), "{doc}");
@@ -8923,8 +10014,22 @@ mod tests {
         a.from_name = "Ada".into();
         let mut b = msg_for_print();
         b.id = 2;
-        let doc = MessageView::conversation_document(&[a, b], &Default::default(), &Default::default(), &Default::default(),
-            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false, 100);
+        let doc = MessageView::conversation_document(
+            &[a, b],
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &[],
+            "#3584e4",
+            true,
+            false,
+            false,
+            false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
+            false,
+            100,
+        );
 
         // A nonce'd CSP, so an injected `<script>` or `onerror=` is refused by
         // the engine even if the escaping above ever regresses.
@@ -8941,7 +10046,10 @@ mod tests {
             .and_then(|r| r.split('\'').next())
             .expect("wrapper CSP declares a nonce");
         assert!(nonce.len() >= 16, "nonce is {} chars", nonce.len());
-        assert!(doc.contains(&format!("<script nonce=\"{nonce}\">")), "{doc}");
+        assert!(
+            doc.contains(&format!("<script nonce=\"{nonce}\">")),
+            "{doc}"
+        );
         // The sizing script is the *only* script, and it carries the nonce.
         assert_eq!(doc.matches("<script").count(), 1, "{doc}");
         // No `default-src` here: a wrapper policy is inherited by the srcdoc
@@ -8949,21 +10057,22 @@ mod tests {
         // frame brings its own `default-src 'none'`.
         assert!(!policy.contains("default-src"), "{policy}");
         // Two renders never share a nonce.
-        let again =
-            MessageView::conversation_document(
-                &[msg_for_print(), msg_for_print()],
-                &Default::default(),
-                &Default::default(),
-                &Default::default(),
-                &[],
-                "#3584e4",
-                true,
-                false,
-                false,
-                false,
-                &crate::config::ReaderStyle::NONE,
-                &Default::default(),
-                false, 100);
+        let again = MessageView::conversation_document(
+            &[msg_for_print(), msg_for_print()],
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &[],
+            "#3584e4",
+            true,
+            false,
+            false,
+            false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
+            false,
+            100,
+        );
         assert!(!again.contains(nonce), "nonce was reused across renders");
     }
 
@@ -9033,13 +10142,33 @@ mod tests {
         // about, a frame built while remote content is disallowed carries the
         // restrictive policy. A detector miss costs a banner, not the blocking.
         let sneaky = r#"<img data-x="y" src="//tracker.example/p.gif">"#;
-        let frame = message_frame(sneaky, true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false, 100);
+        let frame = message_frame(
+            sneaky,
+            true,
+            false,
+            (1, 1),
+            None,
+            &crate::config::ReaderStyle::NONE,
+            "#3584e4",
+            false,
+            100,
+        );
         assert!(frame.contains("img-src data: cid:"), "{frame}");
         assert!(!frame.contains("img-src http:"), "{frame}");
         assert!(!frame.contains("tracker.example"), "{frame}");
 
         // And once the user allows it, the same body renders untouched.
-        let allowed = message_frame(sneaky, false, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false, 100);
+        let allowed = message_frame(
+            sneaky,
+            false,
+            false,
+            (1, 1),
+            None,
+            &crate::config::ReaderStyle::NONE,
+            "#3584e4",
+            false,
+            100,
+        );
         assert!(allowed.contains("img-src http: https:"), "{allowed}");
         assert!(allowed.contains("tracker.example"), "{allowed}");
     }
@@ -9048,7 +10177,11 @@ mod tests {
     fn only_web_and_mail_links_reach_the_desktop() {
         // An HTML body keeps its own `href` values, so a message can name any
         // scheme a third-party application has registered.
-        for uri in ["http://example.com/", "https://example.com/", "MAILTO:a@b.c"] {
+        for uri in [
+            "http://example.com/",
+            "https://example.com/",
+            "MAILTO:a@b.c",
+        ] {
             assert!(is_launchable_uri(uri), "{uri}");
         }
         for uri in [
@@ -9091,8 +10224,22 @@ mod tests {
         let mut b = msg_for_print();
         b.id = 2;
         b.body = "<p style=\"height:300px\">second</p>".into();
-        let html = MessageView::conversation_document(&[a, b], &Default::default(), &Default::default(), &Default::default(),
-            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false, 100);
+        let html = MessageView::conversation_document(
+            &[a, b],
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &[],
+            "#3584e4",
+            true,
+            false,
+            false,
+            false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
+            false,
+            100,
+        );
 
         let view = webkit6::WebView::new();
         let settings = webkit6::Settings::new();
@@ -9152,18 +10299,12 @@ mod tests {
         while std::time::Instant::now() < deadline {
             answer.replace(None);
             let out = answer.clone();
-            view.evaluate_javascript(
-                probe,
-                None,
-                None,
-                gtk::gio::Cancellable::NONE,
-                move |res| {
-                    *out.borrow_mut() = Some(match res {
-                        Ok(v) => v.to_str().to_string(),
-                        Err(e) => format!("ERROR {e}"),
-                    });
-                },
-            );
+            view.evaluate_javascript(probe, None, None, gtk::gio::Cancellable::NONE, move |res| {
+                *out.borrow_mut() = Some(match res {
+                    Ok(v) => v.to_str().to_string(),
+                    Err(e) => format!("ERROR {e}"),
+                });
+            });
             pump(&|| answer.borrow().is_some());
             json = answer.borrow().clone().expect("the engine answered");
             if json.contains("\"ours\":true") {
@@ -9175,7 +10316,10 @@ mod tests {
 
         // The injected script is inert: it survives as text in the header and
         // never runs.
-        assert!(json.contains("\"pwned\":false"), "injected script ran: {json}");
+        assert!(
+            json.contains("\"pwned\":false"),
+            "injected script ran: {json}"
+        );
         assert!(
             json.contains("<script>window.__pwned = 1</script>"),
             "the display name should read back as text: {json}"
@@ -9196,7 +10340,10 @@ mod tests {
         let m = msg_for_print();
         let header = print_header_html(Some(&m));
         assert!(header.contains("Quarterly numbers"), "{header}");
-        assert!(header.contains("Ada Lovelace &lt;ada@example.com&gt;"), "{header}");
+        assert!(
+            header.contains("Ada Lovelace &lt;ada@example.com&gt;"),
+            "{header}"
+        );
         assert!(header.contains("me@example.com"), "{header}");
         assert!(header.contains("carol@example.com"), "{header}");
         assert!(header.contains("From:") && header.contains("To:") && header.contains("Date:"));
@@ -9251,9 +10398,14 @@ mod tests {
             false,
             false,
         );
-        let ours = doc.find("img{max-width:100%;}").expect("the default image cap");
+        let ours = doc
+            .find("img{max-width:100%;}")
+            .expect("the default image cap");
         let theirs = doc.find("img{max-width:none}").unwrap();
-        assert!(ours < theirs, "the message's own rule must come later and win: {doc}");
+        assert!(
+            ours < theirs,
+            "the message's own rule must come later and win: {doc}"
+        );
         // A body with no head at all gets it too.
         assert!(inject_csp("<img src=x>", false, true).contains("img{max-width:100%;}"));
     }
@@ -9265,8 +10417,14 @@ mod tests {
             "<meta charset=\"utf-8\">hi"
         );
         // A tag that merely starts like one of them is content, not structure.
-        assert_eq!(inline_body("<bodyguard>x</bodyguard>"), "<bodyguard>x</bodyguard>");
-        assert_eq!(inline_body("<p>plain fragment</p>"), "<p>plain fragment</p>");
+        assert_eq!(
+            inline_body("<bodyguard>x</bodyguard>"),
+            "<bodyguard>x</bodyguard>"
+        );
+        assert_eq!(
+            inline_body("<p>plain fragment</p>"),
+            "<p>plain fragment</p>"
+        );
         // Unterminated tags must not swallow the rest of the message.
         assert_eq!(inline_body("text < 5 and > 2"), "text < 5 and > 2");
     }
@@ -9281,7 +10439,10 @@ mod tests {
              .bodyguard{margin:0}</style><p>hi</p>",
             ".hylki-print-m1",
         );
-        assert!(out.contains(".hylki-print-m1{font-family:monospace}"), "{out}");
+        assert!(
+            out.contains(".hylki-print-m1{font-family:monospace}"),
+            "{out}"
+        );
         assert!(
             out.contains("@media print{.hylki-print-m1,.hylki-print-m1>p{color:red}}"),
             "{out}"
@@ -9332,7 +10493,10 @@ mod tests {
         // a file, so it must not carry path separators or other characters a
         // filesystem would refuse.
         assert_eq!(sanitize_filename("Quarterly numbers"), "Quarterly numbers");
-        assert_eq!(sanitize_filename("Invoice 3/4 <urgent>"), "Invoice 3-4 -urgent-");
+        assert_eq!(
+            sanitize_filename("Invoice 3/4 <urgent>"),
+            "Invoice 3-4 -urgent-"
+        );
         assert_eq!(sanitize_filename("../../etc/passwd"), "etc-passwd");
         // Nothing usable left, or nothing to begin with.
         assert_eq!(sanitize_filename("   "), "Message");
@@ -9392,7 +10556,10 @@ mod tests {
     fn ordinary_link_text_is_never_mistaken_for_a_host() {
         assert_eq!(host_of("Click here to sign in"), None);
         assert_eq!(host_of("mailto:someone@example.com"), None);
-        assert_eq!(host_of("https://example.com/path"), Some("example.com".into()));
+        assert_eq!(
+            host_of("https://example.com/path"),
+            Some("example.com".into())
+        );
         assert_eq!(host_of("example.com/path"), Some("example.com".into()));
         // Userinfo can't be used to disguise the real host.
         assert_eq!(
@@ -9445,7 +10612,6 @@ mod scan_perf {
         assert!(strip.as_millis() < 250, "stripping took {strip:?}");
     }
 }
-
 
 impl Drop for MessageView {
     /// A pop-out's view goes with its window (the reader's own only ever

@@ -44,7 +44,12 @@ pub struct RamCache<K, V: Weigh> {
 
 impl<K: std::hash::Hash + Eq + Clone, V: Weigh> RamCache<K, V> {
     pub fn new(budget: usize) -> Self {
-        RamCache { map: HashMap::new(), order: VecDeque::new(), bytes: 0, budget }
+        RamCache {
+            map: HashMap::new(),
+            order: VecDeque::new(),
+            bytes: 0,
+            budget,
+        }
     }
 
     /// How many entries are held.
@@ -81,7 +86,9 @@ impl<K: std::hash::Hash + Eq + Clone, V: Weigh> RamCache<K, V> {
         // it is almost certainly the message on screen, and evicting it would
         // only force a disk re-read on the next render.
         while self.bytes > self.budget && self.order.len() > 1 {
-            let Some(oldest) = self.order.pop_front() else { break };
+            let Some(oldest) = self.order.pop_front() else {
+                break;
+            };
             if let Some(v) = self.map.remove(&oldest) {
                 self.bytes -= v.weight();
             }

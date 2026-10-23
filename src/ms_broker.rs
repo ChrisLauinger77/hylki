@@ -32,7 +32,10 @@ pub struct SsoCookie {
 /// Entra ID and a broker on this computer has that account. `user` is the
 /// address being signed in; without one, a broker holding a single
 /// account uses it. Blocking: call it off the main thread.
-pub fn sso_cookie(settings: &crate::config::OAuthSettings, user: Option<&str>) -> Option<SsoCookie> {
+pub fn sso_cookie(
+    settings: &crate::config::OAuthSettings,
+    user: Option<&str>,
+) -> Option<SsoCookie> {
     if !settings.auth_url.starts_with(ENTRA) || settings.client_id.trim().is_empty() {
         return None;
     }
@@ -50,21 +53,36 @@ pub fn sso_cookie(settings: &crate::config::OAuthSettings, user: Option<&str>) -
     }
 }
 
-fn fetch(settings: &crate::config::OAuthSettings, user: Option<&str>) -> Result<Option<SsoCookie>, String> {
+fn fetch(
+    settings: &crate::config::OAuthSettings,
+    user: Option<&str>,
+) -> Result<Option<SsoCookie>, String> {
     let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
     // One id for the pair of calls, as a broker log ties them together.
     let session = correlation_id();
     let redirect = redirect_uri(settings);
     let call = |method: &str, request: &str| -> Result<String, String> {
-        conn.call_method(Some(BUS_NAME), PATH, Some(INTERFACE), method, &("0.0", session.as_str(), request))
-            .map_err(|e| format!("{method}: {e}"))?
-            .body()
-            .deserialize::<String>()
-            .map_err(|e| format!("{method}: {e}"))
+        conn.call_method(
+            Some(BUS_NAME),
+            PATH,
+            Some(INTERFACE),
+            method,
+            &("0.0", session.as_str(), request),
+        )
+        .map_err(|e| format!("{method}: {e}"))?
+        .body()
+        .deserialize::<String>()
+        .map_err(|e| format!("{method}: {e}"))
     };
-    let accounts = call("getAccounts", &accounts_request(&settings.client_id, &redirect))?;
+    let accounts = call(
+        "getAccounts",
+        &accounts_request(&settings.client_id, &redirect),
+    )?;
     let Some(account) = pick_account(&accounts, user) else {
-        return Err(format!("no broker account for {}", user.unwrap_or("this sign-in")));
+        return Err(format!(
+            "no broker account for {}",
+            user.unwrap_or("this sign-in")
+        ));
     };
     let reply = call(
         "acquirePrtSsoCookie",
@@ -91,7 +109,14 @@ fn correlation_id() -> String {
     b[6] = (b[6] & 0x0f) | 0x40;
     b[8] = (b[8] & 0x3f) | 0x80;
     let h: String = b.iter().map(|x| format!("{x:02x}")).collect();
-    format!("{}-{}-{}-{}-{}", &h[..8], &h[8..12], &h[12..16], &h[16..20], &h[20..])
+    format!(
+        "{}-{}-{}-{}-{}",
+        &h[..8],
+        &h[8..12],
+        &h[12..16],
+        &h[16..20],
+        &h[20..]
+    )
 }
 
 fn accounts_request(client_id: &str, redirect: &str) -> String {
@@ -106,7 +131,11 @@ fn pick_account(reply: &str, user: Option<&str>) -> Option<Value> {
     match user.map(str::trim).filter(|u| !u.is_empty()) {
         Some(user) => accounts
             .iter()
-            .find(|a| a["username"].as_str().is_some_and(|n| n.eq_ignore_ascii_case(user)))
+            .find(|a| {
+                a["username"]
+                    .as_str()
+                    .is_some_and(|n| n.eq_ignore_ascii_case(user))
+            })
             .cloned(),
         None if accounts.len() == 1 => accounts.first().cloned(),
         None => None,
@@ -141,7 +170,10 @@ fn parse_cookie(reply: &str) -> Option<SsoCookie> {
     };
     let name = cookie["cookieName"].as_str().filter(|s| !s.is_empty())?;
     let value = cookie["cookieContent"].as_str().filter(|s| !s.is_empty())?;
-    Some(SsoCookie { name: name.to_string(), value: value.to_string() })
+    Some(SsoCookie {
+        name: name.to_string(),
+        value: value.to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -151,7 +183,10 @@ mod tests {
     #[test]
     fn the_account_is_picked_by_name() {
         let reply = r#"{"accounts":[{"username":"Ann@Contoso.com","homeAccountId":"1"},{"username":"bob@contoso.com"}]}"#;
-        assert_eq!(pick_account(reply, Some("ann@contoso.com")).unwrap()["homeAccountId"], "1");
+        assert_eq!(
+            pick_account(reply, Some("ann@contoso.com")).unwrap()["homeAccountId"],
+            "1"
+        );
         assert!(pick_account(reply, Some("eve@contoso.com")).is_none());
         // With no name, only a single account is a safe guess.
         assert!(pick_account(reply, None).is_none());
@@ -174,7 +209,10 @@ mod tests {
         assert_eq!(req["authParameters"]["account"], account);
         assert_eq!(req["authParameters"]["authorizationType"], 8);
         assert_eq!(req["authParameters"]["username"], "ann@contoso.com");
-        assert_eq!(req["authParameters"]["requestedScopes"][0], "https://graph.microsoft.com/.default");
+        assert_eq!(
+            req["authParameters"]["requestedScopes"][0],
+            "https://graph.microsoft.com/.default"
+        );
         assert_eq!(req["ssoUrl"], req["authParameters"]["ssoUrl"]);
     }
 
@@ -182,7 +220,10 @@ mod tests {
     fn both_cookie_shapes_parse() {
         let old = r#"{"cookieName":"x-ms-RefreshTokenCredential","cookieContent":"abc"}"#;
         let new = r#"{"cookieItems":[{"cookieName":"x-ms-RefreshTokenCredential","cookieContent":"abc"}]}"#;
-        let want = SsoCookie { name: "x-ms-RefreshTokenCredential".into(), value: "abc".into() };
+        let want = SsoCookie {
+            name: "x-ms-RefreshTokenCredential".into(),
+            value: "abc".into(),
+        };
         assert_eq!(parse_cookie(old).as_ref(), Some(&want));
         assert_eq!(parse_cookie(new).as_ref(), Some(&want));
         assert!(parse_cookie(r#"{"cookieItems":[]}"#).is_none());

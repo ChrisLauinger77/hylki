@@ -53,7 +53,10 @@ mod tests {
         assert_eq!(encode("\"body:opt out\""), "%22body%3Aopt%20out%22");
         assert_eq!(encode("a-b_c.d~e"), "a-b_c.d~e");
         assert_eq!(encode("caf\u{e9}"), "caf%C3%A9");
-        assert_eq!(encode_path("/Hylki/Q3 report.pdf"), "/Hylki/Q3%20report.pdf");
+        assert_eq!(
+            encode_path("/Hylki/Q3 report.pdf"),
+            "/Hylki/Q3%20report.pdf"
+        );
     }
 
     #[test]

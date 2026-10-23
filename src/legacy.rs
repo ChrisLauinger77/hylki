@@ -58,7 +58,8 @@ pub const PREDECESSORS: &[Predecessor] = &[
 
 /// Which predecessor this start brought data across from, if any — set
 /// once by [`migrate_dirs`], read by the first-run notice.
-static MIGRATED_FROM: std::sync::OnceLock<Option<&'static Predecessor>> = std::sync::OnceLock::new();
+static MIGRATED_FROM: std::sync::OnceLock<Option<&'static Predecessor>> =
+    std::sync::OnceLock::new();
 
 pub fn migrated_from() -> Option<&'static Predecessor> {
     MIGRATED_FROM.get().copied().flatten()
@@ -107,7 +108,11 @@ pub fn migrate_dirs() {
                 continue;
             }
             let Some(home) = home.as_ref() else { continue };
-            let old = home.join(".var/app").join(pred.app_id).join(sub).join(pred.dir);
+            let old = home
+                .join(".var/app")
+                .join(pred.app_id)
+                .join(sub)
+                .join(pred.dir);
             if !old.is_dir() || same_tree(&old, &new) {
                 continue;
             }
@@ -133,9 +138,15 @@ pub fn migrate_dirs() {
 /// (Flatpak leaves `~/.var/app/<old id>` pointing at the new one after a
 /// rebase): copying a tree into itself is not a migration.
 fn same_tree(old: &Path, new: &Path) -> bool {
-    let Ok(old) = old.canonicalize() else { return false };
-    let Some(parent) = new.parent() else { return false };
-    let Ok(parent) = parent.canonicalize() else { return false };
+    let Ok(old) = old.canonicalize() else {
+        return false;
+    };
+    let Some(parent) = new.parent() else {
+        return false;
+    };
+    let Ok(parent) = parent.canonicalize() else {
+        return false;
+    };
     old.starts_with(&parent) || parent.starts_with(&old)
 }
 
@@ -157,7 +168,9 @@ fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 /// The user's home as the host sees it (inside Flatpak too).
 fn host_home() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from).or_else(dirs::home_dir)
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .or_else(dirs::home_dir)
 }
 
 /// Whether a predecessor is still installed, as far as this process can
@@ -167,7 +180,10 @@ fn host_home() -> Option<PathBuf> {
 fn predecessor_seen(pred: &Predecessor) -> bool {
     let mut paths = vec![PathBuf::from("/var/lib/flatpak/exports/bin").join(pred.app_id)];
     if let Some(home) = host_home() {
-        paths.push(home.join(".local/share/flatpak/exports/bin").join(pred.app_id));
+        paths.push(
+            home.join(".local/share/flatpak/exports/bin")
+                .join(pred.app_id),
+        );
         paths.push(home.join(".local/bin").join(pred.dir));
     }
     paths.push(PathBuf::from("/usr/bin").join(pred.dir));
@@ -188,7 +204,9 @@ pub fn tidy_host() {
 }
 
 fn tidy_nautilus_extension() {
-    let Some(dir) = crate::nautilus_ext::dir() else { return };
+    let Some(dir) = crate::nautilus_ext::dir() else {
+        return;
+    };
     for pred in PREDECESSORS {
         let old = dir.join(pred.nautilus_file);
         if !old.exists() {
@@ -197,12 +215,22 @@ fn tidy_nautilus_extension() {
         let ours = dir.join(crate::nautilus_ext::FILE_NAME);
         if !ours.exists() {
             if let Err(e) = std::fs::write(&ours, crate::nautilus_ext::SOURCE) {
-                tracing::warn!("could not install the Files extension in place of {}: {e}", old.display());
+                tracing::warn!(
+                    "could not install the Files extension in place of {}: {e}",
+                    old.display()
+                );
                 continue;
             }
-            tracing::info!("Files extension installed at {} in place of {}", ours.display(), old.display());
+            tracing::info!(
+                "Files extension installed at {} in place of {}",
+                ours.display(),
+                old.display()
+            );
         }
-        let _ = std::fs::remove_file(dir.join(format!(".{}.loaded", pred.nautilus_file.trim_end_matches(".py"))));
+        let _ = std::fs::remove_file(dir.join(format!(
+            ".{}.loaded",
+            pred.nautilus_file.trim_end_matches(".py")
+        )));
         match std::fs::remove_file(&old) {
             Ok(()) => tracing::info!("removed {}", old.display()),
             Err(e) => tracing::warn!("could not remove {}: {e}", old.display()),
@@ -217,7 +245,9 @@ fn tidy_launchers() {
         if predecessor_seen(pred) {
             continue;
         }
-        let launcher = share.join("applications").join(format!("{}.desktop", pred.app_id));
+        let launcher = share
+            .join("applications")
+            .join(format!("{}.desktop", pred.app_id));
         let ours = std::fs::read_to_string(&launcher)
             .map(|t| t.lines().any(|l| l.starts_with(pred.launcher_mark)))
             .unwrap_or(false);
@@ -225,9 +255,10 @@ fn tidy_launchers() {
             continue;
         }
         // The launcher names its launch target; only act when that is gone.
-        let try_exec = std::fs::read_to_string(&launcher)
-            .ok()
-            .and_then(|t| t.lines().find_map(|l| l.strip_prefix("TryExec=").map(str::to_string)));
+        let try_exec = std::fs::read_to_string(&launcher).ok().and_then(|t| {
+            t.lines()
+                .find_map(|l| l.strip_prefix("TryExec=").map(str::to_string))
+        });
         if try_exec.as_deref().is_some_and(|p| Path::new(p).exists()) {
             continue;
         }
@@ -241,7 +272,9 @@ fn tidy_launchers() {
         let prefix = format!("{}-", pred.app_id);
         for size in ["512x512", "256x256"] {
             let dir = share.join("icons/hicolor").join(size).join("apps");
-            let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 if name.starts_with(&prefix) && name.ends_with(".png") {
@@ -262,7 +295,9 @@ pub fn default_mailer() -> Option<&'static Predecessor> {
         files.push(home.join(".local/share/applications/mimeapps.list"));
     }
     for file in files {
-        let Ok(text) = std::fs::read_to_string(&file) else { continue };
+        let Ok(text) = std::fs::read_to_string(&file) else {
+            continue;
+        };
         let mut in_defaults = false;
         for line in text.lines() {
             let line = line.trim();
@@ -275,7 +310,9 @@ pub fn default_mailer() -> Option<&'static Predecessor> {
             }
             if let Some(value) = line.strip_prefix("x-scheme-handler/mailto=") {
                 let first = value.split(';').next().unwrap_or("").trim();
-                return PREDECESSORS.iter().find(|p| first == format!("{}.desktop", p.app_id));
+                return PREDECESSORS
+                    .iter()
+                    .find(|p| first == format!("{}.desktop", p.app_id));
             }
         }
     }
@@ -358,7 +395,8 @@ mod tests {
         let root = std::env::temp_dir().join(format!("hylki-legacy-test-{}", std::process::id()));
         let new_base = root.join("co.hyprlab.Hylki/config");
         std::fs::create_dir_all(&new_base).unwrap();
-        std::os::unix::fs::symlink(root.join("co.hyprlab.Hylki"), root.join("co.hyprlab.Vireo")).unwrap();
+        std::os::unix::fs::symlink(root.join("co.hyprlab.Hylki"), root.join("co.hyprlab.Vireo"))
+            .unwrap();
         let old = root.join("co.hyprlab.Vireo/config/vireo");
         std::fs::create_dir_all(&old).unwrap();
         assert!(same_tree(&old, &new_base.join("hylki")));

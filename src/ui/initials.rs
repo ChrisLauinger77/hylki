@@ -40,9 +40,9 @@ const PALETTE: [(&str, &str, &str); 14] = [
 /// The palette entry `adw::Avatar` gives `text`: GLib's `g_str_hash`
 /// (djb2) modulo the palette, as libadwaita does it.
 fn palette_index(text: &str) -> usize {
-    let hash = text
-        .bytes()
-        .fold(5381u32, |h, b| h.wrapping_mul(33).wrapping_add(u32::from(b)));
+    let hash = text.bytes().fold(5381u32, |h, b| {
+        h.wrapping_mul(33).wrapping_add(u32::from(b))
+    });
     (hash % PALETTE.len() as u32) as usize
 }
 
@@ -50,8 +50,12 @@ fn palette_index(text: &str) -> usize {
 /// the first word and of the last, uppercased; nothing for an empty name.
 pub fn initials_of(text: &str) -> String {
     let upper = text.trim().to_uppercase();
-    let mut words = upper.split_whitespace().filter(|w| w.chars().any(char::is_alphanumeric));
-    let Some(first) = words.next() else { return String::new() };
+    let mut words = upper
+        .split_whitespace()
+        .filter(|w| w.chars().any(char::is_alphanumeric));
+    let Some(first) = words.next() else {
+        return String::new();
+    };
     let mut out: String = first.chars().take(1).collect();
     if let Some(last) = words.last() {
         out.extend(last.chars().take(1));
@@ -95,14 +99,19 @@ mod imp {
         }
 
         fn snapshot(&self, snapshot: &gdk::Snapshot, width: f64, height: f64) {
-            let Some(snapshot) = snapshot.downcast_ref::<gtk::Snapshot>() else { return };
+            let Some(snapshot) = snapshot.downcast_ref::<gtk::Snapshot>() else {
+                return;
+            };
             // The circle's ground: the avatar clips this to its disc.
             if let Some((top, bottom)) = *self.ground.borrow() {
                 snapshot.append_linear_gradient(
                     &graphene::Rect::new(0.0, 0.0, width as f32, height as f32),
                     &graphene::Point::new(0.0, 0.0),
                     &graphene::Point::new(0.0, height as f32),
-                    &[gsk::ColorStop::new(0.0, top), gsk::ColorStop::new(1.0, bottom)],
+                    &[
+                        gsk::ColorStop::new(0.0, top),
+                        gsk::ColorStop::new(1.0, bottom),
+                    ],
                 );
             }
 
@@ -294,7 +303,10 @@ thread_local! {
 pub fn cache_stats() -> (usize, u64, usize, usize) {
     let (pictures, picture_bytes) = AVATAR_TEXTURES.with(|c| {
         let c = c.borrow();
-        (c.len(), c.values().map(crate::memory_report::texture_bytes).sum())
+        (
+            c.len(),
+            c.values().map(crate::memory_report::texture_bytes).sum(),
+        )
     });
     let (uris, uri_bytes) = PICTURE_URIS.with(|c| {
         let c = c.borrow();
@@ -322,7 +334,9 @@ pub fn png_data_uri(text: &str, bg: gdk::RGBA, size: i32) -> Option<String> {
     if !gtk::is_initialized_main_thread() {
         return None;
     }
-    let window = gtk::Window::list_toplevels().into_iter().find_map(|w| w.downcast::<gtk::Window>().ok())?;
+    let window = gtk::Window::list_toplevels()
+        .into_iter()
+        .find_map(|w| w.downcast::<gtk::Window>().ok())?;
     let renderer = window.renderer()?;
     let scale = window.scale_factor().max(1);
     let px = size * scale;
@@ -330,8 +344,14 @@ pub fn png_data_uri(text: &str, bg: gdk::RGBA, size: i32) -> Option<String> {
     let snapshot = gtk::Snapshot::new();
     paintable.snapshot(&snapshot, f64::from(px), f64::from(px));
     let node = snapshot.to_node()?;
-    let texture = renderer.render_texture(&node, Some(&graphene::Rect::new(0.0, 0.0, px as f32, px as f32)));
-    let uri = format!("data:image/png;base64,{}", glib::base64_encode(&texture.save_to_png_bytes()));
+    let texture = renderer.render_texture(
+        &node,
+        Some(&graphene::Rect::new(0.0, 0.0, px as f32, px as f32)),
+    );
+    let uri = format!(
+        "data:image/png;base64,{}",
+        glib::base64_encode(&texture.save_to_png_bytes())
+    );
     PNG_CACHE.with(|c| {
         c.borrow_mut().insert(key, uri.clone());
     });

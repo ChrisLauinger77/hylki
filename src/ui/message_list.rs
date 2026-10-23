@@ -7,11 +7,11 @@ use adw::prelude::*;
 use gtk::glib;
 use relm4::prelude::*;
 
+use crate::i18n::i18n;
 use crate::models::{Message, ThreadSummary};
 use crate::ui::context_menu::{show_context_menu_popover, MenuEntry};
-use crate::i18n::i18n;
-use crate::ui::message_row::{DaySection, RowData, RowMeta, RowShared, Slot};
 pub use crate::ui::message_row::{tag_menu_entries, RowAction};
+use crate::ui::message_row::{DaySection, RowData, RowMeta, RowShared, Slot};
 
 /// The message-list pane's floor: exactly what a conversation-member card
 /// needs to show a row's full actions palette — the tightest real constraint
@@ -51,34 +51,49 @@ fn message_cmp(a: &Message, b: &Message, order: SortOrder) -> std::cmp::Ordering
     match order {
         SortOrder::DateNewest => b.timestamp.cmp(&a.timestamp),
         SortOrder::DateOldest => a.timestamp.cmp(&b.timestamp),
-        SortOrder::Sender => name_of(a).cmp(&name_of(b)).then(b.timestamp.cmp(&a.timestamp)),
+        SortOrder::Sender => name_of(a)
+            .cmp(&name_of(b))
+            .then(b.timestamp.cmp(&a.timestamp)),
         SortOrder::Subject => normalize_subject(&a.subject)
             .cmp(&normalize_subject(&b.subject))
             .then(b.timestamp.cmp(&a.timestamp)),
         // `true` sorts after `false`, so compare b-vs-a to put unread/flagged first.
         SortOrder::UnreadFirst => b.unread.cmp(&a.unread).then(b.timestamp.cmp(&a.timestamp)),
-        SortOrder::FlaggedFirst => b.starred.cmp(&a.starred).then(b.timestamp.cmp(&a.timestamp)),
+        SortOrder::FlaggedFirst => b
+            .starred
+            .cmp(&a.starred)
+            .then(b.timestamp.cmp(&a.timestamp)),
         // The single line's other columns (#334).
         SortOrder::Recipients => {
             let to = |m: &Message| crate::ui::message_row::recipient_names(&m.to).to_lowercase();
             to(a).cmp(&to(b)).then(b.timestamp.cmp(&a.timestamp))
         }
-        SortOrder::Account => a.account_id.cmp(&b.account_id).then(b.timestamp.cmp(&a.timestamp)),
-        SortOrder::Attachment => b.has_attachment.cmp(&a.has_attachment).then(b.timestamp.cmp(&a.timestamp)),
-        SortOrder::Replied => {
-            (b.answered, b.forwarded).cmp(&(a.answered, a.forwarded)).then(b.timestamp.cmp(&a.timestamp))
-        }
+        SortOrder::Account => a
+            .account_id
+            .cmp(&b.account_id)
+            .then(b.timestamp.cmp(&a.timestamp)),
+        SortOrder::Attachment => b
+            .has_attachment
+            .cmp(&a.has_attachment)
+            .then(b.timestamp.cmp(&a.timestamp)),
+        SortOrder::Replied => (b.answered, b.forwarded)
+            .cmp(&(a.answered, a.forwarded))
+            .then(b.timestamp.cmp(&a.timestamp)),
         SortOrder::Importance => b
             .importance
             .to_i64()
             .cmp(&a.importance.to_i64())
             .then(b.timestamp.cmp(&a.timestamp)),
         // Soonest due first; mail with no due date after all that has one.
-        SortOrder::Due => (a.due == 0, a.due).cmp(&(b.due == 0, b.due)).then(b.timestamp.cmp(&a.timestamp)),
+        SortOrder::Due => (a.due == 0, a.due)
+            .cmp(&(b.due == 0, b.due))
+            .then(b.timestamp.cmp(&a.timestamp)),
         // Both are put in order by the rebuild, which knows a conversation's
         // writers and the tags' names (#443); one message alone goes by its
         // sender and its keywords.
-        SortOrder::Correspondents => name_of(a).cmp(&name_of(b)).then(b.timestamp.cmp(&a.timestamp)),
+        SortOrder::Correspondents => name_of(a)
+            .cmp(&name_of(b))
+            .then(b.timestamp.cmp(&a.timestamp)),
         SortOrder::Tags => {
             let tags = |m: &Message| m.keywords.join(",").to_lowercase();
             tags(a).cmp(&tags(b)).then(b.timestamp.cmp(&a.timestamp))
@@ -174,7 +189,10 @@ fn row_for_reader_key<M: std::borrow::Borrow<Message>>(
     emitted: &[(u32, u32)],
     viewed: Option<(u32, u32)>,
 ) -> Option<usize> {
-    let own_row = shown.iter().map(|m| m.borrow()).position(|m| (m.account_id, m.id) == *key);
+    let own_row = shown
+        .iter()
+        .map(|m| m.borrow())
+        .position(|m| (m.account_id, m.id) == *key);
     let thread_row = || {
         let tkey = msg_thread.get(key)?;
         shown
@@ -187,7 +205,10 @@ fn row_for_reader_key<M: std::borrow::Borrow<Message>>(
             return None;
         }
         let viewed = viewed?;
-        shown.iter().map(|m| m.borrow()).position(|m| (m.account_id, m.id) == viewed)
+        shown
+            .iter()
+            .map(|m| m.borrow())
+            .position(|m| (m.account_id, m.id) == viewed)
     };
     own_row.or_else(thread_row).or_else(viewed_row)
 }
@@ -255,7 +276,11 @@ fn nested_members<M: std::borrow::Borrow<Message>>(
         if m.message_id.is_empty()
             || listed_folders.contains(&(m.account_id, m.folder_id))
             || !passes(m)
-            || own.iter().map(|o| o.borrow()).chain(&out).any(|o| o.message_id == m.message_id)
+            || own
+                .iter()
+                .map(|o| o.borrow())
+                .chain(&out)
+                .any(|o| o.message_id == m.message_id)
         {
             continue;
         }
@@ -268,7 +293,10 @@ fn latest_elsewhere(
     summary: Option<&crate::models::ThreadSummary>,
     newest_here: i64,
 ) -> Option<crate::models::ThreadLatest> {
-    summary.and_then(|s| s.latest.as_ref()).filter(|l| l.timestamp > newest_here).cloned()
+    summary
+        .and_then(|s| s.latest.as_ref())
+        .filter(|l| l.timestamp > newest_here)
+        .cloned()
 }
 
 /// Which of the page's conversations still need their real size looked up
@@ -382,21 +410,45 @@ trait ThreadFields {
 }
 
 impl ThreadFields for Message {
-    fn account_id(&self) -> u32 { self.account_id }
-    fn folder_id(&self) -> u32 { self.folder_id }
-    fn id(&self) -> u32 { self.id }
-    fn uid(&self) -> u32 { self.uid }
-    fn message_id(&self) -> &str { &self.message_id }
-    fn references(&self) -> &str { &self.references }
+    fn account_id(&self) -> u32 {
+        self.account_id
+    }
+    fn folder_id(&self) -> u32 {
+        self.folder_id
+    }
+    fn id(&self) -> u32 {
+        self.id
+    }
+    fn uid(&self) -> u32 {
+        self.uid
+    }
+    fn message_id(&self) -> &str {
+        &self.message_id
+    }
+    fn references(&self) -> &str {
+        &self.references
+    }
 }
 
 impl ThreadFields for Rc<Message> {
-    fn account_id(&self) -> u32 { self.as_ref().account_id }
-    fn folder_id(&self) -> u32 { self.as_ref().folder_id }
-    fn id(&self) -> u32 { self.as_ref().id }
-    fn uid(&self) -> u32 { self.as_ref().uid }
-    fn message_id(&self) -> &str { &self.as_ref().message_id }
-    fn references(&self) -> &str { &self.as_ref().references }
+    fn account_id(&self) -> u32 {
+        self.as_ref().account_id
+    }
+    fn folder_id(&self) -> u32 {
+        self.as_ref().folder_id
+    }
+    fn id(&self) -> u32 {
+        self.as_ref().id
+    }
+    fn uid(&self) -> u32 {
+        self.as_ref().uid
+    }
+    fn message_id(&self) -> &str {
+        &self.as_ref().message_id
+    }
+    fn references(&self) -> &str {
+        &self.as_ref().references
+    }
 }
 
 /// A message's threading fields, owned, to be worked on off the main loop.
@@ -410,12 +462,24 @@ struct ThreadInput {
 }
 
 impl ThreadFields for ThreadInput {
-    fn account_id(&self) -> u32 { self.account_id }
-    fn folder_id(&self) -> u32 { self.folder_id }
-    fn id(&self) -> u32 { self.id }
-    fn uid(&self) -> u32 { self.uid }
-    fn message_id(&self) -> &str { &self.message_id }
-    fn references(&self) -> &str { &self.references }
+    fn account_id(&self) -> u32 {
+        self.account_id
+    }
+    fn folder_id(&self) -> u32 {
+        self.folder_id
+    }
+    fn id(&self) -> u32 {
+        self.id
+    }
+    fn uid(&self) -> u32 {
+        self.uid
+    }
+    fn message_id(&self) -> &str {
+        &self.message_id
+    }
+    fn references(&self) -> &str {
+        &self.references
+    }
 }
 
 fn compute_thread_keys<M: ThreadFields>(
@@ -500,25 +564,39 @@ fn compute_thread_keys<M: ThreadFields>(
     let mut out = HashMap::with_capacity(msgs.len());
     for (m, sn) in msgs.iter().zip(own) {
         let root = forest.find(sn);
-        let name = names.entry(root).or_insert_with(|| match forest.nodes[root] {
-            Node::Id(aid, id) => format!("{aid}\u{0}{id}"),
-            Node::Uid(aid, folder, uid) => format!("{aid}\u{0}uid{folder}/{uid}"),
-        });
-        out.insert((m.account_id(), m.folder_id(), m.id()), (m.account_id(), name.clone()));
+        let name = names
+            .entry(root)
+            .or_insert_with(|| match forest.nodes[root] {
+                Node::Id(aid, id) => format!("{aid}\u{0}{id}"),
+                Node::Uid(aid, folder, uid) => format!("{aid}\u{0}uid{folder}/{uid}"),
+            });
+        out.insert(
+            (m.account_id(), m.folder_id(), m.id()),
+            (m.account_id(), name.clone()),
+        );
     }
     out
 }
 
 /// [`SourceThreads`] worked out from `msgs` (in the list's order).
-fn source_threads_of<M: ThreadFields>(msgs: &[M], links: &[(u32, String, String)], pool: bool) -> SourceThreads {
+fn source_threads_of<M: ThreadFields>(
+    msgs: &[M],
+    links: &[(u32, String, String)],
+    pool: bool,
+) -> SourceThreads {
     let keys = compute_thread_keys(msgs, links);
-    let mut members: std::collections::HashMap<(u32, String), Vec<usize>> = std::collections::HashMap::new();
+    let mut members: std::collections::HashMap<(u32, String), Vec<usize>> =
+        std::collections::HashMap::new();
     for (i, m) in msgs.iter().enumerate() {
         if let Some(key) = keys.get(&(m.account_id(), m.folder_id(), m.id())) {
             members.entry(key.clone()).or_default().push(i);
         }
     }
-    SourceThreads { pool, keys, members }
+    SourceThreads {
+        pool,
+        keys,
+        members,
+    }
 }
 
 // Short: the map runs to the size of the folder.
@@ -545,7 +623,10 @@ const SEARCH_OFF_MAIN: usize = 4000;
 /// sender's name and address, and its preview, apart, so a query never
 /// matches across two of them.
 pub(crate) fn search_text_of(m: &Message) -> Box<str> {
-    [m.subject.as_str(), &m.from_name, &m.from_addr, &m.preview].join("\u{0}").to_lowercase().into_boxed_str()
+    [m.subject.as_str(), &m.from_name, &m.from_addr, &m.preview]
+        .join("\u{0}")
+        .to_lowercase()
+        .into_boxed_str()
 }
 
 /// [`search_text_of`] for each message of a list, and which messages they
@@ -602,14 +683,19 @@ pub(crate) fn after_next_paint(clock: &gtk::gdk::FrameClock, f: impl FnOnce() + 
 fn hold_top(adj: &gtk::Adjustment, shared: &Rc<RowShared>) {
     let shared = Rc::downgrade(shared);
     let id = adj.connect_value_changed(move |adj| {
-        let heading = shared.upgrade().and_then(|s| s.first_heading_height()).map_or(f64::MAX, f64::from);
+        let heading = shared
+            .upgrade()
+            .and_then(|s| s.first_heading_height())
+            .map_or(f64::MAX, f64::from);
         if adj.value() > 0.0 && adj.value() <= heading + 1.0 {
             let adj = adj.clone();
             glib::idle_add_local_once(move || adj.set_value(0.0));
         }
     });
     let adj = adj.clone();
-    glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || adj.disconnect(id));
+    glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
+        adj.disconnect(id)
+    });
 }
 
 /// Where [`compute_thread_keys`] files a message: its account, folder and id.
@@ -900,7 +986,9 @@ pub struct MessageList {
     /// How wide the rows are, for fitting the columns into it.
     pane_width: i32,
     /// The headings' sized cells, which a drag resizes in place.
-    heading_bins: std::cell::RefCell<std::collections::HashMap<crate::config::ListColumn, crate::ui::column_bin::ColumnBin>>,
+    heading_bins: std::cell::RefCell<
+        std::collections::HashMap<crate::config::ListColumn, crate::ui::column_bin::ColumnBin>,
+    >,
 }
 
 /// The Correspondents column (#334): who wrote in a conversation, newest
@@ -916,7 +1004,11 @@ fn correspondents(msgs: &[&Message]) -> String {
     let mut others = false;
     for m in &sorted {
         let own = crate::avatar::account_face(&m.from_addr).is_some();
-        let key = if own { String::new() } else { m.from_addr.to_ascii_lowercase() };
+        let key = if own {
+            String::new()
+        } else {
+            m.from_addr.to_ascii_lowercase()
+        };
         if !seen.insert(key) {
             continue;
         }
@@ -924,7 +1016,11 @@ fn correspondents(msgs: &[&Message]) -> String {
             names.push(i18n("me"));
         } else {
             others = true;
-            names.push(if m.from_name.is_empty() { m.from_addr.clone() } else { m.from_name.clone() });
+            names.push(if m.from_name.is_empty() {
+                m.from_addr.clone()
+            } else {
+                m.from_name.clone()
+            });
         }
     }
     if !others {
@@ -976,11 +1072,19 @@ impl SortOrder {
     ];
 
     pub fn from_key(key: &str) -> Self {
-        SortOrder::KEYS.iter().find(|(_, k)| *k == key).map(|(o, _)| *o).unwrap_or(SortOrder::DateNewest)
+        SortOrder::KEYS
+            .iter()
+            .find(|(_, k)| *k == key)
+            .map(|(o, _)| *o)
+            .unwrap_or(SortOrder::DateNewest)
     }
 
     pub fn key(self) -> &'static str {
-        SortOrder::KEYS.iter().find(|(o, _)| *o == self).map(|(_, k)| *k).unwrap_or("date_newest")
+        SortOrder::KEYS
+            .iter()
+            .find(|(o, _)| *o == self)
+            .map(|(_, k)| *k)
+            .unwrap_or("date_newest")
     }
 
     /// Whether the order runs from the most to the least: newest first,
@@ -1012,7 +1116,11 @@ pub enum SearchScope {
 
 impl SearchScope {
     /// In the order the search bar's dropdown lists them.
-    const ALL: [SearchScope; 3] = [SearchScope::AllFolders, SearchScope::Everywhere, SearchScope::ThisFolder];
+    const ALL: [SearchScope; 3] = [
+        SearchScope::AllFolders,
+        SearchScope::Everywhere,
+        SearchScope::ThisFolder,
+    ];
 
     fn label(self) -> String {
         match self {
@@ -1122,7 +1230,13 @@ impl ScopePicker {
         }
         popover.set_child(Some(&list));
         button.set_popover(Some(&popover));
-        Self { button: button.clone(), label, arrow, radios, infos }
+        Self {
+            button: button.clone(),
+            label,
+            arrow,
+            radios,
+            infos,
+        }
     }
 
     fn sync(&self, scope: SearchScope) {
@@ -1233,7 +1347,11 @@ impl QuickFilters {
     }
 
     pub fn with(self, f: QuickFilter, on: bool) -> Self {
-        Self(if on { self.0 | f.bit() } else { self.0 & !f.bit() })
+        Self(if on {
+            self.0 | f.bit()
+        } else {
+            self.0 & !f.bit()
+        })
     }
 
     pub fn is_empty(self) -> bool {
@@ -1255,21 +1373,25 @@ struct QuickFilterContext {
 
 impl QuickFilterContext {
     fn passes(&self, m: &Message) -> bool {
-        QuickFilter::ALL.iter().filter(|f| self.filters.has(**f)).all(|f| match f {
-            QuickFilter::Unread => m.unread,
-            QuickFilter::Starred => m.starred,
-            QuickFilter::Attachment => m.has_attachment,
-            QuickFilter::ToMe => [m.to.as_str(), m.cc.as_str()]
-                .iter()
-                .flat_map(|list| list.split(','))
-                .any(|part| self.own.contains(&bare_address(part))),
-            QuickFilter::Contacts => {
-                self.contacts.as_ref().is_some_and(|c| c.contains(&m.from_addr.trim().to_lowercase()))
-            }
-            QuickFilter::Important => m.importance == crate::models::Importance::High,
-            QuickFilter::Tagged => !m.pills(&self.tags).is_empty(),
-            QuickFilter::Today => m.timestamp >= self.today,
-        })
+        QuickFilter::ALL
+            .iter()
+            .filter(|f| self.filters.has(**f))
+            .all(|f| match f {
+                QuickFilter::Unread => m.unread,
+                QuickFilter::Starred => m.starred,
+                QuickFilter::Attachment => m.has_attachment,
+                QuickFilter::ToMe => [m.to.as_str(), m.cc.as_str()]
+                    .iter()
+                    .flat_map(|list| list.split(','))
+                    .any(|part| self.own.contains(&bare_address(part))),
+                QuickFilter::Contacts => self
+                    .contacts
+                    .as_ref()
+                    .is_some_and(|c| c.contains(&m.from_addr.trim().to_lowercase())),
+                QuickFilter::Important => m.importance == crate::models::Importance::High,
+                QuickFilter::Tagged => !m.pills(&self.tags).is_empty(),
+                QuickFilter::Today => m.timestamp >= self.today,
+            })
     }
 }
 
@@ -1285,10 +1407,20 @@ fn bare_address(part: &str) -> String {
 
 /// The start of today in local time, Unix seconds.
 fn start_of_today() -> i64 {
-    let Ok(now) = glib::DateTime::now_local() else { return 0 };
-    glib::DateTime::new(&now.timezone(), now.year(), now.month(), now.day_of_month(), 0, 0, 0.0)
-        .map(|d| d.to_unix())
-        .unwrap_or(0)
+    let Ok(now) = glib::DateTime::now_local() else {
+        return 0;
+    };
+    glib::DateTime::new(
+        &now.timezone(),
+        now.year(),
+        now.month(),
+        now.day_of_month(),
+        0,
+        0,
+        0.0,
+    )
+    .map(|d| d.to_unix())
+    .unwrap_or(0)
 }
 
 /// Which conversations Gmail's * r, * u, * s and * t select (#392).
@@ -1324,23 +1456,38 @@ pub enum MessageListInput {
         filters: QuickFilters,
         contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
     },
-    SetMessages { messages: Vec<Message> },
+    SetMessages {
+        messages: Vec<Message>,
+    },
     /// The view now on show (`None` for any other), and its content's
     /// fingerprint. With `restore`, the list shows the view as kept when it
     /// was last left (the app checked with `has_view`) and no messages
     /// follow.
-    SetView { key: Option<u64>, fp: u64, restore: bool },
+    SetView {
+        key: Option<u64>,
+        fp: u64,
+        restore: bool,
+    },
     /// The fingerprint of the content about to be set for the view on show.
     SetViewFp(u64),
     /// Build a view that is not on show and keep it, so its first visit
     /// is shown as kept: the unified rows, once a start has read their
     /// folders.
-    Prebuild { key: u64, fp: u64, messages: Vec<Message> },
+    Prebuild {
+        key: u64,
+        fp: u64,
+        messages: Vec<Message>,
+    },
     /// The conversations of the view being built ahead.
-    PrebuildThreads { gen: u64, threads: Box<SourceThreads> },
+    PrebuildThreads {
+        gen: u64,
+        threads: Box<SourceThreads>,
+    },
     /// Merge more indexed messages into the current list (background backfill),
     /// preserving the current search query and view.
-    AppendMessages { messages: Vec<Message> },
+    AppendMessages {
+        messages: Vec<Message>,
+    },
     SetLoading,
     SetThreading(bool),
     /// Whether conversation rows may expand into their members in the list
@@ -1364,7 +1511,11 @@ pub enum MessageListInput {
     RecheckThreadSummaries(u32),
     /// The reader assembled this message's conversation from the cache, at
     /// this size: a row that counts fewer asks again (#351).
-    ConversationSize { account_id: u32, id: u32, size: usize },
+    ConversationSize {
+        account_id: u32,
+        id: u32,
+        size: usize,
+    },
     /// Whether a conversation's row speaks for the newest message anywhere in
     /// the account, the replies you sent included (#236).
     SetThreadRowNewest(bool),
@@ -1380,10 +1531,15 @@ pub enum MessageListInput {
     /// pointer, not j or k, says where the user is now. A plain click also
     /// ends Gmail's checking; `extend` is a Ctrl or Shift click, which adds
     /// to it.
-    PointerPressed { extend: bool },
+    PointerPressed {
+        extend: bool,
+    },
     /// File the selected rows into `dest`, a conversation's row with all
     /// of it (the picker's answer for a selection, #392).
-    MoveSelectedTo { account_id: u32, dest: String },
+    MoveSelectedTo {
+        account_id: u32,
+        dest: String,
+    },
     /// Close the open conversation and leave the keyboard on its row
     /// (Gmail's u and Esc, and after Shift+U or _, #392).
     CloseOpen,
@@ -1416,7 +1572,12 @@ pub enum MessageListInput {
     /// Mode leave them. `animate` (a Focus Mode toggle) slides the avatars
     /// away before the rows are rebuilt without them, or builds them folded
     /// and slides them in.
-    SetLook { avatars: bool, preview_lines: u32, subject: bool, animate: bool },
+    SetLook {
+        avatars: bool,
+        preview_lines: u32,
+        subject: bool,
+        animate: bool,
+    },
     /// The Focus Mode slide finished: rebuild the rows as they now are.
     LookSettled,
     /// Lay the rows out on one line, or as cards (#334).
@@ -1433,7 +1594,11 @@ pub enum MessageListInput {
     SortByColumn(crate::config::ListColumn),
     /// A heading's edge was dragged to `width`, or double-clicked (`None`:
     /// the column's own width). `done` once the drag is over (#334).
-    ResizeColumn { column: crate::config::ListColumn, width: Option<i32>, done: bool },
+    ResizeColumn {
+        column: crate::config::ListColumn,
+        width: Option<i32>,
+        done: bool,
+    },
     /// The saved column widths (#334).
     SetColumnWidths(std::collections::HashMap<crate::config::ListColumn, i32>),
     /// Fill the headings again, once a handler that set them going is over.
@@ -1444,7 +1609,10 @@ pub enum MessageListInput {
     SetSearchPinned(bool),
     /// Where the search field and the bulk bar open: under the rows when
     /// true, above them when false (#496).
-    SetBarsPlacement { search_bottom: bool, bulk_bottom: bool },
+    SetBarsPlacement {
+        search_bottom: bool,
+        bulk_bottom: bool,
+    },
     /// The rows are this wide now.
     PaneWidth(i32),
     /// Each account's name for the Account column, and which accounts are
@@ -1469,9 +1637,18 @@ pub enum MessageListInput {
     /// the app when a search begins; cleared to empty when it ends. The
     /// pool's [`search_text_of`], worked out where the pool was put together,
     /// comes with it.
-    SetSearchPool(Vec<Message>, std::collections::HashMap<(u32, u32), PoolFolder>, Vec<Box<str>>),
+    SetSearchPool(
+        Vec<Message>,
+        std::collections::HashMap<(u32, u32), PoolFolder>,
+        Vec<Box<str>>,
+    ),
     /// What a search matched on another thread ([`MessageList::start_search`]).
-    SearchMatched { gen: u64, query: String, text: std::sync::Arc<Vec<Box<str>>>, hits: Vec<bool> },
+    SearchMatched {
+        gen: u64,
+        query: String,
+        text: std::sync::Arc<Vec<Box<str>>>,
+        hits: Vec<bool>,
+    },
     /// The reader's selection: mirror whichever of these the list has rows for,
     /// so everything that acts on the list's selection acts on the messages the
     /// user pointed at. The reader is already showing them, so this must not
@@ -1481,7 +1658,10 @@ pub enum MessageListInput {
     /// conversation as the reader has it, which is wider than what this list
     /// handed over: the app pulls the user's own replies in from Sent after
     /// the fact, under ids the list never sees.
-    SelectFromReader { keys: Vec<(u32, u32)>, conversation: Vec<(u32, u32)> },
+    SelectFromReader {
+        keys: Vec<(u32, u32)>,
+        conversation: Vec<(u32, u32)>,
+    },
     /// The set of selected rows changed (single click, Ctrl/Shift multi-select).
     SelectionChanged,
     /// A row was activated (double-click / Enter): pop it out into its own window.
@@ -1521,7 +1701,10 @@ pub enum MessageListInput {
     /// Showcase only (HYLKI_SHOWCASE_SWIPE): drive row `index` through a full
     /// swipe and release, so the commit exit can be caught in stills — there
     /// is no way to inject a real gesture on this desktop.
-    DebugSwipe { index: usize, left: bool },
+    DebugSwipe {
+        index: usize,
+        left: bool,
+    },
     /// Showcase only (HYLKI_SHOWCASE_ROW_MENU): the first row's menu.
     DebugRowMenu,
     /// Expand/collapse a conversation thread.
@@ -1535,35 +1718,68 @@ pub enum MessageListInput {
     /// folder, UID) here: a UID repeats from folder to folder and, in the
     /// unified view, from account to account (#333).
     MarkRead((u32, u32, u32)),
-    SetRead { slot: (u32, u32, u32), read: bool },
+    SetRead {
+        slot: (u32, u32, u32),
+        read: bool,
+    },
     /// A hover-palette action for a specific message (forwarded to the app).
-    RowAction { action: RowAction, message: Box<Message> },
-    SetStarred { slot: (u32, u32, u32), starred: bool },
+    RowAction {
+        action: RowAction,
+        message: Box<Message>,
+    },
+    SetStarred {
+        slot: (u32, u32, u32),
+        starred: bool,
+    },
     /// A message was replied to or forwarded (#454), or the send that
     /// marked it ahead of time failed (`on` false).
-    SetAnswered { slot: (u32, u32, u32), forwarded: bool, on: bool },
+    SetAnswered {
+        slot: (u32, u32, u32),
+        forwarded: bool,
+        on: bool,
+    },
     /// A message's keywords changed (a tag put on or taken off, #71).
     /// A message's keywords and Gmail labels changed (a tag put on or
     /// taken off, #374).
-    SetKeywords { slot: (u32, u32, u32), keywords: Vec<String>, labels: Vec<String> },
+    SetKeywords {
+        slot: (u32, u32, u32),
+        keywords: Vec<String>,
+        labels: Vec<String>,
+    },
     /// The tag definitions changed: rows rebuild their chips.
     SetTags(Vec<crate::config::Tag>),
     /// A row's tag menu toggled a tag — passed up to the app.
-    SetTagFor { message: Box<Message>, keyword: String, add: bool },
+    SetTagFor {
+        message: Box<Message>,
+        keyword: String,
+        add: bool,
+    },
     /// Update a message's attachment indicator (e.g. clearing a false paperclip).
     /// A message's paperclip, found by where it lives: its own folder and
     /// UID, since a UID is unique only within its folder.
-    SetHasAttachment { account_id: u32, folder_id: u32, uid: u32, has: bool },
+    SetHasAttachment {
+        account_id: u32,
+        folder_id: u32,
+        uid: u32,
+        has: bool,
+    },
     Remove(u32),
     /// `gone` left the open conversation, which stays open: its row stays,
     /// now headed by `head`.
-    LeaveConversation { gone: (u32, u32), head: (u32, u32) },
+    LeaveConversation {
+        gone: (u32, u32),
+        head: (u32, u32),
+    },
     /// Remove many messages in a single batch (bulk archive/delete/spam), so the
     /// list updates in one render pass instead of one per message.
     RemoveMany(Vec<u32>),
     /// Secondary-click on the row showing `key`, at (x, y) in the list's
     /// coordinates: open the context menu.
-    ContextMenu { x: f64, y: f64, key: (u32, u32) },
+    ContextMenu {
+        x: f64,
+        y: f64,
+        key: (u32, u32),
+    },
     /// Rows have just started showing conversations nobody has asked the
     /// cache about yet (#222).
     AskThreads,
@@ -1597,7 +1813,10 @@ pub enum MessageListInput {
     /// Scrolled near the end of the rows on screen: add the next window.
     NearEnd,
     /// A large list's conversations, worked out off the main loop.
-    ThreadsReady { gen: u64, threads: Box<SourceThreads> },
+    ThreadsReady {
+        gen: u64,
+        threads: Box<SourceThreads>,
+    },
     /// Mark which message is being viewed so it stays highlighted across
     /// rebuilds; `None` clears the selection (e.g. on folder switch).
     SetSelected(Option<u32>),
@@ -1606,7 +1825,11 @@ pub enum MessageListInput {
     SelectAndLoad((u32, u32)),
     /// A row palette's Move to…: open the picker for that row (and, for a
     /// conversation head, its thread) at window point (x, y).
-    RowMoveTo { message: Box<Message>, x: f64, y: f64 },
+    RowMoveTo {
+        message: Box<Message>,
+        x: f64,
+        y: f64,
+    },
 }
 
 #[derive(Debug)]
@@ -1621,7 +1844,11 @@ pub enum MessageListOutput {
     /// `message` when it is not one). `solo` marks the deliberate case: the user
     /// picked one reply *inside* a conversation shown in the list, and wants
     /// only that message — so the reader must not go looking for its siblings.
-    Selected { message: Message, thread: Vec<Message>, solo: bool },
+    Selected {
+        message: Message,
+        thread: Vec<Message>,
+        solo: bool,
+    },
     /// Every selected message, whenever that changes — the reader outlines the
     /// matching cards. Each comes with its folder: a view of several folders
     /// can hold one UID twice in an account, and the app has to act on the
@@ -1635,32 +1862,60 @@ pub enum MessageListOutput {
     /// A row was double-clicked: open it in its own window. `thread` is the
     /// whole conversation when the row heads one (same shape as `Selected`),
     /// so the window shows every card — otherwise just `[message]`.
-    Activated { message: Message, thread: Vec<Message> },
+    Activated {
+        message: Message,
+        thread: Vec<Message>,
+    },
     /// A context-menu or palette action chosen for a specific message.
     /// `conversation` holds the thread when the row stands for a collapsed
     /// conversation rather than for `message` alone, so a reply started there
     /// can answer the conversation instead of the head it is filed under
     /// (#210). Empty for an ordinary row, and for a head row shown alongside
     /// its expanded replies — there the row means only itself.
-    Action { action: RowAction, message: Box<Message>, conversation: Vec<Message> },
+    Action {
+        action: RowAction,
+        message: Box<Message>,
+        conversation: Vec<Message>,
+    },
     /// A tag toggled on a specific message (#71).
-    SetTag { message: Box<Message>, keyword: String, add: bool },
+    SetTag {
+        message: Box<Message>,
+        keyword: String,
+        add: bool,
+    },
     /// A tag toggled on every selected message from the bulk bar (#313).
-    SetTagMany { messages: Vec<Message>, keyword: String, add: bool },
+    SetTagMany {
+        messages: Vec<Message>,
+        keyword: String,
+        add: bool,
+    },
     /// A bulk action chosen for every currently-selected message.
-    Bulk { action: BulkAction, messages: Vec<Message> },
+    Bulk {
+        action: BulkAction,
+        messages: Vec<Message>,
+    },
     /// "Move To…" from a row's menu: open the folder picker for `messages`
     /// at window point (`x`, `y`). With `offer_whole`, the first message is
     /// the clicked conversation row and the rest its members: the picker
     /// offers moving them all (#171), or just the first.
-    MoveTo { messages: Vec<Message>, offer_whole: bool, x: f64, y: f64 },
+    MoveTo {
+        messages: Vec<Message>,
+        offer_whole: bool,
+        x: f64,
+        y: f64,
+    },
     /// The selected conversation gained a member since it was opened (a
     /// reply synced in): the head and the whole conversation as it now is.
-    ThreadGrew { message: Message, thread: Vec<Message> },
+    ThreadGrew {
+        message: Message,
+        thread: Vec<Message>,
+    },
     /// Conversations rows have started showing and the Message-IDs each is
     /// threaded by, so the app can ask the cache how big they really are
     /// (#222). Each is asked about once.
-    ThreadsListed { groups: Vec<(u32, String, Vec<String>)> },
+    ThreadsListed {
+        groups: Vec<(u32, String, Vec<String>)>,
+    },
     /// Delete requested on a lone selected row that heads a whole conversation:
     /// every member of the thread, for the app to confirm and delete.
     DeleteThread { messages: Vec<Message> },
@@ -1668,7 +1923,11 @@ pub enum MessageListOutput {
     /// reader should clear.
     SelectionCleared,
     /// The selected rows' messages to file into `dest` (#392).
-    MoveMessages { account_id: u32, dest: String, messages: Vec<Message> },
+    MoveMessages {
+        account_id: u32,
+        dest: String,
+        messages: Vec<Message>,
+    },
     /// How many rows Gmail's x has checked (#392), whenever that changes;
     /// `None` once checking ends.
     Checked(Option<usize>),
@@ -2125,9 +2384,12 @@ impl SimpleComponent for MessageList {
             click.connect_pressed(move |g, _, x, y| {
                 g.set_state(gtk::EventSequenceState::Claimed);
                 let s = s.clone();
-                let entry = crate::ui::context_menu::MenuEntry::new(i18n("Customize Columns…"), move || {
-                    let _ = s.output(MessageListOutput::CustomizeColumns);
-                })
+                let entry = crate::ui::context_menu::MenuEntry::new(
+                    i18n("Customize Columns…"),
+                    move || {
+                        let _ = s.output(MessageListOutput::CustomizeColumns);
+                    },
+                )
                 .icon("view-list-bullet-symbolic");
                 crate::ui::context_menu::show_context_menu(&area, x, y, vec![vec![entry]]);
             });
@@ -2137,9 +2399,12 @@ impl SimpleComponent for MessageList {
             // The rows' width, which fitted columns fit into: the view's
             // page across, set as it is allocated.
             let input = sender.input_sender().clone();
-            widgets.scroller.hadjustment().connect_notify_local(Some("page-size"), move |adj, _| {
-                let _ = input.send(MessageListInput::PaneWidth(adj.page_size() as i32));
-            });
+            widgets.scroller.hadjustment().connect_notify_local(
+                Some("page-size"),
+                move |adj, _| {
+                    let _ = input.send(MessageListInput::PaneWidth(adj.page_size() as i32));
+                },
+            );
         }
         {
             // Whether the list sits at its bottom, for the spinner that says
@@ -2149,7 +2414,8 @@ impl SimpleComponent for MessageList {
             let at_bottom = std::rc::Rc::new(std::cell::Cell::new(false));
             let near = std::rc::Rc::new(std::cell::Cell::new(false));
             let check = move |adj: &gtk::Adjustment| {
-                let bottom = adj.upper() > adj.page_size() && adj.value() + adj.page_size() >= adj.upper() - 1.0;
+                let bottom = adj.upper() > adj.page_size()
+                    && adj.value() + adj.page_size() >= adj.upper() - 1.0;
                 if at_bottom.replace(bottom) != bottom {
                     let _ = input.send(MessageListInput::AtBottom(bottom));
                 }
@@ -2174,7 +2440,10 @@ impl SimpleComponent for MessageList {
             bulk: widgets.bulk_revealer.clone(),
         });
 
-        model.scope_picker = Some(ScopePicker::new(&widgets.scope_button, sender.input_sender()));
+        model.scope_picker = Some(ScopePicker::new(
+            &widgets.scope_button,
+            sender.input_sender(),
+        ));
         model.place_bars();
 
         schedule_midnight_refresh(&sender);
@@ -2185,7 +2454,11 @@ impl SimpleComponent for MessageList {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
             MessageListInput::SetView { key, fp, restore } => {
-                let kept = if restore { self.take_view(key, fp) } else { None };
+                let kept = if restore {
+                    self.take_view(key, fp)
+                } else {
+                    None
+                };
                 self.trim_views();
                 self.view_key = key;
                 self.view_fp = fp;
@@ -2202,7 +2475,10 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::SetViewFp(fp) => self.view_fp = fp,
             MessageListInput::Prebuild { key, fp, messages } => {
-                if self.view_key == Some(key) || self.has_view(key, fp) || messages.len() > KEEP_AT_MOST {
+                if self.view_key == Some(key)
+                    || self.has_view(key, fp)
+                    || messages.len() > KEEP_AT_MOST
+                {
                     return;
                 }
                 let all: Vec<Rc<Message>> = messages.into_iter().map(Rc::new).collect();
@@ -2218,7 +2494,10 @@ impl SimpleComponent for MessageList {
                 self.prebuild = Some((gen, key, fp, all));
                 std::thread::spawn(move || {
                     let threads = source_threads_of(&input, &links, false);
-                    let _ = sender.send(MessageListInput::PrebuildThreads { gen, threads: Box::new(threads) });
+                    let _ = sender.send(MessageListInput::PrebuildThreads {
+                        gen,
+                        threads: Box::new(threads),
+                    });
                 });
             }
             MessageListInput::PrebuildThreads { gen, threads } => {
@@ -2316,7 +2595,9 @@ impl SimpleComponent for MessageList {
                     if listed.iter().any(|(a, r, _)| (*a, r) == (key.0, &key.1)) {
                         continue;
                     }
-                    let Some(members) = self.groups.get(&key) else { continue };
+                    let Some(members) = self.groups.get(&key) else {
+                        continue;
+                    };
                     let ids = crate::models::thread_ids(members.iter().map(|m| &**m));
                     if !ids.is_empty() {
                         listed.push((key.0, key.1, ids));
@@ -2396,7 +2677,11 @@ impl SimpleComponent for MessageList {
                     self.recheck_bound_rows();
                 }
             }
-            MessageListInput::ConversationSize { account_id, id, size } => {
+            MessageListInput::ConversationSize {
+                account_id,
+                id,
+                size,
+            } => {
                 if !self.threading || size < 2 {
                     return;
                 }
@@ -2410,7 +2695,9 @@ impl SimpleComponent for MessageList {
                         self.shown.iter().position(|m| (m.account_id, m.id) == head)
                     })
                     .and_then(|pos| self.shared.model.row(pos));
-                let Some(row) = row.filter(|r| r.meta.count < size) else { return };
+                let Some(row) = row.filter(|r| r.meta.count < size) else {
+                    return;
+                };
                 if let Some(group) = row.meta.group.clone() {
                     self.asked_threads.remove(&group);
                     self.shared.want(group);
@@ -2476,8 +2763,7 @@ impl SimpleComponent for MessageList {
                                         .map(|m| Message::clone(m))
                                 })
                                 .collect();
-                            let _ = sender
-                                .output(MessageListOutput::DeleteThread { messages });
+                            let _ = sender.output(MessageListOutput::DeleteThread { messages });
                             return;
                         }
                     }
@@ -2519,7 +2805,9 @@ impl SimpleComponent for MessageList {
             MessageListInput::SetColumns(columns) => {
                 if self.columns != columns {
                     // The Correspondents column is worked out by the rebuild.
-                    let people = |c: &[crate::config::ListColumn]| c.contains(&crate::config::ListColumn::Correspondents);
+                    let people = |c: &[crate::config::ListColumn]| {
+                        c.contains(&crate::config::ListColumn::Correspondents)
+                    };
                     let rebuild = people(&columns) != people(&self.columns);
                     self.columns = columns;
                     self.sync_look();
@@ -2529,15 +2817,24 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::SetAccountNames { names, graph } => {
-                let changed = *self.shared.account_names.borrow() != names || self.graph_accounts != graph;
+                let changed =
+                    *self.shared.account_names.borrow() != names || self.graph_accounts != graph;
                 if changed {
                     *self.shared.account_names.borrow_mut() = names;
                     self.graph_accounts = graph;
-                    self.graph_in_view = self.listed_folders.iter().any(|(a, _)| self.graph_accounts.contains(a));
+                    self.graph_in_view = self
+                        .listed_folders
+                        .iter()
+                        .any(|(a, _)| self.graph_accounts.contains(a));
                     self.sync_look();
                 }
             }
-            MessageListInput::SetLook { avatars, preview_lines, subject, animate } => {
+            MessageListInput::SetLook {
+                avatars,
+                preview_lines,
+                subject,
+                animate,
+            } => {
                 let preview_lines = preview_lines.min(3);
                 let avatars_changed = self.avatars != avatars;
                 let lines_changed = self.preview_lines != preview_lines;
@@ -2653,8 +2950,15 @@ impl SimpleComponent for MessageList {
                     self.scroll_top();
                 }
             }
-            MessageListInput::SearchMatched { gen, query, text, hits } => {
-                if gen == self.search_gen.load(std::sync::atomic::Ordering::Relaxed) && query == self.query {
+            MessageListInput::SearchMatched {
+                gen,
+                query,
+                text,
+                hits,
+            } => {
+                if gen == self.search_gen.load(std::sync::atomic::Ordering::Relaxed)
+                    && query == self.query
+                {
                     self.search_hits = Some(SearchHits { query, text, hits });
                     self.rebuild();
                     self.scroll_top();
@@ -2682,7 +2986,9 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::SetSearchPool(pool, folders, text) => {
                 self.search_pool = pool.into_iter().map(Rc::new).collect();
-                self.search_text.borrow_mut()[1] = (text.len() == self.search_pool.len() && !text.is_empty()).then(|| SearchText {
+                self.search_text.borrow_mut()[1] = (text.len() == self.search_pool.len()
+                    && !text.is_empty())
+                .then(|| SearchText {
                     of: self.search_pool.iter().map(Rc::as_ptr).collect(),
                     text: std::sync::Arc::new(text),
                 });
@@ -2730,7 +3036,13 @@ impl SimpleComponent for MessageList {
                 let positions: Vec<usize> = keys
                     .iter()
                     .filter_map(|key| {
-                        row_for_reader_key(key, &self.shown, &self.msg_thread, &conversation, self.selected_id)
+                        row_for_reader_key(
+                            key,
+                            &self.shown,
+                            &self.msg_thread,
+                            &conversation,
+                            self.selected_id,
+                        )
                     })
                     .collect();
                 // What the reader asked for, as this list can represent it, so
@@ -2782,8 +3094,9 @@ impl SimpleComponent for MessageList {
                             // known previous row says anything — the post-delete
                             // advance clears selected_id first, so it can never
                             // flip the direction it is itself steering by.
-                            let pos =
-                                |k: &(u32, u32)| self.shown.iter().position(|m| (m.account_id, m.id) == *k);
+                            let pos = |k: &(u32, u32)| {
+                                self.shown.iter().position(|m| (m.account_id, m.id) == *k)
+                            };
                             if let (Some(old), Some(new)) =
                                 (self.selected_id.as_ref().and_then(&pos), pos(key))
                             {
@@ -2817,7 +3130,11 @@ impl SimpleComponent for MessageList {
             MessageListInput::Bulk(action) => {
                 // The bulk bar's spam button is one button: in Junk it means
                 // the reverse.
-                let action = if self.in_junk && action == BulkAction::Spam { BulkAction::NotSpam } else { action };
+                let action = if self.in_junk && action == BulkAction::Spam {
+                    BulkAction::NotSpam
+                } else {
+                    action
+                };
                 let rows = self.selected_messages();
                 // Likewise the star: it clears a selection that is starred
                 // throughout, or it could never be taken off again (#313).
@@ -2832,7 +3149,11 @@ impl SimpleComponent for MessageList {
                 // A conversation's row stands for all of it, as it does for a
                 // lone Delete: marking several read reached only the first
                 // message of each (#392). A star goes on the row's message.
-                let messages = if action == BulkAction::Flag { rows } else { self.selected_conversations() };
+                let messages = if action == BulkAction::Flag {
+                    rows
+                } else {
+                    self.selected_conversations()
+                };
                 if !messages.is_empty() {
                     let _ = sender.output(MessageListOutput::Bulk { action, messages });
                 }
@@ -2856,7 +3177,11 @@ impl SimpleComponent for MessageList {
                     .selected_positions()
                     .first()
                     .map(|&p| p as i64)
-                    .unwrap_or(if delta > 0 { -1 } else { self.shown.len() as i64 });
+                    .unwrap_or(if delta > 0 {
+                        -1
+                    } else {
+                        self.shown.len() as i64
+                    });
                 let next = (current + delta as i64).clamp(0, self.shown.len() as i64 - 1) as usize;
                 self.shared.set_cursor(None);
                 self.shared.selection.select_item(next as u32, true);
@@ -2879,13 +3204,16 @@ impl SimpleComponent for MessageList {
                 }
                 // From the row the keyboard is on, else the open one, else
                 // the top or the bottom.
-                let from = self.cursor_position().or_else(|| self.selected_positions().first().copied());
+                let from = self
+                    .cursor_position()
+                    .or_else(|| self.selected_positions().first().copied());
                 let next = self.conversation_step(from, delta);
                 self.focus_row(next);
                 // Drawn by the row itself: the list's focus ring is off, and
                 // the window's focus-visible flag is not reliably set by a key
                 // a shortcut handler consumed.
-                self.shared.set_cursor(self.shown.get(next).map(|m| (m.account_id, m.id)));
+                self.shared
+                    .set_cursor(self.shown.get(next).map(|m| (m.account_id, m.id)));
             }
             MessageListInput::OpenCursor => {
                 // Several checked are for an action, not for reading: which
@@ -2893,7 +3221,10 @@ impl SimpleComponent for MessageList {
                 if self.checking && self.selection_count > 1 {
                     return;
                 }
-                let Some(pos) = self.cursor_position().or_else(|| self.selected_positions().first().copied()) else {
+                let Some(pos) = self
+                    .cursor_position()
+                    .or_else(|| self.selected_positions().first().copied())
+                else {
                     return;
                 };
                 self.shared.set_cursor(None);
@@ -2912,7 +3243,11 @@ impl SimpleComponent for MessageList {
             MessageListInput::MoveSelectedTo { account_id, dest } => {
                 let messages = self.selected_conversations();
                 if !messages.is_empty() {
-                    let _ = sender.output(MessageListOutput::MoveMessages { account_id, dest, messages });
+                    let _ = sender.output(MessageListOutput::MoveMessages {
+                        account_id,
+                        dest,
+                        messages,
+                    });
                 }
             }
             MessageListInput::CloseOpen => {
@@ -2934,7 +3269,8 @@ impl SimpleComponent for MessageList {
                 self.focus_row(pos);
                 // The cursor stays on the row just read, so j, k and o carry
                 // on from there.
-                self.shared.set_cursor(self.shown.get(pos).map(|m| (m.account_id, m.id)));
+                self.shared
+                    .set_cursor(self.shown.get(pos).map(|m| (m.account_id, m.id)));
                 let _ = sender.output(MessageListOutput::SelectionCleared);
             }
             MessageListInput::StepConversation(delta) => {
@@ -2953,7 +3289,8 @@ impl SimpleComponent for MessageList {
                 // Selecting opens it; the keyboard stays where it is, in the
                 // reader, so the next j or k goes on from there.
                 self.shared.selection.select_item(next as u32, true);
-                self.list_view.scroll_to(next as u32, gtk::ListScrollFlags::NONE, None);
+                self.list_view
+                    .scroll_to(next as u32, gtk::ListScrollFlags::NONE, None);
                 self.reveal_first_heading(next);
             }
             MessageListInput::SelectAllShown => {
@@ -2987,7 +3324,10 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::ToggleSelection => {
                 // The row the keyboard is on, or the first selected one.
-                let Some(pos) = self.cursor_position().or_else(|| self.selected_positions().first().copied()) else {
+                let Some(pos) = self
+                    .cursor_position()
+                    .or_else(|| self.selected_positions().first().copied())
+                else {
                     return;
                 };
                 let selection = &self.shared.selection;
@@ -3006,7 +3346,8 @@ impl SimpleComponent for MessageList {
                 if self.checking {
                     // The keyboard stays on the row, for the next j, k or x.
                     self.focus_row(pos);
-                    self.shared.set_cursor(self.shown.get(pos).map(|m| (m.account_id, m.id)));
+                    self.shared
+                        .set_cursor(self.shown.get(pos).map(|m| (m.account_id, m.id)));
                     // Told even when GTK's selection did not change, as when
                     // the row checked is the one that was open.
                     sender.input(MessageListInput::SelectionChanged);
@@ -3058,7 +3399,10 @@ impl SimpleComponent for MessageList {
                 }
                 // HYLKI_SHOWCASE_SCOPE_MENU=<png> opens the scope popover and
                 // captures it.
-                if let (Ok(path), Some(picker)) = (std::env::var("HYLKI_SHOWCASE_SCOPE_MENU"), &self.scope_picker) {
+                if let (Ok(path), Some(picker)) = (
+                    std::env::var("HYLKI_SHOWCASE_SCOPE_MENU"),
+                    &self.scope_picker,
+                ) {
                     picker.button.popup();
                     if let Some(popover) = picker.button.popover() {
                         gtk::glib::timeout_add_seconds_local_once(1, move || {
@@ -3067,7 +3411,10 @@ impl SimpleComponent for MessageList {
                     }
                     // HYLKI_SHOWCASE_SCOPE_INFO=<png> opens the first scope's
                     // info popover on top and captures that.
-                    if let (Ok(path), Some(info)) = (std::env::var("HYLKI_SHOWCASE_SCOPE_INFO"), picker.infos.first()) {
+                    if let (Ok(path), Some(info)) = (
+                        std::env::var("HYLKI_SHOWCASE_SCOPE_INFO"),
+                        picker.infos.first(),
+                    ) {
                         let info = info.clone();
                         gtk::glib::timeout_add_seconds_local_once(2, move || {
                             info.popup();
@@ -3117,7 +3464,10 @@ impl SimpleComponent for MessageList {
                 if self.search_pinned {
                     // Esc in the field hands the keyboard back to the list;
                     // an empty field losing focus has gone somewhere already.
-                    let had_focus = self.search_entry.as_ref().is_some_and(|e| e.has_focus() || e.focus_child().is_some());
+                    let had_focus = self
+                        .search_entry
+                        .as_ref()
+                        .is_some_and(|e| e.has_focus() || e.focus_child().is_some());
                     if !self.query.is_empty() {
                         self.clear_search(&sender);
                         self.rebuild();
@@ -3181,7 +3531,11 @@ impl SimpleComponent for MessageList {
                     self.sync_headings();
                 }
             }
-            MessageListInput::ResizeColumn { column, width, done } => {
+            MessageListInput::ResizeColumn {
+                column,
+                width,
+                done,
+            } => {
                 match width {
                     Some(px) => self.widths.insert(column, px),
                     None => self.widths.remove(&column),
@@ -3192,7 +3546,12 @@ impl SimpleComponent for MessageList {
                 let min_width = self.row_min_width();
                 let fitted = self.fitted_widths();
                 for (c, bin) in self.heading_bins.borrow().iter() {
-                    bin.set_width(fitted.get(c).copied().unwrap_or_else(|| crate::ui::message_row::default_width(*c)));
+                    bin.set_width(
+                        fitted
+                            .get(c)
+                            .copied()
+                            .unwrap_or_else(|| crate::ui::message_row::default_width(*c)),
+                    );
                 }
                 self.headings_bar.set_size_request(min_width, -1);
                 {
@@ -3216,7 +3575,10 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::RefreshHeadings => self.sync_headings(),
-            MessageListInput::SetBarsPlacement { search_bottom, bulk_bottom } => {
+            MessageListInput::SetBarsPlacement {
+                search_bottom,
+                bulk_bottom,
+            } => {
                 if (self.search_bottom, self.bulk_bottom) != (search_bottom, bulk_bottom) {
                     self.search_bottom = search_bottom;
                     self.bulk_bottom = bulk_bottom;
@@ -3266,9 +3628,15 @@ impl SimpleComponent for MessageList {
                 let order = column_sort(column, self.show_recipient);
                 match (order, self.sort) {
                     // Date has an order each way of its own.
-                    (SortOrder::DateNewest, SortOrder::DateNewest) => self.sort = SortOrder::DateOldest,
-                    (SortOrder::DateNewest, SortOrder::DateOldest) => self.sort = SortOrder::DateNewest,
-                    (order, current) if order == current => self.sort_reversed = !self.sort_reversed,
+                    (SortOrder::DateNewest, SortOrder::DateNewest) => {
+                        self.sort = SortOrder::DateOldest
+                    }
+                    (SortOrder::DateNewest, SortOrder::DateOldest) => {
+                        self.sort = SortOrder::DateNewest
+                    }
+                    (order, current) if order == current => {
+                        self.sort_reversed = !self.sort_reversed
+                    }
                     (order, _) => {
                         self.sort = order;
                         self.sort_reversed = false;
@@ -3315,7 +3683,9 @@ impl SimpleComponent for MessageList {
                 // With Gmail's keys, Enter on the row the cursor reached opens
                 // it here, as o does, checked or not (#392); a row already
                 // open goes to a window.
-                if self.gmail_keys && (self.checking || !self.shared.selection.is_selected(index as u32)) {
+                if self.gmail_keys
+                    && (self.checking || !self.shared.selection.is_selected(index as u32))
+                {
                     sender.input(MessageListInput::OpenCursor);
                     return;
                 }
@@ -3336,14 +3706,28 @@ impl SimpleComponent for MessageList {
                 self.update_message(|m| thread_slot(m) == slot, |m| m.starred = starred);
                 self.refresh_thread_head(slot);
             }
-            MessageListInput::SetAnswered { slot, forwarded, on } => {
+            MessageListInput::SetAnswered {
+                slot,
+                forwarded,
+                on,
+            } => {
                 self.update_message(
                     |m| thread_slot(m) == slot,
-                    |m| if forwarded { m.forwarded = on } else { m.answered = on },
+                    |m| {
+                        if forwarded {
+                            m.forwarded = on
+                        } else {
+                            m.answered = on
+                        }
+                    },
                 );
                 self.refresh_thread_head(slot);
             }
-            MessageListInput::SetKeywords { slot, keywords, labels } => {
+            MessageListInput::SetKeywords {
+                slot,
+                keywords,
+                labels,
+            } => {
                 self.update_message(
                     |m| thread_slot(m) == slot,
                     |m| {
@@ -3361,10 +3745,23 @@ impl SimpleComponent for MessageList {
                     self.sync_look();
                 }
             }
-            MessageListInput::SetTagFor { message, keyword, add } => {
-                let _ = sender.output(MessageListOutput::SetTag { message, keyword, add });
+            MessageListInput::SetTagFor {
+                message,
+                keyword,
+                add,
+            } => {
+                let _ = sender.output(MessageListOutput::SetTag {
+                    message,
+                    keyword,
+                    add,
+                });
             }
-            MessageListInput::SetHasAttachment { account_id, folder_id, uid, has } => {
+            MessageListInput::SetHasAttachment {
+                account_id,
+                folder_id,
+                uid,
+                has,
+            } => {
                 self.update_message(
                     |m| m.account_id == account_id && m.folder_id == folder_id && m.uid == uid,
                     |m| m.has_attachment = has,
@@ -3396,7 +3793,9 @@ impl SimpleComponent for MessageList {
                 }
                 if self.checking {
                     self.selection_count = self.selected_ids.len();
-                    let _ = sender.output(MessageListOutput::SelectionKeys(self.slots_at(&self.selected_positions())));
+                    let _ = sender.output(MessageListOutput::SelectionKeys(
+                        self.slots_at(&self.selected_positions()),
+                    ));
                     let _ = sender.output(MessageListOutput::Checked(Some(self.selection_count)));
                 }
 
@@ -3443,19 +3842,28 @@ impl SimpleComponent for MessageList {
                 // A message of this folder goes by another id there, so by
                 // folder and UID; one filed elsewhere by the id the reader
                 // gave it.
-                let slot = self.all.iter().find(|m| (m.account_id, m.id) == gone).map(|m| (m.account_id, m.folder_id, m.uid));
+                let slot = self
+                    .all
+                    .iter()
+                    .find(|m| (m.account_id, m.id) == gone)
+                    .map(|m| (m.account_id, m.folder_id, m.uid));
                 if let Some(s) = group.and_then(|k| self.thread_summaries.get_mut(&k)) {
                     let before = s.members.len();
-                    s.members.retain(|m| (m.account_id, m.id) != gone && Some((m.account_id, m.folder_id, m.uid)) != slot);
+                    s.members.retain(|m| {
+                        (m.account_id, m.id) != gone
+                            && Some((m.account_id, m.folder_id, m.uid)) != slot
+                    });
                     if s.members.len() < before {
                         s.count = s.count.saturating_sub(before - s.members.len());
                         // The row may have been quoting it as the newest.
-                        s.latest = s.members.iter().max_by_key(|m| m.timestamp).map(|m| crate::models::ThreadLatest {
-                            from_name: m.from_name.clone(),
-                            from_addr: m.from_addr.clone(),
-                            preview: m.preview.clone(),
-                            timestamp: m.timestamp,
-                            date: m.date.clone(),
+                        s.latest = s.members.iter().max_by_key(|m| m.timestamp).map(|m| {
+                            crate::models::ThreadLatest {
+                                from_name: m.from_name.clone(),
+                                from_addr: m.from_addr.clone(),
+                                preview: m.preview.clone(),
+                                timestamp: m.timestamp,
+                                date: m.date.clone(),
+                            }
                         });
                     }
                 }
@@ -3480,7 +3888,10 @@ impl SimpleComponent for MessageList {
                     return;
                 }
                 let set: std::collections::HashSet<u32> = ids.into_iter().collect();
-                let was_viewed = self.selected_id.map(|(_, i)| i).is_some_and(|i| set.contains(&i));
+                let was_viewed = self
+                    .selected_id
+                    .map(|(_, i)| i)
+                    .is_some_and(|i| set.contains(&i));
                 if was_viewed {
                     self.selected_id = None;
                 }
@@ -3490,11 +3901,9 @@ impl SimpleComponent for MessageList {
                 self.tail.retain(|r| !set.contains(&r.msg.id));
                 // Where the first removed row sat, so we can re-select in its place.
                 let first_removed = self.shown.iter().position(|m| set.contains(&m.id));
-                let had_focus = self
-                    .shared
-                    .bound_rows()
-                    .into_iter()
-                    .any(|r| r.has_focus_within() && r.data().is_some_and(|d| set.contains(&d.msg.id)));
+                let had_focus = self.shared.bound_rows().into_iter().any(|r| {
+                    r.has_focus_within() && r.data().is_some_and(|d| set.contains(&d.msg.id))
+                });
                 // Out in runs, back to front, so the view hears of each run
                 // once and the positions still to come stay valid.
                 let shown_before = self.shown.len();
@@ -3513,20 +3922,31 @@ impl SimpleComponent for MessageList {
                 }
                 self.selection_count = self.selected_ids.len();
                 if self.checking {
-                    let _ = sender.output(MessageListOutput::SelectionKeys(self.slots_at(&self.selected_positions())));
+                    let _ = sender.output(MessageListOutput::SelectionKeys(
+                        self.slots_at(&self.selected_positions()),
+                    ));
                     let _ = sender.output(MessageListOutput::Checked(Some(self.selection_count)));
                 }
                 // Keep the header count honest; no rebuild follows.
-                self.total_matches = self.total_matches.saturating_sub(shown_before - self.shown.len());
+                self.total_matches = self
+                    .total_matches
+                    .saturating_sub(shown_before - self.shown.len());
                 if self.checking {
                     // Checked rows deleted (#392): the keyboard goes to the
                     // conversation above them, else the one below, outlined
                     // but neither checked nor opened.
                     let cursor_gone = self.shared.cursor().is_some_and(|(_, i)| set.contains(&i));
-                    if let Some(idx) = first_removed.filter(|_| (cursor_gone || had_focus) && !self.shown.is_empty()) {
-                        let pos = if idx > 0 { self.conversation_step(Some(idx), -1) } else { 0 };
+                    if let Some(idx) = first_removed
+                        .filter(|_| (cursor_gone || had_focus) && !self.shown.is_empty())
+                    {
+                        let pos = if idx > 0 {
+                            self.conversation_step(Some(idx), -1)
+                        } else {
+                            0
+                        };
                         self.focus_row(pos);
-                        self.shared.set_cursor(self.shown.get(pos).map(|m| (m.account_id, m.id)));
+                        self.shared
+                            .set_cursor(self.shown.get(pos).map(|m| (m.account_id, m.id)));
                     }
                 } else if was_viewed {
                     match first_removed {
@@ -3552,9 +3972,9 @@ impl SimpleComponent for MessageList {
                 // members keep their own stars via their own rows/cards.
                 if matches!(action, RowAction::ToggleStar) {
                     let members = self.thread_members(&message);
-                    let is_head = members.first().is_some_and(|h| {
-                        (h.account_id, h.id) == (message.account_id, message.id)
-                    });
+                    let is_head = members
+                        .first()
+                        .is_some_and(|h| (h.account_id, h.id) == (message.account_id, message.id));
                     if is_head && members.len() > 1 {
                         // ANY starred member reads as a starred conversation
                         // (matching the head's indicator), so the toggle can
@@ -3562,16 +3982,26 @@ impl SimpleComponent for MessageList {
                         // moment one member was individually unstarred.
                         let any = members.iter().any(|m| m.starred);
                         let _ = sender.output(MessageListOutput::Bulk {
-                            action: if any { BulkAction::Unflag } else { BulkAction::Flag },
+                            action: if any {
+                                BulkAction::Unflag
+                            } else {
+                                BulkAction::Flag
+                            },
                             messages: members,
                         });
                         return;
                     }
                 }
                 let conversation = self.row_conversation(&message);
-                let _ = sender.output(MessageListOutput::Action { action, message, conversation });
+                let _ = sender.output(MessageListOutput::Action {
+                    action,
+                    message,
+                    conversation,
+                });
             }
-            MessageListInput::SetPaletteCollapse(secs) => self.shared.palette_collapse_secs.set(secs),
+            MessageListInput::SetPaletteCollapse(secs) => {
+                self.shared.palette_collapse_secs.set(secs)
+            }
             MessageListInput::SetPaletteHover(on) => self.shared.palette_hover.set(on),
             MessageListInput::SetSwipeReversed(on) => self.shared.swipe_reversed.set(on),
             MessageListInput::SetSwipeEnabled(on) => {
@@ -3630,7 +4060,11 @@ impl SimpleComponent for MessageList {
                 let asked = key;
                 self.stop_checking(&sender);
                 // A row further down than the window reaches comes on screen.
-                if let Some(at) = self.tail.iter().position(|r| (r.msg.account_id, r.msg.id) == key) {
+                if let Some(at) = self
+                    .tail
+                    .iter()
+                    .position(|r| (r.msg.account_id, r.msg.id) == key)
+                {
                     self.grow_window(at + 1);
                 }
                 // A reply inside a conversation has no row of its own: its
@@ -3643,7 +4077,12 @@ impl SimpleComponent for MessageList {
                         None => key,
                     },
                 };
-                if let Some(m) = self.shown.iter().find(|m| (m.account_id, m.id) == key).map(|m| Message::clone(m)) {
+                if let Some(m) = self
+                    .shown
+                    .iter()
+                    .find(|m| (m.account_id, m.id) == key)
+                    .map(|m| Message::clone(m))
+                {
                     self.selected_id = Some(key);
                     self.selected_ids = vec![key];
                     // Exactly this row: anything already selected (e.g. the
@@ -3655,9 +4094,7 @@ impl SimpleComponent for MessageList {
                     // click, an undo) where the row can be far outside the
                     // viewport — bring it into view, in an idle so a rebuild
                     // queued just before this has run first.
-                    if let Some(idx) =
-                        self.shown.iter().position(|m| (m.account_id, m.id) == key)
-                    {
+                    if let Some(idx) = self.shown.iter().position(|m| (m.account_id, m.id) == key) {
                         let list = self.list_view.clone();
                         gtk::glib::idle_add_local_once(move || {
                             if idx < list.model().map_or(0, |m| m.n_items() as usize) {
@@ -3673,7 +4110,11 @@ impl SimpleComponent for MessageList {
                     }
                     let (thread, solo) = self.conversation_for(&m);
                     self.emitted_thread = thread.iter().map(|t| (t.account_id, t.id)).collect();
-                    let _ = sender.output(MessageListOutput::Selected { message: m, thread, solo });
+                    let _ = sender.output(MessageListOutput::Selected {
+                        message: m,
+                        thread,
+                        solo,
+                    });
                 } else {
                     // Not listed yet: mail that has only just arrived, whose
                     // notification was clicked before its folder's list was in.
@@ -3683,7 +4124,12 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::RowMoveTo { message, x, y } => {
                 let (messages, offer_whole) = self.move_to_messages(&message);
-                let _ = sender.output(MessageListOutput::MoveTo { messages, offer_whole, x, y });
+                let _ = sender.output(MessageListOutput::MoveTo {
+                    messages,
+                    offer_whole,
+                    x,
+                    y,
+                });
             }
             MessageListInput::ContextMenu { x, y, key } => {
                 let Some(pos) = self.shown.iter().position(|m| (m.account_id, m.id) == key) else {
@@ -3739,7 +4185,10 @@ impl SelectionProbe {
 
 impl MessageList {
     pub fn selection_probe(&self) -> SelectionProbe {
-        SelectionProbe { selection: self.shared.selection.clone(), model: self.shared.model.clone() }
+        SelectionProbe {
+            selection: self.shared.selection.clone(),
+            model: self.shared.model.clone(),
+        }
     }
 
     /// What the list holds in RAM, for the memory section of an export: the
@@ -3750,7 +4199,10 @@ impl MessageList {
         use crate::memory_report::messages_bytes;
         [
             messages_bytes(self.all.iter().map(|m| &**m)),
-            (self.shown.len(), self.shown.len() * std::mem::size_of::<RowData>()),
+            (
+                self.shown.len(),
+                self.shown.len() * std::mem::size_of::<RowData>(),
+            ),
             messages_bytes(self.search_pool.iter().map(|m| &**m)),
         ]
     }
@@ -3775,24 +4227,34 @@ impl MessageList {
             }
             if let Some(t) = &v.threads {
                 maps += t.keys.values().map(|(_, s)| 12 + key(s)).sum::<usize>();
-                maps += t.members.iter().map(|((_, s), m)| key(s) + 24 + m.len() * 8).sum::<usize>();
+                maps += t
+                    .members
+                    .iter()
+                    .map(|((_, s), m)| key(s) + 24 + m.len() * 8)
+                    .sum::<usize>();
             }
-            maps += v.groups.iter().map(|((_, s), m)| key(s) + 24 + m.len() * 8).sum::<usize>();
-            maps += v.msg_thread.values().map(|(_, s)| 8 + key(s)).sum::<usize>();
-            maps += v.thread_members.iter().map(|((_, s), m)| key(s) + 24 + m.len() * 8).sum::<usize>();
+            maps += v
+                .groups
+                .iter()
+                .map(|((_, s), m)| key(s) + 24 + m.len() * 8)
+                .sum::<usize>();
+            maps += v
+                .msg_thread
+                .values()
+                .map(|(_, s)| 8 + key(s))
+                .sum::<usize>();
+            maps += v
+                .thread_members
+                .iter()
+                .map(|((_, s), m)| key(s) + 24 + m.len() * 8)
+                .sum::<usize>();
             maps += (v.rows.len() + v.tail.len()) * std::mem::size_of::<RowData>();
         }
         (self.views.len(), (n, bytes), maps)
     }
 
     /// Build and pop up the right-click menu for `msg` at the click location.
-    fn show_context_menu(
-        &self,
-        msg: &Message,
-        x: f64,
-        y: f64,
-        sender: &ComponentSender<Self>,
-    ) {
+    fn show_context_menu(&self, msg: &Message, x: f64, y: f64, sender: &ComponentSender<Self>) {
         // Each entry carries the same icon as the reader-toolbar button (or
         // row-palette button) for that action, tying the two together.
         let conversation = self.row_conversation(msg);
@@ -3822,10 +4284,18 @@ impl MessageList {
             let s = sender.clone();
             let members = members_for_star.clone();
             MenuEntry::new(
-                if any { i18n("Remove Stars") } else { i18n("Star Conversation") },
+                if any {
+                    i18n("Remove Stars")
+                } else {
+                    i18n("Star Conversation")
+                },
                 move || {
                     let _ = s.output(MessageListOutput::Bulk {
-                        action: if any { BulkAction::Unflag } else { BulkAction::Flag },
+                        action: if any {
+                            BulkAction::Unflag
+                        } else {
+                            BulkAction::Flag
+                        },
                         messages: members.clone(),
                     });
                 },
@@ -3836,7 +4306,11 @@ impl MessageList {
                 "starred-symbolic"
             })
         } else if msg.starred {
-            item(RowAction::ToggleStar, &i18n("Remove Star"), "hylki-non-starred-symbolic")
+            item(
+                RowAction::ToggleStar,
+                &i18n("Remove Star"),
+                "hylki-non-starred-symbolic",
+            )
         } else {
             item(RowAction::ToggleStar, &i18n("Star"), "starred-symbolic")
         }];
@@ -3847,8 +4321,9 @@ impl MessageList {
         // Expanded replies keep the singular toggle. Labels follow state, like
         // the singular one: any unread member reads as an unread conversation.
         let members = self.thread_members(msg);
-        let is_thread_head =
-            members.first().is_some_and(|h| (h.account_id, h.id) == (msg.account_id, msg.id));
+        let is_thread_head = members
+            .first()
+            .is_some_and(|h| (h.account_id, h.id) == (msg.account_id, msg.id));
         // Move To…: the clicked message, then (for a conversation row) the
         // rest of its members, at the click's point in the window so the
         // app can anchor the picker there.
@@ -3873,7 +4348,11 @@ impl MessageList {
             let s = sender.clone();
             flag_section.push(
                 MenuEntry::new(
-                    if any_unread { i18n("Mark All as Read") } else { i18n("Mark All as Unread") },
+                    if any_unread {
+                        i18n("Mark All as Read")
+                    } else {
+                        i18n("Mark All as Unread")
+                    },
                     move || {
                         let _ = s.output(MessageListOutput::Bulk {
                             action: if any_unread {
@@ -3892,8 +4371,11 @@ impl MessageList {
                 }),
             );
         } else if msg.unread {
-            flag_section
-                .push(item(RowAction::ToggleRead, &i18n("Mark as Read"), "hylki-mail-read-symbolic"));
+            flag_section.push(item(
+                RowAction::ToggleRead,
+                &i18n("Mark as Read"),
+                "hylki-mail-read-symbolic",
+            ));
         } else {
             flag_section.push(item(
                 RowAction::ToggleRead,
@@ -3926,14 +4408,34 @@ impl MessageList {
         let sections = vec![
             if self.in_templates {
                 vec![
-                    item(RowAction::EditAsNew, &i18n("Use Template"), "mail-message-new-symbolic"),
-                    item(RowAction::EditTemplate, &i18n("Edit Template"), "document-edit-symbolic"),
+                    item(
+                        RowAction::EditAsNew,
+                        &i18n("Use Template"),
+                        "mail-message-new-symbolic",
+                    ),
+                    item(
+                        RowAction::EditTemplate,
+                        &i18n("Edit Template"),
+                        "document-edit-symbolic",
+                    ),
                 ]
             } else {
                 vec![
-                    item(RowAction::Reply, &i18n("Reply"), "mail-reply-sender-symbolic"),
-                    item(RowAction::ReplyAll, &i18n("Reply All"), "mail-reply-all-symbolic"),
-                    item(RowAction::Forward, &i18n("Forward"), "mail-forward-symbolic"),
+                    item(
+                        RowAction::Reply,
+                        &i18n("Reply"),
+                        "mail-reply-sender-symbolic",
+                    ),
+                    item(
+                        RowAction::ReplyAll,
+                        &i18n("Reply All"),
+                        "mail-reply-all-symbolic",
+                    ),
+                    item(
+                        RowAction::Forward,
+                        &i18n("Forward"),
+                        "mail-forward-symbolic",
+                    ),
                     item(
                         RowAction::EditAsNew,
                         &i18n("Edit as New Message"),
@@ -3949,25 +4451,57 @@ impl MessageList {
                 // told, and the message returns to the Inbox. In Trash it
                 // is a plain move, with spam still on offer.
                 if self.in_junk {
-                    section.push(item(RowAction::NotSpam, &i18n("Not Spam"), "mail-mark-notjunk-symbolic"));
+                    section.push(item(
+                        RowAction::NotSpam,
+                        &i18n("Not Spam"),
+                        "mail-mark-notjunk-symbolic",
+                    ));
                 } else {
                     if self.restorable {
-                        section.push(item(RowAction::MoveToInbox, &i18n("Move to Inbox"), "mail-inbox-symbolic"));
+                        section.push(item(
+                            RowAction::MoveToInbox,
+                            &i18n("Move to Inbox"),
+                            "mail-inbox-symbolic",
+                        ));
                     }
-                    section.push(item(RowAction::Spam, &i18n("Mark as Spam"), "mail-mark-junk-symbolic"));
+                    section.push(item(
+                        RowAction::Spam,
+                        &i18n("Mark as Spam"),
+                        "mail-mark-junk-symbolic",
+                    ));
                 }
                 section.push(move_entry);
-                section.push(item(RowAction::Archive, &i18n("Archive"), "mail-archive-symbolic"));
-                section.push(item(RowAction::Delete, &i18n("Delete"), "user-trash-symbolic"));
+                section.push(item(
+                    RowAction::Archive,
+                    &i18n("Archive"),
+                    "mail-archive-symbolic",
+                ));
+                section.push(item(
+                    RowAction::Delete,
+                    &i18n("Delete"),
+                    "user-trash-symbolic",
+                ));
                 section
             },
             vec![
-                item(RowAction::AddContact, &i18n("Add Sender to Contacts"), "contact-new-symbolic"),
-                item(RowAction::CreateFilter, &i18n("Create Filter from Message…"), "filter-folder-symbolic"),
+                item(
+                    RowAction::AddContact,
+                    &i18n("Add Sender to Contacts"),
+                    "contact-new-symbolic",
+                ),
+                item(
+                    RowAction::CreateFilter,
+                    &i18n("Create Filter from Message…"),
+                    "filter-folder-symbolic",
+                ),
             ],
             vec![
                 item(RowAction::ViewSource, &i18n("View Source"), "code-symbolic"),
-                item(RowAction::SaveAsFile, &i18n("Save as File…"), "document-save-symbolic"),
+                item(
+                    RowAction::SaveAsFile,
+                    &i18n("Save as File…"),
+                    "document-save-symbolic",
+                ),
             ],
         ];
 
@@ -3979,9 +4513,14 @@ impl MessageList {
     /// view then scrolls to the row its focus starts from, the first one:
     /// every right-click menu, tagging included, sent the list to the top.
     fn popup_menu(&self, x: f64, y: f64, header: Option<&str>, sections: Vec<Vec<MenuEntry>>) {
-        let before = self.list_view.root().and_then(|r| gtk::prelude::RootExt::focus(&r));
+        let before = self
+            .list_view
+            .root()
+            .and_then(|r| gtk::prelude::RootExt::focus(&r));
         let popover = show_context_menu_popover(&self.list_view, x, y, header, sections);
-        let Some(scroller) = self.scroller.clone() else { return };
+        let Some(scroller) = self.scroller.clone() else {
+            return;
+        };
         let adj = scroller.vadjustment();
         let pos = adj.value();
         popover.connect_closed(move |_| {
@@ -4024,7 +4563,10 @@ impl MessageList {
     /// the stars off rather than adding them.
     fn selection_all_starred(&self) -> bool {
         let positions = self.selected_positions();
-        !positions.is_empty() && positions.iter().all(|&p| self.shown.get(p).is_some_and(|m| m.starred))
+        !positions.is_empty()
+            && positions
+                .iter()
+                .all(|&p| self.shown.get(p).is_some_and(|m| m.starred))
     }
 
     /// Whether any selected message is unread, so the bulk read toggle
@@ -4033,7 +4575,10 @@ impl MessageList {
         // The rows first: asked on every update, and a row's own message
         // usually answers it.
         let positions = self.selected_positions();
-        if positions.iter().any(|&p| self.shown.get(p).is_some_and(|m| m.unread)) {
+        if positions
+            .iter()
+            .any(|&p| self.shown.get(p).is_some_and(|m| m.unread))
+        {
             return true;
         }
         if !self.threading {
@@ -4043,16 +4588,21 @@ impl MessageList {
         // `selected_conversations` gathers it, without copying any.
         let threads = self.source_threads();
         let source = self.active_source();
-        positions.iter().filter_map(|&p| self.shown.get(p)).any(|m| {
-            let key = (m.account_id, m.id);
-            !self.nested.contains_key(&key)
-                && heads_its_row(key, &self.msg_thread, &self.thread_members)
-                && threads
-                    .keys
-                    .get(&thread_slot(m))
-                    .and_then(|k| threads.members.get(k))
-                    .is_some_and(|idx| idx.iter().any(|&i| source.get(i).is_some_and(|x| x.unread)))
-        })
+        positions
+            .iter()
+            .filter_map(|&p| self.shown.get(p))
+            .any(|m| {
+                let key = (m.account_id, m.id);
+                !self.nested.contains_key(&key)
+                    && heads_its_row(key, &self.msg_thread, &self.thread_members)
+                    && threads
+                        .keys
+                        .get(&thread_slot(m))
+                        .and_then(|k| threads.members.get(k))
+                        .is_some_and(|idx| {
+                            idx.iter().any(|&i| source.get(i).is_some_and(|x| x.unread))
+                        })
+            })
     }
 
     /// One toggle per tag for the whole selection (#313). A tag is ticked
@@ -4060,14 +4610,26 @@ impl MessageList {
     /// off them all, and otherwise puts it on them all.
     fn bulk_tag_entries(&self, sender: &ComponentSender<Self>) -> Vec<MenuEntry> {
         let messages = self.selected_messages();
-        let Some(first) = messages.first() else { return Vec::new() };
+        let Some(first) = messages.first() else {
+            return Vec::new();
+        };
         let tags = self.shared.tags.borrow().clone();
         let mut all = first.clone();
         all.keywords = first.tag_keywords(&tags);
-        all.keywords.retain(|k| messages.iter().all(|m| m.tag_keywords(&tags).iter().any(|x| x.eq_ignore_ascii_case(k))));
+        all.keywords.retain(|k| {
+            messages.iter().all(|m| {
+                m.tag_keywords(&tags)
+                    .iter()
+                    .any(|x| x.eq_ignore_ascii_case(k))
+            })
+        });
         let s = sender.clone();
         tag_menu_entries(&tags, &all, move |keyword, add| {
-            let _ = s.output(MessageListOutput::SetTagMany { messages: messages.clone(), keyword, add });
+            let _ = s.output(MessageListOutput::SetTagMany {
+                messages: messages.clone(),
+                keyword,
+                add,
+            });
         })
     }
 
@@ -4085,33 +4647,59 @@ impl MessageList {
                 // One entry, the way the bar's button toggles.
                 if !self.in_drafts {
                     section.push(if self.selection_any_unread() {
-                        item(BulkAction::MarkRead, &i18n("Mark as Read"), "hylki-mail-read-symbolic")
+                        item(
+                            BulkAction::MarkRead,
+                            &i18n("Mark as Read"),
+                            "hylki-mail-read-symbolic",
+                        )
                     } else {
-                        item(BulkAction::MarkUnread, &i18n("Mark as Unread"), "mail-unread-symbolic")
+                        item(
+                            BulkAction::MarkUnread,
+                            &i18n("Mark as Unread"),
+                            "mail-unread-symbolic",
+                        )
                     });
                 }
                 // The Bulk handler turns this into Unflag for a starred
                 // selection.
                 section.push(if self.selection_all_starred() {
-                    item(BulkAction::Flag, &i18n("Remove Star"), "hylki-non-starred-symbolic")
+                    item(
+                        BulkAction::Flag,
+                        &i18n("Remove Star"),
+                        "hylki-non-starred-symbolic",
+                    )
                 } else {
                     item(BulkAction::Flag, &i18n("Star"), "starred-symbolic")
                 });
                 let tags = self.bulk_tag_entries(sender);
                 if !tags.is_empty() {
-                    section.push(MenuEntry::submenu(i18n("Tags"), vec![tags]).icon("tag-outline-symbolic"));
+                    section.push(
+                        MenuEntry::submenu(i18n("Tags"), vec![tags]).icon("tag-outline-symbolic"),
+                    );
                 }
                 section
             },
             {
                 let mut section = Vec::new();
                 if self.in_junk {
-                    section.push(item(BulkAction::NotSpam, &i18n("Not Spam"), "mail-mark-notjunk-symbolic"));
+                    section.push(item(
+                        BulkAction::NotSpam,
+                        &i18n("Not Spam"),
+                        "mail-mark-notjunk-symbolic",
+                    ));
                 } else {
                     if self.restorable {
-                        section.push(item(BulkAction::MoveToInbox, &i18n("Move to Inbox"), "mail-inbox-symbolic"));
+                        section.push(item(
+                            BulkAction::MoveToInbox,
+                            &i18n("Move to Inbox"),
+                            "mail-inbox-symbolic",
+                        ));
                     }
-                    section.push(item(BulkAction::Spam, &i18n("Mark as Spam"), "mail-mark-junk-symbolic"));
+                    section.push(item(
+                        BulkAction::Spam,
+                        &i18n("Mark as Spam"),
+                        "mail-mark-junk-symbolic",
+                    ));
                 }
                 {
                     // Move To… for the whole selection, conversations whole.
@@ -4130,13 +4718,26 @@ impl MessageList {
                         .icon("folder-symbolic"),
                     );
                 }
-                section.push(item(BulkAction::Archive, &i18n("Archive"), "mail-archive-symbolic"));
-                section.push(item(BulkAction::Delete, &i18n("Delete"), "user-trash-symbolic"));
+                section.push(item(
+                    BulkAction::Archive,
+                    &i18n("Archive"),
+                    "mail-archive-symbolic",
+                ));
+                section.push(item(
+                    BulkAction::Delete,
+                    &i18n("Delete"),
+                    "user-trash-symbolic",
+                ));
                 section
             },
         ];
 
-        self.popup_menu(x, y, Some(&format!("{} selected", self.selection_count)), sections);
+        self.popup_menu(
+            x,
+            y,
+            Some(&format!("{} selected", self.selection_count)),
+            sections,
+        );
     }
 
     /// After a rebuild: a lone selected conversation head whose thread has
@@ -4149,7 +4750,12 @@ impl MessageList {
             return;
         }
         let Some(key) = self.selected_id else { return };
-        let Some(m) = self.shown.iter().find(|m| (m.account_id, m.id) == key).map(|m| Message::clone(m)) else {
+        let Some(m) = self
+            .shown
+            .iter()
+            .find(|m| (m.account_id, m.id) == key)
+            .map(|m| Message::clone(m))
+        else {
             return;
         };
         let (thread, solo) = self.conversation_for(&m);
@@ -4170,13 +4776,17 @@ impl MessageList {
     /// switch (#171).
     fn move_to_messages(&self, msg: &Message) -> (Vec<Message>, bool) {
         let members = self.thread_members(msg);
-        let is_head =
-            members.first().is_some_and(|h| (h.account_id, h.id) == (msg.account_id, msg.id));
+        let is_head = members
+            .first()
+            .is_some_and(|h| (h.account_id, h.id) == (msg.account_id, msg.id));
         let mut messages = vec![msg.clone()];
         let offer_whole = is_head && members.len() > 1;
         if offer_whole {
             messages.extend(
-                members.iter().filter(|m| (m.account_id, m.id) != (msg.account_id, msg.id)).cloned(),
+                members
+                    .iter()
+                    .filter(|m| (m.account_id, m.id) != (msg.account_id, msg.id))
+                    .cloned(),
             );
         }
         (messages, offer_whole)
@@ -4216,7 +4826,11 @@ impl MessageList {
             }
         }
         let slide = |bottom: bool| {
-            if bottom { gtk::RevealerTransitionType::SlideUp } else { gtk::RevealerTransitionType::SlideDown }
+            if bottom {
+                gtk::RevealerTransitionType::SlideUp
+            } else {
+                gtk::RevealerTransitionType::SlideDown
+            }
         };
         bars.search.set_transition_type(slide(self.search_bottom));
         bars.bulk.set_transition_type(slide(self.bulk_bottom));
@@ -4233,8 +4847,16 @@ impl MessageList {
         }
         if let Some(picker) = &self.scope_picker {
             // The scope menu opens toward the rows.
-            picker.button.set_direction(if self.search_bottom { gtk::ArrowType::Up } else { gtk::ArrowType::Down });
-            picker.arrow.set_icon_name(Some(if self.search_bottom { "pan-up-symbolic" } else { "pan-down-symbolic" }));
+            picker.button.set_direction(if self.search_bottom {
+                gtk::ArrowType::Up
+            } else {
+                gtk::ArrowType::Down
+            });
+            picker.arrow.set_icon_name(Some(if self.search_bottom {
+                "pan-up-symbolic"
+            } else {
+                "pan-down-symbolic"
+            }));
         }
     }
 
@@ -4283,7 +4905,8 @@ impl MessageList {
         // keep the old last row in view, and the adjustment does not reach
         // past the old size yet: move the view's own anchor too.
         if self.shared.model.len() > 0 {
-            self.list_view.scroll_to(0, gtk::ListScrollFlags::NONE, None);
+            self.list_view
+                .scroll_to(0, gtk::ListScrollFlags::NONE, None);
             self.reveal_first_heading(0);
         }
     }
@@ -4313,11 +4936,18 @@ impl MessageList {
             look.in_drafts = self.in_drafts;
             look.show_recipient = self.show_recipient;
             look.thread_expansion = self.thread_expansion;
-            look.ringed = if self.colorize { self.account_colors.keys().copied().collect() } else { Default::default() };
+            look.ringed = if self.colorize {
+                self.account_colors.keys().copied().collect()
+            } else {
+                Default::default()
+            };
             look.face_gen = self.face_gen;
             look.tags_gen = self.tags_gen;
             look.folder_pills = Rc::new(if self.searching_pool() {
-                self.pool_folders.iter().map(|(k, f)| (*k, f.name.clone())).collect()
+                self.pool_folders
+                    .iter()
+                    .map(|(k, f)| (*k, f.name.clone()))
+                    .collect()
             } else {
                 Default::default()
             });
@@ -4344,8 +4974,12 @@ impl MessageList {
         const DATE_PX: i32 = 64;
         /// Room kept for the subject.
         const SUBJECT_PX: i32 = 100;
-        let columns: Vec<C> =
-            self.columns.iter().copied().filter(|c| *c != C::Due || self.graph_in_view).collect();
+        let columns: Vec<C> = self
+            .columns
+            .iter()
+            .copied()
+            .filter(|c| *c != C::Due || self.graph_in_view)
+            .collect();
         // The pill's margins and padding, the unread dot and the spacing.
         let mut fixed = 12 + 18 + 18 + 8 * columns.len().saturating_sub(1) as i32;
         if self.avatars {
@@ -4353,7 +4987,11 @@ impl MessageList {
         }
         let mut names = Vec::new();
         for c in &columns {
-            let px = self.widths.get(c).copied().unwrap_or_else(|| default_width(*c));
+            let px = self
+                .widths
+                .get(c)
+                .copied()
+                .unwrap_or_else(|| default_width(*c));
             match c {
                 C::Star | C::Attachment => fixed += 12,
                 C::Replied => fixed += crate::ui::message_row::REPLIED_PX,
@@ -4429,7 +5067,11 @@ impl MessageList {
                 let _ = input.send(MessageListInput::SortByColumn(c));
             }),
             Rc::new(move |column, width, done| {
-                let _ = resized.send(MessageListInput::ResizeColumn { column, width, done });
+                let _ = resized.send(MessageListInput::ResizeColumn {
+                    column,
+                    width,
+                    done,
+                });
             }),
         );
     }
@@ -4447,22 +5089,35 @@ impl MessageList {
     fn selected_positions(&self) -> Vec<usize> {
         let set = self.shared.selection.selection();
         match gtk::BitsetIter::init_first(&set) {
-            Some((iter, first)) => std::iter::once(first).chain(iter).map(|p| p as usize).collect(),
+            Some((iter, first)) => std::iter::once(first)
+                .chain(iter)
+                .map(|p| p as usize)
+                .collect(),
             None => Vec::new(),
         }
     }
 
     fn keys_at(&self, positions: &[usize]) -> Vec<(u32, u32)> {
-        positions.iter().filter_map(|&p| self.shown.get(p).map(|m| (m.account_id, m.id))).collect()
+        positions
+            .iter()
+            .filter_map(|&p| self.shown.get(p).map(|m| (m.account_id, m.id)))
+            .collect()
     }
 
     fn slots_at(&self, positions: &[usize]) -> Vec<Slot> {
-        positions.iter().filter_map(|&p| self.shown.get(p).map(|m| thread_slot(m))).collect()
+        positions
+            .iter()
+            .filter_map(|&p| self.shown.get(p).map(|m| thread_slot(m)))
+            .collect()
     }
 
     /// Select exactly these rows, telling GTK only if that changes anything.
     fn select_positions(&self, positions: &[usize]) {
-        let mut wanted: Vec<usize> = positions.iter().copied().filter(|&p| p < self.shown.len()).collect();
+        let mut wanted: Vec<usize> = positions
+            .iter()
+            .copied()
+            .filter(|&p| p < self.shown.len())
+            .collect();
         wanted.sort_unstable();
         wanted.dedup();
         if wanted == self.selected_positions() {
@@ -4489,7 +5144,16 @@ impl MessageList {
         if let Some(idx) = self.shown.iter().position(|m| is(m)) {
             let m = match &changed {
                 // The same message, as the index now has it.
-                Some(m) if (m.account_id, m.folder_id, m.id) == (self.shown[idx].account_id, self.shown[idx].folder_id, self.shown[idx].id) => m.clone(),
+                Some(m)
+                    if (m.account_id, m.folder_id, m.id)
+                        == (
+                            self.shown[idx].account_id,
+                            self.shown[idx].folder_id,
+                            self.shown[idx].id,
+                        ) =>
+                {
+                    m.clone()
+                }
                 _ => {
                     let mut m = Message::clone(&self.shown[idx]);
                     change(&mut m);
@@ -4521,11 +5185,20 @@ impl MessageList {
         }
         let passes = self.filter();
         for row in rows.iter_mut() {
-            let Some(key) = row.meta.pending.clone() else { continue };
-            let own = self.groups.get(&key).cloned().unwrap_or_else(|| vec![row.msg.clone()]);
+            let Some(key) = row.meta.pending.clone() else {
+                continue;
+            };
+            let own = self
+                .groups
+                .get(&key)
+                .cloned()
+                .unwrap_or_else(|| vec![row.msg.clone()]);
             let (meta, _) = self.describe_group(&key, &own, &passes, true);
             let mut data = RowData::clone(row);
-            data.meta = RowMeta { appear: data.meta.appear, ..meta };
+            data.meta = RowMeta {
+                appear: data.meta.appear,
+                ..meta
+            };
             *row = Rc::new(data);
         }
     }
@@ -4554,7 +5227,12 @@ impl MessageList {
     /// you sent, filed in Sent) stand in for an unread one here that shared
     /// its UID, and the row stayed bold after it was read (#333).
     fn refresh_thread_head(&mut self, slot: (u32, u32, u32)) {
-        let Some(own) = self.groups.values().find(|g| g.iter().any(|m| thread_slot(m) == slot)).cloned() else {
+        let Some(own) = self
+            .groups
+            .values()
+            .find(|g| g.iter().any(|m| thread_slot(m) == slot))
+            .cloned()
+        else {
             return;
         };
         let head = thread_slot(&own[0]);
@@ -4562,17 +5240,28 @@ impl MessageList {
             return;
         };
         // A row that stands for one message shows that message's own state.
-        if self.shared.model.row(idx).is_none_or(|r| r.meta.key.is_none()) {
+        if self
+            .shared
+            .model
+            .row(idx)
+            .is_none_or(|r| r.meta.key.is_none())
+        {
             return;
         }
         let now = |m: &Rc<Message>| -> Rc<Message> {
             let s = thread_slot(m);
-            self.all.iter().find(|a| thread_slot(a) == s).cloned().unwrap_or_else(|| m.clone())
+            self.all
+                .iter()
+                .find(|a| thread_slot(a) == s)
+                .cloned()
+                .unwrap_or_else(|| m.clone())
         };
         let unread = own.iter().any(|m| now(m).unread);
         let starred = own.iter().any(|m| now(m).starred);
         let newest = own.last().map(now);
-        let (answered, forwarded) = newest.map(|m| (m.answered, m.forwarded)).unwrap_or_default();
+        let (answered, forwarded) = newest
+            .map(|m| (m.answered, m.forwarded))
+            .unwrap_or_default();
         self.shared.model.update_row(idx, |d| {
             d.meta.unread = unread;
             d.meta.starred = starred;
@@ -4580,7 +5269,6 @@ impl MessageList {
             d.meta.forwarded = forwarded;
         });
     }
-
 
     /// Begin collapsing a thread: slide its replies shut (they stay where
     /// they are in the list — only their own Revealer closes), then drop them
@@ -4592,15 +5280,27 @@ impl MessageList {
             // so its own chevron can rotate shut in place, in step with the
             // replies sliding closed beneath it.
             if let Some(&head_key) = members.first() {
-                if let Some(idx) = self.shown.iter().position(|m| (m.account_id, m.id) == head_key) {
-                    self.shared.model.update_row(idx, |d| d.meta.expanded = false);
+                if let Some(idx) = self
+                    .shown
+                    .iter()
+                    .position(|m| (m.account_id, m.id) == head_key)
+                {
+                    self.shared
+                        .model
+                        .update_row(idx, |d| d.meta.expanded = false);
                 }
             }
             // `members` is head-first (see `rebuild`); only the replies
             // beneath it animate closed.
             for child_key in members.iter().skip(1) {
-                if let Some(idx) = self.shown.iter().position(|m| (m.account_id, m.id) == *child_key) {
-                    self.shared.model.update_row(idx, |d| d.meta.revealed = false);
+                if let Some(idx) = self
+                    .shown
+                    .iter()
+                    .position(|m| (m.account_id, m.id) == *child_key)
+                {
+                    self.shared
+                        .model
+                        .update_row(idx, |d| d.meta.revealed = false);
                 }
             }
         }
@@ -4611,9 +5311,10 @@ impl MessageList {
         let timer_key = key.clone();
         // Matches the Revealer's own transition duration, so the rows are
         // fully closed by the time they're actually dropped from the list.
-        let timer = gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(200), move || {
-            s.input(MessageListInput::FinishCollapseThread(timer_key));
-        });
+        let timer =
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(200), move || {
+                s.input(MessageListInput::FinishCollapseThread(timer_key));
+            });
         self.collapsing_threads.insert(key, timer);
     }
 
@@ -4622,9 +5323,17 @@ impl MessageList {
     /// slides open the first time it is shown (see `RowMeta::appear`).
     /// (PR #79)
     fn expand_thread(&mut self, key: &(u32, String)) {
-        let Some(members) = self.thread_members.get(key).cloned() else { return };
-        let Some(&head_key) = members.first() else { return };
-        let Some(head_pos) = self.shown.iter().position(|m| (m.account_id, m.id) == head_key) else {
+        let Some(members) = self.thread_members.get(key).cloned() else {
+            return;
+        };
+        let Some(&head_key) = members.first() else {
+            return;
+        };
+        let Some(head_pos) = self
+            .shown
+            .iter()
+            .position(|m| (m.account_id, m.id) == head_key)
+        else {
             return;
         };
         // `members` is already oldest-first (see `rebuild`).
@@ -4634,7 +5343,11 @@ impl MessageList {
                 .iter()
                 .skip(1)
                 .filter_map(|k| {
-                    source.iter().find(|m| (m.account_id, m.id) == *k).or_else(|| self.nested.get(k)).cloned()
+                    source
+                        .iter()
+                        .find(|m| (m.account_id, m.id) == *k)
+                        .or_else(|| self.nested.get(k))
+                        .cloned()
                 })
                 .collect()
         };
@@ -4643,8 +5356,15 @@ impl MessageList {
         }
         // The head survives the toggle (only its replies are put in), so its
         // own chevron can rotate open in place.
-        self.shared.model.update_row(head_pos, |d| d.meta.expanded = true);
-        let section = self.shared.model.row(head_pos).map(|r| r.section).unwrap_or_default();
+        self.shared
+            .model
+            .update_row(head_pos, |d| d.meta.expanded = true);
+        let section = self
+            .shared
+            .model
+            .row(head_pos)
+            .map(|r| r.section)
+            .unwrap_or_default();
         let n = children.len();
         let rows: Vec<Rc<RowData>> = children
             .iter()
@@ -4652,7 +5372,13 @@ impl MessageList {
             .map(|(i, m)| {
                 Rc::new(RowData {
                     msg: m.clone(),
-                    meta: RowMeta { is_child: true, is_last: i + 1 == n, revealed: true, appear: true, ..Default::default() },
+                    meta: RowMeta {
+                        is_child: true,
+                        is_last: i + 1 == n,
+                        revealed: true,
+                        appear: true,
+                        ..Default::default()
+                    },
                     section,
                 })
             })
@@ -4665,7 +5391,9 @@ impl MessageList {
     /// without touching any other row — the counterpart to `expand_thread`.
     /// (PR #79)
     fn collapse_thread_rows(&mut self, key: &(u32, String)) {
-        let Some(members) = self.thread_members.get(key).cloned() else { return };
+        let Some(members) = self.thread_members.get(key).cloned() else {
+            return;
+        };
         let mut indices: Vec<usize> = members
             .iter()
             .skip(1)
@@ -4736,11 +5464,18 @@ impl MessageList {
     /// still being worked out.
     fn keep_view(&mut self) {
         let Some(key) = self.view_key else { return };
-        if !self.loaded || !self.query.is_empty() || self.all.is_empty() || self.all.len() > KEEP_AT_MOST {
+        if !self.loaded
+            || !self.query.is_empty()
+            || self.all.is_empty()
+            || self.all.len() > KEEP_AT_MOST
+        {
             return;
         }
         let threads = self.source_threads.borrow().clone();
-        if self.threading && self.all.len() >= THREADS_OFF_MAIN && threads.as_ref().is_none_or(|t| t.pool) {
+        if self.threading
+            && self.all.len() >= THREADS_OFF_MAIN
+            && threads.as_ref().is_none_or(|t| t.pool)
+        {
             return;
         }
         let snap = ViewSnapshot {
@@ -4782,7 +5517,9 @@ impl MessageList {
     /// rather than sending its messages.
     pub fn has_view(&self, key: u64, fp: u64) -> bool {
         let sig = self.rows_signature();
-        self.views.iter().any(|v| v.key == key && v.fp == fp && v.sig == sig)
+        self.views
+            .iter()
+            .any(|v| v.key == key && v.fp == fp && v.sig == sig)
     }
 
     /// Why `has_view` said no, for the log.
@@ -4803,7 +5540,10 @@ impl MessageList {
     fn take_view(&mut self, key: Option<u64>, fp: u64) -> Option<ViewSnapshot> {
         let key = key?;
         let sig = self.rows_signature();
-        let at = self.views.iter().position(|v| v.key == key && v.fp == fp && v.sig == sig)?;
+        let at = self
+            .views
+            .iter()
+            .position(|v| v.key == key && v.fp == fp && v.sig == sig)?;
         self.views.remove(at)
     }
 
@@ -4823,7 +5563,10 @@ impl MessageList {
         *self.source_threads.borrow_mut() = snap.threads;
         self.loaded = true;
         self.listed_folders = snap.listed_folders;
-        let graph_in_view = self.listed_folders.iter().any(|(a, _)| self.graph_accounts.contains(a));
+        let graph_in_view = self
+            .listed_folders
+            .iter()
+            .any(|(a, _)| self.graph_accounts.contains(a));
         if graph_in_view != self.graph_in_view {
             self.graph_in_view = graph_in_view;
             self.sync_look();
@@ -4836,24 +5579,43 @@ impl MessageList {
         if !self.shared.model.replace(snap.rows, stale) && stale {
             self.shared.refresh_all();
         }
-        let by_date = self.group_by_date && matches!(self.sort, SortOrder::DateNewest | SortOrder::DateOldest);
+        let by_date = self.group_by_date
+            && matches!(self.sort, SortOrder::DateNewest | SortOrder::DateOldest);
         self.show_headings(by_date);
         self.select_current();
-        let any_expanded = self.shared.model.rows().iter().chain(&self.tail).any(|r| r.meta.expanded);
+        let any_expanded = self
+            .shared
+            .model
+            .rows()
+            .iter()
+            .chain(&self.tail)
+            .any(|r| r.meta.expanded);
         self.fit_expanded(any_expanded);
-        tracing::debug!("list: kept view shown, {} rows of {}, in {:?}", self.shown.len(), self.total_matches, t.elapsed());
+        tracing::debug!(
+            "list: kept view shown, {} rows of {}, in {:?}",
+            self.shown.len(),
+            self.total_matches,
+            t.elapsed()
+        );
     }
 
     /// Build the view `key` from `all` and keep it, leaving the view on show
     /// as it is: its state steps aside for the build and comes back.
-    fn prebuild_view(&mut self, key: u64, fp: u64, all: Vec<Rc<Message>>, threads: Option<Rc<SourceThreads>>) {
+    fn prebuild_view(
+        &mut self,
+        key: u64,
+        fp: u64,
+        all: Vec<Rc<Message>>,
+        threads: Option<Rc<SourceThreads>>,
+    ) {
         // A search on show would filter the build; the visit builds it then.
         if !self.query.is_empty() {
             return;
         }
         let t = std::time::Instant::now();
         let all = std::mem::replace(&mut self.all, all);
-        let source_threads = std::mem::replace(&mut *self.source_threads.borrow_mut(), threads.clone());
+        let source_threads =
+            std::mem::replace(&mut *self.source_threads.borrow_mut(), threads.clone());
         let shown = std::mem::take(&mut self.shown);
         let tail = std::mem::take(&mut self.tail);
         let groups = std::mem::take(&mut self.groups);
@@ -4889,7 +5651,12 @@ impl MessageList {
         *self.source_threads.borrow_mut() = source_threads;
         self.selected_ids = selected_ids;
         self.selected_id = selected_id;
-        tracing::debug!("list: built ahead, {} rows of {}, in {:?}", snap.shown.len(), snap.total_matches, t.elapsed());
+        tracing::debug!(
+            "list: built ahead, {} rows of {}, in {:?}",
+            snap.shown.len(),
+            snap.total_matches,
+            t.elapsed()
+        );
         self.views.retain(|v| v.key != key);
         self.views.push_back(snap);
     }
@@ -4908,7 +5675,12 @@ impl MessageList {
     /// meanwhile, and the main loop stays free.
     fn threads_pending(&self) -> bool {
         let pool = self.searching_pool();
-        if self.source_threads.borrow().as_ref().is_some_and(|t| t.pool == pool) {
+        if self
+            .source_threads
+            .borrow()
+            .as_ref()
+            .is_some_and(|t| t.pool == pool)
+        {
             return false;
         }
         let source = self.active_source();
@@ -4926,8 +5698,15 @@ impl MessageList {
         std::thread::spawn(move || {
             let t = std::time::Instant::now();
             let threads = source_threads_of(&input, &links, pool);
-            tracing::debug!("list: {} messages threaded off the main loop in {:?}", input.len(), t.elapsed());
-            let _ = sender.send(MessageListInput::ThreadsReady { gen, threads: Box::new(threads) });
+            tracing::debug!(
+                "list: {} messages threaded off the main loop in {:?}",
+                input.len(),
+                t.elapsed()
+            );
+            let _ = sender.send(MessageListInput::ThreadsReady {
+                gen,
+                threads: Box::new(threads),
+            });
         });
         true
     }
@@ -4945,10 +5724,19 @@ impl MessageList {
     /// source it was worked out from is still the one in use.
     fn source_threads(&self) -> std::rc::Rc<SourceThreads> {
         let pool = self.searching_pool();
-        if let Some(t) = self.source_threads.borrow().as_ref().filter(|t| t.pool == pool) {
+        if let Some(t) = self
+            .source_threads
+            .borrow()
+            .as_ref()
+            .filter(|t| t.pool == pool)
+        {
             return t.clone();
         }
-        let t = std::rc::Rc::new(source_threads_of(self.active_source(), &self.thread_links, pool));
+        let t = std::rc::Rc::new(source_threads_of(
+            self.active_source(),
+            &self.thread_links,
+            pool,
+        ));
         *self.source_threads.borrow_mut() = Some(t.clone());
         t
     }
@@ -4974,7 +5762,8 @@ impl MessageList {
             let _ = sender.output(MessageListOutput::SearchActive(false));
         }
         self.query.clear();
-        self.search_gen.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.search_gen
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.search_hits = None;
         *self.search_text.borrow_mut() = Default::default();
         if let Some(e) = &self.search_entry {
@@ -4994,19 +5783,43 @@ impl MessageList {
     fn filter_besides_text(&self) -> impl Fn(&Message) -> bool {
         let quick = QuickFilterContext {
             filters: self.quick,
-            own: if self.quick.has(QuickFilter::ToMe) { self.own_addresses.clone() } else { Default::default() },
-            contacts: self.contact_addresses.clone().filter(|_| self.quick.has(QuickFilter::Contacts)),
-            tags: if self.quick.has(QuickFilter::Tagged) { self.shared.tags.borrow().clone() } else { Vec::new() },
-            today: if self.quick.has(QuickFilter::Today) { start_of_today() } else { 0 },
+            own: if self.quick.has(QuickFilter::ToMe) {
+                self.own_addresses.clone()
+            } else {
+                Default::default()
+            },
+            contacts: self
+                .contact_addresses
+                .clone()
+                .filter(|_| self.quick.has(QuickFilter::Contacts)),
+            tags: if self.quick.has(QuickFilter::Tagged) {
+                self.shared.tags.borrow().clone()
+            } else {
+                Vec::new()
+            },
+            today: if self.quick.has(QuickFilter::Today) {
+                start_of_today()
+            } else {
+                0
+            },
         };
         // An "All folders" search leaves Trash and Junk out, but for the
         // folder the list is showing (#374).
-        let left_out: std::collections::HashSet<(u32, u32)> = if self.searching_pool() && self.scope == SearchScope::AllFolders {
-            let here: std::collections::HashSet<(u32, u32)> = self.all.iter().map(|m| (m.account_id, m.folder_id)).collect();
-            self.pool_folders.iter().filter(|(k, f)| f.waste && !here.contains(k)).map(|(k, _)| *k).collect()
-        } else {
-            Default::default()
-        };
+        let left_out: std::collections::HashSet<(u32, u32)> =
+            if self.searching_pool() && self.scope == SearchScope::AllFolders {
+                let here: std::collections::HashSet<(u32, u32)> = self
+                    .all
+                    .iter()
+                    .map(|m| (m.account_id, m.folder_id))
+                    .collect();
+                self.pool_folders
+                    .iter()
+                    .filter(|(k, f)| f.waste && !here.contains(k))
+                    .map(|(k, _)| *k)
+                    .collect()
+            } else {
+                Default::default()
+            };
         move |m: &Message| !left_out.contains(&(m.account_id, m.folder_id)) && quick.passes(m)
     }
 
@@ -5018,8 +5831,9 @@ impl MessageList {
         let slot = &mut texts[usize::from(self.searching_pool())];
         match slot {
             Some(t) if t.of.len() == source.len() => {
-                let stale: Vec<usize> =
-                    (0..source.len()).filter(|&i| t.of[i] != Rc::as_ptr(&source[i])).collect();
+                let stale: Vec<usize> = (0..source.len())
+                    .filter(|&i| t.of[i] != Rc::as_ptr(&source[i]))
+                    .collect();
                 if !stale.is_empty() {
                     let text = std::sync::Arc::make_mut(&mut t.text);
                     for i in stale {
@@ -5043,7 +5857,10 @@ impl MessageList {
     /// enough to search in place, or no search at all. Either way a search
     /// still running is overtaken.
     fn start_search(&self) -> bool {
-        let gen = self.search_gen.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        let gen = self
+            .search_gen
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            + 1;
         if self.query.is_empty() || self.active_source().len() < SEARCH_OFF_MAIN {
             return false;
         }
@@ -5061,8 +5878,17 @@ impl MessageList {
                 }
                 hits.push(haystack.contains(&needle));
             }
-            tracing::debug!("list: searched {} messages off the main loop in {:?}", text.len(), t.elapsed());
-            let _ = sender.send(MessageListInput::SearchMatched { gen, query, text, hits });
+            tracing::debug!(
+                "list: searched {} messages off the main loop in {:?}",
+                text.len(),
+                t.elapsed()
+            );
+            let _ = sender.send(MessageListInput::SearchMatched {
+                gen,
+                query,
+                text,
+                hits,
+            });
         });
         true
     }
@@ -5085,7 +5911,9 @@ impl MessageList {
         source
             .iter()
             .enumerate()
-            .filter(|(i, m)| hits.map_or_else(|| text[*i].contains(&query), |h| h[*i]) && besides(m))
+            .filter(|(i, m)| {
+                hits.map_or_else(|| text[*i].contains(&query), |h| h[*i]) && besides(m)
+            })
             .map(|(_, m)| m.clone())
             .collect()
     }
@@ -5093,7 +5921,10 @@ impl MessageList {
     /// Who took part in a conversation (#334), for its Correspondents
     /// column: `msgs` and the replies filed in other folders.
     fn people_of(&self, key: &(u32, String), msgs: &[Rc<Message>]) -> String {
-        let summary = self.threading.then(|| self.thread_summaries.get(key)).flatten();
+        let summary = self
+            .threading
+            .then(|| self.thread_summaries.get(key))
+            .flatten();
         let mut all: Vec<&Message> = msgs.iter().map(|m| &**m).collect();
         all.extend(summary.iter().flat_map(|s| s.members.iter()));
         correspondents(&all)
@@ -5113,7 +5944,10 @@ impl MessageList {
         full: bool,
     ) -> (RowMeta, Vec<Rc<Message>>) {
         let mut msgs = own.to_vec();
-        let summary = self.threading.then(|| self.thread_summaries.get(key)).flatten();
+        let summary = self
+            .threading
+            .then(|| self.thread_summaries.get(key))
+            .flatten();
         // The parts of the conversation filed elsewhere, which the row opens
         // out into along with this folder's own (#309). What you sent comes
         // with them only when "Show your own replies in the message list" is
@@ -5121,11 +5955,13 @@ impl MessageList {
         // from Sent (#388). Gmail's All Mail copy of them goes too.
         let own = (!self.thread_row_newest).then_some(&self.own_addresses);
         let extras: Vec<Rc<Message>> = match summary {
-            Some(s) if self.thread_expansion => nested_members(&s.members, &msgs, &self.listed_folders, passes)
-                .into_iter()
-                .filter(|m| !own.is_some_and(|own| own.contains(&m.from_addr.to_lowercase())))
-                .map(Rc::new)
-                .collect(),
+            Some(s) if self.thread_expansion => {
+                nested_members(&s.members, &msgs, &self.listed_folders, passes)
+                    .into_iter()
+                    .filter(|m| !own.is_some_and(|own| own.contains(&m.from_addr.to_lowercase())))
+                    .map(Rc::new)
+                    .collect()
+            }
             _ => Vec::new(),
         };
         let count = msgs.len() + extras.len();
@@ -5134,9 +5970,14 @@ impl MessageList {
         // the chip is the size of the *conversation*, drafts included (#222).
         // Never less than what is on screen: a stale or partial answer from
         // the cache must not make the badge contradict the rows under it.
-        let total = if self.threading { summary.map(|s| s.count).unwrap_or(0).max(count) } else { count };
-        let expanded =
-            count > 1 && self.thread_expansion && (self.expanded_threads.contains(key) != self.default_expanded);
+        let total = if self.threading {
+            summary.map(|s| s.count).unwrap_or(0).max(count)
+        } else {
+            count
+        };
+        let expanded = count > 1
+            && self.thread_expansion
+            && (self.expanded_threads.contains(key) != self.default_expanded);
         if !full {
             if !extras.is_empty() {
                 for m in &extras {
@@ -5168,9 +6009,18 @@ impl MessageList {
         }
         // The newest member this folder holds, and the newer one the cache
         // found in another folder — the reply you sent, filed in Sent (#236).
-        let newest_here = msgs.last().expect("a group holds at least one message").clone();
-        let elsewhere = self.thread_row_newest.then(|| latest_elsewhere(summary, newest_here.timestamp)).flatten();
-        let people = self.columns.contains(&crate::config::ListColumn::Correspondents).then(|| self.people_of(key, &msgs));
+        let newest_here = msgs
+            .last()
+            .expect("a group holds at least one message")
+            .clone();
+        let elsewhere = self
+            .thread_row_newest
+            .then(|| latest_elsewhere(summary, newest_here.timestamp))
+            .flatten();
+        let people = self
+            .columns
+            .contains(&crate::config::ListColumn::Correspondents)
+            .then(|| self.people_of(key, &msgs));
         // `expanded_threads` stores toggles away from the default state. With
         // expansion disabled no thread ever opens in the list; the stored
         // toggles survive for when it is re-enabled.
@@ -5208,7 +6058,10 @@ impl MessageList {
             (None, None, None, None)
         };
         let any_starred = count > 1 && msgs.iter().any(|m| m.starred);
-        let (answered, forwarded) = (count > 1 && newest_here.answered, count > 1 && newest_here.forwarded);
+        let (answered, forwarded) = (
+            count > 1 && newest_here.answered,
+            count > 1 && newest_here.forwarded,
+        );
         // The row stays this folder's oldest message, whatever the other
         // folders hold that is older, so what is done to the row is done to
         // mail in this folder. The rest follow in time order.
@@ -5274,10 +6127,16 @@ impl MessageList {
     fn apply_summaries(&mut self, keys: Vec<(u32, String)>) {
         let passes = self.filter();
         for key in keys {
-            let Some(own) = self.groups.get(&key).cloned() else { continue };
+            let Some(own) = self.groups.get(&key).cloned() else {
+                continue;
+            };
             let head = (own[0].account_id, own[0].id);
-            let Some(pos) = self.shown.iter().position(|m| (m.account_id, m.id) == head) else { continue };
-            let Some(row) = self.shared.model.row(pos) else { continue };
+            let Some(pos) = self.shown.iter().position(|m| (m.account_id, m.id) == head) else {
+                continue;
+            };
+            let Some(row) = self.shared.model.row(pos) else {
+                continue;
+            };
             if row.meta.expanded {
                 self.queue_rebuild(true);
                 return;
@@ -5296,7 +6155,10 @@ impl MessageList {
     /// first one landed out of sight, just above the view (#400). Scrolled
     /// down, the view keeps the row it has, as before.
     fn rebuild(&mut self) {
-        let at_top = self.scroller.as_ref().is_some_and(|s| s.vadjustment().value() < 1.0);
+        let at_top = self
+            .scroller
+            .as_ref()
+            .is_some_and(|s| s.vadjustment().value() < 1.0);
         self.rebuild_rows();
         if at_top {
             self.scroll_top();
@@ -5305,7 +6167,11 @@ impl MessageList {
 
     fn rebuild_rows(&mut self) {
         let t_rebuild = std::time::Instant::now();
-        let Built { rows, by_date, any_expanded } = self.compute_rows(false);
+        let Built {
+            rows,
+            by_date,
+            any_expanded,
+        } = self.compute_rows(false);
         // Only what changed reaches the view: rows that show the same message
         // stay where they are, with whatever they were doing (#323).
         let t_rows = std::time::Instant::now();
@@ -5343,7 +6209,12 @@ impl MessageList {
     /// clipped at the right edge (see THREAD_EXPANDED_EXTRA).
     fn fit_expanded(&self, any_expanded: bool) {
         if let Some(s) = &self.scroller {
-            let floor = LIST_MIN_WIDTH + if any_expanded { THREAD_EXPANDED_EXTRA } else { 0 };
+            let floor = LIST_MIN_WIDTH
+                + if any_expanded {
+                    THREAD_EXPANDED_EXTRA
+                } else {
+                    0
+                };
             s.set_size_request(floor, -1);
         }
     }
@@ -5357,15 +6228,26 @@ impl MessageList {
         let source_len = self.active_source().len();
         let mut matches = self.source_matches();
         if self.searching() {
-            tracing::debug!("list: search matched {} of {} messages ({:?})", matches.len(), source_len, self.scope);
+            tracing::debug!(
+                "list: search matched {} of {} messages ({:?})",
+                matches.len(),
+                source_len,
+                self.scope
+            );
         }
         // A large list's conversations are worked out on a background
         // thread (`threads_pending`). Until they are in, its newest messages
         // go on screen at once, grouped among themselves; the whole list
         // follows when the answer comes.
         let preview = self.threading && self.threads_pending();
-        self.listed_folders = matches.iter().map(|m| (m.account_id, m.folder_id)).collect();
-        let graph_in_view = self.listed_folders.iter().any(|(a, _)| self.graph_accounts.contains(a));
+        self.listed_folders = matches
+            .iter()
+            .map(|m| (m.account_id, m.folder_id))
+            .collect();
+        let graph_in_view = self
+            .listed_folders
+            .iter()
+            .any(|(a, _)| self.graph_accounts.contains(a));
         if !offscreen && graph_in_view != self.graph_in_view {
             self.graph_in_view = graph_in_view;
             self.sync_look();
@@ -5377,9 +6259,13 @@ impl MessageList {
             // Each message's tag names are worked out once, not at every
             // comparison.
             let tags = self.shared.tags.borrow();
-            let mut keyed: Vec<(String, Rc<Message>)> =
-                matches.drain(..).map(|m| (tag_sort_key(&m, &tags), m)).collect();
-            keyed.sort_by(|(ka, a), (kb, b)| flip(text_key_cmp(ka, kb).then(b.timestamp.cmp(&a.timestamp))));
+            let mut keyed: Vec<(String, Rc<Message>)> = matches
+                .drain(..)
+                .map(|m| (tag_sort_key(&m, &tags), m))
+                .collect();
+            keyed.sort_by(|(ka, a), (kb, b)| {
+                flip(text_key_cmp(ka, kb).then(b.timestamp.cmp(&a.timestamp)))
+            });
             matches = keyed.into_iter().map(|(_, m)| m).collect();
         } else {
             matches.sort_by(|a, b| flip(message_cmp(a, b, sort)));
@@ -5412,9 +6298,17 @@ impl MessageList {
         // part of grouping a long list.
         let mut grouped: Vec<((u32, String), Vec<Rc<Message>>)> = Vec::with_capacity(matches.len());
         let mut at: std::collections::HashMap<&(u32, String), usize> =
-            std::collections::HashMap::with_capacity(if keys.is_empty() { 0 } else { matches.len() });
+            std::collections::HashMap::with_capacity(if keys.is_empty() {
+                0
+            } else {
+                matches.len()
+            });
         let mut alone: std::collections::HashMap<(u32, u32, u32), usize> =
-            std::collections::HashMap::with_capacity(if keys.is_empty() { matches.len() } else { 0 });
+            std::collections::HashMap::with_capacity(if keys.is_empty() {
+                matches.len()
+            } else {
+                0
+            });
         for m in matches {
             let slot = thread_slot(&m);
             let i = match keys.get(&slot) {
@@ -5423,7 +6317,10 @@ impl MessageList {
                     grouped.len() - 1
                 }),
                 None => *alone.entry(slot).or_insert_with(|| {
-                    grouped.push(((m.account_id, format!("\u{0}uid{}/{}", m.folder_id, m.uid)), Vec::new()));
+                    grouped.push((
+                        (m.account_id, format!("\u{0}uid{}/{}", m.folder_id, m.uid)),
+                        Vec::new(),
+                    ));
                     grouped.len() - 1
                 }),
             };
@@ -5435,11 +6332,14 @@ impl MessageList {
         // conversations are in date order beneath, newest first, from the
         // sort above.
         if sort == SortOrder::Correspondents {
-            let people: Vec<String> =
-                grouped.iter().map(|(k, msgs)| self.people_of(k, msgs).to_lowercase()).collect();
+            let people: Vec<String> = grouped
+                .iter()
+                .map(|(k, msgs)| self.people_of(k, msgs).to_lowercase())
+                .collect();
             let mut by: Vec<usize> = (0..grouped.len()).collect();
             by.sort_by(|a, b| flip(text_key_cmp(&people[*a], &people[*b])));
-            let mut slots: Vec<Option<((u32, String), Vec<Rc<Message>>)>> = grouped.into_iter().map(Some).collect();
+            let mut slots: Vec<Option<((u32, String), Vec<Rc<Message>>)>> =
+                grouped.into_iter().map(Some).collect();
             grouped = by.into_iter().filter_map(|i| slots[i].take()).collect();
         }
 
@@ -5454,7 +6354,8 @@ impl MessageList {
         // message that put it where it is in the sort, the newest for
         // Newest First and the oldest for Oldest First, so a heading's rows
         // always run together.
-        let by_date = self.group_by_date && matches!(sort, SortOrder::DateNewest | SortOrder::DateOldest);
+        let by_date =
+            self.group_by_date && matches!(sort, SortOrder::DateNewest | SortOrder::DateOldest);
         let day_starts = by_date.then(|| crate::datefmt::day_starts(crate::datefmt::now()));
 
         // Flatten back into display order, recording per-row thread metadata.
@@ -5474,11 +6375,17 @@ impl MessageList {
         }
         let mut any_expanded = false;
         let full_rows = self.window.max(LIST_WINDOW);
-        let mut unseen: std::collections::HashSet<(u32, u32)> =
-            self.selected_ids.iter().copied().chain(self.selected_id).collect();
+        let mut unseen: std::collections::HashSet<(u32, u32)> = self
+            .selected_ids
+            .iter()
+            .copied()
+            .chain(self.selected_id)
+            .collect();
         for (key, mut msgs) in grouped {
             let key = &key;
-            let section = day_starts.as_ref().map_or(DaySection::None, |d| DaySection::of(msgs[0].timestamp, d));
+            let section = day_starts
+                .as_ref()
+                .map_or(DaySection::None, |d| DaySection::of(msgs[0].timestamp, d));
             // A conversation reads like a transcript: the message that started it
             // is the row on screen, and its replies descend beneath it to the
             // newest. Where the *thread* sits among the other rows is still the
@@ -5491,7 +6398,9 @@ impl MessageList {
                 let head = &msgs[0];
                 thread_drag.insert(
                     (head.account_id, head.id),
-                    msgs.iter().map(|m| (m.account_id, m.folder_id, m.uid, m.id)).collect(),
+                    msgs.iter()
+                        .map(|m| (m.account_id, m.folder_id, m.uid, m.id))
+                        .collect(),
                 );
             }
             // Past the window, and the selection, a row is described in
@@ -5510,7 +6419,11 @@ impl MessageList {
             let mut it = members.into_iter();
             let head = it.next().unwrap();
             shown.push(head.clone());
-            rows.push(Rc::new(RowData { msg: head, meta, section }));
+            rows.push(Rc::new(RowData {
+                msg: head,
+                meta,
+                section,
+            }));
             if expanded {
                 any_expanded = true;
                 let closing = self.collapsing_threads.contains_key(key);
@@ -5540,7 +6453,10 @@ impl MessageList {
         // to light, so the highlight blinked off and came back a moment later
         // as the list caught up. Follow the selection by Message-ID over a
         // renumbering instead (#200).
-        let lost = self.selected_ids.iter().any(|k| !shown.iter().any(|m| (m.account_id, m.id) == *k));
+        let lost = self
+            .selected_ids
+            .iter()
+            .any(|k| !shown.iter().any(|m| (m.account_id, m.id) == *k));
         if lost {
             let renumbered: Vec<((u32, u32), (u32, u32))> = self
                 .selected_ids
@@ -5552,8 +6468,9 @@ impl MessageList {
                         .iter()
                         .find(|m| (m.account_id, m.id) == *k)
                         .filter(|m| !m.message_id.is_empty())?;
-                    let now =
-                        shown.iter().find(|m| m.account_id == was.account_id && m.message_id == was.message_id)?;
+                    let now = shown.iter().find(|m| {
+                        m.account_id == was.account_id && m.message_id == was.message_id
+                    })?;
                     Some((*k, (now.account_id, now.id)))
                 })
                 .collect();
@@ -5573,18 +6490,33 @@ impl MessageList {
         let mut rows = rows;
         let selected_at = shown
             .iter()
-            .rposition(|m| self.selected_ids.contains(&(m.account_id, m.id)) || self.selected_id == Some((m.account_id, m.id)))
+            .rposition(|m| {
+                self.selected_ids.contains(&(m.account_id, m.id))
+                    || self.selected_id == Some((m.account_id, m.id))
+            })
             .map_or(0, |i| i + 1);
-        let limit = self.window.max(LIST_WINDOW).max(selected_at).min(rows.len());
+        let limit = self
+            .window
+            .max(LIST_WINDOW)
+            .max(selected_at)
+            .min(rows.len());
         later_drop(std::mem::replace(&mut self.tail, rows.split_off(limit)));
         shown.truncate(limit);
         self.window = limit.max(LIST_WINDOW);
         self.shown = shown;
-        Built { rows, by_date, any_expanded }
+        Built {
+            rows,
+            by_date,
+            any_expanded,
+        }
     }
 
     /// Everything the view needs wired: selection, activation and keys.
-    fn wire_list(list: &gtk::ListView, shared: &RowShared, input: &relm4::Sender<MessageListInput>) {
+    fn wire_list(
+        list: &gtk::ListView,
+        shared: &RowShared,
+        input: &relm4::Sender<MessageListInput>,
+    ) {
         // Multiple selection: plain click selects one (shown in the reader),
         // Ctrl/Shift extend the selection for bulk actions; double click (or
         // Enter) pops a message out into its own window.
@@ -5609,7 +6541,10 @@ impl MessageList {
             if shift && matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete) {
                 let _ = s.send(MessageListInput::Bulk(BulkAction::DeleteForever));
                 gtk::glib::Propagation::Stop
-            } else if matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete | gtk::gdk::Key::BackSpace) {
+            } else if matches!(
+                keyval,
+                gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete | gtk::gdk::Key::BackSpace
+            ) {
                 // ResolveDelete, not a straight Bulk: a lone thread-head row
                 // stands for its whole conversation (confirmed by the app).
                 let _ = s.send(MessageListInput::ResolveDelete);
@@ -5640,7 +6575,9 @@ impl MessageList {
     /// keep the scroll offset (a folder switch) wins over ones that would.
     fn queue_rebuild(&mut self, preserve_scroll: bool) {
         let first = self.rebuild_queued.is_none();
-        let preserve = self.rebuild_queued.map_or(preserve_scroll, |p| p && preserve_scroll);
+        let preserve = self
+            .rebuild_queued
+            .map_or(preserve_scroll, |p| p && preserve_scroll);
         self.rebuild_queued = Some(preserve);
         if !first {
             return;
@@ -5673,7 +6610,10 @@ impl MessageList {
         if !self.threading {
             return None;
         }
-        let m = self.active_source().iter().find(|m| (m.account_id, m.id) == key)?;
+        let m = self
+            .active_source()
+            .iter()
+            .find(|m| (m.account_id, m.id) == key)?;
         let threads = self.source_threads();
         let thread = threads.keys.get(&thread_slot(m))?;
         self.shown
@@ -5700,9 +6640,7 @@ impl MessageList {
             && self
                 .msg_thread
                 .get(&(m.account_id, m.id))
-                .is_some_and(|key| {
-                    self.expanded_threads.contains(key) != self.default_expanded
-                });
+                .is_some_and(|key| self.expanded_threads.contains(key) != self.default_expanded);
         if expanded {
             Vec::new()
         } else {
@@ -5731,7 +6669,12 @@ impl MessageList {
             .keys
             .get(&thread_slot(m))
             .and_then(|key| threads.members.get(key))
-            .map(|idx| idx.iter().filter_map(|&i| source.get(i)).map(|m| Message::clone(m)).collect())
+            .map(|idx| {
+                idx.iter()
+                    .filter_map(|&i| source.get(i))
+                    .map(|m| Message::clone(m))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -5789,7 +6732,8 @@ impl MessageList {
     /// only when the list already has it.
     fn focus_row(&self, idx: usize) {
         if idx < self.shown.len() {
-            self.list_view.scroll_to(idx as u32, gtk::ListScrollFlags::FOCUS, None);
+            self.list_view
+                .scroll_to(idx as u32, gtk::ListScrollFlags::FOCUS, None);
             self.reveal_first_heading(idx);
             self.list_view.grab_focus();
         }
@@ -5860,7 +6804,11 @@ impl MessageList {
     /// occupying that slot when the user was moving down the list, the row
     /// above it when they were moving up. Clamped to the list either way.
     fn advance_index(&self, idx: usize) -> usize {
-        let next = if self.nav_direction < 0 { idx.saturating_sub(1) } else { idx };
+        let next = if self.nav_direction < 0 {
+            idx.saturating_sub(1)
+        } else {
+            idx
+        };
         next.min(self.shown.len().saturating_sub(1))
     }
 
@@ -5879,7 +6827,11 @@ impl MessageList {
     /// no accent focus ring appears around a row the user never navigated to.
     /// The next real key press turns the ring back on, as normal.
     fn hide_focus_ring(&self) {
-        if let Some(win) = self.list_view.root().and_then(|r| r.downcast::<gtk::Window>().ok()) {
+        if let Some(win) = self
+            .list_view
+            .root()
+            .and_then(|r| r.downcast::<gtk::Window>().ok())
+        {
             win.set_focus_visible(false);
         }
     }
@@ -5917,11 +6869,15 @@ impl MessageList {
 #[cfg(test)]
 mod tests {
     use super::{
-        column_sort, compute_thread_keys, correspondents, text_key_cmp, heads_its_row, message_cmp, SortOrder, latest_elsewhere, nested_members, reader_conversation,
-        row_for_reader_key, thread_slot, unasked_threads, QuickFilter, QuickFilterContext, QuickFilters,
+        column_sort, compute_thread_keys, correspondents, heads_its_row, latest_elsewhere,
+        message_cmp, nested_members, reader_conversation, row_for_reader_key, text_key_cmp,
+        thread_slot, unasked_threads, QuickFilter, QuickFilterContext, QuickFilters, SortOrder,
     };
-    use crate::ui::message_row::{row_edits, swap_wanted, swipe_progress_px, DaySection, RowData, RowEdit, SWIPE_ARM, SWIPE_MAX};
     use crate::models::Message;
+    use crate::ui::message_row::{
+        row_edits, swap_wanted, swipe_progress_px, DaySection, RowData, RowEdit, SWIPE_ARM,
+        SWIPE_MAX,
+    };
     use std::rc::Rc;
 
     /// Apply `row_edits` to `old` the way the model applies them, then add
@@ -6024,8 +6980,14 @@ mod tests {
         let mut thread_members = HashMap::new();
         thread_members.insert(key, vec![(1, 30), (1, 40)]);
 
-        assert!(heads_its_row((1, 30), &msg_thread, &thread_members), "the oldest shown is the row");
-        assert!(!heads_its_row((1, 40), &msg_thread, &thread_members), "a child row is not");
+        assert!(
+            heads_its_row((1, 30), &msg_thread, &thread_members),
+            "the oldest shown is the row"
+        );
+        assert!(
+            !heads_its_row((1, 40), &msg_thread, &thread_members),
+            "a child row is not"
+        );
         // A message grouped with nothing in the window is its own row, and the
         // reader is still free to look for the rest of it in the cache.
         assert!(heads_its_row((1, 10), &msg_thread, &thread_members));
@@ -6044,7 +7006,11 @@ mod tests {
             timestamp: 600,
             date: String::new(),
         };
-        let summary = ThreadSummary { count: 2, latest: Some(reply.clone()), ..Default::default() };
+        let summary = ThreadSummary {
+            count: 2,
+            latest: Some(reply.clone()),
+            ..Default::default()
+        };
 
         // The Inbox holds the message that came in at 500; the answer is later.
         assert_eq!(latest_elsewhere(Some(&summary), 500), Some(reply));
@@ -6057,7 +7023,13 @@ mod tests {
         // size, leaves the row alone.
         assert_eq!(latest_elsewhere(None, 500), None);
         assert_eq!(
-            latest_elsewhere(Some(&ThreadSummary { count: 3, ..Default::default() }), 500),
+            latest_elsewhere(
+                Some(&ThreadSummary {
+                    count: 3,
+                    ..Default::default()
+                }),
+                500
+            ),
             None
         );
     }
@@ -6106,7 +7078,10 @@ mod tests {
         assert_eq!(column_sort(ListColumn::Tags, false), SortOrder::Tags);
         assert_eq!(text_key_cmp("", "a"), std::cmp::Ordering::Greater);
         assert_eq!(text_key_cmp("ann", "bob"), std::cmp::Ordering::Less);
-        let due = |id, due| Message { due, ..msg(id, "", "") };
+        let due = |id, due| Message {
+            due,
+            ..msg(id, "", "")
+        };
         let mut list = vec![due(1, 0), due(2, 300), due(3, 100)];
         list.sort_by(|a, b| message_cmp(a, b, SortOrder::Due));
         assert_eq!(list.iter().map(|m| m.id).collect::<Vec<_>>(), vec![3, 2, 1]);
@@ -6123,7 +7098,11 @@ mod tests {
             to: "Zoe <z@example.com>".into(),
             ..msg(id, "", "")
         };
-        let (a, b, a2) = (from(1, "Ann", "a@example.com", 10), from(2, "", "b@example.com", 20), from(3, "Ann", "A@example.com", 30));
+        let (a, b, a2) = (
+            from(1, "Ann", "a@example.com", 10),
+            from(2, "", "b@example.com", 20),
+            from(3, "Ann", "A@example.com", 30),
+        );
         assert_eq!(correspondents(&[&a, &b, &a2]), "Ann, b@example.com");
         assert_eq!(correspondents(&[&a, &b]), "b@example.com, Ann");
         assert_eq!(correspondents(&[&a]), "Ann");
@@ -6135,21 +7114,33 @@ mod tests {
     /// same mail, or what the list's filters leave out.
     #[test]
     fn a_row_nests_only_the_conversation_filed_elsewhere() {
-        let in_folder = |id, mid: &str, folder| Message { folder_id: folder, ..msg(id, mid, "") };
+        let in_folder = |id, mid: &str, folder| Message {
+            folder_id: folder,
+            ..msg(id, mid, "")
+        };
         let own = vec![in_folder(1, "a@x", 1)];
         let found = vec![
-            in_folder(1, "a@x", 1),          // the inbox message itself
-            in_folder(90, "a@x", 9),         // its copy under All Mail
-            in_folder(91, "b@x", 3),         // your reply in Sent
-            in_folder(92, "b@x", 9),         // the reply's All Mail copy
-            in_folder(93, "c@x", 2),         // in another listed folder
-            Message { unread: true, ..in_folder(94, "d@x", 5) },
-            in_folder(95, "", 5),            // no Message-ID to tell copies by
+            in_folder(1, "a@x", 1),  // the inbox message itself
+            in_folder(90, "a@x", 9), // its copy under All Mail
+            in_folder(91, "b@x", 3), // your reply in Sent
+            in_folder(92, "b@x", 9), // the reply's All Mail copy
+            in_folder(93, "c@x", 2), // in another listed folder
+            Message {
+                unread: true,
+                ..in_folder(94, "d@x", 5)
+            },
+            in_folder(95, "", 5), // no Message-ID to tell copies by
         ];
         let listed = [(1u32, 1u32), (1, 2)].into_iter().collect();
         let ids = |v: Vec<Message>| v.iter().map(|m| m.id).collect::<Vec<_>>();
-        assert_eq!(ids(nested_members(&found, &own, &listed, &|_| true)), vec![91, 94]);
-        assert_eq!(ids(nested_members(&found, &own, &listed, &|m| m.unread)), vec![94]);
+        assert_eq!(
+            ids(nested_members(&found, &own, &listed, &|_| true)),
+            vec![91, 94]
+        );
+        assert_eq!(
+            ids(nested_members(&found, &own, &listed, &|m| m.unread)),
+            vec![94]
+        );
     }
 
     /// Two replies in an Inbox each answer a different message in Sent, and
@@ -6173,7 +7164,11 @@ mod tests {
         // Sent 2 replied to reply-a, which replied to Sent 1: one conversation.
         let links = vec![
             (1u32, "sent-1@us".to_string(), String::new()),
-            (1u32, "sent-2@us".to_string(), "sent-1@us reply-a@them".to_string()),
+            (
+                1u32,
+                "sent-2@us".to_string(),
+                "sent-1@us reply-a@them".to_string(),
+            ),
         ];
         let joined = compute_thread_keys(&shown, &links);
         assert_eq!(
@@ -6206,7 +7201,10 @@ mod tests {
     }
 
     fn listed(items: &[(u32, &str)]) -> Vec<(u32, String, Vec<String>)> {
-        items.iter().map(|(a, r)| (*a, r.to_string(), vec![format!("{r}@x")])).collect()
+        items
+            .iter()
+            .map(|(a, r)| (*a, r.to_string(), vec![format!("{r}@x")]))
+            .collect()
     }
 
     /// The counts come back as a rebuild, and a rebuild is what decides to ask.
@@ -6222,7 +7220,10 @@ mod tests {
         for (aid, root, _) in &first {
             asked.insert((*aid, root.clone()));
         }
-        assert!(unasked_threads(&page, &asked).is_empty(), "the answer must not start another round");
+        assert!(
+            unasked_threads(&page, &asked).is_empty(),
+            "the answer must not start another round"
+        );
     }
 
     /// A search re-filters the page on every keystroke, and each rebuild would
@@ -6245,7 +7246,10 @@ mod tests {
         let page = listed(&[(1, "a"), (1, "new")]);
 
         let fresh = unasked_threads(&page, &asked);
-        assert_eq!(fresh.iter().map(|(_, r, _)| r.as_str()).collect::<Vec<_>>(), vec!["new"]);
+        assert_eq!(
+            fresh.iter().map(|(_, r, _)| r.as_str()).collect::<Vec<_>>(),
+            vec!["new"]
+        );
     }
 
     /// Two accounts can root a thread at the same Message-ID (the unified
@@ -6258,7 +7262,10 @@ mod tests {
         let page = listed(&[(1, "shared"), (2, "shared")]);
 
         let fresh = unasked_threads(&page, &asked);
-        assert_eq!(fresh.iter().map(|(a, _, _)| *a).collect::<Vec<_>>(), vec![2]);
+        assert_eq!(
+            fresh.iter().map(|(a, _, _)| *a).collect::<Vec<_>>(),
+            vec![2]
+        );
     }
 
     /// A search over every folder holds the same UID once per folder. Those
@@ -6296,7 +7303,11 @@ mod tests {
         let shown = [msg(1, "a@x", ""), msg(2, "b@x", "")];
         let links = vec![(1u32, "c@x".to_string(), "a@x".to_string())];
         let keys = compute_thread_keys(&shown, &links);
-        assert_ne!(keys.get(&(1, 1, 1)), keys.get(&(1, 1, 2)), "still two conversations");
+        assert_ne!(
+            keys.get(&(1, 1, 1)),
+            keys.get(&(1, 1, 2)),
+            "still two conversations"
+        );
     }
 
     /// A long conversation groups whole. What it may drag in from *other*
@@ -6315,11 +7326,16 @@ mod tests {
         let keys = compute_thread_keys(&members, &[]);
         let root = keys.get(&(1, 1, 1)).cloned().expect("threaded");
         assert!(
-            members.iter().all(|m| keys.get(&(1, 1, m.id)) == Some(&root)),
+            members
+                .iter()
+                .all(|m| keys.get(&(1, 1, m.id)) == Some(&root)),
             "one conversation"
         );
         assert_eq!(
-            members.iter().filter(|m| keys.get(&(1, 1, m.id)) == Some(&root)).count(),
+            members
+                .iter()
+                .filter(|m| keys.get(&(1, 1, m.id)) == Some(&root))
+                .count(),
             n,
             "every message belongs to it, however long the thread runs"
         );
@@ -6352,9 +7368,7 @@ mod tests {
         let travel = |sensitivity: f64| {
             (1..=2000)
                 .map(|px| px as f64)
-                .find(|px| {
-                    swipe_progress_px(px / TOUCHPAD_BASE, sensitivity).abs() >= SWIPE_ARM
-                })
+                .find(|px| swipe_progress_px(px / TOUCHPAD_BASE, sensitivity).abs() >= SWIPE_ARM)
                 .expect("armed eventually")
         };
         // Untuned, a trackpad has to travel further than most can in one go —
@@ -6408,9 +7422,8 @@ mod tests {
         let conversation = reader_conversation(&emitted, &merged);
         assert_eq!(conversation, [(1, 1), (1, 2), (1, 3), (1, 77)]);
         let viewed = Some((1, 1));
-        let row = |key: (u32, u32)| {
-            row_for_reader_key(&key, &shown, &msg_thread, &conversation, viewed)
-        };
+        let row =
+            |key: (u32, u32)| row_for_reader_key(&key, &shown, &msg_thread, &conversation, viewed);
 
         // The head has a row of its own.
         assert_eq!(row((1, 1)), Some(0));
@@ -6421,7 +7434,10 @@ mod tests {
         assert_eq!(row((1, 77)), Some(0));
         // Going by what the list handed over alone, that copy would land
         // nowhere — the bug behind #220.
-        assert_eq!(row_for_reader_key(&(1, 77), &shown, &msg_thread, &emitted, viewed), None);
+        assert_eq!(
+            row_for_reader_key(&(1, 77), &shown, &msg_thread, &emitted, viewed),
+            None
+        );
         // A message in no conversation still matches only itself.
         assert_eq!(row((1, 9)), Some(1));
         // And one from neither is no row at all.
@@ -6456,10 +7472,20 @@ mod tests {
         let [today, yesterday, week, fortnight] = crate::datefmt::day_starts(now);
         assert!(today <= now && now - today < 25 * 3600);
         assert_eq!(crate::datefmt::day_key(today), crate::datefmt::day_key(now));
-        assert_ne!(crate::datefmt::day_key(today - 1), crate::datefmt::day_key(today));
-        for (later, earlier, days) in [(today, yesterday, 1), (today, week, 6), (today, fortnight, 13)] {
+        assert_ne!(
+            crate::datefmt::day_key(today - 1),
+            crate::datefmt::day_key(today)
+        );
+        for (later, earlier, days) in [
+            (today, yesterday, 1),
+            (today, week, 6),
+            (today, fortnight, 13),
+        ] {
             let gap = later - earlier;
-            assert!((gap - days * 86_400).abs() <= 3600, "{days} days back is {gap}s");
+            assert!(
+                (gap - days * 86_400).abs() <= 3600,
+                "{days} days back is {gap}s"
+            );
         }
     }
 
@@ -6468,7 +7494,13 @@ mod tests {
     #[test]
     fn sections_are_the_runs_of_one_heading() {
         use crate::ui::message_row::section_starts;
-        let row = |id: u32, section| Rc::new(RowData { msg: Rc::new(msg(id, "", "")), meta: Default::default(), section });
+        let row = |id: u32, section| {
+            Rc::new(RowData {
+                msg: Rc::new(msg(id, "", "")),
+                meta: Default::default(),
+                section,
+            })
+        };
         assert_eq!(section_starts(&[]), vec![0]);
         let plain: Vec<_> = (0..5).map(|i| row(i, DaySection::None)).collect();
         assert_eq!(section_starts(&plain), vec![0]);
@@ -6480,7 +7512,11 @@ mod tests {
             DaySection::Older,
             DaySection::Older,
         ];
-        let rows: Vec<_> = days.iter().enumerate().map(|(i, s)| row(i as u32, *s)).collect();
+        let rows: Vec<_> = days
+            .iter()
+            .enumerate()
+            .map(|(i, s)| row(i as u32, *s))
+            .collect();
         assert_eq!(section_starts(&rows), vec![0, 2, 3]);
     }
 
@@ -6491,7 +7527,9 @@ mod tests {
         let ctx = |filters: QuickFilters| QuickFilterContext {
             filters,
             own: ["me@example.com".to_string()].into_iter().collect(),
-            contacts: Some(std::sync::Arc::new(["x@example.com".to_string()].into_iter().collect())),
+            contacts: Some(std::sync::Arc::new(
+                ["x@example.com".to_string()].into_iter().collect(),
+            )),
             tags: Vec::new(),
             today: 900,
         };
@@ -6500,11 +7538,24 @@ mod tests {
         let all = QuickFilters::default();
         assert!(ctx(all).passes(&m));
         assert!(ctx(all.with(QuickFilter::ToMe, true)).passes(&m));
-        assert!(ctx(all.with(QuickFilter::Contacts, true).with(QuickFilter::Today, true)).passes(&m));
-        assert!(!ctx(all.with(QuickFilter::ToMe, true).with(QuickFilter::Unread, true)).passes(&m));
+        assert!(ctx(all
+            .with(QuickFilter::Contacts, true)
+            .with(QuickFilter::Today, true))
+        .passes(&m));
+        assert!(!ctx(all
+            .with(QuickFilter::ToMe, true)
+            .with(QuickFilter::Unread, true))
+        .passes(&m));
         m.unread = true;
-        assert!(ctx(all.with(QuickFilter::ToMe, true).with(QuickFilter::Unread, true)).passes(&m));
-        assert!(!ctx(all.with(QuickFilter::Unread, true).with(QuickFilter::Unread, false).with(QuickFilter::Attachment, true)).passes(&m));
+        assert!(ctx(all
+            .with(QuickFilter::ToMe, true)
+            .with(QuickFilter::Unread, true))
+        .passes(&m));
+        assert!(!ctx(all
+            .with(QuickFilter::Unread, true)
+            .with(QuickFilter::Unread, false)
+            .with(QuickFilter::Attachment, true))
+        .passes(&m));
         m.timestamp = 800;
         assert!(!ctx(all.with(QuickFilter::Today, true)).passes(&m));
     }
@@ -6519,7 +7570,13 @@ mod tests {
         m.from_addr = "ada@example.com".into();
         m.preview = "Figures attached.".into();
         let text = super::search_text_of(&m);
-        for hit in ["report", "ada lovelace", "ada@example", "figures", "QUARTERLY".to_lowercase().as_str()] {
+        for hit in [
+            "report",
+            "ada lovelace",
+            "ada@example",
+            "figures",
+            "QUARTERLY".to_lowercase().as_str(),
+        ] {
             assert!(text.contains(hit), "{hit}");
         }
         assert!(!text.contains("report ada"));

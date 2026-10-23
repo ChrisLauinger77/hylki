@@ -53,7 +53,9 @@ pub fn show(parent: &impl IsA<gtk::Window>, from: &'static Predecessor) {
     content.append(&text);
 
     if crate::platform::is_flatpak() {
-        let caption = gtk::Label::new(Some(i18n_f("To remove {old}, run:", &[("old", from.name)]).as_str()));
+        let caption = gtk::Label::new(Some(
+            i18n_f("To remove {old}, run:", &[("old", from.name)]).as_str(),
+        ));
         caption.set_xalign(0.0);
         caption.set_margin_top(6);
         caption.add_css_class("dim-label");

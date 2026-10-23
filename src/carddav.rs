@@ -64,13 +64,23 @@ impl Account {
         if !self.name.trim().is_empty() {
             return self.name.trim().to_string();
         }
-        let host = parse_url(&self.url).map(|u| u.host).unwrap_or_else(|_| self.url.clone());
-        if self.user.trim().is_empty() { host } else { format!("{}@{host}", self.user.trim()) }
+        let host = parse_url(&self.url)
+            .map(|u| u.host)
+            .unwrap_or_else(|_| self.url.clone());
+        if self.user.trim().is_empty() {
+            host
+        } else {
+            format!("{}@{host}", self.user.trim())
+        }
     }
 
     fn from_source(uid: &str, path: &str, data: &str, books: Vec<String>) -> Option<Self> {
         let kf = crate::platform::keyfile(data)?;
-        let get = |group: &str, key: &str| kf.string(group, key).map(|s| s.to_string()).unwrap_or_default();
+        let get = |group: &str, key: &str| {
+            kf.string(group, key)
+                .map(|s| s.to_string())
+                .unwrap_or_default()
+        };
         // A WebDAV collection, but not one GNOME Online Accounts keeps:
         // that is changed in Online Accounts.
         if get("Collection", "BackendName") != "webdav" || kf.has_group("GNOME Online Accounts") {
@@ -131,7 +141,11 @@ pub fn parse_url(text: &str) -> Result<ServerUrl, String> {
     if text.is_empty() {
         return Err(i18n("Enter the server's address."));
     }
-    let url = if text.contains("://") { text.to_string() } else { format!("https://{text}") };
+    let url = if text.contains("://") {
+        text.to_string()
+    } else {
+        format!("https://{text}")
+    };
     let uri = gtk::glib::Uri::parse(&url, gtk::glib::UriFlags::NONE)
         .map_err(|_| i18n_f("“{text}” is not a server address.", &[("text", text)]))?;
     let tls = match uri.scheme().to_ascii_lowercase().as_str() {
@@ -141,10 +155,21 @@ pub fn parse_url(text: &str) -> Result<ServerUrl, String> {
     };
     let host = uri.host().map(|h| h.to_string()).unwrap_or_default();
     if host.is_empty() {
-        return Err(i18n_f("“{text}” is not a server address.", &[("text", text)]));
+        return Err(i18n_f(
+            "“{text}” is not a server address.",
+            &[("text", text)],
+        ));
     }
-    let port = u16::try_from(uri.port()).ok().filter(|p| *p != 0).unwrap_or(if tls { 443 } else { 80 });
-    Ok(ServerUrl { url, host, port, tls })
+    let port = u16::try_from(uri.port())
+        .ok()
+        .filter(|p| *p != 0)
+        .unwrap_or(if tls { 443 } else { 80 });
+    Ok(ServerUrl {
+        url,
+        host,
+        port,
+        tls,
+    })
 }
 
 fn registry() -> Result<String, String> {
@@ -161,12 +186,20 @@ pub fn list() -> Result<Vec<Account>, String> {
     let sources = crate::contacts::registry_sources().ok_or_else(not_available)?;
     let mut books: HashMap<String, Vec<String>> = HashMap::new();
     for (_, _, data) in &sources {
-        let Some(kf) = crate::platform::keyfile(data) else { continue };
+        let Some(kf) = crate::platform::keyfile(data) else {
+            continue;
+        };
         if !kf.has_group("Address Book") {
             continue;
         }
-        let parent = kf.string("Data Source", "Parent").map(|s| s.to_string()).unwrap_or_default();
-        let name = kf.string("Data Source", "DisplayName").map(|s| s.to_string()).unwrap_or_default();
+        let parent = kf
+            .string("Data Source", "Parent")
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let name = kf
+            .string("Data Source", "DisplayName")
+            .map(|s| s.to_string())
+            .unwrap_or_default();
         if !parent.is_empty() {
             books.entry(parent).or_default().push(name);
         }
@@ -196,11 +229,19 @@ pub fn save(account: &Account, password: Option<&str>) -> Result<String, String>
         // In the keyring before the source exists, so EDS finds it the
         // moment it first looks.
         if let Some(pw) = password {
-            crate::config::store_eds_password(&account.uid, &account.title(), pw).map_err(|e| e.to_string())?;
+            crate::config::store_eds_password(&account.uid, &account.title(), pw)
+                .map_err(|e| e.to_string())?;
         }
-        let sources: HashMap<&str, String> = HashMap::from([(account.uid.as_str(), account.to_source(&url))]);
-        conn.call_method(Some(dest.as_str()), MANAGER_PATH, Some(MANAGER_IFACE), "CreateSources", &(sources,))
-            .map_err(|e| e.to_string())?;
+        let sources: HashMap<&str, String> =
+            HashMap::from([(account.uid.as_str(), account.to_source(&url))]);
+        conn.call_method(
+            Some(dest.as_str()),
+            MANAGER_PATH,
+            Some(MANAGER_IFACE),
+            "CreateSources",
+            &(sources,),
+        )
+        .map_err(|e| e.to_string())?;
     } else {
         conn.call_method(
             Some(dest.as_str()),
@@ -211,10 +252,14 @@ pub fn save(account: &Account, password: Option<&str>) -> Result<String, String>
         )
         .map_err(|e| e.to_string())?;
         if let Some(pw) = password {
-            crate::config::store_eds_password(&account.uid, &account.title(), pw).map_err(|e| e.to_string())?;
+            crate::config::store_eds_password(&account.uid, &account.title(), pw)
+                .map_err(|e| e.to_string())?;
             // A source that gave up on the old password tries the new one
             // now rather than at its next look.
-            let credentials = vec![format!("username:{}", account.user.trim()), format!("password:{pw}")];
+            let credentials = vec![
+                format!("username:{}", account.user.trim()),
+                format!("password:{pw}"),
+            ];
             let _ = conn.call_method(
                 Some(dest.as_str()),
                 account.path.as_str(),
@@ -239,8 +284,14 @@ pub fn set_enabled(account: &Account, enabled: bool) -> Result<(), String> {
 pub fn remove(account: &Account) -> Result<(), String> {
     let conn = crate::directory::bus()?;
     let dest = registry()?;
-    conn.call_method(Some(dest.as_str()), account.path.as_str(), Some(REMOVABLE_IFACE), "Remove", &())
-        .map_err(|e| e.to_string())?;
+    conn.call_method(
+        Some(dest.as_str()),
+        account.path.as_str(),
+        Some(REMOVABLE_IFACE),
+        "Remove",
+        &(),
+    )
+    .map_err(|e| e.to_string())?;
     crate::config::delete_eds_password(&account.uid);
     Ok(())
 }
@@ -280,13 +331,24 @@ pub fn status(account: &Account) -> Status {
         return Status::Failed(not_available());
     };
     let last = conn
-        .call_method(Some(dest.as_str()), account.path.as_str(), Some(SOURCE_IFACE), "GetLastCredentialsRequiredArguments", &())
+        .call_method(
+            Some(dest.as_str()),
+            account.path.as_str(),
+            Some(SOURCE_IFACE),
+            "GetLastCredentialsRequiredArguments",
+            &(),
+        )
         .ok()
-        .and_then(|r| r.body().deserialize::<(String, String, String, String, String)>().ok());
-    let connection = zbus::blocking::Proxy::new(&conn, dest.as_str(), account.path.as_str(), SOURCE_IFACE)
-        .ok()
-        .and_then(|p| p.get_property::<String>("ConnectionStatus").ok())
-        .unwrap_or_default();
+        .and_then(|r| {
+            r.body()
+                .deserialize::<(String, String, String, String, String)>()
+                .ok()
+        });
+    let connection =
+        zbus::blocking::Proxy::new(&conn, dest.as_str(), account.path.as_str(), SOURCE_IFACE)
+            .ok()
+            .and_then(|p| p.get_property::<String>("ConnectionStatus").ok())
+            .unwrap_or_default();
     let (reason, message) = last.map(|(r, _, _, _, m)| (r, m)).unwrap_or_default();
     match reason.as_str() {
         "rejected" => Status::Rejected,
@@ -301,7 +363,9 @@ pub fn status(account: &Account) -> Status {
             "The server's certificate could not be verified: {error}",
             &[("error", message.trim())],
         )),
-        "error" if message.trim().is_empty() => Status::Failed(i18n("Could not connect to the server.")),
+        "error" if message.trim().is_empty() => {
+            Status::Failed(i18n("Could not connect to the server."))
+        }
         "error" => Status::Failed(message.trim().to_string()),
         _ if connection == "connecting" || account.books.is_empty() => Status::Connecting,
         _ => Status::Connected,
@@ -315,7 +379,8 @@ pub fn status(account: &Account) -> Status {
 /// The address books Hylki holds open, by source UID: when each was last
 /// asked to sync.
 fn opened() -> &'static Mutex<HashMap<String, Instant>> {
-    static OPENED: std::sync::OnceLock<Mutex<HashMap<String, Instant>>> = std::sync::OnceLock::new();
+    static OPENED: std::sync::OnceLock<Mutex<HashMap<String, Instant>>> =
+        std::sync::OnceLock::new();
     OPENED.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -326,8 +391,13 @@ const SYNC_AFTER: Duration = Duration::from_secs(5 * 60);
 /// GNOME Online Accounts and Microsoft 365, not the local ones, which have
 /// nothing to fetch, nor LDAP directories, which are asked as one types.
 fn server_books() -> Vec<String> {
-    let Some(sources) = crate::contacts::registry_sources() else { return Vec::new() };
-    let by_uid: HashMap<String, String> = sources.iter().map(|(_, uid, data)| (uid.clone(), data.clone())).collect();
+    let Some(sources) = crate::contacts::registry_sources() else {
+        return Vec::new();
+    };
+    let by_uid: HashMap<String, String> = sources
+        .iter()
+        .map(|(_, uid, data)| (uid.clone(), data.clone()))
+        .collect();
     let off = crate::contact_sources::off();
     let disabled: HashSet<String> = sources
         .iter()
@@ -342,7 +412,10 @@ fn server_books() -> Vec<String> {
         .filter_map(|(_, uid, data)| {
             let kf = crate::platform::keyfile(data)?;
             let backend = kf.string("Address Book", "BackendName").ok()?.to_string();
-            let parent = kf.string("Data Source", "Parent").map(|s| s.to_string()).unwrap_or_default();
+            let parent = kf
+                .string("Data Source", "Parent")
+                .map(|s| s.to_string())
+                .unwrap_or_default();
             let wanted = !matches!(backend.as_str(), "local" | "ldap" | "")
                 && !disabled.contains(uid)
                 && !disabled.contains(&parent)
@@ -357,12 +430,16 @@ fn server_books() -> Vec<String> {
 /// changed. Blocking: run it off the main thread. Answers whether any book
 /// was synced, so the caller can read the contacts again.
 pub fn sync_books(force: bool) -> bool {
-    let (Ok(conn), Some(factory)) = (crate::directory::bus(), crate::contacts::factory_dest()) else {
+    let (Ok(conn), Some(factory)) = (crate::directory::bus(), crate::contacts::factory_dest())
+    else {
         return false;
     };
     let mut synced = false;
     for uid in server_books() {
-        let due = opened().lock().ok().is_none_or(|o| o.get(&uid).is_none_or(|t| force || t.elapsed() >= SYNC_AFTER));
+        let due = opened().lock().ok().is_none_or(|o| {
+            o.get(&uid)
+                .is_none_or(|t| force || t.elapsed() >= SYNC_AFTER)
+        });
         if !due {
             continue;
         }
@@ -378,7 +455,13 @@ pub fn sync_books(force: bool) -> bool {
         if let Ok(mut o) = opened().lock() {
             o.insert(uid.clone(), Instant::now());
         }
-        match conn.call_method(Some(bus_name.as_str()), path.as_str(), Some(crate::contacts::BOOK_IFACE), "Refresh", &()) {
+        match conn.call_method(
+            Some(bus_name.as_str()),
+            path.as_str(),
+            Some(crate::contacts::BOOK_IFACE),
+            "Refresh",
+            &(),
+        ) {
             Ok(_) => synced = true,
             Err(e) => tracing::debug!(book = %uid, "address book did not sync: {e}"),
         }
@@ -396,14 +479,18 @@ const SIGN_IN_GRACE: Duration = Duration::from_secs(6);
 pub fn await_books(uid: &str, limit: Duration, signing_in: bool) -> Option<Account> {
     let started = Instant::now();
     loop {
-        let account = list().ok().and_then(|l| l.into_iter().find(|a| a.uid == uid));
+        let account = list()
+            .ok()
+            .and_then(|l| l.into_iter().find(|a| a.uid == uid));
         let grace_over = started.elapsed() >= SIGN_IN_GRACE;
         // A source asks for its password as it starts, and EDS answers from
         // the keyring a moment later: only a request that stays counts.
         let settled = account.as_ref().is_some_and(|a| match status(a) {
             Status::Rejected | Status::Failed(_) => true,
             Status::NeedsPassword => grace_over,
-            Status::Connected | Status::Connecting => !a.books.is_empty() && (!signing_in || grace_over),
+            Status::Connected | Status::Connecting => {
+                !a.books.is_empty() && (!signing_in || grace_over)
+            }
         });
         if settled || started.elapsed() >= limit {
             if account.as_ref().is_some_and(|a| !a.books.is_empty()) {
@@ -422,7 +509,10 @@ mod tests {
     #[test]
     fn a_bare_server_name_is_taken_as_https() {
         let u = parse_url(" cloud.example.org ").unwrap();
-        assert_eq!((u.url.as_str(), u.host.as_str(), u.port, u.tls), ("https://cloud.example.org", "cloud.example.org", 443, true));
+        assert_eq!(
+            (u.url.as_str(), u.host.as_str(), u.port, u.tls),
+            ("https://cloud.example.org", "cloud.example.org", 443, true)
+        );
         let u = parse_url("http://127.0.0.1:5232/dav/").unwrap();
         assert_eq!((u.host.as_str(), u.port, u.tls), ("127.0.0.1", 5232, false));
         assert!(parse_url("").is_err());
@@ -431,10 +521,14 @@ mod tests {
 
     #[test]
     fn an_account_is_a_webdav_collection_not_kept_by_online_accounts() {
-        let own = "[Data Source]\nDisplayName=Work\nEnabled=true\n\n[Collection]\nBackendName=webdav\n\
+        let own =
+            "[Data Source]\nDisplayName=Work\nEnabled=true\n\n[Collection]\nBackendName=webdav\n\
                    ContactsUrl=https://dav.example.org/\n\n[Authentication]\nUser=ann\n";
         let a = Account::from_source("u1", "/p", own, vec!["Team".into()]).unwrap();
-        assert_eq!((a.title().as_str(), a.url.as_str(), a.user.as_str()), ("Work", "https://dav.example.org/", "ann"));
+        assert_eq!(
+            (a.title().as_str(), a.url.as_str(), a.user.as_str()),
+            ("Work", "https://dav.example.org/", "ann")
+        );
         let goa = format!("{own}\n[GNOME Online Accounts]\nAccountId=account_1\n");
         assert!(Account::from_source("u2", "/p", &goa, Vec::new()).is_none());
         let google = own.replace("BackendName=webdav", "BackendName=google");
@@ -452,10 +546,16 @@ mod tests {
         assert!(kf.boolean("Collection", "ContactsEnabled").unwrap());
         assert!(!kf.boolean("Collection", "CalendarEnabled").unwrap());
         assert!(!kf.boolean("Collection", "MailEnabled").unwrap());
-        assert_eq!(kf.string("Collection", "ContactsUrl").unwrap(), "https://dav.example.org");
+        assert_eq!(
+            kf.string("Collection", "ContactsUrl").unwrap(),
+            "https://dav.example.org"
+        );
         assert_eq!(kf.string("Security", "Method").unwrap(), "tls");
         assert_eq!(kf.integer("Authentication", "Port").unwrap(), 443);
-        assert_eq!(kf.string("Data Source", "DisplayName").unwrap(), "ann@dav.example.org");
+        assert_eq!(
+            kf.string("Data Source", "DisplayName").unwrap(),
+            "ann@dav.example.org"
+        );
     }
 
     /// Against a real server, in a session with EDS and a keyring:
@@ -467,7 +567,9 @@ mod tests {
     #[test]
     #[ignore]
     fn live() {
-        let Ok(spec) = std::env::var("CARDDAV_LIVE") else { return };
+        let Ok(spec) = std::env::var("CARDDAV_LIVE") else {
+            return;
+        };
         let mut f = spec.splitn(3, '|').map(str::to_string);
         let (url, user, pw) = (f.next().unwrap(), f.next().unwrap(), f.next().unwrap());
         let mut a = Account::empty();
@@ -475,7 +577,12 @@ mod tests {
         a.user = user;
         let uid = super::save(&a, Some(&pw)).unwrap();
         let got = super::await_books(&uid, std::time::Duration::from_secs(30), true).unwrap();
-        println!("books {:?}, {:?}, password kept: {}", got.books, super::status(&got), super::has_password(&got));
+        println!(
+            "books {:?}, {:?}, password kept: {}",
+            got.books,
+            super::status(&got),
+            super::has_password(&got)
+        );
         println!("synced: {}", super::sync_books(true));
         std::thread::sleep(std::time::Duration::from_secs(2));
         for c in crate::contacts::read_contact_details() {

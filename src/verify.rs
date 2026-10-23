@@ -24,8 +24,8 @@
 //! sets up DKIM properly gets a clean pass. That's why domain and display-name
 //! mismatches are reported alongside the authentication verdict.
 
-use crate::models::{SenderCheck, SenderTrust};
 use crate::i18n::{i18n, i18n_f};
+use crate::models::{SenderCheck, SenderTrust};
 
 /// One authentication method's outcome, as reported by the receiving server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,7 +114,6 @@ fn gather(raw: &[u8]) -> Evidence {
     ev.invite = crate::invite::detect(&parsed).map(Box::new);
     ev.label = crate::sensitivity::detect(&parsed);
 
-
     let first_addr = |a: Option<&mail_parser::Address>| -> Option<String> {
         a.and_then(|a| a.first())
             .and_then(|x| x.address())
@@ -138,7 +137,6 @@ fn gather(raw: &[u8]) -> Evidence {
         .header("Return-Path")
         .and_then(header_text)
         .and_then(|v| domain_of(v.trim().trim_start_matches('<').trim_end_matches('>')));
-
 
     // Providers split their verdicts differently: Gmail packs SPF, DKIM and DMARC
     // into one header, while iCloud emits one header per method, each with its
@@ -302,7 +300,10 @@ fn judge(ev: &Evidence) -> SenderCheck {
         AuthResult::Other => Some(i18n_f("{name}: inconclusive", &[("name", name)])),
         AuthResult::Missing => None,
     };
-    findings.extend(describe(&i18n("DMARC (is the From: address genuine)"), dmarc));
+    findings.extend(describe(
+        &i18n("DMARC (is the From: address genuine)"),
+        dmarc,
+    ));
     findings.extend(describe(&i18n("DKIM (signature)"), dkim));
     findings.extend(describe(&i18n("SPF (sending server)"), spf));
     if let Some(d) = &ev.dkim_domain {
@@ -320,7 +321,10 @@ fn judge(ev: &Evidence) -> SenderCheck {
     let mut downgraded_by_addressing = false;
     if let Some(reply) = &ev.reply_to_domain {
         if !same_site(reply, &ev.from_domain) {
-            findings.push(i18n_f("Replies would go to {reply}, not {from}", &[("reply", reply), ("from", &from.to_string())]));
+            findings.push(i18n_f(
+                "Replies would go to {reply}, not {from}",
+                &[("reply", reply), ("from", &from.to_string())],
+            ));
             // An organisation answering from another domain of its own (a
             // newsletter's reply address on its mailing service, a1.at
             // replying from email.a1.net) is everyday mail: the note says
@@ -460,7 +464,10 @@ mod tests {
             "Subject: Your order",
         )));
         assert_eq!(check.trust, SenderTrust::Pass);
-        assert!(check.findings.iter().any(|f| f.contains("DMARC")), "{check:?}");
+        assert!(
+            check.findings.iter().any(|f| f.contains("DMARC")),
+            "{check:?}"
+        );
     }
 
     /// iCloud splits its verdicts across several headers, one per method, and
@@ -478,7 +485,13 @@ mod tests {
             "From: Amazon.com <account-update@amazon.com>\r\n",
         )));
         assert_eq!(check.trust, SenderTrust::Pass, "{check:?}");
-        assert!(check.findings.iter().any(|f| f.contains("Checked by: dmarc.icloud.com")), "{check:?}");
+        assert!(
+            check
+                .findings
+                .iter()
+                .any(|f| f.contains("Checked by: dmarc.icloud.com")),
+            "{check:?}"
+        );
     }
 
     /// A `header.d` on a header that reported no DKIM result (iCloud's BIMI one)
@@ -490,7 +503,10 @@ mod tests {
             "From: Amazon <account-update@amazon.com>\r\n",
         )));
         assert_eq!(check.trust, SenderTrust::Unverified, "{check:?}");
-        assert!(!check.findings.iter().any(|f| f.starts_with("Signed by")), "{check:?}");
+        assert!(
+            !check.findings.iter().any(|f| f.starts_with("Signed by")),
+            "{check:?}"
+        );
     }
 
     #[test]
@@ -530,7 +546,10 @@ mod tests {
         assert_ne!(check.trust, SenderTrust::Fail, "{check:?}");
         // The detail is still there for anyone who looks.
         assert!(
-            check.findings.iter().any(|f| f.contains("DKIM") && f.contains("FAILED")),
+            check
+                .findings
+                .iter()
+                .any(|f| f.contains("DKIM") && f.contains("FAILED")),
             "{check:?}"
         );
     }
@@ -612,7 +631,10 @@ mod tests {
             "Reply-To: reply-x.500019@email.a1.net\r\n",
         )));
         assert_eq!(check.trust, SenderTrust::Pass);
-        assert!(check.findings.iter().any(|f| f.contains("email.a1.net")), "{check:?}");
+        assert!(
+            check.findings.iter().any(|f| f.contains("email.a1.net")),
+            "{check:?}"
+        );
     }
 
     #[test]

@@ -52,7 +52,10 @@ fn local(ts: i64) -> Option<glib::DateTime> {
 }
 
 fn fmt(dt: &glib::DateTime, pattern: &str) -> String {
-    let text = dt.format(pattern).map(|s| s.to_string()).unwrap_or_default();
+    let text = dt
+        .format(pattern)
+        .map(|s| s.to_string())
+        .unwrap_or_default();
     // Some locales pad a field ("%b" is " 8月" in Japanese), which doubles up
     // against the space this pattern already puts there.
     text.split_whitespace().collect::<Vec<_>>().join(" ")
@@ -254,7 +257,10 @@ pub fn date_time(ts: i64) -> String {
     if local(ts).is_none() {
         return String::new();
     }
-    crate::i18n::i18n_f("{date} at {time}", &[("date", &day_month_year(ts)), ("time", &time(ts))])
+    crate::i18n::i18n_f(
+        "{date} at {time}",
+        &[("date", &day_month_year(ts)), ("time", &time(ts))],
+    )
 }
 
 /// The day an event falls on, with its weekday: "Monday, 2 Nov 2026".
@@ -322,13 +328,32 @@ pub fn day_key(ts: i64) -> (i32, i32) {
 /// midnight.
 pub fn day_starts(now: i64) -> [i64; 4] {
     let midnight = local(now).and_then(|dt| {
-        glib::DateTime::new(&dt.timezone(), dt.year(), dt.month(), dt.day_of_month(), 0, 0, 0.0).ok()
+        glib::DateTime::new(
+            &dt.timezone(),
+            dt.year(),
+            dt.month(),
+            dt.day_of_month(),
+            0,
+            0,
+            0.0,
+        )
+        .ok()
     });
     let Some(midnight) = midnight else {
         let today = now - now.rem_euclid(86_400);
-        return [today, today - 86_400, today - 6 * 86_400, today - 13 * 86_400];
+        return [
+            today,
+            today - 86_400,
+            today - 6 * 86_400,
+            today - 13 * 86_400,
+        ];
     };
-    let back = |days: i32| midnight.add_days(-days).map(|d| d.to_unix()).unwrap_or(i64::MIN);
+    let back = |days: i32| {
+        midnight
+            .add_days(-days)
+            .map(|d| d.to_unix())
+            .unwrap_or(i64::MIN)
+    };
     [midnight.to_unix(), back(1), back(6), back(13)]
 }
 
@@ -344,7 +369,9 @@ pub fn now() -> i64 {
     if let Some(ts) = demo {
         return *ts;
     }
-    glib::DateTime::now_local().map(|d| d.to_unix()).unwrap_or_default()
+    glib::DateTime::now_local()
+        .map(|d| d.to_unix())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -382,7 +409,10 @@ mod tests {
         // All day: the date alone, even though the event runs to midnight.
         let day = event_span(start, start + 86_400, true);
         assert!(!day.contains('–'), "{day}");
-        assert!(!day.contains('·'), "no time of day on an all-day event: {day}");
+        assert!(
+            !day.contains('·'),
+            "no time of day on an all-day event: {day}"
+        );
 
         // Two days: both dates.
         let two = event_span(start, start + 2 * 86_400, true);
@@ -410,15 +440,31 @@ mod tests {
         // each choice has to hold regardless of that.
         let ts = 1787478020; // 2026-08-23, 09:40 UTC
         set_style(DateStyle::DayFirst, ClockStyle::Twelve);
-        assert!(day_month_year(ts).starts_with("23"), "{}", day_month_year(ts));
+        assert!(
+            day_month_year(ts).starts_with("23"),
+            "{}",
+            day_month_year(ts)
+        );
         assert!(time(ts).contains(':') && time(ts).len() > 5, "{}", time(ts));
 
         set_style(DateStyle::YearFirst, ClockStyle::TwentyFour);
-        assert!(day_month_year(ts).starts_with("2026"), "{}", day_month_year(ts));
-        assert!(!time(ts).contains("AM") && !time(ts).contains("PM"), "{}", time(ts));
+        assert!(
+            day_month_year(ts).starts_with("2026"),
+            "{}",
+            day_month_year(ts)
+        );
+        assert!(
+            !time(ts).contains("AM") && !time(ts).contains("PM"),
+            "{}",
+            time(ts)
+        );
 
         set_style(DateStyle::MonthFirst, ClockStyle::System);
-        assert!(day_month_year(ts).starts_with("Aug"), "{}", day_month_year(ts));
+        assert!(
+            day_month_year(ts).starts_with("Aug"),
+            "{}",
+            day_month_year(ts)
+        );
 
         // Back to following the locale, so the other tests see it as they found it.
         set_style(DateStyle::System, ClockStyle::System);

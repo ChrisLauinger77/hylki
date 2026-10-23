@@ -106,13 +106,18 @@ impl Store {
     /// yet. A read never writes the file: the photo watcher fingerprints it,
     /// and a write on every read made it look changed on every look.
     fn open_read() -> Result<Option<Store>, String> {
-        let Some(path) = db_path().filter(|p| p.is_file()) else { return Ok(None) };
+        let Some(path) = db_path().filter(|p| p.is_file()) else {
+            return Ok(None);
+        };
         Store::open_read_at(&path)
     }
 
     fn open_read_at(path: &Path) -> Result<Option<Store>, String> {
-        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_URI;
-        let conn = Connection::open_with_flags(path, flags).map_err(|e| format!("{}: {e}", path.display()))?;
+        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_URI;
+        let conn = Connection::open_with_flags(path, flags)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
         match schema_version(&conn).map_err(|e| format!("{}: {e}", path.display()))? {
             0 => Ok(None),
             _ => Ok(Some(Store { conn })),
@@ -124,7 +129,12 @@ impl Store {
     fn open_at(path: &Path) -> Result<Store, String> {
         {
             use std::os::unix::fs::OpenOptionsExt;
-            let _ = std::fs::OpenOptions::new().write(true).create(true).truncate(false).mode(0o600).open(path);
+            let _ = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .mode(0o600)
+                .open(path);
         }
         let conn = Connection::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
         restrict(path);
@@ -133,7 +143,8 @@ impl Store {
 
     /// Enable foreign keys, and create the schema when the file has none yet.
     fn init(conn: Connection) -> Result<Store, String> {
-        conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| e.to_string())?;
+        conn.execute_batch("PRAGMA foreign_keys = ON;")
+            .map_err(|e| e.to_string())?;
         if schema_version(&conn)? < SCHEMA_VERSION {
             conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
             conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION};"))
@@ -170,7 +181,11 @@ impl Store {
         let tx = self.conn.transaction().map_err(|e| e.to_string())?;
         match upsert_tx(&tx, vcard, false, None)? {
             Upsert::Added | Upsert::Updated | Upsert::Duplicate => {}
-            Upsert::Invalid => return Err(i18n("A contact needs a name, an email address or a phone number")),
+            Upsert::Invalid => {
+                return Err(i18n(
+                    "A contact needs a name, an email address or a phone number",
+                ))
+            }
             Upsert::TooBig => return Err(i18n("The contact is too large")),
         }
         tx.commit().map_err(|e| e.to_string())
@@ -190,14 +205,18 @@ impl Store {
             .conn
             .prepare("SELECT vcard FROM contact ORDER BY name COLLATE NOCASE, uid")
             .map_err(|e| e.to_string())?;
-        let rows = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
         rows.collect::<Result<_, _>>().map_err(|e| e.to_string())
     }
 
     /// One stored vCard by its UID.
     fn vcard(&self, uid: &str) -> Result<Option<String>, String> {
         self.conn
-            .query_row("SELECT vcard FROM contact WHERE uid = ?1", [uid], |r| r.get(0))
+            .query_row("SELECT vcard FROM contact WHERE uid = ?1", [uid], |r| {
+                r.get(0)
+            })
             .optional()
             .map_err(|e| e.to_string())
     }
@@ -207,16 +226,22 @@ impl Store {
     fn group_vcards(&self) -> Result<Vec<String>, String> {
         let mut stmt = self
             .conn
-            .prepare(&format!("SELECT vcard FROM contact WHERE {GROUP_WHERE} ORDER BY name COLLATE NOCASE, uid"))
+            .prepare(&format!(
+                "SELECT vcard FROM contact WHERE {GROUP_WHERE} ORDER BY name COLLATE NOCASE, uid"
+            ))
             .map_err(|e| e.to_string())?;
-        let rows = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
         rows.collect::<Result<_, _>>().map_err(|e| e.to_string())
     }
 
     /// How many people the book holds: its contacts less its groups.
     fn people(&self) -> usize {
         let sql = format!("SELECT count(*) FROM contact WHERE NOT ({GROUP_WHERE})");
-        self.conn.query_row(&sql, [], |r| r.get::<_, i64>(0)).map_or(0, |n| n as usize)
+        self.conn
+            .query_row(&sql, [], |r| r.get::<_, i64>(0))
+            .map_or(0, |n| n as usize)
     }
 
     /// (display name, email) for every address in the book.
@@ -257,7 +282,9 @@ fn schema_version(conn: &Connection) -> Result<i64, String> {
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .map_err(|e| e.to_string())?;
     if version > SCHEMA_VERSION {
-        return Err(format!("the local address book is from a newer Hylki (schema {version})"));
+        return Err(format!(
+            "the local address book is from a newer Hylki (schema {version})"
+        ));
     }
     Ok(version)
 }
@@ -285,7 +312,11 @@ fn upsert_tx(
         return Ok(Upsert::Invalid);
     };
     let (uid, vcard) = if details.eds_uid.is_empty() {
-        let uid = if stable_uid { content_uid(vcard) } else { random_uid()? };
+        let uid = if stable_uid {
+            content_uid(vcard)
+        } else {
+            random_uid()?
+        };
         let with_uid = insert_uid(vcard, &uid);
         (uid, with_uid)
     } else {
@@ -311,7 +342,8 @@ fn upsert_tx(
         params![uid, vcard, details.name, now],
     )
     .map_err(|e| e.to_string())?;
-    tx.execute("DELETE FROM contact_email WHERE uid = ?1", [&uid]).map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM contact_email WHERE uid = ?1", [&uid])
+        .map_err(|e| e.to_string())?;
     for email in &details.emails {
         tx.execute(
             "INSERT INTO contact_email (uid, email_lower, email) VALUES (?1, ?2, ?3)",
@@ -319,12 +351,19 @@ fn upsert_tx(
         )
         .map_err(|e| e.to_string())?;
     }
-    Ok(if existed { Upsert::Updated } else { Upsert::Added })
+    Ok(if existed {
+        Upsert::Updated
+    } else {
+        Upsert::Added
+    })
 }
 
 /// A random UID for a contact created in the editor.
 fn random_uid() -> Result<String, String> {
-    Ok(format!("hylki-{}", crate::rng::token(24).map_err(|e| e.to_string())?))
+    Ok(format!(
+        "hylki-{}",
+        crate::rng::token(24).map_err(|e| e.to_string())?
+    ))
 }
 
 /// A UID derived from the vCard text, so the same card always maps to the same contact.
@@ -368,7 +407,9 @@ pub fn split_vcards(text: &str) -> (Vec<String>, usize) {
             }
             current = Some(String::new());
         }
-        let Some(block) = current.as_mut() else { continue };
+        let Some(block) = current.as_mut() else {
+            continue;
+        };
         block.push_str(line);
         block.push_str("\r\n");
         if marker.eq_ignore_ascii_case("END:VCARD") {
@@ -414,7 +455,8 @@ pub fn decode_quoted_printable(block: &str) -> String {
         let name = params.next().unwrap_or("");
         let params: Vec<&str> = params.collect();
         let qp = params.iter().any(|p| {
-            p.eq_ignore_ascii_case("ENCODING=QUOTED-PRINTABLE") || p.eq_ignore_ascii_case("QUOTED-PRINTABLE")
+            p.eq_ignore_ascii_case("ENCODING=QUOTED-PRINTABLE")
+                || p.eq_ignore_ascii_case("QUOTED-PRINTABLE")
         });
         if !qp {
             push_line(&mut out, line);
@@ -430,11 +472,16 @@ pub fn decode_quoted_printable(block: &str) -> String {
         }
         let charset = params
             .iter()
-            .find_map(|p| p.split_once('=').filter(|(k, _)| k.eq_ignore_ascii_case("CHARSET")).map(|(_, v)| v))
+            .find_map(|p| {
+                p.split_once('=')
+                    .filter(|(k, _)| k.eq_ignore_ascii_case("CHARSET"))
+                    .map(|(_, v)| v)
+            })
             .unwrap_or("UTF-8");
         let bytes = qp_bytes(&raw);
         let text = if charset.eq_ignore_ascii_case("UTF-8") {
-            String::from_utf8(bytes).unwrap_or_else(|e| e.into_bytes().iter().map(|&b| b as char).collect())
+            String::from_utf8(bytes)
+                .unwrap_or_else(|e| e.into_bytes().iter().map(|&b| b as char).collect())
         } else {
             // ISO-8859-1 and its Windows cousin, which older phones use.
             bytes.iter().map(|&b| b as char).collect()
@@ -476,7 +523,11 @@ fn qp_bytes(raw: &str) -> Vec<u8> {
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
     while i < b.len() {
-        if b[i] == b'=' && i + 2 < b.len() && b[i + 1].is_ascii_hexdigit() && b[i + 2].is_ascii_hexdigit() {
+        if b[i] == b'='
+            && i + 2 < b.len()
+            && b[i + 1].is_ascii_hexdigit()
+            && b[i + 2].is_ascii_hexdigit()
+        {
             let hex = |c: u8| (c as char).to_digit(16).unwrap_or(0) as u8;
             out.push(hex(b[i + 1]) << 4 | hex(b[i + 2]));
             i += 3;
@@ -503,7 +554,10 @@ pub fn import_files(paths: &[PathBuf]) -> Result<ImportOutcome, String> {
     let mut store = Store::open()?;
     let mut total = ImportOutcome::default();
     for path in paths {
-        let label = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let label = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
         match read_vcf_file(path).and_then(|text| import_text_into(&mut store, &text)) {
             Ok(outcome) => total.merge(outcome),
             Err(e) => total.failed_files.push(format!("{label}: {e}")),
@@ -587,7 +641,10 @@ pub fn delete_all() -> Result<usize, String> {
         return Ok(0);
     }
     let store = Store::open()?;
-    store.conn.execute("DELETE FROM contact", []).map_err(|e| e.to_string())
+    store
+        .conn
+        .execute("DELETE FROM contact", [])
+        .map_err(|e| e.to_string())
 }
 
 /// Whether the database file exists yet (nothing to read before the first write).
@@ -597,7 +654,9 @@ pub fn exists() -> bool {
 
 /// The file the fingerprint watcher should look at, with its journal files.
 pub fn db_paths() -> Vec<PathBuf> {
-    let Some(db) = db_path() else { return Vec::new() };
+    let Some(db) = db_path() else {
+        return Vec::new();
+    };
     ["", "-journal", "-wal"]
         .iter()
         .map(|suffix| PathBuf::from(format!("{}{suffix}", db.to_string_lossy())))
@@ -614,14 +673,23 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("local_contacts.db");
         let _ = std::fs::remove_file(&path);
-        Store::open_at(&path).unwrap().upsert_one(&card("Ada", "ada@example.org")).unwrap();
+        Store::open_at(&path)
+            .unwrap()
+            .upsert_one(&card("Ada", "ada@example.org"))
+            .unwrap();
         use std::os::unix::fs::PermissionsExt;
-        assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
         let before = std::fs::read(&path).unwrap();
         // Opening for writing again must not rewrite the schema either.
         drop(Store::open_at(&path).unwrap());
         let read = Store::open_read_at(&path).unwrap().unwrap();
-        assert_eq!(read.emails().unwrap(), vec![("Ada".to_string(), "ada@example.org".to_string())]);
+        assert_eq!(
+            read.emails().unwrap(),
+            vec![("Ada".to_string(), "ada@example.org".to_string())]
+        );
         drop(read);
         assert_eq!(std::fs::read(&path).unwrap(), before);
         let _ = std::fs::remove_dir_all(&dir);
@@ -657,7 +725,11 @@ mod tests {
 
     #[test]
     fn split_ignores_text_between_cards() {
-        let text = format!("junk\r\n{}more junk\r\n{}", card("Ann", "a@x.org"), card("Bob", "b@x.org"));
+        let text = format!(
+            "junk\r\n{}more junk\r\n{}",
+            card("Ann", "a@x.org"),
+            card("Bob", "b@x.org")
+        );
         assert_eq!(split_vcards(&text).0.len(), 2);
     }
 
@@ -704,7 +776,8 @@ mod tests {
     #[test]
     fn import_adds_then_updates_and_is_idempotent() {
         let mut store = Store::in_memory();
-        let text = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u1\r\nFN:Ann\r\nEMAIL:a@x.org\r\nEND:VCARD\r\n\
+        let text =
+            "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u1\r\nFN:Ann\r\nEMAIL:a@x.org\r\nEND:VCARD\r\n\
                     BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Bob\r\nEMAIL:b@x.org\r\nEND:VCARD\r\n";
         let first = import_text_into(&mut store, text).unwrap();
         assert_eq!((first.added, first.updated), (2, 0));
@@ -720,7 +793,10 @@ mod tests {
                     BEGIN:VCARD\r\nVERSION:3.0\r\nUID:1\r\nFN:Bob\r\nEMAIL:b@x.org\r\nEND:VCARD\r\n";
         let out = import_text_into(&mut store, text).unwrap();
         assert_eq!((out.added, out.updated, out.skipped), (1, 0, 1));
-        assert_eq!(store.emails().unwrap(), vec![("Ann".to_string(), "a@x.org".to_string())]);
+        assert_eq!(
+            store.emails().unwrap(),
+            vec![("Ann".to_string(), "a@x.org".to_string())]
+        );
     }
 
     #[test]
@@ -759,7 +835,10 @@ mod tests {
         let out = import_text_into(&mut store, text).unwrap();
         assert_eq!(out.added, 2);
         store.upsert_one(&card("Ann", "a@x.org")).unwrap();
-        assert_eq!(store.emails().unwrap(), vec![("Ann".to_string(), "a@x.org".to_string())]);
+        assert_eq!(
+            store.emails().unwrap(),
+            vec![("Ann".to_string(), "a@x.org".to_string())]
+        );
         assert_eq!(store.group_vcards().unwrap().len(), 2);
         assert_eq!(store.people(), 1);
     }
@@ -779,11 +858,21 @@ mod tests {
     #[test]
     fn create_modify_delete_keep_the_email_index_in_sync() {
         let mut store = Store::in_memory();
-        store.upsert_one("BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u1\r\nFN:Ann\r\nEMAIL:A@X.org\r\nEND:VCARD\r\n").unwrap();
-        assert_eq!(store.emails().unwrap(), vec![("Ann".to_string(), "A@X.org".to_string())]);
+        store
+            .upsert_one(
+                "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u1\r\nFN:Ann\r\nEMAIL:A@X.org\r\nEND:VCARD\r\n",
+            )
+            .unwrap();
+        assert_eq!(
+            store.emails().unwrap(),
+            vec![("Ann".to_string(), "A@X.org".to_string())]
+        );
 
         store.upsert_one("BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u1\r\nFN:Ann B\r\nEMAIL:new@x.org\r\nEND:VCARD\r\n").unwrap();
-        assert_eq!(store.emails().unwrap(), vec![("Ann B".to_string(), "new@x.org".to_string())]);
+        assert_eq!(
+            store.emails().unwrap(),
+            vec![("Ann B".to_string(), "new@x.org".to_string())]
+        );
 
         store.delete("u1").unwrap();
         assert!(store.emails().unwrap().is_empty());
@@ -795,11 +884,17 @@ mod tests {
         let mut store = Store::in_memory();
         let edit = crate::contacts::GroupEdit {
             name: "Team".into(),
-            members: vec![crate::contacts::Member { name: "Ann".into(), email: "a@x.org".into(), ..Default::default() }],
+            members: vec![crate::contacts::Member {
+                name: "Ann".into(),
+                email: "a@x.org".into(),
+                ..Default::default()
+            }],
             hide_addresses: false,
             kept: Vec::new(),
         };
-        store.upsert_one(&crate::contacts::new_group_vcard(&edit)).unwrap();
+        store
+            .upsert_one(&crate::contacts::new_group_vcard(&edit))
+            .unwrap();
         let stored = store.group_vcards().unwrap();
         assert!(stored[0].contains("\r\nUID:hylki-"));
         // Ann is in the group, not in the book.
@@ -810,7 +905,9 @@ mod tests {
     #[test]
     fn create_rejects_a_card_with_nothing_in_it() {
         let mut store = Store::in_memory();
-        assert!(store.upsert_one("BEGIN:VCARD\r\nVERSION:3.0\r\nEND:VCARD\r\n").is_err());
+        assert!(store
+            .upsert_one("BEGIN:VCARD\r\nVERSION:3.0\r\nEND:VCARD\r\n")
+            .is_err());
     }
 
     #[test]
@@ -826,7 +923,10 @@ mod tests {
         let mut store = Store::in_memory();
         store.upsert_one("BEGIN:VCARD\r\nUID:p1\r\nFN:Pic\r\nEMAIL:Pic@x.org\r\nPHOTO;ENCODING=b:AAAA\r\nEND:VCARD\r\n").unwrap();
         store.upsert_one(&card("Plain", "plain@x.org")).unwrap();
-        assert_eq!(store.photo_entries().unwrap(), vec![("pic@x.org".to_string(), "p1".to_string())]);
+        assert_eq!(
+            store.photo_entries().unwrap(),
+            vec![("pic@x.org".to_string(), "p1".to_string())]
+        );
     }
 
     #[test]

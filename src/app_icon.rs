@@ -38,7 +38,8 @@ pub const ICON_GENERATION: u32 = 3;
 
 /// The icon this build installs under its app ID.
 #[cfg(not(feature = "beta"))]
-const DEFAULT_PNG: &[u8] = include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.png");
+const DEFAULT_PNG: &[u8] =
+    include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.png");
 #[cfg(feature = "beta")]
 const DEFAULT_PNG: &[u8] =
     include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.Beta.png");
@@ -50,7 +51,11 @@ const DEFAULT_PNG: &[u8] =
 /// worn. The labels are written out rather than passed through a macro,
 /// where the translation template's extractor never saw them.
 const CATALOG: &[IconChoice] = &[
-    IconChoice { id: DEFAULT_ID, label: i18n_noop("Default"), png: DEFAULT_PNG },
+    IconChoice {
+        id: DEFAULT_ID,
+        label: i18n_noop("Default"),
+        png: DEFAULT_PNG,
+    },
     IconChoice {
         id: "square",
         label: i18n_noop("Blue square"),
@@ -88,13 +93,20 @@ fn effective(id: &str) -> &'static str {
         "squircle-yellow" => "square-yellow",
         other => other,
     };
-    catalog().find(|c| c.id == id).map(|c| c.id).unwrap_or(DEFAULT_ID)
+    catalog()
+        .find(|c| c.id == id)
+        .map(|c| c.id)
+        .unwrap_or(DEFAULT_ID)
 }
 
 /// The artwork for an id (the default's for an unknown one).
 pub fn png_for(id: &str) -> &'static [u8] {
     let id = effective(id);
-    CATALOG.iter().find(|c| c.id == id).map(|c| c.png).unwrap_or(DEFAULT_PNG)
+    CATALOG
+        .iter()
+        .find(|c| c.id == id)
+        .map(|c| c.png)
+        .unwrap_or(DEFAULT_PNG)
 }
 
 /// The image the tray's App icon option draws: the icon the dock shows.
@@ -111,7 +123,14 @@ pub fn tray_image(id: &str) -> std::borrow::Cow<'static, [u8]> {
     } else {
         // In the desktop's icon folders: Hylki's own search leaves them out.
         crate::app::desktop_icon_theme()
-            .lookup_icon(&icon, &[], 256, 1, gtk::TextDirection::None, gtk::IconLookupFlags::empty())
+            .lookup_icon(
+                &icon,
+                &[],
+                256,
+                1,
+                gtk::TextDirection::None,
+                gtk::IconLookupFlags::empty(),
+            )
             .file()
             .and_then(|f| gtk::gio::prelude::FileExt::path(&f))
     };
@@ -224,7 +243,9 @@ pub fn private_icons_root() -> Option<PathBuf> {
 /// Keep the private folder's copy of the chosen icon, and nothing else of
 /// ours there.
 fn sync_private_icon(id: &str, name: &str, write: bool) {
-    let Some(dir) = private_icons_root().map(|r| r.join("hicolor/512x512/apps")) else { return };
+    let Some(dir) = private_icons_root().map(|r| r.join("hicolor/512x512/apps")) else {
+        return;
+    };
     let prefix = format!("{}-", crate::APP_ID);
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for entry in entries.flatten() {
@@ -241,7 +262,8 @@ fn sync_private_icon(id: &str, name: &str, write: bool) {
     if std::fs::read(&path).is_ok_and(|cur| cur == png_for(id)) {
         return;
     }
-    if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, png_for(id))) {
+    if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, png_for(id)))
+    {
         tracing::warn!("could not keep the app icon in {}: {e}", dir.display());
     }
 }
@@ -335,7 +357,10 @@ fn sync_icon_files(hicolor: &std::path::Path, id: &str, name: &str, write: bool)
                 None => continue,
             }
         };
-        if std::fs::read(&path).map(|cur| cur == *bytes).unwrap_or(false) {
+        if std::fs::read(&path)
+            .map(|cur| cur == *bytes)
+            .unwrap_or(false)
+        {
             continue;
         }
         if let Err(e) = std::fs::create_dir_all(&dir) {
@@ -357,8 +382,12 @@ fn sync_icon_files(hicolor: &std::path::Path, id: &str, name: &str, write: bool)
 
 /// Whether a file is one of the gallery's non-default icons, byte for byte.
 fn is_alt_art(path: &std::path::Path) -> bool {
-    let Ok(bytes) = std::fs::read(path) else { return false };
-    CATALOG.iter().any(|c| c.id != DEFAULT_ID && c.png == bytes.as_slice())
+    let Ok(bytes) = std::fs::read(path) else {
+        return false;
+    };
+    CATALOG
+        .iter()
+        .any(|c| c.id != DEFAULT_ID && c.png == bytes.as_slice())
 }
 
 /// The artwork re-encoded at `size`.
@@ -368,7 +397,9 @@ fn scaled_png(png: &[u8], size: i32) -> Option<Vec<u8>> {
     let loader = PixbufLoader::with_type("png").ok()?;
     loader.write(png).ok()?;
     loader.close().ok()?;
-    let pb = loader.pixbuf()?.scale_simple(size, size, InterpType::Hyper)?;
+    let pb = loader
+        .pixbuf()?
+        .scale_simple(size, size, InterpType::Hyper)?;
     pb.save_to_bufferv("png", &[]).ok()
 }
 
@@ -399,15 +430,18 @@ static LAST_LAUNCHER_WRITE: std::sync::Mutex<Option<std::time::Instant>> =
 const LAUNCHER_SETTLE: std::time::Duration = std::time::Duration::from_secs(9);
 
 fn note_launcher_written() {
-    *LAST_LAUNCHER_WRITE.lock().unwrap_or_else(|e| e.into_inner()) =
-        Some(std::time::Instant::now());
+    *LAST_LAUNCHER_WRITE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = Some(std::time::Instant::now());
 }
 
 /// How much longer to keep running before a restart, so the desktop has
 /// acted on the launcher written for the current choice. Zero when it has
 /// had the time, or nothing was written.
 pub fn launcher_settle_remaining() -> std::time::Duration {
-    let last = *LAST_LAUNCHER_WRITE.lock().unwrap_or_else(|e| e.into_inner());
+    let last = *LAST_LAUNCHER_WRITE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     match last {
         Some(t) => LAUNCHER_SETTLE.saturating_sub(t.elapsed()),
         None => std::time::Duration::ZERO,
@@ -459,8 +493,17 @@ impl Launcher {
         }
         if crate::platform::is_flatpak() {
             let base = PathBuf::from("/app/share/applications").join(&file);
-            let Some((exec, try_exec)) = flatpak_exec() else { return Launcher::None };
-            return Launcher::Shadow { base, user_path, ours, exec: Some(exec), try_exec, flatpak: true };
+            let Some((exec, try_exec)) = flatpak_exec() else {
+                return Launcher::None;
+            };
+            return Launcher::Shadow {
+                base,
+                user_path,
+                ours,
+                exec: Some(exec),
+                try_exec,
+                flatpak: true,
+            };
         }
         // An AppImage installs nothing (#235): the only launcher is the one
         // the integrator wrote (AppManager, Gear Lever), under a name of its
@@ -488,7 +531,14 @@ impl Launcher {
                         .map(|e| e.split_whitespace().next().unwrap_or("").to_string())
                 })
                 .unwrap_or_default();
-            return Launcher::Shadow { base, user_path, ours, exec: None, try_exec, flatpak: false };
+            return Launcher::Shadow {
+                base,
+                user_path,
+                ours,
+                exec: None,
+                try_exec,
+                flatpak: false,
+            };
         }
         Launcher::None
     }
@@ -511,10 +561,24 @@ impl Launcher {
     /// puts the installed launcher back (the default, where a copy exists).
     fn point_at(&self, icon: &str, restore: bool) {
         let placed = match self {
-            Launcher::Shadow { base, user_path, ours, exec, try_exec, flatpak } => {
-                write_shadow(base, user_path, icon, restore, *ours, exec.as_deref(), try_exec, *flatpak)
-                    .then_some(user_path.as_path())
-            }
+            Launcher::Shadow {
+                base,
+                user_path,
+                ours,
+                exec,
+                try_exec,
+                flatpak,
+            } => write_shadow(
+                base,
+                user_path,
+                icon,
+                restore,
+                *ours,
+                exec.as_deref(),
+                try_exec,
+                *flatpak,
+            )
+            .then_some(user_path.as_path()),
             Launcher::Owned(path) => {
                 edit_icon_line(path, icon);
                 Some(path.as_path())
@@ -538,7 +602,9 @@ fn launcher_running(dir: &std::path::Path, bundle: &std::path::Path) -> Option<P
             return None;
         }
         let text = std::fs::read_to_string(&path).ok()?;
-        desktop_value(&text, "Exec")?.contains(bundle).then_some(path)
+        desktop_value(&text, "Exec")?
+            .contains(bundle)
+            .then_some(path)
     })
 }
 
@@ -602,7 +668,10 @@ fn write_shadow(
         return false;
     };
     let out = shadow_text(&text, icon, exec, try_exec, flatpak);
-    if std::fs::read_to_string(user_path).map(|cur| cur == out).unwrap_or(false) {
+    if std::fs::read_to_string(user_path)
+        .map(|cur| cur == out)
+        .unwrap_or(false)
+    {
         return true;
     }
     if let Some(dir) = user_path.parent() {
@@ -627,7 +696,13 @@ fn write_shadow(
 /// runs the app with arguments of its own, which the host command has to
 /// carry. The keys added at the end of the main group stay in it: appended
 /// after an action group they would belong to the action.
-fn shadow_text(text: &str, icon: &str, exec: Option<&str>, try_exec: &str, flatpak: bool) -> String {
+fn shadow_text(
+    text: &str,
+    icon: &str,
+    exec: Option<&str>,
+    try_exec: &str,
+    flatpak: bool,
+) -> String {
     let mut out = String::new();
     let mut main = false;
     let mut added = false;
@@ -685,7 +760,11 @@ fn action_exec(exec: &str, args: &str) -> String {
         .strip_suffix(" @@u %U @@")
         .unwrap_or(exec)
         .replace(" --file-forwarding", "");
-    if args.is_empty() { base } else { format!("{base} {args}") }
+    if args.is_empty() {
+        base
+    } else {
+        format!("{base} {args}")
+    }
 }
 
 /// Bring `<dir>/mimeinfo.cache` up to date with the entries in `dir`, as
@@ -710,7 +789,10 @@ pub fn sync_mime_cache(dir: &std::path::Path) {
     }
     let cache = dir.join("mimeinfo.cache");
     let out = mime_cache_text(dir);
-    if std::fs::read_to_string(&cache).map(|cur| cur == out).unwrap_or(false) {
+    if std::fs::read_to_string(&cache)
+        .map(|cur| cur == out)
+        .unwrap_or(false)
+    {
         return;
     }
     let tmp = dir.join(format!(".mimeinfo.cache.{}", std::process::id()));
@@ -747,7 +829,9 @@ fn collect_mime_types(
     prefix: &str,
     map: &mut std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
 ) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
@@ -758,7 +842,9 @@ fn collect_mime_types(
         if !name.ends_with(".desktop") {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
         let id = format!("{prefix}{name}");
         for mime in desktop_mime_types(&text) {
             map.entry(mime).or_default().insert(id.clone());
@@ -770,18 +856,28 @@ fn collect_mime_types(
 /// that has none or is `Hidden`.
 fn desktop_mime_types(text: &str) -> Vec<String> {
     const MAIN: &str = "Desktop Entry";
-    let Some(kf) = crate::platform::keyfile(text) else { return Vec::new() };
+    let Some(kf) = crate::platform::keyfile(text) else {
+        return Vec::new();
+    };
     if kf.boolean(MAIN, "Hidden").unwrap_or(false) {
         return Vec::new();
     }
     kf.string_list(MAIN, "MimeType")
-        .map(|types| types.iter().map(|t| t.trim().to_string()).filter(|t| !t.is_empty()).collect())
+        .map(|types| {
+            types
+                .iter()
+                .map(|t| t.trim().to_string())
+                .filter(|t| !t.is_empty())
+                .collect()
+        })
         .unwrap_or_default()
 }
 
 /// Replace the `Icon=` line of a launcher the user's own install owns.
 fn edit_icon_line(path: &std::path::Path, icon: &str) {
-    let Ok(text) = std::fs::read_to_string(path) else { return };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return;
+    };
     let mut out = String::new();
     let mut seen = false;
     for line in text.lines() {
@@ -959,15 +1055,22 @@ mod tests {
     fn desktop_entries_are_read_from_the_main_group() {
         let entry = "[Desktop Action compose]\nExec=other --compose\n\n\
                      [Desktop Entry]\nExec=hylki %U\nMimeType=x-scheme-handler/mailto;message/rfc822;\n";
-        assert_eq!(super::desktop_value(entry, "Exec").as_deref(), Some("hylki %U"));
-        assert_eq!(super::desktop_mime_types(entry), ["x-scheme-handler/mailto", "message/rfc822"]);
+        assert_eq!(
+            super::desktop_value(entry, "Exec").as_deref(),
+            Some("hylki %U")
+        );
+        assert_eq!(
+            super::desktop_mime_types(entry),
+            ["x-scheme-handler/mailto", "message/rfc822"]
+        );
         assert!(super::desktop_mime_types(&format!("{entry}Hidden=true\n")).is_empty());
     }
 
     /// The same fixture `update-desktop-database` was run over by hand:
     /// its output is what the expectation below is copied from.
     fn fixture(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("hylki-mime-cache-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("hylki-mime-cache-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("sub")).unwrap();
         std::fs::write(
@@ -990,7 +1093,8 @@ mod tests {
         dir
     }
 
-    const EXPECTED: &str = "[MIME Cache]\ntext/plain=a.desktop;sub-b.desktop;\nx-scheme-handler/mailto=a.desktop;\n";
+    const EXPECTED: &str =
+        "[MIME Cache]\ntext/plain=a.desktop;sub-b.desktop;\nx-scheme-handler/mailto=a.desktop;\n";
 
     #[test]
     fn cache_matches_update_desktop_database() {
@@ -1008,7 +1112,10 @@ mod tests {
         let stamp = std::fs::metadata(&cache).unwrap().modified().unwrap();
         std::thread::sleep(std::time::Duration::from_millis(20));
         sync_mime_cache(&dir);
-        assert_eq!(std::fs::metadata(&cache).unwrap().modified().unwrap(), stamp);
+        assert_eq!(
+            std::fs::metadata(&cache).unwrap().modified().unwrap(),
+            stamp
+        );
         // A missing directory is nothing to write into.
         sync_mime_cache(&dir.join("absent"));
         assert!(!dir.join("absent").exists());
@@ -1027,8 +1134,12 @@ mod tests {
     fn only_icons_hylki_writes_count_as_its_own() {
         let id = crate::APP_ID;
         assert!(icon_is_ours(id));
-        assert!(icon_is_ours(&format!("/home/u/.local/share/icons/hicolor/512x512/apps/{id}-envelope-wave.png")));
-        assert!(icon_is_ours(&format!("/home/u/.local/share/icons/hicolor/512x512/apps/{id}-default.png")));
+        assert!(icon_is_ours(&format!(
+            "/home/u/.local/share/icons/hicolor/512x512/apps/{id}-envelope-wave.png"
+        )));
+        assert!(icon_is_ours(&format!(
+            "/home/u/.local/share/icons/hicolor/512x512/apps/{id}-default.png"
+        )));
         // A theme's name, the symbolic, another app's file, a relative path.
         assert!(!icon_is_ours("mail-client"));
         assert!(!icon_is_ours(&format!("{id}-symbolic")));
@@ -1049,7 +1160,10 @@ mod tests {
         assert!(main.contains("Icon=/icons/x.png\n"));
         assert!(main.contains("TryExec=/exports/bin/x\n"));
         assert!(main.contains(&format!("{LAUNCHER_MARK}=1\n")));
-        assert!(main.ends_with("=1\n\n"), "the group keeps its blank line: {main:?}");
+        assert!(
+            main.ends_with("=1\n\n"),
+            "the group keeps its blank line: {main:?}"
+        );
         assert_eq!(
             action,
             format!("\nName=New Message\nExec=flatpak run --branch=stable --arch=x86_64 --command=hylki {} mailto:\n", crate::APP_ID)
@@ -1057,9 +1171,19 @@ mod tests {
         // Outside Flatpak the action is left as it is.
         let out = shadow_text(base, "/icons/x.png", None, "/usr/bin/hylki", false);
         assert!(out.contains("Exec=hylki %U\n") && out.contains("Exec=hylki mailto:\n"));
-        assert!(out.split_once("[Desktop Action").unwrap().0.contains("TryExec=/usr/bin/hylki"));
+        assert!(out
+            .split_once("[Desktop Action")
+            .unwrap()
+            .0
+            .contains("TryExec=/usr/bin/hylki"));
         // A launcher with no action still ends with the added keys.
-        let out = shadow_text("[Desktop Entry]\nName=Hylki\nExec=hylki %U\n", "i", None, "", false);
+        let out = shadow_text(
+            "[Desktop Entry]\nName=Hylki\nExec=hylki %U\n",
+            "i",
+            None,
+            "",
+            false,
+        );
         assert!(out.ends_with(&format!("{LAUNCHER_MARK}=1\n")));
     }
 
@@ -1069,9 +1193,20 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("launcher.desktop");
         // A menu editor keeps our mark when it edits our copy.
-        std::fs::write(&path, format!("[Desktop Entry]\nName=Hylki\nIcon=Papirus-mail\n{LAUNCHER_MARK}=1\n")).unwrap();
-        assert_eq!(Launcher::Owned(path.clone()).custom_icon().as_deref(), Some("Papirus-mail"));
-        std::fs::write(&path, format!("[Desktop Entry]\nName=Hylki\nIcon={}\n", crate::APP_ID)).unwrap();
+        std::fs::write(
+            &path,
+            format!("[Desktop Entry]\nName=Hylki\nIcon=Papirus-mail\n{LAUNCHER_MARK}=1\n"),
+        )
+        .unwrap();
+        assert_eq!(
+            Launcher::Owned(path.clone()).custom_icon().as_deref(),
+            Some("Papirus-mail")
+        );
+        std::fs::write(
+            &path,
+            format!("[Desktop Entry]\nName=Hylki\nIcon={}\n", crate::APP_ID),
+        )
+        .unwrap();
         assert_eq!(Launcher::Owned(path.clone()).custom_icon(), None);
         assert_eq!(Launcher::None.custom_icon(), None);
         let _ = std::fs::remove_dir_all(&dir);

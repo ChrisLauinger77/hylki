@@ -56,7 +56,9 @@ extern "C" {
 /// came with one. Call it from the action's own handler: GTK holds the token
 /// only from the start of that emission until the next one.
 pub fn complete() {
-    let Some(display) = gtk::gdk::Display::default() else { return };
+    let Some(display) = gtk::gdk::Display::default() else {
+        return;
+    };
     let kind = display.type_().name();
     let raw: *mut gtk::gdk::ffi::GdkDisplay = display.to_glib_none().0;
     if kind.starts_with("GdkX11") {

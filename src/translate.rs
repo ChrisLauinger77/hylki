@@ -48,7 +48,13 @@ pub enum Service {
 
 impl Service {
     /// In the order the Settings picker lists them.
-    pub const ALL: [Service; 5] = [Service::Off, Service::DeepL, Service::Google, Service::Microsoft, Service::Libre];
+    pub const ALL: [Service; 5] = [
+        Service::Off,
+        Service::DeepL,
+        Service::Google,
+        Service::Microsoft,
+        Service::Libre,
+    ];
 
     /// The service's own name, which is not translated.
     pub fn name(self) -> String {
@@ -113,8 +119,9 @@ impl Settings {
 /// them. Every service takes all of these; how each one spells them is
 /// [`service_code`]'s business.
 pub const LANGUAGES: &[&str] = &[
-    "ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "he", "hu", "id", "it", "ja", "ko", "lt",
-    "lv", "nb", "nl", "pl", "pt-BR", "pt-PT", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi", "zh-Hans", "zh-Hant",
+    "ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "he", "hu", "id", "it", "ja",
+    "ko", "lt", "lv", "nb", "nl", "pl", "pt-BR", "pt-PT", "ro", "ru", "sk", "sl", "sv", "tr", "uk",
+    "vi", "zh-Hans", "zh-Hant",
 ];
 
 /// A language as it names itself ("Deutsch"), the way the spell checker's
@@ -147,7 +154,11 @@ pub fn ui_language() -> String {
 
 /// `pt_BR.UTF-8` → `pt-BR`, `zh_TW` → `zh-Hant`, `de_AT` → `de`.
 fn normalize(raw: &str) -> String {
-    let base = raw.split(['.', '@']).next().unwrap_or(raw).replace('_', "-");
+    let base = raw
+        .split(['.', '@'])
+        .next()
+        .unwrap_or(raw)
+        .replace('_', "-");
     let lang = base.split('-').next().unwrap_or(&base).to_lowercase();
     let region = base.split('-').nth(1).unwrap_or_default();
     match lang.as_str() {
@@ -175,7 +186,11 @@ fn service_code(service: Service, code: &str) -> String {
             let british = ["LC_ALL", "LC_MESSAGES", "LANG"]
                 .iter()
                 .filter_map(|k| std::env::var(k).ok())
-                .any(|v| ["en_GB", "en_IE", "en_AU", "en_NZ", "en_ZA", "en_IN"].iter().any(|p| v.starts_with(p)));
+                .any(|v| {
+                    ["en_GB", "en_IE", "en_AU", "en_NZ", "en_ZA", "en_IN"]
+                        .iter()
+                        .any(|p| v.starts_with(p))
+                });
             if british { "EN-GB" } else { "EN-US" }.into()
         }
         (Service::DeepL, _) => code.to_uppercase(),
@@ -209,7 +224,11 @@ fn from_service_code(raw: &str) -> String {
 // ─── Settings file and key ────────────────────────────────────────────────
 
 fn path() -> Option<PathBuf> {
-    Some(crate::config::config_base()?.join("hylki").join("translation.toml"))
+    Some(
+        crate::config::config_base()?
+            .join("hylki")
+            .join("translation.toml"),
+    )
 }
 
 /// Bumped on every save, so an open reader can tell its offer is stale.
@@ -220,8 +239,12 @@ pub fn generation() -> u64 {
 }
 
 pub fn load() -> Settings {
-    let Some(path) = path() else { return Settings::default() };
-    let Ok(text) = std::fs::read_to_string(path) else { return Settings::default() };
+    let Some(path) = path() else {
+        return Settings::default();
+    };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Settings::default();
+    };
     toml::from_str(&text).unwrap_or_default()
 }
 
@@ -328,7 +351,11 @@ fn visible_text(html: &str) -> String {
             if c == '>' {
                 in_tag = false;
                 let t = tag.trim().to_ascii_lowercase();
-                let name: String = t.trim_start_matches('/').chars().take_while(|c| c.is_ascii_alphanumeric()).collect();
+                let name: String = t
+                    .trim_start_matches('/')
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric())
+                    .collect();
                 if matches!(name.as_str(), "blockquote" | "style" | "script") {
                     if t.starts_with('/') {
                         skip_depth = skip_depth.saturating_sub(1);
@@ -355,7 +382,10 @@ fn visible_text(html: &str) -> String {
         .replace("&#39;", "'")
         .replace("&amp;", "&");
     // Plain-text replies quote with "> " lines.
-    out.lines().filter(|l| !l.trim_start().starts_with('>')).collect::<Vec<_>>().join("\n")
+    out.lines()
+        .filter(|l| !l.trim_start().starts_with('>'))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 // ─── Translating ──────────────────────────────────────────────────────────
@@ -395,7 +425,11 @@ static DONE: Mutex<Option<HashMap<String, Translated>>> = Mutex::new(None);
 /// What the session cache keys a translation by: the message, the service
 /// and the language it went into.
 pub fn cache_key(account_id: u32, message: &str, settings: &Settings) -> String {
-    format!("{account_id}\u{1f}{message}\u{1f}{:?}\u{1f}{}", settings.service, settings.target_language())
+    format!(
+        "{account_id}\u{1f}{message}\u{1f}{:?}\u{1f}{}",
+        settings.service,
+        settings.target_language()
+    )
 }
 
 pub fn cached(key: &str) -> Option<Translated> {
@@ -416,10 +450,15 @@ pub fn translate(
     }
     let service = settings.service;
     if service == Service::Off {
-        return Err(i18n("Choose a translation service in Settings → Translation first."));
+        return Err(i18n(
+            "Choose a translation service in Settings → Translation first.",
+        ));
     }
     if key.is_empty() && service != Service::Libre {
-        return Err(i18n_f("No key for {service}: add one in Settings → Translation.", &[("service", &service.name())]));
+        return Err(i18n_f(
+            "No key for {service}: add one in Settings → Translation.",
+            &[("service", &service.name())],
+        ));
     }
     let target = settings.target_language();
     let mut document = body.contains('<').then(|| InPlace::parse(body));
@@ -446,12 +485,31 @@ pub fn translate(
     } else {
         texts
             .pop()
-            .map(|t| crate::markdown::plain_text(&t).split_whitespace().collect::<Vec<_>>().join(" "))
+            .map(|t| {
+                crate::markdown::plain_text(&t)
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
             .filter(|t| !t.is_empty())
     };
     let done = match document.as_mut() {
-        Some(d) => Translated { html: d.fill(&texts), reader: false, from, service, to: target, subject },
-        None => Translated { html: texts.concat(), reader: true, from, service, to: target, subject },
+        Some(d) => Translated {
+            html: d.fill(&texts),
+            reader: false,
+            from,
+            service,
+            to: target,
+            subject,
+        },
+        None => Translated {
+            html: texts.concat(),
+            reader: true,
+            from,
+            service,
+            to: target,
+            subject,
+        },
     };
     if let Ok(mut g) = DONE.lock() {
         let map = g.get_or_insert_with(HashMap::new);
@@ -466,10 +524,17 @@ pub fn translate(
 /// Send `pieces` of HTML to the configured service, to be put into
 /// `target`: one translation per piece, in order, and the language the
 /// service found the first in.
-fn run(settings: &Settings, key: &str, pieces: &[String], target: &str) -> Result<(Vec<String>, Option<String>), String> {
+fn run(
+    settings: &Settings,
+    key: &str,
+    pieces: &[String],
+    target: &str,
+) -> Result<(Vec<String>, Option<String>), String> {
     let service = settings.service;
     let to = service_code(service, target);
-    let agent = ureq::AgentBuilder::new().timeout(Duration::from_secs(45)).build();
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(45))
+        .build();
     let mut out = Vec::with_capacity(pieces.len());
     let mut from = None;
     for batch in batches(pieces, service) {
@@ -478,7 +543,11 @@ fn run(settings: &Settings, key: &str, pieces: &[String], target: &str) -> Resul
             Service::Google => google(&agent, key, &batch, &to)?,
             Service::Microsoft => microsoft(&agent, key, &settings.region, &batch, &to)?,
             Service::Libre => libre(&agent, key, &settings.url, &batch, &to)?,
-            Service::Off => return Err(i18n("Choose a translation service in Settings → Translation first.")),
+            Service::Off => {
+                return Err(i18n(
+                    "Choose a translation service in Settings → Translation first.",
+                ))
+            }
         };
         if texts.len() != batch.len() {
             return Err(i18n("The service's answer could not be read."));
@@ -494,9 +563,16 @@ fn run(settings: &Settings, key: &str, pieces: &[String], target: &str) -> Resul
 /// Translate what is being written (blocking): pieces of the composer's
 /// own HTML, each kept whole so it goes back where it came from, into
 /// `target`. Nothing is cached; the text is the user's, and changes.
-pub fn translate_parts(settings: &Settings, key: &str, parts: &[String], target: &str) -> Result<Vec<String>, String> {
+pub fn translate_parts(
+    settings: &Settings,
+    key: &str,
+    parts: &[String],
+    target: &str,
+) -> Result<Vec<String>, String> {
     if !settings.enabled() {
-        return Err(i18n("Choose a translation service in Settings → Translation first."));
+        return Err(i18n(
+            "Choose a translation service in Settings → Translation first.",
+        ));
     }
     if key.is_empty() && settings.service != Service::Libre {
         return Err(i18n_f(
@@ -517,7 +593,11 @@ pub fn translate_parts(settings: &Settings, key: &str, parts: &[String], target:
 static COMPOSE_TARGET: Mutex<String> = Mutex::new(String::new());
 
 pub fn last_compose_target() -> Option<String> {
-    COMPOSE_TARGET.lock().ok().map(|g| g.clone()).filter(|t| !t.is_empty())
+    COMPOSE_TARGET
+        .lock()
+        .ok()
+        .map(|g| g.clone())
+        .filter(|t| !t.is_empty())
 }
 
 fn remember_compose_target(target: &str) {
@@ -533,7 +613,10 @@ pub fn text_to_parts(text: &str) -> Vec<String> {
         .map(|p| p.trim_matches('\n'))
         .filter(|p| !p.trim().is_empty())
         .map(|p| {
-            let esc = p.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+            let esc = p
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;");
             format!("<p>{}</p>", esc.replace('\n', "<br>"))
         })
         .collect()
@@ -544,7 +627,10 @@ pub fn parts_to_text(parts: &[String]) -> String {
     parts
         .iter()
         .map(|p| {
-            let p = p.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n");
+            let p = p
+                .replace("<br>", "\n")
+                .replace("<br/>", "\n")
+                .replace("<br />", "\n");
             let mut out = String::with_capacity(p.len());
             let mut in_tag = false;
             for c in p.chars() {
@@ -572,9 +658,9 @@ pub fn parts_to_text(parts: &[String]) -> String {
 /// what goes to the service as one unit, so a sentence with a link or a
 /// bold word in it is translated whole.
 const INLINE: &[&str] = &[
-    "a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "dfn", "em", "font", "i", "kbd", "label",
-    "mark", "q", "s", "samp", "small", "span", "strike", "strong", "sub", "sup", "time", "tt", "u", "var",
-    "wbr",
+    "a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "dfn", "em", "font", "i", "kbd",
+    "label", "mark", "q", "s", "samp", "small", "span", "strike", "strong", "sub", "sup", "time",
+    "tt", "u", "var", "wbr",
 ];
 /// Elements whose content is never sent.
 const UNSENT: &[&str] = &[
@@ -600,7 +686,9 @@ struct InPlace {
 impl InPlace {
     fn parse(body: &str) -> InPlace {
         use html5ever::tendril::TendrilSink;
-        let dom = html5ever::parse_document(markup5ever_rcdom::RcDom::default(), Default::default()).one(body);
+        let dom =
+            html5ever::parse_document(markup5ever_rcdom::RcDom::default(), Default::default())
+                .one(body);
         let mut runs = Vec::new();
         collect_runs(&dom.document, &mut runs);
         let mut attrs = Vec::new();
@@ -617,7 +705,12 @@ impl InPlace {
                 _ => pieces.push(html),
             }
         }
-        InPlace { dom, runs, attrs, pieces }
+        InPlace {
+            dom,
+            runs,
+            attrs,
+            pieces,
+        }
     }
 
     /// The document with each run replaced by its translation. A run the
@@ -629,8 +722,9 @@ impl InPlace {
         // in it, the ones moved into the message included.
         let mut answers = Vec::new();
         for piece in translated {
-            let dom = html5ever::parse_document(markup5ever_rcdom::RcDom::default(), Default::default())
-                .one(format!("<body>{piece}</body>"));
+            let dom =
+                html5ever::parse_document(markup5ever_rcdom::RcDom::default(), Default::default())
+                    .one(format!("<body>{piece}</body>"));
             find_runs(&dom.document, &mut by_run);
             answers.push(dom);
         }
@@ -661,14 +755,18 @@ impl InPlace {
 
 fn element_name(node: &markup5ever_rcdom::Handle) -> Option<String> {
     match &node.data {
-        markup5ever_rcdom::NodeData::Element { name, .. } => Some(name.local.to_string().to_ascii_lowercase()),
+        markup5ever_rcdom::NodeData::Element { name, .. } => {
+            Some(name.local.to_string().to_ascii_lowercase())
+        }
         _ => None,
     }
 }
 
 fn is_hidden_node(node: &markup5ever_rcdom::Handle) -> bool {
     match &node.data {
-        markup5ever_rcdom::NodeData::Element { attrs, .. } => crate::reader::is_hidden(&attrs.borrow()),
+        markup5ever_rcdom::NodeData::Element { attrs, .. } => {
+            crate::reader::is_hidden(&attrs.borrow())
+        }
         _ => false,
     }
 }
@@ -689,13 +787,18 @@ fn is_inline(node: &markup5ever_rcdom::Handle) -> bool {
 
 fn has_text(node: &markup5ever_rcdom::Handle) -> bool {
     match &node.data {
-        markup5ever_rcdom::NodeData::Text { contents } => contents.borrow().chars().any(char::is_alphanumeric),
+        markup5ever_rcdom::NodeData::Text { contents } => {
+            contents.borrow().chars().any(char::is_alphanumeric)
+        }
         _ => node.children.borrow().iter().any(has_text),
     }
 }
 
 /// Every run of inline content with words in it, in document order.
-fn collect_runs(node: &markup5ever_rcdom::Handle, runs: &mut Vec<(markup5ever_rcdom::Handle, std::ops::Range<usize>)>) {
+fn collect_runs(
+    node: &markup5ever_rcdom::Handle,
+    runs: &mut Vec<(markup5ever_rcdom::Handle, std::ops::Range<usize>)>,
+) {
     let kids = node.children.borrow();
     let mut i = 0;
     while i < kids.len() {
@@ -729,7 +832,11 @@ fn stand_in_attrs(node: &markup5ever_rcdom::Handle, saved: &mut Vec<Vec<html5eve
             let n = saved.len();
             saved.push(std::mem::take(&mut *attrs));
             attrs.push(html5ever::Attribute {
-                name: html5ever::QualName::new(None, html5ever::ns!(), html5ever::LocalName::from(ATTRS_ATTR)),
+                name: html5ever::QualName::new(
+                    None,
+                    html5ever::ns!(),
+                    html5ever::LocalName::from(ATTRS_ATTR),
+                ),
                 value: n.to_string().into(),
             });
         }
@@ -758,7 +865,10 @@ fn restore_attrs(node: &markup5ever_rcdom::Handle, saved: &[Vec<html5ever::Attri
 }
 
 /// The numbered runs in a piece that came back: each one's children.
-fn find_runs(node: &markup5ever_rcdom::Handle, out: &mut HashMap<usize, Vec<markup5ever_rcdom::Handle>>) {
+fn find_runs(
+    node: &markup5ever_rcdom::Handle,
+    out: &mut HashMap<usize, Vec<markup5ever_rcdom::Handle>>,
+) {
     if let markup5ever_rcdom::NodeData::Element { attrs, .. } = &node.data {
         let n = attrs
             .borrow()
@@ -797,7 +907,11 @@ fn prepare_blocks(body: &str) -> Vec<String> {
             .and_then(|b| b.strip_suffix("</div>"))
         {
             Some(text) => {
-                for para in text.split("\n\n").map(|p| p.trim_matches('\n')).filter(|p| !p.trim().is_empty()) {
+                for para in text
+                    .split("\n\n")
+                    .map(|p| p.trim_matches('\n'))
+                    .filter(|p| !p.trim().is_empty())
+                {
                     out.push(format!("<p>{}</p>", para.replace('\n', "<br>")));
                 }
             }
@@ -847,12 +961,17 @@ type Answer = (Vec<String>, Option<String>);
 /// refused.
 fn send(req: ureq::Request, body: Value) -> Result<Value, String> {
     match req.send_json(body) {
-        Ok(resp) => resp.into_json::<Value>().map_err(|_| i18n("The service's answer could not be read.")),
+        Ok(resp) => resp
+            .into_json::<Value>()
+            .map_err(|_| i18n("The service's answer could not be read.")),
         Err(ureq::Error::Status(code, resp)) => {
             let text = resp.into_string().unwrap_or_default();
             Err(refusal(code, &text))
         }
-        Err(e) => Err(i18n_f("The service could not be reached: {e}", &[("e", &e.to_string())])),
+        Err(e) => Err(i18n_f(
+            "The service could not be reached: {e}",
+            &[("e", &e.to_string())],
+        )),
     }
 }
 
@@ -877,7 +996,10 @@ fn refusal(code: u16, body: &str) -> String {
         401 | 403 => i18n("The service did not accept the key."),
         429 => i18n("Too many requests: try again in a moment."),
         456 => i18n("This month's allowance is used up."),
-        _ => i18n_f("The service refused the request (error {code}).", &[("code", &code.to_string())]),
+        _ => i18n_f(
+            "The service refused the request (error {code}).",
+            &[("code", &code.to_string())],
+        ),
     };
     if said.is_empty() {
         what
@@ -887,14 +1009,29 @@ fn refusal(code: u16, body: &str) -> String {
 }
 
 fn deepl(agent: &ureq::Agent, key: &str, texts: &[String], to: &str) -> Result<Answer, String> {
-    let host = if key.trim().ends_with(":fx") { "api-free.deepl.com" } else { "api.deepl.com" };
+    let host = if key.trim().ends_with(":fx") {
+        "api-free.deepl.com"
+    } else {
+        "api.deepl.com"
+    };
     let req = agent
         .post(&format!("https://{host}/v2/translate"))
         .set("Authorization", &format!("DeepL-Auth-Key {}", key.trim()));
-    let v = send(req, json!({ "text": texts, "target_lang": to, "tag_handling": "html" }))?;
+    let v = send(
+        req,
+        json!({ "text": texts, "target_lang": to, "tag_handling": "html" }),
+    )?;
     let list = v["translations"].as_array().cloned().unwrap_or_default();
-    let detected = list.first().and_then(|t| t["detected_source_language"].as_str()).map(str::to_string);
-    Ok((list.iter().map(|t| t["text"].as_str().unwrap_or_default().to_string()).collect(), detected))
+    let detected = list
+        .first()
+        .and_then(|t| t["detected_source_language"].as_str())
+        .map(str::to_string);
+    Ok((
+        list.iter()
+            .map(|t| t["text"].as_str().unwrap_or_default().to_string())
+            .collect(),
+        detected,
+    ))
 }
 
 fn google(agent: &ureq::Agent, key: &str, texts: &[String], to: &str) -> Result<Answer, String> {
@@ -902,12 +1039,29 @@ fn google(agent: &ureq::Agent, key: &str, texts: &[String], to: &str) -> Result<
         .post("https://translation.googleapis.com/language/translate/v2")
         .query("key", key.trim());
     let v = send(req, json!({ "q": texts, "target": to, "format": "html" }))?;
-    let list = v["data"]["translations"].as_array().cloned().unwrap_or_default();
-    let detected = list.first().and_then(|t| t["detectedSourceLanguage"].as_str()).map(str::to_string);
-    Ok((list.iter().map(|t| t["translatedText"].as_str().unwrap_or_default().to_string()).collect(), detected))
+    let list = v["data"]["translations"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let detected = list
+        .first()
+        .and_then(|t| t["detectedSourceLanguage"].as_str())
+        .map(str::to_string);
+    Ok((
+        list.iter()
+            .map(|t| t["translatedText"].as_str().unwrap_or_default().to_string())
+            .collect(),
+        detected,
+    ))
 }
 
-fn microsoft(agent: &ureq::Agent, key: &str, region: &str, texts: &[String], to: &str) -> Result<Answer, String> {
+fn microsoft(
+    agent: &ureq::Agent,
+    key: &str,
+    region: &str,
+    texts: &[String],
+    to: &str,
+) -> Result<Answer, String> {
     let mut req = agent
         .post("https://api.cognitive.microsofttranslator.com/translate")
         .query("api-version", "3.0")
@@ -920,14 +1074,35 @@ fn microsoft(agent: &ureq::Agent, key: &str, region: &str, texts: &[String], to:
     let body: Vec<Value> = texts.iter().map(|t| json!({ "Text": t })).collect();
     let v = send(req, Value::Array(body))?;
     let list = v.as_array().cloned().unwrap_or_default();
-    let detected = list.first().and_then(|t| t["detectedLanguage"]["language"].as_str()).map(str::to_string);
-    Ok((list.iter().map(|t| t["translations"][0]["text"].as_str().unwrap_or_default().to_string()).collect(), detected))
+    let detected = list
+        .first()
+        .and_then(|t| t["detectedLanguage"]["language"].as_str())
+        .map(str::to_string);
+    Ok((
+        list.iter()
+            .map(|t| {
+                t["translations"][0]["text"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string()
+            })
+            .collect(),
+        detected,
+    ))
 }
 
-fn libre(agent: &ureq::Agent, key: &str, url: &str, texts: &[String], to: &str) -> Result<Answer, String> {
+fn libre(
+    agent: &ureq::Agent,
+    key: &str,
+    url: &str,
+    texts: &[String],
+    to: &str,
+) -> Result<Answer, String> {
     let base = url.trim().trim_end_matches('/');
     if !(base.starts_with("https://") || base.starts_with("http://")) {
-        return Err(i18n("Enter the LibreTranslate server's address in Settings → Translation."));
+        return Err(i18n(
+            "Enter the LibreTranslate server's address in Settings → Translation.",
+        ));
     }
     let mut out = Vec::new();
     let mut detected = None;
@@ -938,7 +1113,9 @@ fn libre(agent: &ureq::Agent, key: &str, url: &str, texts: &[String], to: &str) 
         }
         let v = send(agent.post(&format!("{base}/translate")), body)?;
         if detected.is_none() {
-            detected = v["detectedLanguage"]["language"].as_str().map(str::to_string);
+            detected = v["detectedLanguage"]["language"]
+                .as_str()
+                .map(str::to_string);
         }
         out.push(v["translatedText"].as_str().unwrap_or_default().to_string());
     }
@@ -949,7 +1126,11 @@ fn libre(agent: &ureq::Agent, key: &str, url: &str, texts: &[String], to: &str) 
 /// (blocking): what was sent and what came back. The greeting is in a
 /// language other than the target, or nothing would change.
 pub fn check(settings: &Settings, key: &str) -> Result<(String, String), String> {
-    let greeting = if base(&settings.target_language()) == "en" { "Guten Morgen" } else { "Good morning" };
+    let greeting = if base(&settings.target_language()) == "en" {
+        "Guten Morgen"
+    } else {
+        "Good morning"
+    };
     let probe = format!("{}\u{1f}check", generation());
     let t = translate(settings, key, &format!("<p>{greeting}</p>"), "", &probe)?;
     if let Ok(mut g) = DONE.lock() {
@@ -957,7 +1138,10 @@ pub fn check(settings: &Settings, key: &str) -> Result<(String, String), String>
             map.remove(&probe);
         }
     }
-    Ok((greeting.to_string(), visible_text(&t.html).trim().to_string()))
+    Ok((
+        greeting.to_string(),
+        visible_text(&t.html).trim().to_string(),
+    ))
 }
 
 #[cfg(test)]
@@ -974,7 +1158,11 @@ mod tests {
                 '>' => in_tag = false,
                 _ => {}
             }
-            out.extend(if in_tag || c == '>' { c.to_lowercase().collect::<Vec<_>>() } else { c.to_uppercase().collect() });
+            out.extend(if in_tag || c == '>' {
+                c.to_lowercase().collect::<Vec<_>>()
+            } else {
+                c.to_uppercase().collect()
+            });
         }
         out
     }
@@ -989,14 +1177,23 @@ mod tests {
         let mut doc = InPlace::parse(body);
         assert_eq!(doc.runs.len(), 2, "{:?}", doc.pieces);
         let sent = doc.pieces.concat();
-        assert!(!sent.contains("preheader") && !sent.contains("example.com") && !sent.contains(".hero"), "{sent}");
+        assert!(
+            !sent.contains("preheader") && !sent.contains("example.com") && !sent.contains(".hero"),
+            "{sent}"
+        );
         let back: Vec<String> = doc.pieces.iter().map(|p| shout(p)).collect();
         let html = doc.fill(&back);
         assert!(html.contains("<style>.hero{color:#c00}</style>"), "{html}");
         assert!(html.contains(r#"<td style="padding:20px">HELLO <a href="https://example.com/track?id=42" style="color:red">OUR OFFER</a>, FRIEND.</td>"#), "{html}");
         assert!(html.contains("<p>SECOND <b>LINE</b></p>"), "{html}");
-        assert!(html.contains("preheader text") && html.contains(r##"bgcolor="#eee""##), "{html}");
-        assert!(!html.contains(RUN_ATTR) && !html.contains(ATTRS_ATTR), "{html}");
+        assert!(
+            html.contains("preheader text") && html.contains(r##"bgcolor="#eee""##),
+            "{html}"
+        );
+        assert!(
+            !html.contains(RUN_ATTR) && !html.contains(ATTRS_ATTR),
+            "{html}"
+        );
     }
 
     /// The same against a real LibreTranslate server (#327):
@@ -1004,15 +1201,30 @@ mod tests {
     #[test]
     #[ignore]
     fn live_libre_keeps_the_design() {
-        let Ok(url) = std::env::var("LIBRE_LIVE") else { return };
-        let settings = Settings { service: Service::Libre, target: "de".into(), url, ..Default::default() };
+        let Ok(url) = std::env::var("LIBRE_LIVE") else {
+            return;
+        };
+        let settings = Settings {
+            service: Service::Libre,
+            target: "de".into(),
+            url,
+            ..Default::default()
+        };
         let body = r##"<html><head><style>.hero{color:#c00}</style></head><body><table class="hero"><tr><td style="padding:20px">Good morning, <a href="https://example.com/x">read our news</a> today.</td></tr></table><p>Thank you for your <b>order</b>.</p></body></html>"##;
-        let t = translate(&settings, "", body, "Good morning", "live-libre-test").expect("translated");
+        let t =
+            translate(&settings, "", body, "Good morning", "live-libre-test").expect("translated");
         eprintln!("{}", t.html);
         assert!(!t.reader);
         assert!(t.html.contains("<style>.hero{color:#c00}</style>"));
-        assert!(t.html.contains(r#"<td style="padding:20px">"#) && t.html.contains(r#"href="https://example.com/x""#));
-        assert!(!t.html.contains("Good morning") && !t.html.contains(RUN_ATTR) && !t.html.contains(ATTRS_ATTR));
+        assert!(
+            t.html.contains(r#"<td style="padding:20px">"#)
+                && t.html.contains(r#"href="https://example.com/x""#)
+        );
+        assert!(
+            !t.html.contains("Good morning")
+                && !t.html.contains(RUN_ATTR)
+                && !t.html.contains(ATTRS_ATTR)
+        );
         let subject = t.subject.expect("the subject came back");
         eprintln!("subject: {subject}");
         assert!(!subject.is_empty() && subject != "Good morning");
@@ -1022,7 +1234,10 @@ mod tests {
     fn a_run_that_does_not_come_back_keeps_its_text() {
         let mut doc = InPlace::parse("<p>One <a href=\"x\">two</a></p><p>Three</p>");
         let html = doc.fill(&[String::new()]);
-        assert!(html.contains("<p>One <a href=\"x\">two</a></p><p>Three</p>"), "{html}");
+        assert!(
+            html.contains("<p>One <a href=\"x\">two</a></p><p>Three</p>"),
+            "{html}"
+        );
     }
 
     #[test]
@@ -1062,23 +1277,36 @@ mod tests {
     #[test]
     fn plain_text_is_sent_as_paragraphs() {
         let blocks = prepare_blocks("Hallo Anna,\nwie geht es?\n\nViele Grüße\nBen");
-        assert_eq!(blocks, ["<p>Hallo Anna,<br>wie geht es?</p>", "<p>Viele Grüße<br>Ben</p>"]);
+        assert_eq!(
+            blocks,
+            [
+                "<p>Hallo Anna,<br>wie geht es?</p>",
+                "<p>Viele Grüße<br>Ben</p>"
+            ]
+        );
     }
 
     #[test]
     fn long_messages_go_in_pieces() {
-        let blocks: Vec<String> = (0..30).map(|i| format!("<p>{}</p>", "x".repeat(400 + i))).collect();
+        let blocks: Vec<String> = (0..30)
+            .map(|i| format!("<p>{}</p>", "x".repeat(400 + i)))
+            .collect();
         let chunks = chunk(&blocks);
         assert!(chunks.len() > 1);
         assert!(chunks.iter().all(|c| c.len() <= CHUNK));
-        assert_eq!(chunks.concat(), blocks.concat(), "nothing lost or reordered");
+        assert_eq!(
+            chunks.concat(),
+            blocks.concat(),
+            "nothing lost or reordered"
+        );
         assert_eq!(batches(&chunks, Service::DeepL).len(), 1);
         assert_eq!(batches(&chunks, Service::Libre).len(), chunks.len());
     }
 
     #[test]
     fn the_language_is_told_offline_and_quotes_do_not_count() {
-        let de = "<p>Vielen Dank für Ihre Nachricht. Wir melden uns so bald wie möglich bei Ihnen, \
+        let de =
+            "<p>Vielen Dank für Ihre Nachricht. Wir melden uns so bald wie möglich bei Ihnen, \
                   spätestens aber bis Ende der Woche.</p>";
         assert_eq!(detect(de).as_deref(), Some("de"));
         let reply = format!(
@@ -1095,7 +1323,10 @@ mod tests {
     fn written_text_goes_as_paragraphs_and_comes_back_as_text() {
         let parts = text_to_parts("Hi Anna,\nthanks <3\n\n**Ben**\n");
         assert_eq!(parts, ["<p>Hi Anna,<br>thanks &lt;3</p>", "<p>**Ben**</p>"]);
-        let back = parts_to_text(&["<p>Hallo Anna,<br/>danke &lt;3</p>".to_string(), "<p>**Ben**</p>".to_string()]);
+        let back = parts_to_text(&[
+            "<p>Hallo Anna,<br/>danke &lt;3</p>".to_string(),
+            "<p>**Ben**</p>".to_string(),
+        ]);
         assert_eq!(back, "Hallo Anna,\ndanke <3\n\n**Ben**");
     }
 

@@ -102,10 +102,16 @@ impl DropZones {
         layer.append(&zones);
 
         let (attach, inline, cloud) = match context {
-            DropContext::Composer => (i18n("Attach"), i18n("Insert in Text"), i18n("Upload to Cloud")),
-            DropContext::NewMessage => {
-                (i18n("Attach to New Message"), i18n("Insert in New Message"), i18n("Share Link in New Message"))
-            }
+            DropContext::Composer => (
+                i18n("Attach"),
+                i18n("Insert in Text"),
+                i18n("Upload to Cloud"),
+            ),
+            DropContext::NewMessage => (
+                i18n("Attach to New Message"),
+                i18n("Insert in New Message"),
+                i18n("Share Link in New Message"),
+            ),
         };
         let attach = Zone::new("mail-attachment-symbolic", &attach);
         let inline = Zone::new("image-x-generic-symbolic", &inline);
@@ -141,7 +147,10 @@ impl DropZones {
         // each read the files again when let go, and on some desktops that
         // second read never came back, so the drop never happened. Which
         // card was chosen is worked out from where the files were let go.
-        let target = gtk::DropTarget::new(gtk::gdk::FileList::static_type(), gtk::gdk::DragAction::COPY);
+        let target = gtk::DropTarget::new(
+            gtk::gdk::FileList::static_type(),
+            gtk::gdk::DragAction::COPY,
+        );
         target.set_propagation_phase(gtk::PropagationPhase::Capture);
         target.set_preload(true);
         let host_widget = host.as_ref().clone();
@@ -149,8 +158,12 @@ impl DropZones {
 
         let weak = Rc::downgrade(&this);
         target.connect_accept(move |_, drop| {
-            let open = weak.upgrade().is_some_and(|this| this.gate.borrow().as_ref().is_none_or(|gate| gate()));
-            open && drop.formats().contains_type(gtk::gdk::FileList::static_type())
+            let open = weak
+                .upgrade()
+                .is_some_and(|this| this.gate.borrow().as_ref().is_none_or(|gate| gate()));
+            open && drop
+                .formats()
+                .contains_type(gtk::gdk::FileList::static_type())
                 && drop.actions().contains(gtk::gdk::DragAction::COPY)
         });
 
@@ -159,8 +172,15 @@ impl DropZones {
         target.connect_value_notify(move |t| {
             let Some(this) = weak.upgrade() else { return };
             let Some(value) = t.value() else { return };
-            let paths = value.get::<gtk::gdk::FileList>().map(|l| file_paths(&l)).unwrap_or_default();
-            tracing::debug!("drop cards: {} file(s) dragged over the {:?}", paths.len(), this.context);
+            let paths = value
+                .get::<gtk::gdk::FileList>()
+                .map(|l| file_paths(&l))
+                .unwrap_or_default();
+            tracing::debug!(
+                "drop cards: {} file(s) dragged over the {:?}",
+                paths.len(),
+                this.context
+            );
             if let Some(refresh) = this.refresh.borrow().as_ref() {
                 refresh(&this);
             }
@@ -188,7 +208,9 @@ impl DropZones {
         let weak = Rc::downgrade(&this);
         let h = host_widget.clone();
         target.connect_drop(move |_, value, x, y| {
-            let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
+            let Ok(list) = value.get::<gtk::gdk::FileList>() else {
+                return false;
+            };
             let paths = file_paths(&list);
             // Let go before the cards were up, or between them: attached,
             // which is what a drop on the composer always did.
@@ -213,22 +235,31 @@ impl DropZones {
 
     /// The card under `(x, y)` in `host`'s coordinates, if one is up there.
     fn card_at(&self, host: &gtk::Widget, x: f64, y: f64) -> Option<DropChoice> {
-        [(&self.attach, DropChoice::Attach), (&self.inline, DropChoice::Inline), (&self.cloud, DropChoice::Cloud)]
-            .into_iter()
-            .filter(|(zone, _)| zone.widget.is_visible())
-            .find(|(zone, _)| {
-                host.compute_point(&zone.widget, &gtk::graphene::Point::new(x as f32, y as f32))
-                    .is_some_and(|p| zone.widget.contains(p.x() as f64, p.y() as f64))
-            })
-            .map(|(_, choice)| choice)
+        [
+            (&self.attach, DropChoice::Attach),
+            (&self.inline, DropChoice::Inline),
+            (&self.cloud, DropChoice::Cloud),
+        ]
+        .into_iter()
+        .filter(|(zone, _)| zone.widget.is_visible())
+        .find(|(zone, _)| {
+            host.compute_point(&zone.widget, &gtk::graphene::Point::new(x as f32, y as f32))
+                .is_some_and(|p| zone.widget.contains(p.x() as f64, p.y() as f64))
+        })
+        .map(|(_, choice)| choice)
     }
 
     /// Light the card under the pointer the way GTK lights a drop target
     /// that would take the drop (`:drop(active)` in the stylesheet).
     fn hover(&self, choice: Option<DropChoice>) {
-        for (zone, c) in [(&self.attach, DropChoice::Attach), (&self.inline, DropChoice::Inline), (&self.cloud, DropChoice::Cloud)] {
+        for (zone, c) in [
+            (&self.attach, DropChoice::Attach),
+            (&self.inline, DropChoice::Inline),
+            (&self.cloud, DropChoice::Cloud),
+        ] {
             if choice == Some(c) {
-                zone.widget.set_state_flags(gtk::StateFlags::DROP_ACTIVE, false);
+                zone.widget
+                    .set_state_flags(gtk::StateFlags::DROP_ACTIVE, false);
             } else {
                 zone.widget.unset_state_flags(gtk::StateFlags::DROP_ACTIVE);
             }
@@ -268,16 +299,31 @@ impl DropZones {
 
     fn show(&self, paths: &[PathBuf], width: i32, height: i32) {
         let n = paths.len() as u32;
-        let pictures = paths.iter().filter(|p| crate::ui::rich_editor::is_inline_image(p)).count() as u32;
-        let size: u64 = paths.iter().filter_map(|p| std::fs::metadata(p).ok()).map(|m| m.len()).sum();
+        let pictures = paths
+            .iter()
+            .filter(|p| crate::ui::rich_editor::is_inline_image(p))
+            .count() as u32;
+        let size: u64 = paths
+            .iter()
+            .filter_map(|p| std::fs::metadata(p).ok())
+            .map(|m| m.len())
+            .sum();
         let size = crate::models::human_size(size);
         let names = self.cloud_names.borrow();
 
         self.summary.set_label(&if n == 1 {
-            let name = paths[0].file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            let name = paths[0]
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default();
             format!("{name} · {size}")
         } else {
-            ni18n_f("{n} file · {size}", "{n} files · {size}", n, &[("n", &n.to_string()), ("size", &size)])
+            ni18n_f(
+                "{n} file · {size}",
+                "{n} files · {size}",
+                n,
+                &[("n", &n.to_string()), ("size", &size)],
+            )
         });
 
         let inline = self.allow_inline.get() && pictures > 0;
@@ -285,9 +331,17 @@ impl DropZones {
         self.cloud.widget.set_visible(!names.is_empty());
         match self.context {
             DropContext::Composer => {
-                self.attach.subtitle.set_label(&ni18n("Send as a normal attachment", "Send as normal attachments", n));
+                self.attach.subtitle.set_label(&ni18n(
+                    "Send as a normal attachment",
+                    "Send as normal attachments",
+                    n,
+                ));
                 self.inline.subtitle.set_label(&if pictures == n {
-                    ni18n("Place the picture where the cursor is", "Place the pictures where the cursor is", n)
+                    ni18n(
+                        "Place the picture where the cursor is",
+                        "Place the pictures where the cursor is",
+                        n,
+                    )
                 } else {
                     i18n("Pictures insert where the cursor is placed, other files attach normally")
                 });
@@ -297,7 +351,11 @@ impl DropZones {
                 });
             }
             DropContext::NewMessage => {
-                self.cloud.title.set_label(&ni18n("Share Link in New Message", "Share Links in New Message", n));
+                self.cloud.title.set_label(&ni18n(
+                    "Share Link in New Message",
+                    "Share Links in New Message",
+                    n,
+                ));
                 self.attach.subtitle.set_label(&ni18n(
                     "Start a message with the file attached",
                     "Start a message with the files attached",
@@ -366,8 +424,10 @@ impl DropZones {
     /// line up down the stack however long each card's words are. (A size
     /// group would be the tool, but it does not hold with wrapping labels.)
     fn align_rows(&self, room: i32) {
-        let visible: Vec<&Zone> =
-            [&self.attach, &self.inline, &self.cloud].into_iter().filter(|z| z.widget.is_visible()).collect();
+        let visible: Vec<&Zone> = [&self.attach, &self.inline, &self.cloud]
+            .into_iter()
+            .filter(|z| z.widget.is_visible())
+            .collect();
         let widest = visible
             .iter()
             .map(|z| z.inner.measure(gtk::Orientation::Horizontal, -1).1)
@@ -380,7 +440,11 @@ impl DropZones {
     }
 
     fn lay_out(&self, rows: bool) {
-        self.zones.set_orientation(if rows { gtk::Orientation::Vertical } else { gtk::Orientation::Horizontal });
+        self.zones.set_orientation(if rows {
+            gtk::Orientation::Vertical
+        } else {
+            gtk::Orientation::Horizontal
+        });
         if rows {
             self.layer.add_css_class("rows");
         } else {
@@ -458,7 +522,12 @@ impl Zone {
         inner.append(&words);
 
         widget.append(&inner);
-        let zone = Self { widget, inner, title, subtitle };
+        let zone = Self {
+            widget,
+            inner,
+            title,
+            subtitle,
+        };
         zone.lay_out(true);
         zone
     }
@@ -469,10 +538,17 @@ impl Zone {
     /// centred, the line under the title kept three lines tall (the
     /// stylesheet's `.rows` lifts that) so side by side the icons stay level.
     fn lay_out(&self, row: bool) {
-        self.inner.set_orientation(if row { gtk::Orientation::Horizontal } else { gtk::Orientation::Vertical });
+        self.inner.set_orientation(if row {
+            gtk::Orientation::Horizontal
+        } else {
+            gtk::Orientation::Vertical
+        });
         self.inner.set_spacing(if row { 20 } else { 12 });
-        let (xalign, justify) =
-            if row { (0.0, gtk::Justification::Left) } else { (0.5, gtk::Justification::Center) };
+        let (xalign, justify) = if row {
+            (0.0, gtk::Justification::Left)
+        } else {
+            (0.5, gtk::Justification::Center)
+        };
         for label in [&self.title, &self.subtitle] {
             label.set_xalign(xalign);
             label.set_justify(justify);
@@ -482,5 +558,9 @@ impl Zone {
 
 /// The regular files in a dragged list; folders have nothing to attach.
 fn file_paths(list: &gtk::gdk::FileList) -> Vec<PathBuf> {
-    list.files().iter().filter_map(|f| f.path()).filter(|p| p.is_file()).collect()
+    list.files()
+        .iter()
+        .filter_map(|f| f.path())
+        .filter(|p| p.is_file())
+        .collect()
 }

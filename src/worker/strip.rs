@@ -12,7 +12,8 @@ use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 pub(super) fn is_placeholder(part: &MessagePart<'_>) -> bool {
     part.content_type().is_some_and(|c| {
         c.ctype().eq_ignore_ascii_case("text")
-            && c.subtype().is_some_and(|s| s.eq_ignore_ascii_case("x-moz-deleted"))
+            && c.subtype()
+                .is_some_and(|s| s.eq_ignore_ascii_case("x-moz-deleted"))
     })
 }
 
@@ -33,7 +34,9 @@ impl StripError {
     pub(super) fn text(&self) -> String {
         use crate::i18n::i18n;
         match self {
-            StripError::NotFound => i18n("The attachment is no longer in the message on the server"),
+            StripError::NotFound => {
+                i18n("The attachment is no longer in the message on the server")
+            }
             StripError::Protected => {
                 i18n("The message is signed or encrypted, and removing a file would break it")
             }
@@ -56,7 +59,9 @@ pub(super) fn without_attachment(
     if crate::pgp::detect(raw).is_some() {
         return Err(StripError::Protected);
     }
-    let parsed = MessageParser::default().parse(raw).ok_or(StripError::NotFound)?;
+    let parsed = MessageParser::default()
+        .parse(raw)
+        .ok_or(StripError::NotFound)?;
     let (id, _) = super::attachment_parts(&parsed, raw)
         .into_iter()
         .filter(|(_, a)| a.name == name)
@@ -73,15 +78,23 @@ pub(super) fn without_attachment(
             && p.content_type().is_some_and(|c| {
                 let sub = c.subtype().unwrap_or_default();
                 (c.ctype().eq_ignore_ascii_case("multipart")
-                    && (sub.eq_ignore_ascii_case("signed") || sub.eq_ignore_ascii_case("encrypted")))
-                    || (c.ctype().eq_ignore_ascii_case("application") && sub.eq_ignore_ascii_case("pkcs7-mime"))
+                    && (sub.eq_ignore_ascii_case("signed")
+                        || sub.eq_ignore_ascii_case("encrypted")))
+                    || (c.ctype().eq_ignore_ascii_case("application")
+                        && sub.eq_ignore_ascii_case("pkcs7-mime"))
             })
     });
     if protected {
         return Err(StripError::Protected);
     }
-    let headers = raw.get(start..part.offset_body).ok_or(StripError::NotFound)?;
-    let eol: &[u8] = if raw.windows(2).any(|w| w == b"\r\n") { b"\r\n" } else { b"\n" };
+    let headers = raw
+        .get(start..part.offset_body)
+        .ok_or(StripError::NotFound)?;
+    let eol: &[u8] = if raw.windows(2).any(|w| w == b"\r\n") {
+        b"\r\n"
+    } else {
+        b"\n"
+    };
     let mut out = Vec::with_capacity(raw.len() - (end - start) + 512);
     out.extend_from_slice(&raw[..start]);
     out.extend_from_slice(&placeholder(name, headers, date, eol));
@@ -111,10 +124,18 @@ fn placeholder(name: &str, original_headers: &[u8], date: &str, eol: &[u8]) -> V
         out.extend_from_slice(s.as_bytes());
         out.extend_from_slice(eol);
     };
-    line(&format!("Content-Type: text/x-moz-deleted; charset=UTF-8; name={label}"));
-    line(if ascii { "Content-Transfer-Encoding: 7bit" } else { "Content-Transfer-Encoding: base64" });
+    line(&format!(
+        "Content-Type: text/x-moz-deleted; charset=UTF-8; name={label}"
+    ));
+    line(if ascii {
+        "Content-Transfer-Encoding: 7bit"
+    } else {
+        "Content-Transfer-Encoding: base64"
+    });
     line(&format!("Content-Disposition: inline; filename={label}"));
-    line(&format!("X-Mozilla-Altered: AttachmentDeleted; date=\"{date}\""));
+    line(&format!(
+        "X-Mozilla-Altered: AttachmentDeleted; date=\"{date}\""
+    ));
     line("");
     if ascii {
         out.extend_from_slice(&body);
@@ -142,12 +163,17 @@ fn header_param(value: &str) -> String {
     }
     use base64::Engine;
     let clean: String = value.chars().filter(|c| !c.is_control()).collect();
-    format!("\"=?UTF-8?B?{}?=\"", base64::engine::general_purpose::STANDARD.encode(clean.as_bytes()))
+    format!(
+        "\"=?UTF-8?B?{}?=\"",
+        base64::engine::general_purpose::STANDARD.encode(clean.as_bytes())
+    )
 }
 
 /// Now, as Thunderbird dates the note: `Thu Sep 25 10:00:00 2026`.
 pub(super) fn note_date() -> String {
-    chrono::Local::now().format("%a %b %e %H:%M:%S %Y").to_string()
+    chrono::Local::now()
+        .format("%a %b %e %H:%M:%S %Y")
+        .to_string()
 }
 
 /// A message with a body and two files, for the tests here and the live
@@ -183,17 +209,29 @@ mod tests {
     use super::*;
 
     fn names(raw: &[u8]) -> Vec<String> {
-        super::super::extract_attachments(raw).into_iter().map(|a| a.name).collect()
+        super::super::extract_attachments(raw)
+            .into_iter()
+            .map(|a| a.name)
+            .collect()
     }
 
     #[test]
     fn removes_only_the_named_part() {
-        let out = without_attachment(MIXED.as_bytes(), "report.pdf", 18, "Thu Sep 25 10:00:00 2026").unwrap();
+        let out = without_attachment(
+            MIXED.as_bytes(),
+            "report.pdf",
+            18,
+            "Thu Sep 25 10:00:00 2026",
+        )
+        .unwrap();
         let text = String::from_utf8(out.clone()).unwrap();
         assert_eq!(names(&out), vec!["data.csv"]);
         assert!(!text.contains("JVBERi0x"));
-        assert!(text.contains("Content-Type: text/x-moz-deleted; charset=UTF-8; name=\"Deleted: report.pdf\"\r\n"));
-        assert!(text.contains("X-Mozilla-Altered: AttachmentDeleted; date=\"Thu Sep 25 10:00:00 2026\""));
+        assert!(text.contains(
+            "Content-Type: text/x-moz-deleted; charset=UTF-8; name=\"Deleted: report.pdf\"\r\n"
+        ));
+        assert!(text
+            .contains("X-Mozilla-Altered: AttachmentDeleted; date=\"Thu Sep 25 10:00:00 2026\""));
         // Everything around the part is untouched.
         let head = MIXED.find("--XX\r\nContent-Type: application/pdf").unwrap();
         assert!(text.starts_with(&MIXED[..head]));
@@ -201,7 +239,10 @@ mod tests {
         assert!(text.ends_with(&format!("\r\n{}", &MIXED[tail..])));
         // The body still reads the same.
         let parsed = MessageParser::default().parse(&out).unwrap();
-        assert_eq!(parsed.body_text(0).as_deref().map(str::trim), Some("Here is the report."));
+        assert_eq!(
+            parsed.body_text(0).as_deref().map(str::trim),
+            Some("Here is the report.")
+        );
         assert_eq!(parsed.body_text(1), None);
         // The note is not drawn into the reader either.
         assert!(!super::super::extract_body(&out).contains("You deleted"));
@@ -213,7 +254,10 @@ mod tests {
         let twice = without_attachment(&once, "data.csv", 8, "d").unwrap();
         assert!(names(&twice).is_empty());
         let parsed = MessageParser::default().parse(&twice).unwrap();
-        assert_eq!(parsed.body_text(0).as_deref().map(str::trim), Some("Here is the report."));
+        assert_eq!(
+            parsed.body_text(0).as_deref().map(str::trim),
+            Some("Here is the report.")
+        );
     }
 
     #[test]
@@ -226,14 +270,22 @@ mod tests {
 
     #[test]
     fn unknown_name_is_not_found() {
-        assert_eq!(without_attachment(MIXED.as_bytes(), "nope.pdf", 1, "d"), Err(StripError::NotFound));
+        assert_eq!(
+            without_attachment(MIXED.as_bytes(), "nope.pdf", 1, "d"),
+            Err(StripError::NotFound)
+        );
     }
 
     #[test]
     fn refuses_signed_mail() {
-        let signed = MIXED
-            .replace("multipart/mixed; boundary=\"XX\"", "multipart/signed; protocol=\"application/pgp-signature\"; boundary=\"XX\"");
-        assert_eq!(without_attachment(signed.as_bytes(), "data.csv", 8, "d"), Err(StripError::Protected));
+        let signed = MIXED.replace(
+            "multipart/mixed; boundary=\"XX\"",
+            "multipart/signed; protocol=\"application/pgp-signature\"; boundary=\"XX\"",
+        );
+        assert_eq!(
+            without_attachment(signed.as_bytes(), "data.csv", 8, "d"),
+            Err(StripError::Protected)
+        );
     }
 
     #[test]
@@ -244,7 +296,10 @@ Content-Disposition: attachment; filename=\"x.pdf\"\r\n\
 Content-Transfer-Encoding: base64\r\n\
 \r\n\
 JVBERi0xLjQK\r\n";
-        assert_eq!(without_attachment(single.as_bytes(), "x.pdf", 9, "d"), Err(StripError::WholeMessage));
+        assert_eq!(
+            without_attachment(single.as_bytes(), "x.pdf", 9, "d"),
+            Err(StripError::WholeMessage)
+        );
     }
 
     #[test]

@@ -80,7 +80,11 @@ const SIZES: [i32; 6] = [16, 22, 24, 32, 48, 64];
 /// on a light panel and a dark one alike.
 const SYMBOLIC_GREY: &str = "#bebebe";
 /// GNOME's red (`@error_color`).
-const DOT_RGB: (f64, f64, f64) = (0xe0 as f64 / 255.0, 0x1b as f64 / 255.0, 0x24 as f64 / 255.0);
+const DOT_RGB: (f64, f64, f64) = (
+    0xe0 as f64 / 255.0,
+    0x1b as f64 / 255.0,
+    0x24 as f64 / 255.0,
+);
 
 /// A running tray item. Dropping it does not remove the icon; call
 /// [`TrayHandle::stop`].
@@ -108,8 +112,15 @@ impl TrayHandle {
             sender,
             symbolic: symbolic_theme(icon),
         };
-        match tray.disable_dbus_name(true).assume_sni_available(true).spawn() {
-            Ok(handle) => Some(Self { handle, last_unread: std::cell::Cell::new(unread) }),
+        match tray
+            .disable_dbus_name(true)
+            .assume_sni_available(true)
+            .spawn()
+        {
+            Ok(handle) => Some(Self {
+                handle,
+                last_unread: std::cell::Cell::new(unread),
+            }),
             Err(e) => {
                 tracing::info!("tray icon not shown: {e}");
                 None
@@ -165,7 +176,11 @@ struct HylkiTray {
 /// rest has no prefix an installed icon has (`co.hyprlab.Hylki-tray` found
 /// the app icon).
 fn symbolic_name(dotted: bool) -> &'static str {
-    if dotted { "hylki_tray_unread-symbolic" } else { "hylki_tray-symbolic" }
+    if dotted {
+        "hylki_tray_unread-symbolic"
+    } else {
+        "hylki_tray-symbolic"
+    }
 }
 
 /// Whether the panel draws a symbolic icon it is handed as a file, in its
@@ -198,8 +213,18 @@ fn symbolic_theme(icon: TrayIcon) -> Option<String> {
     let root = crate::config::data_base()?.join("hylki").join("tray-icons");
     let dir = symbolic_dir(&root);
     let written = std::fs::create_dir_all(&dir)
-        .and_then(|_| std::fs::write(dir.join(format!("{}.svg", symbolic_name(false))), ENVELOPE_SVG))
-        .and_then(|_| std::fs::write(dir.join(format!("{}.svg", symbolic_name(true))), envelope_with_dot()))
+        .and_then(|_| {
+            std::fs::write(
+                dir.join(format!("{}.svg", symbolic_name(false))),
+                ENVELOPE_SVG,
+            )
+        })
+        .and_then(|_| {
+            std::fs::write(
+                dir.join(format!("{}.svg", symbolic_name(true))),
+                envelope_with_dot(),
+            )
+        })
         .and_then(|_| {
             std::fs::write(
                 root.join("hicolor").join("index.theme"),
@@ -222,7 +247,9 @@ fn symbolic_theme(icon: TrayIcon) -> Option<String> {
 /// ring round it is masked out of the envelope so it reads as sitting on top.
 fn envelope_with_dot() -> String {
     let (cx, cy, r, ring) = (12.32, 3.68, 3.04, 4.04);
-    let open = ENVELOPE_SVG.find("<svg").and_then(|i| ENVELOPE_SVG[i..].find('>').map(|j| i + j + 1));
+    let open = ENVELOPE_SVG
+        .find("<svg")
+        .and_then(|i| ENVELOPE_SVG[i..].find('>').map(|j| i + j + 1));
     let close = ENVELOPE_SVG.rfind("</svg>");
     let inner = match (open, close) {
         (Some(a), Some(b)) if a < b => &ENVELOPE_SVG[a..b],
@@ -258,7 +285,11 @@ impl Tray for HylkiTray {
     // With the symbolic icon the panel uses the name and falls back on
     // these pixels only when it cannot load it.
     fn icon_pixmap(&self) -> Vec<Icon> {
-        if self.unread > 0 { self.dotted.clone() } else { self.plain.clone() }
+        if self.unread > 0 {
+            self.dotted.clone()
+        } else {
+            self.plain.clone()
+        }
     }
 
     fn icon_theme_path(&self) -> String {
@@ -317,7 +348,10 @@ impl Tray for HylkiTray {
             if mail.unread as usize > mail.items.len() {
                 items.push(
                     StandardItem {
-                        label: i18n_f("View all {n} unread in Inboxes…", &[("n", &mail.unread.to_string())]),
+                        label: i18n_f(
+                            "View all {n} unread in Inboxes…",
+                            &[("n", &mail.unread.to_string())],
+                        ),
                         activate: Box::new(|t: &mut Self| {
                             let _ = t.sender.send(AppMsg::PresentWindow);
                             let _ = t.sender.send(AppMsg::TrayViewUnread);
@@ -369,7 +403,12 @@ impl Tray for HylkiTray {
 fn inbox_status_text(unread: u32) -> String {
     match unread {
         0 => i18n("No unread mail in Inboxes"),
-        n => ni18n_f("{n} unread in Inboxes", "{n} unread in Inboxes", n, &[("n", &n.to_string())]),
+        n => ni18n_f(
+            "{n} unread in Inboxes",
+            "{n} unread in Inboxes",
+            n,
+            &[("n", &n.to_string())],
+        ),
     }
 }
 
@@ -448,10 +487,16 @@ fn initials_png(name: &str, email: &str, size: i32) -> Option<Vec<u8>> {
         (0.75, 0.11, 0.16), // red
     ];
     let seed = if name.is_empty() { email } else { name };
-    let hash = seed.bytes().fold(0usize, |h, b| h.wrapping_mul(31).wrapping_add(b as usize));
+    let hash = seed
+        .bytes()
+        .fold(0usize, |h, b| h.wrapping_mul(31).wrapping_add(b as usize));
     let (r, g, b) = PALETTE[hash % PALETTE.len()];
     let initials: String = {
-        let src = if name.trim().is_empty() { email.split('@').next().unwrap_or("") } else { name };
+        let src = if name.trim().is_empty() {
+            email.split('@').next().unwrap_or("")
+        } else {
+            name
+        };
         let mut it = src
             .split(|c: char| c.is_whitespace() || c == '.' || c == '_' || c == '-')
             .filter_map(|w| w.chars().next())
@@ -471,8 +516,18 @@ fn initials_png(name: &str, email: &str, size: i32) -> Option<Vec<u8>> {
         cr.arc(s / 2.0, s / 2.0, s / 2.0, 0.0, std::f64::consts::TAU);
         cr.fill().ok()?;
         cr.set_source_rgb(1.0, 1.0, 1.0);
-        cr.select_font_face("Cantarell", cairo::FontSlant::Normal, cairo::FontWeight::Bold);
-        cr.set_font_size(s * if initials.chars().count() > 1 { 0.44 } else { 0.5 });
+        cr.select_font_face(
+            "Cantarell",
+            cairo::FontSlant::Normal,
+            cairo::FontWeight::Bold,
+        );
+        cr.set_font_size(
+            s * if initials.chars().count() > 1 {
+                0.44
+            } else {
+                0.5
+            },
+        );
         let ext = cr.text_extents(&initials).ok()?;
         cr.move_to(
             s / 2.0 - ext.width() / 2.0 - ext.x_bearing(),
@@ -506,7 +561,11 @@ fn panel_fill() -> f64 {
     let cinnamon = desktop
         .split(':')
         .any(|d| d.eq_ignore_ascii_case("x-cinnamon") || d.eq_ignore_ascii_case("cinnamon"));
-    if cinnamon { 0.625 } else { 1.0 }
+    if cinnamon {
+        0.625
+    } else {
+        1.0
+    }
 }
 
 /// Decode the chosen icon, composite the dot over its top-right, and centre
@@ -584,7 +643,11 @@ fn argb_network_order(data: &[u8], width: usize, height: usize, stride: usize) -
             let native = u32::from_ne_bytes([px[0], px[1], px[2], px[3]]);
             let a = (native >> 24) & 0xff;
             let un = |c: u32| -> u8 {
-                if a == 0 { 0 } else { ((c * 255 + a / 2) / a).min(255) as u8 }
+                if a == 0 {
+                    0
+                } else {
+                    ((c * 255 + a / 2) / a).min(255) as u8
+                }
             };
             let r = un((native >> 16) & 0xff);
             let g = un((native >> 8) & 0xff);
@@ -614,7 +677,11 @@ mod tests {
     fn every_icon_renders_at_every_size() {
         for icon in [TrayIcon::Hylki, TrayIcon::Symbolic] {
             for dotted in [false, true] {
-                let set = render_set(icon, crate::app_icon::png_for(crate::app_icon::DEFAULT_ID), dotted);
+                let set = render_set(
+                    icon,
+                    crate::app_icon::png_for(crate::app_icon::DEFAULT_ID),
+                    dotted,
+                );
                 assert_eq!(set.len(), SIZES.len(), "{icon:?} dotted={dotted}");
                 for (i, size) in SIZES.iter().enumerate() {
                     assert_eq!(set[i].width, *size);
@@ -631,7 +698,11 @@ mod tests {
         let svg = envelope_with_dot();
         let count = |s: &str, pat: &str| s.matches(pat).count();
         assert_eq!(count(&svg, "<path"), count(ENVELOPE_SVG, "<path"));
-        assert_eq!(count(&svg, "<rect") - 1, count(ENVELOPE_SVG, "<rect"), "one rect is the mask's");
+        assert_eq!(
+            count(&svg, "<rect") - 1,
+            count(ENVELOPE_SVG, "<rect"),
+            "one rect is the mask's"
+        );
         let group = svg.find("<g mask=\"url(#ring)\">").unwrap();
         assert!(svg.find("<path").unwrap() > group);
         assert_eq!(count(&svg, "class=\"error\""), 1);
@@ -672,15 +743,34 @@ mod tests {
     #[test]
     fn the_dot_is_red_and_only_when_asked() {
         let size = 32usize;
-        let plain = render(TrayIcon::Symbolic, crate::app_icon::png_for(crate::app_icon::DEFAULT_ID), false, size as i32, 1.0).unwrap();
-        let dotted = render(TrayIcon::Symbolic, crate::app_icon::png_for(crate::app_icon::DEFAULT_ID), true, size as i32, 1.0).unwrap();
+        let plain = render(
+            TrayIcon::Symbolic,
+            crate::app_icon::png_for(crate::app_icon::DEFAULT_ID),
+            false,
+            size as i32,
+            1.0,
+        )
+        .unwrap();
+        let dotted = render(
+            TrayIcon::Symbolic,
+            crate::app_icon::png_for(crate::app_icon::DEFAULT_ID),
+            true,
+            size as i32,
+            1.0,
+        )
+        .unwrap();
         // The dot's centre, per `render`.
         let s = size as f64;
         let r = s * 0.19;
         let (cx, cy) = ((s - r - s * 0.04) as usize, (r + s * 0.04) as usize);
         let at = |icon: &Icon| {
             let i = (cy * size + cx) * 4;
-            (icon.data[i], icon.data[i + 1], icon.data[i + 2], icon.data[i + 3])
+            (
+                icon.data[i],
+                icon.data[i + 1],
+                icon.data[i + 2],
+                icon.data[i + 3],
+            )
         };
         let (a, red, g, b) = at(&dotted);
         assert_eq!(a, 0xff);
@@ -691,11 +781,23 @@ mod tests {
     #[test]
     fn a_half_fill_leaves_a_clear_margin_and_moves_the_dot() {
         let size = 32usize;
-        let icon = render(TrayIcon::Hylki, crate::app_icon::png_for(crate::app_icon::DEFAULT_ID), true, size as i32, 0.5).unwrap();
+        let icon = render(
+            TrayIcon::Hylki,
+            crate::app_icon::png_for(crate::app_icon::DEFAULT_ID),
+            true,
+            size as i32,
+            0.5,
+        )
+        .unwrap();
         assert_eq!(icon.data.len(), size * size * 4);
         let at = |x: usize, y: usize| {
             let i = (y * size + x) * 4;
-            (icon.data[i], icon.data[i + 1], icon.data[i + 2], icon.data[i + 3])
+            (
+                icon.data[i],
+                icon.data[i + 1],
+                icon.data[i + 2],
+                icon.data[i + 3],
+            )
         };
         // The outer 8px ring is empty: corner, and just inside the old dot.
         assert_eq!(at(1, 1), (0, 0, 0, 0));
@@ -703,7 +805,10 @@ mod tests {
         // The dot sits on the 16px glyph's corner, per `render`.
         let (s, margin) = (16.0f64, 8.0f64);
         let r = s * 0.19;
-        let (cx, cy) = ((margin + s - r - s * 0.04) as usize, (margin + r + s * 0.04) as usize);
+        let (cx, cy) = (
+            (margin + s - r - s * 0.04) as usize,
+            (margin + r + s * 0.04) as usize,
+        );
         let (a, red, g, b) = at(cx, cy);
         assert_eq!(a, 0xff);
         assert_eq!((red, g, b), (0xe0, 0x1b, 0x24));

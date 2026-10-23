@@ -165,8 +165,10 @@ pub fn base64_decode(text: &str) -> Option<Vec<u8>> {
             .with_decode_padding_mode(DecodePaddingMode::RequireNone)
             .with_decode_allow_trailing_bits(true),
     );
-    let mut clean: Vec<u8> =
-        text.bytes().filter(|b| !b.is_ascii_whitespace() && *b != b'=').collect();
+    let mut clean: Vec<u8> = text
+        .bytes()
+        .filter(|b| !b.is_ascii_whitespace() && *b != b'=')
+        .collect();
     if clean.len() % 4 == 1 {
         clean.pop();
     }
@@ -221,14 +223,17 @@ pub fn preset(provider: &str) -> Option<Preset> {
 /// Asked for only when the account's directory switch is turned on, since a
 /// tenant that lets users approve mail access may still want an
 /// administrator for these.
-pub const MICROSOFT_DIRECTORY_SCOPES: [&str; 2] =
-    ["https://graph.microsoft.com/People.Read", "https://graph.microsoft.com/User.ReadBasic.All"];
+pub const MICROSOFT_DIRECTORY_SCOPES: [&str; 2] = [
+    "https://graph.microsoft.com/People.Read",
+    "https://graph.microsoft.com/User.ReadBasic.All",
+];
 
 /// What reading the names of the organization's sensitivity labels needs
 /// (#411), when a message's label leaves its name out. Asked for only when
 /// the account's label switch is turned on, for the same reason as the
 /// directory's.
-pub const MICROSOFT_LABEL_SCOPES: [&str; 1] = ["https://graph.microsoft.com/InformationProtectionPolicy.Read"];
+pub const MICROSOFT_LABEL_SCOPES: [&str; 1] =
+    ["https://graph.microsoft.com/InformationProtectionPolicy.Read"];
 
 /// Every scope Hylki adds to its own sign-in on request.
 const MICROSOFT_EXTRA_SCOPES: [&[&str]; 2] = [&MICROSOFT_DIRECTORY_SCOPES, &MICROSOFT_LABEL_SCOPES];
@@ -237,12 +242,16 @@ const MICROSOFT_EXTRA_SCOPES: [&[&str]; 2] = [&MICROSOFT_DIRECTORY_SCOPES, &MICR
 /// name, the way the Advanced row takes them.
 fn is_scope(scope: &str, full: &str) -> bool {
     scope.eq_ignore_ascii_case(full)
-        || full.rsplit('/').next().is_some_and(|short| scope.eq_ignore_ascii_case(short))
+        || full
+            .rsplit('/')
+            .next()
+            .is_some_and(|short| scope.eq_ignore_ascii_case(short))
 }
 
 /// Whether a sign-in with `scopes` was granted all of `set`.
 pub fn has_scopes(scopes: &str, set: &[&str]) -> bool {
-    set.iter().all(|full| scopes.split_whitespace().any(|s| is_scope(s, full)))
+    set.iter()
+        .all(|full| scopes.split_whitespace().any(|s| is_scope(s, full)))
 }
 
 /// `scopes` with those of `set` added where missing.
@@ -272,7 +281,12 @@ pub fn with_directory_scopes(scopes: &str) -> String {
 fn without_extra_scopes(scopes: &str) -> String {
     scopes
         .split_whitespace()
-        .filter(|s| !MICROSOFT_EXTRA_SCOPES.iter().flat_map(|set| set.iter()).any(|full| s.eq_ignore_ascii_case(full)))
+        .filter(|s| {
+            !MICROSOFT_EXTRA_SCOPES
+                .iter()
+                .flat_map(|set| set.iter())
+                .any(|full| s.eq_ignore_ascii_case(full))
+        })
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -283,18 +297,31 @@ fn without_extra_scopes(scopes: &str) -> String {
 /// what `settings` has. Scopes are Graph's short names, as Evolution lists
 /// them; `offline_access` is added when missing, or no refresh token comes
 /// back.
-pub fn microsoft_advanced(settings: &mut OAuthSettings, client_id: &str, tenant: &str, scopes: &str, redirect: &str) {
+pub fn microsoft_advanced(
+    settings: &mut OAuthSettings,
+    client_id: &str,
+    tenant: &str,
+    scopes: &str,
+    redirect: &str,
+) {
     if !client_id.is_empty() {
         settings.client_id = client_id.to_string();
     }
     let tenant = tenant.trim().trim_matches('/');
     if !tenant.is_empty() && !tenant.contains(['/', '?', '#', ' ']) {
-        settings.auth_url = settings.auth_url.replacen("/common/", &format!("/{tenant}/"), 1);
-        settings.token_url = settings.token_url.replacen("/common/", &format!("/{tenant}/"), 1);
+        settings.auth_url = settings
+            .auth_url
+            .replacen("/common/", &format!("/{tenant}/"), 1);
+        settings.token_url = settings
+            .token_url
+            .replacen("/common/", &format!("/{tenant}/"), 1);
     }
     if !scopes.trim().is_empty() {
         let mut list: Vec<&str> = scopes.split_whitespace().collect();
-        if !list.iter().any(|s| s.eq_ignore_ascii_case("offline_access")) {
+        if !list
+            .iter()
+            .any(|s| s.eq_ignore_ascii_case("offline_access"))
+        {
             list.push("offline_access");
         }
         settings.scopes = list.join(" ");
@@ -306,11 +333,17 @@ pub fn microsoft_advanced(settings: &mut OAuthSettings, client_id: &str, tenant:
 /// the form: `(client_id, tenant, scopes, redirect)`, each empty where it
 /// is Hylki's own.
 pub fn microsoft_advanced_of(settings: &OAuthSettings) -> (String, String, String, String) {
-    let Some(p) = preset("microsoft") else { return Default::default() };
+    let Some(p) = preset("microsoft") else {
+        return Default::default();
+    };
     if !settings.token_url.contains("microsoftonline") {
         return Default::default();
     }
-    let client = if settings.client_id == MICROSOFT_CLIENT_ID { String::new() } else { settings.client_id.clone() };
+    let client = if settings.client_id == MICROSOFT_CLIENT_ID {
+        String::new()
+    } else {
+        settings.client_id.clone()
+    };
     let tenant = settings
         .auth_url
         .strip_prefix("https://login.microsoftonline.com/")
@@ -319,7 +352,11 @@ pub fn microsoft_advanced_of(settings: &OAuthSettings) -> (String, String, Strin
         .unwrap_or_default()
         .to_string();
     let own = without_extra_scopes(&settings.scopes);
-    let scopes = if own == without_extra_scopes(p.scopes) { String::new() } else { own };
+    let scopes = if own == without_extra_scopes(p.scopes) {
+        String::new()
+    } else {
+        own
+    };
     (client, tenant, scopes, settings.redirect_uri.clone())
 }
 
@@ -354,7 +391,13 @@ pub fn provider_credentials(provider: &str) -> (String, String) {
             MICROSOFT_CLIENT_SECRET,
             false,
         ),
-        "dropbox" => ("HYLKI_DROPBOX_CLIENT_ID", "HYLKI_DROPBOX_CLIENT_SECRET", DROPBOX_CLIENT_ID, "", false),
+        "dropbox" => (
+            "HYLKI_DROPBOX_CLIENT_ID",
+            "HYLKI_DROPBOX_CLIENT_SECRET",
+            DROPBOX_CLIENT_ID,
+            "",
+            false,
+        ),
         _ => ("", "", "", "", true),
     };
 
@@ -396,7 +439,9 @@ struct FileCreds {
 }
 
 fn creds_from_file(provider: &str) -> Option<(String, String)> {
-    let path = crate::config::config_base()?.join("hylki").join("oauth.toml");
+    let path = crate::config::config_base()?
+        .join("hylki")
+        .join("oauth.toml");
     let text = std::fs::read_to_string(path).ok()?;
     let file: OAuthFile = toml::from_str(&text).ok()?;
     let creds = match provider {
@@ -483,7 +528,10 @@ pub fn microsoft_prompt(login_hint: Option<&str>) -> String {
 
 /// [`run_flow`] for the account `login_hint` names, where the provider
 /// takes a hint (Microsoft).
-pub fn run_flow_as(settings: &OAuthSettings, login_hint: Option<&str>) -> Result<FlowResult, String> {
+pub fn run_flow_as(
+    settings: &OAuthSettings,
+    login_hint: Option<&str>,
+) -> Result<FlowResult, String> {
     // Dropbox matches the redirect URI exactly, port and all, so its
     // listener sits on a fixed port the app registers; the others accept
     // any loopback port.
@@ -499,7 +547,11 @@ pub fn run_flow_as(settings: &OAuthSettings, login_hint: Option<&str>) -> Result
     // which we can't do. Google (and others) accept the 127.0.0.1 literal. The
     // listener is on 127.0.0.1 either way; browsers resolve localhost to it.
     let microsoft = settings.token_url.contains("microsoftonline");
-    let host = if microsoft || dropbox { "localhost" } else { "127.0.0.1" };
+    let host = if microsoft || dropbox {
+        "localhost"
+    } else {
+        "127.0.0.1"
+    };
     // Microsoft compares the redirect with the registered `http://localhost`
     // to the letter, the port aside, so it gets no trailing slash.
     let redirect = if microsoft {
@@ -564,7 +616,12 @@ impl Authorization {
             chal = crate::percent::encode(&challenge),
             st = crate::percent::encode(&state),
         );
-        Ok(Self { url, redirect: redirect.to_string(), state, verifier })
+        Ok(Self {
+            url,
+            redirect: redirect.to_string(),
+            state,
+            verifier,
+        })
     }
 
     /// For a sign-in in Hylki's own window (#329): the code a navigation
@@ -583,7 +640,10 @@ impl Authorization {
             None => Err(match redirect_error(&line) {
                 Some((error, description)) => {
                     let first = description.lines().next().unwrap_or("").trim().to_string();
-                    explain_microsoft_refusal(settings, if first.is_empty() { error } else { first })
+                    explain_microsoft_refusal(
+                        settings,
+                        if first.is_empty() { error } else { first },
+                    )
                 }
                 None => "no authorization code returned".into(),
             }),
@@ -592,7 +652,11 @@ impl Authorization {
 }
 
 /// Redeem an authorization code for the refresh token (blocking).
-pub fn exchange_code(settings: &OAuthSettings, request: &Authorization, code: &str) -> Result<FlowResult, String> {
+pub fn exchange_code(
+    settings: &OAuthSettings,
+    request: &Authorization,
+    code: &str,
+) -> Result<FlowResult, String> {
     let mut form: Vec<(&str, &str)> = vec![
         ("grant_type", "authorization_code"),
         ("code", code),
@@ -627,12 +691,13 @@ pub fn microsoft_whoami(
     user: Option<&str>,
 ) -> Result<(String, String, String), String> {
     let fresh = refresh_access_token_as(settings, refresh, user)?;
-    let me: serde_json::Value = ureq::get("https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName")
-        .set("Authorization", &format!("Bearer {}", fresh.access_token))
-        .call()
-        .map_err(|e| e.to_string())?
-        .into_json()
-        .map_err(|e| e.to_string())?;
+    let me: serde_json::Value =
+        ureq::get("https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName")
+            .set("Authorization", &format!("Bearer {}", fresh.access_token))
+            .call()
+            .map_err(|e| e.to_string())?
+            .into_json()
+            .map_err(|e| e.to_string())?;
     let name = me["displayName"].as_str().unwrap_or_default().to_string();
     let address = me["mail"]
         .as_str()
@@ -640,11 +705,18 @@ pub fn microsoft_whoami(
         .or_else(|| me["userPrincipalName"].as_str())
         .unwrap_or_default()
         .to_string();
-    Ok((name, address, fresh.refresh_token.unwrap_or_else(|| refresh.to_string())))
+    Ok((
+        name,
+        address,
+        fresh.refresh_token.unwrap_or_else(|| refresh.to_string()),
+    ))
 }
 
 /// Mint a fresh access token from a stored refresh token (blocking).
-pub fn refresh_access_token(settings: &OAuthSettings, refresh_token: &str) -> Result<Refreshed, String> {
+pub fn refresh_access_token(
+    settings: &OAuthSettings,
+    refresh_token: &str,
+) -> Result<Refreshed, String> {
     refresh_access_token_as(settings, refresh_token, None)
 }
 
@@ -696,16 +768,24 @@ fn bind_fixed_port(port: u16) -> Result<TcpListener, String> {
             Ok(l) => return Ok(l),
             Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
                 let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-                if let Ok(mut s) = std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
+                if let Ok(mut s) =
+                    std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(2))
+                {
                     let _ = s.set_read_timeout(Some(Duration::from_secs(2)));
-                    let _ = s.write_all(b"GET /?cancel=1 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+                    let _ = s.write_all(
+                        b"GET /?cancel=1 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+                    );
                     let mut sink = [0u8; 512];
                     let _ = s.read(&mut sink);
                 }
                 last = Some(e);
                 std::thread::sleep(Duration::from_millis(250));
             }
-            Err(e) => return Err(format!("could not listen on localhost port {port} for the sign-in redirect: {e}")),
+            Err(e) => {
+                return Err(format!(
+                    "could not listen on localhost port {port} for the sign-in redirect: {e}"
+                ))
+            }
         }
     }
     Err(format!(
@@ -729,7 +809,9 @@ fn wait_for_code(listener: &TcpListener, expected_state: &str) -> Result<String,
                 let line = req.lines().next().unwrap_or("");
                 // A newer sign-in of ours taking the port over.
                 if line.starts_with("GET /?cancel=1 ") {
-                    let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    let _ = stream.write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    );
                     return Err("this sign-in was replaced by a newer one".into());
                 }
                 let (code, state) = parse_redirect(line);
@@ -805,9 +887,16 @@ fn redirect_error(request_line: &str) -> Option<(String, String)> {
 /// work and school accounts elsewhere cannot approve an app from a publisher
 /// Microsoft has not verified themselves (#329).
 fn explain_microsoft_refusal(settings: &OAuthSettings, reason: String) -> String {
-    let consent = ["AADSTS65001", "AADSTS65004", "AADSTS90094", "AADSTS90095", "consent_required", "access_denied"]
-        .iter()
-        .any(|c| reason.contains(c));
+    let consent = [
+        "AADSTS65001",
+        "AADSTS65004",
+        "AADSTS90094",
+        "AADSTS90095",
+        "consent_required",
+        "access_denied",
+    ]
+    .iter()
+    .any(|c| reason.contains(c));
     if !consent {
         return reason;
     }
@@ -873,19 +962,44 @@ mod tests {
             "https://login.microsoftonline.com/common/oauth2/nativeclient",
         );
         assert_eq!(s.client_id, "20460e5d-ce91-49af-a3a5-70b6be7486d1");
-        assert_eq!(s.auth_url, "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize");
-        assert_eq!(s.token_url, "https://login.microsoftonline.com/organizations/oauth2/v2.0/token");
-        assert_eq!(s.scopes, "Mail.ReadWrite Mail.Send User.Read offline_access");
+        assert_eq!(
+            s.auth_url,
+            "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize"
+        );
+        assert_eq!(
+            s.token_url,
+            "https://login.microsoftonline.com/organizations/oauth2/v2.0/token"
+        );
+        assert_eq!(
+            s.scopes,
+            "Mail.ReadWrite Mail.Send User.Read offline_access"
+        );
         let back = microsoft_advanced_of(&s);
         assert_eq!(back.1, "organizations");
-        assert_eq!(back.3, "https://login.microsoftonline.com/common/oauth2/nativeclient");
+        assert_eq!(
+            back.3,
+            "https://login.microsoftonline.com/common/oauth2/nativeclient"
+        );
         // The redirect is caught, with its code and the request's state.
         let req = Authorization::new(&s, &s.redirect_uri, "").unwrap();
-        assert!(req.url.contains("redirect_uri=https%3A%2F%2Flogin.microsoftonline.com"), "{}", req.url);
+        assert!(
+            req.url
+                .contains("redirect_uri=https%3A%2F%2Flogin.microsoftonline.com"),
+            "{}",
+            req.url
+        );
         let ok = format!("{}?code=abc&state={}", s.redirect_uri, req.state);
         assert_eq!(req.answer(&ok, &s), Some(Ok("abc".into())));
-        assert!(req.answer("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x", &s).is_none());
-        let refused = format!("{}?error=access_denied&error_description=AADSTS65004%3A+declined", s.redirect_uri);
+        assert!(req
+            .answer(
+                "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x",
+                &s
+            )
+            .is_none());
+        let refused = format!(
+            "{}?error=access_denied&error_description=AADSTS65004%3A+declined",
+            s.redirect_uri
+        );
         assert!(matches!(req.answer(&refused, &s), Some(Err(_))));
     }
 
@@ -908,17 +1022,29 @@ mod tests {
         };
         assert_eq!(microsoft_advanced_of(&s), Default::default());
         // A registration's own short names count, and stay where typed.
-        let own = OAuthSettings { scopes: "Mail.ReadWrite people.read User.ReadBasic.All offline_access".into(), ..s };
+        let own = OAuthSettings {
+            scopes: "Mail.ReadWrite people.read User.ReadBasic.All offline_access".into(),
+            ..s
+        };
         assert!(has_directory_scopes(&own.scopes));
         assert_eq!(microsoft_advanced_of(&own).2, own.scopes);
         // The label scope (#411) rides along the same way.
         let both = with_scopes(&with_directory_scopes(p.scopes), &MICROSOFT_LABEL_SCOPES);
         assert!(has_scopes(&both, &MICROSOFT_LABEL_SCOPES) && has_directory_scopes(&both));
         assert!(!has_scopes(p.scopes, &MICROSOFT_LABEL_SCOPES));
-        assert_eq!(microsoft_advanced_of(&OAuthSettings { scopes: both, ..own.clone() }), Default::default());
+        assert_eq!(
+            microsoft_advanced_of(&OAuthSettings {
+                scopes: both,
+                ..own.clone()
+            }),
+            Default::default()
+        );
         assert_eq!(microsoft_prompt(None), "&prompt=select_account");
         assert_eq!(microsoft_prompt(Some(" ")), "&prompt=select_account");
-        assert_eq!(microsoft_prompt(Some("ann+x@contoso.com")), "&login_hint=ann%2Bx%40contoso.com");
+        assert_eq!(
+            microsoft_prompt(Some("ann+x@contoso.com")),
+            "&login_hint=ann%2Bx%40contoso.com"
+        );
     }
 
     #[test]
@@ -928,10 +1054,17 @@ mod tests {
         assert_eq!(error, "access_denied");
         assert!(description.starts_with("AADSTS65004: User declined to consent."));
         assert_eq!(parse_redirect(line).0, None);
-        let settings = OAuthSettings { client_id: "abc".into(), ..Default::default() };
-        let told = explain_microsoft_refusal(&settings, "AADSTS65004: User declined to consent.".into());
+        let settings = OAuthSettings {
+            client_id: "abc".into(),
+            ..Default::default()
+        };
+        let told =
+            explain_microsoft_refusal(&settings, "AADSTS65004: User declined to consent.".into());
         assert!(told.contains("adminconsent?client_id=abc"), "{told}");
-        assert_eq!(explain_microsoft_refusal(&settings, "sign-in timed out".into()), "sign-in timed out");
+        assert_eq!(
+            explain_microsoft_refusal(&settings, "sign-in timed out".into()),
+            "sign-in timed out"
+        );
     }
 
     use super::*;
@@ -942,8 +1075,16 @@ mod tests {
         assert_eq!(base64_decode(&base64_encode(&bytes)).unwrap(), bytes);
         assert_eq!(base64_encode(b"hi!?"), "aGkhPw==");
         assert_eq!(base64_decode("aGkh\r\nPw==").unwrap(), b"hi!?");
-        assert_eq!(base64_decode("aGkhPw").unwrap(), b"hi!?", "padding is optional");
-        assert_eq!(base64_decode("aGkhP").unwrap(), b"hi!", "a lone last character is dropped");
+        assert_eq!(
+            base64_decode("aGkhPw").unwrap(),
+            b"hi!?",
+            "padding is optional"
+        );
+        assert_eq!(
+            base64_decode("aGkhP").unwrap(),
+            b"hi!",
+            "a lone last character is dropped"
+        );
         assert_eq!(base64_decode("aG*h"), None);
     }
 
@@ -957,7 +1098,11 @@ mod tests {
             let (mut s, _) = old.accept().unwrap();
             let mut buf = [0u8; 256];
             let n = s.read(&mut buf).unwrap();
-            let line = String::from_utf8_lossy(&buf[..n]).lines().next().unwrap_or("").to_string();
+            let line = String::from_utf8_lossy(&buf[..n])
+                .lines()
+                .next()
+                .unwrap_or("")
+                .to_string();
             let _ = s.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
             drop(old);
             line

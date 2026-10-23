@@ -40,7 +40,9 @@ mod imp {
 
     impl WidgetImpl for ColumnBin {
         fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
-            let Some(child) = self.obj().first_child() else { return (0, 0, -1, -1) };
+            let Some(child) = self.obj().first_child() else {
+                return (0, 0, -1, -1);
+            };
             let (min, nat, base_min, base_nat) = child.measure(orientation, for_size);
             if orientation == gtk::Orientation::Horizontal {
                 let width = self.width.get();

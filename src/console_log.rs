@@ -39,7 +39,11 @@ pub fn lines_since(after: u64) -> (u64, Vec<String>) {
         return (newest, Vec::new());
     }
     let buf = BUF.lock().unwrap();
-    let lines = buf.iter().filter(|(s, _)| *s > after).map(|(_, l)| l.clone()).collect();
+    let lines = buf
+        .iter()
+        .filter(|(s, _)| *s > after)
+        .map(|(_, l)| l.clone())
+        .collect();
     (newest, lines)
 }
 
@@ -88,8 +92,10 @@ pub fn export_text(memory: &str) -> String {
     let os = std::fs::read_to_string("/etc/os-release")
         .ok()
         .and_then(|t| {
-            t.lines()
-                .find_map(|l| l.strip_prefix("PRETTY_NAME=").map(|v| v.trim_matches('"').to_string()))
+            t.lines().find_map(|l| {
+                l.strip_prefix("PRETTY_NAME=")
+                    .map(|v| v.trim_matches('"').to_string())
+            })
         })
         .unwrap_or_else(|| "unknown OS".to_string());
     let host = if crate::platform::is_flatpak() {
@@ -135,7 +141,12 @@ fn redact_addresses(line: &str) -> String {
     let mut out = String::with_capacity(line.len());
     let mut i = 0;
     while i < chars.len() {
-        if chars[i] == '@' && i > 0 && is_local(chars[i - 1]) && i + 1 < chars.len() && is_domain(chars[i + 1]) {
+        if chars[i] == '@'
+            && i > 0
+            && is_local(chars[i - 1])
+            && i + 1 < chars.len()
+            && is_domain(chars[i + 1])
+        {
             // Walk the local part back out of `out`, then keep the domain.
             let mut start = i;
             while start > 0 && is_local(chars[start - 1]) {
@@ -160,8 +171,17 @@ mod tests {
 
     #[test]
     fn addresses_keep_their_domain_only() {
-        assert_eq!(redact_addresses("filter: jane.doe@example.com tagged Work"), "filter: \u{2026}@example.com tagged Work");
-        assert_eq!(redact_addresses("two a@b.org and c+d@e.f.net"), "two \u{2026}@b.org and \u{2026}@e.f.net");
-        assert_eq!(redact_addresses("no address here @ all"), "no address here @ all");
+        assert_eq!(
+            redact_addresses("filter: jane.doe@example.com tagged Work"),
+            "filter: \u{2026}@example.com tagged Work"
+        );
+        assert_eq!(
+            redact_addresses("two a@b.org and c+d@e.f.net"),
+            "two \u{2026}@b.org and \u{2026}@e.f.net"
+        );
+        assert_eq!(
+            redact_addresses("no address here @ all"),
+            "no address here @ all"
+        );
     }
 }

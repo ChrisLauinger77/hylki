@@ -28,18 +28,28 @@ impl Gpg {
     /// The user's GnuPG (honouring `HYLKI_GNUPGHOME`, for trying an
     /// alternative keyring without touching the real one).
     pub fn system() -> Gpg {
-        Gpg { home: std::env::var_os("HYLKI_GNUPGHOME").map(PathBuf::from) }
+        Gpg {
+            home: std::env::var_os("HYLKI_GNUPGHOME").map(PathBuf::from),
+        }
     }
 
     fn command(&self) -> Command {
         let mut c = Command::new("gpg");
         // `--batch` keeps gpg off the terminal; the agent still asks for a
         // passphrase through pinentry, which is exactly the prompt we want.
-        c.args(["--batch", "--no-tty", "--status-fd", "2", "--exit-on-status-write-error"]);
+        c.args([
+            "--batch",
+            "--no-tty",
+            "--status-fd",
+            "2",
+            "--exit-on-status-write-error",
+        ]);
         if let Some(h) = &self.home {
             c.env("GNUPGHOME", h);
         }
-        c.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        c.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         c
     }
 }
@@ -74,7 +84,10 @@ pub enum Shape {
 
 impl Shape {
     pub fn is_encrypted(&self) -> bool {
-        matches!(self, Shape::Encrypted { .. } | Shape::InlineEncrypted { .. })
+        matches!(
+            self,
+            Shape::Encrypted { .. } | Shape::InlineEncrypted { .. }
+        )
     }
 }
 
@@ -87,8 +100,12 @@ pub fn detect(raw: &[u8]) -> Option<Shape> {
     let (ct_type, ct_sub, protocol, boundary) = match ctype {
         Some(ct) => (
             ct.ctype().to_ascii_lowercase(),
-            ct.subtype().map(|s| s.to_ascii_lowercase()).unwrap_or_default(),
-            ct.attribute("protocol").map(|p| p.to_ascii_lowercase()).unwrap_or_default(),
+            ct.subtype()
+                .map(|s| s.to_ascii_lowercase())
+                .unwrap_or_default(),
+            ct.attribute("protocol")
+                .map(|p| p.to_ascii_lowercase())
+                .unwrap_or_default(),
             ct.attribute("boundary").map(str::to_string),
         ),
         None => (String::new(), String::new(), String::new(), None),
@@ -105,7 +122,9 @@ pub fn detect(raw: &[u8]) -> Option<Shape> {
                 let part = parsed.part(*id)?;
                 let text = part_text(part);
                 if text.contains("-----BEGIN PGP MESSAGE-----") {
-                    return Some(Shape::Encrypted { armored: text.into_bytes() });
+                    return Some(Shape::Encrypted {
+                        armored: text.into_bytes(),
+                    });
                 }
             }
             return None;
@@ -126,10 +145,16 @@ pub fn detect(raw: &[u8]) -> Option<Shape> {
     // Inline forms: the first text body.
     let text = parsed.body_text(0)?;
     if text.contains("-----BEGIN PGP MESSAGE-----") && text.contains("-----END PGP MESSAGE-----") {
-        return Some(Shape::InlineEncrypted { armored: armored_block(&text, "MESSAGE").into_bytes() });
+        return Some(Shape::InlineEncrypted {
+            armored: armored_block(&text, "MESSAGE").into_bytes(),
+        });
     }
-    if text.contains("-----BEGIN PGP SIGNED MESSAGE-----") && text.contains("-----END PGP SIGNATURE-----") {
-        return Some(Shape::InlineSigned { text: text.into_owned().into_bytes() });
+    if text.contains("-----BEGIN PGP SIGNED MESSAGE-----")
+        && text.contains("-----END PGP SIGNATURE-----")
+    {
+        return Some(Shape::InlineSigned {
+            text: text.into_owned().into_bytes(),
+        });
     }
     None
 }
@@ -208,7 +233,11 @@ fn from_address(raw: &[u8]) -> String {
     use mail_parser::MessageParser;
     MessageParser::default()
         .parse(raw)
-        .and_then(|m| m.from().and_then(|f| f.first()).and_then(|a| a.address().map(|s| s.to_ascii_lowercase())))
+        .and_then(|m| {
+            m.from()
+                .and_then(|f| f.first())
+                .and_then(|a| a.address().map(|s| s.to_ascii_lowercase()))
+        })
         .unwrap_or_default()
 }
 
@@ -218,7 +247,9 @@ fn unwrap_shape(shape: Shape, _raw: &[u8], gpg: &Gpg) -> Unwrapped {
             encrypted: shape.is_encrypted(),
             decrypted: false,
             signature: PgpSignature::None,
-            notes: vec![i18n("GnuPG (gpg) is not installed, so this message cannot be read.")],
+            notes: vec![i18n(
+                "GnuPG (gpg) is not installed, so this message cannot be read.",
+            )],
             ..Default::default()
         };
         // A signed message is still readable without gpg.
@@ -239,9 +270,18 @@ fn unwrap_shape(shape: Shape, _raw: &[u8], gpg: &Gpg) -> Unwrapped {
             if decrypted {
                 notes.insert(0, i18n("Decrypted with your key."));
             } else if let Some(k) = outcome.no_seckey.first() {
-                notes.insert(0, i18n_f("Encrypted to key {id}, which is not in your keyring.", &[("id", &key_display(k))]));
+                notes.insert(
+                    0,
+                    i18n_f(
+                        "Encrypted to key {id}, which is not in your keyring.",
+                        &[("id", &key_display(k))],
+                    ),
+                );
             } else if outcome.nodata {
-                notes.insert(0, i18n("The encrypted block is damaged or not OpenPGP data."));
+                notes.insert(
+                    0,
+                    i18n("The encrypted block is damaged or not OpenPGP data."),
+                );
             } else if let Some(d) = out.detail.clone() {
                 notes.insert(0, d);
             }
@@ -256,7 +296,14 @@ fn unwrap_shape(shape: Shape, _raw: &[u8], gpg: &Gpg) -> Unwrapped {
             let subject = inner.as_deref().and_then(protected_subject);
             Unwrapped {
                 inner,
-                status: PgpStatus { encrypted: true, decrypted, signature, notes, subject, ..Default::default() },
+                status: PgpStatus {
+                    encrypted: true,
+                    decrypted,
+                    signature,
+                    notes,
+                    subject,
+                    ..Default::default()
+                },
             }
         }
         Shape::Signed { data, signature } => {
@@ -271,7 +318,13 @@ fn unwrap_shape(shape: Shape, _raw: &[u8], gpg: &Gpg) -> Unwrapped {
             }
             Unwrapped {
                 inner: Some(data),
-                status: PgpStatus { encrypted: false, decrypted: false, signature, notes, ..Default::default() },
+                status: PgpStatus {
+                    encrypted: false,
+                    decrypted: false,
+                    signature,
+                    notes,
+                    ..Default::default()
+                },
             }
         }
         Shape::InlineSigned { text } => {
@@ -281,10 +334,20 @@ fn unwrap_shape(shape: Shape, _raw: &[u8], gpg: &Gpg) -> Unwrapped {
             let outcome = parse_status(&out.status_lines);
             let mut notes = Vec::new();
             let signature = signature_verdict(&outcome, &mut notes);
-            let inner = if out.stdout.is_empty() { text_entity(&text) } else { text_entity(&out.stdout) };
+            let inner = if out.stdout.is_empty() {
+                text_entity(&text)
+            } else {
+                text_entity(&out.stdout)
+            };
             Unwrapped {
                 inner: Some(inner),
-                status: PgpStatus { encrypted: false, decrypted: false, signature, notes, ..Default::default() },
+                status: PgpStatus {
+                    encrypted: false,
+                    decrypted: false,
+                    signature,
+                    notes,
+                    ..Default::default()
+                },
             }
         }
     }
@@ -317,9 +380,13 @@ pub fn legacy_display_part(parsed: &mail_parser::Message) -> Option<usize> {
     let first = *root.sub_parts()?.first()?;
     let ct = parsed.part(first)?.content_type()?;
     let legacy = ct.ctype().eq_ignore_ascii_case("text")
-        && (ct.subtype().is_some_and(|s| s.eq_ignore_ascii_case("rfc822-headers"))
+        && (ct
+            .subtype()
+            .is_some_and(|s| s.eq_ignore_ascii_case("rfc822-headers"))
             || ct.has_attribute("protected-headers")
-            || ct.attribute("hp-legacy-display").is_some_and(|v| v.trim() == "1"));
+            || ct
+                .attribute("hp-legacy-display")
+                .is_some_and(|v| v.trim() == "1"));
     legacy.then_some(first)
 }
 
@@ -333,7 +400,9 @@ fn looks_like_mime(bytes: &[u8]) -> bool {
         || lower.starts_with("content-transfer-encoding:")
         || lower.starts_with("content-disposition:")
         || lower.starts_with("mime-version:")
-        || protected_header_block(&String::from_utf8_lossy(&bytes[..bytes.len().min(16 * 1024)]))
+        || protected_header_block(&String::from_utf8_lossy(
+            &bytes[..bytes.len().min(16 * 1024)],
+        ))
 }
 
 /// Whether text opens with a header block that has a Content-Type in it:
@@ -360,7 +429,9 @@ fn protected_header_block(head: &str) -> bool {
 
 /// Bare text as a `text/plain` entity the renderer understands.
 fn text_entity(text: &[u8]) -> Vec<u8> {
-    let mut out = b"Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n".to_vec();
+    let mut out =
+        b"Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
+            .to_vec();
     out.extend_from_slice(text);
     out
 }
@@ -403,7 +474,10 @@ fn run(gpg: &Gpg, args: &[&str], input: &[u8], detached_sig: Option<&[u8]>) -> R
             if let Some(p) = &sig_path {
                 let _ = std::fs::remove_file(p);
             }
-            return Run { detail: Some(format!("gpg: {e}")), ..Default::default() };
+            return Run {
+                detail: Some(format!("gpg: {e}")),
+                ..Default::default()
+            };
         }
     };
     // Feed stdin from a thread: gpg may start writing before it has read
@@ -421,7 +495,10 @@ fn run(gpg: &Gpg, args: &[&str], input: &[u8], detached_sig: Option<&[u8]>) -> R
         let _ = std::fs::remove_file(p);
     }
     let Ok(output) = output else {
-        return Run { detail: Some("gpg: no output".into()), ..Default::default() };
+        return Run {
+            detail: Some("gpg: no output".into()),
+            ..Default::default()
+        };
     };
     let stderr = String::from_utf8_lossy(&output.stderr);
     // A lock left by a gpg or keyboxd that is no longer serving it makes
@@ -449,7 +526,11 @@ fn run(gpg: &Gpg, args: &[&str], input: &[u8], detached_sig: Option<&[u8]>) -> R
     for s in &status_lines {
         tracing::debug!(target: "hylki::pgp", "[GNUPG:] {s}");
     }
-    Run { stdout: output.stdout, status_lines, detail }
+    Run {
+        stdout: output.stdout,
+        status_lines,
+        detail,
+    }
 }
 
 /// The signature-related lines of a gpg run, distilled.
@@ -511,7 +592,11 @@ fn parse_status(lines: &[String]) -> Outcome {
 /// The verdict on the signature, with its explanatory lines.
 fn signature_verdict(o: &Outcome, notes: &mut Vec<String>) -> PgpSignature {
     if let Some((kind, key, uid)) = &o.sig {
-        let signer = if uid.is_empty() { key_display(key) } else { uid.clone() };
+        let signer = if uid.is_empty() {
+            key_display(key)
+        } else {
+            uid.clone()
+        };
         let key_id = o.fingerprint.clone().unwrap_or_else(|| key.clone());
         return match kind.as_str() {
             "GOODSIG" => {
@@ -525,10 +610,17 @@ fn signature_verdict(o: &Outcome, notes: &mut Vec<String>) -> PgpSignature {
                         &[("id", &key_display(&key_id))],
                     ),
                 });
-                PgpSignature::Good { signer, key_id, trust }
+                PgpSignature::Good {
+                    signer,
+                    key_id,
+                    trust,
+                }
             }
             "BADSIG" => {
-                notes.push(i18n_f("Signed with key {id}.", &[("id", &key_display(&key_id))]));
+                notes.push(i18n_f(
+                    "Signed with key {id}.",
+                    &[("id", &key_display(&key_id))],
+                ));
                 PgpSignature::Bad { signer }
             }
             "EXPKEYSIG" => PgpSignature::ExpiredKey { signer },
@@ -546,8 +638,19 @@ fn signature_verdict(o: &Outcome, notes: &mut Vec<String>) -> PgpSignature {
 /// A key id or fingerprint in readable groups: the last sixteen hex digits,
 /// four at a time.
 pub fn key_display(id: &str) -> String {
-    let hex: String = id.chars().filter(|c| c.is_ascii_hexdigit()).collect::<String>().to_ascii_uppercase();
-    let tail: String = hex.chars().rev().take(16).collect::<Vec<_>>().into_iter().rev().collect();
+    let hex: String = id
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .collect::<String>()
+        .to_ascii_uppercase();
+    let tail: String = hex
+        .chars()
+        .rev()
+        .take(16)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
     tail.as_bytes()
         .chunks(4)
         .map(|c| String::from_utf8_lossy(c).into_owned())
@@ -665,8 +768,22 @@ impl KeyInfo {
 
 /// The keys in the keyring: the user's own (`secret`) or everyone's.
 pub fn list_keys(gpg: &Gpg, secret: bool) -> Vec<KeyInfo> {
-    let list = if secret { "--list-secret-keys" } else { "--list-keys" };
-    let out = run(gpg, &["--with-colons", "--with-fingerprint", "--fixed-list-mode", list], b"", None);
+    let list = if secret {
+        "--list-secret-keys"
+    } else {
+        "--list-keys"
+    };
+    let out = run(
+        gpg,
+        &[
+            "--with-colons",
+            "--with-fingerprint",
+            "--fixed-list-mode",
+            list,
+        ],
+        b"",
+        None,
+    );
     parse_colons(&String::from_utf8_lossy(&out.stdout), secret)
 }
 
@@ -689,7 +806,10 @@ fn parse_colons(text: &str, secret: bool) -> Vec<KeyInfo> {
                     can_encrypt: caps.contains(['e', 'E']),
                     can_sign: caps.contains(['s', 'S']),
                     created: f.get(5).and_then(|v| v.parse().ok()).unwrap_or(0),
-                    expires: f.get(6).and_then(|v| v.parse().ok()).filter(|e: &i64| *e > 0),
+                    expires: f
+                        .get(6)
+                        .and_then(|v| v.parse().ok())
+                        .filter(|e: &i64| *e > 0),
                     validity: KeyValidity::from_colon(f.get(1).copied().unwrap_or("")),
                     disabled: caps.contains('D'),
                 });
@@ -747,7 +867,9 @@ pub fn public_key_for(gpg: &Gpg, addr: &str) -> Option<KeyInfo> {
 /// The key with this fingerprint, if the keyring holds it.
 pub fn key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
     let fpr = fpr.to_ascii_uppercase();
-    list_keys(gpg, false).into_iter().find(|k| k.fingerprint == fpr)
+    list_keys(gpg, false)
+        .into_iter()
+        .find(|k| k.fingerprint == fpr)
 }
 
 /// What an import did.
@@ -785,7 +907,9 @@ pub fn import_keys(gpg: &Gpg, bytes: &[u8]) -> Result<ImportSummary, String> {
     let out = run(gpg, &["--import"], bytes, None);
     let s = import_summary(&out);
     if s.fingerprints.is_empty() {
-        return Err(out.detail.unwrap_or_else(|| i18n("No key was found in that file.")));
+        return Err(out
+            .detail
+            .unwrap_or_else(|| i18n("No key was found in that file.")));
     }
     Ok(s)
 }
@@ -803,11 +927,31 @@ pub fn export_public(gpg: &Gpg, fpr: &str) -> Result<Vec<u8>, String> {
 /// encryption subkey (`default default`, the pair the terminal command's
 /// bare `rsa4096` does NOT give), protected by `passphrase` (empty = none).
 /// The passphrase goes down a pipe, never a command line.
-pub fn generate_key(gpg: &Gpg, name: &str, email: &str, expire: &str, passphrase: &str) -> Result<String, String> {
-    let uid = if name.trim().is_empty() { email.trim().to_string() } else { format!("{} <{}>", name.trim(), email.trim()) };
+pub fn generate_key(
+    gpg: &Gpg,
+    name: &str,
+    email: &str,
+    expire: &str,
+    passphrase: &str,
+) -> Result<String, String> {
+    let uid = if name.trim().is_empty() {
+        email.trim().to_string()
+    } else {
+        format!("{} <{}>", name.trim(), email.trim())
+    };
     let out = run(
         gpg,
-        &["--pinentry-mode", "loopback", "--passphrase-fd", "0", "--quick-gen-key", &uid, "default", "default", expire],
+        &[
+            "--pinentry-mode",
+            "loopback",
+            "--passphrase-fd",
+            "0",
+            "--quick-gen-key",
+            &uid,
+            "default",
+            "default",
+            expire,
+        ],
         format!("{passphrase}\n").as_bytes(),
         None,
     );
@@ -818,7 +962,9 @@ pub fn generate_key(gpg: &Gpg, name: &str, email: &str, expire: &str, passphrase
             }
         }
     }
-    Err(out.detail.unwrap_or_else(|| i18n("gpg did not create the key.")))
+    Err(out
+        .detail
+        .unwrap_or_else(|| i18n("gpg did not create the key.")))
 }
 
 /// Look a key up by address (WKD, then the keyservers), and by key id
@@ -827,7 +973,17 @@ pub fn fetch_key(gpg: &Gpg, addr: &str, key_id: Option<&str>) -> Result<ImportSu
     let mut total = ImportSummary::default();
     let mut detail = None;
     if !addr.trim().is_empty() {
-        let out = run(gpg, &["--auto-key-locate", "clear,wkd,keyserver", "--locate-external-keys", addr.trim()], b"", None);
+        let out = run(
+            gpg,
+            &[
+                "--auto-key-locate",
+                "clear,wkd,keyserver",
+                "--locate-external-keys",
+                addr.trim(),
+            ],
+            b"",
+            None,
+        );
         let s = import_summary(&out);
         total.imported += s.imported;
         total.unchanged += s.unchanged;
@@ -862,12 +1018,13 @@ pub fn trust_key(gpg: &Gpg, fpr: &str, signer: Option<&str>) -> Result<(), Strin
     args.extend(["--quick-lsign-key", fpr]);
     let out = run(gpg, &args, b"", None);
     // gpg says nothing on success; a failure has a line.
-    let failed = out
-        .status_lines
-        .iter()
-        .any(|l| l.starts_with("FAILURE") || l.starts_with("INV_SGNR") || l.starts_with("NO_SECKEY"));
+    let failed = out.status_lines.iter().any(|l| {
+        l.starts_with("FAILURE") || l.starts_with("INV_SGNR") || l.starts_with("NO_SECKEY")
+    });
     if failed {
-        return Err(out.detail.unwrap_or_else(|| i18n("gpg could not sign the key.")));
+        return Err(out
+            .detail
+            .unwrap_or_else(|| i18n("gpg could not sign the key.")));
     }
     Ok(())
 }
@@ -875,10 +1032,16 @@ pub fn trust_key(gpg: &Gpg, fpr: &str, signer: Option<&str>) -> Result<(), Strin
 /// Remove a key from the keyring; the secret half too when it is the
 /// user's own.
 pub fn delete_key(gpg: &Gpg, fpr: &str, secret: bool) -> Result<(), String> {
-    let cmd = if secret { "--delete-secret-and-public-key" } else { "--delete-keys" };
+    let cmd = if secret {
+        "--delete-secret-and-public-key"
+    } else {
+        "--delete-keys"
+    };
     let out = run(gpg, &["--yes", cmd, fpr], b"", None);
     if key_by_fingerprint(gpg, fpr).is_some() {
-        return Err(out.detail.unwrap_or_else(|| i18n("gpg could not delete the key.")));
+        return Err(out
+            .detail
+            .unwrap_or_else(|| i18n("gpg could not delete the key.")));
     }
     Ok(())
 }
@@ -886,10 +1049,21 @@ pub fn delete_key(gpg: &Gpg, fpr: &str, secret: bool) -> Result<(), String> {
 /// A detached, armoured signature over `data` by `local_user`, with the
 /// `micalg` value RFC 3156 wants beside it ("pgp-sha256"), read from gpg's
 /// SIG_CREATED line.
-pub fn sign_detached(gpg: &Gpg, data: &[u8], local_user: &str) -> Result<(Vec<u8>, String), String> {
-    let out = run(gpg, &["--armor", "--local-user", local_user, "--detach-sign"], data, None);
+pub fn sign_detached(
+    gpg: &Gpg,
+    data: &[u8],
+    local_user: &str,
+) -> Result<(Vec<u8>, String), String> {
+    let out = run(
+        gpg,
+        &["--armor", "--local-user", local_user, "--detach-sign"],
+        data,
+        None,
+    );
     if out.stdout.is_empty() {
-        return Err(out.detail.unwrap_or_else(|| i18n("gpg did not sign the message.")));
+        return Err(out
+            .detail
+            .unwrap_or_else(|| i18n("gpg did not sign the message.")));
     }
     // SIG_CREATED <type> <pk algo> <hash algo> <class> <timestamp> <fpr>
     let hash = out
@@ -922,7 +1096,12 @@ pub fn secret_key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
 /// address, armoured. The sender is a recipient too, so the Sent copy stays
 /// readable. Keys are used as found: a recipient's key that is in the
 /// keyring but not vouched for still encrypts, as Thunderbird does.
-pub fn encrypt(gpg: &Gpg, data: &[u8], recipients: &[String], local_user: Option<&str>) -> Result<Vec<u8>, String> {
+pub fn encrypt(
+    gpg: &Gpg,
+    data: &[u8],
+    recipients: &[String],
+    local_user: Option<&str>,
+) -> Result<Vec<u8>, String> {
     let mut args: Vec<&str> = vec!["--armor", "--trust-model", "always", "--encrypt"];
     if let Some(u) = local_user {
         args.extend(["--sign", "--local-user", u]);
@@ -932,7 +1111,9 @@ pub fn encrypt(gpg: &Gpg, data: &[u8], recipients: &[String], local_user: Option
     }
     let out = run(gpg, &args, data, None);
     if out.stdout.is_empty() {
-        return Err(out.detail.unwrap_or_else(|| i18n("gpg did not encrypt the message.")));
+        return Err(out
+            .detail
+            .unwrap_or_else(|| i18n("gpg did not encrypt the message.")));
     }
     Ok(out.stdout)
 }
@@ -975,13 +1156,23 @@ mod tests {
         assert_eq!(o.sig.as_ref().unwrap().0, "GOODSIG");
         assert_eq!(o.sig.as_ref().unwrap().2, "Ada Lovelace <ada@example.org>");
         assert_eq!(o.trust, Some(PgpTrust::Full));
-        assert_eq!(o.fingerprint.as_deref(), Some("0123456789ABCDEF0123456789ABCDEF01234567"));
+        assert_eq!(
+            o.fingerprint.as_deref(),
+            Some("0123456789ABCDEF0123456789ABCDEF01234567")
+        );
 
-        let o = parse_status(&lines(&["ERRSIG 1234567890ABCDEF 1 8 00 1757000000 9 -", "NO_PUBKEY 1234567890ABCDEF"]));
+        let o = parse_status(&lines(&[
+            "ERRSIG 1234567890ABCDEF 1 8 00 1757000000 9 -",
+            "NO_PUBKEY 1234567890ABCDEF",
+        ]));
         assert_eq!(o.missing_key.as_deref(), Some("1234567890ABCDEF"));
         assert!(o.sig.is_none());
 
-        let o = parse_status(&lines(&["ENC_TO AAAA 1 0", "NO_SECKEY AAAA", "DECRYPTION_FAILED"]));
+        let o = parse_status(&lines(&[
+            "ENC_TO AAAA 1 0",
+            "NO_SECKEY AAAA",
+            "DECRYPTION_FAILED",
+        ]));
         assert!(!o.decryption_ok);
         assert_eq!(o.no_seckey, vec!["AAAA".to_string()]);
     }
@@ -999,17 +1190,32 @@ mod tests {
         }
         assert_eq!(notes.len(), 1);
         let o = parse_status(&lines(&["BADSIG AA Ada <a@b.c>"]));
-        assert!(matches!(signature_verdict(&o, &mut notes), PgpSignature::Bad { .. }));
+        assert!(matches!(
+            signature_verdict(&o, &mut notes),
+            PgpSignature::Bad { .. }
+        ));
         let o = parse_status(&lines(&["EXPKEYSIG AA Ada <a@b.c>"]));
-        assert!(matches!(signature_verdict(&o, &mut notes), PgpSignature::ExpiredKey { .. }));
+        assert!(matches!(
+            signature_verdict(&o, &mut notes),
+            PgpSignature::ExpiredKey { .. }
+        ));
         let o = parse_status(&lines(&["NO_PUBKEY AA"]));
-        assert!(matches!(signature_verdict(&o, &mut notes), PgpSignature::NoKey { .. }));
-        assert!(matches!(signature_verdict(&Outcome::default(), &mut notes), PgpSignature::None));
+        assert!(matches!(
+            signature_verdict(&o, &mut notes),
+            PgpSignature::NoKey { .. }
+        ));
+        assert!(matches!(
+            signature_verdict(&Outcome::default(), &mut notes),
+            PgpSignature::None
+        ));
     }
 
     #[test]
     fn key_ids_read_in_groups_of_four() {
-        assert_eq!(key_display("0123456789ABCDEF0123456789abcdef01234567"), "89AB CDEF 0123 4567");
+        assert_eq!(
+            key_display("0123456789ABCDEF0123456789abcdef01234567"),
+            "89AB CDEF 0123 4567"
+        );
         assert_eq!(key_display("1234567890ABCDEF"), "1234 5678 90AB CDEF");
     }
 
@@ -1029,7 +1235,9 @@ Content-Type: multipart/signed; micalg=pgp-sha256; protocol=\"application/pgp-si
                     String::from_utf8(data).unwrap(),
                     "Content-Type: text/plain; charset=utf-8\r\n\r\nhello signed\r\nsecond line"
                 );
-                assert!(String::from_utf8(signature).unwrap().starts_with("-----BEGIN PGP SIGNATURE-----"));
+                assert!(String::from_utf8(signature)
+                    .unwrap()
+                    .starts_with("-----BEGIN PGP SIGNATURE-----"));
             }
             other => panic!("{other:?}"),
         }
@@ -1057,13 +1265,22 @@ Content-Type: multipart/encrypted; protocol=\"application/pgp-encrypted\"; bound
 -----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA\r\n-----END PGP MESSAGE-----\r\n";
         match detect(inline.as_bytes()) {
             Some(Shape::InlineEncrypted { armored }) => {
-                assert_eq!(String::from_utf8(armored).unwrap(), "-----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA\r\n-----END PGP MESSAGE-----");
+                assert_eq!(
+                    String::from_utf8(armored).unwrap(),
+                    "-----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA\r\n-----END PGP MESSAGE-----"
+                );
             }
             other => panic!("{other:?}"),
         }
         let clear = "From: a@b.c\r\nContent-Type: text/plain\r\n\r\n-----BEGIN PGP SIGNED MESSAGE-----\r\nHash: SHA256\r\n\r\nhi\r\n-----BEGIN PGP SIGNATURE-----\r\n\r\nabc\r\n-----END PGP SIGNATURE-----\r\n";
-        assert!(matches!(detect(clear.as_bytes()), Some(Shape::InlineSigned { .. })));
-        assert_eq!(detect(b"From: a@b.c\r\nContent-Type: text/plain\r\n\r\nplain mail\r\n"), None);
+        assert!(matches!(
+            detect(clear.as_bytes()),
+            Some(Shape::InlineSigned { .. })
+        ));
+        assert_eq!(
+            detect(b"From: a@b.c\r\nContent-Type: text/plain\r\n\r\nplain mail\r\n"),
+            None
+        );
         // A plain message that merely quotes the markers is not a signed one.
         let html_only = "From: a@b.c\r\nContent-Type: text/html\r\n\r\n<p>x</p>\r\n";
         assert_eq!(detect(html_only.as_bytes()), None);
@@ -1072,20 +1289,27 @@ Content-Type: multipart/encrypted; protocol=\"application/pgp-encrypted\"; bound
     #[test]
     fn mime_versus_bare_text_is_told_by_the_first_line() {
         assert!(looks_like_mime(b"Content-Type: text/plain\r\n\r\nx"));
-        assert!(looks_like_mime(b"MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=b\r\n"));
+        assert!(looks_like_mime(
+            b"MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=b\r\n"
+        ));
         assert!(!looks_like_mime(b"Hello there\r\n"));
         let e = text_entity(b"hi");
         assert!(e.starts_with(b"Content-Type: text/plain"));
         // Protected headers may come first; bare text that merely starts
         // like a header is still text.
-        assert!(looks_like_mime(b"Subject: Plans\r\nFrom: a@b.c\r\nContent-Type: text/plain\r\n\r\nx"));
+        assert!(looks_like_mime(
+            b"Subject: Plans\r\nFrom: a@b.c\r\nContent-Type: text/plain\r\n\r\nx"
+        ));
         assert!(!looks_like_mime(b"Subject: Plans\r\n\r\nSee you at noon."));
-        assert!(!looks_like_mime(b"Note: Content-Type: text/plain is fine\r\n"));
+        assert!(!looks_like_mime(
+            b"Note: Content-Type: text/plain is fine\r\n"
+        ));
     }
 
     /// The inner entity as Thunderbird sends it: protected headers on a
     /// flagged multipart/mixed, then the legacy display part.
-    const PROTECTED: &str = "Content-Type: multipart/mixed; boundary=\"pp\";\r\n protected-headers=\"v1\"\r\n\
+    const PROTECTED: &str =
+        "Content-Type: multipart/mixed; boundary=\"pp\";\r\n protected-headers=\"v1\"\r\n\
 From: Ann <ann@example.com>\r\nTo: bob@example.com\r\n\
 Subject: =?UTF-8?Q?Caf=C3=A9_at_noon?=\r\n\r\n\
 --pp\r\nContent-Type: text/plain; charset=UTF-8; protected-headers=\"v1\"\r\n\
@@ -1094,24 +1318,41 @@ Content-Disposition: inline\r\n\r\nSubject: Caf\u{e9} at noon\r\n\r\n\
 
     #[test]
     fn protected_subject_comes_from_the_inner_entity() {
-        assert_eq!(protected_subject(PROTECTED.as_bytes()).as_deref(), Some("Caf\u{e9} at noon"));
-        assert_eq!(protected_subject(b"Content-Type: text/plain\r\n\r\nhi"), None);
-        assert_eq!(protected_subject(b"Subject:  \r\nContent-Type: text/plain\r\n\r\nhi"), None);
+        assert_eq!(
+            protected_subject(PROTECTED.as_bytes()).as_deref(),
+            Some("Caf\u{e9} at noon")
+        );
+        assert_eq!(
+            protected_subject(b"Content-Type: text/plain\r\n\r\nhi"),
+            None
+        );
+        assert_eq!(
+            protected_subject(b"Subject:  \r\nContent-Type: text/plain\r\n\r\nhi"),
+            None
+        );
     }
 
     #[test]
     fn legacy_display_part_is_found_only_under_protected_headers() {
         use mail_parser::MessageParser;
-        let parsed = MessageParser::default().parse(PROTECTED.as_bytes()).unwrap();
+        let parsed = MessageParser::default()
+            .parse(PROTECTED.as_bytes())
+            .unwrap();
         let first = parsed.root_part().sub_parts().unwrap()[0];
         assert_eq!(legacy_display_part(&parsed), Some(first));
         // Enigmail's form.
-        let enigmail = PROTECTED.replace("text/plain; charset=UTF-8; protected-headers", "text/rfc822-headers; protected-headers");
+        let enigmail = PROTECTED.replace(
+            "text/plain; charset=UTF-8; protected-headers",
+            "text/rfc822-headers; protected-headers",
+        );
         let parsed = MessageParser::default().parse(enigmail.as_bytes()).unwrap();
         assert_eq!(legacy_display_part(&parsed), Some(first));
         // RFC 9788's form.
         let rfc = PROTECTED
-            .replace("protected-headers=\"v1\"\r\n\r\nSubject", "hp-legacy-display=\"1\"\r\n\r\nSubject")
+            .replace(
+                "protected-headers=\"v1\"\r\n\r\nSubject",
+                "hp-legacy-display=\"1\"\r\n\r\nSubject",
+            )
             .replace("\r\n protected-headers=\"v1\"", "\r\n hp=\"cipher\"");
         let parsed = MessageParser::default().parse(rfc.as_bytes()).unwrap();
         assert_eq!(legacy_display_part(&parsed), Some(first));
@@ -1123,7 +1364,12 @@ Content-Disposition: inline\r\n\r\nSubject: Caf\u{e9} at noon\r\n\r\n\
 
     #[test]
     fn protected_subject_is_never_serialized() {
-        let status = PgpStatus { encrypted: true, decrypted: true, subject: Some("secret".into()), ..Default::default() };
+        let status = PgpStatus {
+            encrypted: true,
+            decrypted: true,
+            subject: Some("secret".into()),
+            ..Default::default()
+        };
         let json = serde_json::to_string(&status).unwrap();
         assert!(!json.contains("secret"), "{json}");
         let back: PgpStatus = serde_json::from_str(&json).unwrap();
@@ -1151,19 +1397,30 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
         assert!(k.can_encrypt && k.can_sign);
         assert_eq!(k.validity, KeyValidity::Ultimate);
         assert!(k.matches_address("Jason@Hyprlab.co"));
-        assert_eq!(k.fingerprint_display(), "7927 7AB4 A01A 00F9 574F D84E 7949 BE45 9D0D 7AF2");
+        assert_eq!(
+            k.fingerprint_display(),
+            "7927 7AB4 A01A 00F9 574F D84E 7949 BE45 9D0D 7AF2"
+        );
         let k = &keys[1];
         assert!(!k.can_encrypt, "no encryption subkey");
         assert_eq!(k.expires, Some(1820000000));
         assert_eq!(k.validity, KeyValidity::Unknown);
-        assert_eq!(k.uids, vec!["Jason Martin <jasonjmartin@me.com>"], "revoked uid dropped");
+        assert_eq!(
+            k.uids,
+            vec!["Jason Martin <jasonjmartin@me.com>"],
+            "revoked uid dropped"
+        );
         assert_eq!(k.emails(), vec!["jasonjmartin@me.com"]);
     }
 
     #[test]
     fn import_status_is_summarised() {
         let out = Run {
-            status_lines: lines(&["IMPORT_OK 1 AAAA", "IMPORT_OK 0 BBBB", "IMPORT_RES 2 0 1 0 0 0 0 0 0 0 0 0 0 0 0"]),
+            status_lines: lines(&[
+                "IMPORT_OK 1 AAAA",
+                "IMPORT_OK 0 BBBB",
+                "IMPORT_RES 2 0 1 0 0 0 0 0 0 0 0 0 0 0 0",
+            ]),
             ..Default::default()
         };
         let s = import_summary(&out);
@@ -1201,14 +1458,53 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&home, std::fs::Permissions::from_mode(0o700)).unwrap();
         }
-        let gpg = Gpg { home: Some(home.clone()) };
+        let gpg = Gpg {
+            home: Some(home.clone()),
+        };
         let status = |args: &[&str], input: &[u8]| -> Run { run(&gpg, args, input, None) };
-        let gen = status(&["--passphrase", "", "--pinentry-mode", "loopback", "--quick-gen-key", "Test Hylki <test@hylki.invalid>", "default", "default", "never"], b"");
-        assert!(gen.status_lines.iter().any(|l| l.starts_with("KEY_CREATED")), "{gen:?}");
+        let gen = status(
+            &[
+                "--passphrase",
+                "",
+                "--pinentry-mode",
+                "loopback",
+                "--quick-gen-key",
+                "Test Hylki <test@hylki.invalid>",
+                "default",
+                "default",
+                "never",
+            ],
+            b"",
+        );
+        assert!(
+            gen.status_lines
+                .iter()
+                .any(|l| l.starts_with("KEY_CREATED")),
+            "{gen:?}"
+        );
         let entity = b"Content-Type: text/plain; charset=utf-8\r\n\r\nsecret hello\r\n";
-        let enc = status(&["--armor", "--trust-model", "always", "--pinentry-mode", "loopback", "--passphrase", "", "--recipient", "test@hylki.invalid", "--sign", "--encrypt"], entity);
+        let enc = status(
+            &[
+                "--armor",
+                "--trust-model",
+                "always",
+                "--pinentry-mode",
+                "loopback",
+                "--passphrase",
+                "",
+                "--recipient",
+                "test@hylki.invalid",
+                "--sign",
+                "--encrypt",
+            ],
+            entity,
+        );
         let armored = String::from_utf8(enc.stdout.clone()).unwrap();
-        assert!(armored.contains("-----BEGIN PGP MESSAGE-----"), "{:?}", enc.status_lines);
+        assert!(
+            armored.contains("-----BEGIN PGP MESSAGE-----"),
+            "{:?}",
+            enc.status_lines
+        );
         let mail = format!(
             "From: test@hylki.invalid\r\nSubject: s\r\nMIME-Version: 1.0\r\n\
              Content-Type: multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"enc\"\r\n\r\n\
@@ -1219,11 +1515,31 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
         assert!(u.status.encrypted && u.status.decrypted, "{:?}", u.status);
         let inner = String::from_utf8(u.inner.clone().unwrap()).unwrap();
         assert!(inner.contains("secret hello"), "{inner}");
-        assert!(matches!(u.status.signature, PgpSignature::Good { trust: PgpTrust::Full, .. }), "{:?}", u.status);
+        assert!(
+            matches!(
+                u.status.signature,
+                PgpSignature::Good {
+                    trust: PgpTrust::Full,
+                    ..
+                }
+            ),
+            "{:?}",
+            u.status
+        );
         assert_eq!(u.status.subject, None);
 
         // Protected headers (#493): the subject inside replaces the "..." outside.
-        let enc = status(&["--armor", "--trust-model", "always", "--recipient", "test@hylki.invalid", "--encrypt"], PROTECTED.as_bytes());
+        let enc = status(
+            &[
+                "--armor",
+                "--trust-model",
+                "always",
+                "--recipient",
+                "test@hylki.invalid",
+                "--encrypt",
+            ],
+            PROTECTED.as_bytes(),
+        );
         let armored = String::from_utf8(enc.stdout.clone()).unwrap();
         let mail = format!(
             "From: test@hylki.invalid\r\nSubject: ...\r\nMIME-Version: 1.0\r\n\
@@ -1237,7 +1553,17 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
 
         // Detached signature over a MIME part, verified the RFC 3156 way.
         let part = b"Content-Type: text/plain; charset=utf-8\r\n\r\nsigned hello";
-        let sig = status(&["--armor", "--pinentry-mode", "loopback", "--passphrase", "", "--detach-sign"], part);
+        let sig = status(
+            &[
+                "--armor",
+                "--pinentry-mode",
+                "loopback",
+                "--passphrase",
+                "",
+                "--detach-sign",
+            ],
+            part,
+        );
         let sig = String::from_utf8(sig.stdout).unwrap();
         let mail = format!(
             "From: test@hylki.invalid\r\nMIME-Version: 1.0\r\n\
@@ -1247,13 +1573,21 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
         );
         let u = unwrap_message(mail.as_bytes(), &gpg).expect("recognised");
         assert!(!u.status.encrypted);
-        assert!(matches!(u.status.signature, PgpSignature::Good { .. }), "{:?}", u.status);
+        assert!(
+            matches!(u.status.signature, PgpSignature::Good { .. }),
+            "{:?}",
+            u.status
+        );
         assert_eq!(u.inner.unwrap(), part.to_vec());
 
         // A tampered signed part fails.
         let mail = mail.replace("signed hello", "signed hellO");
         let u = unwrap_message(mail.as_bytes(), &gpg).expect("recognised");
-        assert!(matches!(u.status.signature, PgpSignature::Bad { .. }), "{:?}", u.status);
+        assert!(
+            matches!(u.status.signature, PgpSignature::Bad { .. }),
+            "{:?}",
+            u.status
+        );
 
         // Encrypted to a key we don't have: reported, nothing rendered.
         let other = "-----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA\r\n-----END PGP MESSAGE-----";
@@ -1269,9 +1603,13 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
         assert!(secret_key_for(&gpg, "TEST@hylki.invalid").is_some());
         assert!(public_key_for(&gpg, "test@hylki.invalid").is_some());
         assert!(public_key_for(&gpg, "nobody@hylki.invalid").is_none());
-        let fpr = generate_key(&gpg, "Second Key", "second@hylki.invalid", "1y", "pw").expect("generated");
+        let fpr = generate_key(&gpg, "Second Key", "second@hylki.invalid", "1y", "pw")
+            .expect("generated");
         let second = key_by_fingerprint(&gpg, &fpr).expect("listed");
-        assert!(second.can_encrypt, "default default gives an encryption subkey: {second:?}");
+        assert!(
+            second.can_encrypt,
+            "default default gives an encryption subkey: {second:?}"
+        );
         assert!(second.expires.is_some());
         let armored = export_public(&gpg, &fpr).expect("exported");
         assert!(String::from_utf8_lossy(&armored).contains("BEGIN PGP PUBLIC KEY BLOCK"));
@@ -1284,24 +1622,55 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&home2, std::fs::Permissions::from_mode(0o700)).unwrap();
         }
-        let gpg2 = Gpg { home: Some(home2.clone()) };
+        let gpg2 = Gpg {
+            home: Some(home2.clone()),
+        };
         let s = import_keys(&gpg2, &armored).expect("imported");
         assert_eq!(s.imported, 1);
         assert_eq!(s.fingerprints, vec![fpr.clone()]);
         assert_eq!(import_keys(&gpg2, &armored).unwrap().unchanged, 1);
         assert!(import_keys(&gpg2, b"not a key").is_err());
-        assert_eq!(key_by_fingerprint(&gpg2, &fpr).unwrap().validity, KeyValidity::Unknown);
-        assert!(trust_key(&gpg2, &fpr, None).is_err(), "no key of one's own to sign with");
+        assert_eq!(
+            key_by_fingerprint(&gpg2, &fpr).unwrap().validity,
+            KeyValidity::Unknown
+        );
+        assert!(
+            trust_key(&gpg2, &fpr, None).is_err(),
+            "no key of one's own to sign with"
+        );
         let own = generate_key(&gpg2, "", "me@hylki.invalid", "never", "").expect("own key");
         trust_key(&gpg2, &fpr, Some(&own)).expect("signed");
         assert!(key_by_fingerprint(&gpg2, &fpr).unwrap().validity.trusted());
         // Encrypt to the imported key from the second keyring; the first opens it.
-        let ct = encrypt(&gpg2, b"Content-Type: text/plain\r\n\r\nfor second", &["second@hylki.invalid".into()], Some(&own)).expect("encrypted");
+        let ct = encrypt(
+            &gpg2,
+            b"Content-Type: text/plain\r\n\r\nfor second",
+            &["second@hylki.invalid".into()],
+            Some(&own),
+        )
+        .expect("encrypted");
         let mail = format!("From: me@hylki.invalid\r\nMIME-Version: 1.0\r\nContent-Type: multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"e\"\r\n\r\n--e\r\nContent-Type: application/pgp-encrypted\r\n\r\nVersion: 1\r\n--e\r\nContent-Type: application/octet-stream\r\n\r\n{}\r\n--e--\r\n", String::from_utf8_lossy(&ct));
         // The second key has a passphrase, fed through the loopback for the test.
-        let gpg_pw = Gpg { home: Some(home.clone()) };
-        let out = run(&gpg_pw, &["--pinentry-mode", "loopback", "--passphrase", "pw", "--decrypt"], &ct, None);
-        assert!(String::from_utf8_lossy(&out.stdout).contains("for second"), "{:?}", out.status_lines);
+        let gpg_pw = Gpg {
+            home: Some(home.clone()),
+        };
+        let out = run(
+            &gpg_pw,
+            &[
+                "--pinentry-mode",
+                "loopback",
+                "--passphrase",
+                "pw",
+                "--decrypt",
+            ],
+            &ct,
+            None,
+        );
+        assert!(
+            String::from_utf8_lossy(&out.stdout).contains("for second"),
+            "{:?}",
+            out.status_lines
+        );
         let _ = mail;
         let (sig, micalg) = sign_detached(&gpg2, b"data", &own).expect("signed");
         assert!(String::from_utf8_lossy(&sig).contains("BEGIN PGP SIGNATURE"));
@@ -1313,7 +1682,10 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
         assert!(list_keys(&gpg2, true).is_empty());
 
         for h in [&home, &home2] {
-            let _ = std::process::Command::new("gpgconf").env("GNUPGHOME", h).args(["--kill", "all"]).status();
+            let _ = std::process::Command::new("gpgconf")
+                .env("GNUPGHOME", h)
+                .args(["--kill", "all"])
+                .status();
             let _ = std::fs::remove_dir_all(h);
         }
     }

@@ -126,14 +126,23 @@ fn chunk_ranges(size: u64, chunk: u64) -> Vec<(u64, u64)> {
     if size == 0 {
         return vec![(0, 0)];
     }
-    (0..size).step_by(chunk as usize).map(|off| (off, chunk.min(size - off))).collect()
+    (0..size)
+        .step_by(chunk as usize)
+        .map(|off| (off, chunk.min(size - off)))
+        .collect()
 }
 
 /// A reader over one piece of the file on disk.
-fn file_slice(path: &Path, name: &str, offset: u64, len: u64) -> Result<std::io::Take<std::fs::File>, String> {
+fn file_slice(
+    path: &Path,
+    name: &str,
+    offset: u64,
+    len: u64,
+) -> Result<std::io::Take<std::fs::File>, String> {
     use std::io::Seek;
     let mut f = std::fs::File::open(path).map_err(|e| format!("could not read {name}: {e}"))?;
-    f.seek(std::io::SeekFrom::Start(offset)).map_err(|e| format!("could not read {name}: {e}"))?;
+    f.seek(std::io::SeekFrom::Start(offset))
+        .map_err(|e| format!("could not read {name}: {e}"))?;
     Ok(f.take(len))
 }
 
@@ -161,12 +170,36 @@ impl Service {
 /// The services offered, in picker order. Names are the services' own
 /// and are not translated.
 pub const SERVICES: [Service; 6] = [
-    Service { kind: CloudKind::Nextcloud, product: "nextcloud", name: "Nextcloud" },
-    Service { kind: CloudKind::Nextcloud, product: "owncloud", name: "ownCloud" },
-    Service { kind: CloudKind::Nextcloud, product: "opencloud", name: "OpenCloud" },
-    Service { kind: CloudKind::OneDrive, product: "", name: "OneDrive" },
-    Service { kind: CloudKind::Dropbox, product: "", name: "Dropbox" },
-    Service { kind: CloudKind::Seafile, product: "", name: "Seafile" },
+    Service {
+        kind: CloudKind::Nextcloud,
+        product: "nextcloud",
+        name: "Nextcloud",
+    },
+    Service {
+        kind: CloudKind::Nextcloud,
+        product: "owncloud",
+        name: "ownCloud",
+    },
+    Service {
+        kind: CloudKind::Nextcloud,
+        product: "opencloud",
+        name: "OpenCloud",
+    },
+    Service {
+        kind: CloudKind::OneDrive,
+        product: "",
+        name: "OneDrive",
+    },
+    Service {
+        kind: CloudKind::Dropbox,
+        product: "",
+        name: "Dropbox",
+    },
+    Service {
+        kind: CloudKind::Seafile,
+        product: "",
+        name: "Seafile",
+    },
 ];
 
 /// Which product a WebDAV server is, from its `status.php` (Nextcloud and
@@ -255,7 +288,9 @@ impl CloudAccount {
 
     /// The Service picker entry this account matches, if any.
     pub fn service_index(&self) -> Option<usize> {
-        SERVICES.iter().position(|s| s.kind == self.kind && (self.kind != CloudKind::Nextcloud || s.product == self.product))
+        SERVICES.iter().position(|s| {
+            s.kind == self.kind && (self.kind != CloudKind::Nextcloud || s.product == self.product)
+        })
     }
 
     /// Whether the service lets this account's links expire (assumed
@@ -357,13 +392,23 @@ struct CloudFile {
 }
 
 fn path() -> Option<PathBuf> {
-    Some(crate::config::config_base()?.join("hylki").join("cloud.toml"))
+    Some(
+        crate::config::config_base()?
+            .join("hylki")
+            .join("cloud.toml"),
+    )
 }
 
 pub fn load_accounts() -> Vec<CloudAccount> {
-    let Some(path) = path() else { return Vec::new() };
-    let Ok(text) = std::fs::read_to_string(path) else { return Vec::new() };
-    toml::from_str::<CloudFile>(&text).map(|f| f.accounts).unwrap_or_default()
+    let Some(path) = path() else {
+        return Vec::new();
+    };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    toml::from_str::<CloudFile>(&text)
+        .map(|f| f.accounts)
+        .unwrap_or_default()
 }
 
 /// The accounts the composer offers: those switched on.
@@ -373,7 +418,9 @@ pub fn load_enabled_accounts() -> Vec<CloudAccount> {
 
 pub fn save_accounts(accounts: &[CloudAccount]) {
     let Some(path) = path() else { return };
-    let file = CloudFile { accounts: accounts.to_vec() };
+    let file = CloudFile {
+        accounts: accounts.to_vec(),
+    };
     match toml::to_string_pretty(&file) {
         Ok(toml) => {
             if let Err(e) = crate::config::write_private_file(&path, &toml) {
@@ -436,11 +483,20 @@ fn http_err(what: &str, e: ureq::Error) -> String {
 /// cut, seen as a 5xx or a transport error), which reads like the server
 /// broke. When that is what happened to a file over the piece size on an
 /// account without the switch, say so and name the switch.
-fn cloudflare_error(account: &CloudAccount, what: &str, name: &str, size: u64, e: &ureq::Error) -> Option<String> {
+fn cloudflare_error(
+    account: &CloudAccount,
+    what: &str,
+    name: &str,
+    size: u64,
+    e: &ureq::Error,
+) -> Option<String> {
     let (status, via_cloudflare) = match e {
         ureq::Error::Status(code, resp) => {
             let server = resp.header("server").unwrap_or("").to_ascii_lowercase();
-            (Some(*code), server.contains("cloudflare") || resp.header("cf-ray").is_some())
+            (
+                Some(*code),
+                server.contains("cloudflare") || resp.header("cf-ray").is_some(),
+            )
         }
         ureq::Error::Transport(_) => (None, false),
     };
@@ -528,7 +584,10 @@ pub fn verify(account: &CloudAccount, secret: &str) -> Result<String, String> {
 /// an expiry but no link password. Microsoft does not say which plan a
 /// drive is on; a personal drive's quota tells a free one (5 GB) from a
 /// subscription (100 GB and up).
-pub fn probe_link_terms(account: &CloudAccount, _secret: &str) -> Result<Option<LinkTerms>, String> {
+pub fn probe_link_terms(
+    account: &CloudAccount,
+    _secret: &str,
+) -> Result<Option<LinkTerms>, String> {
     if account.kind != CloudKind::OneDrive {
         return Ok(None);
     }
@@ -551,9 +610,14 @@ fn onedrive_terms(drive_type: &str, quota_total: u64) -> LinkTerms {
         "personal" if quota_total > 0 && quota_total <= FREE_CEILING => LinkTerms {
             expiry: false,
             password: false,
-            note: "Not available on a free personal OneDrive; needs a Microsoft 365 subscription".to_string(),
+            note: "Not available on a free personal OneDrive; needs a Microsoft 365 subscription"
+                .to_string(),
         },
-        "personal" => LinkTerms { expiry: true, password: true, note: String::new() },
+        "personal" => LinkTerms {
+            expiry: true,
+            password: true,
+            note: String::new(),
+        },
         _ => LinkTerms {
             expiry: true,
             password: false,
@@ -604,7 +668,11 @@ fn auth(account: &CloudAccount, password: &str) -> String {
 }
 
 fn dav_root(account: &CloudAccount) -> String {
-    format!("{}/remote.php/dav/files/{}", account.base(), crate::percent::encode(account.user.trim()))
+    format!(
+        "{}/remote.php/dav/files/{}",
+        account.base(),
+        crate::percent::encode(account.user.trim())
+    )
 }
 
 /// The OCS user endpoint answers with the display name.
@@ -626,7 +694,9 @@ fn nextcloud_verify(account: &CloudAccount, password: &str) -> Result<String, St
         .unwrap_or("")
         .to_string();
     if name.is_empty() {
-        return Err("The server answered, but not like a Nextcloud: is the URL its root?".to_string());
+        return Err(
+            "The server answered, but not like a Nextcloud: is the URL its root?".to_string(),
+        );
     }
     Ok(name)
 }
@@ -705,7 +775,12 @@ fn nextcloud_upload_and_share(
             .set("OC-Total-Length", &size.to_string())
             .timeout(timeout)
             .call()
-            .map_err(|e| http_err("Uploaded the pieces, but the server could not put them together", e))?;
+            .map_err(|e| {
+                http_err(
+                    "Uploaded the pieces, but the server could not put them together",
+                    e,
+                )
+            })?;
     } else {
         let file = std::fs::File::open(path).map_err(|e| format!("could not read {name}: {e}"))?;
         ureq::put(&target)
@@ -715,7 +790,8 @@ fn nextcloud_upload_and_share(
             .timeout(timeout)
             .send(file)
             .map_err(|e| {
-                cloudflare_error(account, "Upload failed", &name, size, &e).unwrap_or_else(|| http_err("Upload failed", e))
+                cloudflare_error(account, "Upload failed", &name, size, &e)
+                    .unwrap_or_else(|| http_err("Upload failed", e))
             })?;
     }
 
@@ -748,10 +824,20 @@ fn nextcloud_upload_and_share(
     .map_err(|e| format!("Uploaded, but could not read the share answer: {e}"))?;
     let url = v["ocs"]["data"]["url"].as_str().unwrap_or("").to_string();
     if url.is_empty() {
-        let msg = v["ocs"]["meta"]["message"].as_str().unwrap_or("no link in the answer");
-        return Err(format!("Uploaded, but the server made no share link: {msg}"));
+        let msg = v["ocs"]["meta"]["message"]
+            .as_str()
+            .unwrap_or("no link in the answer");
+        return Err(format!(
+            "Uploaded, but the server made no share link: {msg}"
+        ));
     }
-    Ok(ShareResult { name: remote, size, url, password: pw, expires })
+    Ok(ShareResult {
+        name: remote,
+        size,
+        url,
+        password: pw,
+        expires,
+    })
 }
 
 /// `report-20260909-141500.pdf`: the name with the time in it, for when
@@ -804,7 +890,8 @@ pub fn dropbox_connect(account: &CloudAccount) -> Result<(String, String, String
     if settings.client_id.is_empty() {
         return Err("Enter the app key of a Dropbox app first.".to_string());
     }
-    let flow = crate::oauth::run_flow(&settings).map_err(|e| format!("Dropbox sign-in failed: {e}"))?;
+    let flow =
+        crate::oauth::run_flow(&settings).map_err(|e| format!("Dropbox sign-in failed: {e}"))?;
     let access = crate::oauth::refresh_access_token(&settings, &flow.refresh_token)
         .map_err(|e| format!("Dropbox sign-in failed: {e}"))?
         .access_token;
@@ -825,13 +912,16 @@ fn dropbox_access(account: &CloudAccount, refresh: &str) -> Result<String, Strin
     }
     let settings = dropbox_settings(account);
     if settings.client_id.is_empty() {
-        return Err("The Dropbox app key is missing: open the account's settings and enter it.".to_string());
+        return Err(
+            "The Dropbox app key is missing: open the account's settings and enter it.".to_string(),
+        );
     }
     let tok = crate::oauth::refresh_access_token(&settings, refresh)
         .map_err(|e| format!("Dropbox refused the sign-in ({e}). Open Settings, Cloud Storage, and connect the account again."))?
         .access_token;
     if let Ok(mut g) = DROPBOX_ACCESS.lock() {
-        g.get_or_insert_with(HashMap::new).insert(refresh.to_string(), (tok.clone(), Instant::now()));
+        g.get_or_insert_with(HashMap::new)
+            .insert(refresh.to_string(), (tok.clone(), Instant::now()));
     }
     Ok(tok)
 }
@@ -867,7 +957,11 @@ fn dropbox_err(what: &str, e: ureq::Error) -> String {
 }
 
 /// One RPC-style call: JSON in, JSON out.
-fn dropbox_rpc(access: &str, endpoint: &str, arg: &serde_json::Value) -> Result<serde_json::Value, ureq::Error> {
+fn dropbox_rpc(
+    access: &str,
+    endpoint: &str,
+    arg: &serde_json::Value,
+) -> Result<serde_json::Value, ureq::Error> {
     ureq::post(&format!("{DROPBOX_API}/{endpoint}"))
         .set("Authorization", &format!("Bearer {access}"))
         .timeout(Duration::from_secs(60))
@@ -878,8 +972,12 @@ fn dropbox_rpc(access: &str, endpoint: &str, arg: &serde_json::Value) -> Result<
 
 /// The signed-in account: (e-mail, display name).
 fn dropbox_whoami(access: &str) -> Result<(String, String), String> {
-    let v = dropbox_rpc(access, "users/get_current_account", &serde_json::Value::Null)
-        .map_err(|e| dropbox_err("Could not sign in", e))?;
+    let v = dropbox_rpc(
+        access,
+        "users/get_current_account",
+        &serde_json::Value::Null,
+    )
+    .map_err(|e| dropbox_err("Could not sign in", e))?;
     let email = v["email"].as_str().unwrap_or("").to_string();
     let name = v["name"]["display_name"].as_str().unwrap_or("").to_string();
     if email.is_empty() {
@@ -928,7 +1026,8 @@ fn dropbox_upload_and_share(
     let mut file = std::fs::File::open(path).map_err(|e| format!("could not read {name}: {e}"))?;
 
     let meta = if size <= DROPBOX_SINGLE_LIMIT {
-        dropbox_content(&access, "files/upload", &commit, file, size).map_err(|e| dropbox_err("Upload failed", e))?
+        dropbox_content(&access, "files/upload", &commit, file, size)
+            .map_err(|e| dropbox_err("Upload failed", e))?
     } else {
         // An upload session: start with the first chunk, append the
         // middle ones, finish with the last and the commit. The file is
@@ -940,7 +1039,9 @@ fn dropbox_upload_and_share(
         loop {
             let mut n = 0;
             while n < buf.len() {
-                let r = file.read(&mut buf[n..]).map_err(|e| format!("could not read {name}: {e}"))?;
+                let r = file
+                    .read(&mut buf[n..])
+                    .map_err(|e| format!("could not read {name}: {e}"))?;
                 if r == 0 {
                     break;
                 }
@@ -952,8 +1053,14 @@ fn dropbox_upload_and_share(
             let last = offset + n as u64 >= size;
             let chunk = &buf[..n];
             if session.is_empty() {
-                let v = dropbox_content(&access, "files/upload_session/start", &serde_json::json!({"close": false}), chunk, n as u64)
-                    .map_err(|e| dropbox_err("Upload failed", e))?;
+                let v = dropbox_content(
+                    &access,
+                    "files/upload_session/start",
+                    &serde_json::json!({"close": false}),
+                    chunk,
+                    n as u64,
+                )
+                .map_err(|e| dropbox_err("Upload failed", e))?;
                 session = v["session_id"].as_str().unwrap_or("").to_string();
                 if session.is_empty() {
                     return Err("Upload failed: Dropbox opened no upload session.".to_string());
@@ -963,21 +1070,36 @@ fn dropbox_upload_and_share(
                     "cursor": {"session_id": session, "offset": offset},
                     "commit": commit,
                 });
-                break dropbox_content(&access, "files/upload_session/finish", &arg, chunk, n as u64)
-                    .map_err(|e| dropbox_err("Upload failed", e))?;
+                break dropbox_content(
+                    &access,
+                    "files/upload_session/finish",
+                    &arg,
+                    chunk,
+                    n as u64,
+                )
+                .map_err(|e| dropbox_err("Upload failed", e))?;
             } else {
                 let arg = serde_json::json!({
                     "cursor": {"session_id": session, "offset": offset},
                     "close": false,
                 });
-                dropbox_content(&access, "files/upload_session/append_v2", &arg, chunk, n as u64)
-                    .map_err(|e| dropbox_err("Upload failed", e))?;
+                dropbox_content(
+                    &access,
+                    "files/upload_session/append_v2",
+                    &arg,
+                    chunk,
+                    n as u64,
+                )
+                .map_err(|e| dropbox_err("Upload failed", e))?;
             }
             offset += n as u64;
         }
     };
     let remote = meta["name"].as_str().unwrap_or(&name).to_string();
-    let lower = meta["path_lower"].as_str().unwrap_or(&remote_path).to_string();
+    let lower = meta["path_lower"]
+        .as_str()
+        .unwrap_or(&remote_path)
+        .to_string();
 
     // The public link. Passwords and expiry are settings only paid plans
     // may set; Dropbox says so with a settings_error.
@@ -997,21 +1119,39 @@ fn dropbox_upload_and_share(
         Err(ureq::Error::Status(409, resp)) => {
             let text = resp.into_string().unwrap_or_default();
             if text.contains("shared_link_already_exists") {
-                let v = dropbox_rpc(&access, "sharing/list_shared_links", &serde_json::json!({"path": lower, "direct_only": true}))
-                    .map_err(|e| dropbox_err("Uploaded, but could not find the share link", e))?;
+                let v = dropbox_rpc(
+                    &access,
+                    "sharing/list_shared_links",
+                    &serde_json::json!({"path": lower, "direct_only": true}),
+                )
+                .map_err(|e| dropbox_err("Uploaded, but could not find the share link", e))?;
                 v["links"][0]["url"].as_str().unwrap_or("").to_string()
             } else if text.contains("settings_error") {
                 return Err("Uploaded, but Dropbox would not make the link: link passwords and expiry dates need a paid Dropbox plan. Turn them off in the account's settings.".to_string());
             } else {
-                return Err(format!("Uploaded, but could not create the share link: {}", short_error(&text)));
+                return Err(format!(
+                    "Uploaded, but could not create the share link: {}",
+                    short_error(&text)
+                ));
             }
         }
-        Err(e) => return Err(dropbox_err("Uploaded, but could not create the share link", e)),
+        Err(e) => {
+            return Err(dropbox_err(
+                "Uploaded, but could not create the share link",
+                e,
+            ))
+        }
     };
     if url.is_empty() {
         return Err("Uploaded, but Dropbox made no share link.".to_string());
     }
-    Ok(ShareResult { name: remote, size, url, password: pw, expires })
+    Ok(ShareResult {
+        name: remote,
+        size,
+        url,
+        password: pw,
+        expires,
+    })
 }
 
 // ---------------------------------------------------------------------
@@ -1040,7 +1180,11 @@ fn seafile_err(what: &str, e: ureq::Error) -> String {
 /// the token that comes back is what the keyring keeps from then on, as
 /// the password alone would not get past the code at upload time.
 /// Answers with the token and the account's display name.
-pub fn seafile_login_with_code(account: &CloudAccount, password: &str, code: &str) -> Result<(String, String), String> {
+pub fn seafile_login_with_code(
+    account: &CloudAccount,
+    password: &str,
+    code: &str,
+) -> Result<(String, String), String> {
     let url = format!("{}/api2/auth-token/", account.base());
     let v: serde_json::Value = ureq::post(&url)
         .set("X-SEAFILE-OTP", code.trim())
@@ -1048,7 +1192,10 @@ pub fn seafile_login_with_code(account: &CloudAccount, password: &str, code: &st
         .send_form(&[("username", account.user.trim()), ("password", password)])
         .map_err(|e| match e {
             ureq::Error::Status(400, resp) => {
-                format!("Could not sign in: {}", short_error(&resp.into_string().unwrap_or_default()))
+                format!(
+                    "Could not sign in: {}",
+                    short_error(&resp.into_string().unwrap_or_default())
+                )
             }
             e => seafile_err("Could not sign in", e),
         })?
@@ -1072,7 +1219,9 @@ fn seafile_token(account: &CloudAccount, secret: &str) -> Result<String, String>
         .send_form(&[("username", account.user.trim()), ("password", secret)]);
     let login_err = match login {
         Ok(resp) => {
-            let v: serde_json::Value = resp.into_json().map_err(|e| format!("Could not read the server's answer: {e}"))?;
+            let v: serde_json::Value = resp
+                .into_json()
+                .map_err(|e| format!("Could not read the server's answer: {e}"))?;
             match v["token"].as_str() {
                 Some(t) if !t.is_empty() => return Ok(t.to_string()),
                 _ => "Could not sign in: the server gave no token.".to_string(),
@@ -1107,9 +1256,15 @@ fn seafile_whoami(account: &CloudAccount, token: &str) -> Result<String, String>
     let email = v["email"].as_str().unwrap_or("");
     let name = v["name"].as_str().unwrap_or("");
     if email.is_empty() && name.is_empty() {
-        return Err("The server answered, but not like a Seafile: is the URL its root?".to_string());
+        return Err(
+            "The server answered, but not like a Seafile: is the URL its root?".to_string(),
+        );
     }
-    Ok(if name.is_empty() { email.to_string() } else { name.to_string() })
+    Ok(if name.is_empty() {
+        email.to_string()
+    } else {
+        name.to_string()
+    })
 }
 
 /// The id of the account's library, made when there is none by that name.
@@ -1128,7 +1283,11 @@ fn seafile_library(account: &CloudAccount, token: &str) -> Result<String, String
         for exact in [true, false] {
             for r in list {
                 let name = r["name"].as_str().unwrap_or("");
-                let hit = if exact { name == want } else { name.eq_ignore_ascii_case(&want) };
+                let hit = if exact {
+                    name == want
+                } else {
+                    name.eq_ignore_ascii_case(&want)
+                };
                 if hit && !r["encrypted"].as_bool().unwrap_or(false) {
                     if let Some(id) = r["id"].as_str() {
                         return Ok(id.to_string());
@@ -1158,12 +1317,20 @@ fn multipart_upload<R: Read>(
     file: R,
     size: u64,
 ) -> Result<(String, u64, impl Read), String> {
-    let boundary = format!("----HylkiUpload{}", crate::rng::token(24).map_err(|e| e.to_string())?);
+    let boundary = format!(
+        "----HylkiUpload{}",
+        crate::rng::token(24).map_err(|e| e.to_string())?
+    );
     let mut head = String::new();
     for (k, v) in fields {
-        head.push_str(&format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n"));
+        head.push_str(&format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n"
+        ));
     }
-    let safe = name.replace('\\', "_").replace('"', "_").replace(['\r', '\n'], " ");
+    let safe = name
+        .replace('\\', "_")
+        .replace('"', "_")
+        .replace(['\r', '\n'], " ");
     head.push_str(&format!(
         "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{safe}\"\r\nContent-Type: application/octet-stream\r\n\r\n"
     ));
@@ -1172,7 +1339,11 @@ fn multipart_upload<R: Read>(
     let body = std::io::Cursor::new(head.into_bytes())
         .chain(file)
         .chain(std::io::Cursor::new(tail.into_bytes()));
-    Ok((format!("multipart/form-data; boundary={boundary}"), len, body))
+    Ok((
+        format!("multipart/form-data; boundary={boundary}"),
+        len,
+        body,
+    ))
 }
 
 fn seafile_upload_and_share(
@@ -1194,8 +1365,14 @@ fn seafile_upload_and_share(
     for part in folder.split('/').filter(|p| !p.is_empty()) {
         dir.push('/');
         dir.push_str(part);
-        let url = format!("{base}/api2/repos/{repo}/dir/?p={}", crate::percent::encode_path(&dir));
-        let there = ureq::get(&url).set("Authorization", &authz).timeout(Duration::from_secs(60)).call();
+        let url = format!(
+            "{base}/api2/repos/{repo}/dir/?p={}",
+            crate::percent::encode_path(&dir)
+        );
+        let there = ureq::get(&url)
+            .set("Authorization", &authz)
+            .timeout(Duration::from_secs(60))
+            .call();
         match there {
             Ok(_) => {}
             Err(ureq::Error::Status(404, _)) => {
@@ -1208,16 +1385,23 @@ fn seafile_upload_and_share(
             Err(e) => return Err(seafile_err("Could not look at the folder", e)),
         }
     }
-    let parent = if dir.is_empty() { "/".to_string() } else { dir.clone() };
+    let parent = if dir.is_empty() {
+        "/".to_string()
+    } else {
+        dir.clone()
+    };
 
     // The upload goes to a one-off link from the file server.
-    let link: serde_json::Value = ureq::get(&format!("{base}/api2/repos/{repo}/upload-link/?p={}", crate::percent::encode_path(&parent)))
-        .set("Authorization", &authz)
-        .timeout(Duration::from_secs(60))
-        .call()
-        .map_err(|e| seafile_err("Could not get an upload link", e))?
-        .into_json()
-        .map_err(|e| format!("Could not read the upload link: {e}"))?;
+    let link: serde_json::Value = ureq::get(&format!(
+        "{base}/api2/repos/{repo}/upload-link/?p={}",
+        crate::percent::encode_path(&parent)
+    ))
+    .set("Authorization", &authz)
+    .timeout(Duration::from_secs(60))
+    .call()
+    .map_err(|e| seafile_err("Could not get an upload link", e))?
+    .into_json()
+    .map_err(|e| format!("Could not read the upload link: {e}"))?;
     let link = link.as_str().unwrap_or("").to_string();
     if link.is_empty() {
         return Err("Could not get an upload link: the server gave none.".to_string());
@@ -1232,7 +1416,10 @@ fn seafile_upload_and_share(
         // Content-Disposition naming the file the pieces belong to. The
         // file server keeps them until the last one lands, and only that
         // answer names the file.
-        let safe = name.replace('\\', "_").replace('"', "_").replace(['\r', '\n'], " ");
+        let safe = name
+            .replace('\\', "_")
+            .replace('"', "_")
+            .replace(['\r', '\n'], " ");
         let mut last = serde_json::Value::Null;
         for (i, (offset, len)) in chunk_ranges(size, CLOUDFLARE_CHUNK).into_iter().enumerate() {
             let piece = file_slice(path, &name, offset, len)?;
@@ -1243,7 +1430,10 @@ fn seafile_upload_and_share(
                 .set("Content-Type", &ctype)
                 .set("Content-Length", &body_len.to_string())
                 .set("Content-Range", &format!("bytes {offset}-{end}/{size}"))
-                .set("Content-Disposition", &format!("attachment; filename=\"{safe}\""))
+                .set(
+                    "Content-Disposition",
+                    &format!("attachment; filename=\"{safe}\""),
+                )
                 .timeout(Duration::from_secs(60 * 60))
                 .send(body)
                 .map_err(|e| seafile_err(&format!("Upload failed at piece {}", i + 1), e))?
@@ -1261,7 +1451,8 @@ fn seafile_upload_and_share(
             .timeout(Duration::from_secs(60 * 60))
             .send(body)
             .map_err(|e| {
-                cloudflare_error(account, "Upload failed", &name, size, &e).unwrap_or_else(|| seafile_err("Upload failed", e))
+                cloudflare_error(account, "Upload failed", &name, size, &e)
+                    .unwrap_or_else(|| seafile_err("Upload failed", e))
             })?
             .into_json()
             .map_err(|e| format!("Upload failed: could not read the answer: {e}"))?
@@ -1273,11 +1464,16 @@ fn seafile_upload_and_share(
         .to_string();
 
     // The share link.
-    let file_path = if dir.is_empty() { format!("/{remote}") } else { format!("{dir}/{remote}") };
+    let file_path = if dir.is_empty() {
+        format!("/{remote}")
+    } else {
+        format!("{dir}/{remote}")
+    };
     let expires = expiry(account);
     let pw = share_password(account, fixed)?;
     let days = account.expire_days.to_string();
-    let mut form: Vec<(&str, &str)> = vec![("repo_id", repo.as_str()), ("path", file_path.as_str())];
+    let mut form: Vec<(&str, &str)> =
+        vec![("repo_id", repo.as_str()), ("path", file_path.as_str())];
     if let Some(p) = &pw {
         form.push(("password", p.as_str()));
     }
@@ -1298,7 +1494,13 @@ fn seafile_upload_and_share(
             v["error_msg"].as_str().unwrap_or("no link in the answer")
         ));
     }
-    Ok(ShareResult { name: remote, size, url, password: pw, expires })
+    Ok(ShareResult {
+        name: remote,
+        size,
+        url,
+        password: pw,
+        expires,
+    })
 }
 
 // ---------------------------------------------------------------------
@@ -1349,7 +1551,9 @@ fn api_message(body: &str) -> String {
 fn read_chunk(file: &mut std::fs::File, buf: &mut [u8], name: &str) -> Result<usize, String> {
     let mut n = 0;
     while n < buf.len() {
-        let r = file.read(&mut buf[n..]).map_err(|e| format!("could not read {name}: {e}"))?;
+        let r = file
+            .read(&mut buf[n..])
+            .map_err(|e| format!("could not read {name}: {e}"))?;
         if r == 0 {
             break;
         }
@@ -1367,7 +1571,10 @@ const ONEDRIVE_SINGLE_LIMIT: u64 = 60 * 1024 * 1024;
 /// Session chunks must be multiples of 320 KiB.
 const ONEDRIVE_CHUNK: usize = 32 * 320 * 1024;
 
-fn graph_json(req: ureq::Request, body: Option<&serde_json::Value>) -> Result<serde_json::Value, ureq::Error> {
+fn graph_json(
+    req: ureq::Request,
+    body: Option<&serde_json::Value>,
+) -> Result<serde_json::Value, ureq::Error> {
     let resp = match body {
         Some(b) => req.send_json(b)?,
         None => req.call()?,
@@ -1380,7 +1587,10 @@ fn onedrive_item(path: &str) -> String {
     if path.is_empty() {
         format!("{GRAPH}/me/drive/root")
     } else {
-        format!("{GRAPH}/me/drive/root:/{}", crate::percent::encode_path(path))
+        format!(
+            "{GRAPH}/me/drive/root:/{}",
+            crate::percent::encode_path(path)
+        )
     }
 }
 
@@ -1397,14 +1607,22 @@ fn onedrive_whoami(token: &str) -> Result<String, String> {
     if v["id"].as_str().unwrap_or("").is_empty() {
         return Err("OneDrive answered, but without a drive.".to_string());
     }
-    Ok(if name.is_empty() { "OneDrive".to_string() } else { name.to_string() })
+    Ok(if name.is_empty() {
+        "OneDrive".to_string()
+    } else {
+        name.to_string()
+    })
 }
 
 /// Make sure the upload folder exists, one segment at a time.
 fn onedrive_folder(token: &str, folder: &str) -> Result<String, String> {
     let mut dir = String::new();
     for part in folder.split('/').filter(|p| !p.is_empty()) {
-        let next = if dir.is_empty() { part.to_string() } else { format!("{dir}/{part}") };
+        let next = if dir.is_empty() {
+            part.to_string()
+        } else {
+            format!("{dir}/{part}")
+        };
         let there = ureq::get(&format!("{}?$select=id", onedrive_item(&next)))
             .set("Authorization", &bearer(token))
             .timeout(Duration::from_secs(60))
@@ -1430,17 +1648,28 @@ fn onedrive_folder(token: &str, folder: &str) -> Result<String, String> {
     Ok(dir)
 }
 
-fn onedrive_upload_and_share(account: &CloudAccount, path: &Path, fixed: Option<&str>) -> Result<ShareResult, String> {
+fn onedrive_upload_and_share(
+    account: &CloudAccount,
+    path: &Path,
+    fixed: Option<&str>,
+) -> Result<ShareResult, String> {
     let (name, size) = local_file(path)?;
     let token = goa_token(account)?;
     let dir = onedrive_folder(&token, &account.folder_clean())?;
-    let remote_path = if dir.is_empty() { name.clone() } else { format!("{dir}/{name}") };
+    let remote_path = if dir.is_empty() {
+        name.clone()
+    } else {
+        format!("{dir}/{name}")
+    };
     let mut file = std::fs::File::open(path).map_err(|e| format!("could not read {name}: {e}"))?;
 
     // A taken name is renamed by OneDrive ("report 1.pdf"); the answer
     // says what it became.
     let meta = if size <= ONEDRIVE_SINGLE_LIMIT {
-        let url = format!("{}:/content?@microsoft.graph.conflictBehavior=rename", onedrive_item(&remote_path));
+        let url = format!(
+            "{}:/content?@microsoft.graph.conflictBehavior=rename",
+            onedrive_item(&remote_path)
+        );
         ureq::put(&url)
             .set("Authorization", &bearer(&token))
             .set("Content-Length", &size.to_string())
@@ -1521,7 +1750,13 @@ fn onedrive_upload_and_share(account: &CloudAccount, path: &Path, fixed: Option<
     if url.is_empty() {
         return Err("Uploaded, but OneDrive made no share link.".to_string());
     }
-    Ok(ShareResult { name: remote, size, url, password: pw, expires })
+    Ok(ShareResult {
+        name: remote,
+        size,
+        url,
+        password: pw,
+        expires,
+    })
 }
 
 // ---------------------------------------------------------------------
@@ -1529,8 +1764,11 @@ fn onedrive_upload_and_share(account: &CloudAccount, path: &Path, fixed: Option<
 /// A download password people can read out: letters and digits, no
 /// look-alikes, twelve long.
 fn generate_password() -> Result<String, String> {
-    crate::rng::from_alphabet(12, b"abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789")
-        .map_err(|e| format!("Could not make a link password: {e}"))
+    crate::rng::from_alphabet(
+        12,
+        b"abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789",
+    )
+    .map_err(|e| format!("Could not make a link password: {e}"))
 }
 
 #[cfg(test)]
@@ -1564,8 +1802,14 @@ mod tests {
         assert_eq!(chunk_ranges(0, 90), vec![(0, 0)]);
         assert_eq!(chunk_ranges(90, 90), vec![(0, 90)]);
         assert_eq!(chunk_ranges(91, 90), vec![(0, 90), (90, 1)]);
-        assert_eq!(chunk_ranges(250, 100), vec![(0, 100), (100, 100), (200, 50)]);
-        let total: u64 = chunk_ranges(1_234_567, CLOUDFLARE_CHUNK).iter().map(|(_, l)| l).sum();
+        assert_eq!(
+            chunk_ranges(250, 100),
+            vec![(0, 100), (100, 100), (200, 50)]
+        );
+        let total: u64 = chunk_ranges(1_234_567, CLOUDFLARE_CHUNK)
+            .iter()
+            .map(|(_, l)| l)
+            .sum();
         assert_eq!(total, 1_234_567);
         assert!(CLOUDFLARE_CHUNK < 100 * 1000 * 1000);
     }
@@ -1576,12 +1820,28 @@ mod tests {
         let big = 150 * 1000 * 1000;
         // Cloudflare's own 413: unmistakable.
         let m = cloudflare_hint(&a, "Upload failed", "big.iso", big, Some(413), true).unwrap();
-        assert!(m.contains("Cloudflare") && m.contains("100 MB") && m.contains("Server is behind Cloudflare"), "{m}");
-        assert!(m.contains(&format!("{} pieces", crate::models::human_size(90_000_000))), "{m}");
+        assert!(
+            m.contains("Cloudflare")
+                && m.contains("100 MB")
+                && m.contains("Server is behind Cloudflare"),
+            "{m}"
+        );
+        assert!(
+            m.contains(&format!("{} pieces", crate::models::human_size(90_000_000))),
+            "{m}"
+        );
         // A 502 with Cloudflare's headers: the proxy cut it off.
-        assert!(cloudflare_hint(&a, "Upload failed", "big.iso", big, Some(502), true).unwrap().contains("cut off"));
+        assert!(
+            cloudflare_hint(&a, "Upload failed", "big.iso", big, Some(502), true)
+                .unwrap()
+                .contains("cut off")
+        );
         // Connection dropped, no headers to go by: a "possibly" hint.
-        assert!(cloudflare_hint(&a, "Upload failed", "big.iso", big, None, false).unwrap().contains("If the server is reached through Cloudflare"));
+        assert!(
+            cloudflare_hint(&a, "Upload failed", "big.iso", big, None, false)
+                .unwrap()
+                .contains("If the server is reached through Cloudflare")
+        );
         // A small file, or the switch already on, or a plain server error: not this.
         assert!(cloudflare_hint(&a, "Upload failed", "small.pdf", 1000, Some(413), true).is_none());
         assert!(cloudflare_hint(&a, "Upload failed", "big.iso", big, Some(500), false).is_none());
@@ -1599,7 +1859,8 @@ mod tests {
 
     #[test]
     fn old_cloud_toml_still_reads_as_nextcloud() {
-        let text = "[[accounts]]\nname = \"Work\"\nurl = \"https://cloud.example.com\"\nuser = \"me\"\n";
+        let text =
+            "[[accounts]]\nname = \"Work\"\nurl = \"https://cloud.example.com\"\nuser = \"me\"\n";
         let f: CloudFile = toml::from_str(text).unwrap();
         assert_eq!(f.accounts[0].kind, CloudKind::Nextcloud);
         assert_eq!(f.accounts[0].key(), "cloud:https://cloud.example.com|me");
@@ -1620,8 +1881,14 @@ mod tests {
         assert_eq!(a.key(), "cloud:goa|account_123");
         let back = toml::to_string(&CloudFile { accounts: vec![a] }).unwrap();
         assert!(back.contains("kind = \"onedrive\""));
-        assert_eq!(onedrive_item("Hylki/Q3 report"), "https://graph.microsoft.com/v1.0/me/drive/root:/Hylki/Q3%20report");
-        assert_eq!(onedrive_item(""), "https://graph.microsoft.com/v1.0/me/drive/root");
+        assert_eq!(
+            onedrive_item("Hylki/Q3 report"),
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Hylki/Q3%20report"
+        );
+        assert_eq!(
+            onedrive_item(""),
+            "https://graph.microsoft.com/v1.0/me/drive/root"
+        );
     }
 
     #[test]
@@ -1646,8 +1913,14 @@ mod tests {
         let mut a = CloudAccount::empty();
         assert_eq!(share_password(&a, Some("typed")), Ok(None));
         a.password = true;
-        assert_eq!(share_password(&a, Some(" typed ")).unwrap().as_deref(), Some("typed"));
-        assert_eq!(share_password(&a, Some("  ")).unwrap().map(|p| p.len()), Some(12));
+        assert_eq!(
+            share_password(&a, Some(" typed ")).unwrap().as_deref(),
+            Some("typed")
+        );
+        assert_eq!(
+            share_password(&a, Some("  ")).unwrap().map(|p| p.len()),
+            Some(12)
+        );
         assert_eq!(share_password(&a, None).unwrap().map(|p| p.len()), Some(12));
     }
 
@@ -1664,7 +1937,13 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("hylki-mp-{}", std::process::id()));
         std::fs::write(&dir, b"hello").unwrap();
         let f = std::fs::File::open(&dir).unwrap();
-        let (ctype, len, mut body) = multipart_upload(&[("parent_dir", "/"), ("replace", "0")], "a \"b\".txt", f, 5).unwrap();
+        let (ctype, len, mut body) = multipart_upload(
+            &[("parent_dir", "/"), ("replace", "0")],
+            "a \"b\".txt",
+            f,
+            5,
+        )
+        .unwrap();
         let mut bytes = Vec::new();
         body.read_to_end(&mut bytes).unwrap();
         assert_eq!(bytes.len() as u64, len);

@@ -91,7 +91,8 @@ impl MenuEntry {
     /// The keys that do the same, as a GTK accelerator (`<Control>c`),
     /// shown the way GTK's own menus show them.
     pub fn accel(mut self, accel: &str) -> Self {
-        self.accel = gtk::accelerator_parse(accel).map(|(key, mods)| gtk::accelerator_get_label(key, mods).to_string());
+        self.accel = gtk::accelerator_parse(accel)
+            .map(|(key, mods)| gtk::accelerator_get_label(key, mods).to_string());
         self
     }
 
@@ -107,7 +108,12 @@ impl MenuEntry {
 /// right-click landed on, so no coordinate translation is needed). `sections`
 /// groups entries into visually separated clusters, e.g. `[[Reply, Reply All,
 /// Forward], [Star, Mark Read], [Spam, Archive, Delete]]`.
-pub fn show_context_menu(parent: &impl IsA<gtk::Widget>, x: f64, y: f64, sections: Vec<Vec<MenuEntry>>) {
+pub fn show_context_menu(
+    parent: &impl IsA<gtk::Widget>,
+    x: f64,
+    y: f64,
+    sections: Vec<Vec<MenuEntry>>,
+) {
     show_context_menu_with_header(parent, x, y, None, sections);
 }
 
@@ -155,7 +161,10 @@ pub fn show_context_menu_popover(
     stack.set_visible_child_name("main");
 
     // Never taller than the window, scrolling past that (see below).
-    let root_height = parent.as_ref().root().map(|r| r.upcast_ref::<gtk::Widget>().height());
+    let root_height = parent
+        .as_ref()
+        .root()
+        .map(|r| r.upcast_ref::<gtk::Widget>().height());
     let scroller = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)
         .propagate_natural_height(true)
@@ -211,9 +220,12 @@ pub fn show_context_menu_popover(
                     stack.set_visible_child_name(&format!("sub:{which}"));
                 }
                 let stack = stack.clone();
-                gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
-                    crate::app::showcase_capture(stack.upcast_ref(), &path);
-                });
+                gtk::glib::timeout_add_local_once(
+                    std::time::Duration::from_millis(600),
+                    move || {
+                        crate::app::showcase_capture(stack.upcast_ref(), &path);
+                    },
+                );
             });
         }
     }
@@ -234,12 +246,17 @@ fn popup_after_release(popover: &gtk::Popover, parent: &gtk::Widget) {
         | gtk::gdk::ModifierType::BUTTON3_MASK;
     let display = parent.display();
     let is_x11 = display.type_().name() == "GdkX11Display";
-    let Some(root) = parent.root().filter(|_| is_x11) else { return popover.popup() };
+    let Some(root) = parent.root().filter(|_| is_x11) else {
+        return popover.popup();
+    };
     // The device's own modifier state reads empty on X11; asking the
     // window's surface where the pointer is queries the server, buttons too.
     let surface = root.surface();
     let pointer = display.default_seat().and_then(|s| s.pointer());
-    let state = surface.zip(pointer).and_then(|(s, p)| s.device_position(&p)).map(|(_, _, m)| m);
+    let state = surface
+        .zip(pointer)
+        .and_then(|(s, p)| s.device_position(&p))
+        .map(|(_, _, m)| m);
     let pressed = state.is_some_and(|m| m.intersects(held));
     if !pressed {
         return popover.popup();
@@ -283,7 +300,8 @@ const MENU_MARGIN: i32 = 12;
 fn fitted_anchor(parent: &gtk::Widget, natural: i32, x: f64, y: f64) -> f64 {
     let Some(root) = parent.root() else { return y };
     let root: &gtk::Widget = root.upcast_ref();
-    let Some(at) = parent.compute_point(root, &gtk::graphene::Point::new(x as f32, y as f32)) else {
+    let Some(at) = parent.compute_point(root, &gtk::graphene::Point::new(x as f32, y as f32))
+    else {
         return y;
     };
     // The popover itself measures nothing before it is mapped; its content
@@ -353,7 +371,10 @@ fn build_page(
 
     // Any icon in the menu means every row reserves the icon slot, keeping
     // the labels of iconless entries aligned with the rest.
-    let has_icons = sections.iter().flatten().any(|e| e.icon.is_some() || e.swatch.is_some());
+    let has_icons = sections
+        .iter()
+        .flatten()
+        .any(|e| e.icon.is_some() || e.swatch.is_some());
 
     let mut first = true;
     for entries in sections {
@@ -366,7 +387,16 @@ fn build_page(
         first = false;
 
         for entry in entries {
-            let MenuEntry { label, icon, swatch, enabled, selected, accel, activate, submenu } = entry;
+            let MenuEntry {
+                label,
+                icon,
+                swatch,
+                enabled,
+                selected,
+                accel,
+                activate,
+                submenu,
+            } = entry;
 
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
             if selected {
@@ -415,7 +445,14 @@ fn build_page(
                 chevron.add_css_class("dim-label");
                 row.append(&chevron);
                 let name = format!("sub:{label}");
-                let page = build_page(popover, stack, &name, Some(&label), sections, Some(page_name));
+                let page = build_page(
+                    popover,
+                    stack,
+                    &name,
+                    Some(&label),
+                    sections,
+                    Some(page_name),
+                );
                 // Tall lists scroll within the page rather than past the
                 // screen; short ones size exactly, as every page does.
                 let scroller = gtk::ScrolledWindow::new();

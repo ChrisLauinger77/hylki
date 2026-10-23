@@ -80,7 +80,14 @@ impl Outgoing {
             rcpts: Vec::new(),
             recipients,
             subject: m.subject.clone(),
-            preview: m.body.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(160).collect(),
+            preview: m
+                .body
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .chars()
+                .take(160)
+                .collect(),
             raw: Vec::new(),
             sent_path: self.sent_path.clone(),
             queued_at: self.queued_at,
@@ -88,7 +95,11 @@ impl Outgoing {
             last_error: String::new(),
             send_at: None,
             forwards: m.forwards.clone(),
-            status: if self.held { i18n("Waiting to send") } else { i18n("Sending…") },
+            status: if self.held {
+                i18n("Waiting to send")
+            } else {
+                i18n("Sending…")
+            },
         }
     }
 }
@@ -117,6 +128,9 @@ pub(crate) fn park_held(list: &OutgoingList) {
             &o.message,
             o.sent_path.as_deref(),
         );
-        tracing::info!("quit during Undo Send: message {} kept in the Outbox: {kept}", o.ticket);
+        tracing::info!(
+            "quit during Undo Send: message {} kept in the Outbox: {kept}",
+            o.ticket
+        );
     }
 }

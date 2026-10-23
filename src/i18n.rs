@@ -79,7 +79,10 @@ pub fn apply_language(code: &str) {
             std::env::set_var("LANGUAGE", orig);
         }
     } else {
-        std::env::set_var(LANGUAGE_ORIG, std::env::var_os("LANGUAGE").unwrap_or_default());
+        std::env::set_var(
+            LANGUAGE_ORIG,
+            std::env::var_os("LANGUAGE").unwrap_or_default(),
+        );
     }
     if !code.is_empty() {
         std::env::set_var("LANGUAGE", code);
@@ -98,9 +101,11 @@ fn locale_dir() -> Option<PathBuf> {
         candidates.push(PathBuf::from(dir));
     }
     candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("po/.build"));
-    let prefix_dir = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().and_then(|p| p.parent()).map(|p| p.join("share/locale")));
+    let prefix_dir = std::env::current_exe().ok().and_then(|exe| {
+        exe.parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.join("share/locale"))
+    });
     if let Some(p) = &prefix_dir {
         candidates.push(p.clone());
     }
@@ -115,10 +120,15 @@ fn locale_dir() -> Option<PathBuf> {
 
 /// Whether `dir/<lang>/LC_MESSAGES/hylki.mo` exists for any language.
 fn has_catalogue(dir: &Path) -> bool {
-    let Ok(entries) = std::fs::read_dir(dir) else { return false };
-    entries
-        .flatten()
-        .any(|e| e.path().join("LC_MESSAGES").join(format!("{DOMAIN}.mo")).is_file())
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    entries.flatten().any(|e| {
+        e.path()
+            .join("LC_MESSAGES")
+            .join(format!("{DOMAIN}.mo"))
+            .is_file()
+    })
 }
 
 /// The translation of `s`, or `s` itself.
@@ -156,13 +166,18 @@ fn fill(mut s: String, args: &[(&str, &str)]) -> String {
 }
 
 /// Languages written right to left, by their ISO 639 code.
-const RTL_LANGUAGES: &[&str] =
-    &["ar", "fa", "he", "iw", "ur", "ps", "ckb", "yi", "dv", "sd", "ug", "syr"];
+const RTL_LANGUAGES: &[&str] = &[
+    "ar", "fa", "he", "iw", "ur", "ps", "ckb", "yi", "dv", "sd", "ug", "syr",
+];
 
 /// Whether a locale or LANGUAGE value ("fa_IR.UTF-8", "he:en", "ar")
 /// names a right-to-left language first.
 pub fn is_rtl_locale(value: &str) -> bool {
-    let first = value.split(':').map(str::trim).find(|s| !s.is_empty()).unwrap_or("");
+    let first = value
+        .split(':')
+        .map(str::trim)
+        .find(|s| !s.is_empty())
+        .unwrap_or("");
     let lang = first.split(['_', '.', '@', '-']).next().unwrap_or("");
     RTL_LANGUAGES.iter().any(|l| lang.eq_ignore_ascii_case(l))
 }
@@ -201,10 +216,30 @@ mod tests {
 
     #[test]
     fn rtl_locales() {
-        for rtl in ["fa_IR.UTF-8", "fa", "ar", "ar_EG.UTF-8", "he:en", "ur_PK", "ckb_IQ", "sd@devanagari"] {
+        for rtl in [
+            "fa_IR.UTF-8",
+            "fa",
+            "ar",
+            "ar_EG.UTF-8",
+            "he:en",
+            "ur_PK",
+            "ckb_IQ",
+            "sd@devanagari",
+        ] {
             assert!(is_rtl_locale(rtl), "{rtl}");
         }
-        for ltr in ["en_US", "en_US.UTF-8", "C", "C.UTF-8", "POSIX", "", "en:fa", "fr_FR", "fil_PH", "ha"] {
+        for ltr in [
+            "en_US",
+            "en_US.UTF-8",
+            "C",
+            "C.UTF-8",
+            "POSIX",
+            "",
+            "en:fa",
+            "fr_FR",
+            "fil_PH",
+            "ha",
+        ] {
             assert!(!is_rtl_locale(ltr), "{ltr}");
         }
     }

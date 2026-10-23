@@ -28,10 +28,16 @@ pub struct Proc {
 /// processes and their bwrap wrappers.
 pub fn process_tree() -> Vec<Proc> {
     let me = std::process::id();
-    let Ok(dir) = std::fs::read_dir("/proc") else { return Vec::new() };
+    let Ok(dir) = std::fs::read_dir("/proc") else {
+        return Vec::new();
+    };
     let mut parents: Vec<(u32, u32)> = Vec::new();
     for entry in dir.flatten() {
-        let Some(pid) = entry.file_name().to_str().and_then(|s| s.parse::<u32>().ok()) else {
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|s| s.parse::<u32>().ok())
+        else {
             continue;
         };
         if let Some(ppid) = read_status(pid).and_then(|s| field(&s, "PPid:")?.parse().ok()) {
@@ -58,7 +64,9 @@ fn read_status(pid: u32) -> Option<String> {
 
 /// A `Key:` line's value, trimmed.
 fn field<'a>(text: &'a str, key: &str) -> Option<&'a str> {
-    text.lines().find_map(|l| l.strip_prefix(key)).map(str::trim)
+    text.lines()
+        .find_map(|l| l.strip_prefix(key))
+        .map(str::trim)
 }
 
 /// A `Key:   123 kB` line as bytes.
@@ -78,11 +86,20 @@ fn describe(pid: u32) -> Option<Proc> {
     }
     let rss = kb_field(&status, "VmRSS:")?;
     let heap = kb_field(&status, "RssAnon:").unwrap_or(0);
-    let threads = field(&status, "Threads:").and_then(|t| t.parse().ok()).unwrap_or(0);
+    let threads = field(&status, "Threads:")
+        .and_then(|t| t.parse().ok())
+        .unwrap_or(0);
     let pss = std::fs::read_to_string(format!("/proc/{pid}/smaps_rollup"))
         .ok()
         .and_then(|t| kb_field(&t, "Pss:"));
-    Some(Proc { pid, name, rss, pss, heap, threads })
+    Some(Proc {
+        pid,
+        name,
+        rss,
+        pss,
+        heap,
+        threads,
+    })
 }
 
 /// The global allocator: the system one, counting what Rust code holds.
@@ -189,7 +206,11 @@ pub fn allocator() -> Allocator {
     // SAFETY: mallinfo2 takes nothing and returns a plain struct by value; it
     // exists in every glibc since 2.33, which every build target has.
     let m = unsafe { mallinfo2() };
-    Allocator { live: m.uordblks + m.hblkhd, held_free: m.fordblks, mapped: m.hblkhd }
+    Allocator {
+        live: m.uordblks + m.hblkhd,
+        held_free: m.fordblks,
+        mapped: m.hblkhd,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -206,7 +227,9 @@ pub struct Allocator {
 /// have nothing to do with mail — the first thing to rule out on a VM or a
 /// machine without a working GPU driver.
 pub fn graphics_libraries() -> Vec<String> {
-    let Ok(maps) = std::fs::read_to_string("/proc/self/maps") else { return Vec::new() };
+    let Ok(maps) = std::fs::read_to_string("/proc/self/maps") else {
+        return Vec::new();
+    };
     let mut names: Vec<String> = maps
         .lines()
         .filter_map(|l| l.split_whitespace().nth(5))
@@ -308,7 +331,10 @@ pub fn register_web_view(view: &webkit6::WebView, role: &'static str) {
 pub fn release_web_view(view: &webkit6::WebView) {
     use webkit6::prelude::WebViewExt;
     view.terminate_web_process();
-    WEB_VIEWS.with(|v| v.borrow_mut().retain(|(_, w)| w.upgrade().as_ref() != Some(view)));
+    WEB_VIEWS.with(|v| {
+        v.borrow_mut()
+            .retain(|(_, w)| w.upgrade().as_ref() != Some(view))
+    });
     tracing::debug!(target: "hylki::memory", "web view released, its web process ended");
 }
 
@@ -335,12 +361,22 @@ pub fn web_view_lines() -> Vec<String> {
     let total: usize = views.iter().map(|(_, n)| n).sum();
     let roles: Vec<String> = views
         .iter()
-        .map(|(role, n)| if *n == 1 { (*role).to_string() } else { format!("{role} ×{n}") })
+        .map(|(role, n)| {
+            if *n == 1 {
+                (*role).to_string()
+            } else {
+                format!("{role} ×{n}")
+            }
+        })
         .collect();
     let mut lines = vec![format!(
         "  WebKit views alive: {} ({}); each one is its own WebKitWebProcess",
         total,
-        if roles.is_empty() { "none".to_string() } else { roles.join(", ") }
+        if roles.is_empty() {
+            "none".to_string()
+        } else {
+            roles.join(", ")
+        }
     )];
     if crate::platform::is_flatpak() {
         lines.push(
@@ -353,8 +389,12 @@ pub fn web_view_lines() -> Vec<String> {
 
 /// How long this process has been running, from the kernel's clock.
 pub fn uptime() -> Option<std::time::Duration> {
-    let system: f64 =
-        std::fs::read_to_string("/proc/uptime").ok()?.split_whitespace().next()?.parse().ok()?;
+    let system: f64 = std::fs::read_to_string("/proc/uptime")
+        .ok()?
+        .split_whitespace()
+        .next()?
+        .parse()
+        .ok()?;
     let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
     // Field 22 (1-based) is the start time in clock ticks; the command name
     // in parentheses may hold spaces, so count from after it.
@@ -362,7 +402,9 @@ pub fn uptime() -> Option<std::time::Duration> {
     let ticks: f64 = after.split_whitespace().nth(19)?.parse().ok()?;
     let ticks_per_second = 100.0; // CLK_TCK on every Linux Hylki builds for
     let started = ticks / ticks_per_second;
-    Some(std::time::Duration::from_secs_f64((system - started).max(0.0)))
+    Some(std::time::Duration::from_secs_f64(
+        (system - started).max(0.0),
+    ))
 }
 
 /// What a message record costs in RAM: the struct plus every string and
@@ -381,13 +423,20 @@ pub fn message_bytes(m: &Message) -> usize {
         + m.date.len()
         + m.message_id.len()
         + m.references.len()
-        + m.keywords.iter().map(|k| std::mem::size_of::<String>() + k.len()).sum::<usize>()
-        + m.labels.iter().map(|l| std::mem::size_of::<String>() + l.len()).sum::<usize>()
+        + m.keywords
+            .iter()
+            .map(|k| std::mem::size_of::<String>() + k.len())
+            .sum::<usize>()
+        + m.labels
+            .iter()
+            .map(|l| std::mem::size_of::<String>() + l.len())
+            .sum::<usize>()
 }
 
 /// The records and bytes of a batch of messages.
 pub fn messages_bytes<'a>(msgs: impl IntoIterator<Item = &'a Message>) -> (usize, usize) {
-    msgs.into_iter().fold((0, 0), |(n, b), m| (n + 1, b + message_bytes(m)))
+    msgs.into_iter()
+        .fold((0, 0), |(n, b), m| (n + 1, b + message_bytes(m)))
 }
 
 /// A texture's pixel memory: GTK keeps decoded textures as 8-bit RGBA.
@@ -547,7 +596,10 @@ mod tests {
         assert_eq!(empty, std::mem::size_of::<Message>());
         m.subject = "hello".into();
         m.keywords.push("Work".into());
-        assert_eq!(message_bytes(&m), empty + 5 + std::mem::size_of::<String>() + 4);
+        assert_eq!(
+            message_bytes(&m),
+            empty + 5 + std::mem::size_of::<String>() + 4
+        );
         assert_eq!(messages_bytes([&m, &m]), (2, 2 * message_bytes(&m)));
     }
 }

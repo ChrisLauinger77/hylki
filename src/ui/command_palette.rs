@@ -39,7 +39,10 @@ impl Query {
             Some(rest) => (true, rest),
             None => (false, typed.as_str()),
         };
-        Query { words: rest.split_whitespace().map(str::to_string).collect(), actions_only }
+        Query {
+            words: rest.split_whitespace().map(str::to_string).collect(),
+            actions_only,
+        }
     }
 
     /// Whether an entry, `text` being its lower-case title and detail, stays.
@@ -57,14 +60,18 @@ pub fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>, typed: &str) {
         .build();
 
     let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some(i18n("Type an action, a folder or a tag, or > for actions only").as_str()));
+    search.set_placeholder_text(Some(
+        i18n("Type an action, a folder or a tag, or > for actions only").as_str(),
+    ));
     search.set_hexpand(true);
 
     let list = gtk::ListBox::new();
     list.add_css_class("boxed-list");
     list.set_selection_mode(gtk::SelectionMode::Single);
-    let haystacks: Vec<(String, bool)> =
-        entries.iter().map(|e| (format!("{} {}", e.title, e.detail).to_lowercase(), e.action)).collect();
+    let haystacks: Vec<(String, bool)> = entries
+        .iter()
+        .map(|e| (format!("{} {}", e.title, e.detail).to_lowercase(), e.action))
+        .collect();
     for e in &entries {
         let row = adw::ActionRow::builder()
             .title(gtk::glib::markup_escape_text(&e.title))
@@ -140,7 +147,9 @@ pub fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>, typed: &str) {
         let dialog = dialog.clone();
         let entries = entries.clone();
         list.connect_row_activated(move |_, row| {
-            let Some(e) = entries.get(row.index() as usize) else { return };
+            let Some(e) = entries.get(row.index() as usize) else {
+                return;
+            };
             dialog.close();
             (e.run)();
         });
@@ -148,7 +157,9 @@ pub fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>, typed: &str) {
     {
         let list = list.clone();
         search.connect_activate(move |_| {
-            let row = list.selected_row().or_else(|| shown(&list).into_iter().next());
+            let row = list
+                .selected_row()
+                .or_else(|| shown(&list).into_iter().next());
             if let Some(row) = row {
                 row.activate();
             }
@@ -169,7 +180,9 @@ pub fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>, typed: &str) {
             if rows.is_empty() {
                 return gtk::glib::Propagation::Stop;
             }
-            let at = list.selected_row().and_then(|s| rows.iter().position(|r| *r == s));
+            let at = list
+                .selected_row()
+                .and_then(|s| rows.iter().position(|r| *r == s));
             let next = match at {
                 Some(i) => (i as i32 + step).clamp(0, rows.len() as i32 - 1) as usize,
                 None => 0,

@@ -16,7 +16,9 @@ const DEFAULT_DPI: i32 = 96 * 1024;
 /// Put the app's text at `percent` of the desktop's size. 100 hands the
 /// setting back to the desktop, so a change there is followed again.
 pub fn apply(percent: u32) {
-    let Some(settings) = gtk::Settings::default() else { return };
+    let Some(settings) = gtk::Settings::default() else {
+        return;
+    };
     // Measured from the desktop's value every time, never from a scaled
     // one, so moving between sizes does not compound.
     settings.reset_property("gtk-xft-dpi");

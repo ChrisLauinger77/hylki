@@ -5,11 +5,11 @@
 //! Writing goes through the EDS D-Bus API so changes are tracked by EDS and
 //! synced back to CardDAV servers.
 
+use crate::i18n::{i18n, ni18n_f};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, SystemTime};
-use crate::i18n::{i18n, ni18n_f};
 
 /// A name + email pair from the address book.
 #[derive(Debug, Clone)]
@@ -44,7 +44,12 @@ pub fn group_reach(people: usize, hide_addresses: bool) -> String {
     let n = people as u32;
     let count = n.to_string();
     if hide_addresses {
-        ni18n_f("{n} person, in Bcc", "{n} people, in Bcc", n, &[("n", &count)])
+        ni18n_f(
+            "{n} person, in Bcc",
+            "{n} people, in Bcc",
+            n,
+            &[("n", &count)],
+        )
     } else {
         ni18n_f("{n} person", "{n} people", n, &[("n", &count)])
     }
@@ -140,7 +145,11 @@ pub fn suggestions(own: &[(String, String)]) -> Vec<Suggestion> {
             continue;
         }
         map.entry(key).or_insert(Suggestion {
-            name: if name.trim().is_empty() { email.clone() } else { name.clone() },
+            name: if name.trim().is_empty() {
+                email.clone()
+            } else {
+                name.clone()
+            },
             email: email.clone(),
             from_contacts: false,
             from_directory: false,
@@ -167,8 +176,13 @@ fn group_suggestions(groups: Vec<ContactDetails>) -> Vec<Suggestion> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
     for g in groups {
-        let members: Vec<Contact> =
-            g.reachable().map(|m| Contact { name: m.name.clone(), email: m.email.clone() }).collect();
+        let members: Vec<Contact> = g
+            .reachable()
+            .map(|m| Contact {
+                name: m.name.clone(),
+                email: m.email.clone(),
+            })
+            .collect();
         let mut key: Vec<String> = members.iter().map(|m| m.email.to_lowercase()).collect();
         key.sort();
         key.push(g.name.to_lowercase());
@@ -182,7 +196,10 @@ fn group_suggestions(groups: Vec<ContactDetails>) -> Vec<Suggestion> {
             from_directory: false,
             score: 0,
             own: false,
-            group: Some(Arc::new(SuggestedGroup { members, hide_addresses: g.hide_addresses })),
+            group: Some(Arc::new(SuggestedGroup {
+                members,
+                hide_addresses: g.hide_addresses,
+            })),
         });
     }
     out
@@ -264,7 +281,10 @@ impl SavedAddresses {
     pub fn get(&self) -> Option<std::sync::Arc<HashSet<String>>> {
         let (never, stale) = {
             let st = self.0.lock().unwrap_or_else(|e| e.into_inner());
-            (st.read_at.is_none(), st.read_at.is_some_and(|t| t.elapsed() > Self::FRESH_FOR))
+            (
+                st.read_at.is_none(),
+                st.read_at.is_some_and(|t| t.elapsed() > Self::FRESH_FOR),
+            )
         };
         if never {
             let set = read_saved_addresses();
@@ -299,8 +319,10 @@ impl SavedAddresses {
 }
 
 fn read_saved_addresses() -> Option<std::sync::Arc<HashSet<String>>> {
-    let set: HashSet<String> =
-        read_saved_contacts()?.into_iter().map(|c| c.email.trim().to_lowercase()).collect();
+    let set: HashSet<String> = read_saved_contacts()?
+        .into_iter()
+        .map(|c| c.email.trim().to_lowercase())
+        .collect();
     (!set.is_empty()).then(|| std::sync::Arc::new(set))
 }
 
@@ -319,7 +341,10 @@ fn read_contacts_from(saved_only: bool) -> (Vec<Contact>, bool) {
 }
 
 /// [`read_contacts_from`] in the books `active` names.
-fn read_contacts_in(active: &Option<HashMap<String, String>>, saved_only: bool) -> (Vec<Contact>, bool) {
+fn read_contacts_in(
+    active: &Option<HashMap<String, String>>,
+    saved_only: bool,
+) -> (Vec<Contact>, bool) {
     let mut complete = true;
     let mut out = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
@@ -370,16 +395,25 @@ fn read_groups_in(active: &Option<HashMap<String, String>>) -> Vec<ContactDetail
     let mut out = Vec::new();
     let mut read = |db: &std::path::Path, table: &str, col: &str, uid_col: &str| {
         let Ok(conn) = open_book_db(db) else { return };
-        let query = format!("SELECT {col} FROM {table} WHERE {col} {}", WHERE.replace("{col}", col));
-        let Ok(mut stmt) = conn.prepare(&query) else { return };
-        let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) else { return };
+        let query = format!(
+            "SELECT {col} FROM {table} WHERE {col} {}",
+            WHERE.replace("{col}", col)
+        );
+        let Ok(mut stmt) = conn.prepare(&query) else {
+            return;
+        };
+        let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) else {
+            return;
+        };
         let lookup_sql = format!("SELECT {col} FROM {table} WHERE {uid_col} = ?1");
         let lookup = |uid: &str| -> Option<(String, String)> {
             let vcard: String = conn.query_row(&lookup_sql, [uid], |r| r.get(0)).ok()?;
             person_address(&vcard)
         };
         for vcard in rows.flatten() {
-            let Some(mut c) = parse_vcard_fields(&vcard).filter(ContactDetails::is_group) else { continue };
+            let Some(mut c) = parse_vcard_fields(&vcard).filter(ContactDetails::is_group) else {
+                continue;
+            };
             resolve_members(&mut c, &lookup);
             c.raw_vcard = vcard;
             out.push(c);
@@ -403,9 +437,16 @@ fn read_groups_in(active: &Option<HashMap<String, String>>) -> Vec<ContactDetail
         match crate::local_contacts::group_vcards() {
             Ok(vcards) => {
                 for vcard in vcards {
-                    let Some(mut c) = parse_vcard_fields(&vcard).filter(ContactDetails::is_group) else { continue };
+                    let Some(mut c) = parse_vcard_fields(&vcard).filter(ContactDetails::is_group)
+                    else {
+                        continue;
+                    };
                     resolve_members(&mut c, |uid| {
-                        crate::local_contacts::vcard_by_uid(uid).ok().flatten().as_deref().and_then(person_address)
+                        crate::local_contacts::vcard_by_uid(uid)
+                            .ok()
+                            .flatten()
+                            .as_deref()
+                            .and_then(person_address)
                     });
                     c.book_uid = crate::local_contacts::LOCAL_BOOK_UID.to_string();
                     c.raw_vcard = vcard;
@@ -436,7 +477,11 @@ fn add_local_contacts(out: &mut Vec<Contact>, seen: &mut HashSet<String>) -> boo
         if email.is_empty() || !email.contains('@') || !seen.insert(email.to_lowercase()) {
             continue;
         }
-        let name = if name.trim().is_empty() { email.clone() } else { name };
+        let name = if name.trim().is_empty() {
+            email.clone()
+        } else {
+            name
+        };
         out.push(Contact { name, email });
     }
     true
@@ -495,16 +540,27 @@ fn local_details() -> Vec<ContactDetails> {
 
 /// `book_uid_active` keyed off a book database's directory name, minus the
 /// auto-collected books when `saved_only` is set.
-fn db_book_wanted(db: &std::path::Path, active: &Option<HashMap<String, String>>, saved_only: bool) -> bool {
+fn db_book_wanted(
+    db: &std::path::Path,
+    active: &Option<HashMap<String, String>>,
+    saved_only: bool,
+) -> bool {
     let Some(folder) = db.parent().and_then(|p| p.file_name()) else {
         return true;
     };
     let folder = folder.to_string_lossy();
-    let uid = if folder == "system" { "system-address-book" } else { folder.as_ref() };
+    let uid = if folder == "system" {
+        "system-address-book"
+    } else {
+        folder.as_ref()
+    };
     if !book_uid_active(uid, active) {
         return false;
     }
-    let name = active.as_ref().and_then(|m| m.get(uid)).map_or("", String::as_str);
+    let name = active
+        .as_ref()
+        .and_then(|m| m.get(uid))
+        .map_or("", String::as_str);
     !(saved_only && is_auto_collected(uid, name))
 }
 
@@ -714,7 +770,10 @@ fn load_contact_photo_index() -> HashMap<String, Vec<PhotoLocation>> {
     // A book switched off, in EDS or for Hylki, lends no faces.
     let active = registry_books();
     if let Some(dir) = data_dir() {
-        for db in find_dbs(&dir, "contacts.db").into_iter().filter(|db| db_book_wanted(db, &active, false)) {
+        for db in find_dbs(&dir, "contacts.db")
+            .into_iter()
+            .filter(|db| db_book_wanted(db, &active, false))
+        {
             read_photo_locations(
                 &db,
                 "SELECT e.value, f.uid FROM folder_id f \
@@ -726,7 +785,10 @@ fn load_contact_photo_index() -> HashMap<String, Vec<PhotoLocation>> {
         }
     }
     if let Some(dir) = cache_dir() {
-        for db in find_dbs(&dir, "cache.db").into_iter().filter(|db| db_book_wanted(db, &active, false)) {
+        for db in find_dbs(&dir, "cache.db")
+            .into_iter()
+            .filter(|db| db_book_wanted(db, &active, false))
+        {
             read_photo_locations(
                 &db,
                 "SELECT e.value, o.ECacheUID FROM ECacheObjects o \
@@ -755,7 +817,12 @@ fn add_local_photo_locations(photos: &mut HashMap<String, Vec<PhotoLocation>>) {
         }
     };
     for (email, uid) in entries {
-        let location = PhotoLocation { db: PathBuf::new(), uid, cached_book: false, local: true };
+        let location = PhotoLocation {
+            db: PathBuf::new(),
+            uid,
+            cached_book: false,
+            local: true,
+        };
         photos.entry(email).or_default().push(location);
     }
 }
@@ -766,15 +833,17 @@ pub(crate) fn local_changed() {
     start_photo_load();
     start_photo_watcher();
     let index = CONTACT_PHOTOS.get_or_init(new_photo_index).clone();
-    let _ = std::thread::Builder::new().name("local-photo-reload".into()).spawn(move || {
-        let (photos, fingerprint) = load_stable_photo_index();
-        let mut current = index.lock().unwrap_or_else(|p| p.into_inner());
-        current.photos = photos;
-        current.fingerprint = fingerprint;
-        current.generation = current.generation.wrapping_add(1).max(1);
-        drop(current);
-        notify_photo_change();
-    });
+    let _ = std::thread::Builder::new()
+        .name("local-photo-reload".into())
+        .spawn(move || {
+            let (photos, fingerprint) = load_stable_photo_index();
+            let mut current = index.lock().unwrap_or_else(|p| p.into_inner());
+            current.photos = photos;
+            current.fingerprint = fingerprint;
+            current.generation = current.generation.wrapping_add(1).max(1);
+            drop(current);
+            notify_photo_change();
+        });
 }
 
 fn read_photo_locations(
@@ -952,7 +1021,10 @@ pub(crate) fn vcard_photo_with(vcard: &str, allow_files: bool) -> Option<Vec<u8>
             continue;
         };
 
-        let encoded: String = payload.chars().filter(|c| !c.is_ascii_whitespace()).collect();
+        let encoded: String = payload
+            .chars()
+            .filter(|c| !c.is_ascii_whitespace())
+            .collect();
         // Base64 expands data by roughly 4/3. Reject oversized input before
         // allocating the decoded image buffer.
         if encoded.len() > (MAX_PHOTO_BYTES * 4 / 3 + 4) {
@@ -1037,7 +1109,12 @@ fn open_book_db(path: &std::path::Path) -> rusqlite::Result<rusqlite::Connection
     }
 }
 
-fn read_book_db(path: &std::path::Path, query: &str, out: &mut Vec<Contact>, seen: &mut HashSet<String>) -> bool {
+fn read_book_db(
+    path: &std::path::Path,
+    query: &str,
+    out: &mut Vec<Contact>,
+    seen: &mut HashSet<String>,
+) -> bool {
     let conn = match open_book_db(path) {
         Ok(c) => c,
         Err(e) => {
@@ -1058,7 +1135,10 @@ fn read_book_db(path: &std::path::Path, query: &str, out: &mut Vec<Contact>, see
         // EDS indexes a list's members as its addresses, lower-cased and
         // whole ("ann lee <ann@x.org>"): the list is offered as itself.
         let group = vcard.as_deref().is_some_and(is_group_vcard);
-        let name = vcard.as_deref().and_then(vcard_display_name).unwrap_or_default();
+        let name = vcard
+            .as_deref()
+            .and_then(vcard_display_name)
+            .unwrap_or_default();
         Ok((name, email, group))
     });
     let Ok(rows) = rows else { return false };
@@ -1069,7 +1149,11 @@ fn read_book_db(path: &std::path::Path, query: &str, out: &mut Vec<Contact>, see
         }
         let key = email.to_lowercase();
         if seen.insert(key) {
-            let name = if name.trim().is_empty() { email.clone() } else { name };
+            let name = if name.trim().is_empty() {
+                email.clone()
+            } else {
+                name
+            };
             out.push(Contact { name, email });
         }
     }
@@ -1097,7 +1181,10 @@ pub fn writable_books() -> Vec<Book> {
                 continue;
             }
             let name = book_uid_name(&uid, &active, "On This Computer");
-            let groups = formats.get(&uid).copied().unwrap_or(Some(GroupFormat::Evolution));
+            let groups = formats
+                .get(&uid)
+                .copied()
+                .unwrap_or(Some(GroupFormat::Evolution));
             books.push(Book { uid, name, groups });
         }
     }
@@ -1111,7 +1198,10 @@ pub fn writable_books() -> Vec<Book> {
                 continue;
             }
             let name = book_uid_name(&uid, &active, "CardDAV Address Book");
-            let groups = formats.get(&uid).copied().unwrap_or(Some(GroupFormat::Apple));
+            let groups = formats
+                .get(&uid)
+                .copied()
+                .unwrap_or(Some(GroupFormat::Apple));
             books.push(Book { uid, name, groups });
         }
     }
@@ -1140,7 +1230,9 @@ fn prefer_book(books: &mut [Book], uid: &str) {
 /// server's privileges on first connect, cached after that. Any error counts
 /// as writable, so a save still reports EDS's real failure.
 fn book_read_only(conn: &zbus::blocking::Connection, dest: &str, uid: &str) -> bool {
-    let Ok((bus, path)) = open_book(conn, dest, uid) else { return false };
+    let Ok((bus, path)) = open_book(conn, dest, uid) else {
+        return false;
+    };
     conn.call_method(
         Some(bus.as_str()),
         path.as_str(),
@@ -1157,7 +1249,11 @@ fn book_read_only(conn: &zbus::blocking::Connection, dest: &str, uid: &str) -> b
 /// Best-effort display name from the EDS source file for a book UID.
 fn source_display_name(uid: &str) -> Option<String> {
     let path = config_dir()?.join(format!("sources/{uid}.source"));
-    crate::platform::keyfile_value(&std::fs::read_to_string(path).ok()?, "Data Source", "DisplayName")
+    crate::platform::keyfile_value(
+        &std::fs::read_to_string(path).ok()?,
+        "Data Source",
+        "DisplayName",
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -1175,10 +1271,18 @@ fn source_display_name(uid: &str) -> Option<String> {
 fn bus_dest(prefix: &str) -> Option<String> {
     let conn = zbus::blocking::Connection::session().ok()?;
     let proxy = zbus::blocking::fdo::DBusProxy::new(&conn).ok()?;
-    let mut names: Vec<String> =
-        proxy.list_names().unwrap_or_default().iter().map(|n| n.as_str().to_string()).collect();
+    let mut names: Vec<String> = proxy
+        .list_names()
+        .unwrap_or_default()
+        .iter()
+        .map(|n| n.as_str().to_string())
+        .collect();
     names.extend(
-        proxy.list_activatable_names().unwrap_or_default().iter().map(|n| n.as_str().to_string()),
+        proxy
+            .list_activatable_names()
+            .unwrap_or_default()
+            .iter()
+            .map(|n| n.as_str().to_string()),
     );
     // Highest interface version wins if several are present.
     names
@@ -1211,7 +1315,10 @@ fn remembered(prefix: &'static str, from_files: fn() -> Option<String>) -> Optio
 
 /// Discover the versioned AddressBook factory bus name (e.g. `…AddressBook10`).
 pub(crate) fn factory_dest() -> Option<String> {
-    remembered("org.gnome.evolution.dataserver.AddressBook", factory_dest_from_files)
+    remembered(
+        "org.gnome.evolution.dataserver.AddressBook",
+        factory_dest_from_files,
+    )
 }
 
 /// Fallback: read the name from the host's D-Bus service files (works outside
@@ -1244,13 +1351,25 @@ pub(crate) fn open_book(
     uid: &str,
 ) -> Result<(String, String), String> {
     let reply = conn
-        .call_method(Some(dest), FACTORY_PATH, Some(FACTORY_IFACE), "OpenAddressBook", &(uid,))
+        .call_method(
+            Some(dest),
+            FACTORY_PATH,
+            Some(FACTORY_IFACE),
+            "OpenAddressBook",
+            &(uid,),
+        )
         .map_err(|e| e.to_string())?;
     // Returns (object_path, bus_name).
     let (object_path, bus_name): (String, String) =
         reply.body().deserialize().map_err(|e| e.to_string())?;
-    conn.call_method(Some(bus_name.as_str()), object_path.as_str(), Some(BOOK_IFACE), "Open", &())
-        .map_err(|e| e.to_string())?;
+    conn.call_method(
+        Some(bus_name.as_str()),
+        object_path.as_str(),
+        Some(BOOK_IFACE),
+        "Open",
+        &(),
+    )
+    .map_err(|e| e.to_string())?;
     Ok((bus_name, object_path))
 }
 
@@ -1345,7 +1464,8 @@ fn merge_target(vcards: &[String], name: &str) -> Option<String> {
     vcards
         .iter()
         .find(|v| {
-            parse_vcard_fields(v).is_some_and(|d| !d.is_group() && d.name.trim().eq_ignore_ascii_case(name))
+            parse_vcard_fields(v)
+                .is_some_and(|d| !d.is_group() && d.name.trim().eq_ignore_ascii_case(name))
         })
         .cloned()
 }
@@ -1410,7 +1530,11 @@ fn sexpr_escape(s: &str) -> String {
 }
 
 fn vcard_for(name: &str, email: &str) -> String {
-    let name = if name.trim().is_empty() { email } else { name.trim() };
+    let name = if name.trim().is_empty() {
+        email
+    } else {
+        name.trim()
+    };
     // Minimal vCard 3.0; EDS assigns the UID.
     format!(
         "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:{name}\r\nN:;{name};;;\r\n\
@@ -1437,7 +1561,9 @@ pub struct Postal {
 
 impl Postal {
     fn from_adr(label: String, raw: &str) -> Postal {
-        let mut parts = split_unescaped(raw, ';').into_iter().map(|p| unescape_vcard_text(p.trim()));
+        let mut parts = split_unescaped(raw, ';')
+            .into_iter()
+            .map(|p| unescape_vcard_text(p.trim()));
         let mut next = || parts.next().unwrap_or_default();
         Postal {
             label,
@@ -1452,27 +1578,51 @@ impl Postal {
     }
 
     pub fn is_empty(&self) -> bool {
-        [&self.pobox, &self.extended, &self.street, &self.locality, &self.region, &self.code, &self.country]
-            .iter()
-            .all(|p| p.trim().is_empty())
+        [
+            &self.pobox,
+            &self.extended,
+            &self.street,
+            &self.locality,
+            &self.region,
+            &self.code,
+            &self.country,
+        ]
+        .iter()
+        .all(|p| p.trim().is_empty())
     }
 
     /// The parts on one line, as the card shows the address.
     pub fn one_line(&self) -> String {
-        [&self.pobox, &self.extended, &self.street, &self.locality, &self.region, &self.code, &self.country]
-            .iter()
-            .map(|p| p.trim())
-            .filter(|p| !p.is_empty())
-            .collect::<Vec<_>>()
-            .join(", ")
+        [
+            &self.pobox,
+            &self.extended,
+            &self.street,
+            &self.locality,
+            &self.region,
+            &self.code,
+            &self.country,
+        ]
+        .iter()
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ")
     }
 
     fn adr_value(&self) -> String {
-        [&self.pobox, &self.extended, &self.street, &self.locality, &self.region, &self.code, &self.country]
-            .iter()
-            .map(|p| escape_vcard_value(p.trim()))
-            .collect::<Vec<_>>()
-            .join(";")
+        [
+            &self.pobox,
+            &self.extended,
+            &self.street,
+            &self.locality,
+            &self.region,
+            &self.code,
+            &self.country,
+        ]
+        .iter()
+        .map(|p| escape_vcard_value(p.trim()))
+        .collect::<Vec<_>>()
+        .join(";")
     }
 }
 
@@ -1591,7 +1741,10 @@ impl ContactDetails {
         if self.photo.is_some() || self.photo_key == 0 {
             return self.photo.clone();
         }
-        vcard_photo_with(&self.raw_vcard, self.book_uid != crate::local_contacts::LOCAL_BOOK_UID)
+        vcard_photo_with(
+            &self.raw_vcard,
+            self.book_uid != crate::local_contacts::LOCAL_BOOK_UID,
+        )
     }
 
     /// The address used for avatars and as the compose default.
@@ -1606,7 +1759,10 @@ impl ContactDetails {
     /// Whether the group can be changed here: Evolution's lists and
     /// Apple's groups, the kinds Hylki writes. A vCard 4 group is only read.
     pub fn group_editable(&self) -> bool {
-        matches!(self.group, Some(GroupFormat::Evolution | GroupFormat::Apple))
+        matches!(
+            self.group,
+            Some(GroupFormat::Evolution | GroupFormat::Apple)
+        )
     }
 
     /// How a group member found by card is known in a set of addresses.
@@ -1691,8 +1847,10 @@ impl Member {
 /// never written to disk. `None` when the registry can't be reached (then
 /// keep everything rather than hide it all).
 fn registry_books() -> Option<HashMap<String, String>> {
-    let sources: HashMap<String, String> =
-        registry_sources()?.into_iter().map(|(_, uid, data)| (uid, data)).collect();
+    let sources: HashMap<String, String> = registry_sources()?
+        .into_iter()
+        .map(|(_, uid, data)| (uid, data))
+        .collect();
     let mut books = HashMap::new();
     let off = crate::contact_sources::off();
     let names = crate::contact_sources::names();
@@ -1708,7 +1866,10 @@ fn registry_books() -> Option<HashMap<String, String>> {
         {
             let name = book_display_name(data, &sources);
             let account = names.get(&crate::contact_sources::group_of(uid, &sources));
-            books.insert(uid.clone(), with_given_name(&with_account_name(&name, account), names.get(uid)));
+            books.insert(
+                uid.clone(),
+                with_given_name(&with_account_name(&name, account), names.get(uid)),
+            );
         }
     }
     Some(books)
@@ -1754,10 +1915,8 @@ fn sources_from_reply(reply: &gtk::glib::Variant) -> Option<Vec<(String, String,
         let Some(props) = ifaces.get("org.gnome.evolution.dataserver.Source") else {
             continue;
         };
-        let uid =
-            props.get("UID").and_then(|v| v.str()).map(str::to_string);
-        let data =
-            props.get("Data").and_then(|v| v.str()).map(str::to_string);
+        let uid = props.get("UID").and_then(|v| v.str()).map(str::to_string);
+        let data = props.get("Data").and_then(|v| v.str()).map(str::to_string);
         if let (Some(uid), Some(data)) = (uid, data) {
             sources.push((path.to_string(), uid, data));
         }
@@ -1812,7 +1971,9 @@ fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> Stri
     // contacted, System address book), so name the book too — unless it is
     // the account itself.
     match own {
-        Some(own) if !own.is_empty() && Some(&own) != account.as_ref() => format!("{label} · {own}"),
+        Some(own) if !own.is_empty() && Some(&own) != account.as_ref() => {
+            format!("{label} · {own}")
+        }
         _ => label,
     }
 }
@@ -1820,14 +1981,21 @@ fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> Stri
 /// The backend that serves a book, walked up its parent chain to the
 /// account collection (google / microsoft365 / webdav / local…), with the
 /// account's identity and display name when there is one.
-fn book_account(book_data: &str, sources: &HashMap<String, String>) -> (Option<String>, Option<String>, Option<String>) {
+fn book_account(
+    book_data: &str,
+    sources: &HashMap<String, String>,
+) -> (Option<String>, Option<String>, Option<String>) {
     let mut backend = crate::platform::keyfile_value(book_data, "Address Book", "BackendName");
     let mut identity: Option<String> = None;
     let mut top_display = None;
     let mut current = book_data.to_string();
     for _ in 0..4 {
-        let Some(parent) = crate::platform::keyfile_value(&current, "Data Source", "Parent") else { break };
-        let Some(parent_data) = sources.get(&parent) else { break };
+        let Some(parent) = crate::platform::keyfile_value(&current, "Data Source", "Parent") else {
+            break;
+        };
+        let Some(parent_data) = sources.get(&parent) else {
+            break;
+        };
         if let Some(b) = crate::platform::keyfile_value(parent_data, "Collection", "BackendName") {
             backend = Some(b);
         }
@@ -1848,12 +2016,22 @@ fn book_account(book_data: &str, sources: &HashMap<String, String>) -> (Option<S
 /// keeps a group as a person with odd addresses, nor on Microsoft 365 or a
 /// directory, which take none.
 fn book_group_formats() -> HashMap<String, Option<GroupFormat>> {
-    let Some(sources) = registry_sources() else { return HashMap::new() };
-    let sources: HashMap<String, String> = sources.into_iter().map(|(_, uid, data)| (uid, data)).collect();
+    let Some(sources) = registry_sources() else {
+        return HashMap::new();
+    };
+    let sources: HashMap<String, String> = sources
+        .into_iter()
+        .map(|(_, uid, data)| (uid, data))
+        .collect();
     sources
         .iter()
         .filter(|(_, data)| data.contains("[Address Book]"))
-        .map(|(uid, data)| (uid.clone(), group_format_for(book_account(data, &sources).0.as_deref())))
+        .map(|(uid, data)| {
+            (
+                uid.clone(),
+                group_format_for(book_account(data, &sources).0.as_deref()),
+            )
+        })
         .collect()
 }
 
@@ -1867,12 +2045,16 @@ fn group_format_for(backend: Option<&str>) -> Option<GroupFormat> {
 
 /// Whether a source keyfile's `[Data Source]` group says `Enabled=false`.
 fn data_source_disabled(data: &str) -> bool {
-    crate::platform::keyfile(data).and_then(|kf| kf.boolean("Data Source", "Enabled").ok()) == Some(false)
+    crate::platform::keyfile(data).and_then(|kf| kf.boolean("Data Source", "Enabled").ok())
+        == Some(false)
 }
 
 /// Discover the versioned Sources registry bus name (e.g. `…Sources5`).
 pub(crate) fn sources_dest() -> Option<String> {
-    remembered("org.gnome.evolution.dataserver.Sources", sources_dest_from_files)
+    remembered(
+        "org.gnome.evolution.dataserver.Sources",
+        sources_dest_from_files,
+    )
 }
 
 /// Fallback: read the name from the host's D-Bus service files (works outside
@@ -1895,16 +2077,15 @@ fn sources_dest_from_files() -> Option<String> {
 /// Whether the registry lists `uid` as live (fail-open when unreachable,
 /// but for a book switched off for Hylki by its own UID).
 fn book_uid_active(uid: &str, books: &Option<HashMap<String, String>>) -> bool {
-    books.as_ref().map_or_else(|| !crate::contact_sources::off().contains(uid), |map| map.contains_key(uid))
+    books.as_ref().map_or_else(
+        || !crate::contact_sources::off().contains(uid),
+        |map| map.contains_key(uid),
+    )
 }
 
 /// The registry's friendly name for a book, with a fallback for when the
 /// registry is unreachable.
-fn book_uid_name(
-    uid: &str,
-    books: &Option<HashMap<String, String>>,
-    fallback: &str,
-) -> String {
+fn book_uid_name(uid: &str, books: &Option<HashMap<String, String>>, fallback: &str) -> String {
     books
         .as_ref()
         .and_then(|map| map.get(uid).cloned())
@@ -1926,12 +2107,23 @@ pub fn read_contact_details() -> Vec<ContactDetails> {
                 continue;
             }
             let folder = entry.file_name().to_string_lossy().to_string();
-            let uid = if folder == "system" { "system-address-book".to_string() } else { folder };
+            let uid = if folder == "system" {
+                "system-address-book".to_string()
+            } else {
+                folder
+            };
             if !book_uid_active(&uid, &active) {
                 continue;
             }
             let name = book_uid_name(&uid, &active, "On This Computer");
-            read_detail_db(&db, "SELECT vcard FROM folder_id", &uid, &name, &mut out, &mut seen);
+            read_detail_db(
+                &db,
+                "SELECT vcard FROM folder_id",
+                &uid,
+                &name,
+                &mut out,
+                &mut seen,
+            );
         }
     }
     if let Some(dir) = cache_dir() {
@@ -2000,7 +2192,9 @@ fn read_detail_db(
     let Ok(rows) = rows else { return };
     let mut book: Vec<ContactDetails> = Vec::new();
     for vcard in rows.flatten() {
-        let Some(mut c) = parse_vcard_details(&vcard) else { continue };
+        let Some(mut c) = parse_vcard_details(&vcard) else {
+            continue;
+        };
         c.book_uid = book_uid.to_string();
         c.book_name = book_name.to_string();
         c.raw_vcard = vcard;
@@ -2030,7 +2224,15 @@ fn resolve_book_members(book: &mut [ContactDetails]) {
     let people: HashMap<String, (String, String)> = book
         .iter()
         .filter(|c| !c.is_group() && !c.eds_uid.is_empty())
-        .map(|c| (c.eds_uid.clone(), (c.name.clone(), c.primary_email().unwrap_or_default().to_string())))
+        .map(|c| {
+            (
+                c.eds_uid.clone(),
+                (
+                    c.name.clone(),
+                    c.primary_email().unwrap_or_default().to_string(),
+                ),
+            )
+        })
         .collect();
     for c in book.iter_mut().filter(|c| !c.member_refs.is_empty()) {
         resolve_members(c, |uid| people.get(uid).cloned());
@@ -2099,7 +2301,9 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
     let mut email_lines: Vec<(String, Vec<String>, String)> = Vec::new();
     let mut show_addresses = None;
     for line in unfold_vcard(vcard).lines() {
-        let Some((prop, raw_value)) = split_vcard_line(line) else { continue };
+        let Some((prop, raw_value)) = split_vcard_line(line) else {
+            continue;
+        };
         let mut parts = prop.split(';');
         // Group prefixes (`item1.EMAIL`) hide the property name; strip them.
         let name = parts
@@ -2115,8 +2319,12 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
             continue;
         }
         match name.as_str() {
-            "X-EVOLUTION-LIST" if value.eq_ignore_ascii_case("true") => c.group = Some(GroupFormat::Evolution),
-            "X-EVOLUTION-LIST-SHOW-ADDRESSES" => show_addresses = Some(value.eq_ignore_ascii_case("true")),
+            "X-EVOLUTION-LIST" if value.eq_ignore_ascii_case("true") => {
+                c.group = Some(GroupFormat::Evolution)
+            }
+            "X-EVOLUTION-LIST-SHOW-ADDRESSES" => {
+                show_addresses = Some(value.eq_ignore_ascii_case("true"))
+            }
             "X-ADDRESSBOOKSERVER-KIND" if value.eq_ignore_ascii_case("group") => {
                 c.group.get_or_insert(GroupFormat::Apple);
             }
@@ -2127,12 +2335,26 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
                 let lower = value.to_ascii_lowercase();
                 if lower.starts_with("mailto:") {
                     let email = value[7..].trim().to_string();
-                    if email.contains('@') && !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(&email)) {
-                        c.members.push(Member { email, line: line.to_string(), ..Member::default() });
+                    if email.contains('@')
+                        && !c
+                            .members
+                            .iter()
+                            .any(|m| m.email.eq_ignore_ascii_case(&email))
+                    {
+                        c.members.push(Member {
+                            email,
+                            line: line.to_string(),
+                            ..Member::default()
+                        });
                     }
                 } else {
-                    let uid = if lower.starts_with("urn:uuid:") { &value[9..] } else { value.as_str() };
-                    c.member_refs.push((uid.trim().to_string(), line.to_string()));
+                    let uid = if lower.starts_with("urn:uuid:") {
+                        &value[9..]
+                    } else {
+                        value.as_str()
+                    };
+                    c.member_refs
+                        .push((uid.trim().to_string(), line.to_string()));
                 }
             }
             "UID" if c.eds_uid.is_empty() => c.eds_uid = value,
@@ -2149,14 +2371,24 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
             }
             "NOTE" if c.note.is_empty() => c.note = value,
             "EMAIL" => {
-                email_lines.push((line.to_string(), params.iter().map(|p| p.to_string()).collect(), value.clone()));
+                email_lines.push((
+                    line.to_string(),
+                    params.iter().map(|p| p.to_string()).collect(),
+                    value.clone(),
+                ));
                 if value.contains('@') && !c.emails.iter().any(|e| e.value == value) {
-                    c.emails.push(Labeled { label: vcard_type_label(&params), value });
+                    c.emails.push(Labeled {
+                        label: vcard_type_label(&params),
+                        value,
+                    });
                 }
             }
             "TEL" => {
                 if !c.phones.iter().any(|p| p.value == value) {
-                    c.phones.push(Labeled { label: vcard_type_label(&params), value });
+                    c.phones.push(Labeled {
+                        label: vcard_type_label(&params),
+                        value,
+                    });
                 }
             }
             "URL" => {
@@ -2173,8 +2405,14 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
                     .collect::<Vec<_>>()
                     .join(", ");
                 if !formatted.is_empty() && !c.addresses.iter().any(|a| a.value == formatted) {
-                    c.addresses.push(Labeled { label: vcard_type_label(&params), value: formatted });
-                    c.postal.push(Postal::from_adr(vcard_type_label(&params), raw_value.trim()));
+                    c.addresses.push(Labeled {
+                        label: vcard_type_label(&params),
+                        value: formatted,
+                    });
+                    c.postal.push(Postal::from_adr(
+                        vcard_type_label(&params),
+                        raw_value.trim(),
+                    ));
                 }
             }
             _ => {}
@@ -2189,9 +2427,20 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
             // Evolution's own default: a list with no say hides its addresses.
             c.hide_addresses = show_addresses != Some(true);
             for (line, params, value) in email_lines {
-                let Some((name, email)) = evolution_member(&params, &value) else { continue };
-                if !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(&email)) {
-                    c.members.push(Member { name, email, line, ..Member::default() });
+                let Some((name, email)) = evolution_member(&params, &value) else {
+                    continue;
+                };
+                if !c
+                    .members
+                    .iter()
+                    .any(|m| m.email.eq_ignore_ascii_case(&email))
+                {
+                    c.members.push(Member {
+                        name,
+                        email,
+                        line,
+                        ..Member::default()
+                    });
                 }
             }
         } else {
@@ -2232,7 +2481,9 @@ fn evolution_member(params: &[String], value: &str) -> Option<(String, String)> 
     let param = |key: &str| {
         params.iter().find_map(|p| {
             let (k, v) = p.split_once('=')?;
-            k.trim().eq_ignore_ascii_case(key).then(|| unescape_vcard_text(v.trim().trim_matches('"')))
+            k.trim()
+                .eq_ignore_ascii_case(key)
+                .then(|| unescape_vcard_text(v.trim().trim_matches('"')))
         })
     };
     let email = param("X-EVOLUTION-DEST-EMAIL").filter(|e| e.contains('@'))?;
@@ -2243,14 +2494,27 @@ fn evolution_member(params: &[String], value: &str) -> Option<(String, String)> 
 /// that contact's name and first address, empty when they have none, in the
 /// group's own book). A member whose card is not there is not shown, but is
 /// kept.
-pub(crate) fn resolve_members(c: &mut ContactDetails, lookup: impl Fn(&str) -> Option<(String, String)>) {
+pub(crate) fn resolve_members(
+    c: &mut ContactDetails,
+    lookup: impl Fn(&str) -> Option<(String, String)>,
+) {
     for (uid, line) in std::mem::take(&mut c.member_refs) {
         let found = lookup(&uid).filter(|(_, email)| {
-            email.is_empty() || !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(email))
+            email.is_empty()
+                || !c
+                    .members
+                    .iter()
+                    .any(|m| m.email.eq_ignore_ascii_case(email))
         });
         match found {
             Some((name, email)) if !c.members.iter().any(|m| m.uid == uid) => {
-                c.members.push(Member { name, email, line, uid, ..Member::default() });
+                c.members.push(Member {
+                    name,
+                    email,
+                    line,
+                    uid,
+                    ..Member::default()
+                });
             }
             _ => c.hidden_members.push(line),
         }
@@ -2269,11 +2533,21 @@ fn person_address(vcard: &str) -> Option<(String, String)> {
 /// people and never parse the whole card.
 fn is_group_vcard(vcard: &str) -> bool {
     unfold_vcard(vcard).lines().any(|line| {
-        let Some((prop, value)) = line.split_once(':') else { return false };
-        let name = prop.split(';').next().unwrap_or("").rsplit('.').next().unwrap_or("").trim();
+        let Some((prop, value)) = line.split_once(':') else {
+            return false;
+        };
+        let name = prop
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .rsplit('.')
+            .next()
+            .unwrap_or("")
+            .trim();
         let value = value.trim();
         (name.eq_ignore_ascii_case("X-EVOLUTION-LIST") && value.eq_ignore_ascii_case("true"))
-            || ((name.eq_ignore_ascii_case("KIND") || name.eq_ignore_ascii_case("X-ADDRESSBOOKSERVER-KIND"))
+            || ((name.eq_ignore_ascii_case("KIND")
+                || name.eq_ignore_ascii_case("X-ADDRESSBOOKSERVER-KIND"))
                 && value.eq_ignore_ascii_case("group"))
     })
 }
@@ -2281,7 +2555,11 @@ fn is_group_vcard(vcard: &str) -> bool {
 /// The books demo mode offers new contacts, the Hylki book among them.
 pub fn demo_books() -> Vec<Book> {
     vec![
-        Book { uid: "On This Computer".into(), name: "On This Computer".into(), groups: Some(GroupFormat::Evolution) },
+        Book {
+            uid: "On This Computer".into(),
+            name: "On This Computer".into(),
+            groups: Some(GroupFormat::Evolution),
+        },
         Book {
             uid: "CardDAV — jason@hylki.hyprlab.co".into(),
             name: "CardDAV — jason@hylki.hyprlab.co".into(),
@@ -2296,11 +2574,18 @@ pub fn demo_books() -> Vec<Book> {
 /// No EDS identity: demo entries are display-only. The book's name stands
 /// in for its UID, so the book filter has something to tell apart.
 pub fn demo_contacts() -> Vec<ContactDetails> {
-    let l = |label: &str, value: &str| Labeled { label: label.into(), value: value.into() };
+    let l = |label: &str, value: &str| Labeled {
+        label: label.into(),
+        value: value.into(),
+    };
     let contact = |name: &str, book: &str| ContactDetails {
         name: name.into(),
         book_name: book.into(),
-        book_uid: if book == "Hylki Address Book" { crate::local_contacts::LOCAL_BOOK_UID.into() } else { book.into() },
+        book_uid: if book == "Hylki Address Book" {
+            crate::local_contacts::LOCAL_BOOK_UID.into()
+        } else {
+            book.into()
+        },
         ..ContactDetails::default()
     };
     vec![
@@ -2310,7 +2595,10 @@ pub fn demo_contacts() -> Vec<ContactDetails> {
             title: "Design Lead".into(),
             birthday: "March 4, 1991".into(),
             note: "Prefers Figma links over attachments. Out on Fridays.".into(),
-            emails: vec![l("Work", "sophie@studio.dev"), l("Home", "sophie.t@example.com")],
+            emails: vec![
+                l("Work", "sophie@studio.dev"),
+                l("Home", "sophie.t@example.com"),
+            ],
             phones: vec![l("Mobile", "+1 (415) 555-0114")],
             addresses: vec![l("Work", "2261 Market St, San Francisco, CA 94114")],
             urls: vec!["sophie.design".into()],
@@ -2320,7 +2608,10 @@ pub fn demo_contacts() -> Vec<ContactDetails> {
             org: "Studio.dev".into(),
             title: "Engineering Manager".into(),
             emails: vec![l("Work", "marcus@studio.dev")],
-            phones: vec![l("Mobile", "+1 (415) 555-0187"), l("Work", "+1 (415) 555-0100")],
+            phones: vec![
+                l("Mobile", "+1 (415) 555-0187"),
+                l("Work", "+1 (415) 555-0100"),
+            ],
             ..contact("Marcus Chen", "CardDAV — jason@hylki.hyprlab.co")
         },
         ContactDetails {
@@ -2347,7 +2638,10 @@ pub fn demo_contacts() -> Vec<ContactDetails> {
         ContactDetails {
             org: "Ferrous Type".into(),
             title: "Founder".into(),
-            emails: vec![l("Work", "diego@ferroustype.com"), l("Home", "d.alvarez@example.com")],
+            emails: vec![
+                l("Work", "diego@ferroustype.com"),
+                l("Home", "d.alvarez@example.com"),
+            ],
             phones: vec![l("Mobile", "+34 612 555 021")],
             urls: vec!["ferroustype.com".into()],
             ..contact("Diego Álvarez", "CardDAV — jason@hylki.hyprlab.co")
@@ -2366,17 +2660,25 @@ pub fn demo_contacts() -> Vec<ContactDetails> {
             addresses: vec![l("Work", "425 Lexington Ave, New York, NY 10017")],
             ..contact("Grace Kim", "CardDAV — jason@hylki.hyprlab.co")
         },
-        demo_group("Studio.dev Team", false, &[
-            ("Sophie Turner", "sophie@studio.dev"),
-            ("Marcus Chen", "marcus@studio.dev"),
-            ("Priya Sharma", "priya@studio.dev"),
-        ]),
-        demo_group("Book Club", true, &[
-            ("Emma Wright", "emma@example.com"),
-            ("Tom Okafor", "tom.okafor@example.com"),
-            ("Grace Kim", "grace@kimpartners.example"),
-            ("Lena Fischer", "lena@gnome.org"),
-        ]),
+        demo_group(
+            "Studio.dev Team",
+            false,
+            &[
+                ("Sophie Turner", "sophie@studio.dev"),
+                ("Marcus Chen", "marcus@studio.dev"),
+                ("Priya Sharma", "priya@studio.dev"),
+            ],
+        ),
+        demo_group(
+            "Book Club",
+            true,
+            &[
+                ("Emma Wright", "emma@example.com"),
+                ("Tom Okafor", "tom.okafor@example.com"),
+                ("Grace Kim", "grace@kimpartners.example"),
+                ("Lena Fischer", "lena@gnome.org"),
+            ],
+        ),
     ]
 }
 
@@ -2384,9 +2686,18 @@ pub fn demo_contacts() -> Vec<ContactDetails> {
 fn demo_group(name: &str, hide_addresses: bool, people: &[(&str, &str)]) -> ContactDetails {
     let members: Vec<Member> = people
         .iter()
-        .map(|(n, e)| Member { name: n.to_string(), email: e.to_string(), ..Member::default() })
+        .map(|(n, e)| Member {
+            name: n.to_string(),
+            email: e.to_string(),
+            ..Member::default()
+        })
         .collect();
-    let edit = GroupEdit { name: name.into(), members: members.clone(), hide_addresses, kept: Vec::new() };
+    let edit = GroupEdit {
+        name: name.into(),
+        members: members.clone(),
+        hide_addresses,
+        kept: Vec::new(),
+    };
     ContactDetails {
         name: name.into(),
         book_name: i18n("Hylki Address Book"),
@@ -2463,11 +2774,13 @@ fn type_param_for(label: &str) -> &'static str {
 /// properties are replaced — everything else (UID, PHOTO, ADR, REV, X-…)
 /// passes through untouched, so nothing GNOME Contacts manages is lost.
 pub fn patched_vcard(original: &str, e: &ContactEdit) -> String {
-    const REPLACED: [&str; 11] =
-        ["FN", "N", "NICKNAME", "ORG", "TITLE", "NOTE", "EMAIL", "TEL", "URL", "ADR", "BDAY"];
+    const REPLACED: [&str; 11] = [
+        "FN", "N", "NICKNAME", "ORG", "TITLE", "NOTE", "EMAIL", "TEL", "URL", "ADR", "BDAY",
+    ];
     let photo = e.photo != PhotoEdit::Keep;
     let mut out = kept_lines_by(original, |prop| {
-        REPLACED.contains(&prop) || (photo && matches!(prop, "PHOTO" | "X-IMAGETYPE" | "X-IMAGEHASH"))
+        REPLACED.contains(&prop)
+            || (photo && matches!(prop, "PHOTO" | "X-IMAGETYPE" | "X-IMAGEHASH"))
     });
 
     // FN is required: with no name, the card goes by what else it has.
@@ -2475,18 +2788,31 @@ pub fn patched_vcard(original: &str, e: &ContactEdit) -> String {
         [&e.org, &e.nickname]
             .into_iter()
             .map(|s| s.trim().to_string())
-            .chain(e.emails.iter().chain(&e.phones).map(|l| l.value.trim().to_string()))
+            .chain(
+                e.emails
+                    .iter()
+                    .chain(&e.phones)
+                    .map(|l| l.value.trim().to_string()),
+            )
             .find(|s| !s.is_empty())
             .unwrap_or_default()
     };
     let named = !e.name.trim().is_empty();
-    let fn_value = if named { e.name.trim().to_string() } else { fallback() };
+    let fn_value = if named {
+        e.name.trim().to_string()
+    } else {
+        fallback()
+    };
     out.push(format!("FN:{}", escape_vcard_value(&fn_value)));
     let name = if named { e.name.trim() } else { "" };
     // Structured name: last word as the family name — the same heuristic an
     // address book's "sort by surname" uses.
     let mut words: Vec<&str> = name.split_whitespace().collect();
-    let family = if words.len() > 1 { words.pop().unwrap_or("") } else { "" };
+    let family = if words.len() > 1 {
+        words.pop().unwrap_or("")
+    } else {
+        ""
+    };
     out.push(format!(
         "N:{};{};;;",
         escape_vcard_value(family),
@@ -2505,10 +2831,16 @@ pub fn patched_vcard(original: &str, e: &ContactEdit) -> String {
             "gif" => "GIF",
             _ => "JPEG",
         };
-        out.push(format!("PHOTO;ENCODING=b;TYPE={kind}:{}", base64::engine::general_purpose::STANDARD.encode(bytes)));
+        out.push(format!(
+            "PHOTO;ENCODING=b;TYPE={kind}:{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ));
     }
     if !e.nickname.trim().is_empty() {
-        out.push(format!("NICKNAME:{}", escape_vcard_value(e.nickname.trim())));
+        out.push(format!(
+            "NICKNAME:{}",
+            escape_vcard_value(e.nickname.trim())
+        ));
     }
     if !e.org.trim().is_empty() {
         out.push(format!("ORG:{};", escape_vcard_value(e.org.trim())));
@@ -2615,17 +2947,27 @@ pub fn patched_group_vcard(original: &str, e: &GroupEdit) -> String {
     out.push("N:;;;;".to_string());
     out.push(format!("X-EVOLUTION-FILE-AS:{name}"));
     out.push("X-EVOLUTION-LIST:TRUE".to_string());
-    out.push(format!("X-EVOLUTION-LIST-SHOW-ADDRESSES:{}", if e.hide_addresses { "FALSE" } else { "TRUE" }));
+    out.push(format!(
+        "X-EVOLUTION-LIST-SHOW-ADDRESSES:{}",
+        if e.hide_addresses { "FALSE" } else { "TRUE" }
+    ));
     for m in &e.members {
         if !m.line.is_empty() {
             out.push(m.line.clone());
             continue;
         }
         // A parameter value is quoted and cannot hold a quote.
-        let param = |v: &str| v.chars().filter(|c| !matches!(c, '"' | '\r' | '\n')).collect::<String>();
+        let param = |v: &str| {
+            v.chars()
+                .filter(|c| !matches!(c, '"' | '\r' | '\n'))
+                .collect::<String>()
+        };
         let mut line = String::from("EMAIL");
         if !m.name.trim().is_empty() {
-            line.push_str(&format!(";X-EVOLUTION-DEST-NAME=\"{}\"", param(m.name.trim())));
+            line.push_str(&format!(
+                ";X-EVOLUTION-DEST-NAME=\"{}\"",
+                param(m.name.trim())
+            ));
         }
         line.push_str(&format!(";X-EVOLUTION-DEST-EMAIL=\"{}\"", param(&m.email)));
         line.push_str(&format!(
@@ -2649,8 +2991,13 @@ const EMPTY_VCARD: &str = "BEGIN:VCARD\r\nVERSION:3.0\r\nEND:VCARD\r\n";
 /// the editor's values. Every member must carry the UID of their card in
 /// the group's book, which [`save_group`] sees to.
 fn patched_apple_group(original: &str, e: &GroupEdit) -> String {
-    const REPLACED: [&str; 5] =
-        ["FN", "N", "X-ADDRESSBOOKSERVER-KIND", "X-ADDRESSBOOKSERVER-MEMBER", "X-EVOLUTION-LIST-SHOW-ADDRESSES"];
+    const REPLACED: [&str; 5] = [
+        "FN",
+        "N",
+        "X-ADDRESSBOOKSERVER-KIND",
+        "X-ADDRESSBOOKSERVER-MEMBER",
+        "X-EVOLUTION-LIST-SHOW-ADDRESSES",
+    ];
     let mut out = kept_lines(original, &REPLACED);
     let name = escape_vcard_value(e.name.trim());
     out.push(format!("FN:{name}"));
@@ -2677,14 +3024,20 @@ fn patched_apple_group(original: &str, e: &GroupEdit) -> String {
 /// else new. An Apple group holds cards of its own book, so a member with
 /// no card there gets one first, with their name and address (blocking:
 /// call from a background thread).
-pub fn save_group(book_uid: &str, format: GroupFormat, original: Option<&str>, mut edit: GroupEdit) -> Result<(), String> {
+pub fn save_group(
+    book_uid: &str,
+    format: GroupFormat,
+    original: Option<&str>,
+    mut edit: GroupEdit,
+) -> Result<(), String> {
     let create = original.is_none();
     let original = original.unwrap_or(EMPTY_VCARD);
     let vcard = match format {
         GroupFormat::Evolution => patched_group_vcard(original, &edit),
         GroupFormat::Apple => {
-            let cardless =
-                |m: &Member| m.uid.is_empty() && m.line.is_empty() && (!m.email.is_empty() || !m.card.is_empty());
+            let cardless = |m: &Member| {
+                m.uid.is_empty() && m.line.is_empty() && (!m.email.is_empty() || !m.card.is_empty())
+            };
             if edit.members.iter().any(cardless) {
                 let mut cards = BookCards::open(book_uid)?;
                 for m in edit.members.iter_mut().filter(|m| cardless(m)) {
@@ -2704,7 +3057,13 @@ pub fn save_group(book_uid: &str, format: GroupFormat, original: Option<&str>, m
 
 /// Move a group to another book: made in `to_book` as `format` from `edit`,
 /// then deleted from `from_book`, and only once made.
-pub fn move_group(from_book: &str, uid: &str, to_book: &str, format: GroupFormat, edit: GroupEdit) -> Result<(), String> {
+pub fn move_group(
+    from_book: &str,
+    uid: &str,
+    to_book: &str,
+    format: GroupFormat,
+    edit: GroupEdit,
+) -> Result<(), String> {
     save_group(to_book, format, None, edit)?;
     delete_contact(from_book, uid)
 }
@@ -2712,7 +3071,11 @@ pub fn move_group(from_book: &str, uid: &str, to_book: &str, format: GroupFormat
 /// The people's cards of one book, for giving each group member one.
 enum BookCards {
     Local,
-    Eds { conn: zbus::blocking::Connection, bus: String, path: String },
+    Eds {
+        conn: zbus::blocking::Connection,
+        bus: String,
+        path: String,
+    },
 }
 
 impl BookCards {
@@ -2732,30 +3095,46 @@ impl BookCards {
     fn card_for(&mut self, name: &str, email: &str, copy: &str) -> Result<String, String> {
         let card = if copy.is_empty() {
             new_vcard(&ContactEdit {
-                name: if name.trim().is_empty() { email.to_string() } else { name.trim().to_string() },
-                emails: vec![Labeled { label: String::new(), value: email.to_string() }],
+                name: if name.trim().is_empty() {
+                    email.to_string()
+                } else {
+                    name.trim().to_string()
+                },
+                emails: vec![Labeled {
+                    label: String::new(),
+                    value: email.to_string(),
+                }],
                 ..ContactEdit::default()
             })
         } else {
             copy.to_string()
         };
         // Someone with no address is known by name alone.
-        let (field, value) = if email.trim().is_empty() { ("full_name", name.trim()) } else { ("email", email.trim()) };
+        let (field, value) = if email.trim().is_empty() {
+            ("full_name", name.trim())
+        } else {
+            ("email", email.trim())
+        };
         match self {
             Self::Local => {
-                let found = crate::local_contacts::list_vcards()?.into_iter().find_map(|v| {
-                    let c = parse_vcard_fields(&v).filter(|c| !c.is_group())?;
-                    let same = if field == "email" {
-                        c.emails.iter().any(|e| e.value.eq_ignore_ascii_case(value))
-                    } else {
-                        c.emails.is_empty() && c.name.trim().eq_ignore_ascii_case(value)
-                    };
-                    same.then_some(c.eds_uid)
-                });
+                let found = crate::local_contacts::list_vcards()?
+                    .into_iter()
+                    .find_map(|v| {
+                        let c = parse_vcard_fields(&v).filter(|c| !c.is_group())?;
+                        let same = if field == "email" {
+                            c.emails.iter().any(|e| e.value.eq_ignore_ascii_case(value))
+                        } else {
+                            c.emails.is_empty() && c.name.trim().eq_ignore_ascii_case(value)
+                        };
+                        same.then_some(c.eds_uid)
+                    });
                 if let Some(uid) = found.filter(|u| !u.is_empty()) {
                     return Ok(uid);
                 }
-                let uid = format!("hylki-{}", crate::rng::token(24).map_err(|e| e.to_string())?);
+                let uid = format!(
+                    "hylki-{}",
+                    crate::rng::token(24).map_err(|e| e.to_string())?
+                );
                 let card = insert_after_version(&card, &format!("UID:{uid}"));
                 write_local(crate::local_contacts::create(&card))?;
                 Ok(uid)
@@ -2765,15 +3144,19 @@ impl BookCards {
                 for uid in book_get_uids(conn, bus, path, &query)? {
                     let found = book_get_contact(conn, bus, path, &uid)?;
                     // By name, only someone else with no address either.
-                    let fits = parse_vcard_fields(&found)
-                        .is_some_and(|c| !c.is_group() && (field == "email" || c.emails.is_empty()));
+                    let fits = parse_vcard_fields(&found).is_some_and(|c| {
+                        !c.is_group() && (field == "email" || c.emails.is_empty())
+                    });
                     if fits {
                         return Ok(uid);
                     }
                 }
                 let reply = book_call(conn, bus, path, "CreateContacts", &(vec![card], 0u32))?;
-                let (uids,): (Vec<String>,) = reply.body().deserialize().map_err(|e| e.to_string())?;
-                uids.into_iter().next().ok_or_else(|| "The address book made no contact".to_string())
+                let (uids,): (Vec<String>,) =
+                    reply.body().deserialize().map_err(|e| e.to_string())?;
+                uids.into_iter()
+                    .next()
+                    .ok_or_else(|| "The address book made no contact".to_string())
             }
         }
     }
@@ -2822,7 +3205,13 @@ pub fn modify_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
     let dest = factory_dest().ok_or("Evolution Data Server is not available")?;
     let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
     let (bus, path) = open_book(&conn, &dest, book_uid)?;
-    book_call(&conn, &bus, &path, "ModifyContacts", &(vec![vcard.to_string()], 0u32))?;
+    book_call(
+        &conn,
+        &bus,
+        &path,
+        "ModifyContacts",
+        &(vec![vcard.to_string()], 0u32),
+    )?;
     Ok(())
 }
 
@@ -2834,7 +3223,13 @@ pub fn create_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
     let dest = factory_dest().ok_or("Evolution Data Server is not available")?;
     let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
     let (bus, path) = open_book(&conn, &dest, book_uid)?;
-    book_call(&conn, &bus, &path, "CreateContacts", &(vec![vcard.to_string()], 0u32))?;
+    book_call(
+        &conn,
+        &bus,
+        &path,
+        "CreateContacts",
+        &(vec![vcard.to_string()], 0u32),
+    )?;
     Ok(())
 }
 
@@ -2860,14 +3255,20 @@ pub fn delete_contacts(book_uid: &str, uids: &[String]) -> Result<(), String> {
 pub fn moved_vcard(c: &ContactDetails) -> String {
     use base64::Engine as _;
     let mut out = kept_lines_by(&c.raw_vcard, |prop| {
-        matches!(prop, "UID" | "REV" | "PHOTO" | "X-IMAGETYPE" | "X-IMAGEHASH")
-            || prop.starts_with("X-EVOLUTION-WEBDAV")
+        matches!(
+            prop,
+            "UID" | "REV" | "PHOTO" | "X-IMAGETYPE" | "X-IMAGEHASH"
+        ) || prop.starts_with("X-EVOLUTION-WEBDAV")
             || prop.starts_with("X-EVOLUTION-GOOGLE")
             || prop.starts_with("X-EVOLUTION-M365")
     });
     if let Some(photo) = &c.photo_bytes() {
         let kind = crate::models::image_ext(photo).to_ascii_uppercase();
-        let kind = if kind == "JPG" { "JPEG".to_string() } else { kind };
+        let kind = if kind == "JPG" {
+            "JPEG".to_string()
+        } else {
+            kind
+        };
         out.push(format!(
             "PHOTO;ENCODING=b;TYPE={kind}:{}",
             base64::engine::general_purpose::STANDARD.encode(photo)
@@ -2892,7 +3293,13 @@ pub fn delete_contact(book_uid: &str, uid: &str) -> Result<(), String> {
     let dest = factory_dest().ok_or("Evolution Data Server is not available")?;
     let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
     let (bus, path) = open_book(&conn, &dest, book_uid)?;
-    book_call(&conn, &bus, &path, "RemoveContacts", &(vec![uid.to_string()], 0u32))?;
+    book_call(
+        &conn,
+        &bus,
+        &path,
+        "RemoveContacts",
+        &(vec![uid.to_string()], 0u32),
+    )?;
     Ok(())
 }
 
@@ -2905,20 +3312,25 @@ mod tests {
         let path = ObjectPath::try_from("/org/gnome/evolution/dataserver/Source/test").unwrap();
         let data = "[Data Source]\nDisplayName=Test\n[Address Book]\nBackendName=local\n";
         let objects = HashMap::from([
-            (path.clone(), HashMap::from([("org.gnome.evolution.dataserver.Source", HashMap::from([
-                ("UID", "test".to_variant()), ("Data", data.to_variant()),
-            ]))])),
+            (
+                path.clone(),
+                HashMap::from([(
+                    "org.gnome.evolution.dataserver.Source",
+                    HashMap::from([("UID", "test".to_variant()), ("Data", data.to_variant())]),
+                )]),
+            ),
             (ObjectPath::try_from("/unrelated").unwrap(), HashMap::new()),
         ]);
-        assert_eq!(super::sources_from_reply(&(objects,).to_variant()), Some(vec![
-            (path.to_string(), "test".into(), data.into()),
-        ]));
+        assert_eq!(
+            super::sources_from_reply(&(objects,).to_variant()),
+            Some(vec![(path.to_string(), "test".into(), data.into()),])
+        );
         assert!(super::sources_from_reply(&"wrong reply type".to_variant()).is_none());
     }
 
     use super::{
-        details_from_local_vcards, is_local_book, prefer_book, Book, merge_target, vcard_display_name, vcard_photo,
-        vcard_photo_with,
+        details_from_local_vcards, is_local_book, merge_target, prefer_book, vcard_display_name,
+        vcard_photo, vcard_photo_with, Book,
     };
 
     const ONE_PIXEL_PNG: &str =
@@ -2937,7 +3349,8 @@ mod tests {
 
     #[test]
     fn fn_preserves_case() {
-        let v = "BEGIN:VCARD\r\nVERSION:3.0\r\nN:Arnwine;Aaron;;;\r\nFN:Aaron Arnwine\r\nEND:VCARD\r\n";
+        let v =
+            "BEGIN:VCARD\r\nVERSION:3.0\r\nN:Arnwine;Aaron;;;\r\nFN:Aaron Arnwine\r\nEND:VCARD\r\n";
         assert_eq!(vcard_display_name(v).as_deref(), Some("Aaron Arnwine"));
     }
 
@@ -2951,7 +3364,10 @@ mod tests {
     fn fn_line_folded() {
         // A folded FN value continues on the next line after a leading space.
         let v = "FN:Reallylongfirst\r\n Lastname\r\n";
-        assert_eq!(vcard_display_name(v).as_deref(), Some("ReallylongfirstLastname"));
+        assert_eq!(
+            vcard_display_name(v).as_deref(),
+            Some("ReallylongfirstLastname")
+        );
     }
 
     #[test]
@@ -2998,8 +3414,8 @@ mod tests {
 
     impl ConfineFixture {
         fn new(n: u32) -> Self {
-            let base = std::env::temp_dir()
-                .join(format!("hylki-confine-{}-{n}", std::process::id()));
+            let base =
+                std::env::temp_dir().join(format!("hylki-confine-{}-{n}", std::process::id()));
             std::fs::create_dir_all(base.join("root")).unwrap();
             std::fs::create_dir_all(base.join("outside")).unwrap();
             std::fs::write(base.join("root/photo.png"), b"in").unwrap();
@@ -3050,16 +3466,25 @@ mod tests {
         std::fs::create_dir_all(&sibling).unwrap();
         std::fs::write(sibling.join("photo.png"), b"no").unwrap();
         let roots = vec![fx.root()];
-        assert_eq!(super::confine_to_roots(&sibling.join("photo.png"), &roots), None);
+        assert_eq!(
+            super::confine_to_roots(&sibling.join("photo.png"), &roots),
+            None
+        );
     }
 
     #[test]
     fn no_roots_admits_nothing() {
         let fx = ConfineFixture::new(5);
-        assert_eq!(super::confine_to_roots(&fx.root().join("photo.png"), &[]), None);
+        assert_eq!(
+            super::confine_to_roots(&fx.root().join("photo.png"), &[]),
+            None
+        );
         // A root that doesn't resolve is the same as no root at all.
         let ghost = vec![fx.base.join("missing")];
-        assert_eq!(super::confine_to_roots(&fx.root().join("photo.png"), &ghost), None);
+        assert_eq!(
+            super::confine_to_roots(&fx.root().join("photo.png"), &ghost),
+            None
+        );
     }
 
     #[test]
@@ -3093,20 +3518,39 @@ mod tests {
                     Identity=someone@gmail.com\n";
         let sources: std::collections::HashMap<String, String> =
             [("acct".to_string(), acct.to_string())].into();
-        assert_eq!(super::book_display_name(book, &sources), "Google — someone@gmail.com · Contacts");
-        assert!(!super::data_source_disabled(book), "[Refresh] Enabled=false is not the switch");
+        assert_eq!(
+            super::book_display_name(book, &sources),
+            "Google — someone@gmail.com · Contacts"
+        );
+        assert!(
+            !super::data_source_disabled(book),
+            "[Refresh] Enabled=false is not the switch"
+        );
         // Nextcloud: several books under one account get distinct names…
-        let nc = "[Data Source]\nDisplayName=alice@cloud.example\n\n[Collection]\nBackendName=webdav\n\
+        let nc =
+            "[Data Source]\nDisplayName=alice@cloud.example\n\n[Collection]\nBackendName=webdav\n\
                   Identity=alice\n";
-        let sources: std::collections::HashMap<String, String> = [("acct".to_string(), nc.to_string())].into();
+        let sources: std::collections::HashMap<String, String> =
+            [("acct".to_string(), nc.to_string())].into();
         let recent = book.replace("DisplayName=Contacts", "DisplayName=Recently contacted");
-        assert_eq!(super::book_display_name(book, &sources), "CardDAV — alice · Contacts");
-        assert_eq!(super::book_display_name(&recent, &sources), "CardDAV — alice · Recently contacted");
+        assert_eq!(
+            super::book_display_name(book, &sources),
+            "CardDAV — alice · Contacts"
+        );
+        assert_eq!(
+            super::book_display_name(&recent, &sources),
+            "CardDAV — alice · Recently contacted"
+        );
         // …while a standalone book (no parent) isn't named twice.
         let lone = "[Data Source]\nDisplayName=Work\n\n[Address Book]\nBackendName=carddav\n";
         assert_eq!(super::book_display_name(lone, &sources), "CardDAV — Work");
-        assert!(super::data_source_disabled(&book.replace("Enabled=true", "Enabled=false")));
-        assert_eq!(crate::platform::keyfile_value(book, "Address Book", "Missing"), None);
+        assert!(super::data_source_disabled(
+            &book.replace("Enabled=true", "Enabled=false")
+        ));
+        assert_eq!(
+            crate::platform::keyfile_value(book, "Address Book", "Missing"),
+            None
+        );
     }
 
     fn card(name: &str, email: &str) -> String {
@@ -3117,18 +3561,37 @@ mod tests {
     fn books_that_fill_themselves_from_mail_are_spotted() {
         assert!(super::is_auto_collected("contact-collected", ""));
         assert!(super::is_auto_collected("x1", "Collected Addresses"));
-        assert!(super::is_auto_collected("x2", "CardDAV \u{2014} alice · Recently contacted"));
-        assert!(super::is_auto_collected("x3", "Google \u{2014} me@gmail.com · Other contacts"));
-        assert!(!super::is_auto_collected("system-address-book", "On This Computer"));
-        assert!(!super::is_auto_collected("x4", "CardDAV \u{2014} alice · Contacts"));
+        assert!(super::is_auto_collected(
+            "x2",
+            "CardDAV \u{2014} alice · Recently contacted"
+        ));
+        assert!(super::is_auto_collected(
+            "x3",
+            "Google \u{2014} me@gmail.com · Other contacts"
+        ));
+        assert!(!super::is_auto_collected(
+            "system-address-book",
+            "On This Computer"
+        ));
+        assert!(!super::is_auto_collected(
+            "x4",
+            "CardDAV \u{2014} alice · Contacts"
+        ));
     }
 
     #[test]
     fn the_chosen_book_comes_first() {
-        let book = |uid: &str| Book { uid: uid.into(), name: uid.into(), groups: None };
+        let book = |uid: &str| Book {
+            uid: uid.into(),
+            name: uid.into(),
+            groups: None,
+        };
         let mut books = vec![book("a"), book("b"), book("hylki-local")];
         prefer_book(&mut books, "hylki-local");
-        assert_eq!(books.iter().map(|b| b.uid.as_str()).collect::<Vec<_>>(), ["hylki-local", "a", "b"]);
+        assert_eq!(
+            books.iter().map(|b| b.uid.as_str()).collect::<Vec<_>>(),
+            ["hylki-local", "a", "b"]
+        );
         prefer_book(&mut books, "gone");
         prefer_book(&mut books, "");
         assert_eq!(books[0].uid, "hylki-local");
@@ -3170,7 +3633,9 @@ mod tests {
     #[test]
     fn merge_target_matches_the_name_ignoring_case() {
         let vcards = vec![card("Ann Lee", "ann@x.org"), card("Bob", "bob@x.org")];
-        assert!(merge_target(&vcards, " ann lee ").unwrap().contains("ann@x.org"));
+        assert!(merge_target(&vcards, " ann lee ")
+            .unwrap()
+            .contains("ann@x.org"));
         assert!(merge_target(&vcards, "Carl").is_none());
         assert!(merge_target(&vcards, "  ").is_none());
     }
@@ -3186,7 +3651,10 @@ mod tests {
         \"Bob\\, Jr.\" <bob@example.org>\r\nREV:2026-10-17T12:15:22Z\r\nEND:VCARD\r\n";
 
     fn people(c: &super::ContactDetails) -> Vec<(&str, &str)> {
-        c.members.iter().map(|m| (m.name.as_str(), m.email.as_str())).collect()
+        c.members
+            .iter()
+            .map(|m| (m.name.as_str(), m.email.as_str()))
+            .collect()
     }
 
     #[test]
@@ -3194,7 +3662,13 @@ mod tests {
         let c = super::parse_vcard_fields(EDS_LIST).unwrap();
         assert_eq!(c.group, Some(super::GroupFormat::Evolution));
         assert_eq!(c.name, "Book Club");
-        assert_eq!(people(&c), vec![("Alice Able", "alice@example.org"), ("Bob, Jr.", "bob@example.org")]);
+        assert_eq!(
+            people(&c),
+            vec![
+                ("Alice Able", "alice@example.org"),
+                ("Bob, Jr.", "bob@example.org")
+            ]
+        );
         // Its members are not its own addresses.
         assert!(c.emails.is_empty());
         assert!(c.hide_addresses);
@@ -3208,7 +3682,10 @@ mod tests {
     fn a_member_whose_value_does_not_parse_comes_from_its_parameters() {
         let v = "BEGIN:VCARD\r\nFN:L\r\nX-EVOLUTION-LIST:TRUE\r\n\
                  EMAIL;X-EVOLUTION-DEST-NAME=\"Ann\";X-EVOLUTION-DEST-EMAIL=\"ann@x.org\":Ann\r\nEND:VCARD\r\n";
-        assert_eq!(people(&super::parse_vcard_fields(v).unwrap()), vec![("Ann", "ann@x.org")]);
+        assert_eq!(
+            people(&super::parse_vcard_fields(v).unwrap()),
+            vec![("Ann", "ann@x.org")]
+        );
     }
 
     #[test]
@@ -3224,17 +3701,25 @@ mod tests {
                     MEMBER:mailto:ann@x.org\r\nMEMBER:urn:uuid:p1\r\nMEMBER:urn:uuid:gone\r\nEND:VCARD\r\n";
         let apple = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:g2\r\nX-ADDRESSBOOKSERVER-KIND:group\r\nN:Family\r\n\
                      FN:Family\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p1\r\nEND:VCARD\r\n";
-        let mut book: Vec<super::ContactDetails> =
-            [person, kind, apple].iter().map(|v| super::parse_vcard_fields(v).unwrap()).collect();
+        let mut book: Vec<super::ContactDetails> = [person, kind, apple]
+            .iter()
+            .map(|v| super::parse_vcard_fields(v).unwrap())
+            .collect();
         super::resolve_book_members(&mut book);
-        assert_eq!(people(&book[1]), vec![("", "ann@x.org"), ("Pat Doe", "pat@x.org")]);
+        assert_eq!(
+            people(&book[1]),
+            vec![("", "ann@x.org"), ("Pat Doe", "pat@x.org")]
+        );
         assert_eq!(people(&book[2]), vec![("Pat Doe", "pat@x.org")]);
         // Neither has Evolution's Bcc switch; Hylki edits Apple's only.
         assert!(!book[1].hide_addresses && !book[1].group_editable());
         assert!(!book[2].hide_addresses && book[2].group_editable());
         assert_eq!(book[2].group, Some(super::GroupFormat::Apple));
         // The member with no card in the book is kept, out of sight.
-        assert_eq!(book[1].hidden_members, vec!["MEMBER:urn:uuid:gone".to_string()]);
+        assert_eq!(
+            book[1].hidden_members,
+            vec!["MEMBER:urn:uuid:gone".to_string()]
+        );
         assert!(super::is_group_vcard(apple));
         assert!(!super::is_group_vcard(person));
     }
@@ -3251,31 +3736,55 @@ mod tests {
             ..Default::default()
         };
         let out = super::moved_vcard(&c);
-        assert!(!out.contains("UID:") && !out.contains("REV:") && !out.contains("WEBDAV"), "{out}");
+        assert!(
+            !out.contains("UID:") && !out.contains("REV:") && !out.contains("WEBDAV"),
+            "{out}"
+        );
         assert!(!out.contains("file://"), "{out}");
-        assert!(out.contains("PHOTO;ENCODING=b;TYPE=PNG:iVBORwEC\r\n"), "{out}");
+        assert!(
+            out.contains("PHOTO;ENCODING=b;TYPE=PNG:iVBORwEC\r\n"),
+            "{out}"
+        );
         assert!(out.contains("NOTE:Long note that\r\n goes on\r\n"), "{out}");
         assert!(out.ends_with("END:VCARD\r\n"));
         let back = super::parse_vcard_fields(&out).unwrap();
-        assert_eq!((back.name.as_str(), back.primary_email()), ("Pat Doe", Some("pat@x.org")));
+        assert_eq!(
+            (back.name.as_str(), back.primary_email()),
+            ("Pat Doe", Some("pat@x.org"))
+        );
     }
 
     #[test]
     fn an_apple_group_shows_people_with_no_address() {
         let person = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:p1\r\nFN:Pat Doe\r\nTEL:+1 555 0100\r\nEND:VCARD\r\n";
-        let mailed = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:p2\r\nFN:Kim\r\nEMAIL:kim@x.org\r\nEND:VCARD\r\n";
+        let mailed =
+            "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:p2\r\nFN:Kim\r\nEMAIL:kim@x.org\r\nEND:VCARD\r\n";
         let apple = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:g\r\nX-ADDRESSBOOKSERVER-KIND:group\r\nFN:Mission\r\n\
                      X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p1\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p2\r\n\
                      X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p1\r\nEND:VCARD\r\n";
-        let mut book: Vec<super::ContactDetails> =
-            [person, mailed, apple].iter().map(|v| super::parse_vcard_fields(v).unwrap()).collect();
+        let mut book: Vec<super::ContactDetails> = [person, mailed, apple]
+            .iter()
+            .map(|v| super::parse_vcard_fields(v).unwrap())
+            .collect();
         super::resolve_book_members(&mut book);
         let g = &book[2];
         assert_eq!(people(g), vec![("Pat Doe", ""), ("Kim", "kim@x.org")]);
-        assert_eq!(g.hidden_members.len(), 1, "the repeated card is kept, once shown");
+        assert_eq!(
+            g.hidden_members.len(),
+            1,
+            "the repeated card is kept, once shown"
+        );
         // Mail goes to those with an address only.
         assert_eq!(g.members_field(), "Kim <kim@x.org>");
-        assert_eq!(super::group_suggestions(vec![g.clone()])[0].group.as_ref().unwrap().members.len(), 1);
+        assert_eq!(
+            super::group_suggestions(vec![g.clone()])[0]
+                .group
+                .as_ref()
+                .unwrap()
+                .members
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -3293,13 +3802,35 @@ mod tests {
         assert_eq!(g.members[0].uid, "p1");
         // Kim leaves, Lee (whose card save_group made) joins, Bcc goes on.
         let mut members = vec![g.members[0].clone()];
-        members.push(super::Member { name: "Lee".into(), email: "lee@x.org".into(), uid: "p3".into(), ..Default::default() });
-        let edit = super::GroupEdit { name: "Family; Close".into(), members, hide_addresses: true, kept: g.hidden_members.clone() };
+        members.push(super::Member {
+            name: "Lee".into(),
+            email: "lee@x.org".into(),
+            uid: "p3".into(),
+            ..Default::default()
+        });
+        let edit = super::GroupEdit {
+            name: "Family; Close".into(),
+            members,
+            hide_addresses: true,
+            kept: g.hidden_members.clone(),
+        };
         let out = super::patched_apple_group(apple, &edit);
-        assert!(out.contains("\r\nUID:g2\r\n") && out.contains("PRODID:-//Apple Inc.//iOS 18//EN"), "{out}");
-        assert!(out.contains("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p1\r\n"), "{out}");
-        assert!(out.contains("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p3\r\n"), "{out}");
-        assert!(out.contains("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:nomail\r\n"), "{out}");
+        assert!(
+            out.contains("\r\nUID:g2\r\n") && out.contains("PRODID:-//Apple Inc.//iOS 18//EN"),
+            "{out}"
+        );
+        assert!(
+            out.contains("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p1\r\n"),
+            "{out}"
+        );
+        assert!(
+            out.contains("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p3\r\n"),
+            "{out}"
+        );
+        assert!(
+            out.contains("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:nomail\r\n"),
+            "{out}"
+        );
         assert!(!out.contains("urn:uuid:p2"), "{out}");
         assert_eq!(out.matches("X-ADDRESSBOOKSERVER-KIND:group").count(), 1);
         assert!(!out.contains("X-EVOLUTION-LIST:"), "{out}");
@@ -3307,20 +3838,37 @@ mod tests {
         assert_eq!(back.name, "Family; Close");
         assert_eq!(back.group, Some(super::GroupFormat::Apple));
         assert!(back.hide_addresses);
-        let refs: Vec<&str> = back.member_refs.iter().map(|(uid, _)| uid.as_str()).collect();
+        let refs: Vec<&str> = back
+            .member_refs
+            .iter()
+            .map(|(uid, _)| uid.as_str())
+            .collect();
         assert_eq!(refs, vec!["p1", "p3", "nomail"]);
 
         // A new one, with Bcc off, says nothing of it.
-        let edit = super::GroupEdit { name: "Team".into(), hide_addresses: false, ..edit };
+        let edit = super::GroupEdit {
+            name: "Team".into(),
+            hide_addresses: false,
+            ..edit
+        };
         let new = super::patched_apple_group(super::EMPTY_VCARD, &edit);
-        assert!(new.starts_with("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Team\r\nN:Team;;;;\r\n"), "{new}");
-        assert!(!new.contains("SHOW-ADDRESSES") && !new.contains("UID:"), "{new}");
+        assert!(
+            new.starts_with("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Team\r\nN:Team;;;;\r\n"),
+            "{new}"
+        );
+        assert!(
+            !new.contains("SHOW-ADDRESSES") && !new.contains("UID:"),
+            "{new}"
+        );
     }
 
     #[test]
     fn books_keep_groups_as_their_servers_do() {
         use super::{group_format_for, GroupFormat};
-        assert_eq!(group_format_for(Some("local")), Some(GroupFormat::Evolution));
+        assert_eq!(
+            group_format_for(Some("local")),
+            Some(GroupFormat::Evolution)
+        );
         assert_eq!(group_format_for(None), Some(GroupFormat::Evolution));
         assert_eq!(group_format_for(Some("webdav")), Some(GroupFormat::Apple));
         assert_eq!(group_format_for(Some("carddav")), Some(GroupFormat::Apple));
@@ -3332,24 +3880,46 @@ mod tests {
     fn an_edited_list_keeps_the_lines_of_the_members_it_keeps() {
         let c = super::parse_vcard_fields(EDS_LIST).unwrap();
         let mut members = vec![c.members[0].clone()];
-        members.push(super::Member { name: "Carol \"CJ\", Ng".into(), email: "carol@x.org".into(), ..Default::default() });
-        let edit = super::GroupEdit { name: "Readers, All".into(), members, hide_addresses: false, kept: Vec::new() };
+        members.push(super::Member {
+            name: "Carol \"CJ\", Ng".into(),
+            email: "carol@x.org".into(),
+            ..Default::default()
+        });
+        let edit = super::GroupEdit {
+            name: "Readers, All".into(),
+            members,
+            hide_addresses: false,
+            kept: Vec::new(),
+        };
         let out = super::patched_group_vcard(EDS_LIST, &edit);
         assert!(out.contains("X-EVOLUTION-DEST-CONTACT-UID=p1"), "{out}");
-        assert!(out.contains("\r\nUID:l1\r\n") && out.contains("\r\nREV:"), "{out}");
+        assert!(
+            out.contains("\r\nUID:l1\r\n") && out.contains("\r\nREV:"),
+            "{out}"
+        );
         assert!(!out.contains("bob@example.org"), "{out}");
         assert_eq!(out.matches("X-EVOLUTION-LIST:TRUE").count(), 1);
         let back = super::parse_vcard_fields(&out).unwrap();
         assert_eq!(back.name, "Readers, All");
         assert!(!back.hide_addresses);
-        assert_eq!(people(&back), vec![("Alice Able", "alice@example.org"), ("Carol \"CJ\", Ng", "carol@x.org")]);
+        assert_eq!(
+            people(&back),
+            vec![
+                ("Alice Able", "alice@example.org"),
+                ("Carol \"CJ\", Ng", "carol@x.org")
+            ]
+        );
     }
 
     #[test]
     fn a_new_group_reads_back_as_written() {
         let edit = super::GroupEdit {
             name: "Book Club".into(),
-            members: vec![super::Member { name: "Ann".into(), email: "ann@x.org".into(), ..Default::default() }],
+            members: vec![super::Member {
+                name: "Ann".into(),
+                email: "ann@x.org".into(),
+                ..Default::default()
+            }],
             hide_addresses: true,
             kept: Vec::new(),
         };
@@ -3365,7 +3935,13 @@ mod tests {
         let g = |name: &str, emails: &[&str]| super::ContactDetails {
             name: name.into(),
             group: Some(super::GroupFormat::Evolution),
-            members: emails.iter().map(|e| super::Member { email: e.to_string(), ..Default::default() }).collect(),
+            members: emails
+                .iter()
+                .map(|e| super::Member {
+                    email: e.to_string(),
+                    ..Default::default()
+                })
+                .collect(),
             ..Default::default()
         };
         let out = super::group_suggestions(vec![
@@ -3386,21 +3962,37 @@ mod tests {
     #[test]
     #[ignore]
     fn live_group() {
-        let Ok(book) = std::env::var("GROUP_LIVE") else { return };
+        let Ok(book) = std::env::var("GROUP_LIVE") else {
+            return;
+        };
         // "apple": the first book that keeps Apple's groups.
         let book = if book == "apple" {
             let books = super::writable_books();
             println!("books: {books:?}");
-            books.into_iter().find(|b| b.groups == Some(super::GroupFormat::Apple)).expect("a CardDAV book").uid
+            books
+                .into_iter()
+                .find(|b| b.groups == Some(super::GroupFormat::Apple))
+                .expect("a CardDAV book")
+                .uid
         } else {
             book
         };
-        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         let name = format!("Hylki group test {stamp} (delete me)");
-        let member = |n: &str, e: &str| super::Member { name: n.into(), email: e.into(), ..Default::default() };
+        let member = |n: &str, e: &str| super::Member {
+            name: n.into(),
+            email: e.into(),
+            ..Default::default()
+        };
         let edit = super::GroupEdit {
             name: name.clone(),
-            members: vec![member("Hylki Test Member (delete me)", &format!("hylki-test-{stamp}@example.com"))],
+            members: vec![member(
+                "Hylki Test Member (delete me)",
+                &format!("hylki-test-{stamp}@example.com"),
+            )],
             hide_addresses: true,
             kept: Vec::new(),
         };
@@ -3409,15 +4001,28 @@ mod tests {
         let conn = zbus::blocking::Connection::session().unwrap();
         let (bus, path) = super::open_book(&conn, &dest, &book).unwrap();
         let find = |q: String| super::book_get_uids(&conn, &bus, &path, &q).unwrap();
-        let group_uid = find(format!("(is \"full_name\" \"{name}\")")).pop().expect("the group");
+        let group_uid = find(format!("(is \"full_name\" \"{name}\")"))
+            .pop()
+            .expect("the group");
         let card = super::book_get_contact(&conn, &bus, &path, &group_uid).unwrap();
         println!("=== made:\n{card}");
-        let stub = find(format!("(is \"email\" \"hylki-test-{stamp}@example.com\")")).pop().expect("the member's card");
-        println!("=== member's card:\n{}", super::book_get_contact(&conn, &bus, &path, &stub).unwrap());
+        let stub = find(format!("(is \"email\" \"hylki-test-{stamp}@example.com\")"))
+            .pop()
+            .expect("the member's card");
+        println!(
+            "=== member's card:\n{}",
+            super::book_get_contact(&conn, &bus, &path, &stub).unwrap()
+        );
         let mut g = super::parse_vcard_fields(&card).unwrap();
         assert_eq!(g.group, Some(super::GroupFormat::Apple));
         assert!(g.hide_addresses);
-        assert_eq!(g.member_refs.iter().map(|(u, _)| u.as_str()).collect::<Vec<_>>(), vec![stub.as_str()]);
+        assert_eq!(
+            g.member_refs
+                .iter()
+                .map(|(u, _)| u.as_str())
+                .collect::<Vec<_>>(),
+            vec![stub.as_str()]
+        );
         super::resolve_members(&mut g, |uid| {
             super::person_address(&super::book_get_contact(&conn, &bus, &path, uid).ok()?)
         });
@@ -3425,7 +4030,12 @@ mod tests {
         let mut members = g.members.clone();
         members.push(member("Again", &format!("hylki-test-{stamp}@example.com")));
         members.dedup_by(|a, b| a.email == b.email);
-        let edit = super::GroupEdit { name: name.clone(), members, hide_addresses: false, kept: g.hidden_members.clone() };
+        let edit = super::GroupEdit {
+            name: name.clone(),
+            members,
+            hide_addresses: false,
+            kept: g.hidden_members.clone(),
+        };
         super::save_group(&book, super::GroupFormat::Apple, Some(&card), edit).unwrap();
         let changed = super::book_get_contact(&conn, &bus, &path, &group_uid).unwrap();
         println!("=== changed:\n{changed}");
@@ -3463,8 +4073,21 @@ mod tests {
         let conn = zbus::blocking::Connection::session().unwrap();
         let find = |book: &str| {
             let (bus, path) = super::open_book(&conn, &dest, book).unwrap();
-            let uids = super::book_get_uids(&conn, &bus, &path, "(is \"email\" \"move-test@example.com\")").unwrap();
-            uids.into_iter().map(|u| (u.clone(), super::book_get_contact(&conn, &bus, &path, &u).unwrap())).collect::<Vec<_>>()
+            let uids = super::book_get_uids(
+                &conn,
+                &bus,
+                &path,
+                "(is \"email\" \"move-test@example.com\")",
+            )
+            .unwrap();
+            uids.into_iter()
+                .map(|u| {
+                    (
+                        u.clone(),
+                        super::book_get_contact(&conn, &bus, &path, &u).unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>()
         };
         let (uid, stored) = find(from).pop().expect("made in the first book");
         let mut c = super::parse_vcard_details(&stored).unwrap();
@@ -3502,7 +4125,12 @@ mod tests {
             super::book_get_uids(&conn, &bus, &path, q)
                 .unwrap()
                 .into_iter()
-                .map(|u| (u.clone(), super::book_get_contact(&conn, &bus, &path, &u).unwrap()))
+                .map(|u| {
+                    (
+                        u.clone(),
+                        super::book_get_contact(&conn, &bus, &path, &u).unwrap(),
+                    )
+                })
                 .collect::<Vec<_>>()
         };
         let by_name = "(is \"full_name\" \"Hylki Phone Only\")";
@@ -3518,20 +4146,50 @@ mod tests {
         let (src_uid, stored) = find(from, by_name).pop().expect("made");
         let mut c = super::parse_vcard_details(&stored).unwrap();
         c.raw_vcard = stored;
-        let member = super::Member { name: c.name.clone(), card: super::moved_vcard(&c), ..Default::default() };
-        let edit = super::GroupEdit { name: "Hylki copy test".into(), members: vec![member], ..Default::default() };
+        let member = super::Member {
+            name: c.name.clone(),
+            card: super::moved_vcard(&c),
+            ..Default::default()
+        };
+        let edit = super::GroupEdit {
+            name: "Hylki copy test".into(),
+            members: vec![member],
+            ..Default::default()
+        };
         super::save_group(to, super::GroupFormat::Apple, None, edit.clone()).unwrap();
         let (copy_uid, copy) = find(to, by_name).pop().expect("copied to the group's book");
         println!("=== the copy:\n{copy}");
         assert!(copy.contains("+1 555 0199") && copy.contains("copied whole"));
-        let (group_uid, group) = find(to, "(is \"full_name\" \"Hylki copy test\")").pop().expect("the group");
+        let (group_uid, group) = find(to, "(is \"full_name\" \"Hylki copy test\")")
+            .pop()
+            .expect("the group");
         let refs = super::parse_vcard_fields(&group).unwrap().member_refs;
-        assert_eq!(refs.iter().map(|(u, _)| u.as_str()).collect::<Vec<_>>(), vec![copy_uid.as_str()], "{group}");
+        assert_eq!(
+            refs.iter().map(|(u, _)| u.as_str()).collect::<Vec<_>>(),
+            vec![copy_uid.as_str()],
+            "{group}"
+        );
         // Joining another group finds the copy, by name, and makes none.
-        super::save_group(to, super::GroupFormat::Apple, None, super::GroupEdit { name: "Hylki copy test 2".into(), ..edit }).unwrap();
+        super::save_group(
+            to,
+            super::GroupFormat::Apple,
+            None,
+            super::GroupEdit {
+                name: "Hylki copy test 2".into(),
+                ..edit
+            },
+        )
+        .unwrap();
         assert_eq!(find(to, by_name).len(), 1);
-        let (group2, _) = find(to, "(is \"full_name\" \"Hylki copy test 2\")").pop().unwrap();
-        for (book, uid) in [(to, &group_uid), (to, &group2), (to, &copy_uid), (from, &src_uid)] {
+        let (group2, _) = find(to, "(is \"full_name\" \"Hylki copy test 2\")")
+            .pop()
+            .unwrap();
+        for (book, uid) in [
+            (to, &group_uid),
+            (to, &group2),
+            (to, &copy_uid),
+            (from, &src_uid),
+        ] {
             super::delete_contact(book, uid).unwrap();
         }
     }
@@ -3558,7 +4216,12 @@ mod tests {
             super::book_get_uids(&conn, &bus, &path, q)
                 .unwrap()
                 .into_iter()
-                .map(|u| (u.clone(), super::book_get_contact(&conn, &bus, &path, &u).unwrap()))
+                .map(|u| {
+                    (
+                        u.clone(),
+                        super::book_get_contact(&conn, &bus, &path, &u).unwrap(),
+                    )
+                })
                 .collect::<Vec<_>>()
         };
         let person_q = "(is \"full_name\" \"Hylki Mover\")";
@@ -3570,24 +4233,47 @@ mod tests {
                 }
             }
         }
-        super::create_contact(from, "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Hylki Mover\r\nTEL:+1 555 0142\r\nEND:VCARD\r\n").unwrap();
+        super::create_contact(
+            from,
+            "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Hylki Mover\r\nTEL:+1 555 0142\r\nEND:VCARD\r\n",
+        )
+        .unwrap();
         let (person_uid, stored) = find(from, person_q).pop().unwrap();
         let mut person = super::parse_vcard_details(&stored).unwrap();
         person.raw_vcard = stored;
-        let member = super::Member { name: person.name.clone(), uid: person_uid.clone(), ..Default::default() };
-        let edit = super::GroupEdit { name: "Hylki moving group".into(), members: vec![member], ..Default::default() };
+        let member = super::Member {
+            name: person.name.clone(),
+            uid: person_uid.clone(),
+            ..Default::default()
+        };
+        let edit = super::GroupEdit {
+            name: "Hylki moving group".into(),
+            members: vec![member],
+            ..Default::default()
+        };
         super::save_group(from, super::GroupFormat::Apple, None, edit).unwrap();
         let (group_uid, _) = find(from, group_q).pop().unwrap();
         // As the form sends it: the member's card copied from the old book.
-        let moved = super::Member { name: person.name.clone(), card: super::moved_vcard(&person), ..Default::default() };
-        let edit = super::GroupEdit { name: "Hylki moving group".into(), members: vec![moved], ..Default::default() };
+        let moved = super::Member {
+            name: person.name.clone(),
+            card: super::moved_vcard(&person),
+            ..Default::default()
+        };
+        let edit = super::GroupEdit {
+            name: "Hylki moving group".into(),
+            members: vec![moved],
+            ..Default::default()
+        };
         super::move_group(from, &group_uid, to, super::GroupFormat::Apple, edit).unwrap();
         assert!(find(from, group_q).is_empty(), "gone from the first book");
         let (new_group, group) = find(to, group_q).pop().expect("in the second book");
         let (copy_uid, copy) = find(to, person_q).pop().expect("the member copied");
         assert!(copy.contains("555 0142"));
         let refs = super::parse_vcard_fields(&group).unwrap().member_refs;
-        assert_eq!(refs.iter().map(|(u, _)| u.as_str()).collect::<Vec<_>>(), vec![copy_uid.as_str()]);
+        assert_eq!(
+            refs.iter().map(|(u, _)| u.as_str()).collect::<Vec<_>>(),
+            vec![copy_uid.as_str()]
+        );
         for (book, uid) in [(to, &new_group), (to, &copy_uid), (from, &person_uid)] {
             super::delete_contact(book, uid).unwrap();
         }
@@ -3600,11 +4286,21 @@ mod tests {
                         BDAY:1985-04-12\r\nPHOTO;ENCODING=b;TYPE=PNG:iVBORw0KGgo=\r\nEND:VCARD\r\n";
         let c = super::parse_vcard_fields(original).unwrap();
         assert_eq!(c.postal[0].street, "1 Main St, Rear");
-        assert_eq!((c.postal[0].pobox.as_str(), c.postal[0].label.as_str()), ("PO 7", "Home"));
-        assert_eq!(super::birthday_parts(&c.birthday_raw), Some((Some(1985), 4, 12)));
+        assert_eq!(
+            (c.postal[0].pobox.as_str(), c.postal[0].label.as_str()),
+            ("PO 7", "Home")
+        );
+        assert_eq!(
+            super::birthday_parts(&c.birthday_raw),
+            Some((Some(1985), 4, 12))
+        );
         let mut postal = c.postal.clone();
         postal[0].locality = "Shelbyville".into();
-        postal.push(super::Postal { label: "Work".into(), street: "2 Side Rd".into(), ..Default::default() });
+        postal.push(super::Postal {
+            label: "Work".into(),
+            street: "2 Side Rd".into(),
+            ..Default::default()
+        });
         let edit = super::ContactEdit {
             name: "Pat Doe".into(),
             addresses: postal,
@@ -3612,47 +4308,94 @@ mod tests {
             ..Default::default()
         };
         let out = super::patched_vcard(original, &edit);
-        assert!(out.contains("ADR;TYPE=HOME:PO 7;Flat 2;1 Main St\\, Rear;Shelbyville;IL;62701;USA\r\n"), "{out}");
+        assert!(
+            out.contains(
+                "ADR;TYPE=HOME:PO 7;Flat 2;1 Main St\\, Rear;Shelbyville;IL;62701;USA\r\n"
+            ),
+            "{out}"
+        );
         assert!(out.contains("ADR;TYPE=WORK:;;2 Side Rd;;;;\r\n"), "{out}");
-        assert!(out.contains("BDAY:--04-12\r\n") && !out.contains("1985"), "{out}");
-        assert!(out.contains("PHOTO;ENCODING=b;TYPE=PNG:iVBORw0KGgo="), "a kept photo stays: {out}");
-        let gone = super::patched_vcard(original, &super::ContactEdit { photo: super::PhotoEdit::Remove, ..edit.clone() });
+        assert!(
+            out.contains("BDAY:--04-12\r\n") && !out.contains("1985"),
+            "{out}"
+        );
+        assert!(
+            out.contains("PHOTO;ENCODING=b;TYPE=PNG:iVBORw0KGgo="),
+            "a kept photo stays: {out}"
+        );
+        let gone = super::patched_vcard(
+            original,
+            &super::ContactEdit {
+                photo: super::PhotoEdit::Remove,
+                ..edit.clone()
+            },
+        );
         assert!(!gone.contains("PHOTO"), "{gone}");
         let set = super::patched_vcard(
             original,
-            &super::ContactEdit { photo: super::PhotoEdit::Set(vec![0xFF, 0xD8, 0xFF, 1]), ..edit },
+            &super::ContactEdit {
+                photo: super::PhotoEdit::Set(vec![0xFF, 0xD8, 0xFF, 1]),
+                ..edit
+            },
         );
-        assert!(set.contains("PHOTO;ENCODING=b;TYPE=JPEG:/9j/AQ==\r\n") && !set.contains("iVBOR"), "{set}");
+        assert!(
+            set.contains("PHOTO;ENCODING=b;TYPE=JPEG:/9j/AQ==\r\n") && !set.contains("iVBOR"),
+            "{set}"
+        );
     }
 
     #[test]
     fn a_card_with_no_name_or_address_is_still_a_contact() {
         let phone = "BEGIN:VCARD\r\nVERSION:3.0\r\nTEL:+1 555 0100\r\nEND:VCARD\r\n";
-        assert_eq!(super::parse_vcard_fields(phone).unwrap().name, "+1 555 0100");
+        assert_eq!(
+            super::parse_vcard_fields(phone).unwrap().name,
+            "+1 555 0100"
+        );
         let org = "BEGIN:VCARD\r\nVERSION:3.0\r\nORG:Acme;\r\nTEL:+1 555 0100\r\nEND:VCARD\r\n";
         assert_eq!(super::parse_vcard_fields(org).unwrap().name, "Acme");
         assert!(super::parse_vcard_fields("BEGIN:VCARD\r\nVERSION:3.0\r\nEND:VCARD\r\n").is_none());
         // Saved with no name, it goes by its company.
         let edit = super::ContactEdit {
             org: "Acme".into(),
-            phones: vec![super::Labeled { label: "Work".into(), value: "+1 555 0100".into() }],
+            phones: vec![super::Labeled {
+                label: "Work".into(),
+                value: "+1 555 0100".into(),
+            }],
             ..Default::default()
         };
         let out = super::new_vcard(&edit);
-        assert!(out.contains("\r\nFN:Acme\r\n") && out.contains("TEL;TYPE=WORK:+1 555 0100"), "{out}");
+        assert!(
+            out.contains("\r\nFN:Acme\r\n") && out.contains("TEL;TYPE=WORK:+1 555 0100"),
+            "{out}"
+        );
     }
 
     #[test]
     fn an_account_named_in_hylki_names_its_books_account() {
         let work = "Work".to_string();
-        assert_eq!(super::with_account_name("CardDAV — a@b.org · card", Some(&work)), "Work · card");
-        assert_eq!(super::with_account_name("CardDAV — a@b.org", Some(&work)), "Work · a@b.org");
-        assert_eq!(super::with_account_name("On This Computer · Personal", Some(&work)), "Work · Personal");
-        assert_eq!(super::with_account_name("CardDAV — a@b.org · card", None), "CardDAV — a@b.org · card");
+        assert_eq!(
+            super::with_account_name("CardDAV — a@b.org · card", Some(&work)),
+            "Work · card"
+        );
+        assert_eq!(
+            super::with_account_name("CardDAV — a@b.org", Some(&work)),
+            "Work · a@b.org"
+        );
+        assert_eq!(
+            super::with_account_name("On This Computer · Personal", Some(&work)),
+            "Work · Personal"
+        );
+        assert_eq!(
+            super::with_account_name("CardDAV — a@b.org · card", None),
+            "CardDAV — a@b.org · card"
+        );
         // And a book named too.
         let family = "Family".to_string();
         assert_eq!(
-            super::with_given_name(&super::with_account_name("CardDAV — a@b.org · card", Some(&work)), Some(&family)),
+            super::with_given_name(
+                &super::with_account_name("CardDAV — a@b.org · card", Some(&work)),
+                Some(&family)
+            ),
             "Work · Family"
         );
     }
@@ -3660,16 +4403,31 @@ mod tests {
     #[test]
     fn a_book_named_in_hylki_keeps_its_account() {
         let given = "Family".to_string();
-        assert_eq!(super::with_given_name("CardDAV — a@b.org · card", Some(&given)), "CardDAV — a@b.org · Family");
-        assert_eq!(super::with_given_name("CardDAV — Work", Some(&given)), "CardDAV — Work · Family");
-        assert_eq!(super::with_given_name("Hylki Address Book", Some(&given)), "Family");
-        assert_eq!(super::with_given_name("CardDAV — a@b.org · card", None), "CardDAV — a@b.org · card");
+        assert_eq!(
+            super::with_given_name("CardDAV — a@b.org · card", Some(&given)),
+            "CardDAV — a@b.org · Family"
+        );
+        assert_eq!(
+            super::with_given_name("CardDAV — Work", Some(&given)),
+            "CardDAV — Work · Family"
+        );
+        assert_eq!(
+            super::with_given_name("Hylki Address Book", Some(&given)),
+            "Family"
+        );
+        assert_eq!(
+            super::with_given_name("CardDAV — a@b.org · card", None),
+            "CardDAV — a@b.org · card"
+        );
     }
 
     #[test]
     fn a_line_goes_after_the_version() {
         assert_eq!(
-            super::insert_after_version("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:A\r\nEND:VCARD\r\n", "UID:x"),
+            super::insert_after_version(
+                "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:A\r\nEND:VCARD\r\n",
+                "UID:x"
+            ),
             "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:x\r\nFN:A\r\nEND:VCARD\r\n"
         );
     }

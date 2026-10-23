@@ -20,8 +20,8 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use adw::prelude::*;
-use webkit6::prelude::WebViewExt;
 use gtk::{cairo, gdk, gio, glib, pango};
+use webkit6::prelude::WebViewExt;
 
 use crate::config::PrintOptions;
 use crate::i18n::{i18n, i18n_f};
@@ -108,12 +108,18 @@ pub fn print_html(html: &str, job_name: &str, parent: Option<gtk::Window>) {
         render_pdf(&html, &page, &job, move |result| match result {
             Ok(path) => {
                 let file = gio::File::for_path(&path);
-                dialog.print_file(parent.as_ref(), Some(&setup), &file, gio::Cancellable::NONE, move |r| {
-                    if let Err(e) = r {
-                        tracing::warn!("printing failed: {e}");
-                    }
-                    let _ = std::fs::remove_file(&path);
-                });
+                dialog.print_file(
+                    parent.as_ref(),
+                    Some(&setup),
+                    &file,
+                    gio::Cancellable::NONE,
+                    move |r| {
+                        if let Err(e) = r {
+                            tracing::warn!("printing failed: {e}");
+                        }
+                        let _ = std::fs::remove_file(&path);
+                    },
+                );
             }
             Err(e) => tracing::warn!("printing failed: {e}"),
         });
@@ -123,7 +129,14 @@ pub fn print_html(html: &str, job_name: &str, parent: Option<gtk::Window>) {
 /// WebKit prints `html` itself, without the footer: the fallback for a
 /// system with no PDF writer.
 fn print_direct(html: &str, setup: &gtk::PrintSetup) {
-    let page = laid_out(&setup.page_setup(), PrintOptions { page_numbers: false, date: false, ..options() });
+    let page = laid_out(
+        &setup.page_setup(),
+        PrintOptions {
+            page_numbers: false,
+            date: false,
+            ..options()
+        },
+    );
     let settings = setup.print_settings();
     load_for_print(html, move |view, finished| {
         let print = webkit6::PrintOperation::new(view);
@@ -165,7 +178,9 @@ fn load_for_print(html: &str, ready: impl FnOnce(&webkit6::WebView, Box<dyn FnOn
         if event != webkit6::LoadEvent::Finished {
             return;
         }
-        let Some(ready) = ready.borrow_mut().take() else { return };
+        let Some(ready) = ready.borrow_mut().take() else {
+            return;
+        };
         let done = view.clone();
         ready(
             view,
@@ -194,8 +209,16 @@ fn laid_out(base: &gtk::PageSetup, options: PrintOptions) -> gtk::PageSetup {
 
 /// Top, right, bottom and left margins for `options`, in millimetres.
 fn margins_mm(options: PrintOptions) -> (f64, f64, f64, f64) {
-    let bottom = if has_footer(options) { FOOTER_MARGIN_MM } else { MARGIN_MM };
-    let left = if options.punch_margin { PUNCH_MARGIN_MM } else { MARGIN_MM };
+    let bottom = if has_footer(options) {
+        FOOTER_MARGIN_MM
+    } else {
+        MARGIN_MM
+    };
+    let left = if options.punch_margin {
+        PUNCH_MARGIN_MM
+    } else {
+        MARGIN_MM
+    };
     (MARGIN_MM, MARGIN_MM, bottom, left)
 }
 
@@ -242,7 +265,10 @@ fn render_pdf(
         // must not apply twice.
         let settings = gtk::PrintSettings::new();
         settings.set_printer(&printer);
-        settings.set(gtk::PRINT_SETTINGS_OUTPUT_URI, Some(&gio::File::for_path(&raw).uri()));
+        settings.set(
+            gtk::PRINT_SETTINGS_OUTPUT_URI,
+            Some(&gio::File::for_path(&raw).uri()),
+        );
         settings.set(gtk::PRINT_SETTINGS_OUTPUT_FILE_FORMAT, Some("pdf"));
 
         let print = webkit6::PrintOperation::new(view);
@@ -259,7 +285,9 @@ fn render_pdf(
         let done = RefCell::new(Some((done, finished)));
         print.connect_finished(move |_| {
             keep.borrow_mut().take();
-            let Some((done, finished)) = done.borrow_mut().take() else { return };
+            let Some((done, finished)) = done.borrow_mut().take() else {
+                return;
+            };
             finished();
             let result = match failed.borrow_mut().take() {
                 Some(e) => Err(e),
@@ -315,12 +343,22 @@ fn stamp(raw: &Path, out: &Path, footer: &Footer, title: &str) -> Result<(), Str
 fn footer_texts(footer: &Footer, page: u32, pages: u32) -> (Option<String>, Option<String>) {
     let date = footer.options.date.then(|| footer.printed.clone());
     let number = footer.options.page_numbers.then(|| {
-        i18n_f("Page {page} of {pages}", &[("page", &page.to_string()), ("pages", &pages.to_string())])
+        i18n_f(
+            "Page {page} of {pages}",
+            &[("page", &page.to_string()), ("pages", &pages.to_string())],
+        )
     });
     (date, number)
 }
 
-fn draw_footer(cr: &cairo::Context, footer: &Footer, width: f64, height: f64, page: u32, pages: u32) {
+fn draw_footer(
+    cr: &cairo::Context,
+    footer: &Footer,
+    width: f64,
+    height: f64,
+    page: u32,
+    pages: u32,
+) {
     let (date, number) = footer_texts(footer, page, pages);
     if date.is_none() && number.is_none() {
         return;
@@ -337,7 +375,11 @@ fn draw_footer(cr: &cairo::Context, footer: &Footer, width: f64, height: f64, pa
         layout.set_text(text);
         let (w, _) = layout.pixel_size();
         let ascent = f64::from(layout.baseline()) / f64::from(pango::SCALE);
-        let x = if right_aligned { width - footer.right - f64::from(w) } else { footer.left };
+        let x = if right_aligned {
+            width - footer.right - f64::from(w)
+        } else {
+            footer.left
+        };
         cr.move_to(x, baseline - ascent);
         pangocairo::functions::show_layout(cr, &layout);
     };
@@ -412,7 +454,9 @@ pub fn open(parent: &gtk::Window, html: &str, job_name: &str) {
         .valign(gtk::Align::Center)
         .build();
     stack.add_named(&spinner, Some("loading"));
-    let failure = adw::StatusPage::builder().icon_name("printer-symbolic").build();
+    let failure = adw::StatusPage::builder()
+        .icon_name("printer-symbolic")
+        .build();
     stack.add_named(&failure, Some("failed"));
     let pages = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
@@ -446,7 +490,10 @@ pub fn open(parent: &gtk::Window, html: &str, job_name: &str) {
     }
     header.pack_end(&print_btn);
 
-    let save_btn = gtk::Button::builder().label(&i18n("Save as PDF…")).sensitive(false).build();
+    let save_btn = gtk::Button::builder()
+        .label(&i18n("Save as PDF…"))
+        .sensitive(false)
+        .build();
     {
         let pdf = pdf.clone();
         let job = job_name.to_string();
@@ -558,7 +605,8 @@ fn page_textures(path: &Path, scale: f64) -> Result<Vec<(gdk::Texture, f64, f64)
         } else {
             gdk::MemoryFormat::A8r8g8b8Premultiplied
         };
-        let texture = gdk::MemoryTexture::new(pw, ph, format, &glib::Bytes::from_owned(data), stride);
+        let texture =
+            gdk::MemoryTexture::new(pw, ph, format, &glib::Bytes::from_owned(data), stride);
         textures.push((texture.upcast(), w * px, h * px));
     }
     Ok(textures)
@@ -583,7 +631,12 @@ fn save_as_pdf(pdf: &Path, suggested_name: &str, parent: &adw::Window, toasts: &
             .basename()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| "PDF".to_string());
-        match source.copy(&file, gio::FileCopyFlags::OVERWRITE, gio::Cancellable::NONE, None) {
+        match source.copy(
+            &file,
+            gio::FileCopyFlags::OVERWRITE,
+            gio::Cancellable::NONE,
+            None,
+        ) {
             Ok(()) => {
                 tracing::info!(uri = %file.uri(), "saved a PDF");
                 toasts.add_toast(adw::Toast::new(&i18n_f("Saved {name}", &[("name", &name)])));
@@ -604,25 +657,49 @@ mod tests {
     use super::*;
 
     fn footer(options: PrintOptions) -> Footer {
-        Footer { options, printed: "6 October 2026, 09:00".into(), left: 42.5, right: 42.5 }
+        Footer {
+            options,
+            printed: "6 October 2026, 09:00".into(),
+            left: 42.5,
+            right: 42.5,
+        }
     }
 
     #[test]
     fn the_footer_says_what_settings_ask_for() {
-        let both = PrintOptions { page_numbers: true, date: true, punch_margin: false };
+        let both = PrintOptions {
+            page_numbers: true,
+            date: true,
+            punch_margin: false,
+        };
         let (date, number) = footer_texts(&footer(both), 2, 5);
         assert_eq!(date.as_deref(), Some("6 October 2026, 09:00"));
         assert_eq!(number.as_deref(), Some("Page 2 of 5"));
 
-        let none = PrintOptions { page_numbers: false, date: false, punch_margin: false };
+        let none = PrintOptions {
+            page_numbers: false,
+            date: false,
+            punch_margin: false,
+        };
         assert_eq!(footer_texts(&footer(none), 1, 1), (None, None));
     }
 
     #[test]
     fn margins_make_room_for_the_footer_and_the_punch() {
-        let plain = PrintOptions { page_numbers: false, date: false, punch_margin: false };
-        assert_eq!(margins_mm(plain), (MARGIN_MM, MARGIN_MM, MARGIN_MM, MARGIN_MM));
-        let punched = PrintOptions { punch_margin: true, page_numbers: true, ..plain };
+        let plain = PrintOptions {
+            page_numbers: false,
+            date: false,
+            punch_margin: false,
+        };
+        assert_eq!(
+            margins_mm(plain),
+            (MARGIN_MM, MARGIN_MM, MARGIN_MM, MARGIN_MM)
+        );
+        let punched = PrintOptions {
+            punch_margin: true,
+            page_numbers: true,
+            ..plain
+        };
         let (_, right, bottom, left) = margins_mm(punched);
         assert_eq!(left, PUNCH_MARGIN_MM);
         assert_eq!(right, MARGIN_MM);
@@ -648,11 +725,20 @@ mod tests {
             drop(cr);
             surface.finish();
         }
-        let options = PrintOptions { page_numbers: true, date: true, punch_margin: false };
+        let options = PrintOptions {
+            page_numbers: true,
+            date: true,
+            punch_margin: false,
+        };
         stamp(&raw, &out, &footer(options), "A subject").unwrap();
         let doc = poppler::Document::from_file(&gio::File::for_path(&out).uri(), None).unwrap();
         assert_eq!(doc.n_pages(), 2);
-        let text = doc.page(1).unwrap().text().map(|t| t.to_string()).unwrap_or_default();
+        let text = doc
+            .page(1)
+            .unwrap()
+            .text()
+            .map(|t| t.to_string())
+            .unwrap_or_default();
         assert!(text.contains("Page 2 of 2"), "{text}");
         assert!(text.contains("6 October 2026"), "{text}");
         assert_eq!(doc.title().as_deref(), Some("A subject"));

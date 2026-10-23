@@ -186,7 +186,10 @@ impl MockBackend {
                     if newest.is_none_or(|n| m.timestamp > n.timestamp) {
                         newest = Some(m);
                     }
-                    members.push(Message { body: String::new(), ..m.clone() });
+                    members.push(Message {
+                        body: String::new(),
+                        ..m.clone()
+                    });
                 }
                 (!seen.is_empty()).then(|| {
                     (
@@ -324,9 +327,14 @@ const DEMO_HEADERS: &[(u32, &str, &str)] = &[
 /// followed by its body, so the real sender check and the real unsubscribe
 /// scan can be run over it exactly as they are over fetched mail.
 pub fn demo_raw(id: u32) -> Option<String> {
-    let (headers, tail) =
-        DEMO_HEADERS.iter().find(|(i, _, _)| *i == id).map(|(_, h, t)| (*h, *t))?;
-    let body = MockBackend::new().message(id).map(|m| m.body).unwrap_or_default();
+    let (headers, tail) = DEMO_HEADERS
+        .iter()
+        .find(|(i, _, _)| *i == id)
+        .map(|(_, h, t)| (*h, *t))?;
+    let body = MockBackend::new()
+        .message(id)
+        .map(|m| m.body)
+        .unwrap_or_default();
     Some(format!("{headers}{body}{tail}"))
 }
 
@@ -480,7 +488,9 @@ pub fn seed_demo_cache(cache: &crate::cache::Cache) {
     // HYLKI_DEMO_ATTACHMENTS=N adds N more attachments per account, spread back
     // over twenty years — the shape of a real archive, for exercising the
     // gallery's paging and its scroll.
-    if let Some(n) = std::env::var("HYLKI_DEMO_ATTACHMENTS").ok().and_then(|v| v.parse::<u32>().ok())
+    if let Some(n) = std::env::var("HYLKI_DEMO_ATTACHMENTS")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
     {
         let kinds = [
             ("invoice", "pdf", 90u64),
@@ -547,37 +557,221 @@ pub fn seed_demo_cache(cache: &crate::cache::Cache) {
 /// spread over the folder kinds the gallery's scope acts on.
 fn demo_attachments(
     account_id: u32,
-) -> &'static [(u32, &'static str, &'static str, &'static str, &'static str, u64, i64)] {
+) -> &'static [(
+    u32,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    u64,
+    i64,
+)] {
     match account_id {
         1 => &[
-            (9001, "Inbox", "Q3-review.pdf", "Dana Whitfield", "Quarter review pack", 842, 1),
-            (9002, "Inbox", "roadmap.png", "Priya Raman", "Roadmap sketch", 310, 2),
-            (9003, "Inbox", "notes.txt", "Tomas Weber", "Handover notes", 6, 3),
-            (9004, "Inbox", "budget-2026.xlsx", "Dana Whitfield", "Budget draft", 96, 5),
-            (9005, "Archive", "contract-signed.pdf", "Legal", "Countersigned", 1204, 40),
-            (9006, "Archive", "offsite-photos.zip", "Priya Raman", "Offsite photos", 18400, 62),
-            (9007, "Archive", "invoice-2019.pdf", "Northwind Ltd", "Invoice", 74, 2200),
-            (9008, "Starred", "keys.asc", "Tomas Weber", "My public key", 3, 9),
-            (9009, "Newsletters", "issue-42.pdf", "The Weekly", "Issue 42", 520, 4),
-            (9010, "Newsletters", "banner.jpg", "The Weekly", "Issue 41", 244, 11),
-            (9011, "Sent", "proposal-v3.docx", "Jason M.", "Re: Proposal", 180, 2),
-            (9012, "Sent", "screenshot.png", "Jason M.", "Re: That bug", 420, 6),
+            (
+                9001,
+                "Inbox",
+                "Q3-review.pdf",
+                "Dana Whitfield",
+                "Quarter review pack",
+                842,
+                1,
+            ),
+            (
+                9002,
+                "Inbox",
+                "roadmap.png",
+                "Priya Raman",
+                "Roadmap sketch",
+                310,
+                2,
+            ),
+            (
+                9003,
+                "Inbox",
+                "notes.txt",
+                "Tomas Weber",
+                "Handover notes",
+                6,
+                3,
+            ),
+            (
+                9004,
+                "Inbox",
+                "budget-2026.xlsx",
+                "Dana Whitfield",
+                "Budget draft",
+                96,
+                5,
+            ),
+            (
+                9005,
+                "Archive",
+                "contract-signed.pdf",
+                "Legal",
+                "Countersigned",
+                1204,
+                40,
+            ),
+            (
+                9006,
+                "Archive",
+                "offsite-photos.zip",
+                "Priya Raman",
+                "Offsite photos",
+                18400,
+                62,
+            ),
+            (
+                9007,
+                "Archive",
+                "invoice-2019.pdf",
+                "Northwind Ltd",
+                "Invoice",
+                74,
+                2200,
+            ),
+            (
+                9008,
+                "Starred",
+                "keys.asc",
+                "Tomas Weber",
+                "My public key",
+                3,
+                9,
+            ),
+            (
+                9009,
+                "Newsletters",
+                "issue-42.pdf",
+                "The Weekly",
+                "Issue 42",
+                520,
+                4,
+            ),
+            (
+                9010,
+                "Newsletters",
+                "banner.jpg",
+                "The Weekly",
+                "Issue 41",
+                244,
+                11,
+            ),
+            (
+                9011,
+                "Sent",
+                "proposal-v3.docx",
+                "Jason M.",
+                "Re: Proposal",
+                180,
+                2,
+            ),
+            (
+                9012,
+                "Sent",
+                "screenshot.png",
+                "Jason M.",
+                "Re: That bug",
+                420,
+                6,
+            ),
         ],
         2 => &[
-            (9101, "Inbox", "invoice-1180.pdf", "Northwind Ltd", "Invoice 1180", 88, 1),
-            (9102, "Inbox", "logo-pack.zip", "Studio Kern", "Brand assets", 9600, 3),
+            (
+                9101,
+                "Inbox",
+                "invoice-1180.pdf",
+                "Northwind Ltd",
+                "Invoice 1180",
+                88,
+                1,
+            ),
+            (
+                9102,
+                "Inbox",
+                "logo-pack.zip",
+                "Studio Kern",
+                "Brand assets",
+                9600,
+                3,
+            ),
             (9103, "Inbox", "meeting.ics", "Calendar", "Standup", 2, 1),
-            (9104, "Archive", "invoice-1104.pdf", "Northwind Ltd", "Invoice 1104", 86, 95),
-            (9105, "Invoices", "invoice-1172.pdf", "Northwind Ltd", "Invoice 1172", 87, 21),
-            (9106, "Invoices", "invoice-1165.pdf", "Acme Supply", "Invoice 1165", 91, 33),
-            (9107, "Sent", "remittance.pdf", "Hyprlab", "Payment sent", 64, 7),
+            (
+                9104,
+                "Archive",
+                "invoice-1104.pdf",
+                "Northwind Ltd",
+                "Invoice 1104",
+                86,
+                95,
+            ),
+            (
+                9105,
+                "Invoices",
+                "invoice-1172.pdf",
+                "Northwind Ltd",
+                "Invoice 1172",
+                87,
+                21,
+            ),
+            (
+                9106,
+                "Invoices",
+                "invoice-1165.pdf",
+                "Acme Supply",
+                "Invoice 1165",
+                91,
+                33,
+            ),
+            (
+                9107,
+                "Sent",
+                "remittance.pdf",
+                "Hyprlab",
+                "Payment sent",
+                64,
+                7,
+            ),
         ],
         _ => &[
-            (9201, "Inbox", "boarding-pass.pdf", "Skyline Air", "Your trip", 140, 2),
+            (
+                9201,
+                "Inbox",
+                "boarding-pass.pdf",
+                "Skyline Air",
+                "Your trip",
+                140,
+                2,
+            ),
             (9202, "Inbox", "recipe.jpg", "Mum", "That cake", 880, 8),
-            (9203, "Archive", "insurance-2025.pdf", "Cover Direct", "Renewal", 320, 210),
-            (9204, "Orders", "receipt-8841.pdf", "Bookshop", "Your order", 48, 14),
-            (9205, "Sent", "holiday-plan.odt", "Jason", "Re: August", 22, 12),
+            (
+                9203,
+                "Archive",
+                "insurance-2025.pdf",
+                "Cover Direct",
+                "Renewal",
+                320,
+                210,
+            ),
+            (
+                9204,
+                "Orders",
+                "receipt-8841.pdf",
+                "Bookshop",
+                "Your order",
+                48,
+                14,
+            ),
+            (
+                9205,
+                "Sent",
+                "holiday-plan.odt",
+                "Jason",
+                "Re: August",
+                22,
+                12,
+            ),
         ],
     }
 }
@@ -850,8 +1044,15 @@ fn sample_messages() -> Vec<Message> {
     }
     // HYLKI_DEMO_BULK=N pads every account's Inbox and Sent with N more
     // messages, to exercise the list at a real mailbox's size.
-    if let Some(n) = std::env::var("HYLKI_DEMO_BULK").ok().and_then(|v| v.parse::<u32>().ok()) {
-        let base = out.iter().map(|m| m.timestamp).max().unwrap_or(1_700_000_000);
+    if let Some(n) = std::env::var("HYLKI_DEMO_BULK")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+    {
+        let base = out
+            .iter()
+            .map(|m| m.timestamp)
+            .max()
+            .unwrap_or(1_700_000_000);
         let mut id = 100_000u32;
         for (account_id, folders) in [(1u32, [1u32, 3u32]), (2, [11, 13]), (3, [21, 23])] {
             for folder_id in folders {

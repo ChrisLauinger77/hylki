@@ -119,13 +119,15 @@ struct FilterRun {
 impl FilterRun {
     /// The run's totals so far.
     fn totals(&self) -> FolderTally {
-        self.folders.values().fold(FolderTally::default(), |mut t, f| {
-            t.checked += f.checked;
-            t.matched += f.matched;
-            t.tagged += f.tagged;
-            t.filed += f.filed;
-            t
-        })
+        self.folders
+            .values()
+            .fold(FolderTally::default(), |mut t, f| {
+                t.checked += f.checked;
+                t.matched += f.matched;
+                t.tagged += f.tagged;
+                t.filed += f.filed;
+                t
+            })
     }
 
     /// How many of the run's folders are done.
@@ -194,7 +196,11 @@ struct SortFilterPopover {
 impl SortFilterPopover {
     /// The popover stays open as rows are clicked, so an order and several
     /// filters can be set in one visit.
-    fn new(button: gtk::MenuButton, sort: &gtk::gio::SimpleAction, sender: &relm4::Sender<AppMsg>) -> Self {
+    fn new(
+        button: gtk::MenuButton,
+        sort: &gtk::gio::SimpleAction,
+        sender: &relm4::Sender<AppMsg>,
+    ) -> Self {
         let column = |title: &str| {
             let col = gtk::Box::new(gtk::Orientation::Vertical, 0);
             col.add_css_class("sort-filter-column");
@@ -233,7 +239,9 @@ impl SortFilterPopover {
             }
         };
         show_sort(sort.state().and_then(|v| v.str().map(String::from)));
-        sort.connect_state_notify(move |a| show_sort(a.state().and_then(|v| v.str().map(String::from))));
+        sort.connect_state_notify(move |a| {
+            show_sort(a.state().and_then(|v| v.str().map(String::from)))
+        });
 
         let filter_col = column(&i18n("Show only"));
         let mut filters = Vec::new();
@@ -260,7 +268,11 @@ impl SortFilterPopover {
         let popover = gtk::Popover::new();
         popover.set_child(Some(&columns));
         button.set_popover(Some(&popover));
-        Self { button, filters, clear }
+        Self {
+            button,
+            filters,
+            clear,
+        }
     }
 
     /// Show `filters` on the checks, and tint the button while any is on
@@ -274,11 +286,19 @@ impl SortFilterPopover {
         self.clear.set_sensitive(!filters.is_empty());
         if filters.is_empty() {
             self.button.remove_css_class("list-filter-active");
-            self.button.set_tooltip_text(Some(&i18n("Sort and filter messages")));
+            self.button
+                .set_tooltip_text(Some(&i18n("Sort and filter messages")));
         } else {
             self.button.add_css_class("list-filter-active");
-            let names: Vec<String> = QuickFilter::ALL.iter().filter(|f| filters.has(**f)).map(|f| f.label()).collect();
-            self.button.set_tooltip_text(Some(&i18n_f("Filtered: {names}", &[("names", &names.join(", "))])));
+            let names: Vec<String> = QuickFilter::ALL
+                .iter()
+                .filter(|f| filters.has(**f))
+                .map(|f| f.label())
+                .collect();
+            self.button.set_tooltip_text(Some(&i18n_f(
+                "Filtered: {names}",
+                &[("names", &names.join(", "))],
+            )));
         }
     }
 }
@@ -343,22 +363,23 @@ use crate::models::{
     thread_ids, Account, Attachment, Folder, FolderKind, KeywordFinding, Message, ThreadSummary,
 };
 use crate::ui::accounts::{AccountsOutput, AccountsWindow};
+use crate::ui::attachments_gallery::{
+    AttachmentsGallery, GalleryAccount, GalleryFolder, GalleryInput, GalleryOutput, GalleryRequest,
+};
 use crate::ui::compose::{
     Compose, ComposeAccount, ComposeInit, ComposeInput, ComposeOutput, ComposePrefill,
 };
 use crate::ui::message_list::{
-    BulkAction, CheckFilter, MessageList, MessageListInput, MessageListOutput, QuickFilter, QuickFilters, RowAction,
-    SearchScope,
-};
-use crate::ui::attachments_gallery::{
-    AttachmentsGallery, GalleryAccount, GalleryFolder, GalleryInput, GalleryOutput, GalleryRequest,
+    BulkAction, CheckFilter, MessageList, MessageListInput, MessageListOutput, QuickFilter,
+    QuickFilters, RowAction, SearchScope,
 };
 
 /// Largest cached attachment whose bytes ride along with a gallery page, so a
 /// thumbnail or preview is instant. Anything bigger is fetched when opened.
 const GALLERY_DATA_CAP: i64 = 6 * 1024 * 1024;
-use crate::ui::contacts_page::{ContactsPage, ContactsPageInput, ContactsPageOutput};
+use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
 use crate::ui::attachment_drawer::{AttachmentDrawer, AttachmentDrawerInput};
+use crate::ui::contacts_page::{ContactsPage, ContactsPageInput, ContactsPageOutput};
 use crate::ui::message_view::{MessageView, MessageViewInput, MessageViewOutput, UnsubState};
 use crate::ui::message_window::{
     MessageWindow, MessageWindowInit, MessageWindowInput, MessageWindowOutput,
@@ -369,7 +390,6 @@ use crate::ui::sidebar::{
     CtxAction, SectionData, Sidebar, SidebarInit, SidebarInput, SidebarOutput, UnifiedFolderRef,
 };
 use crate::worker::{self, MailRequest, OutgoingMessage, WorkerEvent};
-use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
 
 /// The currently selected mailbox.
 #[derive(Clone)]
@@ -458,22 +478,37 @@ struct FlagChange {
 enum UndoStep {
     /// Take `message_ids` out of `from` and put them in `to`. Symmetric, so
     /// redoing a move is the same request with the two folders swapped.
-    Move { from: String, to: String, message_ids: Vec<String> },
+    Move {
+        from: String,
+        to: String,
+        message_ids: Vec<String>,
+    },
     /// Set flags back to what they were.
     Flags(Vec<FlagChange>),
-    CreateFolder { path: String },
+    CreateFolder {
+        path: String,
+    },
     /// Only ever the inverse of a [`UndoStep::CreateFolder`]: deleting a
     /// folder the user made is undoing that, not a delete of its own. A
     /// folder the user deletes is not undoable at all and never recorded.
-    DeleteFolder { path: String },
-    RenameFolder { from: String, to: String },
+    DeleteFolder {
+        path: String,
+    },
+    RenameFolder {
+        from: String,
+        to: String,
+    },
 }
 
 impl UndoStep {
     /// The step that puts this one back.
     fn inverse(&self) -> UndoStep {
         match self {
-            UndoStep::Move { from, to, message_ids } => UndoStep::Move {
+            UndoStep::Move {
+                from,
+                to,
+                message_ids,
+            } => UndoStep::Move {
                 from: to.clone(),
                 to: from.clone(),
                 message_ids: message_ids.clone(),
@@ -481,14 +516,18 @@ impl UndoStep {
             UndoStep::Flags(changes) => UndoStep::Flags(
                 changes
                     .iter()
-                    .map(|c| FlagChange { value: !c.value, ..c.clone() })
+                    .map(|c| FlagChange {
+                        value: !c.value,
+                        ..c.clone()
+                    })
                     .collect(),
             ),
             UndoStep::CreateFolder { path } => UndoStep::DeleteFolder { path: path.clone() },
             UndoStep::DeleteFolder { path } => UndoStep::CreateFolder { path: path.clone() },
-            UndoStep::RenameFolder { from, to } => {
-                UndoStep::RenameFolder { from: to.clone(), to: from.clone() }
-            }
+            UndoStep::RenameFolder { from, to } => UndoStep::RenameFolder {
+                from: to.clone(),
+                to: from.clone(),
+            },
         }
     }
 }
@@ -542,7 +581,11 @@ impl SmartContext {
                 subject: &m.subject,
                 recipients: &recipients,
                 reply_to: &m.reply_to,
-                body: if m.body.is_empty() { &m.preview } else { &m.body },
+                body: if m.body.is_empty() {
+                    &m.preview
+                } else {
+                    &m.body
+                },
                 body_hits: &[],
                 contacts: self.contacts.as_deref(),
             },
@@ -618,9 +661,15 @@ pub struct HandOffFiles {
 impl HandOffFiles {
     fn of(files: Vec<std::path::PathBuf>, cloud: bool) -> Self {
         if cloud {
-            Self { attach: Vec::new(), cloud: files }
+            Self {
+                attach: Vec::new(),
+                cloud: files,
+            }
         } else {
-            Self { attach: files, cloud: Vec::new() }
+            Self {
+                attach: files,
+                cloud: Vec::new(),
+            }
         }
     }
 }
@@ -1518,7 +1567,12 @@ pub struct AttachmentTarget {
 
 impl AttachmentTarget {
     fn gallery_key(&self) -> crate::ui::attachments_gallery::FileKey {
-        (self.account_id, self.path.clone(), self.uid, self.name.clone())
+        (
+            self.account_id,
+            self.path.clone(),
+            self.uid,
+            self.name.clone(),
+        )
     }
 }
 
@@ -1539,7 +1593,10 @@ pub enum AppMsg {
     /// Show the Outbox (queued, unsent messages).
     ShowOutbox,
     /// A worker reported its queue: replaces that account's entries.
-    OutboxItems { account_id: u32, items: Vec<crate::models::OutboxItem> },
+    OutboxItems {
+        account_id: u32,
+        items: Vec<crate::models::OutboxItem>,
+    },
     /// A worker reported something noteworthy that isn't a failure.
     Notice(String),
     /// Edit the queued message currently open in the reader.
@@ -1553,23 +1610,60 @@ pub enum AppMsg {
     /// The gallery wants a page of attachments matching this query.
     GalleryLoad(Box<GalleryRequest>),
     /// Download an attachment the gallery knows of but has never fetched.
-    GalleryFetch { account_id: u32, folder_path: String, uid: u32 },
+    GalleryFetch {
+        account_id: u32,
+        folder_path: String,
+        uid: u32,
+    },
     /// A chunk of a folder's attachments was described by the scan.
-    AttachmentsScanned { account_id: u32, folder_path: String, added: u32, remaining: u32 },
+    AttachmentsScanned {
+        account_id: u32,
+        folder_path: String,
+        added: u32,
+        remaining: u32,
+    },
     /// Gallery "Go to Message" — open the attachment's source message.
-    OpenAttachmentMessage { account_id: u32, folder_path: String, uid: u32 },
-    FolderSelected { account_id: u32, folder_id: u32, name: String, path: String },
+    OpenAttachmentMessage {
+        account_id: u32,
+        folder_path: String,
+        uid: u32,
+    },
+    FolderSelected {
+        account_id: u32,
+        folder_id: u32,
+        name: String,
+        path: String,
+    },
     /// An account section opened or folded in the sidebar.
-    AccountFolded { id: u32, folded: bool },
+    AccountFolded {
+        id: u32,
+        folded: bool,
+    },
     /// A sidebar folder-tree node was collapsed/expanded (#51) — persist it.
-    FolderNodeCollapsed { account_id: u32, path: String, collapsed: bool },
+    FolderNodeCollapsed {
+        account_id: u32,
+        path: String,
+        collapsed: bool,
+    },
     /// A run of sibling folders was put in a new order in the sidebar.
-    ReorderFolders { account_id: u32, paths: Vec<String> },
+    ReorderFolders {
+        account_id: u32,
+        paths: Vec<String>,
+    },
     /// A folder was dropped beside one at another level: move it there on
     /// the server, then put it just before or after `target`.
-    PlaceFolder { account_id: u32, path: String, dest: String, target: String, after: bool },
+    PlaceFolder {
+        account_id: u32,
+        path: String,
+        dest: String,
+        target: String,
+        after: bool,
+    },
     /// An account's own folder order, chosen from its Folders heading.
-    SetAccountFolderSort { account_id: u32, sort: Option<config::FolderSort> },
+    SetAccountFolderSort {
+        account_id: u32,
+        sort: Option<config::FolderSort>,
+    },
     ToggleCustomFolders(u32),
     SidebarCollapsed(bool),
     /// The message-pane header's sidebar button: flip the sidebar between the
@@ -1586,7 +1680,10 @@ pub enum AppMsg {
     SidebarContext(CtxAction),
     /// A folder's threading references were repaired — re-read it from the cache
     /// so what is on screen groups with what was found.
-    RefsRepaired { account_id: u32, folder_id: u32 },
+    RefsRepaired {
+        account_id: u32,
+        folder_id: u32,
+    },
     /// The list's selection changed; the reader outlines the matching cards.
     SelectionKeys(Vec<crate::ui::message_row::Slot>),
     /// Gmail's x checked rows, this many, or stopped checking (#392).
@@ -1597,57 +1694,129 @@ pub enum AppMsg {
     SelectCards(Vec<(u32, u32)>),
     /// A conversation message was scrolled all the way through — mark it read on
     /// the server, in the caches and in the list.
-    ThreadMessageSeen { account_id: u32, id: u32 },
+    ThreadMessageSeen {
+        account_id: u32,
+        id: u32,
+    },
     /// The conversation on screen has new bodies to show (coalesced).
     RenderThread,
     /// Messages were dropped on a sidebar folder — move them there. `items` is
     /// the dragged selection as (account, folder, uid, id).
-    DropMoveMessages { dest_account: u32, dest: String, items: Vec<(u32, u32, u32, u32)> },
+    DropMoveMessages {
+        dest_account: u32,
+        dest: String,
+        items: Vec<(u32, u32, u32, u32)>,
+    },
     /// Create a custom folder under an account (from the right-click menu).
-    CreateFolder { account_id: u32, name: String },
+    CreateFolder {
+        account_id: u32,
+        name: String,
+    },
     /// Move a folder under a new parent (sidebar drag-and-drop, #51).
     /// `dest` is the new parent's path, or "" for the account's top level.
-    MoveFolder { account_id: u32, path: String, dest: String },
+    MoveFolder {
+        account_id: u32,
+        path: String,
+        dest: String,
+    },
     /// Rename a folder's leaf name in place (context menu).
-    RenameFolderTo { account_id: u32, path: String, new_name: String },
+    RenameFolderTo {
+        account_id: u32,
+        path: String,
+        new_name: String,
+    },
     /// Delete a custom folder (its contents are moved to Trash first).
-    DeleteFolder { account_id: u32, path: String },
+    DeleteFolder {
+        account_id: u32,
+        path: String,
+    },
     /// Erase everything in a Trash or Junk folder (#152).
-    EmptyFolder { account_id: u32, folder_id: u32, path: String },
+    EmptyFolder {
+        account_id: u32,
+        folder_id: u32,
+        path: String,
+    },
     AccountsReordered(Vec<String>),
     /// `solo` marks a reply the user picked out of a conversation on screen:
     /// show that message alone and don't go looking for its siblings.
-    MessageSelected { message: Message, thread: Vec<Message>, solo: bool },
+    MessageSelected {
+        message: Message,
+        thread: Vec<Message>,
+        solo: bool,
+    },
     /// A new-mail desktop notification was clicked — open that message.
-    OpenMessageFromNotification { account_id: u32, folder_id: u32, message_id: u32 },
+    OpenMessageFromNotification {
+        account_id: u32,
+        folder_id: u32,
+        message_id: u32,
+    },
     /// A notification action button (#38): mark the notified message read, or
     /// archive it, without raising the window.
-    NotificationMarkRead { account_id: u32, folder_id: u32, message_id: u32 },
-    NotificationArchive { account_id: u32, folder_id: u32, message_id: u32 },
-    NotificationDelete { account_id: u32, folder_id: u32, message_id: u32 },
-    NotificationReply { account_id: u32, folder_id: u32, message_id: u32 },
-    NotificationForward { account_id: u32, folder_id: u32, message_id: u32 },
-    NotificationSpam { account_id: u32, folder_id: u32, message_id: u32 },
+    NotificationMarkRead {
+        account_id: u32,
+        folder_id: u32,
+        message_id: u32,
+    },
+    NotificationArchive {
+        account_id: u32,
+        folder_id: u32,
+        message_id: u32,
+    },
+    NotificationDelete {
+        account_id: u32,
+        folder_id: u32,
+        message_id: u32,
+    },
+    NotificationReply {
+        account_id: u32,
+        folder_id: u32,
+        message_id: u32,
+    },
+    NotificationForward {
+        account_id: u32,
+        folder_id: u32,
+        message_id: u32,
+    },
+    NotificationSpam {
+        account_id: u32,
+        folder_id: u32,
+        message_id: u32,
+    },
     /// The search field became active/inactive — supply or drop the cross-folder
     /// search pool (every folder's messages, so search can span the mailbox).
     SearchActive(bool),
     /// The indexes of the folders not opened this run, read from disk for
     /// the search `gen` started (#472).
-    SearchPoolLoaded { gen: u64, lists: Vec<((u32, u32), Vec<Message>)> },
+    SearchPoolLoaded {
+        gen: u64,
+        lists: Vec<((u32, u32), Vec<Message>)>,
+    },
     /// The pool [`AppModel::build_search_pool`] put together.
-    SearchPoolBuilt { gen: u64, pool: Vec<Message>, text: Vec<Box<str>> },
+    SearchPoolBuilt {
+        gen: u64,
+        pool: Vec<Message>,
+        text: Vec<Box<str>>,
+    },
     /// The message list has no selection to show (e.g. the last message was
     /// removed), so the reader should clear.
     ClearReader,
     /// Gmail's o or Enter opened a row (#392): the keyboard goes to the
     /// reader, now if the row was already the one open, else once it opens.
-    OpenedByKey { already_open: bool },
+    OpenedByKey {
+        already_open: bool,
+    },
     /// Double-click: open the message in its own standalone window.
-    OpenMessageWindow { message: Message, thread: Vec<Message> },
+    OpenMessageWindow {
+        message: Message,
+        thread: Vec<Message>,
+    },
     /// A popped-out message window was closed (remove it from the map).
     PopoutClosed((u32, u32)),
     /// Add a contact from a popout window's sender.
-    AddContactFrom { name: String, email: String },
+    AddContactFrom {
+        name: String,
+        email: String,
+    },
     /// Download a specific message's attachments (from a popout window).
     LoadAttachmentsFor(Box<Message>),
     /// A message's sender-authentication verdict arrived with its body.
@@ -1661,13 +1830,26 @@ pub enum AppMsg {
     ShowcasePopout,
     /// A message window's Move To: the folder picker over that window, at
     /// its point (x, y). The window closes once a folder is picked.
-    PopoutMoveTo { key: (u32, u32), message: Box<Message>, x: f64, y: f64 },
+    PopoutMoveTo {
+        key: (u32, u32),
+        message: Box<Message>,
+        x: f64,
+        y: f64,
+    },
     /// A message window's single-key shortcut that needs the app (#392):
     /// the window's message and the conversation it shows.
-    PopoutShortcut { action: Shortcut, message: Box<Message>, thread: Vec<Message> },
+    PopoutShortcut {
+        action: Shortcut,
+        message: Box<Message>,
+        thread: Vec<Message>,
+    },
     /// A message window's drawer: delete this file from the server (#289),
     /// asking over that window first.
-    DeletePopoutAttachment { key: (u32, u32), message: Box<Message>, attachment: Box<Attachment> },
+    DeletePopoutAttachment {
+        key: (u32, u32),
+        message: Box<Message>,
+        attachment: Box<Attachment>,
+    },
     ToggleStar,
     Archive,
     Delete,
@@ -1677,25 +1859,44 @@ pub enum AppMsg {
     /// Erase messages for good (confirmed "Delete permanently" in Trash).
     PurgeMessages(Vec<Message>),
     /// The rest of an open message's conversation, found in other folders.
-    Related { account_id: u32, message_id: u32, messages: Vec<Message> },
+    Related {
+        account_id: u32,
+        message_id: u32,
+        messages: Vec<Message>,
+    },
     /// What the conversations on the list really look like, read across the
     /// account's folders: their true size (#222) and their newest message
     /// (#236). Tags are the list's own thread keys.
-    ThreadSummaries { account_id: u32, summaries: Vec<(String, ThreadSummary)> },
+    ThreadSummaries {
+        account_id: u32,
+        summaries: Vec<(String, ThreadSummary)>,
+    },
     /// The list rebuilt its rows: which conversations are on screen, and the
     /// Message-IDs each is threaded by, so their real sizes can be looked up.
-    ThreadsListed { groups: Vec<(u32, String, Vec<String>)> },
+    ThreadsListed {
+        groups: Vec<(u32, String, Vec<String>)>,
+    },
     /// A row's palette or context-menu action. `conversation` holds the whole
     /// thread when the row stands for a collapsed conversation rather than for
     /// `message` alone — a reply started there answers the conversation's
     /// newest message, not the head it is filed under (#210). Empty otherwise.
-    RowAction { action: RowAction, message: Box<Message>, conversation: Vec<Message> },
+    RowAction {
+        action: RowAction,
+        message: Box<Message>,
+        conversation: Vec<Message>,
+    },
     /// A conversation card's own action pill. Reply/Reply all/Forward open the
     /// reader's inline composer (like the toolbar); the rest act like RowAction.
-    CardAction { action: RowAction, message: Box<Message> },
+    CardAction {
+        action: RowAction,
+        message: Box<Message>,
+    },
     /// The open conversation gained a member (a reply synced in while it
     /// was on screen): show it in place, without a re-selection.
-    ThreadGrew { message: Box<Message>, thread: Vec<Message> },
+    ThreadGrew {
+        message: Box<Message>,
+        thread: Vec<Message>,
+    },
     /// A card's "Add sender to Contacts" button.
     CardContact(Box<Message>),
     /// A right-click on a reader card: that message's full menu (the list
@@ -1712,7 +1913,10 @@ pub enum AppMsg {
     /// The reader toolbar's Mark as Read/Unread toggle for the open message.
     ToggleReadCurrent,
     /// A bulk action applied to every selected message.
-    Bulk { action: BulkAction, messages: Vec<Message> },
+    Bulk {
+        action: BulkAction,
+        messages: Vec<Message>,
+    },
     /// A worker finished one bulk MoveMessages request; stops the busy
     /// indicator once all outstanding bulk moves are done.
     BulkComplete,
@@ -1723,15 +1927,27 @@ pub enum AppMsg {
     RemoveSender(String),
     /// A card's Unsubscribe button: confirm, then leave the list the message
     /// came from by the handles its headers offered.
-    Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    Unsubscribe {
+        message: Box<Message>,
+        info: Box<crate::models::Unsubscribe>,
+    },
     /// Confirmed: send the request.
-    UnsubscribeGo { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    UnsubscribeGo {
+        message: Box<Message>,
+        info: Box<crate::models::Unsubscribe>,
+    },
     /// The one-click route failed (or was not offered): write to the list's
     /// `mailto:` handle instead, from the account the message arrived in.
-    UnsubscribeByMail { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    UnsubscribeByMail {
+        message: Box<Message>,
+        info: Box<crate::models::Unsubscribe>,
+    },
     /// The request is over: `Ok(true)` left the list, `Ok(false)` only opened
     /// the list's web page, `Err` says what went wrong.
-    UnsubscribeDone { message: Box<Message>, result: Result<bool, String> },
+    UnsubscribeDone {
+        message: Box<Message>,
+        result: Result<bool, String>,
+    },
     /// A card's invitation button (#223): answer the organiser, or hand the
     /// meeting to whatever application opens calendar files.
     InviteAction {
@@ -1746,10 +1962,16 @@ pub enum AppMsg {
     /// header's buttons into the overflow menu).
     SetReaderActionsCollapsed(bool),
     /// Showcase only: open a drop gap in the Settings toolbar editor.
-    ShowcaseToolbarGap { zone: usize, index: usize },
+    ShowcaseToolbarGap {
+        zone: usize,
+        index: usize,
+    },
     /// A right-click on the reader header's empty space: the menu that
     /// leads to the toolbar editor.
-    ReaderToolbarMenu { x: f64, y: f64 },
+    ReaderToolbarMenu {
+        x: f64,
+        y: f64,
+    },
     /// Open Settings on the Appearance page (its Toolbar section).
     CustomizeToolbar,
     /// Settings, at Message List → Columns (#443).
@@ -1760,7 +1982,10 @@ pub enum AppMsg {
     ReaderOverflowMenu,
     /// Show the full-window attachment lightbox (from the drawer or the
     /// toolbar popover's Preview) over these previewable items.
-    ShowLightbox { items: Vec<Attachment>, start: usize },
+    ShowLightbox {
+        items: Vec<Attachment>,
+        start: usize,
+    },
     /// The GNOME Contacts photo index changed (EDS sync, or the first load
     /// finished) — refresh the avatars that are on screen.
     ContactPhotosChanged,
@@ -1779,7 +2004,10 @@ pub enum AppMsg {
     DeleteThreadConfirmed(Vec<Message>),
     /// Delete every message in an account from this address, after leaving
     /// its list (#407).
-    DeleteFromAddress { account_id: u32, addr: String },
+    DeleteFromAddress {
+        account_id: u32,
+        addr: String,
+    },
     /// Reader View on or off (the header's switch).
     SetReaderMode(bool),
     /// Message zoom (Ctrl+ / Ctrl- / Ctrl+0): a step up, a step down, or
@@ -1802,9 +2030,16 @@ pub enum AppMsg {
     EditAsNewCurrent,
     /// A hand-off's files have a destination (the dialog answered, or the
     /// preference decided); `remember` writes the choice to Settings.
-    HandOffAction { hand_off: FileHandOff, action: config::FilesAction, remember: bool },
+    HandOffAction {
+        hand_off: FileHandOff,
+        action: config::FilesAction,
+        remember: bool,
+    },
     /// The draft picker answered (None: a new message instead).
-    HandOffDraft { hand_off: FileHandOff, draft: Option<Message> },
+    HandOffDraft {
+        hand_off: FileHandOff,
+        draft: Option<Message>,
+    },
     /// Show the draft picker with whatever Drafts lists have arrived.
     HandOffDraftPickNow,
     /// New Message from Template (#360): pick a template to start from,
@@ -1815,14 +2050,26 @@ pub enum AppMsg {
     /// The template picker answered (None: a blank message instead).
     TemplatePicked(Option<Message>),
     /// The reply picker answered (None: a new message instead).
-    HandOffReply { hand_off: FileHandOff, message: Option<Message> },
+    HandOffReply {
+        hand_off: FileHandOff,
+        message: Option<Message>,
+    },
     /// The size check answered: open the composer, attaching or uploading.
-    HandOffOpen { hand_off: FileHandOff, target: HandOffTarget, cloud: bool, remember: bool },
+    HandOffOpen {
+        hand_off: FileHandOff,
+        target: HandOffTarget,
+        cloud: bool,
+        remember: bool,
+    },
     /// The Settings window showed a category; remembered for reopening.
     SettingsPageShown(String),
     /// Show or block remote content for one message, whatever the standing
     /// policy is — the reader menu's entry, and what the banner's Load does.
-    SetRemoteContent { account_id: u32, id: u32, show: bool },
+    SetRemoteContent {
+        account_id: u32,
+        id: u32,
+        show: bool,
+    },
     /// Ctrl+Z: undo the most recent action.
     Undo,
     /// Ctrl+Shift+Z / Ctrl+Y: put back what undo took away.
@@ -1830,7 +2077,11 @@ pub enum AppMsg {
     /// The inline composer's own history changed (#200): what its Undo and
     /// Redo would take back now, or `None` for a direction with nothing in
     /// it. The window's entries follow it while it holds focus.
-    ComposeHistory { id: u32, undo: Option<String>, redo: Option<String> },
+    ComposeHistory {
+        id: u32,
+        undo: Option<String>,
+        redo: Option<String>,
+    },
     /// The ⋯ of the message list header (Focus Mode): search, filters and
     /// sort as a menu.
     ListOverflowMenu,
@@ -1866,7 +2117,10 @@ pub enum AppMsg {
     },
     /// A tag view's rows, read from the index off the main thread: the
     /// view they answer and, per message, its account and folder path.
-    TagViewLoaded { key: (Option<u32>, Option<String>), rows: Vec<(u32, String, Message)> },
+    TagViewLoaded {
+        key: (Option<u32>, Option<String>),
+        rows: Vec<(u32, String, Message)>,
+    },
     /// The cursor entered the sidebar pane — open the hover peek (rail +
     /// preference permitting).
     SidebarHoverEnter,
@@ -1892,7 +2146,12 @@ pub enum AppMsg {
     /// Render it to a PDF and open that, to see what will come out.
     PrintPreview,
     /// A card's attachment chip (#213): open the file, or save it.
-    CardAttachment { account_id: u32, id: u32, index: usize, save: bool },
+    CardAttachment {
+        account_id: u32,
+        id: u32,
+        index: usize,
+        save: bool,
+    },
     /// The drawer's "Show in Message": scroll the reader to the message this
     /// attachment came with (#213).
     ShowAttachmentInMessage(Attachment),
@@ -1907,21 +2166,40 @@ pub enum AppMsg {
     /// straight after [`AppMsg::DeleteAttachment`]).
     SendDeleteAttachment(AttachmentTarget),
     /// The worker could not delete it: show the file as it was.
-    AttachmentNotDeleted { account_id: u32, message_id: u32, name: String, size: u64 },
+    AttachmentNotDeleted {
+        account_id: u32,
+        message_id: u32,
+        name: String,
+        size: u64,
+    },
     /// Showcase only (HYLKI_SHOWCASE_DELETE_ATTACHMENT): the drawer's
     /// Delete from Server for the file called `name`, asking first unless
     /// `confirmed`.
-    ShowcaseDeleteAttachment { name: String, confirmed: bool },
+    ShowcaseDeleteAttachment {
+        name: String,
+        confirmed: bool,
+    },
     /// The worker did it: the message is `new_uid` now (the same UID on
     /// Microsoft 365, a new one elsewhere, `None` if it was not found again).
-    AttachmentDeleted { account_id: u32, message_id: u32, path: String, uid: u32, new_uid: Option<u32>, name: String, size: u64 },
+    AttachmentDeleted {
+        account_id: u32,
+        message_id: u32,
+        path: String,
+        uid: u32,
+        new_uid: Option<u32>,
+        name: String,
+        size: u64,
+    },
     /// Showcase only: turn the inline composer's preview on.
     ShowcaseComposePreview,
     /// Pick entry `n` of the inline composer's From row (#237 capture).
     ShowcaseComposeFrom(u32),
     /// Forward one message of the open conversation by its id (#240), as
     /// its card's Forward button would.
-    ShowcaseForward { account_id: u32, id: u32 },
+    ShowcaseForward {
+        account_id: u32,
+        id: u32,
+    },
     /// Showcase only (HYLKI_SHOWCASE_COMPOSE_CLOSE): cancel the inline
     /// composer, to check its web process goes with it.
     ShowcaseComposeClose,
@@ -1936,7 +2214,9 @@ pub enum AppMsg {
     ShowcaseComposeFormat(config::ComposeFormat),
     /// Showcase only: open the inline composer's format chooser, or its
     /// overflow menu.
-    ShowcaseComposeMenu { format: bool },
+    ShowcaseComposeMenu {
+        format: bool,
+    },
     /// Fetch a message's body again: its OpenPGP verdict changed (#133).
     ReloadBody(Box<crate::models::Message>),
     /// Select a settings category by id (the showcase hook).
@@ -1950,7 +2230,10 @@ pub enum AppMsg {
     ContactSuggestions,
     /// Showcase only (HYLKI_SHOWCASE_FOLDER): switch to the first account's
     /// folder of this kind, so a capture can start from Drafts, Sent, etc.
-    ShowcaseFolder { kind: FolderKind, account: Option<u32> },
+    ShowcaseFolder {
+        kind: FolderKind,
+        account: Option<u32>,
+    },
     /// Showcase only (HYLKI_SHOWCASE_SEND): write `text` in the split
     /// reply's editor and send it, to watch the send morph.
     ShowcaseSend(String),
@@ -1987,11 +2270,18 @@ pub enum AppMsg {
     /// Choose a message file to read (#398).
     PickMessageFile,
     /// An account's answer to a server-side Message-ID search.
-    MidLocated { account_id: u32, message_id: String, hit: Option<(String, u32)> },
+    MidLocated {
+        account_id: u32,
+        message_id: String,
+        hit: Option<(String, u32)>,
+    },
     /// The tag finder: scan every account for keywords in use.
     FindTags,
     /// One account's answer to the scan.
-    KeywordsFound { account_id: u32, findings: Vec<KeywordFinding> },
+    KeywordsFound {
+        account_id: u32,
+        findings: Vec<KeywordFinding>,
+    },
     /// Settings opened this account's page: ask its server how much
     /// storage is in use (#298).
     WantQuota(String),
@@ -1999,9 +2289,15 @@ pub enum AppMsg {
     /// keeps, from the last connect (#346).
     WantIdentities(String),
     /// The server's answer, for the account's Settings page.
-    QuotaFound { account_id: u32, quota: Option<crate::models::MailboxQuota> },
+    QuotaFound {
+        account_id: u32,
+        quota: Option<crate::models::MailboxQuota>,
+    },
     /// A keyword re-sync (#166) changed the cached keywords of these folders.
-    KeywordsSynced { account_id: u32, paths: Vec<String> },
+    KeywordsSynced {
+        account_id: u32,
+        paths: Vec<String>,
+    },
     /// The scan's safety net: report what has come in, if the scan `gen` is
     /// still the one running.
     TagScanTimeout(u32),
@@ -2020,12 +2316,19 @@ pub enum AppMsg {
     ContactAdded(Result<crate::contacts::AddOutcome, String>),
     /// The address books an "Add to Contacts" can go to, gathered off the
     /// UI thread: the dialog for `name` and `email` opens with them.
-    AddContactBooks { name: String, email: String, books: Vec<crate::contacts::Book> },
+    AddContactBooks {
+        name: String,
+        email: String,
+        books: Vec<crate::contacts::Book>,
+    },
     ViewSource,
     /// User clicked "Load attachments" for a message whose attachments weren't
     /// pre-downloaded — fetch them from the server now.
     /// A composer sent a message; `from` is that composer's id.
-    SendMessage { from: u32, out: Box<OutgoingMessage> },
+    SendMessage {
+        from: u32,
+        out: Box<OutgoingMessage>,
+    },
     /// A message's Undo Send delay is over, or Send now was asked for it in
     /// the Outbox: it goes to its worker (#434).
     DispatchSend(u64),
@@ -2042,18 +2345,31 @@ pub enum AppMsg {
     SaveTemplateMessage(Box<OutgoingMessage>),
     /// The composer's Delete Draft: trash the draft it was opened from and
     /// close that composer without saving.
-    DeleteDraft { id: u32, origin: crate::models::DraftOrigin },
+    DeleteDraft {
+        id: u32,
+        origin: crate::models::DraftOrigin,
+    },
     /// A draft is in the Drafts folder under `message_id` (`None`: an
     /// automatic save that did not go through). `autosave` is the composer
     /// that saved it on its own (#340).
-    DraftSaved { account_id: u32, autosave: Option<u32>, message_id: Option<String> },
+    DraftSaved {
+        account_id: u32,
+        autosave: Option<u32>,
+        message_id: Option<String>,
+    },
     /// Merge the unified view's slices now (see `queue_unified_emit`).
     EmitUnified,
     /// A composer saving its message on its own (#340).
-    AutoSaveDraft { id: u32, message: Box<OutgoingMessage> },
+    AutoSaveDraft {
+        id: u32,
+        message: Box<OutgoingMessage>,
+    },
     /// A new message saved only automatically was discarded: the saved copy
     /// goes too, and the composer closes.
-    DiscardAutosave { id: u32, origin: crate::models::DraftOrigin },
+    DiscardAutosave {
+        id: u32,
+        origin: crate::models::DraftOrigin,
+    },
     /// A composer (id) finished — tear down its host (window or inline revealer).
     ComposeClosed(u32),
     /// A composer window's close button: the composer decides, as for
@@ -2065,17 +2381,27 @@ pub enum AppMsg {
     OpenAccounts,
     /// Open the accounts window straight to the "add account" form (empty state).
     AddFirstAccount,
-    AccountSaved { original_email: Option<String>, account: Box<AccountConfig> },
+    AccountSaved {
+        original_email: Option<String>,
+        account: Box<AccountConfig>,
+    },
     /// Show the keyring / Secret Service setup help. `problem: true` when a save
     /// actually failed to persist; `false` for the proactive one-time tip.
-    ShowKeyringHelp { problem: bool },
+    ShowKeyringHelp {
+        problem: bool,
+    },
     /// Reconnect every account: a saved edit changed a secret, which the
     /// keyring said after the save.
     ReconnectAccounts,
     /// The one-time notice that an earlier install's data was carried over.
     ShowCarryOverNotice(&'static crate::legacy::Predecessor),
-    AccountRemoved { email: String },
-    AccountEnabledChanged { email: String, enabled: bool },
+    AccountRemoved {
+        email: String,
+    },
+    AccountEnabledChanged {
+        email: String,
+        enabled: bool,
+    },
     ImportGoaAccount(Box<AccountConfig>),
     /// The welcome wizard's privacy/personalize choices: fan out through the
     /// existing Set* handlers so every side effect stays in one place.
@@ -2094,7 +2420,9 @@ pub enum AppMsg {
     OpenReaderFind,
     /// Delay-policy read marking (#100): fires a couple of seconds after a
     /// message opened; only applies if it is still the one on screen.
-    DeferredMarkRead { message: Box<Message> },
+    DeferredMarkRead {
+        message: Box<Message>,
+    },
     /// The list pane is this wide now (a drag of the divider, #334).
     ListPaneWidth(i32),
     /// Write the exported log straight to `path`, no chooser: the
@@ -2113,21 +2441,32 @@ pub enum AppMsg {
     /// in the background and reports in the status bar instead (#198).
     FilterRunToBackground,
     /// A folder's load has been to the server and back (#198).
-    FolderSynced { account_id: u32, folder_id: u32 },
+    FolderSynced {
+        account_id: u32,
+        folder_id: u32,
+    },
     /// The tags changed in Settings (#71).
     SetTags(Vec<config::Tag>),
     /// A tag row in the sidebar was chosen: list everything carrying it.
     /// A tag row was chosen: its keyword (`None` for the unified Tags row,
     /// every tag at once), and the account it is scoped to (an account
     /// section's own Tags row) or `None` for every account.
-    TagSelected { keyword: Option<String>, account: Option<u32> },
+    TagSelected {
+        keyword: Option<String>,
+        account: Option<u32>,
+    },
     /// A smart folder (#417) was picked, by id.
     SmartSelected(String),
     /// A smart folder's rows, read from the index off the main thread.
-    SmartViewLoaded { id: String, rows: Vec<(u32, String, Message)> },
+    SmartViewLoaded {
+        id: String,
+        rows: Vec<(u32, String, Message)>,
+    },
     /// The starred mail of the accounts with no Starred folder, read from
     /// the index for the unified Starred view (#482).
-    UnifiedStarredLoaded { rows: HashMap<u32, Vec<(String, Message)>> },
+    UnifiedStarredLoaded {
+        rows: HashMap<u32, Vec<(String, Message)>>,
+    },
     /// Read the starred mail of accounts with no Starred folder again (the
     /// debounce ran out).
     RefreshUnifiedStarred,
@@ -2137,7 +2476,9 @@ pub enum AppMsg {
     FillUnifiedSlices,
     /// Folders not in memory yet, read whole from the index off the main
     /// thread: for the unified view being opened, or ahead of it (`Preload`).
-    UnifiedFoldersLoaded { lists: Vec<((u32, u32), Vec<Message>)> },
+    UnifiedFoldersLoaded {
+        lists: Vec<((u32, u32), Vec<Message>)>,
+    },
     /// Read the folders the unified rows list into memory, off the main
     /// thread, so the first visit after a start finds them there.
     Preload,
@@ -2152,14 +2493,25 @@ pub enum AppMsg {
     /// The smart folders as Settings left them.
     SetSmartFolders(Vec<config::SmartFolder>),
     /// Put a tag on one message, or take it off (row menu, palette, card).
-    SetTag { message: Box<Message>, keyword: String, add: bool },
+    SetTag {
+        message: Box<Message>,
+        keyword: String,
+        add: bool,
+    },
     /// Put a tag on several messages, or take it off (the list's bulk bar).
-    SetTagMany { messages: Vec<Message>, keyword: String, add: bool },
+    SetTagMany {
+        messages: Vec<Message>,
+        keyword: String,
+        add: bool,
+    },
     /// The reader toolbar's tag menu: toggle a tag on the reader's target.
     ToggleTagCurrent(String),
     /// A tag's number key, with the list rows selected when it was pressed
     /// (#416).
-    TagKey { n: u8, slots: Vec<crate::ui::message_row::Slot> },
+    TagKey {
+        n: u8,
+        slots: Vec<crate::ui::message_row::Slot>,
+    },
     /// Put the reader's target back in its Inbox (from Trash or Junk, #138).
     MoveToInbox,
     /// Pop the tag menu on the reader toolbar's tag button.
@@ -2169,14 +2521,27 @@ pub enum AppMsg {
     MoveToMenu,
     /// The picker's answer: file the target or selection into `dest` —
     /// or, with `whole`, the open conversation entire (#171).
-    MoveSelectionTo { account_id: u32, dest: String, whole: bool },
+    MoveSelectionTo {
+        account_id: u32,
+        dest: String,
+        whole: bool,
+    },
     /// "Move To…" from the message list's right-click menu: open the
     /// picker at window point (`x`, `y`) for `messages` (with
     /// `offer_whole`, a conversation row and its members: the picker
     /// offers all of them, or the row's own message alone).
-    ListMoveTo { messages: Vec<Message>, offer_whole: bool, x: f64, y: f64 },
+    ListMoveTo {
+        messages: Vec<Message>,
+        offer_whole: bool,
+        x: f64,
+        y: f64,
+    },
     /// That picker's answer.
-    MoveMessagesTo { account_id: u32, dest: String, messages: Vec<Message> },
+    MoveMessagesTo {
+        account_id: u32,
+        dest: String,
+        messages: Vec<Message>,
+    },
     /// Second stage of ImportSettings: the chosen file, applied on a clean
     /// main-loop turn (working inside the chooser's completion callback froze
     /// the app when the confirmation dialog presented there).
@@ -2206,63 +2571,167 @@ pub enum AppMsg {
     SettingsEditorOpen(Option<&'static str>),
     /// A settings editor was asked whether it can be left: `ask` when it
     /// holds unsaved changes, otherwise it has already closed itself.
-    SettingsLeaveEditor { page: String, ask: bool },
+    SettingsLeaveEditor {
+        page: String,
+        ask: bool,
+    },
     // Worker events (each carries the account it came from)
     SetAccount(Account),
     /// A JMAP server's sending identities for an account (#346).
-    ServerIdentities { account_id: u32, identities: Vec<(String, String)> },
-    SetFolders { account_id: u32, folders: Vec<Folder> },
-    Messages { account_id: u32, folder_id: u32, messages: Vec<Message> },
+    ServerIdentities {
+        account_id: u32,
+        identities: Vec<(String, String)>,
+    },
+    SetFolders {
+        account_id: u32,
+        folders: Vec<Folder>,
+    },
+    Messages {
+        account_id: u32,
+        folder_id: u32,
+        messages: Vec<Message>,
+    },
     /// Showcase: open filter rule `i` in the current Accounts panel.
     ShowcaseEditFilter(usize),
     /// The message-body filter conditions the server confirmed for a folder's
     /// listed mail (#191): uid → the lowercased alternatives found in it.
     /// Arrives just ahead of the `Messages` it describes.
-    BodyHits { account_id: u32, folder_id: u32, hits: std::collections::HashMap<u32, Vec<String>> },
+    BodyHits {
+        account_id: u32,
+        folder_id: u32,
+        hits: std::collections::HashMap<u32, Vec<String>>,
+    },
     /// Additional indexed summaries from the background backfill (search index).
-    MessagesAppend { account_id: u32, folder_id: u32, messages: Vec<Message> },
-    UndoRestored { account_id: u32, folder_id: u32, message_ids: Vec<String> },
+    MessagesAppend {
+        account_id: u32,
+        folder_id: u32,
+        messages: Vec<Message>,
+    },
+    UndoRestored {
+        account_id: u32,
+        folder_id: u32,
+        message_ids: Vec<String>,
+    },
     /// A folder's background backfill finished — it's fully indexed now.
-    BackfillDone { account_id: u32, folder_id: u32 },
-    FolderUnread { account_id: u32, folder_id: u32, unread: u32 },
+    BackfillDone {
+        account_id: u32,
+        folder_id: u32,
+    },
+    FolderUnread {
+        account_id: u32,
+        folder_id: u32,
+        unread: u32,
+    },
     /// From a per-folder IDLE watcher, which knows its folder only by path —
     /// folder ids are positional and may have shifted since it was spawned.
-    FolderUnreadByPath { account_id: u32, path: String, unread: u32 },
+    FolderUnreadByPath {
+        account_id: u32,
+        path: String,
+        unread: u32,
+    },
     /// The worker stored (or failed to store) a read/unread change the app
     /// had applied ahead of it.
-    SeenSettled { account_id: u32, path: String, uid: u32 },
+    SeenSettled {
+        account_id: u32,
+        path: String,
+        uid: u32,
+    },
     /// A message was replied to or forwarded, and the server told (#454).
-    Answered { account_id: u32, path: String, uid: u32, forwarded: bool },
-    TagSettled { account_id: u32, path: String, uid: u32, keyword: String },
+    Answered {
+        account_id: u32,
+        path: String,
+        uid: u32,
+        forwarded: bool,
+    },
+    TagSettled {
+        account_id: u32,
+        path: String,
+        uid: u32,
+        keyword: String,
+    },
     /// The worker has run (or failed) the move that took these messages
     /// out of `path`: its lists can be believed about them again.
-    MovesSettled { account_id: u32, path: String, uids: Vec<u32> },
+    MovesSettled {
+        account_id: u32,
+        path: String,
+        uids: Vec<u32>,
+    },
     /// Moving mail to another account (#265): the source's copy of a
     /// message, and the receiving account's answer.
-    RawExported { token: u64, raw: Result<Vec<u8>, String> },
-    RawImported { token: u64, result: Result<(), String> },
+    RawExported {
+        token: u64,
+        raw: Result<Vec<u8>, String>,
+    },
+    RawImported {
+        token: u64,
+        result: Result<(), String>,
+    },
     /// A message the cache listed is no longer in `path` on the server.
-    MessageGone { account_id: u32, message_id: u32, path: String, uid: u32 },
+    MessageGone {
+        account_id: u32,
+        message_id: u32,
+        path: String,
+        uid: u32,
+    },
     /// `path` is the folder the body was read from — a UID only identifies a
     /// message within its own folder, so applying a body to a message means
     /// checking the folder too.
-    Body { account_id: u32, message_id: u32, path: String, body: String },
-    Source { text: String },
+    Body {
+        account_id: u32,
+        message_id: u32,
+        path: String,
+        body: String,
+    },
+    Source {
+        text: String,
+    },
     /// These, like `Body`, name the folder: a UID means a message only
     /// within its folder.
-    Attachments { account_id: u32, path: String, message_id: u32, items: Vec<Attachment> },
-    AttachmentsPending { account_id: u32, path: String, message_id: u32 },
+    Attachments {
+        account_id: u32,
+        path: String,
+        message_id: u32,
+        items: Vec<Attachment>,
+    },
+    AttachmentsPending {
+        account_id: u32,
+        path: String,
+        message_id: u32,
+    },
     /// A flagged message turned out to have no real attachments — drop its paperclip.
-    NoAttachments { account_id: u32, path: String, message_id: u32 },
+    NoAttachments {
+        account_id: u32,
+        path: String,
+        message_id: u32,
+    },
     /// An unflagged message turned out to carry attachments — give it one.
-    HasAttachments { account_id: u32, path: String, message_id: u32 },
-    Sent { account_id: u32 },
+    HasAttachments {
+        account_id: u32,
+        path: String,
+        message_id: u32,
+    },
+    Sent {
+        account_id: u32,
+    },
     /// The worker is done with a message on its way out (#434).
-    SendDone { ticket: u64, sent: bool },
+    SendDone {
+        ticket: u64,
+        sent: bool,
+    },
     /// A message nothing could keep, back for a composer (#340).
-    Unsent { account_id: u32, message: Box<crate::worker::OutgoingMessage> },
-    Status { account_id: u32, text: String },
-    Error { account_id: u32, text: String, connectivity: bool },
+    Unsent {
+        account_id: u32,
+        message: Box<crate::worker::OutgoingMessage>,
+    },
+    Status {
+        account_id: u32,
+        text: String,
+    },
+    Error {
+        account_id: u32,
+        text: String,
+        connectivity: bool,
+    },
     /// An LDAP directory could not be asked (#307), said once per failure.
     DirectoryError(String),
     NotifyCount(usize),
@@ -2279,14 +2748,23 @@ pub enum AppMsg {
     ContactBooksSynced,
     /// Read with the contacts: the books new contacts can go to, chosen one
     /// first, and how many contacts the Hylki book holds.
-    ContactBooksLoaded { books: Vec<crate::contacts::Book>, local_count: usize },
+    ContactBooksLoaded {
+        books: Vec<crate::contacts::Book>,
+        local_count: usize,
+    },
     /// Right-click on the sidebar's Contacts row: the external app.
     LaunchGnomeContacts,
     /// Contact editor writes (run on a background thread against EDS).
-    SaveContact { book_uid: String, vcard: String },
+    SaveContact {
+        book_uid: String,
+        vcard: String,
+    },
     /// A new contact, into the book picked in the editor (`None`: the
     /// default one).
-    CreateContact { book_uid: Option<String>, vcard: String },
+    CreateContact {
+        book_uid: Option<String>,
+        vcard: String,
+    },
     /// A group, new (`original` is `None`) or changed.
     SaveGroup {
         book_uid: String,
@@ -2305,7 +2783,10 @@ pub enum AppMsg {
         edit: crate::contacts::GroupEdit,
     },
     /// Contacts to move to the book `to`: (book, UID, the card for `to`).
-    MoveContacts { to: String, cards: Vec<(String, String, String)> },
+    MoveContacts {
+        to: String,
+        cards: Vec<(String, String, String)>,
+    },
     /// A contact write finished (`Some` = the error to show).
     ContactWriteDone(Option<String>),
     /// The Contacts page's books and groups, for the sidebars.
@@ -2313,15 +2794,25 @@ pub enum AppMsg {
     /// Picked in the sidebar: what the contact list shows.
     ContactScope(crate::ui::contacts_page::ContactScope),
     /// Contacts dropped on a book or group in the sidebar.
-    ContactDrop { keys: Vec<(String, String)>, on: crate::ui::contacts_page::DropOn, moving: bool },
+    ContactDrop {
+        keys: Vec<(String, String)>,
+        on: crate::ui::contacts_page::DropOn,
+        moving: bool,
+    },
     /// A right-click choice on a book or group in the sidebar.
     ContactTreeAction(crate::ui::contacts_page::TreeAction),
     /// Copy these cards into the book `to`.
-    CopyContacts { to: String, cards: Vec<String> },
+    CopyContacts {
+        to: String,
+        cards: Vec<String>,
+    },
     /// The accounts and books folded under the sidebar's Contacts row.
     ContactsFolded(Vec<String>),
     /// Name an address book in Hylki (`None`: its own name again).
-    RenameBook { uid: String, name: Option<String> },
+    RenameBook {
+        uid: String,
+        name: Option<String>,
+    },
     /// `.vcf` files chosen in the Contacts page, to import into the Hylki book.
     ImportContacts(Vec<std::path::PathBuf>),
     /// The import finished.
@@ -3101,9 +3592,15 @@ impl SimpleComponent for AppModel {
             forget_account_secrets(&goa_removed, &config_before_goa);
             sidebar_state.order.retain(|e| !goa_removed.contains(e));
             sidebar_state.collapsed.retain(|e| !goa_removed.contains(e));
-            sidebar_state.folders_expanded.retain(|e| !goa_removed.contains(e));
-            sidebar_state.filtered_expanded_accounts.retain(|e| !goa_removed.contains(e));
-            sidebar_state.tags_expanded_accounts.retain(|e| !goa_removed.contains(e));
+            sidebar_state
+                .folders_expanded
+                .retain(|e| !goa_removed.contains(e));
+            sidebar_state
+                .filtered_expanded_accounts
+                .retain(|e| !goa_removed.contains(e));
+            sidebar_state
+                .tags_expanded_accounts
+                .retain(|e| !goa_removed.contains(e));
             config::save_sidebar_state(&sidebar_state);
         }
         if !goa_removed.is_empty() || goa_outcome.paused_changed || goa_outcome.servers_changed {
@@ -3127,9 +3624,9 @@ impl SimpleComponent for AppModel {
             let (last, last_account) = config::load_last_view();
             match start_view {
                 config::StartView::AllInboxes => None,
-                config::StartView::AccountInbox => {
-                    Some(last_account).filter(|e| !e.is_empty()).map(StartTarget::Inbox)
-                }
+                config::StartView::AccountInbox => Some(last_account)
+                    .filter(|e| !e.is_empty())
+                    .map(StartTarget::Inbox),
                 config::StartView::LastFolder => last
                     .filter(|v| !v.email.is_empty())
                     .map(|v| StartTarget::Folder(v.email, v.path)),
@@ -3192,45 +3689,82 @@ impl SimpleComponent for AppModel {
             MessageList::builder()
                 .launch(())
                 .forward(sender.input_sender(), |out| match out {
-                    MessageListOutput::Selected { message, thread, solo } => {
-                        AppMsg::MessageSelected { message, thread, solo }
-                    }
+                    MessageListOutput::Selected {
+                        message,
+                        thread,
+                        solo,
+                    } => AppMsg::MessageSelected {
+                        message,
+                        thread,
+                        solo,
+                    },
                     MessageListOutput::SelectionKeys(keys) => AppMsg::SelectionKeys(keys),
                     MessageListOutput::Checked(count) => AppMsg::ListChecked(count),
                     MessageListOutput::ViewMissed => AppMsg::EmitUnifiedNow,
-                    MessageListOutput::MoveMessages { account_id, dest, messages } => {
-                        AppMsg::MoveMessagesTo { account_id, dest, messages }
-                    }
-                    MessageListOutput::DeleteThread { messages } => {
-                        AppMsg::DeleteThread(messages)
-                    }
-                    MessageListOutput::ThreadGrew { message, thread } => {
-                        AppMsg::ThreadGrew { message: Box::new(message), thread }
-                    }
-                    MessageListOutput::ThreadsListed { groups } => {
-                        AppMsg::ThreadsListed { groups }
-                    }
+                    MessageListOutput::MoveMessages {
+                        account_id,
+                        dest,
+                        messages,
+                    } => AppMsg::MoveMessagesTo {
+                        account_id,
+                        dest,
+                        messages,
+                    },
+                    MessageListOutput::DeleteThread { messages } => AppMsg::DeleteThread(messages),
+                    MessageListOutput::ThreadGrew { message, thread } => AppMsg::ThreadGrew {
+                        message: Box::new(message),
+                        thread,
+                    },
+                    MessageListOutput::ThreadsListed { groups } => AppMsg::ThreadsListed { groups },
                     MessageListOutput::CountChanged(text) => AppMsg::ListCount(text),
                     MessageListOutput::Activated { message, thread } => {
                         AppMsg::OpenMessageWindow { message, thread }
                     }
-                    MessageListOutput::Action { action, message, conversation } => {
-                        AppMsg::RowAction { action, message, conversation }
-                    }
-                    MessageListOutput::SetTag { message, keyword, add } => {
-                        AppMsg::SetTag { message, keyword, add }
-                    }
-                    MessageListOutput::SetTagMany { messages, keyword, add } => {
-                        AppMsg::SetTagMany { messages, keyword, add }
-                    }
+                    MessageListOutput::Action {
+                        action,
+                        message,
+                        conversation,
+                    } => AppMsg::RowAction {
+                        action,
+                        message,
+                        conversation,
+                    },
+                    MessageListOutput::SetTag {
+                        message,
+                        keyword,
+                        add,
+                    } => AppMsg::SetTag {
+                        message,
+                        keyword,
+                        add,
+                    },
+                    MessageListOutput::SetTagMany {
+                        messages,
+                        keyword,
+                        add,
+                    } => AppMsg::SetTagMany {
+                        messages,
+                        keyword,
+                        add,
+                    },
                     MessageListOutput::Bulk { action, messages } => {
                         AppMsg::Bulk { action, messages }
                     }
-                    MessageListOutput::MoveTo { messages, offer_whole, x, y } => {
-                        AppMsg::ListMoveTo { messages, offer_whole, x, y }
-                    }
+                    MessageListOutput::MoveTo {
+                        messages,
+                        offer_whole,
+                        x,
+                        y,
+                    } => AppMsg::ListMoveTo {
+                        messages,
+                        offer_whole,
+                        x,
+                        y,
+                    },
                     MessageListOutput::SelectionCleared => AppMsg::ClearReader,
-                    MessageListOutput::OpenedByKey { already_open } => AppMsg::OpenedByKey { already_open },
+                    MessageListOutput::OpenedByKey { already_open } => {
+                        AppMsg::OpenedByKey { already_open }
+                    }
                     MessageListOutput::SearchActive(active) => AppMsg::SearchActive(active),
                     MessageListOutput::SortChanged(key) => AppMsg::ListSortChanged(key),
                     MessageListOutput::ColumnWidths(widths) => AppMsg::ListColumnWidths(widths),
@@ -3242,22 +3776,41 @@ impl SimpleComponent for AppModel {
                 .launch(())
                 .forward(sender.input_sender(), |out| match out {
                     MessageViewOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
-                    MessageViewOutput::SetRemote { account_id, id, show } => {
-                        AppMsg::SetRemoteContent { account_id, id, show }
-                    }
-                    MessageViewOutput::OpenWindow(m) => {
-                        AppMsg::OpenMessageWindow { message: *m, thread: Vec::new() }
-                    }
+                    MessageViewOutput::SetRemote {
+                        account_id,
+                        id,
+                        show,
+                    } => AppMsg::SetRemoteContent {
+                        account_id,
+                        id,
+                        show,
+                    },
+                    MessageViewOutput::OpenWindow(m) => AppMsg::OpenMessageWindow {
+                        message: *m,
+                        thread: Vec::new(),
+                    },
                     MessageViewOutput::CardAction { action, message } => {
                         AppMsg::CardAction { action, message }
                     }
                     MessageViewOutput::ContactSender(m) => AppMsg::CardContact(m),
-                    MessageViewOutput::AttachmentAction { account_id, id, index, save } => {
-                        AppMsg::CardAttachment { account_id, id, index, save }
-                    }
-                    MessageViewOutput::CardMenu { message, x, y, hit } => {
-                        AppMsg::CardMenu { message, x, y, hit, popout: None }
-                    }
+                    MessageViewOutput::AttachmentAction {
+                        account_id,
+                        id,
+                        index,
+                        save,
+                    } => AppMsg::CardAttachment {
+                        account_id,
+                        id,
+                        index,
+                        save,
+                    },
+                    MessageViewOutput::CardMenu { message, x, y, hit } => AppMsg::CardMenu {
+                        message,
+                        x,
+                        y,
+                        hit,
+                        popout: None,
+                    },
                     MessageViewOutput::CardMoveTo { message, x, y } => AppMsg::ListMoveTo {
                         messages: vec![*message],
                         offer_whole: false,
@@ -3277,9 +3830,15 @@ impl SimpleComponent for AppModel {
                     MessageViewOutput::Unsubscribe { message, info } => {
                         AppMsg::Unsubscribe { message, info }
                     }
-                    MessageViewOutput::InviteAction { message, invite, action } => {
-                        AppMsg::InviteAction { message, invite, action }
-                    }
+                    MessageViewOutput::InviteAction {
+                        message,
+                        invite,
+                        action,
+                    } => AppMsg::InviteAction {
+                        message,
+                        invite,
+                        action,
+                    },
                 });
 
         // The drawer owns a Paned whose top pane is the reader body, so hand it
@@ -3303,28 +3862,44 @@ impl SimpleComponent for AppModel {
 
         let lightbox = crate::ui::lightbox::Lightbox::builder().launch(()).detach();
 
-        let gallery =
-            AttachmentsGallery::builder()
-                .launch(())
-                .forward(sender.input_sender(), |out| match out {
-                    GalleryOutput::OpenMessage { account_id, folder_path, uid } => {
-                        AppMsg::OpenAttachmentMessage { account_id, folder_path, uid }
-                    }
-                    GalleryOutput::Load(req) => AppMsg::GalleryLoad(Box::new(req)),
-                    GalleryOutput::Fetch { account_id, folder_path, uid } => {
-                        AppMsg::GalleryFetch { account_id, folder_path, uid }
-                    }
-                    GalleryOutput::DeleteFromServer { account_id, folder_path, uid, name, size } => {
-                        AppMsg::AskDeleteAttachment(AttachmentTarget {
-                            account_id,
-                            message_id: uid,
-                            path: folder_path,
-                            uid,
-                            name,
-                            size,
-                        })
-                    }
-                });
+        let gallery = AttachmentsGallery::builder().launch(()).forward(
+            sender.input_sender(),
+            |out| match out {
+                GalleryOutput::OpenMessage {
+                    account_id,
+                    folder_path,
+                    uid,
+                } => AppMsg::OpenAttachmentMessage {
+                    account_id,
+                    folder_path,
+                    uid,
+                },
+                GalleryOutput::Load(req) => AppMsg::GalleryLoad(Box::new(req)),
+                GalleryOutput::Fetch {
+                    account_id,
+                    folder_path,
+                    uid,
+                } => AppMsg::GalleryFetch {
+                    account_id,
+                    folder_path,
+                    uid,
+                },
+                GalleryOutput::DeleteFromServer {
+                    account_id,
+                    folder_path,
+                    uid,
+                    name,
+                    size,
+                } => AppMsg::AskDeleteAttachment(AttachmentTarget {
+                    account_id,
+                    message_id: uid,
+                    path: folder_path,
+                    uid,
+                    name,
+                    size,
+                }),
+            },
+        );
 
         // Built here (not in the model literal) because the contacts page
         // mounts it over its detail pane at launch.
@@ -3336,43 +3911,64 @@ impl SimpleComponent for AppModel {
             r.set_can_target(false);
             r
         };
-        let contacts_page =
-            ContactsPage::builder()
-                .launch(contacts_compose_revealer.clone())
-                .forward(sender.input_sender(), |out| match out {
-                    ContactsPageOutput::Compose(email) => AppMsg::ComposeTo(email),
-                    ContactsPageOutput::ComposeBcc(field) => AppMsg::ComposeBcc(field),
-                    ContactsPageOutput::ToggleSidebar => AppMsg::ToggleSidebar,
-                    ContactsPageOutput::SaveContact { book_uid, vcard } => {
-                        AppMsg::SaveContact { book_uid, vcard }
+        let contacts_page = ContactsPage::builder()
+            .launch(contacts_compose_revealer.clone())
+            .forward(sender.input_sender(), |out| match out {
+                ContactsPageOutput::Compose(email) => AppMsg::ComposeTo(email),
+                ContactsPageOutput::ComposeBcc(field) => AppMsg::ComposeBcc(field),
+                ContactsPageOutput::ToggleSidebar => AppMsg::ToggleSidebar,
+                ContactsPageOutput::SaveContact { book_uid, vcard } => {
+                    AppMsg::SaveContact { book_uid, vcard }
+                }
+                ContactsPageOutput::CreateContact { book_uid, vcard } => {
+                    AppMsg::CreateContact { book_uid, vcard }
+                }
+                ContactsPageOutput::SaveGroup {
+                    book_uid,
+                    format,
+                    original,
+                    edit,
+                } => AppMsg::SaveGroup {
+                    book_uid,
+                    format,
+                    original,
+                    edit,
+                },
+                ContactsPageOutput::DeleteContacts(keys) => AppMsg::DeleteContacts(keys),
+                ContactsPageOutput::MoveGroup {
+                    from,
+                    uid,
+                    to,
+                    format,
+                    edit,
+                } => AppMsg::MoveGroup {
+                    from,
+                    uid,
+                    to,
+                    format,
+                    edit,
+                },
+                ContactsPageOutput::MoveContacts { to, cards } => {
+                    AppMsg::MoveContacts { to, cards }
+                }
+                ContactsPageOutput::CopyContacts { to, cards } => {
+                    AppMsg::CopyContacts { to, cards }
+                }
+                ContactsPageOutput::RenameBook { uid, name } => AppMsg::RenameBook { uid, name },
+                ContactsPageOutput::Tree(tree) => AppMsg::ContactTree(tree),
+                ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
+                ContactsPageOutput::WantSuggestions => AppMsg::ContactSuggestions,
+                ContactsPageOutput::ShowPhoto { name, data } => {
+                    // The lightbox routes by extension — a bare contact
+                    // name sent the JPEG down the PDF path, where poppler
+                    // hung the UI trying to parse it. Name it by content.
+                    let name = format!("{name}.{}", crate::models::image_ext(&data));
+                    AppMsg::ShowLightbox {
+                        items: vec![crate::models::Attachment { name, data }],
+                        start: 0,
                     }
-                    ContactsPageOutput::CreateContact { book_uid, vcard } => {
-                        AppMsg::CreateContact { book_uid, vcard }
-                    }
-                    ContactsPageOutput::SaveGroup { book_uid, format, original, edit } => {
-                        AppMsg::SaveGroup { book_uid, format, original, edit }
-                    }
-                    ContactsPageOutput::DeleteContacts(keys) => AppMsg::DeleteContacts(keys),
-                    ContactsPageOutput::MoveGroup { from, uid, to, format, edit } => {
-                        AppMsg::MoveGroup { from, uid, to, format, edit }
-                    }
-                    ContactsPageOutput::MoveContacts { to, cards } => AppMsg::MoveContacts { to, cards },
-                    ContactsPageOutput::CopyContacts { to, cards } => AppMsg::CopyContacts { to, cards },
-                    ContactsPageOutput::RenameBook { uid, name } => AppMsg::RenameBook { uid, name },
-                    ContactsPageOutput::Tree(tree) => AppMsg::ContactTree(tree),
-                    ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
-                    ContactsPageOutput::WantSuggestions => AppMsg::ContactSuggestions,
-                    ContactsPageOutput::ShowPhoto { name, data } => {
-                        // The lightbox routes by extension — a bare contact
-                        // name sent the JPEG down the PDF path, where poppler
-                        // hung the UI trying to parse it. Name it by content.
-                        let name = format!("{name}.{}", crate::models::image_ext(&data));
-                        AppMsg::ShowLightbox {
-                            items: vec![crate::models::Attachment { name, data }],
-                            start: 0,
-                        }
-                    }
-                });
+                }
+            });
 
         let notifications = NotificationCenter::builder().launch(()).forward(
             sender.input_sender(),
@@ -3400,14 +3996,21 @@ impl SimpleComponent for AppModel {
             // The sidebar's account sections, for those who work from the
             // unified section alone (also Settings → Sidebar).
             let sidebar = gtk::gio::Menu::new();
-            sidebar.append_item(&keyed_item(&i18n("Show Accounts"), "app.show-accounts", "<Ctrl><Shift>a"));
+            sidebar.append_item(&keyed_item(
+                &i18n("Show Accounts"),
+                "app.show-accounts",
+                "<Ctrl><Shift>a",
+            ));
             // Focus Mode: the distraction-free layout (also Ctrl+Shift+F
             // and Settings → Appearance, where its parts are chosen).
             sidebar.append(Some(i18n("Focus Mode").as_str()), Some("app.focus-mode"));
             menu.append_section(None, &sidebar);
 
             let printing = gtk::gio::Menu::new();
-            printing.append(Some(i18n("Print Preview…").as_str()), Some("win.print-preview"));
+            printing.append(
+                Some(i18n("Print Preview…").as_str()),
+                Some("win.print-preview"),
+            );
             printing.append(Some(i18n("Print Message…").as_str()), Some("win.print"));
             menu.append_section(None, &printing);
 
@@ -3435,11 +4038,8 @@ impl SimpleComponent for AppModel {
             });
         }
 
-        let focus_action = gtk::gio::SimpleAction::new_stateful(
-            "focus-mode",
-            None,
-            &focus.enabled.to_variant(),
-        );
+        let focus_action =
+            gtk::gio::SimpleAction::new_stateful("focus-mode", None, &focus.enabled.to_variant());
         {
             let s = sender.clone();
             focus_action.connect_change_state(move |action, value| {
@@ -3459,7 +4059,11 @@ impl SimpleComponent for AppModel {
             mid_searches: HashMap::new(),
             tag_scan: None,
             tag_scan_gen: 0,
-            demo_config: if demo_mode() && config.is_empty() { demo_account_configs_saved() } else { Vec::new() },
+            demo_config: if demo_mode() && config.is_empty() {
+                demo_account_configs_saved()
+            } else {
+                Vec::new()
+            },
             config,
             window: root.clone(),
             prefs: None,
@@ -3537,9 +4141,7 @@ impl SimpleComponent for AppModel {
             reader_toolbar: config::load_reader_toolbar(),
             reader_toolbar_widgets: std::cell::OnceCell::new(),
             reader_overflow_btn: {
-                let b = gtk::Button::from_icon_name(
-                    "view-more-horizontal-symbolic",
-                );
+                let b = gtk::Button::from_icon_name("view-more-horizontal-symbolic");
                 b.set_tooltip_text(Some(i18n("Actions").as_str()));
                 b.add_css_class("flat");
                 b.set_visible(false);
@@ -3775,11 +4377,19 @@ impl SimpleComponent for AppModel {
             quick_filters: QuickFilters::default(),
             filters: {
                 let filters = config::load_filters();
-                if filters.is_empty() && demo_data { demo_filters() } else { filters }
+                if filters.is_empty() && demo_data {
+                    demo_filters()
+                } else {
+                    filters
+                }
             },
             tags: {
                 let tags = config::load_tags();
-                if tags.is_empty() && demo_data { demo_tags() } else { tags }
+                if tags.is_empty() && demo_data {
+                    demo_tags()
+                } else {
+                    tags
+                }
             },
             tag_view: None,
             tag_view_cache: HashMap::new(),
@@ -3896,8 +4506,12 @@ impl SimpleComponent for AppModel {
         if model.filters.iter().any(|r| r.needs_contacts()) {
             model.saved_addresses.refresh();
         }
-        model.message_list.emit(MessageListInput::SetTags(model.tags.clone()));
-        model.message_view.emit(MessageViewInput::SetTags(model.tags.clone()));
+        model
+            .message_list
+            .emit(MessageListInput::SetTags(model.tags.clone()));
+        model
+            .message_view
+            .emit(MessageViewInput::SetTags(model.tags.clone()));
         // What each mailbox of the user's own shows (#189), before the first
         // cached message is painted: the sidebar refreshes this whenever the
         // accounts change, but nothing has rebuilt it yet at this point.
@@ -4028,16 +4642,32 @@ impl SimpleComponent for AppModel {
             subject: model.list_show_subject(),
             animate: false,
         });
-        model.message_view.emit(MessageViewInput::SetFoldLook { preview_lines: model.list_preview_lines() });
+        model.message_view.emit(MessageViewInput::SetFoldLook {
+            preview_lines: model.list_preview_lines(),
+        });
         model.push_single_line();
-        model.message_list.emit(MessageListInput::SetColumns(model.list_columns.clone()));
-        model.message_list.emit(MessageListInput::SetHeadings(model.list_headings));
-        model.message_list.emit(MessageListInput::SetColumnScroll(model.list_column_scroll));
-        model.message_list.emit(MessageListInput::SetSearchPinned(model.list_search_open));
+        model
+            .message_list
+            .emit(MessageListInput::SetColumns(model.list_columns.clone()));
+        model
+            .message_list
+            .emit(MessageListInput::SetHeadings(model.list_headings));
+        model
+            .message_list
+            .emit(MessageListInput::SetColumnScroll(model.list_column_scroll));
+        model
+            .message_list
+            .emit(MessageListInput::SetSearchPinned(model.list_search_open));
         model.push_list_bars();
-        model.contacts_page.emit(ContactsPageInput::SetSearchPinned(model.contacts_search_open));
-        model.contacts_page.emit(ContactsPageInput::SetBookPicker(!model.contacts_placement.shown()));
-        model.message_list.emit(MessageListInput::SetColumnWidths(model.list_column_widths.clone()));
+        model.contacts_page.emit(ContactsPageInput::SetSearchPinned(
+            model.contacts_search_open,
+        ));
+        model.contacts_page.emit(ContactsPageInput::SetBookPicker(
+            !model.contacts_placement.shown(),
+        ));
+        model.message_list.emit(MessageListInput::SetColumnWidths(
+            model.list_column_widths.clone(),
+        ));
         model.sidebars_emit(SidebarInput::SetFocus {
             hide_accounts: model.focus.active(config::FocusPart::HideAccounts),
             fold_unified: model.focus.active(config::FocusPart::FoldUnified),
@@ -4051,7 +4681,9 @@ impl SimpleComponent for AppModel {
             .emit(MessageListInput::SetThreadExpansion(model.thread_expansion));
         model
             .message_list
-            .emit(MessageListInput::SetThreadRowNewest(model.thread_row_newest));
+            .emit(MessageListInput::SetThreadRowNewest(
+                model.thread_row_newest,
+            ));
         model
             .message_list
             .emit(MessageListInput::SetListPalette(model.list_palette));
@@ -4060,36 +4692,66 @@ impl SimpleComponent for AppModel {
             .emit(MessageListInput::SetThreadsExpanded(model.threads_expanded));
         model
             .message_list
-            .emit(MessageListInput::SetPaletteCollapse(model.palette_collapse_secs));
+            .emit(MessageListInput::SetPaletteCollapse(
+                model.palette_collapse_secs,
+            ));
+        model.message_view.emit(MessageViewInput::SetContentTheme(
+            model.message_theme.dark_override(),
+        ));
         model
             .message_view
-            .emit(MessageViewInput::SetContentTheme(model.message_theme.dark_override()));
-        model.message_view.emit(MessageViewInput::SetReaderStyle(model.reader_style()));
+            .emit(MessageViewInput::SetReaderStyle(model.reader_style()));
         model
             .message_view
-            .emit(MessageViewInput::SetAlwaysShowRecipients(model.always_show_recipients));
-        model.message_view.emit(MessageViewInput::SetPgpLabels(model.pgp_labels));
+            .emit(MessageViewInput::SetAlwaysShowRecipients(
+                model.always_show_recipients,
+            ));
         model
             .message_view
-            .emit(MessageViewInput::SetSingleMessageCard(model.single_message_card));
-        model.message_view.emit(MessageViewInput::SetFoldMessages(model.fold_messages));
-        model.message_view.emit(MessageViewInput::SetReaderMode(model.effective_reader_mode()));
-        model.message_view.emit(MessageViewInput::SetZoomDefault(model.zoom_default));
-        model.message_view.emit(MessageViewInput::SetZoom(model.zoom));
-        model.message_view.emit(MessageViewInput::SetReaderSwitchShown(model.reader_switch));
-        model.message_view.emit(MessageViewInput::SetThemeSwitchShown(model.theme_switch));
-        model.message_view.emit(MessageViewInput::SetReaderDefault(model.effective_reader_default()));
+            .emit(MessageViewInput::SetPgpLabels(model.pgp_labels));
         model
             .message_view
-            .emit(MessageViewInput::SetCardAttachmentsShown(model.card_attachments));
+            .emit(MessageViewInput::SetSingleMessageCard(
+                model.single_message_card,
+            ));
+        model
+            .message_view
+            .emit(MessageViewInput::SetFoldMessages(model.fold_messages));
+        model.message_view.emit(MessageViewInput::SetReaderMode(
+            model.effective_reader_mode(),
+        ));
+        model
+            .message_view
+            .emit(MessageViewInput::SetZoomDefault(model.zoom_default));
+        model
+            .message_view
+            .emit(MessageViewInput::SetZoom(model.zoom));
+        model
+            .message_view
+            .emit(MessageViewInput::SetReaderSwitchShown(model.reader_switch));
+        model
+            .message_view
+            .emit(MessageViewInput::SetThemeSwitchShown(model.theme_switch));
+        model.message_view.emit(MessageViewInput::SetReaderDefault(
+            model.effective_reader_default(),
+        ));
+        model
+            .message_view
+            .emit(MessageViewInput::SetCardAttachmentsShown(
+                model.card_attachments,
+            ));
         model
             .message_view
             .emit(MessageViewInput::SetAttachmentDrawer(model.drawer_enabled));
-        model.message_view.emit(MessageViewInput::SetUnsubscribed(model.unsubscribed_map()));
-        model.message_view.emit(MessageViewInput::SetIdentities(model.identities_map()));
         model
             .message_view
-            .emit(MessageViewInput::SetInviteAnswers(model.invite_answers_map()));
+            .emit(MessageViewInput::SetUnsubscribed(model.unsubscribed_map()));
+        model
+            .message_view
+            .emit(MessageViewInput::SetIdentities(model.identities_map()));
+        model.message_view.emit(MessageViewInput::SetInviteAnswers(
+            model.invite_answers_map(),
+        ));
         model.arm_auto_fetch(&sender);
 
         // The app-wide theme choice must be in force before the first frame.
@@ -4190,13 +4852,20 @@ impl SimpleComponent for AppModel {
             let mut button_w = 0;
             for (_, w) in &buttons {
                 packed_sum += w.measure(gtk::Orientation::Horizontal, -1).1;
-                let inner = w.downcast_ref::<gtk::Revealer>().and_then(|r| r.child()).unwrap_or_else(|| w.clone());
+                let inner = w
+                    .downcast_ref::<gtk::Revealer>()
+                    .and_then(|r| r.child())
+                    .unwrap_or_else(|| w.clone());
                 let nat = inner.measure(gtk::Orientation::Horizontal, -1).1;
                 if nat > 0 {
                     button_w = button_w.max(nat);
                 }
             }
-            let base = if full <= 0 { 0 } else { (full - controls - packed_sum).max(0) };
+            let base = if full <= 0 {
+                0
+            } else {
+                (full - controls - packed_sum).max(0)
+            };
             let bp = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
                 adw::BreakpointConditionLengthType::MaxWidth,
                 READER_ACTIONS_BREAKPOINT,
@@ -4314,8 +4983,7 @@ impl SimpleComponent for AppModel {
             gallery_hb.set_title_widget(Some(&title));
             // Leftmost, same spot as the message list header's: the sidebar
             // collapse/expand toggle.
-            let sidebar_btn =
-                gtk::Button::from_icon_name("sidebar-show-symbolic");
+            let sidebar_btn = gtk::Button::from_icon_name("sidebar-show-symbolic");
             sidebar_btn.set_tooltip_text(Some(i18n("Toggle sidebar").as_str()));
             sidebar_btn.add_css_class("flat");
             let s = sender.input_sender().clone();
@@ -4325,7 +4993,9 @@ impl SimpleComponent for AppModel {
             gallery_hb.pack_start(&sidebar_btn);
             gallery_tv.add_top_bar(&gallery_hb);
             gallery_tv.set_content(Some(model.gallery.widget()));
-            widgets.content_stack.add_named(&gallery_tv, Some("gallery"));
+            widgets
+                .content_stack
+                .add_named(&gallery_tv, Some("gallery"));
 
             // The contacts view brings its own per-pane headers (so its
             // divider runs to the very top, like the mail panes').
@@ -4396,15 +5066,30 @@ impl SimpleComponent for AppModel {
                         message_id,
                     }) as &dyn Fn(u32, u32, u32) -> AppMsg,
                 ),
-                (crate::notify::ARCHIVE_ACTION, &|account_id, folder_id, message_id| {
-                    AppMsg::NotificationArchive { account_id, folder_id, message_id }
-                }),
-                (crate::notify::DELETE_ACTION, &|account_id, folder_id, message_id| {
-                    AppMsg::NotificationDelete { account_id, folder_id, message_id }
-                }),
-                (crate::notify::SPAM_ACTION, &|account_id, folder_id, message_id| {
-                    AppMsg::NotificationSpam { account_id, folder_id, message_id }
-                }),
+                (
+                    crate::notify::ARCHIVE_ACTION,
+                    &|account_id, folder_id, message_id| AppMsg::NotificationArchive {
+                        account_id,
+                        folder_id,
+                        message_id,
+                    },
+                ),
+                (
+                    crate::notify::DELETE_ACTION,
+                    &|account_id, folder_id, message_id| AppMsg::NotificationDelete {
+                        account_id,
+                        folder_id,
+                        message_id,
+                    },
+                ),
+                (
+                    crate::notify::SPAM_ACTION,
+                    &|account_id, folder_id, message_id| AppMsg::NotificationSpam {
+                        account_id,
+                        folder_id,
+                        message_id,
+                    },
+                ),
             ] {
                 let act = gtk::gio::SimpleAction::new(name, Some(ty));
                 let asender = sender.clone();
@@ -4432,9 +5117,14 @@ impl SimpleComponent for AppModel {
                         message_id,
                     }) as &dyn Fn(u32, u32, u32) -> AppMsg,
                 ),
-                (crate::notify::FORWARD_ACTION, &|account_id, folder_id, message_id| {
-                    AppMsg::NotificationForward { account_id, folder_id, message_id }
-                }),
+                (
+                    crate::notify::FORWARD_ACTION,
+                    &|account_id, folder_id, message_id| AppMsg::NotificationForward {
+                        account_id,
+                        folder_id,
+                        message_id,
+                    },
+                ),
             ] {
                 let act = gtk::gio::SimpleAction::new(name, Some(ty));
                 let win = model.window.clone();
@@ -4485,17 +5175,20 @@ impl SimpleComponent for AppModel {
         {
             let s = sender.clone();
             let guard = model.peek_transition.clone();
-            widgets.peek_split.connect_show_sidebar_notify(move |split| {
-                tracing::info!(
-                    "peek: show-sidebar notify shown={} guarded={}",
-                    split.shows_sidebar(), guard.get()
-                );
-                // Only a *user* dismissal (scrim click / swipe) counts — our
-                // own open/close transitions notify too.
-                if !guard.get() && !split.shows_sidebar() {
-                    s.input(AppMsg::SidebarPeekDismissed);
-                }
-            });
+            widgets
+                .peek_split
+                .connect_show_sidebar_notify(move |split| {
+                    tracing::info!(
+                        "peek: show-sidebar notify shown={} guarded={}",
+                        split.shows_sidebar(),
+                        guard.get()
+                    );
+                    // Only a *user* dismissal (scrim click / swipe) counts — our
+                    // own open/close transitions notify too.
+                    if !guard.get() && !split.shows_sidebar() {
+                        s.input(AppMsg::SidebarPeekDismissed);
+                    }
+                });
         }
         // Pointer tracking drives the hover peek: with the hover-expand
         // preference on, moving the pointer over the docked rail floats the
@@ -4538,7 +5231,9 @@ impl SimpleComponent for AppModel {
                 .sidebar_refresh_stack
                 .add_named(&model.sidebar_refresh_spinner, Some("spinner"));
             model.sidebar_refresh_stack.set_visible_child_name("icon");
-            model.sidebar_refresh.set_child(Some(&model.sidebar_refresh_stack));
+            model
+                .sidebar_refresh
+                .set_child(Some(&model.sidebar_refresh_stack));
             let s = sender.input_sender().clone();
             model.sidebar_refresh.connect_clicked(move |_| {
                 let _ = s.send(AppMsg::Refresh);
@@ -4568,8 +5263,12 @@ impl SimpleComponent for AppModel {
             model.show_network_state();
         }
         if model.rail_active {
-            widgets.sidebar_split.set_min_sidebar_width(SIDEBAR_RAIL_WIDTH);
-            widgets.sidebar_split.set_max_sidebar_width(SIDEBAR_RAIL_WIDTH);
+            widgets
+                .sidebar_split
+                .set_min_sidebar_width(SIDEBAR_RAIL_WIDTH);
+            widgets
+                .sidebar_split
+                .set_max_sidebar_width(SIDEBAR_RAIL_WIDTH);
             set_sidebar_header_compact(
                 &widgets.sidebar_header,
                 &widgets.app_title,
@@ -4623,7 +5322,11 @@ impl SimpleComponent for AppModel {
                 let s = sender.clone();
                 action.connect_activate(move |_, _| s.input(AppMsg::ComposerKey(keyval)));
                 app.add_action(&action);
-                gtk::prelude::GtkApplicationExt::set_accels_for_action(&app, &format!("app.{name}"), &[accel]);
+                gtk::prelude::GtkApplicationExt::set_accels_for_action(
+                    &app,
+                    &format!("app.{name}"),
+                    &[accel],
+                );
             }
             // Ctrl+Shift+F switches Focus Mode on and off.
             gtk::prelude::GtkApplicationExt::set_accels_for_action(
@@ -4635,7 +5338,11 @@ impl SimpleComponent for AppModel {
             // = key stands in for + on layouts where + needs Shift, and the
             // keypad's keys count too, as in every browser.
             for (name, step, keys) in [
-                ("zoom-in", 1i8, &["<Ctrl>plus", "<Ctrl>equal", "<Ctrl>KP_Add"][..]),
+                (
+                    "zoom-in",
+                    1i8,
+                    &["<Ctrl>plus", "<Ctrl>equal", "<Ctrl>KP_Add"][..],
+                ),
                 ("zoom-out", -1, &["<Ctrl>minus", "<Ctrl>KP_Subtract"][..]),
                 ("zoom-reset", 0, &["<Ctrl>0", "<Ctrl>KP_0"][..]),
             ] {
@@ -4643,7 +5350,11 @@ impl SimpleComponent for AppModel {
                 let s = sender.clone();
                 action.connect_activate(move |_, _| s.input(AppMsg::ZoomKey(step)));
                 app.add_action(&action);
-                gtk::prelude::GtkApplicationExt::set_accels_for_action(&app, &format!("app.{name}"), keys);
+                gtk::prelude::GtkApplicationExt::set_accels_for_action(
+                    &app,
+                    &format!("app.{name}"),
+                    keys,
+                );
             }
             // Ctrl+W closes the window only (issue #64): with "run in the
             // background" on, mail keeps arriving — unlike Ctrl+Q, which
@@ -4662,8 +5373,9 @@ impl SimpleComponent for AppModel {
             // Started hidden? Then the first activation is this very launch, and
             // presenting here would undo it. Every activation after that is a
             // person asking for the window.
-            let pending_hidden_start =
-                std::cell::Cell::new(crate::HIDDEN_START.load(std::sync::atomic::Ordering::Relaxed));
+            let pending_hidden_start = std::cell::Cell::new(
+                crate::HIDDEN_START.load(std::sync::atomic::Ordering::Relaxed),
+            );
             app.connect_activate(move |_| {
                 if pending_hidden_start.replace(false) {
                     return;
@@ -4765,11 +5477,15 @@ impl SimpleComponent for AppModel {
             let probe = model.message_list.model().selection_probe();
             // A tag key carries the rows selected as it is pressed (#416).
             let shortcut = move |action: Shortcut| match action {
-                Shortcut::Tag(n) => AppMsg::TagKey { n, slots: probe.slots() },
+                Shortcut::Tag(n) => AppMsg::TagKey {
+                    n,
+                    slots: probe.slots(),
+                },
                 action => AppMsg::Shortcut(action),
             };
             // The first key of a Gmail sequence (g or *) and when it came.
-            let pending: std::rc::Rc<std::cell::Cell<Option<(char, std::time::Instant)>>> = Default::default();
+            let pending: std::rc::Rc<std::cell::Cell<Option<(char, std::time::Instant)>>> =
+                Default::default();
             keys.connect_key_pressed(move |_, keyval, _, state| {
                 let keyval = without_caps_lock(keyval, state);
                 let ctrl = state.contains(gtk::gdk::ModifierType::CONTROL_MASK);
@@ -4812,7 +5528,10 @@ impl SimpleComponent for AppModel {
                 // single-key shortcuts. A composer keeps them: Ctrl+U
                 // underlines there, and a reply should not start from the
                 // middle of another.
-                if ctrl && !state.contains(gtk::gdk::ModifierType::ALT_MASK) && !focus_in_compose(&window) {
+                if ctrl
+                    && !state.contains(gtk::gdk::ModifierType::ALT_MASK)
+                    && !focus_in_compose(&window)
+                {
                     if let Some(msg) = ctrl_shortcut_for(keyval, shift) {
                         s.input(msg);
                         return gtk::glib::Propagation::Stop;
@@ -4839,7 +5558,11 @@ impl SimpleComponent for AppModel {
                     && !focus_is_text(&window)
                     && !focus_in_compose(&window)
                 {
-                    s.input(shortcut(if shift { Shortcut::DeleteForever } else { Shortcut::Delete }));
+                    s.input(shortcut(if shift {
+                        Shortcut::DeleteForever
+                    } else {
+                        Shortcut::Delete
+                    }));
                     return gtk::glib::Propagation::Stop;
                 }
                 if !enabled.get() || focus_is_text(&window) || focus_in_compose(&window) {
@@ -4853,7 +5576,9 @@ impl SimpleComponent for AppModel {
                     if matches!(keyval, gtk::gdk::Key::Shift_L | gtk::gdk::Key::Shift_R) {
                         return gtk::glib::Propagation::Proceed;
                     }
-                    let first = pending.take().filter(|(_, at)| at.elapsed() < std::time::Duration::from_millis(1500));
+                    let first = pending
+                        .take()
+                        .filter(|(_, at)| at.elapsed() < std::time::Duration::from_millis(1500));
                     if let Some((first, _)) = first {
                         if let Some(action) = gmail_sequence(first, keyval) {
                             s.input(shortcut(action));
@@ -4958,7 +5683,10 @@ impl SimpleComponent for AppModel {
         // pointer, so its log can be read (#236).
         // HYLKI_SHOWCASE_ZOOM=N presses Ctrl+ N times (Ctrl- for a negative
         // N) at 8 s, so the live zoom path can be captured.
-        if let Some(n) = std::env::var("HYLKI_SHOWCASE_ZOOM").ok().and_then(|v| v.parse::<i8>().ok()) {
+        if let Some(n) = std::env::var("HYLKI_SHOWCASE_ZOOM")
+            .ok()
+            .and_then(|v| v.parse::<i8>().ok())
+        {
             let s = sender.clone();
             gtk::glib::timeout_add_seconds_local_once(8, move || {
                 for _ in 0..n.unsigned_abs() {
@@ -4977,7 +5705,10 @@ impl SimpleComponent for AppModel {
                 Some(name) => (name.to_string(), true),
                 None => (v, false),
             };
-            let at: u32 = std::env::var("HYLKI_SHOWCASE_DELETE_AT").ok().and_then(|v| v.parse().ok()).unwrap_or(10);
+            let at: u32 = std::env::var("HYLKI_SHOWCASE_DELETE_AT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(10);
             if name.starts_with("gallery:") {
                 let s = sender.clone();
                 gtk::glib::timeout_add_seconds_local_once(at.saturating_sub(4), move || {
@@ -5056,7 +5787,10 @@ impl SimpleComponent for AppModel {
             let account = v.parse::<u32>().ok().filter(|a| *a > 0);
             let s = sender.clone();
             gtk::glib::timeout_add_seconds_local_once(at, move || {
-                s.input(AppMsg::ShowcaseFolder { kind: FolderKind::Inbox, account });
+                s.input(AppMsg::ShowcaseFolder {
+                    kind: FolderKind::Inbox,
+                    account,
+                });
             });
         }
         // HYLKI_SHOWCASE_LIST_SEARCH=<text>[:<scope>][@<seconds>] searches
@@ -5083,7 +5817,9 @@ impl SimpleComponent for AppModel {
             }
             for at in times {
                 let s = sender.clone();
-                gtk::glib::timeout_add_seconds_local_once(at, move || s.input(AppMsg::ShowcaseNotify));
+                gtk::glib::timeout_add_seconds_local_once(at, move || {
+                    s.input(AppMsg::ShowcaseNotify)
+                });
             }
         }
         // Timers leave room for the WebViews to load and settle between steps.
@@ -5102,15 +5838,20 @@ impl SimpleComponent for AppModel {
                 // capture, for checking pill geometry without a pointer.
                 if std::env::var("HYLKI_SHOWCASE_HEIGHTS").is_ok() {
                     let sidebar = model.sidebar.widget().clone().upcast::<gtk::Widget>();
-                    gtk::glib::timeout_add_seconds_local_once(delay.saturating_sub(1).max(1), move || {
-                        fn walk(w: &gtk::Widget, depth: usize, root: &gtk::Widget) {
-                            let classes = w.css_classes();
-                            let heading = classes.iter().any(|c| c == "unified-folders-toggle");
-                            let child_row = w.is::<gtk::ListBoxRow>()
-                                && w.parent().is_some_and(|p| p.css_classes().iter().any(|c| c == "section-child-list"));
-                            if heading || child_row {
-                                let y = w.compute_bounds(root).map(|b| b.y() as i32).unwrap_or(-1);
-                                tracing::info!(
+                    gtk::glib::timeout_add_seconds_local_once(
+                        delay.saturating_sub(1).max(1),
+                        move || {
+                            fn walk(w: &gtk::Widget, depth: usize, root: &gtk::Widget) {
+                                let classes = w.css_classes();
+                                let heading = classes.iter().any(|c| c == "unified-folders-toggle");
+                                let child_row = w.is::<gtk::ListBoxRow>()
+                                    && w.parent().is_some_and(|p| {
+                                        p.css_classes().iter().any(|c| c == "section-child-list")
+                                    });
+                                if heading || child_row {
+                                    let y =
+                                        w.compute_bounds(root).map(|b| b.y() as i32).unwrap_or(-1);
+                                    tracing::info!(
                                     "showcase heights: {} y={y} h={} margins={}/{} classes={:?}",
                                     if heading { "heading" } else { "row" },
                                     w.height(),
@@ -5118,15 +5859,16 @@ impl SimpleComponent for AppModel {
                                     w.margin_bottom(),
                                     classes,
                                 );
+                                }
+                                let mut c = w.first_child();
+                                while let Some(ch) = c {
+                                    walk(&ch, depth + 1, root);
+                                    c = ch.next_sibling();
+                                }
                             }
-                            let mut c = w.first_child();
-                            while let Some(ch) = c {
-                                walk(&ch, depth + 1, root);
-                                c = ch.next_sibling();
-                            }
-                        }
-                        walk(&sidebar, 0, &sidebar);
-                    });
+                            walk(&sidebar, 0, &sidebar);
+                        },
+                    );
                 }
                 if stage {
                     let list = model.message_list.sender().clone();
@@ -5135,8 +5877,9 @@ impl SimpleComponent for AppModel {
                     });
                     // HYLKI_SHOWCASE_PALETTE=N opens row N's actions palette
                     // (so a capture can verify the floating palette's look).
-                    if let Some(Ok(idx)) =
-                        std::env::var("HYLKI_SHOWCASE_PALETTE").ok().map(|v| v.parse())
+                    if let Some(Ok(idx)) = std::env::var("HYLKI_SHOWCASE_PALETTE")
+                        .ok()
+                        .map(|v| v.parse())
                     {
                         let list = model.message_list.sender().clone();
                         let burst = std::env::var("HYLKI_SHOWCASE_BURST").ok();
@@ -5215,7 +5958,10 @@ impl SimpleComponent for AppModel {
                 }
                 // HYLKI_SHOWCASE_ROW=N selects the list's row N at 4s (with
                 // HYLKI_SHOWCASE_STAGE=0), for capturing or probing one message.
-                if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_ROW").ok().map(|v| v.parse::<u32>()) {
+                if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_ROW")
+                    .ok()
+                    .map(|v| v.parse::<u32>())
+                {
                     let list = model.message_list.sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(4, move || {
                         for _ in 0..=n {
@@ -5229,7 +5975,10 @@ impl SimpleComponent for AppModel {
                 if std::env::var("HYLKI_SHOWCASE_UNSUB").is_ok() {
                     let view = model.message_view.sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(7, move || {
-                        let _ = view.send(MessageViewInput::Unsubscribe { account_id: 1, id: 10 });
+                        let _ = view.send(MessageViewInput::Unsubscribe {
+                            account_id: 1,
+                            id: 10,
+                        });
                     });
                 }
                 // HYLKI_SHOWCASE_INVITE=accept|maybe|decline|calendar presses
@@ -5264,11 +6013,14 @@ impl SimpleComponent for AppModel {
                         .ok()
                         .and_then(|v| v.parse().ok())
                         .unwrap_or(3);
-                    let sub = which.strip_prefix("starred@").and_then(|n| n.parse::<i32>().ok());
+                    let sub = which
+                        .strip_prefix("starred@")
+                        .and_then(|n| n.parse::<i32>().ok());
                     let pick = move || match which.as_str() {
-                        _ if let Some(index) = sub => {
-                            SidebarInput::KindSubRowSelected { kind: FolderKind::Starred, index }
-                        }
+                        _ if let Some(index) = sub => SidebarInput::KindSubRowSelected {
+                            kind: FolderKind::Starred,
+                            index,
+                        },
                         "starred" => SidebarInput::UnifiedKindRowSelected(FolderKind::Starred),
                         "drafts" => SidebarInput::UnifiedKindRowSelected(FolderKind::Drafts),
                         "archive" => SidebarInput::UnifiedKindRowSelected(FolderKind::Archive),
@@ -5442,8 +6194,11 @@ impl SimpleComponent for AppModel {
                 // full width, or under Focus Mode's rail, it is the rail
                 // expanding and folding again.
                 if let Ok(spec) = std::env::var("HYLKI_SHOWCASE_PEEK") {
-                    let mut at: Vec<f64> =
-                        spec.split(',').filter_map(|p| p.trim().parse::<f64>().ok()).filter(|s| *s > 1.5).collect();
+                    let mut at: Vec<f64> = spec
+                        .split(',')
+                        .filter_map(|p| p.trim().parse::<f64>().ok())
+                        .filter(|s| *s > 1.5)
+                        .collect();
                     if at.is_empty() {
                         at.push(8.0);
                     }
@@ -5472,7 +6227,10 @@ impl SimpleComponent for AppModel {
                                         gtk::glib::timeout_add_local_once(
                                             std::time::Duration::from_millis(*ms),
                                             move || {
-                                                showcase_capture(win.upcast_ref::<gtk::Widget>(), &path);
+                                                showcase_capture(
+                                                    win.upcast_ref::<gtk::Widget>(),
+                                                    &path,
+                                                );
                                             },
                                         );
                                     }
@@ -5500,7 +6258,9 @@ impl SimpleComponent for AppModel {
                 if std::env::var("HYLKI_SHOWCASE_FOLD_FILTERED").is_ok() {
                     let sb = model.sidebar.sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(3, move || {
-                        let _ = sb.send(SidebarInput::ToggleFilteredExpand(crate::ui::sidebar::Slot::Unified));
+                        let _ = sb.send(SidebarInput::ToggleFilteredExpand(
+                            crate::ui::sidebar::Slot::Unified,
+                        ));
                     });
                 }
                 // HYLKI_SHOWCASE_REPLY opens the inline reply composer on the
@@ -5515,21 +6275,29 @@ impl SimpleComponent for AppModel {
                 // capture a little later catches the slide, and one later
                 // still the settled layout. HYLKI_SHOWCASE_FOCUS_OFF=<seconds>
                 // switches it off again.
-                for (var, on) in [("HYLKI_SHOWCASE_FOCUS", true), ("HYLKI_SHOWCASE_FOCUS_OFF", false)] {
+                for (var, on) in [
+                    ("HYLKI_SHOWCASE_FOCUS", true),
+                    ("HYLKI_SHOWCASE_FOCUS_OFF", false),
+                ] {
                     if let Some(at) = std::env::var(var).ok().and_then(|v| v.parse::<f64>().ok()) {
                         let s = sender.clone();
-                        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis((at * 1000.0) as u64), move || {
-                            let mut focus = config::load_focus_mode();
-                            focus.enabled = on;
-                            s.input(AppMsg::Pref(PrefOutput::SetFocusMode(focus)));
-                        });
+                        gtk::glib::timeout_add_local_once(
+                            std::time::Duration::from_millis((at * 1000.0) as u64),
+                            move || {
+                                let mut focus = config::load_focus_mode();
+                                focus.enabled = on;
+                                s.input(AppMsg::Pref(PrefOutput::SetFocusMode(focus)));
+                            },
+                        );
                     }
                 }
                 if let Ok(v) = std::env::var("HYLKI_SHOWCASE_FOLDER") {
                     let (kind, at) = showcase_at(&v, 2);
                     if kind == "outbox" {
                         let s = sender.clone();
-                        gtk::glib::timeout_add_seconds_local_once(at, move || s.input(AppMsg::ShowOutbox));
+                        gtk::glib::timeout_add_seconds_local_once(at, move || {
+                            s.input(AppMsg::ShowOutbox)
+                        });
                     }
                     let kind = match kind {
                         "drafts" => Some(FolderKind::Drafts),
@@ -5543,7 +6311,10 @@ impl SimpleComponent for AppModel {
                     if let Some(kind) = kind {
                         let s = sender.clone();
                         gtk::glib::timeout_add_seconds_local_once(at, move || {
-                            s.input(AppMsg::ShowcaseFolder { kind, account: None });
+                            s.input(AppMsg::ShowcaseFolder {
+                                kind,
+                                account: None,
+                            });
                         });
                     }
                 }
@@ -5551,7 +6322,9 @@ impl SimpleComponent for AppModel {
                 // reply's editor and sends it at that moment, for the send
                 // morph.
                 if let Ok(v) = std::env::var("HYLKI_SHOWCASE_SEND") {
-                    let (at, text) = v.split_once(':').unwrap_or((v.as_str(), "Sounds good, ship it.\nJason"));
+                    let (at, text) = v
+                        .split_once(':')
+                        .unwrap_or((v.as_str(), "Sounds good, ship it.\nJason"));
                     let at = at.parse::<f64>().unwrap_or(9.0);
                     // `@<path>` reads the text from a file.
                     let text = match text.strip_prefix('@') {
@@ -5559,26 +6332,41 @@ impl SimpleComponent for AppModel {
                         None => text.replace("\\n", "\n"),
                     };
                     let s = sender.clone();
-                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis((at * 1000.0) as u64), move || {
-                        s.input(AppMsg::ShowcaseSend(text));
-                    });
+                    gtk::glib::timeout_add_local_once(
+                        std::time::Duration::from_millis((at * 1000.0) as u64),
+                        move || {
+                            s.input(AppMsg::ShowcaseSend(text));
+                        },
+                    );
                 }
                 // HYLKI_SHOWCASE_UNDO=<seconds> presses Undo on the first
                 // message sent, to check it comes back where it was (#434).
-                if let Some(at) = std::env::var("HYLKI_SHOWCASE_UNDO").ok().and_then(|v| v.parse::<f64>().ok()) {
+                if let Some(at) = std::env::var("HYLKI_SHOWCASE_UNDO")
+                    .ok()
+                    .and_then(|v| v.parse::<f64>().ok())
+                {
                     let s = sender.clone();
-                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis((at * 1000.0) as u64), move || {
-                        s.input(AppMsg::UndoSend(1));
-                    });
+                    gtk::glib::timeout_add_local_once(
+                        std::time::Duration::from_millis((at * 1000.0) as u64),
+                        move || {
+                            s.input(AppMsg::UndoSend(1));
+                        },
+                    );
                 }
                 // HYLKI_SHOWCASE_COPY=<seconds> has the sent reply's copy
                 // read back then, so its stand-in card can be seen to give
                 // way to it.
-                if let Some(at) = std::env::var("HYLKI_SHOWCASE_COPY").ok().and_then(|v| v.parse::<f64>().ok()) {
+                if let Some(at) = std::env::var("HYLKI_SHOWCASE_COPY")
+                    .ok()
+                    .and_then(|v| v.parse::<f64>().ok())
+                {
                     let s = sender.clone();
-                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis((at * 1000.0) as u64), move || {
-                        s.input(AppMsg::ShowcaseCopy);
-                    });
+                    gtk::glib::timeout_add_local_once(
+                        std::time::Duration::from_millis((at * 1000.0) as u64),
+                        move || {
+                            s.input(AppMsg::ShowcaseCopy);
+                        },
+                    );
                 }
                 // Two seconds on, it logs where focus landed (#266).
                 if let Ok(v) = std::env::var("HYLKI_SHOWCASE_REPLY") {
@@ -5589,7 +6377,9 @@ impl SimpleComponent for AppModel {
                     gtk::glib::timeout_add_seconds_local_once(at, move || {
                         s.input(AppMsg::Reply);
                         // After the split's slide, which focus waits for.
-                        gtk::glib::timeout_add_seconds_local_once(2, move || showcase_log_focus(&window));
+                        gtk::glib::timeout_add_seconds_local_once(2, move || {
+                            showcase_log_focus(&window)
+                        });
                     });
                 }
                 // HYLKI_SHOWCASE_NEW=<seconds>[:<address>] opens a new message
@@ -5604,8 +6394,14 @@ impl SimpleComponent for AppModel {
                     let s = sender.clone();
                     let window = root.clone();
                     gtk::glib::timeout_add_seconds_local_once(at, move || {
-                        s.input(if to.is_empty() { AppMsg::Compose } else { AppMsg::ComposeTo(to) });
-                        gtk::glib::timeout_add_seconds_local_once(1, move || showcase_log_focus(&window));
+                        s.input(if to.is_empty() {
+                            AppMsg::Compose
+                        } else {
+                            AppMsg::ComposeTo(to)
+                        });
+                        gtk::glib::timeout_add_seconds_local_once(1, move || {
+                            showcase_log_focus(&window)
+                        });
                     });
                 }
                 // HYLKI_SHOWCASE_FORWARD=<seconds> does the same with
@@ -5617,14 +6413,18 @@ impl SimpleComponent for AppModel {
                 // picked.
                 if let Ok(v) = std::env::var("HYLKI_SHOWCASE_FORWARD") {
                     let mut parts = v.split(':');
-                    let at = parts.next().and_then(|p| p.parse::<u32>().ok()).unwrap_or(4);
-                    let target = parts
+                    let at = parts
                         .next()
-                        .zip(parts.next())
-                        .and_then(|(a, id)| Some((a.parse::<u32>().ok()?, id.parse::<u32>().ok()?)));
+                        .and_then(|p| p.parse::<u32>().ok())
+                        .unwrap_or(4);
+                    let target = parts.next().zip(parts.next()).and_then(|(a, id)| {
+                        Some((a.parse::<u32>().ok()?, id.parse::<u32>().ok()?))
+                    });
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(at, move || match target {
-                        Some((account_id, id)) => s.input(AppMsg::ShowcaseForward { account_id, id }),
+                        Some((account_id, id)) => {
+                            s.input(AppMsg::ShowcaseForward { account_id, id })
+                        }
                         None => s.input(AppMsg::Forward),
                     });
                 }
@@ -5651,7 +6451,10 @@ impl SimpleComponent for AppModel {
                 // HYLKI_SHOWCASE_COMPOSE_FROM=N picks the inline composer's
                 // From entry N at 7 s, to check where the new account's
                 // signature lands (#237).
-                if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_COMPOSE_FROM").ok().map(|v| v.parse::<u32>()) {
+                if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_COMPOSE_FROM")
+                    .ok()
+                    .map(|v| v.parse::<u32>())
+                {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(7, move || {
                         s.input(AppMsg::ShowcaseComposeFrom(n));
@@ -5661,7 +6464,10 @@ impl SimpleComponent for AppModel {
                 // N seconds in (pair with HYLKI_SHOWCASE_REPLY), to check
                 // that a closed composer's web view, and so its web process,
                 // actually goes away (#221).
-                if let Some(at) = std::env::var("HYLKI_SHOWCASE_COMPOSE_CLOSE").ok().and_then(|v| v.parse::<u32>().ok()) {
+                if let Some(at) = std::env::var("HYLKI_SHOWCASE_COMPOSE_CLOSE")
+                    .ok()
+                    .and_then(|v| v.parse::<u32>().ok())
+                {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(at, move || {
                         s.input(AppMsg::ShowcaseComposeClose);
@@ -5725,7 +6531,11 @@ impl SimpleComponent for AppModel {
                 // (the dialog asking about them) instead of the main one.
                 if let Ok(list) = std::env::var("HYLKI_SHOWCASE_FILES") {
                     let s = sender.clone();
-                    let paths: Vec<std::path::PathBuf> = list.split(':').filter(|p| !p.is_empty()).map(Into::into).collect();
+                    let paths: Vec<std::path::PathBuf> = list
+                        .split(':')
+                        .filter(|p| !p.is_empty())
+                        .map(Into::into)
+                        .collect();
                     gtk::glib::timeout_add_seconds_local_once(4, move || {
                         s.input(AppMsg::OpenWithFiles(paths));
                     });
@@ -5752,7 +6562,10 @@ impl SimpleComponent for AppModel {
                 // HYLKI_SHOWCASE_SHORTCUTS=<height> opens the shortcut list at
                 // 4 s, that tall, so all of it fits a capture (with
                 // HYLKI_SHOWCASE_TOP).
-                if let Some(h) = std::env::var("HYLKI_SHOWCASE_SHORTCUTS").ok().and_then(|v| v.parse::<i32>().ok()) {
+                if let Some(h) = std::env::var("HYLKI_SHOWCASE_SHORTCUTS")
+                    .ok()
+                    .and_then(|v| v.parse::<i32>().ok())
+                {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(4, move || {
                         s.input(AppMsg::ShowShortcuts);
@@ -5762,7 +6575,10 @@ impl SimpleComponent for AppModel {
                         if let Some(w) = (0..tops.n_items())
                             .filter_map(|i| tops.item(i))
                             .filter_map(|o| o.downcast::<adw::Window>().ok())
-                            .find(|w| w.is_visible() && w.title().is_some_and(|t| t == i18n("Keyboard Shortcuts")))
+                            .find(|w| {
+                                w.is_visible()
+                                    && w.title().is_some_and(|t| t == i18n("Keyboard Shortcuts"))
+                            })
                         {
                             w.set_default_size(w.default_width(), h);
                         }
@@ -5772,17 +6588,25 @@ impl SimpleComponent for AppModel {
                 // after the Settings window (with HYLKI_SHOWCASE_SETTINGS),
                 // so the editor itself can be captured.
                 // `new[:<provider label>]` opens a blank editor instead.
-                if let Some(rest) = std::env::var("HYLKI_SHOWCASE_ACCOUNT").ok().and_then(|v| v.strip_prefix("new").map(str::to_string)) {
+                if let Some(rest) = std::env::var("HYLKI_SHOWCASE_ACCOUNT")
+                    .ok()
+                    .and_then(|v| v.strip_prefix("new").map(str::to_string))
+                {
                     let provider = rest.strip_prefix(':').map(str::to_string);
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(5, move || {
                         s.input(AppMsg::ShowcaseNewAccount(provider.clone()));
                     });
                 }
-                if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_ACCOUNT").ok().map(|v| v.parse::<u32>()) {
+                if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_ACCOUNT")
+                    .ok()
+                    .map(|v| v.parse::<u32>())
+                {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(5, move || {
-                        s.input(AppMsg::SidebarContext(CtxAction::OpenAccountSettings(n + 1)));
+                        s.input(AppMsg::SidebarContext(CtxAction::OpenAccountSettings(
+                            n + 1,
+                        )));
                     });
                 }
                 // HYLKI_SHOWCASE_EDITOR_DIRTY=1 types into the open account
@@ -5859,7 +6683,9 @@ impl SimpleComponent for AppModel {
                 // selects the first n entries at 5s.
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_CONTACTS") {
                     let s = sender.clone();
-                    gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::OpenContacts));
+                    gtk::glib::timeout_add_seconds_local_once(3, move || {
+                        s.input(AppMsg::OpenContacts)
+                    });
                     let page = model.contacts_page.sender().clone();
                     if which == "new" || which == "group" {
                         gtk::glib::timeout_add_seconds_local_once(5, move || {
@@ -5869,21 +6695,26 @@ impl SimpleComponent for AppModel {
                                 ContactsPageInput::NewContact
                             });
                         });
-                    } else if let Some(filter) =
-                        which.strip_prefix("filter:").and_then(|n| n.parse::<usize>().ok()).and_then(|n| {
-                            crate::ui::contacts_page::ContactFilter::ALL.get(n).copied()
-                        })
+                    } else if let Some(filter) = which
+                        .strip_prefix("filter:")
+                        .and_then(|n| n.parse::<usize>().ok())
+                        .and_then(|n| crate::ui::contacts_page::ContactFilter::ALL.get(n).copied())
                     {
                         gtk::glib::timeout_add_seconds_local_once(5, move || {
                             let _ = page.send(ContactsPageInput::SetFilter(filter, true));
                         });
-                    } else if let Some(n) = which.strip_prefix("multi:").and_then(|n| n.parse::<u32>().ok()) {
+                    } else if let Some(n) = which
+                        .strip_prefix("multi:")
+                        .and_then(|n| n.parse::<u32>().ok())
+                    {
                         gtk::glib::timeout_add_seconds_local_once(5, move || {
                             let _ = page.send(ContactsPageInput::SelectFirst(n));
                         });
                     } else if let Some(spec) = which.strip_prefix("search:") {
                         let (text, book) = match spec.rsplit_once('@') {
-                            Some((t, n)) if n.parse::<u32>().is_ok() => (t.to_string(), n.parse::<u32>().ok()),
+                            Some((t, n)) if n.parse::<u32>().is_ok() => {
+                                (t.to_string(), n.parse::<u32>().ok())
+                            }
                             _ => (spec.to_string(), None),
                         };
                         let p = page.clone();
@@ -5979,16 +6810,19 @@ impl SimpleComponent for AppModel {
                     .ok()
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(u64::from(delay) * 1000);
-                gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(delay_ms), move || {
-                    let target = settings
-                        .as_ref()
-                        .map(|_| ())
-                        .or(top.then_some(()))
-                        .and_then(|_| settings_window())
-                        .map(|w| w.upcast::<gtk::Widget>())
-                        .unwrap_or_else(|| win.clone().upcast::<gtk::Widget>());
-                    showcase_capture(&target, &shot);
-                });
+                gtk::glib::timeout_add_local_once(
+                    std::time::Duration::from_millis(delay_ms),
+                    move || {
+                        let target = settings
+                            .as_ref()
+                            .map(|_| ())
+                            .or(top.then_some(()))
+                            .and_then(|_| settings_window())
+                            .map(|w| w.upcast::<gtk::Widget>())
+                            .unwrap_or_else(|| win.clone().upcast::<gtk::Widget>());
+                        showcase_capture(&target, &shot);
+                    },
+                );
             }
         }
 
@@ -6010,7 +6844,9 @@ impl SimpleComponent for AppModel {
                 }
             });
             sort_group.add_action(&sort_action);
-            widgets.list_filter_btn.insert_action_group("sortmenu", Some(&sort_group));
+            widgets
+                .list_filter_btn
+                .insert_action_group("sortmenu", Some(&sort_group));
 
             let _ = model.list_header_widgets.set(ListHeaderWidgets {
                 revealers: vec![
@@ -6019,13 +6855,19 @@ impl SimpleComponent for AppModel {
                     widgets.lh_count.clone(),
                 ],
                 overflow: widgets.lh_overflow.clone(),
-                filter: SortFilterPopover::new(widgets.list_filter_btn.clone(), &sort_action, sender.input_sender()),
+                filter: SortFilterPopover::new(
+                    widgets.list_filter_btn.clone(),
+                    &sort_action,
+                    sender.input_sender(),
+                ),
                 sort: sort_action,
             });
             // Focus Mode's chrome as saved: nothing is mapped yet, so the
             // revealers jump to their state without animating.
             model.sync_focus_chrome();
-            model.reader_overflow_btn.set_visible(model.reader_overflow_wanted());
+            model
+                .reader_overflow_btn
+                .set_visible(model.reader_overflow_wanted());
         }
 
         // mailto: URIs can arrive (via GApplication `open`) before this init
@@ -6038,7 +6880,9 @@ impl SimpleComponent for AppModel {
         model
             .notifications
             .emit(NotifyInput::SetConsoleEnabled(model.console_mode));
-        model.notifications.emit(NotifyInput::SetAtTop(model.status_bar_top));
+        model
+            .notifications
+            .emit(NotifyInput::SetAtTop(model.status_bar_top));
         // Screenshot/dev hook: open the status bar console shortly after
         // launch (pref permitting) so captures can show it.
         // HYLKI_SHOWCASE_ABOUT=1 opens the About window a beat after
@@ -6076,19 +6920,34 @@ impl SimpleComponent for AppModel {
             use crate::ui::drop_zones::{DropContext, DropZones};
             let overlay = widgets.window_overlay.clone();
             let s = sender.input_sender().clone();
-            let zones = DropZones::install(DropContext::NewMessage, &root, &overlay, move |choice, paths| {
-                s.emit(AppMsg::DropFilesAs(choice, paths));
-            });
+            let zones = DropZones::install(
+                DropContext::NewMessage,
+                &root,
+                &overlay,
+                move |choice, paths| {
+                    s.emit(AppMsg::DropFilesAs(choice, paths));
+                },
+            );
             let slots = [
                 model.reader_compose_revealer.clone(),
                 model.contacts_compose_revealer.clone(),
                 model.reader_split_top.clone(),
                 model.reader_split_bottom.clone(),
             ];
-            zones.set_gate(move || !slots.iter().any(|slot| slot.reveals_child() && slot.is_visible()));
+            zones.set_gate(move || {
+                !slots
+                    .iter()
+                    .any(|slot| slot.reveals_child() && slot.is_visible())
+            });
             zones.set_refresh(|zones| {
-                zones.set_allow_inline(config::load_compose_format() == config::ComposeFormat::Rich);
-                zones.set_cloud_names(crate::cloud::load_enabled_accounts().into_iter().map(|a| a.name).collect());
+                zones
+                    .set_allow_inline(config::load_compose_format() == config::ComposeFormat::Rich);
+                zones.set_cloud_names(
+                    crate::cloud::load_enabled_accounts()
+                        .into_iter()
+                        .map(|a| a.name)
+                        .collect(),
+                );
             });
             // HYLKI_SHOWCASE_WINDOW_DROP=<attach|inline|cloud|none>:<file>[:<file>…]
             // raises the window's cards at 3 s, for a capture.
@@ -6103,8 +6962,15 @@ impl SimpleComponent for AppModel {
                 let paths: Vec<std::path::PathBuf> = parts.collect();
                 let (zones, host) = (zones.clone(), root.clone().upcast::<gtk::Widget>());
                 gtk::glib::timeout_add_seconds_local_once(3, move || {
-                    zones.set_allow_inline(config::load_compose_format() == config::ComposeFormat::Rich);
-                    zones.set_cloud_names(crate::cloud::load_enabled_accounts().into_iter().map(|a| a.name).collect());
+                    zones.set_allow_inline(
+                        config::load_compose_format() == config::ComposeFormat::Rich,
+                    );
+                    zones.set_cloud_names(
+                        crate::cloud::load_enabled_accounts()
+                            .into_iter()
+                            .map(|a| a.name)
+                            .collect(),
+                    );
                     zones.showcase(&paths, &host, hover);
                 });
             }
@@ -6169,8 +7035,10 @@ impl SimpleComponent for AppModel {
                 self.sync_attachment_drawer();
                 self.message_list.emit(MessageListInput::SetSelected(None));
                 self.message_list.emit(MessageListInput::ResetPaging);
-                self.message_list.emit(MessageListInput::SetScope(SearchScope::ThisFolder));
-                self.message_list.emit(MessageListInput::SetColorize(self.accounts.len() > 1));
+                self.message_list
+                    .emit(MessageListInput::SetScope(SearchScope::ThisFolder));
+                self.message_list
+                    .emit(MessageListInput::SetColorize(self.accounts.len() > 1));
                 self.show_message(None, false);
                 self.push_outbox();
             }
@@ -6179,9 +7047,6 @@ impl SimpleComponent for AppModel {
                 self.outbox_by_account.insert(account_id, items);
                 self.push_outbox();
             }
-
-
-
 
             AppMsg::EditCurrentOutbox => {
                 if let Some(m) = self.current.clone() {
@@ -6194,11 +7059,17 @@ impl SimpleComponent for AppModel {
 
             AppMsg::SendCurrentOutbox => {
                 if let Some(m) = self.current.clone() {
-                    let in_flight = self.outgoing.borrow().iter().any(|o| crate::outgoing::row_id(o.ticket) == m.id);
+                    let in_flight = self
+                        .outgoing
+                        .borrow()
+                        .iter()
+                        .any(|o| crate::outgoing::row_id(o.ticket) == m.id);
                     match self.outgoing_ticket(m.id) {
                         Some(ticket) => self.dispatch_send(ticket),
                         None if in_flight => {}
-                        None => self.send_to(m.account_id, MailRequest::FlushOutbox { id: Some(m.id) }),
+                        None => {
+                            self.send_to(m.account_id, MailRequest::FlushOutbox { id: Some(m.id) })
+                        }
                     }
                 }
             }
@@ -6226,12 +7097,18 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::RetryAllOutbox => {
-                let held: Vec<u64> =
-                    self.outgoing.borrow().iter().filter(|o| o.held).map(|o| o.ticket).collect();
+                let held: Vec<u64> = self
+                    .outgoing
+                    .borrow()
+                    .iter()
+                    .filter(|o| o.held)
+                    .map(|o| o.ticket)
+                    .collect();
                 for ticket in held {
                     self.dispatch_send(ticket);
                 }
-                let accounts: Vec<u32> = self.outbox_by_account
+                let accounts: Vec<u32> = self
+                    .outbox_by_account
                     .iter()
                     .filter(|(_, items)| !items.is_empty())
                     .map(|(id, _)| *id)
@@ -6259,13 +7136,18 @@ impl SimpleComponent for AppModel {
                 // Handing over the folder list is what starts the load: the
                 // gallery asks for its first page once it knows the scope, so
                 // the query is never run against an empty one.
-                self.gallery.emit(GalleryInput::SetAccounts(self.gallery_scope()));
+                self.gallery
+                    .emit(GalleryInput::SetAccounts(self.gallery_scope()));
                 // Keep the scan working through whatever is still unindexed, so
                 // the archive fills in behind the user as they browse.
                 self.start_attachment_scan();
             }
 
-            AppMsg::GalleryFetch { account_id, folder_path, uid } => {
+            AppMsg::GalleryFetch {
+                account_id,
+                folder_path,
+                uid,
+            } => {
                 // The gallery knows this file exists because the scan described
                 // it, but its bytes were never downloaded. Reuse the reader's
                 // own fetch: it stores what comes back, so the next visit finds
@@ -6282,7 +7164,12 @@ impl SimpleComponent for AppModel {
                 self.gallery.emit(GalleryInput::SetFetching(true));
             }
 
-            AppMsg::AttachmentsScanned { account_id, folder_path, added, remaining } => {
+            AppMsg::AttachmentsScanned {
+                account_id,
+                folder_path,
+                added,
+                remaining,
+            } => {
                 let folder_path_key = folder_path.clone();
                 // Keep going while this folder has more to describe. The reply
                 // to each chunk is what asks for the next, so the scan runs at
@@ -6296,7 +7183,8 @@ impl SimpleComponent for AppModel {
                 if added > 0 && self.showing_gallery {
                     self.gallery.emit(GalleryInput::ScanProgress);
                 }
-                self.gallery_scan_left.insert((account_id, folder_path_key), remaining);
+                self.gallery_scan_left
+                    .insert((account_id, folder_path_key), remaining);
                 let left: u32 = self.gallery_scan_left.values().sum();
                 self.gallery.emit(GalleryInput::ScanStatus(left));
             }
@@ -6329,10 +7217,18 @@ impl SimpleComponent for AppModel {
                     self.gallery_total
                 };
                 self.gallery_total = total;
-                self.gallery.emit(GalleryInput::Page { items, total, offset: req.offset });
+                self.gallery.emit(GalleryInput::Page {
+                    items,
+                    total,
+                    offset: req.offset,
+                });
             }
 
-            AppMsg::OpenAttachmentMessage { account_id, folder_path, uid } => {
+            AppMsg::OpenAttachmentMessage {
+                account_id,
+                folder_path,
+                uid,
+            } => {
                 self.leave_gallery();
                 self.showing_contacts = false;
                 self.showing_outbox = false;
@@ -6342,7 +7238,12 @@ impl SimpleComponent for AppModel {
                     .and_then(|fs| fs.iter().find(|f| f.path == folder_path))
                     .cloned()
                 {
-                    self.select_folder(account_id, folder.id, folder.name.clone(), folder.path.clone());
+                    self.select_folder(
+                        account_id,
+                        folder.id,
+                        folder.name.clone(),
+                        folder.path.clone(),
+                    );
                     // Messages use their UID as id, so select by (account, uid).
                     self.message_list
                         .emit(MessageListInput::SelectAndLoad((account_id, uid)));
@@ -6354,15 +7255,28 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::AccountStarredSelected(account_id) => {
-                self.open_unified_in(UnifiedView::Kind(FolderKind::Starred), Some(account_id), &sender);
+                self.open_unified_in(
+                    UnifiedView::Kind(FolderKind::Starred),
+                    Some(account_id),
+                    &sender,
+                );
             }
 
-            AppMsg::FolderSelected { account_id, folder_id, name, path } => {
+            AppMsg::FolderSelected {
+                account_id,
+                folder_id,
+                name,
+                path,
+            } => {
                 self.close_sidebar_peek();
                 self.select_folder(account_id, folder_id, name, path);
             }
 
-            AppMsg::OpenMessageFromNotification { account_id, folder_id, message_id } => {
+            AppMsg::OpenMessageFromNotification {
+                account_id,
+                folder_id,
+                message_id,
+            } => {
                 // The user clicked a new-mail notification: they've engaged with
                 // that account's mail, so clear its toast, then navigate to the
                 // message's folder and open it in the reader.
@@ -6394,11 +7308,14 @@ impl SimpleComponent for AppModel {
                         .map(|m| m.uid);
                     if let Some(uid) = uid {
                         if !self.body_cache.contains_key(&(account_id, folder_id, uid)) {
-                            self.send_to(account_id, MailRequest::LoadBody {
-                                message_id,
-                                path: path.clone(),
-                                uid,
-                            });
+                            self.send_to(
+                                account_id,
+                                MailRequest::LoadBody {
+                                    message_id,
+                                    path: path.clone(),
+                                    uid,
+                                },
+                            );
                         }
                     }
                     // Mail that landed in an inbox opens in the unified
@@ -6424,7 +7341,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::NotificationMarkRead { account_id, folder_id, message_id } => {
+            AppMsg::NotificationMarkRead {
+                account_id,
+                folder_id,
+                message_id,
+            } => {
                 if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
                 {
                     // set_read clears the account's notification itself.
@@ -6432,7 +7353,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::NotificationArchive { account_id, folder_id, message_id } => {
+            AppMsg::NotificationArchive {
+                account_id,
+                folder_id,
+                message_id,
+            } => {
                 if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
                 {
                     self.move_to(m, FolderKind::Archive);
@@ -6440,7 +7365,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::NotificationDelete { account_id, folder_id, message_id } => {
+            AppMsg::NotificationDelete {
+                account_id,
+                folder_id,
+                message_id,
+            } => {
                 if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
                 {
                     // The same path as the Delete key: to Trash, with the
@@ -6450,7 +7379,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::NotificationSpam { account_id, folder_id, message_id } => {
+            AppMsg::NotificationSpam {
+                account_id,
+                folder_id,
+                message_id,
+            } => {
                 if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
                 {
                     self.mark_spam_msg(m);
@@ -6461,7 +7394,11 @@ impl SimpleComponent for AppModel {
             // The message is opening in the reader (the action sent
             // OpenMessageFromNotification first); the composer waits for
             // the body it quotes when that is still on its way.
-            AppMsg::NotificationReply { account_id, folder_id, message_id } => {
+            AppMsg::NotificationReply {
+                account_id,
+                folder_id,
+                message_id,
+            } => {
                 if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
                 {
                     let m = self.with_cached_body(m);
@@ -6478,7 +7415,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::NotificationForward { account_id, folder_id, message_id } => {
+            AppMsg::NotificationForward {
+                account_id,
+                folder_id,
+                message_id,
+            } => {
                 if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
                 {
                     self.forward(m, true, &sender);
@@ -6517,7 +7458,8 @@ impl SimpleComponent for AppModel {
 
             AppMsg::ReorderFolders { account_id, paths } => {
                 let custom = self.folders.get(&account_id).is_some_and(|fs| {
-                    fs.iter().any(|f| f.kind == FolderKind::Custom && paths.contains(&f.path))
+                    fs.iter()
+                        .any(|f| f.kind == FolderKind::Custom && paths.contains(&f.path))
                 });
                 if custom {
                     self.adopt_custom_order(account_id);
@@ -6525,12 +7467,20 @@ impl SimpleComponent for AppModel {
                 self.keep_folder_order(account_id, &paths);
             }
 
-            AppMsg::PlaceFolder { account_id, path, dest, target, after } => {
+            AppMsg::PlaceFolder {
+                account_id,
+                path,
+                dest,
+                target,
+                after,
+            } => {
                 self.adopt_custom_order(account_id);
                 // Moved on the server first (the same move as a drop on a
                 // folder, with its checks and its undo); only once that has
                 // gone ahead does it take its place beside `target`.
-                let Some(new_path) = self.move_folder(account_id, path, dest) else { return };
+                let Some(new_path) = self.move_folder(account_id, path, dest) else {
+                    return;
+                };
                 let shown = self.shown_folders(account_id);
                 let hierarchy = crate::ui::sidebar::Hierarchy {
                     delimiter: self.folder_delimiter(account_id),
@@ -6554,10 +7504,17 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::FolderNodeCollapsed { account_id, path, collapsed } => {
+            AppMsg::FolderNodeCollapsed {
+                account_id,
+                path,
+                collapsed,
+            } => {
                 // The sidebar already reshaped its rows; just remember it.
-                if let Some(email) =
-                    self.accounts.iter().find(|a| a.id == account_id).map(|a| a.email.clone())
+                if let Some(email) = self
+                    .accounts
+                    .iter()
+                    .find(|a| a.id == account_id)
+                    .map(|a| a.email.clone())
                 {
                     let key = format!("{email}\t{path}");
                     if collapsed {
@@ -6633,7 +7590,9 @@ impl SimpleComponent for AppModel {
             AppMsg::ToggleSidebar => {
                 tracing::info!(
                     "peek: toggle button (peek={} auto_rail={} rail_active={})",
-                    self.sidebar_peek, self.auto_rail, self.rail_active
+                    self.sidebar_peek,
+                    self.auto_rail,
+                    self.rail_active
                 );
                 // Self-healing: with no peek open, the split should always be
                 // un-collapsed and showing (rail or side-by-side). If it ended
@@ -6730,8 +7689,20 @@ impl SimpleComponent for AppModel {
                 smart,
                 contacts,
             } => {
-                let now =
-                    (all_inboxes, filtered, tags, starred, sent, drafts, archive, junk, trash, favorites, smart, contacts);
+                let now = (
+                    all_inboxes,
+                    filtered,
+                    tags,
+                    starred,
+                    sent,
+                    drafts,
+                    archive,
+                    junk,
+                    trash,
+                    favorites,
+                    smart,
+                    contacts,
+                );
                 let was = (
                     self.unified_expanded,
                     self.filtered_expanded,
@@ -6817,10 +7788,16 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SidebarContext(action) => match action {
-                CtxAction::MarkFolderRead { account_id, folder_id } => {
+                CtxAction::MarkFolderRead {
+                    account_id,
+                    folder_id,
+                } => {
                     self.mark_folder_read(account_id, folder_id);
                 }
-                CtxAction::RefreshFolder { account_id, folder_id } => {
+                CtxAction::RefreshFolder {
+                    account_id,
+                    folder_id,
+                } => {
                     if let Some(path) = self
                         .folders
                         .get(&account_id)
@@ -6856,7 +7833,10 @@ impl SimpleComponent for AppModel {
                 CtxAction::EmptyAll(kind) => {
                     self.confirm_empty_all(kind, &sender);
                 }
-                CtxAction::ApplyFilters { account_id, folder_id } => {
+                CtxAction::ApplyFilters {
+                    account_id,
+                    folder_id,
+                } => {
                     self.start_filter_run(vec![(account_id, folder_id)], &sender);
                 }
                 CtxAction::EditFilter { account_id, path } => {
@@ -6921,7 +7901,9 @@ impl SimpleComponent for AppModel {
                         .map(|a| a.email.clone());
                     self.open_settings_window(&sender, true, false);
                     if let (Some(email), Some(acc)) = (email, &self.accounts_win) {
-                        acc.emit(crate::ui::accounts::AccountsInput::EditAccountByEmail(email));
+                        acc.emit(crate::ui::accounts::AccountsInput::EditAccountByEmail(
+                            email,
+                        ));
                     }
                 }
                 CtxAction::RemoveAccount(account_id) => {
@@ -6930,13 +7912,26 @@ impl SimpleComponent for AppModel {
                 CtxAction::NewFolder(account_id) => {
                     self.prompt_new_folder(account_id, &sender);
                 }
-                CtxAction::DeleteFolder { account_id, name, path } => {
+                CtxAction::DeleteFolder {
+                    account_id,
+                    name,
+                    path,
+                } => {
                     self.confirm_delete_folder(account_id, name, path, &sender);
                 }
-                CtxAction::RenameFolder { account_id, name, path } => {
+                CtxAction::RenameFolder {
+                    account_id,
+                    name,
+                    path,
+                } => {
                     self.prompt_rename_folder(account_id, name, path, &sender);
                 }
-                CtxAction::EmptyFolder { account_id, folder_id, name, path } => {
+                CtxAction::EmptyFolder {
+                    account_id,
+                    folder_id,
+                    name,
+                    path,
+                } => {
                     self.confirm_empty_folder(account_id, folder_id, name, path, &sender);
                 }
                 CtxAction::HideFolder { account_id, path } => {
@@ -6974,7 +7969,11 @@ impl SimpleComponent for AppModel {
                 }
             },
 
-            AppMsg::DropMoveMessages { dest_account, dest, items } => {
+            AppMsg::DropMoveMessages {
+                dest_account,
+                dest,
+                items,
+            } => {
                 self.drop_move(dest_account, dest, items);
             }
 
@@ -6998,20 +7997,36 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::MoveFolder { account_id, path, dest } => {
+            AppMsg::MoveFolder {
+                account_id,
+                path,
+                dest,
+            } => {
                 let _ = self.move_folder(account_id, path, dest);
             }
 
-            AppMsg::RenameFolderTo { account_id, path, new_name } => {
+            AppMsg::RenameFolderTo {
+                account_id,
+                path,
+                new_name,
+            } => {
                 self.rename_folder_to(account_id, path, new_name);
             }
 
-            AppMsg::EmptyFolder { account_id, folder_id, path } => {
+            AppMsg::EmptyFolder {
+                account_id,
+                folder_id,
+                path,
+            } => {
                 // Gone locally at once; the worker's empty message list and
                 // zero count confirm it, or an error says why not.
                 self.message_cache.remove(&(account_id, folder_id));
                 self.folder_unread.insert((account_id, folder_id), 0);
-                if self.selected.as_ref().is_some_and(|s| s.account_id == account_id && s.folder_id == folder_id) {
+                if self
+                    .selected
+                    .as_ref()
+                    .is_some_and(|s| s.account_id == account_id && s.folder_id == folder_id)
+                {
                     self.current = None;
                     self.current_thread.clear();
                     self.show_message(None, false);
@@ -7054,7 +8069,11 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::SearchPoolBuilt { gen, pool, text } => {
                 if gen == self.search_gen {
-                    self.message_list.emit(MessageListInput::SetSearchPool(pool, self.pool_folders(), text));
+                    self.message_list.emit(MessageListInput::SetSearchPool(
+                        pool,
+                        self.pool_folders(),
+                        text,
+                    ));
                 }
             }
             AppMsg::OpenedByKey { already_open } => {
@@ -7086,14 +8105,21 @@ impl SimpleComponent for AppModel {
                         self.message_list.emit(MessageListInput::SetColorize(true));
                     }
                 } else {
-                    self.message_list
-                        .emit(MessageListInput::SetSearchPool(Vec::new(), HashMap::new(), Vec::new()));
+                    self.message_list.emit(MessageListInput::SetSearchPool(
+                        Vec::new(),
+                        HashMap::new(),
+                        Vec::new(),
+                    ));
                     // Restore the tint state the underlying view wants.
                     self.message_list
                         .emit(MessageListInput::SetColorize(self.unified));
                 }
             }
-            AppMsg::MessageSelected { message: m, thread, solo } => {
+            AppMsg::MessageSelected {
+                message: m,
+                thread,
+                solo,
+            } => {
                 // What the reader is showing right now. A message that has just
                 // been moved back arrives under a new UID, so the list hands it
                 // over again as if it were a different message; rendering it a
@@ -7117,7 +8143,10 @@ impl SimpleComponent for AppModel {
                 self.release_reader_compose();
                 // A sent reply still on its way into the conversation left
                 // behind: the reader shows the new message at once.
-                let elsewhere = self.current.as_ref().is_some_and(|c| (c.account_id, c.id) != (m.account_id, m.id));
+                let elsewhere = self
+                    .current
+                    .as_ref()
+                    .is_some_and(|c| (c.account_id, c.id) != (m.account_id, m.id));
                 if elsewhere && self.send_morph.running() {
                     self.send_morph.finish();
                 }
@@ -7210,9 +8239,16 @@ impl SimpleComponent for AppModel {
                 let mut related = None;
                 if self.threading && !solo {
                     let only = [m.clone()];
-                    let ids = thread_ids(if thread.is_empty() { &only[..] } else { &thread });
+                    let ids = thread_ids(if thread.is_empty() {
+                        &only[..]
+                    } else {
+                        &thread
+                    });
                     if !ids.is_empty() {
-                        related = Some(MailRequest::LoadRelated { message_id: m.id, ids });
+                        related = Some(MailRequest::LoadRelated {
+                            message_id: m.id,
+                            ids,
+                        });
                         self.thread_related_pending = true;
                     }
                 }
@@ -7328,11 +8364,14 @@ impl SimpleComponent for AppModel {
                     // worker processes requests in order, so the body must come first.
                     if needs_body {
                         if let Some(path) = folder_path.clone() {
-                            self.send_to(account_id, MailRequest::LoadBody {
-                                message_id: m.id,
-                                path,
-                                uid: m.uid,
-                            });
+                            self.send_to(
+                                account_id,
+                                MailRequest::LoadBody {
+                                    message_id: m.id,
+                                    path,
+                                    uid: m.uid,
+                                },
+                            );
                         }
                     }
                     if let Some(req) = related.take() {
@@ -7351,12 +8390,15 @@ impl SimpleComponent for AppModel {
                         self.sync_attachment_drawer();
                     } else if let Some(path) = folder_path {
                         self.attachments_loading = true;
-                        self.send_to(account_id, MailRequest::LoadAttachments {
-                            message_id: m.id,
-                            path,
-                            uid: m.uid,
-                            download: true,
-                        });
+                        self.send_to(
+                            account_id,
+                            MailRequest::LoadAttachments {
+                                message_id: m.id,
+                                path,
+                                uid: m.uid,
+                                download: true,
+                            },
+                        );
                     }
                 }
             }
@@ -7425,14 +8467,16 @@ impl SimpleComponent for AppModel {
                 .map(|tm| (tm.account_id, tm.id))
                 .or_else(|| self.current.as_ref().map(|c| (c.account_id, c.id)));
                 if let Some((account_id, id)) = top {
-                    self.message_view.emit(MessageViewInput::HoldPlace { account_id, id });
+                    self.message_view
+                        .emit(MessageViewInput::HoldPlace { account_id, id });
                 }
                 let to_load: Vec<MissingBody> = self
                     .current_thread
                     .iter()
                     .filter(|tm| tm.body.is_empty())
                     .filter_map(|tm| {
-                        self.resolve_folder_path(tm).map(|p| (tm.account_id, tm.id, tm.uid, p))
+                        self.resolve_folder_path(tm)
+                            .map(|p| (tm.account_id, tm.id, tm.uid, p))
                     })
                     .collect();
                 if to_load.is_empty() {
@@ -7450,7 +8494,8 @@ impl SimpleComponent for AppModel {
                 // and a template opens a new message made from it (#360).
                 if self.is_drafts_folder(m.account_id, m.folder_id) {
                     self.open_draft(m, false, HandOffFiles::default(), &sender);
-                } else if self.folder_kind(m.account_id, m.folder_id) == Some(FolderKind::Templates) {
+                } else if self.folder_kind(m.account_id, m.folder_id) == Some(FolderKind::Templates)
+                {
                     self.edit_as_new(m, &sender);
                 } else {
                     // Popouts follow the reading pane's display order (#70).
@@ -7473,12 +8518,15 @@ impl SimpleComponent for AppModel {
             AppMsg::LoadAttachmentsFor(m) => {
                 let m = *m;
                 if let Some(path) = self.resolve_folder_path(&m) {
-                    self.send_to(m.account_id, MailRequest::LoadAttachments {
-                        message_id: m.id,
-                        path,
-                        uid: m.uid,
-                        download: true,
-                    });
+                    self.send_to(
+                        m.account_id,
+                        MailRequest::LoadAttachments {
+                            message_id: m.id,
+                            path,
+                            uid: m.uid,
+                            download: true,
+                        },
+                    );
                 }
             }
 
@@ -7490,28 +8538,54 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::PopoutMoveTo { key, message, x, y } => {
-                let Some(window) = self.popouts.get(&key).map(|p| p.window.clone()) else { return };
-                let accounts = self.picker_accounts(message.account_id, self.resolve_folder_path(&message));
+                let Some(window) = self.popouts.get(&key).map(|p| p.window.clone()) else {
+                    return;
+                };
+                let accounts =
+                    self.picker_accounts(message.account_id, self.resolve_folder_path(&message));
                 if accounts.is_empty() {
                     return;
                 }
                 let s = sender.input_sender().clone();
                 let picked = (*message).clone();
                 let closing = window.clone();
-                crate::ui::folder_picker::show_folder_picker(&window, x, y, accounts, None, move |account_id, dest, _| {
-                    let _ = s.send(AppMsg::MoveMessagesTo { account_id, dest, messages: vec![picked.clone()] });
-                    // As Archive and Delete do: the message has left.
-                    closing.close();
-                });
+                crate::ui::folder_picker::show_folder_picker(
+                    &window,
+                    x,
+                    y,
+                    accounts,
+                    None,
+                    move |account_id, dest, _| {
+                        let _ = s.send(AppMsg::MoveMessagesTo {
+                            account_id,
+                            dest,
+                            messages: vec![picked.clone()],
+                        });
+                        // As Archive and Delete do: the message has left.
+                        closing.close();
+                    },
+                );
             }
 
-            AppMsg::PopoutShortcut { action, message, thread } => {
+            AppMsg::PopoutShortcut {
+                action,
+                message,
+                thread,
+            } => {
                 self.run_popout_shortcut(action, *message, thread, &sender);
             }
 
-            AppMsg::DeletePopoutAttachment { key, message, attachment } => {
-                let Some(window) = self.popouts.get(&key).map(|p| p.window.clone()) else { return };
-                let Some(path) = self.resolve_folder_path(&message) else { return };
+            AppMsg::DeletePopoutAttachment {
+                key,
+                message,
+                attachment,
+            } => {
+                let Some(window) = self.popouts.get(&key).map(|p| p.window.clone()) else {
+                    return;
+                };
+                let Some(path) = self.resolve_folder_path(&message) else {
+                    return;
+                };
                 let target = AttachmentTarget {
                     account_id: message.account_id,
                     message_id: message.id,
@@ -7539,12 +8613,7 @@ impl SimpleComponent for AppModel {
                         // sets the whole set (same semantics as the list row).
                         let any = self.current_thread.iter().any(|t| t.starred);
                         let members = self.current_thread.clone();
-                        self.user_set_flags(
-                            star_label(!any),
-                            &members,
-                            FlagKind::Star,
-                            !any,
-                        );
+                        self.user_set_flags(star_label(!any), &members, FlagKind::Star, !any);
                     } else {
                         let starred = !m.starred;
                         self.user_set_flags(star_label(starred), &[m], FlagKind::Star, starred);
@@ -7554,7 +8623,8 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Archive => {
                 if self.many_selected() {
-                    self.message_list.emit(MessageListInput::Bulk(BulkAction::Archive));
+                    self.message_list
+                        .emit(MessageListInput::Bulk(BulkAction::Archive));
                     return;
                 }
                 // An open conversation's row stands for all of it, as it does
@@ -7615,7 +8685,8 @@ impl SimpleComponent for AppModel {
                         && self.list_selection.len() == 1
                         && self.current_thread.len() > 1)
                 {
-                    self.message_list.emit(MessageListInput::Bulk(BulkAction::DeleteForever));
+                    self.message_list
+                        .emit(MessageListInput::Bulk(BulkAction::DeleteForever));
                     return;
                 }
                 if let Some(m) = self.reply_target() {
@@ -7629,7 +8700,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::Related { account_id, message_id, messages } => {
+            AppMsg::Related {
+                account_id,
+                message_id,
+                messages,
+            } => {
                 if self
                     .current
                     .as_ref()
@@ -7665,7 +8740,10 @@ impl SimpleComponent for AppModel {
                 self.request_thread_summaries(groups);
             }
 
-            AppMsg::ThreadSummaries { account_id, summaries } => {
+            AppMsg::ThreadSummaries {
+                account_id,
+                summaries,
+            } => {
                 let summaries: Vec<((u32, String), ThreadSummary)> = summaries
                     .into_iter()
                     .map(|(root, mut summary)| {
@@ -7676,7 +8754,8 @@ impl SimpleComponent for AppModel {
                     })
                     .collect();
                 if !summaries.is_empty() {
-                    self.message_list.emit(MessageListInput::SetThreadSummaries(summaries));
+                    self.message_list
+                        .emit(MessageListInput::SetThreadSummaries(summaries));
                 }
             }
 
@@ -7696,7 +8775,12 @@ impl SimpleComponent for AppModel {
                 );
                 match action {
                     RowAction::Reply => {
-                        self.open_reply(m.account_id, self.reply_context(&m, reply_prefill(&m)), (m.account_id, m.id), &sender);
+                        self.open_reply(
+                            m.account_id,
+                            self.reply_context(&m, reply_prefill(&m)),
+                            (m.account_id, m.id),
+                            &sender,
+                        );
                     }
                     RowAction::ReplyAll => {
                         let own = self.own_identities(m.account_id);
@@ -7750,9 +8834,16 @@ impl SimpleComponent for AppModel {
                 self.show_add_contact_dialog(&message.from_name, &message.from_addr, &sender);
             }
 
-            AppMsg::RowAction { action, message, conversation } => {
+            AppMsg::RowAction {
+                action,
+                message,
+                conversation,
+            } => {
                 let m = *message;
-                if matches!(action, RowAction::Reply | RowAction::ReplyAll | RowAction::Forward) {
+                if matches!(
+                    action,
+                    RowAction::Reply | RowAction::ReplyAll | RowAction::Forward
+                ) {
                     tracing::debug!(
                         target: "hylki::reply",
                         "row {:?}: {}:{} from={} conversation={:?}",
@@ -7777,7 +8868,11 @@ impl SimpleComponent for AppModel {
                     RowAction::Reply => {
                         let m = self.newest_to_answer(&conversation, m);
                         let m = self.with_cached_body(m);
-                        self.open_compose(m.account_id, self.reply_context(&m, reply_prefill(&m)), &sender);
+                        self.open_compose(
+                            m.account_id,
+                            self.reply_context(&m, reply_prefill(&m)),
+                            &sender,
+                        );
                     }
                     RowAction::ReplyAll => {
                         let m = self.newest_to_answer(&conversation, m);
@@ -7820,11 +8915,14 @@ impl SimpleComponent for AppModel {
                     RowAction::Delete => self.delete_messages(vec![m], &sender),
                     RowAction::ViewSource => {
                         if let Some(path) = self.resolve_folder_path(&m) {
-                            self.send_to(m.account_id, MailRequest::LoadSource {
-                                message_id: m.id,
-                                path,
-                                uid: m.uid,
-                            });
+                            self.send_to(
+                                m.account_id,
+                                MailRequest::LoadSource {
+                                    message_id: m.id,
+                                    path,
+                                    uid: m.uid,
+                                },
+                            );
                         }
                     }
                     RowAction::SaveAsFile => {
@@ -7834,15 +8932,29 @@ impl SimpleComponent for AppModel {
                             let token = self.next_transfer;
                             self.next_transfer += 1;
                             self.pending_saves.insert(token, eml_file_name(&m.subject));
-                            self.send_to(m.account_id, MailRequest::ExportRaw { token, path, uid: m.uid, for_reader: true });
+                            self.send_to(
+                                m.account_id,
+                                MailRequest::ExportRaw {
+                                    token,
+                                    path,
+                                    uid: m.uid,
+                                    for_reader: true,
+                                },
+                            );
                         }
                     }
                     RowAction::AddContact => {
                         self.show_add_contact_dialog(&m.from_name, &m.from_addr, &sender);
                     }
                     RowAction::CreateFilter => {
-                        let Some(email) = self.email_of(m.account_id) else { return };
-                        let rule = config::FilterRule::draft_from_message(&email, &m.from_addr, &m.subject);
+                        let Some(email) = self.email_of(m.account_id) else {
+                            return;
+                        };
+                        let rule = config::FilterRule::draft_from_message(
+                            &email,
+                            &m.from_addr,
+                            &m.subject,
+                        );
                         self.open_settings_window(&sender, true, false);
                         if let Some(p) = &self.prefs {
                             p.emit(PrefInput::ShowPageById("filters".to_string()));
@@ -7911,7 +9023,8 @@ impl SimpleComponent for AppModel {
                 self.bulk_pending = self.bulk_pending.saturating_sub(1);
                 self.update_busy_indicator();
                 if self.bulk_pending == 0 && self.busy.is_empty() {
-                    self.notifications.emit(NotifyInput::SetStatus(String::new()));
+                    self.notifications
+                        .emit(NotifyInput::SetStatus(String::new()));
                 }
             }
 
@@ -7931,10 +9044,13 @@ impl SimpleComponent for AppModel {
                     self.refresh_unified_starred(&sender);
                 } else {
                     match self.selected.clone() {
-                        Some(sel) => self.send_to(sel.account_id, MailRequest::LoadMessages {
-                            folder_id: sel.folder_id,
-                            path: sel.path,
-                        }),
+                        Some(sel) => self.send_to(
+                            sel.account_id,
+                            MailRequest::LoadMessages {
+                                folder_id: sel.folder_id,
+                                path: sel.path,
+                            },
+                        ),
                         None => {
                             for w in self.workers.values() {
                                 let _ = w.send(MailRequest::Reconnect);
@@ -7983,7 +9099,9 @@ impl SimpleComponent for AppModel {
                     Some((folder, id, from, subject)) => {
                         self.announce_new_mail(account, folder, id, &from, &subject, 0, true);
                     }
-                    None => tracing::warn!("showcase notify: no Inbox message cached for account {account}"),
+                    None => tracing::warn!(
+                        "showcase notify: no Inbox message cached for account {account}"
+                    ),
                 }
             }
 
@@ -8029,7 +9147,12 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Reply => {
                 if let Some(m) = self.compose_target() {
-                    self.open_reply(m.account_id, self.reply_context(&m, reply_prefill(&m)), (m.account_id, m.id), &sender);
+                    self.open_reply(
+                        m.account_id,
+                        self.reply_context(&m, reply_prefill(&m)),
+                        (m.account_id, m.id),
+                        &sender,
+                    );
                 }
             }
 
@@ -8087,23 +9210,36 @@ impl SimpleComponent for AppModel {
                 use crate::contacts::AddOutcome;
                 let (text, error) = match result {
                     Ok(AddOutcome::Created) => (i18n("Added to Contacts"), false),
-                    Ok(AddOutcome::Merged(name)) => (i18n_f("Added email to {name}", &[("name", &name)]), false),
-                    Ok(AddOutcome::AlreadyPresent(name)) => {
-                        (i18n_f("Already in Contacts ({name})", &[("name", &name)]), false)
+                    Ok(AddOutcome::Merged(name)) => {
+                        (i18n_f("Added email to {name}", &[("name", &name)]), false)
                     }
-                    Err(e) => (i18n_f("Could not add contact: {e}", &[("e", &e.to_string())]), true),
+                    Ok(AddOutcome::AlreadyPresent(name)) => (
+                        i18n_f("Already in Contacts ({name})", &[("name", &name)]),
+                        false,
+                    ),
+                    Err(e) => (
+                        i18n_f("Could not add contact: {e}", &[("e", &e.to_string())]),
+                        true,
+                    ),
                 };
-                self.notifications.emit(NotifyInput::Push { text, error, connectivity: false });
+                self.notifications.emit(NotifyInput::Push {
+                    text,
+                    error,
+                    connectivity: false,
+                });
             }
 
             AppMsg::ViewSource => {
                 if let Some(m) = self.current.clone() {
                     if let Some(path) = self.resolve_folder_path(&m) {
-                        self.send_to(m.account_id, MailRequest::LoadSource {
-                            message_id: m.id,
-                            path,
-                            uid: m.uid,
-                        });
+                        self.send_to(
+                            m.account_id,
+                            MailRequest::LoadSource {
+                                message_id: m.id,
+                                path,
+                                uid: m.uid,
+                            },
+                        );
                     }
                 }
             }
@@ -8133,7 +9269,11 @@ impl SimpleComponent for AppModel {
             AppMsg::UnsubscribeByMail { message, info } => {
                 self.unsubscribe_by_mail(*message, &info, &sender);
             }
-            AppMsg::InviteAction { message, invite, action } => {
+            AppMsg::InviteAction {
+                message,
+                invite,
+                action,
+            } => {
                 self.invite_action(*message, *invite, action);
             }
             AppMsg::UnsubscribeDone { message, result } => {
@@ -8192,7 +9332,8 @@ impl SimpleComponent for AppModel {
                 // In Junk the same button, shortcut and menu entry mean the
                 // reverse (#168); for a selection the list makes that swap.
                 if self.many_selected() {
-                    self.message_list.emit(MessageListInput::Bulk(BulkAction::Spam));
+                    self.message_list
+                        .emit(MessageListInput::Bulk(BulkAction::Spam));
                     return;
                 }
                 if let Some(m) = self.reply_target() {
@@ -8221,7 +9362,10 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Pref(PrefOutput::LoadContactBooks) => {
                 if demo_mode() {
-                    sender.input(AppMsg::ContactBooksLoaded { books: crate::contacts::demo_books(), local_count: 1 });
+                    sender.input(AppMsg::ContactBooksLoaded {
+                        books: crate::contacts::demo_books(),
+                        local_count: 1,
+                    });
                     return;
                 }
                 let s = sender.clone();
@@ -8234,9 +9378,12 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Pref(PrefOutput::ImportLocalContacts) => {
                 let s = sender.clone();
-                crate::ui::contacts_page::choose_vcf_files(self.dialog_parent().as_ref(), move |paths| {
-                    s.input(AppMsg::ImportContacts(paths));
-                });
+                crate::ui::contacts_page::choose_vcf_files(
+                    self.dialog_parent().as_ref(),
+                    move |paths| {
+                        s.input(AppMsg::ImportContacts(paths));
+                    },
+                );
             }
             AppMsg::Pref(PrefOutput::ExportLocalContacts) => {
                 let dialog = gtk::FileDialog::builder()
@@ -8244,26 +9391,30 @@ impl SimpleComponent for AppModel {
                     .initial_name("hylki-contacts.vcf")
                     .build();
                 let notif = self.notifications.sender().clone();
-                dialog.save(self.dialog_parent().as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-                    let Ok(file) = res else { return };
-                    let Some(path) = file.path() else { return };
-                    let notif = notif.clone();
-                    std::thread::spawn(move || {
-                        let _ = notif.send(match crate::local_contacts::export_to(&path) {
-                            Ok(n) => NotifyInput::SetStatus(ni18n_f(
-                                "{n} contact exported to {path}",
-                                "{n} contacts exported to {path}",
-                                n as u32,
-                                &[("n", &n.to_string()), ("path", &path.display().to_string())],
-                            )),
-                            Err(e) => NotifyInput::Push {
-                                text: i18n_f("Could not export contacts: {e}", &[("e", &e)]),
-                                error: true,
-                                connectivity: false,
-                            },
+                dialog.save(
+                    self.dialog_parent().as_ref(),
+                    gtk::gio::Cancellable::NONE,
+                    move |res| {
+                        let Ok(file) = res else { return };
+                        let Some(path) = file.path() else { return };
+                        let notif = notif.clone();
+                        std::thread::spawn(move || {
+                            let _ = notif.send(match crate::local_contacts::export_to(&path) {
+                                Ok(n) => NotifyInput::SetStatus(ni18n_f(
+                                    "{n} contact exported to {path}",
+                                    "{n} contacts exported to {path}",
+                                    n as u32,
+                                    &[("n", &n.to_string()), ("path", &path.display().to_string())],
+                                )),
+                                Err(e) => NotifyInput::Push {
+                                    text: i18n_f("Could not export contacts: {e}", &[("e", &e)]),
+                                    error: true,
+                                    connectivity: false,
+                                },
+                            });
                         });
-                    });
-                });
+                    },
+                );
             }
             AppMsg::Pref(PrefOutput::DeleteAllLocalContacts) => {
                 let n = crate::local_contacts::count();
@@ -8329,7 +9480,8 @@ impl SimpleComponent for AppModel {
 
             AppMsg::SetReaderActionsCollapsed(on) => {
                 self.reader_actions_collapsed = on;
-                self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
+                self.reader_overflow_btn
+                    .set_visible(self.reader_overflow_wanted());
             }
 
             AppMsg::Pref(PrefOutput::SetReaderToolbar(layout)) => {
@@ -8338,12 +9490,18 @@ impl SimpleComponent for AppModel {
                     config::save_reader_toolbar(&self.reader_toolbar);
                     self.relayout_reader_toolbar();
                     for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetToolbar(self.reader_toolbar.clone()));
+                        p.controller
+                            .emit(MessageWindowInput::SetToolbar(self.reader_toolbar.clone()));
                     }
                     // Not while the inline composer covers the header: that
                     // path hides the ⋯ by hand and restores it on close.
-                    if !self.reader_compose.as_ref().is_some_and(|r| r.window.is_none()) {
-                        self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
+                    if !self
+                        .reader_compose
+                        .as_ref()
+                        .is_some_and(|r| r.window.is_none())
+                    {
+                        self.reader_overflow_btn
+                            .set_visible(self.reader_overflow_wanted());
                     }
                 }
             }
@@ -8365,9 +9523,11 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetShowSpoofBanner(on)) => {
                 if pref!(self.show_spoof_banner = on) {
-                    self.message_view.emit(MessageViewInput::SetSpoofBannerShown(on));
+                    self.message_view
+                        .emit(MessageViewInput::SetSpoofBannerShown(on));
                     for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetSpoofBannerShown(on));
+                        p.controller
+                            .emit(MessageWindowInput::SetSpoofBannerShown(on));
                     }
                 }
             }
@@ -8473,12 +9633,14 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ShowLightbox { items, start } => {
-                self.lightbox.emit(crate::ui::lightbox::LightboxInput::Show { items, start });
+                self.lightbox
+                    .emit(crate::ui::lightbox::LightboxInput::Show { items, start });
             }
             AppMsg::ContactPhotosChanged => {
                 // The list skips the work when avatars are off; the
                 // reader's cards draw initials only, so it has nothing to do.
-                self.message_list.emit(MessageListInput::ContactPhotosChanged);
+                self.message_list
+                    .emit(MessageListInput::ContactPhotosChanged);
                 // The books' files changed: a sync landed, which EDS writes
                 // after its refresh call has already returned (#408).
                 if self.showing_contacts && !demo_mode() {
@@ -8601,8 +9763,10 @@ impl SimpleComponent for AppModel {
                     tracing::warn!("restart helper failed: {e}");
                     self.restart_pending = false;
                     self.notifications.emit(NotifyInput::Push {
-                        text: i18n("Couldn't restart automatically — quit and reopen Hylki \
-                               to finish switching the icon."),
+                        text: i18n(
+                            "Couldn't restart automatically — quit and reopen Hylki \
+                               to finish switching the icon.",
+                        ),
                         error: true,
                         connectivity: false,
                     });
@@ -8650,7 +9814,6 @@ impl SimpleComponent for AppModel {
                     self.select_folder(account_id, folder_id, name, path);
                 }
             }
-
 
             AppMsg::Pref(PrefOutput::SetSingleKey(on)) => {
                 if self.single_key.get() != on {
@@ -8728,17 +9891,20 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Pref(PrefOutput::SetListColumnScroll(on)) => {
                 if pref!(self.list_column_scroll = on) {
-                    self.message_list.emit(MessageListInput::SetColumnScroll(on));
+                    self.message_list
+                        .emit(MessageListInput::SetColumnScroll(on));
                 }
             }
             AppMsg::Pref(PrefOutput::SetListSearchOpen(on)) => {
                 if pref!(self.list_search_open = on) {
-                    self.message_list.emit(MessageListInput::SetSearchPinned(on));
+                    self.message_list
+                        .emit(MessageListInput::SetSearchPinned(on));
                 }
             }
             AppMsg::Pref(PrefOutput::SetContactsSearchOpen(on)) => {
                 if pref!(self.contacts_search_open = on) {
-                    self.contacts_page.emit(ContactsPageInput::SetSearchPinned(on));
+                    self.contacts_page
+                        .emit(ContactsPageInput::SetSearchPinned(on));
                 }
             }
             AppMsg::Pref(PrefOutput::SetListSearchBottom(on)) => {
@@ -8763,13 +9929,18 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Pref(PrefOutput::SetListColumns(columns)) => {
                 if pref!(self.list_columns = columns.clone()) {
-                    self.message_list.emit(MessageListInput::SetColumns(columns));
+                    self.message_list
+                        .emit(MessageListInput::SetColumns(columns));
                 }
             }
             AppMsg::ListPaneWidth(width) => {
                 // A margin each way, so a drag that rests near the line does
                 // not flick the rows back and forth.
-                let wide = if self.list_wide { width >= LIST_WIDE_OFF } else { width >= LIST_WIDE_ON };
+                let wide = if self.list_wide {
+                    width >= LIST_WIDE_OFF
+                } else {
+                    width >= LIST_WIDE_ON
+                };
                 if wide != self.list_wide {
                     self.list_wide = wide;
                     if self.list_layout == config::ListLayout::Automatic {
@@ -8807,7 +9978,8 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Pref(PrefOutput::ResetColumnWidths) => {
                 if pref!(self.list_column_widths = Default::default()) {
-                    self.message_list.emit(MessageListInput::SetColumnWidths(Default::default()));
+                    self.message_list
+                        .emit(MessageListInput::SetColumnWidths(Default::default()));
                 }
             }
             AppMsg::ListSortChanged(key) => {
@@ -8840,7 +10012,12 @@ impl SimpleComponent for AppModel {
                     self.rebuild_sidebar();
                 }
                 // Both places that offer the switch stay in step.
-                if self.show_accounts_action.state().and_then(|v| v.get::<bool>()) != Some(show) {
+                if self
+                    .show_accounts_action
+                    .state()
+                    .and_then(|v| v.get::<bool>())
+                    != Some(show)
+                {
                     self.show_accounts_action.set_state(&show.to_variant());
                 }
                 if let Some(p) = &self.prefs {
@@ -8850,7 +10027,8 @@ impl SimpleComponent for AppModel {
 
             AppMsg::ToggleAccountTags(account_id) => {
                 if let Some(email) = self.email_of(account_id) {
-                    if let Some(pos) = self.tags_expanded_accounts.iter().position(|e| *e == email) {
+                    if let Some(pos) = self.tags_expanded_accounts.iter().position(|e| *e == email)
+                    {
                         self.tags_expanded_accounts.remove(pos);
                     } else {
                         self.tags_expanded_accounts.push(email);
@@ -8887,7 +10065,8 @@ impl SimpleComponent for AppModel {
                 if pref!(self.contacts_placement = p) {
                     // Without its books under it in the sidebar, Contacts
                     // picks them itself.
-                    self.contacts_page.emit(ContactsPageInput::SetBookPicker(!p.shown()));
+                    self.contacts_page
+                        .emit(ContactsPageInput::SetBookPicker(!p.shown()));
                     self.rebuild_sidebar();
                 }
             }
@@ -8916,13 +10095,15 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetThreadExpansion(on)) => {
                 if pref!(self.thread_expansion = on) {
-                    self.message_list.emit(MessageListInput::SetThreadExpansion(on));
+                    self.message_list
+                        .emit(MessageListInput::SetThreadExpansion(on));
                 }
             }
 
             AppMsg::Pref(PrefOutput::SetThreadRowNewest(on)) => {
                 if pref!(self.thread_row_newest = on) {
-                    self.message_list.emit(MessageListInput::SetThreadRowNewest(on));
+                    self.message_list
+                        .emit(MessageListInput::SetThreadRowNewest(on));
                 }
             }
 
@@ -8947,16 +10128,20 @@ impl SimpleComponent for AppModel {
 
             AppMsg::DeleteFromAddress { account_id, addr } => {
                 let messages = self.mail_from_address(account_id, &addr);
-                tracing::info!("unsubscribe: deleting {} message(s) from {addr}", messages.len());
+                tracing::info!(
+                    "unsubscribe: deleting {} message(s) from {addr}",
+                    messages.len()
+                );
                 if !messages.is_empty() {
                     self.delete_messages(messages, &sender);
                 }
             }
 
-            AppMsg::Pref(PrefOutput::SetCardActionsMode { hover_toggle, hover_auto }) => {
-                if self.card_actions_hover != hover_toggle
-                    || self.card_actions_auto != hover_auto
-                {
+            AppMsg::Pref(PrefOutput::SetCardActionsMode {
+                hover_toggle,
+                hover_auto,
+            }) => {
+                if self.card_actions_hover != hover_toggle || self.card_actions_auto != hover_auto {
                     self.card_actions_hover = hover_toggle;
                     self.card_actions_auto = hover_auto;
                     self.save_settings();
@@ -8966,7 +10151,8 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetThreadsExpanded(on)) => {
                 if pref!(self.threads_expanded = on) {
-                    self.message_list.emit(MessageListInput::SetThreadsExpanded(on));
+                    self.message_list
+                        .emit(MessageListInput::SetThreadsExpanded(on));
                 }
             }
 
@@ -8981,13 +10167,15 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetFoldMessages(fold)) => {
                 if pref!(self.fold_messages = fold) {
-                    self.message_view.emit(MessageViewInput::SetFoldMessages(fold));
+                    self.message_view
+                        .emit(MessageViewInput::SetFoldMessages(fold));
                 }
             }
 
             AppMsg::Pref(PrefOutput::SetAlwaysShowRecipients(on)) => {
                 if pref!(self.always_show_recipients = on) {
-                    self.message_view.emit(MessageViewInput::SetAlwaysShowRecipients(on));
+                    self.message_view
+                        .emit(MessageViewInput::SetAlwaysShowRecipients(on));
                     // Re-render whatever is open so the header reflects it.
                     if self.current_thread.len() > 1 {
                         self.show_thread();
@@ -9000,22 +10188,31 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetCardAttachments(on)) => {
                 if pref!(self.card_attachments = on) {
-                    self.message_view.emit(MessageViewInput::SetCardAttachmentsShown(on));
+                    self.message_view
+                        .emit(MessageViewInput::SetCardAttachmentsShown(on));
                     for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetCardAttachmentsShown(on));
+                        p.controller
+                            .emit(MessageWindowInput::SetCardAttachmentsShown(on));
                     }
                 }
             }
             AppMsg::Pref(PrefOutput::SetAttachmentDrawer(on)) => {
                 if pref!(self.drawer_enabled = on) {
                     self.sync_attachment_drawer();
-                    self.message_view.emit(MessageViewInput::SetAttachmentDrawer(on));
+                    self.message_view
+                        .emit(MessageViewInput::SetAttachmentDrawer(on));
                     for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetAttachmentDrawer(on));
+                        p.controller
+                            .emit(MessageWindowInput::SetAttachmentDrawer(on));
                     }
                 }
             }
-            AppMsg::CardAttachment { account_id, id, index, save } => {
+            AppMsg::CardAttachment {
+                account_id,
+                id,
+                index,
+                save,
+            } => {
                 let Some(items) = self
                     .member_key((account_id, id))
                     .and_then(|k| self.attachment_cache.get(&k))
@@ -9023,7 +10220,9 @@ impl SimpleComponent for AppModel {
                 else {
                     return;
                 };
-                let Some(att) = items.get(index).cloned() else { return };
+                let Some(att) = items.get(index).cloned() else {
+                    return;
+                };
                 if save {
                     save_attachment(att, Some(self.window.clone()));
                 } else if crate::ui::attachment_drawer::previewable(&att) {
@@ -9040,7 +10239,10 @@ impl SimpleComponent for AppModel {
                         .filter(|a| crate::ui::attachment_drawer::previewable(a))
                         .count()
                         .saturating_sub(1);
-                    sender.input(AppMsg::ShowLightbox { items: previewable, start });
+                    sender.input(AppMsg::ShowLightbox {
+                        items: previewable,
+                        start,
+                    });
                 } else {
                     crate::ui::attachments_gallery::open_bytes(
                         &att.name,
@@ -9052,14 +10254,15 @@ impl SimpleComponent for AppModel {
             AppMsg::ShowAttachmentInMessage(att) => {
                 // The drawer shows identical (name, size) pairs once, so the
                 // first message carrying this one is the one to find.
-                let owner = self
-                    .conversation_members()
-                    .into_iter()
-                    .find(|key| {
-                        self.member_key(*key).and_then(|k| self.attachment_cache.get(&k)).is_some_and(|items| {
-                            items.iter().any(|a| a.name == att.name && a.data.len() == att.data.len())
+                let owner = self.conversation_members().into_iter().find(|key| {
+                    self.member_key(*key)
+                        .and_then(|k| self.attachment_cache.get(&k))
+                        .is_some_and(|items| {
+                            items
+                                .iter()
+                                .any(|a| a.name == att.name && a.data.len() == att.data.len())
                         })
-                    });
+                });
                 if let Some((account_id, id)) = owner {
                     self.message_view
                         .emit(MessageViewInput::ScrollToAttachments { account_id, id });
@@ -9073,7 +10276,8 @@ impl SimpleComponent for AppModel {
             AppMsg::ShowcaseDeleteAttachment { name, confirmed } => {
                 if let Some(name) = name.strip_prefix("gallery:") {
                     self.showcase_confirm_delete = confirmed;
-                    self.gallery.emit(GalleryInput::ShowcaseDelete(name.to_string()));
+                    self.gallery
+                        .emit(GalleryInput::ShowcaseDelete(name.to_string()));
                     return;
                 }
                 match self.attachment_target(&name, None) {
@@ -9082,7 +10286,9 @@ impl SimpleComponent for AppModel {
                     None => tracing::warn!("showcase: no attachment called {name:?} on screen"),
                 }
             }
-            AppMsg::AskDeleteAttachment(target) if std::mem::take(&mut self.showcase_confirm_delete) => {
+            AppMsg::AskDeleteAttachment(target)
+                if std::mem::take(&mut self.showcase_confirm_delete) =>
+            {
                 sender.input(AppMsg::DeleteAttachment(target));
             }
             AppMsg::AskDeleteAttachment(target) => {
@@ -9090,18 +10296,24 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::DeleteAttachment(t) => {
                 self.attachment_drawer
-                    .emit(AttachmentDrawerInput::MarkDeleting(t.name.clone(), t.size as usize));
-                if let Some(p) = self.popouts.get(&(t.account_id, t.message_id)) {
-                    p.controller.emit(MessageWindowInput::Drawer(AttachmentDrawerInput::MarkDeleting(
+                    .emit(AttachmentDrawerInput::MarkDeleting(
                         t.name.clone(),
                         t.size as usize,
-                    )));
+                    ));
+                if let Some(p) = self.popouts.get(&(t.account_id, t.message_id)) {
+                    p.controller.emit(MessageWindowInput::Drawer(
+                        AttachmentDrawerInput::MarkDeleting(t.name.clone(), t.size as usize),
+                    ));
                 }
-                self.gallery.emit(GalleryInput::SetDeleting(t.gallery_key(), true));
+                self.gallery
+                    .emit(GalleryInput::SetDeleting(t.gallery_key(), true));
                 self.deleting_attachments.push(t.clone());
                 // HYLKI_SHOWCASE_DELETE_HOLD=<seconds> holds the request back,
                 // so the file can be captured while it is being deleted.
-                if let Some(secs) = std::env::var("HYLKI_SHOWCASE_DELETE_HOLD").ok().and_then(|v| v.parse().ok()) {
+                if let Some(secs) = std::env::var("HYLKI_SHOWCASE_DELETE_HOLD")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(secs, move || {
                         s.input(AppMsg::SendDeleteAttachment(t));
@@ -9111,41 +10323,67 @@ impl SimpleComponent for AppModel {
                 sender.input(AppMsg::SendDeleteAttachment(t));
             }
             AppMsg::SendDeleteAttachment(t) => {
-                self.send_to(t.account_id, MailRequest::DeleteAttachment {
-                    message_id: t.message_id,
-                    path: t.path,
-                    uid: t.uid,
-                    name: t.name,
-                    size: t.size,
-                });
+                self.send_to(
+                    t.account_id,
+                    MailRequest::DeleteAttachment {
+                        message_id: t.message_id,
+                        path: t.path,
+                        uid: t.uid,
+                        name: t.name,
+                        size: t.size,
+                    },
+                );
             }
-            AppMsg::AttachmentNotDeleted { account_id, message_id, name, size } => {
+            AppMsg::AttachmentNotDeleted {
+                account_id,
+                message_id,
+                name,
+                size,
+            } => {
                 if let Some(t) = self.take_deleting(account_id, message_id, &name) {
-                    self.gallery.emit(GalleryInput::SetDeleting(t.gallery_key(), false));
+                    self.gallery
+                        .emit(GalleryInput::SetDeleting(t.gallery_key(), false));
                 }
                 if let Some(p) = self.popouts.get(&(account_id, message_id)) {
-                    p.controller.emit(MessageWindowInput::Drawer(AttachmentDrawerInput::NotDeleted(
-                        name.clone(),
-                        size as usize,
-                    )));
+                    p.controller.emit(MessageWindowInput::Drawer(
+                        AttachmentDrawerInput::NotDeleted(name.clone(), size as usize),
+                    ));
                 }
-                self.attachment_drawer.emit(AttachmentDrawerInput::NotDeleted(name, size as usize));
+                self.attachment_drawer
+                    .emit(AttachmentDrawerInput::NotDeleted(name, size as usize));
             }
-            AppMsg::AttachmentDeleted { account_id, message_id, path, uid, new_uid, name, size } => {
+            AppMsg::AttachmentDeleted {
+                account_id,
+                message_id,
+                path,
+                uid,
+                new_uid,
+                name,
+                size,
+            } => {
                 // The file fades out where it is shown; the lists that
                 // follow wait for it.
                 let t = self.take_deleting(account_id, message_id, &name);
-                self.gallery.emit(GalleryInput::Removed((account_id, path.clone(), uid, name.clone())));
+                self.gallery.emit(GalleryInput::Removed((
+                    account_id,
+                    path.clone(),
+                    uid,
+                    name.clone(),
+                )));
                 let shown = t.map_or(size, |t| t.size) as usize;
-                self.attachment_drawer.emit(AttachmentDrawerInput::Deleted(name.clone(), shown));
+                self.attachment_drawer
+                    .emit(AttachmentDrawerInput::Deleted(name.clone(), shown));
                 if let Some(p) = self.popouts.get(&(account_id, message_id)) {
-                    p.controller.emit(MessageWindowInput::Drawer(AttachmentDrawerInput::Deleted(name.clone(), shown)));
+                    p.controller
+                        .emit(MessageWindowInput::Drawer(AttachmentDrawerInput::Deleted(
+                            name.clone(),
+                            shown,
+                        )));
                 }
                 let key = (account_id, message_id);
                 let members = self.conversation_members();
-                self.thread_cache.retain(|_, members| {
-                    !members.iter().any(|m| (m.account_id, m.id) == key)
-                });
+                self.thread_cache
+                    .retain(|_, members| !members.iter().any(|m| (m.account_id, m.id) == key));
                 let folder = self
                     .folders
                     .get(&account_id)
@@ -9168,7 +10406,12 @@ impl SimpleComponent for AppModel {
                         {
                             items.remove(at);
                         }
-                        sender.input(AppMsg::Attachments { account_id, path, message_id, items });
+                        sender.input(AppMsg::Attachments {
+                            account_id,
+                            path,
+                            message_id,
+                            items,
+                        });
                     }
                     return;
                 }
@@ -9185,12 +10428,15 @@ impl SimpleComponent for AppModel {
                     self.attachment_cache.remove(&(account_id, fid, new_uid));
                 }
                 if members.contains(&now) {
-                    self.send_to(account_id, MailRequest::LoadAttachments {
-                        message_id: new_uid,
-                        path,
-                        uid: new_uid,
-                        download: true,
-                    });
+                    self.send_to(
+                        account_id,
+                        MailRequest::LoadAttachments {
+                            message_id: new_uid,
+                            path,
+                            uid: new_uid,
+                            download: true,
+                        },
+                    );
                 } else if members.contains(&key) {
                     self.message_list.emit(MessageListInput::SelectAndLoad(now));
                 }
@@ -9198,22 +10444,29 @@ impl SimpleComponent for AppModel {
             AppMsg::ZoomKey(step) => {
                 // The keys are the application's, so they reach the main
                 // window before the composer in it could take them.
-                let compose = self
-                    .reader_compose
-                    .as_ref()
-                    .filter(|r| r.window.is_none() && focus_in_compose(&self.window) && r.controller.model().zooms());
+                let compose = self.reader_compose.as_ref().filter(|r| {
+                    r.window.is_none()
+                        && focus_in_compose(&self.window)
+                        && r.controller.model().zooms()
+                });
                 match compose {
                     Some(r) => r.controller.emit(ComposeInput::Zoom(step)),
                     None => sender.input(AppMsg::ZoomMessage(step)),
                 }
             }
             AppMsg::ComposerKey(keyval) => {
-                let compose = self.reader_compose.as_ref().filter(|r| r.window.is_none() && focus_in_compose(&self.window));
-                let shift_ctrl = gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::SHIFT_MASK;
+                let compose = self
+                    .reader_compose
+                    .as_ref()
+                    .filter(|r| r.window.is_none() && focus_in_compose(&self.window));
+                let shift_ctrl =
+                    gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::SHIFT_MASK;
                 match compose.zip(crate::ui::compose::composer_key(keyval, shift_ctrl)) {
                     Some((r, input)) => r.controller.emit(input),
                     // Activated without a value, the stateful action toggles.
-                    None if keyval == gtk::gdk::Key::a => relm4::main_application().activate_action("show-accounts", None),
+                    None if keyval == gtk::gdk::Key::a => {
+                        relm4::main_application().activate_action("show-accounts", None)
+                    }
                     None => sender.input(AppMsg::OpenConsole),
                 }
             }
@@ -9222,13 +10475,17 @@ impl SimpleComponent for AppModel {
                 let at = STEPS.iter().position(|&z| z == self.zoom).unwrap_or(5) as i32;
                 let zoom = match step {
                     0 => self.zoom_default,
-                    s => STEPS[(at + i32::from(s.signum())).clamp(0, STEPS.len() as i32 - 1) as usize],
+                    s => {
+                        STEPS
+                            [(at + i32::from(s.signum())).clamp(0, STEPS.len() as i32 - 1) as usize]
+                    }
                 };
                 self.set_zoom(zoom);
             }
             AppMsg::SetZoomDefault(zoom) => {
                 if pref!(self.zoom_default = zoom) {
-                    self.message_view.emit(MessageViewInput::SetZoomDefault(zoom));
+                    self.message_view
+                        .emit(MessageViewInput::SetZoomDefault(zoom));
                     for p in self.popouts.values() {
                         p.controller.emit(MessageWindowInput::SetZoomDefault(zoom));
                     }
@@ -9257,17 +10514,21 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::SetReaderSwitchShown(on) => {
                 if pref!(self.reader_switch = on) {
-                    self.message_view.emit(MessageViewInput::SetReaderSwitchShown(on));
+                    self.message_view
+                        .emit(MessageViewInput::SetReaderSwitchShown(on));
                     for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetReaderSwitchShown(on));
+                        p.controller
+                            .emit(MessageWindowInput::SetReaderSwitchShown(on));
                     }
                 }
             }
             AppMsg::SetThemeSwitchShown(on) => {
                 if pref!(self.theme_switch = on) {
-                    self.message_view.emit(MessageViewInput::SetThemeSwitchShown(on));
+                    self.message_view
+                        .emit(MessageViewInput::SetThemeSwitchShown(on));
                     for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetThemeSwitchShown(on));
+                        p.controller
+                            .emit(MessageWindowInput::SetThemeSwitchShown(on));
                     }
                 }
             }
@@ -9280,9 +10541,11 @@ impl SimpleComponent for AppModel {
                 if pref!(self.reader_default = policy) {
                     // Focus Mode's Reader View outranks it while on.
                     let policy = self.effective_reader_default();
-                    self.message_view.emit(MessageViewInput::SetReaderDefault(policy));
+                    self.message_view
+                        .emit(MessageViewInput::SetReaderDefault(policy));
                     for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetReaderDefault(policy));
+                        p.controller
+                            .emit(MessageWindowInput::SetReaderDefault(policy));
                     }
                 }
             }
@@ -9296,7 +10559,8 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Pref(PrefOutput::SetSingleMessageCard(on)) => {
                 if pref!(self.single_message_card = on) {
-                    self.message_view.emit(MessageViewInput::SetSingleMessageCard(on));
+                    self.message_view
+                        .emit(MessageViewInput::SetSingleMessageCard(on));
                     // Only lone messages change; re-render one if it's open.
                     if self.current_thread.len() <= 1 {
                         if let Some(current) = self.current.clone() {
@@ -9309,13 +10573,15 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetPaletteCollapse(secs)) => {
                 if pref!(self.palette_collapse_secs = secs) {
-                    self.message_list.emit(MessageListInput::SetPaletteCollapse(secs));
+                    self.message_list
+                        .emit(MessageListInput::SetPaletteCollapse(secs));
                 }
             }
 
             AppMsg::Pref(PrefOutput::SetCardPaletteCollapse(secs)) => {
                 if pref!(self.card_palette_collapse_secs = secs) {
-                    self.message_view.emit(MessageViewInput::SetPaletteCollapse(secs));
+                    self.message_view
+                        .emit(MessageViewInput::SetPaletteCollapse(secs));
                 }
             }
 
@@ -9327,40 +10593,46 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetListPaletteHover(on)) => {
                 if pref!(self.list_palette_hover = on) {
-                    self.message_list.emit(MessageListInput::SetPaletteHover(on));
+                    self.message_list
+                        .emit(MessageListInput::SetPaletteHover(on));
                 }
             }
 
             AppMsg::Pref(PrefOutput::SetCardPaletteMenu(on)) => {
                 if pref!(self.card_palette_menu = on) {
-                    self.message_view.emit(MessageViewInput::SetCardPaletteMenu(on));
+                    self.message_view
+                        .emit(MessageViewInput::SetCardPaletteMenu(on));
                 }
             }
 
             AppMsg::Pref(PrefOutput::SetSwipeEnabled(on)) => {
                 if pref!(self.swipe_enabled = on) {
-                    self.message_list.emit(MessageListInput::SetSwipeEnabled(on));
+                    self.message_list
+                        .emit(MessageListInput::SetSwipeEnabled(on));
                 }
             }
 
             AppMsg::Pref(PrefOutput::SetSwipeReversed(on)) => {
                 if pref!(self.swipe_reversed = on) {
-                    self.message_list.emit(MessageListInput::SetSwipeReversed(on));
+                    self.message_list
+                        .emit(MessageListInput::SetSwipeReversed(on));
                 }
             }
 
             AppMsg::Pref(PrefOutput::SetSwipeSensitivity(factor)) => {
-                let factor = factor.clamp(
-                    config::SWIPE_SENSITIVITY_MIN,
-                    config::SWIPE_SENSITIVITY_MAX,
-                );
+                let factor =
+                    factor.clamp(config::SWIPE_SENSITIVITY_MIN, config::SWIPE_SENSITIVITY_MAX);
                 if pref!(self.swipe_sensitivity = factor) {
                     self.message_list
                         .emit(MessageListInput::SetSwipeSensitivity(factor));
                 }
             }
 
-            AppMsg::SetRemoteContent { account_id, id, show } => {
+            AppMsg::SetRemoteContent {
+                account_id,
+                id,
+                show,
+            } => {
                 self.remote_override.insert((account_id, id), show);
                 // Re-show whatever is open so the decision takes effect now.
                 // The reader re-reads `remote_allowed` for every message it
@@ -9380,12 +10652,15 @@ impl SimpleComponent for AppModel {
             AppMsg::ComposeHistory { id, undo, redo } => {
                 // Only the inline composer's: a composer in a window of its
                 // own answers its keys there and has no menu here to label.
-                if self.reader_compose.as_ref().is_some_and(|r| r.id == id && r.window.is_none()) {
+                if self
+                    .reader_compose
+                    .as_ref()
+                    .is_some_and(|r| r.id == id && r.window.is_none())
+                {
                     self.compose_history = (undo, redo);
                     self.refresh_undo_menu();
                 }
             }
-
 
             AppMsg::Pref(PrefOutput::SetComposeInline(on)) => {
                 pref!(self.compose_inline = on);
@@ -9417,7 +10692,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::HandOffAction { hand_off, action, remember } => {
+            AppMsg::HandOffAction {
+                hand_off,
+                action,
+                remember,
+            } => {
                 if remember && self.files_prefs.action != action {
                     self.files_prefs.action = action;
                     self.save_settings();
@@ -9440,7 +10719,13 @@ impl SimpleComponent for AppModel {
                 for (account_id, folder) in self.templates_folders() {
                     if !self.message_cache.contains_key(&(account_id, folder.id)) {
                         waiting.insert((account_id, folder.id));
-                        self.send_to(account_id, MailRequest::SyncFolder { folder_id: folder.id, path: folder.path.clone() });
+                        self.send_to(
+                            account_id,
+                            MailRequest::SyncFolder {
+                                folder_id: folder.id,
+                                path: folder.path.clone(),
+                            },
+                        );
                     }
                 }
                 if waiting.is_empty() {
@@ -9448,7 +10733,9 @@ impl SimpleComponent for AppModel {
                 } else {
                     self.pending_template_pick = Some(waiting);
                     let s = sender.clone();
-                    gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::TemplatePickNow));
+                    gtk::glib::timeout_add_seconds_local_once(3, move || {
+                        s.input(AppMsg::TemplatePickNow)
+                    });
                 }
             }
 
@@ -9479,9 +10766,18 @@ impl SimpleComponent for AppModel {
                 self.hand_off_size_check(hand_off, target, &sender);
             }
 
-            AppMsg::HandOffOpen { hand_off, target, cloud, remember } => {
+            AppMsg::HandOffOpen {
+                hand_off,
+                target,
+                cloud,
+                remember,
+            } => {
                 if remember {
-                    let large = if cloud { config::FilesLarge::Cloud } else { config::FilesLarge::Attach };
+                    let large = if cloud {
+                        config::FilesLarge::Cloud
+                    } else {
+                        config::FilesLarge::Attach
+                    };
                     if pref!(self.files_prefs.large = large) {
                         self.push_files_prefs();
                     }
@@ -9542,7 +10838,8 @@ impl SimpleComponent for AppModel {
                 if pref!(self.message_theme = theme) {
                     let dark = theme.dark_override();
                     // Message content only — the reader and any popped-out windows.
-                    self.message_view.emit(MessageViewInput::SetContentTheme(dark));
+                    self.message_view
+                        .emit(MessageViewInput::SetContentTheme(dark));
                     for p in self.popouts.values() {
                         p.controller.emit(MessageWindowInput::SetContentTheme(dark));
                     }
@@ -9584,7 +10881,14 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::ReloadBody(m) => {
                 if let Some(path) = self.resolve_folder_path(&m) {
-                    self.send_to(m.account_id, MailRequest::LoadBody { message_id: m.id, path, uid: m.uid });
+                    self.send_to(
+                        m.account_id,
+                        MailRequest::LoadBody {
+                            message_id: m.id,
+                            path,
+                            uid: m.uid,
+                        },
+                    );
                 }
             }
             AppMsg::Pref(PrefOutput::SetOverrideFonts(on)) => {
@@ -9704,11 +11008,23 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ComposeTo(to) => {
-                self.compose_addressed(ComposePrefill { to, ..Default::default() }, &sender);
+                self.compose_addressed(
+                    ComposePrefill {
+                        to,
+                        ..Default::default()
+                    },
+                    &sender,
+                );
             }
 
             AppMsg::ComposeBcc(bcc) => {
-                self.compose_addressed(ComposePrefill { bcc, ..Default::default() }, &sender);
+                self.compose_addressed(
+                    ComposePrefill {
+                        bcc,
+                        ..Default::default()
+                    },
+                    &sender,
+                );
             }
 
             AppMsg::OpenWithFiles(mut paths) => {
@@ -9720,7 +11036,10 @@ impl SimpleComponent for AppModel {
                 paths.retain(|p| {
                     let ok = p.is_file();
                     if !ok {
-                        tracing::warn!("file hand-off ignored (not a readable file): {}", p.display());
+                        tracing::warn!(
+                            "file hand-off ignored (not a readable file): {}",
+                            p.display()
+                        );
                     }
                     ok
                 });
@@ -9729,14 +11048,21 @@ impl SimpleComponent for AppModel {
                     return;
                 }
                 self.begin_hand_off(
-                    FileHandOff { base: ComposePrefill::default(), files: paths, dropped: Vec::new() },
+                    FileHandOff {
+                        base: ComposePrefill::default(),
+                        files: paths,
+                        dropped: Vec::new(),
+                    },
                     &sender,
                 );
             }
 
             AppMsg::DropFilesAs(choice, paths) => {
                 use crate::ui::drop_zones::DropChoice;
-                tracing::info!("file drop: {} file(s) for a new message ({choice:?})", paths.len());
+                tracing::info!(
+                    "file drop: {} file(s) for a new message ({choice:?})",
+                    paths.len()
+                );
                 let mut prefill = ComposePrefill::default();
                 match choice {
                     // The route a drop always took: the size check first.
@@ -9748,7 +11074,11 @@ impl SimpleComponent for AppModel {
                     DropChoice::Cloud => prefill.cloud_uploads = paths,
                 }
                 self.leave_gallery();
-                let account = self.current.as_ref().map(|m| m.account_id).unwrap_or_else(|| self.active_account());
+                let account = self
+                    .current
+                    .as_ref()
+                    .map(|m| m.account_id)
+                    .unwrap_or_else(|| self.active_account());
                 let (account, prefill) = self.new_message_from(account, prefill);
                 if self.compose_inline {
                     self.open_inline_reply(account, prefill, None, &sender);
@@ -9767,7 +11097,11 @@ impl SimpleComponent for AppModel {
                 }
                 self.leave_gallery();
                 self.hand_off_size_check(
-                    FileHandOff { base: ComposePrefill::default(), files: paths, dropped: Vec::new() },
+                    FileHandOff {
+                        base: ComposePrefill::default(),
+                        files: paths,
+                        dropped: Vec::new(),
+                    },
                     HandOffTarget::New,
                     &sender,
                 );
@@ -9793,7 +11127,9 @@ impl SimpleComponent for AppModel {
                     .unwrap_or_default()
                     .into_iter()
                     .filter(|(acc, path, _)| {
-                        self.folders.get(acc).is_some_and(|fs| fs.iter().any(|f| f.path == *path))
+                        self.folders
+                            .get(acc)
+                            .is_some_and(|fs| fs.iter().any(|f| f.path == *path))
                     })
                     .collect();
                 // The copy in the account currently in view wins when several
@@ -9805,8 +11141,14 @@ impl SimpleComponent for AppModel {
                     .or_else(|| hits.first())
                     .cloned()
                 {
-                    tracing::info!("mid: {id} is cached in account {account_id}, {folder_path} uid {uid}");
-                    sender.input(AppMsg::OpenAttachmentMessage { account_id, folder_path, uid });
+                    tracing::info!(
+                        "mid: {id} is cached in account {account_id}, {folder_path} uid {uid}"
+                    );
+                    sender.input(AppMsg::OpenAttachmentMessage {
+                        account_id,
+                        folder_path,
+                        uid,
+                    });
                     return;
                 }
                 if self.workers.is_empty() {
@@ -9819,16 +11161,30 @@ impl SimpleComponent for AppModel {
                 }
                 self.mid_searches.insert(id.clone(), self.workers.len());
                 for w in self.workers.values() {
-                    let _ = w.send(MailRequest::Locate { message_id: id.clone() });
+                    let _ = w.send(MailRequest::Locate {
+                        message_id: id.clone(),
+                    });
                 }
             }
 
-            AppMsg::MidLocated { account_id, message_id, hit } => {
-                let Some(remaining) = self.mid_searches.get_mut(&message_id) else { return };
+            AppMsg::MidLocated {
+                account_id,
+                message_id,
+                hit,
+            } => {
+                let Some(remaining) = self.mid_searches.get_mut(&message_id) else {
+                    return;
+                };
                 if let Some((folder_path, uid)) = hit {
-                    tracing::info!("mid: {message_id} found on account {account_id}, {folder_path} uid {uid}");
+                    tracing::info!(
+                        "mid: {message_id} found on account {account_id}, {folder_path} uid {uid}"
+                    );
                     self.mid_searches.remove(&message_id);
-                    sender.input(AppMsg::OpenAttachmentMessage { account_id, folder_path, uid });
+                    sender.input(AppMsg::OpenAttachmentMessage {
+                        account_id,
+                        folder_path,
+                        uid,
+                    });
                     return;
                 }
                 *remaining = remaining.saturating_sub(1);
@@ -9836,7 +11192,10 @@ impl SimpleComponent for AppModel {
                     tracing::info!("mid: {message_id} not found on any account");
                     self.mid_searches.remove(&message_id);
                     self.notifications.emit(NotifyInput::Push {
-                        text: i18n_f("No message with the ID {id} was found", &[("id", &message_id)]),
+                        text: i18n_f(
+                            "No message with the ID {id} was found",
+                            &[("id", &message_id)],
+                        ),
                         error: true,
                         connectivity: false,
                     });
@@ -9855,7 +11214,11 @@ impl SimpleComponent for AppModel {
                 }
                 self.tag_scan_gen = self.tag_scan_gen.wrapping_add(1);
                 let gen = self.tag_scan_gen;
-                self.tag_scan = Some(TagScan { gen, remaining: self.workers.len(), found: Vec::new() });
+                self.tag_scan = Some(TagScan {
+                    gen,
+                    remaining: self.workers.len(),
+                    found: Vec::new(),
+                });
                 for w in self.workers.values() {
                     let _ = w.send(MailRequest::FindKeywords);
                 }
@@ -9887,8 +11250,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::KeywordsFound { account_id, findings } => {
-                let Some(scan) = self.tag_scan.as_mut() else { return };
+            AppMsg::KeywordsFound {
+                account_id,
+                findings,
+            } => {
+                let Some(scan) = self.tag_scan.as_mut() else {
+                    return;
+                };
                 scan.found.push((account_id, findings));
                 scan.remaining = scan.remaining.saturating_sub(1);
                 if scan.remaining == 0 {
@@ -9907,7 +11275,9 @@ impl SimpleComponent for AppModel {
                 // A mailto: link from anywhere on the system (the desktop file
                 // registers the scheme). Same open-composer flow as ComposeTo,
                 // with the URI's subject/cc/bcc/body carried along.
-                let Some(mut prefill) = parse_mailto(&uri) else { return };
+                let Some(mut prefill) = parse_mailto(&uri) else {
+                    return;
+                };
                 // attach= names files (#90): keep only the ones that really
                 // exist as regular files. Whatever attaches shows up as a
                 // normal removable chip in the composer, so nothing rides
@@ -9916,9 +11286,14 @@ impl SimpleComponent for AppModel {
                 // not dropped in silence: from inside the Flatpak sandbox a
                 // path the file manager can see may be one Hylki cannot.
                 let (attachments, dropped): (Vec<_>, Vec<_>) =
-                    std::mem::take(&mut prefill.attachments).into_iter().partition(|p| p.is_file());
+                    std::mem::take(&mut prefill.attachments)
+                        .into_iter()
+                        .partition(|p| p.is_file());
                 for p in &dropped {
-                    tracing::warn!("mailto attach ignored (not a readable file): {}", p.display());
+                    tracing::warn!(
+                        "mailto attach ignored (not a readable file): {}",
+                        p.display()
+                    );
                 }
                 tracing::info!(
                     "mailto hand-off: {} attachment(s) named, {} readable",
@@ -9928,7 +11303,14 @@ impl SimpleComponent for AppModel {
                 if !attachments.is_empty() {
                     // Files came along (Files' own "Email…" entry): the same
                     // choice of destination as "Send with Hylki".
-                    self.begin_hand_off(FileHandOff { base: prefill, files: attachments, dropped }, &sender);
+                    self.begin_hand_off(
+                        FileHandOff {
+                            base: prefill,
+                            files: attachments,
+                            dropped,
+                        },
+                        &sender,
+                    );
                     return;
                 }
                 // None of the named files could be read (#339): asking where
@@ -9967,7 +11349,9 @@ impl SimpleComponent for AppModel {
                 if self.reply_joins(from, &out) {
                     match self.provisional_message(&out) {
                         Some(m) => self.arriving = Some((from, m, motion_wanted())),
-                        None => tracing::info!(target: "hylki::morph", "no send morph: the reply's card could not be built"),
+                        None => {
+                            tracing::info!(target: "hylki::morph", "no send morph: the reply's card could not be built")
+                        }
                     }
                 }
                 let account_id = out.from_account_id;
@@ -9981,7 +11365,8 @@ impl SimpleComponent for AppModel {
                 if let Some(c) = self.cache.as_ref() {
                     c.record_addresses(&recipients);
                 }
-                let own: HashSet<String> = self.config.iter().map(|c| c.email.to_lowercase()).collect();
+                let own: HashSet<String> =
+                    self.config.iter().map(|c| c.email.to_lowercase()).collect();
                 let fresh: Vec<crate::contacts::Suggestion> = recipients
                     .into_iter()
                     .filter(|(_, e)| e.contains('@'))
@@ -9997,22 +11382,36 @@ impl SimpleComponent for AppModel {
                     .collect();
                 if !fresh.is_empty() {
                     for host in &self.composers {
-                        host.controller.emit(ComposeInput::AddSuggestions { account_id, new: fresh.clone() });
+                        host.controller.emit(ComposeInput::AddSuggestions {
+                            account_id,
+                            new: fresh.clone(),
+                        });
                     }
                     if let Some(rc) = &self.reader_compose {
-                        rc.controller.emit(ComposeInput::AddSuggestions { account_id, new: fresh.clone() });
+                        rc.controller.emit(ComposeInput::AddSuggestions {
+                            account_id,
+                            new: fresh.clone(),
+                        });
                     }
                 }
                 let sent_path = self.sent_copy_path(account_id);
                 if out.send_at.is_some() {
                     // Send Later has its own way back: the message waits in
                     // the Outbox, where it can be edited or dropped.
-                    self.send_to(account_id, MailRequest::Send { message: out, sent_path, ticket: 0 });
+                    self.send_to(
+                        account_id,
+                        MailRequest::Send {
+                            message: out,
+                            sent_path,
+                            ticket: 0,
+                        },
+                    );
                 } else {
                     let origin = match self.reader_compose.as_ref().filter(|r| r.id == from) {
-                        Some(r) if r.window.is_none() => {
-                            r.answering.map_or(crate::outgoing::Origin::Pane, crate::outgoing::Origin::Split)
-                        }
+                        Some(r) if r.window.is_none() => r.answering.map_or(
+                            crate::outgoing::Origin::Pane,
+                            crate::outgoing::Origin::Split,
+                        ),
                         _ => crate::outgoing::Origin::Window,
                     };
                     self.queue_send(origin, out, sent_path, &sender);
@@ -10034,7 +11433,9 @@ impl SimpleComponent for AppModel {
                 }
                 let done = {
                     let mut list = self.outgoing.borrow_mut();
-                    list.iter().position(|o| o.ticket == ticket).map(|i| list.remove(i))
+                    list.iter()
+                        .position(|o| o.ticket == ticket)
+                        .map(|i| list.remove(i))
                 };
                 if done.is_some() {
                     self.push_outbox();
@@ -10051,7 +11452,16 @@ impl SimpleComponent for AppModel {
                     });
                     return;
                 };
-                self.send_to(account_id, MailRequest::SaveDraft { message: out, folder_id, path, autosave: None, template: false });
+                self.send_to(
+                    account_id,
+                    MailRequest::SaveDraft {
+                        message: out,
+                        folder_id,
+                        path,
+                        autosave: None,
+                        template: false,
+                    },
+                );
             }
 
             AppMsg::SaveTemplateMessage(out) => {
@@ -10073,7 +11483,16 @@ impl SimpleComponent for AppModel {
                     });
                     return;
                 };
-                self.send_to(account_id, MailRequest::SaveDraft { message: out, folder_id, path, autosave: None, template: true });
+                self.send_to(
+                    account_id,
+                    MailRequest::SaveDraft {
+                        message: out,
+                        folder_id,
+                        path,
+                        autosave: None,
+                        template: true,
+                    },
+                );
             }
 
             AppMsg::FillUnifiedSlices => self.fill_unified_slices(),
@@ -10115,11 +11534,17 @@ impl SimpleComponent for AppModel {
                     // The worker's own answer may have come first. An empty
                     // folder is recorded as read too: building a unified row
                     // ahead waits on all of its folders.
-                    if self.message_cache.get(&(account_id, folder_id)).is_some_and(|c| !c.is_empty()) {
+                    if self
+                        .message_cache
+                        .get(&(account_id, folder_id))
+                        .is_some_and(|c| !c.is_empty())
+                    {
                         continue;
                     }
                     if messages.is_empty() {
-                        self.message_cache.entry((account_id, folder_id)).or_default();
+                        self.message_cache
+                            .entry((account_id, folder_id))
+                            .or_default();
                         continue;
                     }
                     let messages = self.merge_local_tags(account_id, messages);
@@ -10132,16 +11557,23 @@ impl SimpleComponent for AppModel {
                             self.unified_unfilled.insert((account_id, folder_id));
                         } else {
                             self.unified_unfilled.remove(&(account_id, folder_id));
-                            self.unified_slices.insert((account_id, folder_id), messages.clone());
+                            self.unified_slices
+                                .insert((account_id, folder_id), messages.clone());
                         }
                         landed = true;
                     } else if !open
-                        && self.selected.as_ref().is_some_and(|s| (s.account_id, s.folder_id) == (account_id, folder_id))
+                        && self
+                            .selected
+                            .as_ref()
+                            .is_some_and(|s| (s.account_id, s.folder_id) == (account_id, folder_id))
                     {
                         // The folder on show had only its newest so far.
-                        self.message_list.emit(MessageListInput::SetMessages { messages: messages.clone() });
+                        self.message_list.emit(MessageListInput::SetMessages {
+                            messages: messages.clone(),
+                        });
                     }
-                    self.message_cache.insert((account_id, folder_id), messages.into());
+                    self.message_cache
+                        .insert((account_id, folder_id), messages.into());
                 }
                 // A view left before its folders landed.
                 self.shed_large_folders();
@@ -10176,9 +11608,21 @@ impl SimpleComponent for AppModel {
                 match self.drafts_target(account_id) {
                     Some((folder_id, path)) => self.send_to(
                         account_id,
-                        MailRequest::SaveDraft { message, folder_id, path, autosave: Some(id), template: false },
+                        MailRequest::SaveDraft {
+                            message,
+                            folder_id,
+                            path,
+                            autosave: Some(id),
+                            template: false,
+                        },
                     ),
-                    None => self.emit_to_composer(id, ComposeInput::Autosaved { saved: false, origin: None }),
+                    None => self.emit_to_composer(
+                        id,
+                        ComposeInput::Autosaved {
+                            saved: false,
+                            origin: None,
+                        },
+                    ),
                 }
             }
 
@@ -10221,13 +11665,19 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::ReclaimFocus);
             }
 
-            AppMsg::DraftSaved { account_id, autosave, message_id } => {
+            AppMsg::DraftSaved {
+                account_id,
+                autosave,
+                message_id,
+            } => {
                 // The Drafts folder reload already reflects the saved draft; an
                 // explicit save's composer has closed. No notification (mirrors
                 // silent send). An automatic save tells its composer where the
                 // copy is now, so the next save replaces it (#340).
                 let Some(id) = autosave else { return };
-                let origin = message_id.as_deref().and_then(|mid| self.find_draft(account_id, mid));
+                let origin = message_id
+                    .as_deref()
+                    .and_then(|mid| self.find_draft(account_id, mid));
                 if !self.composer_exists(id) {
                     // Sent, saved or closed while this save was on its way:
                     // the copy it left is not wanted.
@@ -10236,7 +11686,13 @@ impl SimpleComponent for AppModel {
                     }
                     return;
                 }
-                self.emit_to_composer(id, ComposeInput::Autosaved { saved: message_id.is_some(), origin });
+                self.emit_to_composer(
+                    id,
+                    ComposeInput::Autosaved {
+                        saved: message_id.is_some(),
+                        origin,
+                    },
+                );
             }
 
             AppMsg::ShowcaseComposeClose => {
@@ -10248,8 +11704,12 @@ impl SimpleComponent for AppModel {
             AppMsg::SendMorphFailed => self.send_morph_failed(),
 
             AppMsg::ShowcaseCopy => {
-                let Some(current) = self.current.clone() else { return };
-                let Some(p) = self.provisionals.values().next() else { return };
+                let Some(current) = self.current.clone() else {
+                    return;
+                };
+                let Some(p) = self.provisionals.values().next() else {
+                    return;
+                };
                 let mut copy = p.message.clone();
                 copy.uid = 9_999;
                 copy.message_id = "showcase-copy@hylki.local".into();
@@ -10260,13 +11720,21 @@ impl SimpleComponent for AppModel {
                 // own last frame, to hold the two against each other.
                 if let Some(dir) = std::env::var_os("HYLKI_MORPH_FRAMES") {
                     let window: gtk::Widget = self.window.clone().upcast();
-                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1200), move || {
-                        crate::ui::send_morph::capture_next_frame(&window.clone(), move |still| {
-                            if let Some((tex, _)) = still {
-                                let _ = tex.save_to_png(std::path::Path::new(&dir).join("zz-copy.png"));
-                            }
-                        });
-                    });
+                    gtk::glib::timeout_add_local_once(
+                        std::time::Duration::from_millis(1200),
+                        move || {
+                            crate::ui::send_morph::capture_next_frame(
+                                &window.clone(),
+                                move |still| {
+                                    if let Some((tex, _)) = still {
+                                        let _ = tex.save_to_png(
+                                            std::path::Path::new(&dir).join("zz-copy.png"),
+                                        );
+                                    }
+                                },
+                            );
+                        },
+                    );
                 }
             }
 
@@ -10284,13 +11752,18 @@ impl SimpleComponent for AppModel {
                     });
                     let c2 = clock.clone();
                     let cell = std::rc::Rc::new(std::cell::Cell::new(Some(id)));
-                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
-                        if let Some(id) = cell.take() {
-                            c2.disconnect(id);
-                        }
-                    });
+                    gtk::glib::timeout_add_local_once(
+                        std::time::Duration::from_millis(2500),
+                        move || {
+                            if let Some(id) = cell.take() {
+                                c2.disconnect(id);
+                            }
+                        },
+                    );
                 }
-                let Some(rc) = self.reader_compose.as_ref().map(|r| &r.controller) else { return };
+                let Some(rc) = self.reader_compose.as_ref().map(|r| &r.controller) else {
+                    return;
+                };
                 let editor = crate::ui::send_morph::find_widget(rc.widget().upcast_ref(), &|w| {
                     w.is::<webkit6::WebView>()
                 })
@@ -10299,28 +11772,50 @@ impl SimpleComponent for AppModel {
                 let js = format!(
                     "document.body.focus();{}",
                     text.split('\n')
-                        .map(|l| format!("document.execCommand('insertText',false,{});", serde_json::to_string(l).unwrap_or_default()))
+                        .map(|l| format!(
+                            "document.execCommand('insertText',false,{});",
+                            serde_json::to_string(l).unwrap_or_default()
+                        ))
                         .collect::<Vec<_>>()
                         .join("document.execCommand('insertParagraph');")
                 );
-                webkit6::prelude::WebViewExt::evaluate_javascript(&editor, &js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+                webkit6::prelude::WebViewExt::evaluate_javascript(
+                    &editor,
+                    &js,
+                    None,
+                    None,
+                    None::<&gtk::gio::Cancellable>,
+                    |_| {},
+                );
                 let c = rc.sender().clone();
-                gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
-                    c.emit(ComposeInput::Send);
-                });
+                gtk::glib::timeout_add_local_once(
+                    std::time::Duration::from_millis(600),
+                    move || {
+                        c.emit(ComposeInput::Send);
+                    },
+                );
                 // The whole window every quarter second for six seconds from
                 // Send, to see what the reader does while the message goes.
                 if let Some(dir) = std::env::var_os("HYLKI_MORPH_FRAMES") {
                     let window: gtk::Widget = self.window.clone().upcast();
                     for i in 0..24u64 {
                         let (dir, window) = (dir.clone(), window.clone());
-                        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600 + i * 250), move || {
-                            crate::ui::send_morph::capture_next_frame(&window.clone(), move |still| {
-                                if let Some((tex, _)) = still {
-                                    let _ = tex.save_to_png(std::path::Path::new(&dir).join(format!("win-{:05}.png", i * 250)));
-                                }
-                            });
-                        });
+                        gtk::glib::timeout_add_local_once(
+                            std::time::Duration::from_millis(600 + i * 250),
+                            move || {
+                                crate::ui::send_morph::capture_next_frame(
+                                    &window.clone(),
+                                    move |still| {
+                                        if let Some((tex, _)) = still {
+                                            let _ = tex.save_to_png(
+                                                std::path::Path::new(&dir)
+                                                    .join(format!("win-{:05}.png", i * 250)),
+                                            );
+                                        }
+                                    },
+                                );
+                            },
+                        );
                     }
                 }
             }
@@ -10336,7 +11831,11 @@ impl SimpleComponent for AppModel {
                     .iter()
                     .find(|h| h.id == id)
                     .map(|h| &h.controller)
-                    .or(self.reader_compose.as_ref().filter(|r| r.id == id).map(|r| &r.controller));
+                    .or(self
+                        .reader_compose
+                        .as_ref()
+                        .filter(|r| r.id == id)
+                        .map(|r| &r.controller));
                 match controller {
                     Some(c) => c.emit(ComposeInput::Cancel),
                     None => self.close_compose(id),
@@ -10356,10 +11855,13 @@ impl SimpleComponent for AppModel {
                     let viewing_sent = sel.account_id == account_id
                         && copied_to.is_some_and(|path| path == sel.path);
                     if viewing_sent {
-                        self.send_to(account_id, MailRequest::LoadMessages {
-                            folder_id: sel.folder_id,
-                            path: sel.path,
-                        });
+                        self.send_to(
+                            account_id,
+                            MailRequest::LoadMessages {
+                                folder_id: sel.folder_id,
+                                path: sel.path,
+                            },
+                        );
                     }
                 }
                 // The reply just sent answers the conversation on screen, and
@@ -10370,7 +11872,10 @@ impl SimpleComponent for AppModel {
                 self.reload_related(account_id);
             }
 
-            AppMsg::Unsent { account_id, message } => {
+            AppMsg::Unsent {
+                account_id,
+                message,
+            } => {
                 self.drop_provisional(&message.in_reply_to);
                 self.compose_unsent(account_id, *message, &sender);
             }
@@ -10378,7 +11883,10 @@ impl SimpleComponent for AppModel {
             AppMsg::OpenAccounts => self.open_settings_window(&sender, true, false),
 
             AppMsg::AddFirstAccount => self.open_settings_window(&sender, true, true),
-            AppMsg::AccountSaved { original_email, account } => {
+            AppMsg::AccountSaved {
+                original_email,
+                account,
+            } => {
                 // Whether the account joined or left the unified section
                 // (#267): the merged views open now are redrawn without it.
                 let unified_changed = original_email
@@ -10403,7 +11911,10 @@ impl SimpleComponent for AppModel {
                     self.warm_own_gravatars(&sender);
                     self.refresh_faces();
                     if unified_changed {
-                        self.reload_unified_views(self.unified.then_some(self.unified_view), &sender);
+                        self.reload_unified_views(
+                            self.unified.then_some(self.unified_view),
+                            &sender,
+                        );
                     }
                     return;
                 }
@@ -10422,7 +11933,8 @@ impl SimpleComponent for AppModel {
                     .cloned();
                 let display_only = look_only.is_some();
                 if let Some(old) = look_only {
-                    let (new, email, sender) = ((*account).clone(), new_email.clone(), sender.clone());
+                    let (new, email, sender) =
+                        ((*account).clone(), new_email.clone(), sender.clone());
                     config::keyring_then(
                         move || secrets_kept(&old, &new),
                         move |kept| {
@@ -10437,8 +11949,8 @@ impl SimpleComponent for AppModel {
                 // Remember the secret we expect to persist, so we can verify the
                 // keyring actually stored it (a silent keyring failure would
                 // otherwise leave the account unable to log in after a restart).
-                let expected_secret = (!account.password.is_empty())
-                    .then(|| account.password.clone());
+                let expected_secret =
+                    (!account.password.is_empty()).then(|| account.password.clone());
                 // An alias dropped (or switched back to the account's SMTP) in
                 // this edit must not leave its SMTP password behind in the
                 // keyring — and an email rename re-keys every alias entry, so
@@ -10454,7 +11966,9 @@ impl SimpleComponent for AppModel {
                                 });
                             if !kept {
                                 let (email, address) = (old.email.clone(), old_alias.address());
-                                config::keyring_later(move || config::delete_alias_smtp_password(&email, &address));
+                                config::keyring_later(move || {
+                                    config::delete_alias_smtp_password(&email, &address)
+                                });
                             }
                         }
                     }
@@ -10469,7 +11983,11 @@ impl SimpleComponent for AppModel {
                         }
                         // Track an email change in the display-order/collapsed lists.
                         if orig != new_email {
-                            for e in self.account_order.iter_mut().chain(self.collapsed.iter_mut()) {
+                            for e in self
+                                .account_order
+                                .iter_mut()
+                                .chain(self.collapsed.iter_mut())
+                            {
                                 if *e == orig {
                                     *e = new_email.clone();
                                 }
@@ -10489,7 +12007,10 @@ impl SimpleComponent for AppModel {
                         if let Some(secret) = expected_secret {
                             let (email, sender) = (new_email.clone(), sender.clone());
                             config::keyring_then(
-                                move || config::load_password(&email).as_deref() == Some(secret.as_str()),
+                                move || {
+                                    config::load_password(&email).as_deref()
+                                        == Some(secret.as_str())
+                                },
                                 move |stored| {
                                     if !stored {
                                         sender.input(AppMsg::ShowKeyringHelp { problem: true });
@@ -10537,7 +12058,10 @@ impl SimpleComponent for AppModel {
                         slot.enabled = enabled;
                         if let Err(e) = config::save(&self.config) {
                             self.notifications.emit(NotifyInput::Push {
-                                text: i18n_f("Could not save account: {e}", &[("e", &(e).to_string())]),
+                                text: i18n_f(
+                                    "Could not save account: {e}",
+                                    &[("e", &(e).to_string())],
+                                ),
                                 error: true,
                                 connectivity: false,
                             });
@@ -10604,7 +12128,10 @@ impl SimpleComponent for AppModel {
                 self.filter_run_dismissed();
             }
 
-            AppMsg::FolderSynced { account_id, folder_id } => {
+            AppMsg::FolderSynced {
+                account_id,
+                folder_id,
+            } => {
                 self.filter_run_folder_synced(account_id, folder_id);
             }
 
@@ -10615,10 +12142,13 @@ impl SimpleComponent for AppModel {
                 // stale once the set changes.
                 self.tag_view_cache.retain(|(_, kw), _| kw.is_some());
                 self.refresh_tag_css();
-                self.message_list.emit(MessageListInput::SetTags(self.tags.clone()));
-                self.message_view.emit(MessageViewInput::SetTags(self.tags.clone()));
+                self.message_list
+                    .emit(MessageListInput::SetTags(self.tags.clone()));
+                self.message_view
+                    .emit(MessageViewInput::SetTags(self.tags.clone()));
                 for p in self.popouts.values() {
-                    p.controller.emit(MessageWindowInput::SetTags(self.tags.clone()));
+                    p.controller
+                        .emit(MessageWindowInput::SetTags(self.tags.clone()));
                 }
                 // The sidebar lists the tags; a removed one that was the open
                 // view falls back to All Inboxes there (SetContents).
@@ -10649,13 +12179,17 @@ impl SimpleComponent for AppModel {
                 self.show_message(None, false);
                 self.message_list.emit(MessageListInput::SetSelected(None));
                 self.message_list.emit(MessageListInput::ResetPaging);
-                self.message_list.emit(MessageListInput::SetScope(SearchScope::ThisFolder));
+                self.message_list
+                    .emit(MessageListInput::SetScope(SearchScope::ThisFolder));
                 self.message_list.emit(MessageListInput::SetColorize(true));
-                self.message_list.emit(MessageListInput::SetShowRecipient(false));
-                self.message_list.emit(MessageListInput::SetRestorable(false));
+                self.message_list
+                    .emit(MessageListInput::SetShowRecipient(false));
+                self.message_list
+                    .emit(MessageListInput::SetRestorable(false));
                 self.message_list.emit(MessageListInput::SetInJunk(false));
                 self.message_list.emit(MessageListInput::SetInDrafts(false));
-                self.message_view.emit(MessageViewInput::SetDraftsView(false));
+                self.message_view
+                    .emit(MessageViewInput::SetDraftsView(false));
                 self.show_tag_view();
                 self.refresh_tag_view(&sender);
                 self.sync_tag_keywords();
@@ -10683,18 +12217,22 @@ impl SimpleComponent for AppModel {
                 self.show_message(None, false);
                 self.message_list.emit(MessageListInput::SetSelected(None));
                 self.message_list.emit(MessageListInput::ResetPaging);
-                self.message_list.emit(MessageListInput::SetScope(SearchScope::ThisFolder));
+                self.message_list
+                    .emit(MessageListInput::SetScope(SearchScope::ThisFolder));
                 self.message_list.emit(MessageListInput::SetColorize(true));
                 // A folder held to Sent lists what you sent: name the
                 // recipients, as Sent does.
                 let sent = self
                     .open_smart_folder()
                     .is_some_and(|f| f.folder == Some(config::SmartFolderKind::Sent));
-                self.message_list.emit(MessageListInput::SetShowRecipient(sent));
-                self.message_list.emit(MessageListInput::SetRestorable(false));
+                self.message_list
+                    .emit(MessageListInput::SetShowRecipient(sent));
+                self.message_list
+                    .emit(MessageListInput::SetRestorable(false));
                 self.message_list.emit(MessageListInput::SetInJunk(false));
                 self.message_list.emit(MessageListInput::SetInDrafts(false));
-                self.message_view.emit(MessageViewInput::SetDraftsView(false));
+                self.message_view
+                    .emit(MessageViewInput::SetDraftsView(false));
                 self.show_smart_view();
                 self.refresh_smart_view(&sender);
                 self.push_index_complete();
@@ -10709,7 +12247,8 @@ impl SimpleComponent for AppModel {
                         self.smart_view_cache.insert(id.clone(), out.clone());
                     }
                     if self.smart_view.as_ref() == Some(&id) && changed {
-                        self.message_list.emit(MessageListInput::SetMessages { messages: out });
+                        self.message_list
+                            .emit(MessageListInput::SetMessages { messages: out });
                     }
                 }
                 if std::mem::take(&mut self.smart_view_dirty) {
@@ -10750,10 +12289,16 @@ impl SimpleComponent for AppModel {
                 self.smart_view_cache.clear();
                 self.smart_folders = folders;
                 if let Some(acc) = &self.accounts_win {
-                    acc.emit(crate::ui::accounts::AccountsInput::SetSmartFolders(self.smart_folders.clone()));
+                    acc.emit(crate::ui::accounts::AccountsInput::SetSmartFolders(
+                        self.smart_folders.clone(),
+                    ));
                 }
                 self.rebuild_sidebar();
-                if self.smart_view.as_ref().is_some_and(|id| self.smart_folders.iter().any(|f| &f.id == id)) {
+                if self
+                    .smart_view
+                    .as_ref()
+                    .is_some_and(|id| self.smart_folders.iter().any(|f| &f.id == id))
+                {
                     self.show_smart_view();
                     self.refresh_smart_view(&sender);
                 }
@@ -10775,10 +12320,13 @@ impl SimpleComponent for AppModel {
                 }
                 if let Some(sel) = self.selected.clone() {
                     if sel.account_id == account_id && paths.contains(&sel.path) {
-                        self.send_to(account_id, MailRequest::LoadMessages {
-                            folder_id: sel.folder_id,
-                            path: sel.path,
-                        });
+                        self.send_to(
+                            account_id,
+                            MailRequest::LoadMessages {
+                                folder_id: sel.folder_id,
+                                path: sel.path,
+                            },
+                        );
                     }
                 }
             }
@@ -10791,26 +12339,36 @@ impl SimpleComponent for AppModel {
                     self.tag_view_cache.insert(key.clone(), out.clone());
                 }
                 if self.tag_view.as_ref() == Some(&key) && changed {
-                    self.message_list.emit(MessageListInput::SetMessages { messages: out });
+                    self.message_list
+                        .emit(MessageListInput::SetMessages { messages: out });
                 }
                 if std::mem::take(&mut self.tag_view_dirty) {
                     self.refresh_tag_view(&sender);
                 }
             }
 
-            AppMsg::SetTag { message, keyword, add } => {
+            AppMsg::SetTag {
+                message,
+                keyword,
+                add,
+            } => {
                 let what = self.tag_label(&keyword, add);
                 self.user_set_flags(what, &[*message], FlagKind::Tag(keyword), add);
             }
 
-            AppMsg::SetTagMany { messages, keyword, add } => {
+            AppMsg::SetTagMany {
+                messages,
+                keyword,
+                add,
+            } => {
                 let what = self.tag_label(&keyword, add);
                 self.user_set_flags(what, &messages, FlagKind::Tag(keyword), add);
             }
 
             AppMsg::MoveToInbox => {
                 if self.many_selected() {
-                    self.message_list.emit(MessageListInput::Bulk(BulkAction::MoveToInbox));
+                    self.message_list
+                        .emit(MessageListInput::Bulk(BulkAction::MoveToInbox));
                     return;
                 }
                 if let Some(m) = self.reply_target() {
@@ -10826,7 +12384,11 @@ impl SimpleComponent for AppModel {
             AppMsg::TagKey { n, slots } => {
                 // Settings order, first nine. A number past the list does
                 // nothing rather than something surprising.
-                let Some(keyword) = self.tags.get(usize::from(n).saturating_sub(1)).map(|t| t.keyword.clone()) else {
+                let Some(keyword) = self
+                    .tags
+                    .get(usize::from(n).saturating_sub(1))
+                    .map(|t| t.keyword.clone())
+                else {
                     return;
                 };
                 // Arrowing quickly, the key can arrive before the app has
@@ -10834,11 +12396,12 @@ impl SimpleComponent for AppModel {
                 // the ones meant, or the tag lands on the row before and the
                 // next press takes it back off (#416).
                 let keys: Vec<(u32, u32)> = slots.iter().map(|&(a, _, id)| (a, id)).collect();
-                let targets = if !keys.is_empty() && keys != self.list_heard && keys != self.list_selection {
-                    self.rows_at(&slots)
-                } else {
-                    self.selected_targets()
-                };
+                let targets =
+                    if !keys.is_empty() && keys != self.list_heard && keys != self.list_selection {
+                        self.rows_at(&slots)
+                    } else {
+                        self.selected_targets()
+                    };
                 self.toggle_tag(keyword, &targets);
             }
 
@@ -10873,8 +12436,7 @@ impl SimpleComponent for AppModel {
                 }
                 // The reading pane shows a conversation (its row was opened,
                 // not one reply of it): offer to move the whole of it.
-                let conversation = (!self.many_selected()
-                    && self.current_thread.len() > 1)
+                let conversation = (!self.many_selected() && self.current_thread.len() > 1)
                     .then_some(self.current_thread.len());
                 // Anchored to the toolbar button, or to the overflow button
                 // when the toolbar has folded into it.
@@ -10891,22 +12453,41 @@ impl SimpleComponent for AppModel {
                     accounts,
                     conversation,
                     move |account_id, dest, whole| {
-                        let _ = s.send(AppMsg::MoveSelectionTo { account_id, dest, whole });
+                        let _ = s.send(AppMsg::MoveSelectionTo {
+                            account_id,
+                            dest,
+                            whole,
+                        });
                     },
                 );
             }
 
-            AppMsg::CardMenu { message, x, y, hit, popout } => {
+            AppMsg::CardMenu {
+                message,
+                x,
+                y,
+                hit,
+                popout,
+            } => {
                 self.show_card_menu(*message, x, y, hit, popout, &sender);
             }
 
-            AppMsg::ListMoveTo { messages, offer_whole, x, y } => {
-                let Some(first) = messages.first() else { return };
+            AppMsg::ListMoveTo {
+                messages,
+                offer_whole,
+                x,
+                y,
+            } => {
+                let Some(first) = messages.first() else {
+                    return;
+                };
                 let account_id = first.account_id;
                 // Leave out the folder the mail sits in, when it is one.
-                let exclude = self
-                    .resolve_folder_path(first)
-                    .filter(|p| messages.iter().all(|m| self.resolve_folder_path(m).as_ref() == Some(p)));
+                let exclude = self.resolve_folder_path(first).filter(|p| {
+                    messages
+                        .iter()
+                        .all(|m| self.resolve_folder_path(m).as_ref() == Some(p))
+                });
                 let accounts = self.picker_accounts(account_id, exclude);
                 if accounts.is_empty() {
                     return;
@@ -10926,18 +12507,32 @@ impl SimpleComponent for AppModel {
                         } else {
                             messages.clone()
                         };
-                        let _ = s.send(AppMsg::MoveMessagesTo { account_id, dest, messages: picked });
+                        let _ = s.send(AppMsg::MoveMessagesTo {
+                            account_id,
+                            dest,
+                            messages: picked,
+                        });
                     },
                 );
             }
 
-            AppMsg::MoveMessagesTo { account_id, dest, messages } => {
-                let items: Vec<(u32, u32, u32, u32)> =
-                    messages.iter().map(|m| (m.account_id, m.folder_id, m.uid, m.id)).collect();
+            AppMsg::MoveMessagesTo {
+                account_id,
+                dest,
+                messages,
+            } => {
+                let items: Vec<(u32, u32, u32, u32)> = messages
+                    .iter()
+                    .map(|m| (m.account_id, m.folder_id, m.uid, m.id))
+                    .collect();
                 self.drop_move(account_id, dest, items);
             }
 
-            AppMsg::MoveSelectionTo { account_id, dest, whole } => {
+            AppMsg::MoveSelectionTo {
+                account_id,
+                dest,
+                whole,
+            } => {
                 if whole && self.current_thread.len() > 1 {
                     // The whole conversation, the way a dragged selection
                     // moves: grouped by source folder, undoable, and any
@@ -10951,7 +12546,8 @@ impl SimpleComponent for AppModel {
                     self.drop_move(account_id, dest, items);
                 } else if self.rows_selected() {
                     // The list knows the conversations its rows stand for.
-                    self.message_list.emit(MessageListInput::MoveSelectedTo { account_id, dest });
+                    self.message_list
+                        .emit(MessageListInput::MoveSelectedTo { account_id, dest });
                 } else if self.many_selected() {
                     // The same path a drag onto the sidebar takes: grouped by
                     // source folder, undoable, foreign accounts reported.
@@ -10968,7 +12564,11 @@ impl SimpleComponent for AppModel {
                     if m.account_id == account_id {
                         self.move_to_path(m, dest);
                     } else {
-                        self.drop_move(account_id, dest, vec![(m.account_id, m.folder_id, m.uid, m.id)]);
+                        self.drop_move(
+                            account_id,
+                            dest,
+                            vec![(m.account_id, m.folder_id, m.uid, m.id)],
+                        );
                     }
                 }
             }
@@ -11006,7 +12606,8 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetReadMark(policy)) => {
                 if pref!(self.read_mark = policy) {
-                    self.message_view.emit(MessageViewInput::SetReadMark(policy));
+                    self.message_view
+                        .emit(MessageViewInput::SetReadMark(policy));
                 }
             }
 
@@ -11024,7 +12625,10 @@ impl SimpleComponent for AppModel {
                         .and_then(|t| std::fs::write(&path, t).map_err(|e| e.to_string()));
                     let _ = notif.send(match outcome {
                         Ok(()) => NotifyInput::Push {
-                            text: i18n_f("Settings exported to {display}", &[("display", &(path.display()).to_string())]),
+                            text: i18n_f(
+                                "Settings exported to {display}",
+                                &[("display", &(path.display()).to_string())],
+                            ),
                             error: false,
                             connectivity: false,
                         },
@@ -11040,7 +12644,10 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(PrefOutput::ExportLog) => {
                 let dialog = gtk::FileDialog::builder()
                     .title(&i18n("Export Log"))
-                    .initial_name(&format!("hylki-log-{}.txt", chrono::Local::now().format("%Y%m%d-%H%M")))
+                    .initial_name(&format!(
+                        "hylki-log-{}.txt",
+                        chrono::Local::now().format("%Y%m%d-%H%M")
+                    ))
                     .build();
                 let win = self.window.clone();
                 let notif = self.notifications.sender().clone();
@@ -11054,7 +12661,10 @@ impl SimpleComponent for AppModel {
                         .map_err(|e| e.to_string());
                     let _ = notif.send(match outcome {
                         Ok(()) => NotifyInput::Push {
-                            text: i18n_f("Log exported to {display}", &[("display", &(path.display()).to_string())]),
+                            text: i18n_f(
+                                "Log exported to {display}",
+                                &[("display", &(path.display()).to_string())],
+                            ),
                             error: false,
                             connectivity: false,
                         },
@@ -11076,7 +12686,9 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::Pref(PrefOutput::ImportSettings) => {
-                let dialog = gtk::FileDialog::builder().title(&i18n("Import Settings")).build();
+                let dialog = gtk::FileDialog::builder()
+                    .title(&i18n("Import Settings"))
+                    .build();
                 let win = self.window.clone();
                 let s = sender.clone();
                 dialog.open(Some(&win), gtk::gio::Cancellable::NONE, move |res| {
@@ -11165,10 +12777,14 @@ impl SimpleComponent for AppModel {
                 config::mark_wizard_completed();
                 // Route every choice through its normal handler (each saves and
                 // updates the live UI); drop the wizard controller afterwards.
-                sender.input(AppMsg::Pref(PrefOutput::SetAutoRemoteContent(!p.block_remote)));
+                sender.input(AppMsg::Pref(PrefOutput::SetAutoRemoteContent(
+                    !p.block_remote,
+                )));
                 sender.input(AppMsg::Pref(PrefOutput::SetGravatar(p.gravatar)));
                 sender.input(AppMsg::Pref(PrefOutput::SetSenderLogos(p.sender_logos)));
-                sender.input(AppMsg::Pref(PrefOutput::SetNotificationContent(p.notification_content)));
+                sender.input(AppMsg::Pref(PrefOutput::SetNotificationContent(
+                    p.notification_content,
+                )));
                 sender.input(AppMsg::Pref(PrefOutput::SetPreviewLines(p.preview_lines)));
                 sender.input(AppMsg::Pref(PrefOutput::SetAvatars(p.avatars)));
                 sender.input(AppMsg::Pref(PrefOutput::SetThreading(p.threading)));
@@ -11254,7 +12870,8 @@ impl SimpleComponent for AppModel {
                     }
                     self.save_sidebar_state();
                 }
-                if !outcome.removed.is_empty() || outcome.paused_changed || outcome.servers_changed {
+                if !outcome.removed.is_empty() || outcome.paused_changed || outcome.servers_changed
+                {
                     if let Err(e) = config::save(&self.config) {
                         tracing::error!("could not save config after GOA change: {e}");
                     }
@@ -11268,7 +12885,10 @@ impl SimpleComponent for AppModel {
                 self.resend_launcher_count();
                 // logind and the clock check both report the same wake.
                 let now = std::time::Instant::now();
-                if self.last_wake.is_some_and(|t| now - t < std::time::Duration::from_secs(30)) {
+                if self
+                    .last_wake
+                    .is_some_and(|t| now - t < std::time::Duration::from_secs(30))
+                {
                     return;
                 }
                 self.last_wake = Some(now);
@@ -11409,19 +13029,33 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::ServerIdentities { account_id, identities } => {
+            AppMsg::ServerIdentities {
+                account_id,
+                identities,
+            } => {
                 if let (Some(email), Some(a)) = (self.email_of(account_id), &self.accounts_win) {
-                    a.emit(crate::ui::accounts::AccountsInput::ServerIdentities { email, identities: identities.clone() });
+                    a.emit(crate::ui::accounts::AccountsInput::ServerIdentities {
+                        email,
+                        identities: identities.clone(),
+                    });
                 }
                 self.server_identities.insert(account_id, identities);
             }
             AppMsg::WantIdentities(email) => {
-                let Some(id) = self.accounts.iter().find(|a| a.email.eq_ignore_ascii_case(&email)).map(|a| a.id) else {
+                let Some(id) = self
+                    .accounts
+                    .iter()
+                    .find(|a| a.email.eq_ignore_ascii_case(&email))
+                    .map(|a| a.id)
+                else {
                     return;
                 };
                 let identities = self.server_identities.get(&id).cloned().unwrap_or_default();
                 if let Some(a) = &self.accounts_win {
-                    a.emit(crate::ui::accounts::AccountsInput::ServerIdentities { email, identities });
+                    a.emit(crate::ui::accounts::AccountsInput::ServerIdentities {
+                        email,
+                        identities,
+                    });
                 }
             }
 
@@ -11442,13 +13076,19 @@ impl SimpleComponent for AppModel {
                 self.rebuild_sidebar();
             }
 
-            AppMsg::SetFolders { account_id, folders } => {
+            AppMsg::SetFolders {
+                account_id,
+                folders,
+            } => {
                 self.notifications.emit(NotifyInput::ClearConnectivity);
                 // Defence in depth against a wedged session's empty LIST (the
                 // worker filters these too): never trade a real folder list
                 // for nothing.
                 if folders.is_empty()
-                    && self.folders.get(&account_id).is_some_and(|old| !old.is_empty())
+                    && self
+                        .folders
+                        .get(&account_id)
+                        .is_some_and(|old| !old.is_empty())
                 {
                     return;
                 }
@@ -11471,7 +13111,9 @@ impl SimpleComponent for AppModel {
                         }
                     }
                     if !seed.is_empty() {
-                        tracing::info!("account {account_id}: hiding Exchange's non-mail folders {seed:?}");
+                        tracing::info!(
+                            "account {account_id}: hiding Exchange's non-mail folders {seed:?}"
+                        );
                         self.hide_folders(account_id, seed);
                     }
                 }
@@ -11480,7 +13122,8 @@ impl SimpleComponent for AppModel {
                 if let Some(cfg) = self.config.get(account_id as usize - 1) {
                     if !cfg.hidden_folders.is_empty() {
                         let hidden = cfg.hidden_folders.clone();
-                        folders.retain(|f| !crate::models::folder_is_hidden(&f.path, None, &hidden));
+                        folders
+                            .retain(|f| !crate::models::folder_is_hidden(&f.path, None, &hidden));
                     }
                 }
                 // Manual special-folder assignments (#82) ride over whatever
@@ -11530,10 +13173,7 @@ impl SimpleComponent for AppModel {
                 let unchanged = self.folders.get(&account_id).is_some_and(|old| {
                     old.len() == folders.len()
                         && old.iter().zip(&folders).all(|(a, b)| {
-                            a.id == b.id
-                                && a.path == b.path
-                                && a.kind == b.kind
-                                && a.name == b.name
+                            a.id == b.id && a.path == b.path && a.kind == b.kind && a.name == b.name
                         })
                 });
                 // Ids are list positions, so a folder another client added,
@@ -11541,7 +13181,12 @@ impl SimpleComponent for AppModel {
                 // folders). The open folder and the cached lists follow their
                 // folder by path; a list whose folder is gone is dropped.
                 // The first listing has nothing to follow from.
-                if !unchanged && self.folders.get(&account_id).is_some_and(|old| !old.is_empty()) {
+                if !unchanged
+                    && self
+                        .folders
+                        .get(&account_id)
+                        .is_some_and(|old| !old.is_empty())
+                {
                     let old_paths: HashMap<u32, String> = self
                         .folders
                         .get(&account_id)
@@ -11555,7 +13200,8 @@ impl SimpleComponent for AppModel {
                             self.message_cache.insert((a, fid), list);
                             continue;
                         }
-                        let Some(&id) = old_paths.get(&fid).and_then(|p| new_ids.get(p.as_str())) else {
+                        let Some(&id) = old_paths.get(&fid).and_then(|p| new_ids.get(p.as_str()))
+                        else {
                             continue;
                         };
                         for m in &mut list {
@@ -11563,7 +13209,11 @@ impl SimpleComponent for AppModel {
                         }
                         self.message_cache.insert((a, id), list);
                     }
-                    if let Some(sel) = self.selected.as_mut().filter(|s| s.account_id == account_id) {
+                    if let Some(sel) = self
+                        .selected
+                        .as_mut()
+                        .filter(|s| s.account_id == account_id)
+                    {
                         if let Some(&id) = new_ids.get(sel.path.as_str()) {
                             sel.folder_id = id;
                         }
@@ -11608,7 +13258,11 @@ impl SimpleComponent for AppModel {
                 self.push_index_complete();
             }
 
-            AppMsg::FolderUnread { account_id, folder_id, unread } => {
+            AppMsg::FolderUnread {
+                account_id,
+                folder_id,
+                unread,
+            } => {
                 // A count fetched ahead of a read mark still in the worker's
                 // queue: the app's own count (adjusted when the mark was
                 // made) stands until the mark is stored, and the server is
@@ -11619,7 +13273,9 @@ impl SimpleComponent for AppModel {
                 }
                 // Nothing unread left where the notification points: it is
                 // answered, wherever the mail was read (#333).
-                if unread == 0 && crate::notify::posted_for(account_id).is_some_and(|(f, _)| f == folder_id) {
+                if unread == 0
+                    && crate::notify::posted_for(account_id).is_some_and(|(f, _)| f == folder_id)
+                {
                     crate::notify::withdraw_mail(account_id);
                 }
                 // Likewise while mail is being taken out of the folder: each
@@ -11640,9 +13296,14 @@ impl SimpleComponent for AppModel {
                 self.push_unread_counts();
             }
 
-            AppMsg::SeenSettled { account_id, path, uid } => {
+            AppMsg::SeenSettled {
+                account_id,
+                path,
+                uid,
+            } => {
                 self.pending_seen.remove(&(account_id, path, uid));
-                self.pending_seen.retain(|_, (_, at)| at.elapsed() < PENDING_SEEN_MAX);
+                self.pending_seen
+                    .retain(|_, (_, at)| at.elapsed() < PENDING_SEEN_MAX);
                 // Counts the server sent while the marks were on their way
                 // were set aside; with the last one stored, ask for fresh
                 // ones, or the badge keeps the app's guess until the next
@@ -11652,16 +13313,33 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::Answered { account_id, path, uid, forwarded } => {
-                let fid = self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)).map(|f| f.id);
+            AppMsg::Answered {
+                account_id,
+                path,
+                uid,
+                forwarded,
+            } => {
+                let fid = self
+                    .folders
+                    .get(&account_id)
+                    .and_then(|fs| fs.iter().find(|f| f.path == path))
+                    .map(|f| f.id);
                 if let Some(fid) = fid {
                     self.show_answered(account_id, fid, uid, forwarded, true);
                 }
             }
 
-            AppMsg::TagSettled { account_id, path, uid, keyword } => {
+            AppMsg::TagSettled {
+                account_id,
+                path,
+                uid,
+                keyword,
+            } => {
                 let soon = std::time::Instant::now() + PENDING_TAG_SETTLED;
-                if let Some((_, until, _)) = self.pending_tags.get_mut(&(account_id, path, uid, keyword.to_lowercase())) {
+                if let Some((_, until, _)) =
+                    self.pending_tags
+                        .get_mut(&(account_id, path, uid, keyword.to_lowercase()))
+                {
                     *until = (*until).min(soon);
                 }
             }
@@ -11680,7 +13358,9 @@ impl SimpleComponent for AppModel {
                 }
                 if self.pending_draft_token == Some(token) {
                     self.pending_draft_token = None;
-                    let Some((m, inline, extra)) = self.pending_draft.take() else { return };
+                    let Some((m, inline, extra)) = self.pending_draft.take() else {
+                        return;
+                    };
                     match raw {
                         Ok(raw) => self.compose_from_draft_raw(m, &raw, inline, extra, &sender),
                         // Offline, say: the body the reader has is still
@@ -11692,15 +13372,20 @@ impl SimpleComponent for AppModel {
                     }
                     return;
                 }
-                let Some(t) = self.transfers.get(&token) else { return };
+                let Some(t) = self.transfers.get(&token) else {
+                    return;
+                };
                 match raw {
-                    Ok(raw) => self.send_to(t.dest_account, MailRequest::ImportRaw {
-                        token,
-                        path: t.dest_path.clone(),
-                        raw,
-                        seen: t.seen,
-                        flagged: t.flagged,
-                    }),
+                    Ok(raw) => self.send_to(
+                        t.dest_account,
+                        MailRequest::ImportRaw {
+                            token,
+                            path: t.dest_path.clone(),
+                            raw,
+                            seen: t.seen,
+                            flagged: t.flagged,
+                        },
+                    ),
                     Err(e) => self.transfer_failed(token, e),
                 }
             }
@@ -11710,19 +13395,29 @@ impl SimpleComponent for AppModel {
                 Err(e) => self.transfer_failed(token, e),
             },
 
-            AppMsg::MovesSettled { account_id, path, uids } => {
+            AppMsg::MovesSettled {
+                account_id,
+                path,
+                uids,
+            } => {
                 let mut pending = self.pending_moves.borrow_mut();
                 for uid in uids {
                     pending.remove(&(account_id, path.clone(), uid));
                 }
                 pending.retain(|_, at| at.elapsed() < PENDING_MOVE_MAX);
                 drop(pending);
-                if !self.pending_moves_in(account_id, &path) && !self.pending_seen_in(account_id, &path) {
+                if !self.pending_moves_in(account_id, &path)
+                    && !self.pending_seen_in(account_id, &path)
+                {
                     self.resync_dropped_unread(account_id);
                 }
             }
 
-            AppMsg::FolderUnreadByPath { account_id, path, unread } => {
+            AppMsg::FolderUnreadByPath {
+                account_id,
+                path,
+                unread,
+            } => {
                 // Resolve against the current list; a path the app no longer
                 // knows (folder deleted/renamed under a live watcher) is
                 // dropped rather than guessed at.
@@ -11731,14 +13426,19 @@ impl SimpleComponent for AppModel {
                     .get(&account_id)
                     .and_then(|fs| fs.iter().find(|f| f.path == path))
                     .map(|f| f.id);
-                if self.pending_seen_in(account_id, &path) || self.pending_moves_in(account_id, &path) {
+                if self.pending_seen_in(account_id, &path)
+                    || self.pending_moves_in(account_id, &path)
+                {
                     if let Some(folder_id) = id {
                         self.dropped_unread.insert((account_id, folder_id));
                     }
                     return;
                 }
                 if let Some(folder_id) = id {
-                    if unread == 0 && crate::notify::posted_for(account_id).is_some_and(|(f, _)| f == folder_id) {
+                    if unread == 0
+                        && crate::notify::posted_for(account_id)
+                            .is_some_and(|(f, _)| f == folder_id)
+                    {
                         crate::notify::withdraw_mail(account_id);
                     }
                     let prev = self.folder_unread.insert((account_id, folder_id), unread);
@@ -11755,13 +13455,21 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::BodyHits { account_id, folder_id, hits } => {
+            AppMsg::BodyHits {
+                account_id,
+                folder_id,
+                hits,
+            } => {
                 // The whole answer for the sync about to land; the previous
                 // one described mail that sync lists again anyway.
                 self.body_hits.insert((account_id, folder_id), hits);
             }
 
-            AppMsg::Messages { account_id, folder_id, messages } => {
+            AppMsg::Messages {
+                account_id,
+                folder_id,
+                messages,
+            } => {
                 self.notifications.emit(NotifyInput::ClearConnectivity);
                 let messages = self.merge_local_tags(account_id, messages);
                 // Mail already moved or deleted here, in a list fetched before
@@ -11782,8 +13490,9 @@ impl SimpleComponent for AppModel {
                 // anything asks for it (#200).
                 if !self.carried_bodies.is_empty() {
                     for m in messages.iter().filter(|m| !m.message_id.is_empty()) {
-                        if let Some(body) =
-                            self.carried_bodies.remove(&(account_id, m.message_id.clone()))
+                        if let Some(body) = self
+                            .carried_bodies
+                            .remove(&(account_id, m.message_id.clone()))
                         {
                             self.body_cache.insert(body_key(m), body);
                         }
@@ -11826,7 +13535,9 @@ impl SimpleComponent for AppModel {
                 let next_after_vanish = if vanished {
                     let cur_uid = self.current.as_ref().unwrap().uid;
                     next_after_vanish(
-                        self.message_cache.get(&(account_id, folder_id)).map(|c| &**c),
+                        self.message_cache
+                            .get(&(account_id, folder_id))
+                            .map(|c| &**c),
                         &messages,
                         cur_uid,
                     )
@@ -11845,7 +13556,8 @@ impl SimpleComponent for AppModel {
                 if self.notifications_enabled
                     && (!self.window.is_active() || crate::config::sound_when_focused())
                 {
-                    let is_inbox = self.folder_kind(account_id, folder_id) == Some(FolderKind::Inbox);
+                    let is_inbox =
+                        self.folder_kind(account_id, folder_id) == Some(FolderKind::Inbox);
                     if let (true, Some(old)) =
                         (is_inbox, self.message_cache.get(&(account_id, folder_id)))
                     {
@@ -11866,9 +13578,7 @@ impl SimpleComponent for AppModel {
                             // The newest arrival is still in the inbox: anchor
                             // there. Ties go to the inbox copy — its click
                             // target and action buttons actually work.
-                            (Some(m), nf)
-                                if nf.is_none_or(|(f, _)| f.timestamp <= m.timestamp) =>
-                            {
+                            (Some(m), nf) if nf.is_none_or(|(f, _)| f.timestamp <= m.timestamp) => {
                                 self.announce_new_mail(
                                     account_id,
                                     folder_id,
@@ -11911,7 +13621,11 @@ impl SimpleComponent for AppModel {
                 // changed list is worth re-threading and re-emitting: a
                 // rebuild of a large (or merged) list is not free, and it
                 // used to happen several times over per visit.
-                let unchanged = self.message_cache.get(&(account_id, folder_id)).map(|c| &**c) == Some(&messages);
+                let unchanged = self
+                    .message_cache
+                    .get(&(account_id, folder_id))
+                    .map(|c| &**c)
+                    == Some(&messages);
                 // What the badge counts when it counts arrivals (#431): the
                 // same new inbox mail as the notification above, whatever
                 // the notification settings, and only what is still in the
@@ -11994,8 +13708,9 @@ impl SimpleComponent for AppModel {
                 // spinner, which is the whole point of carrying it.
                 if !self.carried_threads.is_empty() {
                     for m in messages.iter().filter(|m| !m.message_id.is_empty()) {
-                        let Some(mut thread) =
-                            self.carried_threads.remove(&(account_id, m.message_id.clone()))
+                        let Some(mut thread) = self
+                            .carried_threads
+                            .remove(&(account_id, m.message_id.clone()))
                         else {
                             continue;
                         };
@@ -12023,7 +13738,9 @@ impl SimpleComponent for AppModel {
                             && if through {
                                 self.unified_unfilled.contains(&key)
                             } else {
-                                self.unified_slices.get(&key).is_some_and(|s| *s == messages)
+                                self.unified_slices
+                                    .get(&key)
+                                    .is_some_and(|s| *s == messages)
                             };
                         if !same_slice {
                             if through {
@@ -12077,7 +13794,11 @@ impl SimpleComponent for AppModel {
                 self.push_unread_counts();
             }
 
-            AppMsg::UndoRestored { account_id, folder_id, message_ids } => {
+            AppMsg::UndoRestored {
+                account_id,
+                folder_id,
+                message_ids,
+            } => {
                 // The undone move landed and the folder's reload has already
                 // been processed (the worker sends Messages first): put the
                 // user on the restored message — selected, loaded in the
@@ -12089,26 +13810,27 @@ impl SimpleComponent for AppModel {
                 // the undo put the row back itself (#200): selecting it again
                 // would tear the message down and render it a second time for
                 // no change the reader can see.
-                let already_open = self
-                    .current
-                    .as_ref()
-                    .is_some_and(|c| !c.message_id.is_empty() && message_ids.contains(&c.message_id));
+                let already_open = self.current.as_ref().is_some_and(|c| {
+                    !c.message_id.is_empty() && message_ids.contains(&c.message_id)
+                });
                 if already_open {
                     return;
                 }
                 let restored = self
                     .message_cache
                     .get(&(account_id, folder_id))
-                    .and_then(|msgs| {
-                        msgs.iter().find(|m| message_ids.contains(&m.message_id))
-                    })
+                    .and_then(|msgs| msgs.iter().find(|m| message_ids.contains(&m.message_id)))
                     .map(|m| (m.account_id, m.id));
                 if let Some(key) = restored {
                     self.message_list.emit(MessageListInput::SelectAndLoad(key));
                 }
             }
 
-            AppMsg::MessagesAppend { account_id, folder_id, messages } => {
+            AppMsg::MessagesAppend {
+                account_id,
+                folder_id,
+                messages,
+            } => {
                 // Background backfill: grow the folder's search index without
                 // disturbing the current view (no title/query reset).
                 let messages = self.merge_local_tags(account_id, messages);
@@ -12152,12 +13874,20 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::BackfillDone { account_id, folder_id } => {
+            AppMsg::BackfillDone {
+                account_id,
+                folder_id,
+            } => {
                 self.indexed_folders.insert((account_id, folder_id));
                 self.push_index_complete();
             }
 
-            AppMsg::SenderChecked { account_id, path, message_id, check } => {
+            AppMsg::SenderChecked {
+                account_id,
+                path,
+                message_id,
+                check,
+            } => {
                 // Remember it: prefetch delivers the verdict long before the
                 // message is opened, and opening it renders from the in-memory
                 // body cache without asking the worker for anything.
@@ -12191,15 +13921,24 @@ impl SimpleComponent for AppModel {
                     });
                 }
                 for p in self.popouts.values().filter(|p| key == Some(p.message)) {
-                    p.controller.emit(MessageWindowInput::SetSenderCheck(check.clone()));
+                    p.controller
+                        .emit(MessageWindowInput::SetSenderCheck(check.clone()));
                 }
             }
 
-            AppMsg::Body { account_id, message_id, path, body } => {
+            AppMsg::Body {
+                account_id,
+                message_id,
+                path,
+                body,
+            } => {
                 // Interior NULs abort glib string conversion (labels and the
                 // WebView document alike); decoded mail bodies can carry them.
-                let body =
-                    if body.contains('\0') { body.replace('\0', " ") } else { body };
+                let body = if body.contains('\0') {
+                    body.replace('\0', " ")
+                } else {
+                    body
+                };
                 // A UID is unique only within its folder, and the background
                 // prefetch pushes bodies from every folder it syncs, so the
                 // body is filed by folder and UID. A folder the app does not
@@ -12211,8 +13950,9 @@ impl SimpleComponent for AppModel {
                 }
                 // If this body was fetched to open a draft, open the editor now.
                 // One waiting for its bytes ignores a body the prefetch sent.
-                if let Some((pd, inline, extra)) =
-                    self.pending_draft.take_if(|_| self.pending_draft_token.is_none())
+                if let Some((pd, inline, extra)) = self
+                    .pending_draft
+                    .take_if(|_| self.pending_draft_token.is_none())
                 {
                     if pd.account_id == account_id && pd.id == message_id {
                         self.compose_from_draft(pd, body, inline, extra, &sender);
@@ -12300,7 +14040,12 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::MessageGone { account_id, message_id, path, uid } => {
+            AppMsg::MessageGone {
+                account_id,
+                message_id,
+                path,
+                uid,
+            } => {
                 // A conversation member the cache still listed turned out to
                 // be gone from the server (#257): take it out of the open
                 // conversation rather than show it as a blank card.
@@ -12316,7 +14061,10 @@ impl SimpleComponent for AppModel {
                 }
                 // The message the reader was opened on stays: that one is
                 // the list's to settle, by its own sync.
-                let opened = self.current.as_ref().map(|c| (c.account_id, c.id, c.folder_id));
+                let opened = self
+                    .current
+                    .as_ref()
+                    .map(|c| (c.account_id, c.id, c.folder_id));
                 let before = self.current_thread.len();
                 self.current_thread.retain(|m| {
                     let gone = m.account_id == account_id
@@ -12342,7 +14090,10 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::RefsRepaired { account_id, folder_id } => {
+            AppMsg::RefsRepaired {
+                account_id,
+                folder_id,
+            } => {
                 // Only the folder on screen, and only its cached copy: the repair
                 // rewrote rows on disk, and re-reading is what lets the list see
                 // the conversations they now form.
@@ -12368,7 +14119,8 @@ impl SimpleComponent for AppModel {
                 self.list_heard = keys.clone();
                 self.list_selection = keys.clone();
                 self.selection_from_cards = false;
-                self.message_view.emit(MessageViewInput::SetSelectedCards(keys));
+                self.message_view
+                    .emit(MessageViewInput::SetSelectedCards(keys));
             }
 
             AppMsg::ListChecked(count) => {
@@ -12405,9 +14157,13 @@ impl SimpleComponent for AppModel {
                 }
                 // The conversation as the reader has it, Sent members and all,
                 // so a card the list never listed still keeps its row (#220).
-                let conversation =
-                    self.current_thread.iter().map(|m| (m.account_id, m.id)).collect();
-                self.message_list.emit(MessageListInput::SelectFromReader { keys, conversation });
+                let conversation = self
+                    .current_thread
+                    .iter()
+                    .map(|m| (m.account_id, m.id))
+                    .collect();
+                self.message_list
+                    .emit(MessageListInput::SelectFromReader { keys, conversation });
             }
 
             AppMsg::ThreadMessageSeen { account_id, id } => {
@@ -12422,23 +14178,40 @@ impl SimpleComponent for AppModel {
                         m.unread = false;
                         (m.uid, m.folder_id)
                     });
-                let Some((uid, folder_id)) = target else { return };
-                if let Some(c) = self.current.as_mut().filter(|c| (c.account_id, c.id) == (account_id, id)) {
+                let Some((uid, folder_id)) = target else {
+                    return;
+                };
+                if let Some(c) = self
+                    .current
+                    .as_mut()
+                    .filter(|c| (c.account_id, c.id) == (account_id, id))
+                {
                     c.unread = false;
                 }
                 if let Some(path) = self.folder_path(account_id, folder_id) {
-                    self.pending_seen
-                        .insert((account_id, path.clone(), uid), (true, std::time::Instant::now()));
-                    self.send_to(account_id, MailRequest::SetSeen { path, uid, seen: true });
+                    self.pending_seen.insert(
+                        (account_id, path.clone(), uid),
+                        (true, std::time::Instant::now()),
+                    );
+                    self.send_to(
+                        account_id,
+                        MailRequest::SetSeen {
+                            path,
+                            uid,
+                            seen: true,
+                        },
+                    );
                 }
                 // Reading the new mail inside its conversation answers the
                 // notification as opening it on its own does (#333).
                 crate::notify::withdraw_mail(account_id);
-                self.message_list.emit(MessageListInput::MarkRead((account_id, folder_id, id)));
+                self.message_list
+                    .emit(MessageListInput::MarkRead((account_id, folder_id, id)));
                 self.mark_cached_read(account_id, folder_id, id);
                 // The card's dot clears in place as the viewport observer
                 // marks it (#100) — this path never told the view before.
-                self.message_view.emit(MessageViewInput::ClearDot { account_id, id });
+                self.message_view
+                    .emit(MessageViewInput::ClearDot { account_id, id });
                 if let Some(n) = self.folder_unread.get_mut(&(account_id, folder_id)) {
                     *n = n.saturating_sub(1);
                 }
@@ -12473,7 +14246,12 @@ impl SimpleComponent for AppModel {
                 self.show_source_window(&text);
             }
 
-            AppMsg::Attachments { account_id, path, message_id, items } => {
+            AppMsg::Attachments {
+                account_id,
+                path,
+                message_id,
+                items,
+            } => {
                 let key = self.event_key(account_id, &path, message_id);
                 if let Some(k) = key {
                     self.attachment_cache.insert(k, items.clone());
@@ -12534,7 +14312,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::AttachmentsPending { account_id, path, message_id } => {
+            AppMsg::AttachmentsPending {
+                account_id,
+                path,
+                message_id,
+            } => {
                 // Attachments exist but weren't on disk. Opening the message
                 // was the request — fetch them now rather than asking for a
                 // click (the old "load attachments" button). Every reader path
@@ -12551,12 +14333,15 @@ impl SimpleComponent for AppModel {
                 if let Some(m) = msg {
                     if let Some(path) = self.resolve_folder_path(&m) {
                         self.attachments_loading = true;
-                        self.send_to(account_id, MailRequest::LoadAttachments {
-                            message_id,
-                            path,
-                            uid: m.uid,
-                            download: true,
-                        });
+                        self.send_to(
+                            account_id,
+                            MailRequest::LoadAttachments {
+                                message_id,
+                                path,
+                                uid: m.uid,
+                                download: true,
+                            },
+                        );
                     }
                 }
                 for p in self.popouts.values() {
@@ -12564,12 +14349,19 @@ impl SimpleComponent for AppModel {
                         key.map_or(*a == account_id && *id == message_id, |key| *k == key)
                     });
                     if let Some((_, (a, id))) = member {
-                        p.controller.emit(MessageWindowInput::AttachmentsPending { account_id: *a, id: *id });
+                        p.controller.emit(MessageWindowInput::AttachmentsPending {
+                            account_id: *a,
+                            id: *id,
+                        });
                     }
                 }
             }
 
-            AppMsg::NoAttachments { account_id, path, message_id } => {
+            AppMsg::NoAttachments {
+                account_id,
+                path,
+                message_id,
+            } => {
                 // Clear a false paperclip live: on this message, in its own
                 // folder. A UID names a message only within its folder, so
                 // the same number elsewhere is a different message.
@@ -12601,7 +14393,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::HasAttachments { account_id, path, message_id } => {
+            AppMsg::HasAttachments {
+                account_id,
+                path,
+                message_id,
+            } => {
                 // The mirror of NoAttachments: a message whose structure didn't
                 // advertise its attachments (an inline PDF, say — issue #9) is
                 // given its paperclip once the body has proved they are there.
@@ -12624,12 +14420,15 @@ impl SimpleComponent for AppModel {
                         self.sync_attachment_drawer();
                     } else if let Some(path) = self.resolve_folder_path(&message) {
                         self.attachments_loading = true;
-                        self.send_to(account_id, MailRequest::LoadAttachments {
-                            message_id,
-                            path,
-                            uid: message.uid,
-                            download: true,
-                        });
+                        self.send_to(
+                            account_id,
+                            MailRequest::LoadAttachments {
+                                message_id,
+                                path,
+                                uid: message.uid,
+                                download: true,
+                            },
+                        );
                     }
                 }
             }
@@ -12648,7 +14447,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::Error { account_id, text, connectivity } => {
+            AppMsg::Error {
+                account_id,
+                text,
+                connectivity,
+            } => {
                 // The log gets the whole error (a parser dump included, which
                 // is what diagnoses #226-style replies); the bar gets it
                 // readable.
@@ -12674,7 +14477,11 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::DirectoryError(text) => {
-                self.notifications.emit(NotifyInput::Push { text, error: true, connectivity: false });
+                self.notifications.emit(NotifyInput::Push {
+                    text,
+                    error: true,
+                    connectivity: false,
+                });
             }
 
             AppMsg::NotifyCount(n) => self.notify_count = n,
@@ -12690,7 +14497,8 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ContactTree(tree) => {
-                self.sidebar.emit(SidebarInput::SetContactTree(tree.clone()));
+                self.sidebar
+                    .emit(SidebarInput::SetContactTree(tree.clone()));
                 self.peek_sidebar.emit(SidebarInput::SetContactTree(tree));
             }
 
@@ -12736,15 +14544,22 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ContactSuggestions => {
-                let own: Vec<(String, String)> = self.config.iter().map(|c| (c.name.clone(), c.email.clone())).collect();
+                let own: Vec<(String, String)> = self
+                    .config
+                    .iter()
+                    .map(|c| (c.name.clone(), c.email.clone()))
+                    .collect();
                 let page = self.contacts_page.sender().clone();
                 std::thread::spawn(move || {
-                    let _ = page.send(ContactsPageInput::SuggestionsLoaded(crate::contacts::suggestions(&own)));
+                    let _ = page.send(ContactsPageInput::SuggestionsLoaded(
+                        crate::contacts::suggestions(&own),
+                    ));
                 });
             }
 
             AppMsg::ContactsLoaded(contacts) => {
-                self.contacts_page.emit(ContactsPageInput::SetContacts(contacts));
+                self.contacts_page
+                    .emit(ContactsPageInput::SetContacts(contacts));
                 // A contact was saved, deleted or imported: the rules on
                 // whether a sender is in Contacts should know.
                 if self.filters.iter().any(|r| r.needs_contacts()) {
@@ -12768,7 +14583,9 @@ impl SimpleComponent for AppModel {
                     // No book picked (none was listed yet): the default one.
                     let book_uid = match book_uid {
                         Some(uid) => Some(uid),
-                        None => crate::contacts::writable_books().first().map(|b| b.uid.clone()),
+                        None => crate::contacts::writable_books()
+                            .first()
+                            .map(|b| b.uid.clone()),
                     };
                     let result = match book_uid {
                         Some(uid) => crate::contacts::create_contact(&uid, &vcard),
@@ -12778,10 +14595,16 @@ impl SimpleComponent for AppModel {
                 });
             }
 
-            AppMsg::SaveGroup { book_uid, format, original, edit } => {
+            AppMsg::SaveGroup {
+                book_uid,
+                format,
+                original,
+                edit,
+            } => {
                 let s = sender.clone();
                 std::thread::spawn(move || {
-                    let result = crate::contacts::save_group(&book_uid, format, original.as_deref(), edit);
+                    let result =
+                        crate::contacts::save_group(&book_uid, format, original.as_deref(), edit);
                     s.input(AppMsg::ContactWriteDone(result.err()));
                 });
             }
@@ -12799,13 +14622,21 @@ impl SimpleComponent for AppModel {
                     }
                     let err = by_book
                         .iter()
-                        .filter_map(|(book, uids)| crate::contacts::delete_contacts(book, uids).err())
+                        .filter_map(|(book, uids)| {
+                            crate::contacts::delete_contacts(book, uids).err()
+                        })
                         .next();
                     s.input(AppMsg::ContactWriteDone(err));
                 });
             }
 
-            AppMsg::MoveGroup { from, uid, to, format, edit } => {
+            AppMsg::MoveGroup {
+                from,
+                uid,
+                to,
+                format,
+                edit,
+            } => {
                 let s = sender.clone();
                 std::thread::spawn(move || {
                     let result = crate::contacts::move_group(&from, &uid, &to, format, edit);
@@ -12814,7 +14645,8 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ContactDrop { keys, on, moving } => {
-                self.contacts_page.emit(ContactsPageInput::DropContacts { keys, on, moving });
+                self.contacts_page
+                    .emit(ContactsPageInput::DropContacts { keys, on, moving });
             }
 
             AppMsg::ContactTreeAction(action) => {
@@ -12842,8 +14674,10 @@ impl SimpleComponent for AppModel {
             AppMsg::CopyContacts { to, cards } => {
                 let s = sender.clone();
                 std::thread::spawn(move || {
-                    let failed: Vec<String> =
-                        cards.iter().filter_map(|card| crate::contacts::create_contact(&to, card).err()).collect();
+                    let failed: Vec<String> = cards
+                        .iter()
+                        .filter_map(|card| crate::contacts::create_contact(&to, card).err())
+                        .collect();
                     let err = failed.first().map(|e| {
                         let n = failed.len() as u32;
                         ni18n_f(
@@ -12862,7 +14696,9 @@ impl SimpleComponent for AppModel {
                 std::thread::spawn(move || {
                     let failed: Vec<String> = cards
                         .iter()
-                        .filter_map(|(book, uid, vcard)| crate::contacts::move_contact(book, uid, vcard, &to).err())
+                        .filter_map(|(book, uid, vcard)| {
+                            crate::contacts::move_contact(book, uid, vcard, &to).err()
+                        })
                         .collect();
                     let err = failed.first().map(|e| {
                         let n = failed.len() as u32;
@@ -12896,7 +14732,9 @@ impl SimpleComponent for AppModel {
             AppMsg::ImportContacts(paths) => {
                 let s = sender.clone();
                 std::thread::spawn(move || {
-                    s.input(AppMsg::ContactsImported(crate::contacts::import_vcf_files(&paths)));
+                    s.input(AppMsg::ContactsImported(crate::contacts::import_vcf_files(
+                        &paths,
+                    )));
                 });
             }
 
@@ -12908,7 +14746,11 @@ impl SimpleComponent for AppModel {
                 // The bar opens for errors only; a good import shows in the
                 // list, and its counts wait in the bar for whoever opens it.
                 if error {
-                    self.notifications.emit(NotifyInput::Push { text, error, connectivity: false });
+                    self.notifications.emit(NotifyInput::Push {
+                        text,
+                        error,
+                        connectivity: false,
+                    });
                 } else {
                     self.notifications.emit(NotifyInput::SetStatus(text));
                 }
@@ -12956,7 +14798,10 @@ fn reload_contacts(sender: &ComponentSender<AppModel>, delay_ms: u64) {
         std::thread::sleep(std::time::Duration::from_millis(delay_ms));
         if demo_mode() {
             s.input(AppMsg::ContactsLoaded(crate::contacts::demo_contacts()));
-            s.input(AppMsg::ContactBooksLoaded { books: crate::contacts::demo_books(), local_count: 1 });
+            s.input(AppMsg::ContactBooksLoaded {
+                books: crate::contacts::demo_books(),
+                local_count: 1,
+            });
             return;
         }
         let contacts = crate::contacts::read_contact_details();
@@ -12972,7 +14817,10 @@ fn reload_contacts(sender: &ComponentSender<AppModel>, delay_ms: u64) {
 /// The notification text for a finished contacts import, and whether it is an error.
 fn import_summary(o: &crate::local_contacts::ImportOutcome) -> (String, bool) {
     if o.added + o.updated == 0 {
-        return (i18n("No contacts were found in the selected files"), o.errors > 0);
+        return (
+            i18n("No contacts were found in the selected files"),
+            o.errors > 0,
+        );
     }
     let counts = [
         ("added", o.added.to_string()),
@@ -13006,8 +14854,6 @@ const THREAD_BODY_WAIT: std::time::Duration = std::time::Duration::from_millis(1
 /// where the mail being read lives.
 const THREAD_LINK_LIMIT: usize = 20_000;
 
-
-
 impl AppModel {
     /// The memory section of an exported log: the process tree as the
     /// kernel sees it, then what the main process is holding — the mail
@@ -13017,11 +14863,16 @@ impl AppModel {
     /// cost of keeping everything in RAM; a big cache is something to fix.
     fn memory_report(&self) -> String {
         use crate::memory_report::{human_bytes, human_count, messages_bytes};
-        let count = |(n, b): (usize, usize)| format!("{} messages, {}", human_count(n), human_bytes(b as u64));
+        let count = |(n, b): (usize, usize)| {
+            format!("{} messages, {}", human_count(n), human_bytes(b as u64))
+        };
         let mut out = String::new();
         out.push_str("== Memory ==\n");
         if let Some(up) = crate::memory_report::uptime() {
-            out.push_str(&format!("Running for {}\n", crate::memory_report::human_duration(up)));
+            out.push_str(&format!(
+                "Running for {}\n",
+                crate::memory_report::human_duration(up)
+            ));
         }
         out.push_str("Processes:\n");
         for line in crate::memory_report::process_lines() {
@@ -13054,7 +14905,9 @@ impl AppModel {
         // no hardware driver is there beside it.
         let hardware = libs.iter().any(|l| {
             let l = l.as_str();
-            (l.starts_with("libvulkan_") && !l.starts_with("libvulkan_lvp") && !l.starts_with("libvulkan_dzn"))
+            (l.starts_with("libvulkan_")
+                && !l.starts_with("libvulkan_lvp")
+                && !l.starts_with("libvulkan_dzn"))
                 || l.contains("nvidia")
                 || (l.ends_with("_dri.so") && !l.contains("swrast"))
         });
@@ -13128,7 +14981,12 @@ impl AppModel {
             count(threads),
             count(messages_bytes(&self.current_thread))
         ));
-        let undo = messages_bytes(self.undo_stack.iter().chain(&self.redo_stack).flat_map(|e| &e.rows));
+        let undo = messages_bytes(
+            self.undo_stack
+                .iter()
+                .chain(&self.redo_stack)
+                .flat_map(|e| &e.rows),
+        );
         out.push_str(&format!(
             "  undo/redo: {} entries, {}\n",
             human_count(self.undo_stack.len() + self.redo_stack.len()),
@@ -13219,14 +15077,28 @@ impl AppModel {
     /// only while Console mode is enabled in Settings.
     fn rebuild_help_menu(&self) {
         self.help_menu.remove_all();
-        let status_bar = if self.status_bar_shown { i18n("Hide Status Bar") } else { i18n("Reveal Status Bar") };
-        self.help_menu.append(Some(status_bar.as_str()), Some("win.status-bar"));
-        if self.console_mode {
-            self.help_menu.append_item(&keyed_item(&i18n("Console"), "win.console", "<Ctrl><Shift>c"));
-        }
-        self.help_menu.append(Some(i18n("Keyboard Shortcuts").as_str()), Some("win.shortcuts"));
+        let status_bar = if self.status_bar_shown {
+            i18n("Hide Status Bar")
+        } else {
+            i18n("Reveal Status Bar")
+        };
         self.help_menu
-            .append(Some(format!("{} {}", i18n("About"), crate::APP_NAME).as_str()), Some("win.about"));
+            .append(Some(status_bar.as_str()), Some("win.status-bar"));
+        if self.console_mode {
+            self.help_menu.append_item(&keyed_item(
+                &i18n("Console"),
+                "win.console",
+                "<Ctrl><Shift>c",
+            ));
+        }
+        self.help_menu.append(
+            Some(i18n("Keyboard Shortcuts").as_str()),
+            Some("win.shortcuts"),
+        );
+        self.help_menu.append(
+            Some(format!("{} {}", i18n("About"), crate::APP_NAME).as_str()),
+            Some("win.about"),
+        );
     }
 
     /// The reader's font-and-color override (#56) as the reader applies it:
@@ -13247,15 +15119,21 @@ impl AppModel {
                 self.plain_font.clone()
             }
         });
-        config::ReaderStyle { font, colors: self.override_colors, plain_font }
+        config::ReaderStyle {
+            font,
+            colors: self.override_colors,
+            plain_font,
+        }
     }
 
     /// Hand the current reader style to the reader and every popped-out window.
     fn push_reader_style(&self) {
         let style = self.reader_style();
-        self.message_view.emit(MessageViewInput::SetReaderStyle(style.clone()));
+        self.message_view
+            .emit(MessageViewInput::SetReaderStyle(style.clone()));
         for p in self.popouts.values() {
-            p.controller.emit(MessageWindowInput::SetReaderStyle(style.clone()));
+            p.controller
+                .emit(MessageWindowInput::SetReaderStyle(style.clone()));
         }
     }
 
@@ -13426,7 +15304,9 @@ impl AppModel {
                     self.message_list.emit(MessageListInput::FocusList);
                 }
             }
-            Shortcut::Search if self.showing_contacts => self.contacts_page.emit(ContactsPageInput::FocusSearch),
+            Shortcut::Search if self.showing_contacts => {
+                self.contacts_page.emit(ContactsPageInput::FocusSearch)
+            }
             Shortcut::Search => self.message_list.emit(MessageListInput::FocusSearch),
             // The open message's own view, not the reader's first page,
             // which is the "No message selected" one and takes no focus.
@@ -13435,7 +15315,8 @@ impl AppModel {
                 // In the reader, Gmail's j and k open the next or previous
                 // conversation; in the list they only move the cursor (#392).
                 if self.current.is_some() && self.reader_has_focus() {
-                    self.message_list.emit(MessageListInput::StepConversation(delta));
+                    self.message_list
+                        .emit(MessageListInput::StepConversation(delta));
                 } else {
                     self.message_list.emit(MessageListInput::MoveCursor(delta));
                 }
@@ -13453,7 +15334,11 @@ impl AppModel {
                 let mut targets = self.multi_selection();
                 if targets.is_empty() && self.acts_on_conversation(self.gmail_keys.get()) {
                     // The whole conversation, as Gmail marks it (#392).
-                    targets = if read { self.current_thread.clone() } else { self.conversation_to_mark_unread() };
+                    targets = if read {
+                        self.current_thread.clone()
+                    } else {
+                        self.conversation_to_mark_unread()
+                    };
                 }
                 if targets.is_empty() {
                     targets.extend(self.reply_target());
@@ -13476,12 +15361,17 @@ impl AppModel {
             Shortcut::Label => sender.input(AppMsg::ReaderTagMenu),
             Shortcut::SelectAll => self.message_list.emit(MessageListInput::SelectAllShown),
             Shortcut::SelectNone => self.message_list.emit(MessageListInput::ClearSelection),
-            Shortcut::SelectWhere(filter) => self.message_list.emit(MessageListInput::SelectWhere(filter)),
+            Shortcut::SelectWhere(filter) => self
+                .message_list
+                .emit(MessageListInput::SelectWhere(filter)),
             Shortcut::ArchiveAndStep(delta) => {
                 // The list goes on to the neighbour once the conversation's
                 // row leaves it. On Gmail, from a label, archiving leaves the
                 // row where it is, so the step is taken here instead.
-                let stays = self.current.as_ref().is_some_and(|m| self.archives_in_place(m));
+                let stays = self
+                    .current
+                    .as_ref()
+                    .is_some_and(|m| self.archives_in_place(m));
                 self.message_list.emit(if stays {
                     MessageListInput::StepConversation(delta)
                 } else {
@@ -13502,7 +15392,10 @@ impl AppModel {
                 if merged {
                     self.open_unified(UnifiedView::Kind(kind), sender);
                 } else {
-                    sender.input(AppMsg::ShowcaseFolder { kind, account: None });
+                    sender.input(AppMsg::ShowcaseFolder {
+                        kind,
+                        account: None,
+                    });
                 }
             }
             Shortcut::NextInThread => self.step_thread(1),
@@ -13573,12 +15466,18 @@ impl AppModel {
                         .map(|t| t.keyword.clone())
                         .collect();
                     for keyword in keywords {
-                        let m = self.shown_copy(target.account_id, target.id).unwrap_or_else(|| target.clone());
+                        let m = self
+                            .shown_copy(target.account_id, target.id)
+                            .unwrap_or_else(|| target.clone());
                         changes.entry(m.account_id).or_default().push(FlagChange {
                             kind: FlagKind::Tag(keyword.clone()),
                             // The step is the reversal: undo puts them back.
                             value: true,
-                            items: vec![FlagRef { folder_id: m.folder_id, uid: m.uid, id: m.id }],
+                            items: vec![FlagRef {
+                                folder_id: m.folder_id,
+                                uid: m.uid,
+                                id: m.id,
+                            }],
                         });
                         self.set_tag(&m, &keyword, false);
                     }
@@ -13595,7 +15494,10 @@ impl AppModel {
     /// What the command palette offers now (#399): the actions that apply
     /// to what is open or selected, then the views, every account's folders
     /// and the tags.
-    fn command_palette_entries(&self, sender: &ComponentSender<Self>) -> Vec<crate::ui::command_palette::Entry> {
+    fn command_palette_entries(
+        &self,
+        sender: &ComponentSender<Self>,
+    ) -> Vec<crate::ui::command_palette::Entry> {
         use crate::ui::command_palette::Entry;
         let mut out = Vec::new();
         let action = i18n("Action");
@@ -13612,44 +15514,79 @@ impl AppModel {
             });
         };
         add(i18n("New Message"), &action, "Ctrl+N", || AppMsg::Compose);
-        add(i18n("New Message from Template"), &action, "Ctrl+Shift+N", || AppMsg::NewFromTemplate);
+        add(
+            i18n("New Message from Template"),
+            &action,
+            "Ctrl+Shift+N",
+            || AppMsg::NewFromTemplate,
+        );
         if self.reply_target().is_some() {
             add(i18n("Reply"), &action, "Ctrl+R", || AppMsg::Reply);
-            add(i18n("Reply to All"), &action, "Ctrl+Shift+R", || AppMsg::ReplyAll);
+            add(i18n("Reply to All"), &action, "Ctrl+Shift+R", || {
+                AppMsg::ReplyAll
+            });
             add(i18n("Forward"), &action, "", || AppMsg::Forward);
-            add(i18n("Edit as New Message"), &action, "", || AppMsg::EditAsNewCurrent);
-            add(i18n("View Source"), &action, "Ctrl+U", || AppMsg::ViewSource);
+            add(i18n("Edit as New Message"), &action, "", || {
+                AppMsg::EditAsNewCurrent
+            });
+            add(i18n("View Source"), &action, "Ctrl+U", || {
+                AppMsg::ViewSource
+            });
             add(i18n("Print"), &action, "Ctrl+P", || AppMsg::PrintMessage);
-            add(i18n("Print Preview"), &action, "Ctrl+Shift+P", || AppMsg::PrintPreview);
-            add(i18n("Find in Message"), &action, "", || AppMsg::OpenReaderFind);
+            add(i18n("Print Preview"), &action, "Ctrl+Shift+P", || {
+                AppMsg::PrintPreview
+            });
+            add(i18n("Find in Message"), &action, "", || {
+                AppMsg::OpenReaderFind
+            });
         }
         if self.acts_on_selection() {
             add(i18n("Archive"), &action, "", || AppMsg::Archive);
             add(i18n("Delete"), &action, "Delete", || AppMsg::Delete);
-            add(i18n("Delete Permanently"), &action, "Shift+Delete", || AppMsg::DeleteForever);
+            add(i18n("Delete Permanently"), &action, "Shift+Delete", || {
+                AppMsg::DeleteForever
+            });
             add(i18n("Mark as Spam"), &action, "", || AppMsg::MarkSpam);
-            add(i18n("Star or Remove Star"), &action, "", || AppMsg::ToggleStar);
-            add(i18n("Mark as Read or Unread"), &action, "", || AppMsg::ToggleReadCurrent);
+            add(i18n("Star or Remove Star"), &action, "", || {
+                AppMsg::ToggleStar
+            });
+            add(i18n("Mark as Read or Unread"), &action, "", || {
+                AppMsg::ToggleReadCurrent
+            });
             add(i18n("Move to Folder"), &action, "", || AppMsg::MoveToMenu);
             add(i18n("Tags"), &action, "", || AppMsg::ReaderTagMenu);
         }
-        add(i18n("Open Message File…"), &action, "", || AppMsg::PickMessageFile);
+        add(i18n("Open Message File…"), &action, "", || {
+            AppMsg::PickMessageFile
+        });
         add(i18n("Undo"), &action, "Ctrl+Z", || AppMsg::Undo);
         add(i18n("Redo"), &action, "Ctrl+Shift+Z", || AppMsg::Redo);
         add(i18n("Check for New Mail"), &action, "", || AppMsg::Refresh);
-        add(i18n("Search Messages"), &action, "Ctrl+F", || AppMsg::OpenListSearch);
-        add(i18n("Show or Hide the Sidebar"), &action, "", || AppMsg::ToggleSidebar);
+        add(i18n("Search Messages"), &action, "Ctrl+F", || {
+            AppMsg::OpenListSearch
+        });
+        add(i18n("Show or Hide the Sidebar"), &action, "", || {
+            AppMsg::ToggleSidebar
+        });
         add(i18n("Settings"), &action, "Ctrl+,", || AppMsg::OpenSettings);
         add(i18n("Mail Accounts"), &action, "", || AppMsg::OpenAccounts);
-        add(i18n("New Smart Folder…"), &action, "", || AppMsg::SidebarContext(CtxAction::NewSmartFolder));
-        add(i18n("Keyboard Shortcuts"), &action, "Ctrl+?", || AppMsg::ShowShortcuts);
+        add(i18n("New Smart Folder…"), &action, "", || {
+            AppMsg::SidebarContext(CtxAction::NewSmartFolder)
+        });
+        add(i18n("Keyboard Shortcuts"), &action, "Ctrl+?", || {
+            AppMsg::ShowShortcuts
+        });
         add(i18n("About Hylki"), &action, "", || AppMsg::OpenAbout);
         {
             let mut focus = self.focus;
             focus.enabled = !focus.enabled;
             let s = sender.input_sender().clone();
             out.push(Entry {
-                title: if focus.enabled { i18n("Turn Focus Mode On") } else { i18n("Turn Focus Mode Off") },
+                title: if focus.enabled {
+                    i18n("Turn Focus Mode On")
+                } else {
+                    i18n("Turn Focus Mode Off")
+                },
                 detail: action.clone(),
                 key: "Ctrl+Shift+F".into(),
                 action: true,
@@ -13683,7 +15620,11 @@ impl AppModel {
             FolderKind::Junk,
             FolderKind::Trash,
         ] {
-            let listed = if kind == FolderKind::Inbox { self.unified_inboxes_shown() } else { self.unified_kinds.has(kind) };
+            let listed = if kind == FolderKind::Inbox {
+                self.unified_inboxes_shown()
+            } else {
+                self.unified_kinds.has(kind)
+            };
             if listed {
                 go(
                     crate::ui::sidebar::kind_label(kind),
@@ -13692,13 +15633,28 @@ impl AppModel {
                 );
             }
         }
-        go(i18n("Contacts"), view.clone(), Box::new(|| AppMsg::OpenContacts));
-        go(i18n("Attachments"), view.clone(), Box::new(|| AppMsg::ShowAttachments));
-        go(i18n("Outbox"), view.clone(), Box::new(|| AppMsg::ShowOutbox));
+        go(
+            i18n("Contacts"),
+            view.clone(),
+            Box::new(|| AppMsg::OpenContacts),
+        );
+        go(
+            i18n("Attachments"),
+            view.clone(),
+            Box::new(|| AppMsg::ShowAttachments),
+        );
+        go(
+            i18n("Outbox"),
+            view.clone(),
+            Box::new(|| AppMsg::ShowOutbox),
+        );
         for email in self.ordered_emails() {
-            let Some(account) = self.accounts.iter().find(|a| a.email == email) else { continue };
+            let Some(account) = self.accounts.iter().find(|a| a.email == email) else {
+                continue;
+            };
             for f in self.folders.get(&account.id).into_iter().flatten() {
-                let (account_id, folder_id, name, path) = (account.id, f.id, f.name.clone(), f.path.clone());
+                let (account_id, folder_id, name, path) =
+                    (account.id, f.id, f.name.clone(), f.path.clone());
                 go(
                     f.name.clone(),
                     format!("{} · {}", account.label, f.path),
@@ -13717,13 +15673,20 @@ impl AppModel {
             go(
                 t.name.clone(),
                 tag.clone(),
-                Box::new(move || AppMsg::TagSelected { keyword: Some(keyword.clone()), account: None }),
+                Box::new(move || AppMsg::TagSelected {
+                    keyword: Some(keyword.clone()),
+                    account: None,
+                }),
             );
         }
         let smart = i18n("Smart Folder");
         for f in &self.smart_folders {
             let id = f.id.clone();
-            go(f.name.clone(), smart.clone(), Box::new(move || AppMsg::SmartSelected(id.clone())));
+            go(
+                f.name.clone(),
+                smart.clone(),
+                Box::new(move || AppMsg::SmartSelected(id.clone())),
+            );
         }
         out
     }
@@ -13741,7 +15704,8 @@ impl AppModel {
         } else {
             // Not in a conversation: moving through the list is what someone
             // pressing "next" almost certainly meant.
-            self.message_list.emit(MessageListInput::MoveSelection(delta));
+            self.message_list
+                .emit(MessageListInput::MoveSelection(delta));
         }
     }
 
@@ -13761,17 +15725,29 @@ impl AppModel {
             .into_iter()
             .map(|t| self.shown_copy(t.account_id, t.id).unwrap_or(t))
             .collect();
-        let row = |action| AppMsg::RowAction { action, message: Box::new(m.clone()), conversation: thread.clone() };
+        let row = |action| AppMsg::RowAction {
+            action,
+            message: Box::new(m.clone()),
+            conversation: thread.clone(),
+        };
         match action {
-            Shortcut::Reply | Shortcut::InWindow(WindowCompose::Reply) => sender.input(row(RowAction::Reply)),
-            Shortcut::ReplyAll | Shortcut::InWindow(WindowCompose::ReplyAll) => sender.input(row(RowAction::ReplyAll)),
-            Shortcut::Forward | Shortcut::InWindow(WindowCompose::Forward) => sender.input(row(RowAction::Forward)),
+            Shortcut::Reply | Shortcut::InWindow(WindowCompose::Reply) => {
+                sender.input(row(RowAction::Reply))
+            }
+            Shortcut::ReplyAll | Shortcut::InWindow(WindowCompose::ReplyAll) => {
+                sender.input(row(RowAction::ReplyAll))
+            }
+            Shortcut::Forward | Shortcut::InWindow(WindowCompose::Forward) => {
+                sender.input(row(RowAction::Forward))
+            }
             Shortcut::Archive | Shortcut::ArchiveAndStep(_) => {
                 if whole {
                     // What the list row stands for: the members filed with
                     // the window's message, not a reply kept in Sent.
-                    let members =
-                        thread.into_iter().filter(|t| (t.account_id, t.folder_id) == (m.account_id, m.folder_id)).collect();
+                    let members = thread
+                        .into_iter()
+                        .filter(|t| (t.account_id, t.folder_id) == (m.account_id, m.folder_id))
+                        .collect();
                     self.apply_bulk_move(BulkAction::Archive, members);
                 } else {
                     self.move_to(m, FolderKind::Archive);
@@ -13784,7 +15760,10 @@ impl AppModel {
                     (true, false) => thread
                         .into_iter()
                         .filter(|t| {
-                            !matches!(self.folder_kind(t.account_id, t.folder_id), Some(FolderKind::Sent | FolderKind::Drafts))
+                            !matches!(
+                                self.folder_kind(t.account_id, t.folder_id),
+                                Some(FolderKind::Sent | FolderKind::Drafts)
+                            )
                         })
                         .collect(),
                 };
@@ -13796,7 +15775,10 @@ impl AppModel {
             Shortcut::MarkUnreadFrom => {
                 // The window picks no card, so the message read from is the
                 // newest, as in the main window with none picked.
-                let newest = thread.into_iter().max_by_key(|t| (t.timestamp, t.uid)).unwrap_or(m);
+                let newest = thread
+                    .into_iter()
+                    .max_by_key(|t| (t.timestamp, t.uid))
+                    .unwrap_or(m);
                 self.user_set_flags(read_label(false), &[newest], FlagKind::Read, false);
             }
             Shortcut::DeleteForever => self.confirm_purge(vec![m], sender),
@@ -13813,7 +15795,8 @@ impl AppModel {
     /// inside the reading pane.
     fn reader_has_focus(&self) -> bool {
         let reader = self.message_view.widget().clone().upcast::<gtk::Widget>();
-        gtk::prelude::GtkWindowExt::focus(&self.window).is_some_and(|f| f == reader || f.is_ancestor(&reader))
+        gtk::prelude::GtkWindowExt::focus(&self.window)
+            .is_some_and(|f| f == reader || f.is_ancestor(&reader))
     }
 
     /// Open the keyboard-shortcut reference, or close it if it is already up:
@@ -13862,7 +15845,10 @@ impl AppModel {
         }
 
         let sections: Vec<&(&str, &[(&str, &str)])> = if self.gmail_keys.get() {
-            GMAIL_HELP.iter().chain(SHORTCUT_HELP.iter().skip(2)).collect()
+            GMAIL_HELP
+                .iter()
+                .chain(SHORTCUT_HELP.iter().skip(2))
+                .collect()
         } else {
             SHORTCUT_HELP.iter().collect()
         };
@@ -13930,8 +15916,7 @@ impl AppModel {
         let closer = win.clone();
         keys.connect_key_pressed(move |_, keyval, _, state| {
             let ctrl = state.contains(gtk::gdk::ModifierType::CONTROL_MASK);
-            let toggles = ctrl
-                && matches!(keyval, gtk::gdk::Key::question | gtk::gdk::Key::slash);
+            let toggles = ctrl && matches!(keyval, gtk::gdk::Key::question | gtk::gdk::Key::slash);
             if keyval == gtk::gdk::Key::Escape || toggles || keyval == gtk::gdk::Key::F1 {
                 closer.close();
                 return gtk::glib::Propagation::Stop;
@@ -13974,7 +15959,12 @@ impl AppModel {
         if !self.showing_outbox {
             return None;
         }
-        if let Some(o) = self.outgoing.borrow().iter().find(|o| crate::outgoing::row_id(o.ticket) == id) {
+        if let Some(o) = self
+            .outgoing
+            .borrow()
+            .iter()
+            .find(|o| crate::outgoing::row_id(o.ticket) == id)
+        {
             return Some(o.as_outbox_item());
         }
         self.outbox_by_account
@@ -13999,7 +15989,12 @@ impl AppModel {
     /// with the message in view; one already with its worker is past
     /// stopping.
     fn drop_outbox_row(&mut self, account_id: u32, id: u32, sender: &ComponentSender<Self>) {
-        if self.outgoing.borrow().iter().any(|o| crate::outgoing::row_id(o.ticket) == id) {
+        if self
+            .outgoing
+            .borrow()
+            .iter()
+            .any(|o| crate::outgoing::row_id(o.ticket) == id)
+        {
             if let Some(ticket) = self.outgoing_ticket(id) {
                 self.undo_send(ticket, sender);
             }
@@ -14029,14 +16024,24 @@ impl AppModel {
             .checked_sub(1)
             .and_then(|i| self.effective_config().get(i as usize).cloned())
         else {
-            self.send_to(account_id, MailRequest::Send { message: out, sent_path, ticket: 0 });
+            self.send_to(
+                account_id,
+                MailRequest::Send {
+                    message: out,
+                    sent_path,
+                    ticket: 0,
+                },
+            );
             return;
         };
         self.send_ticket += 1;
         let ticket = self.send_ticket;
         self.mark_answered_ahead(ticket, &out);
         let delay = self.undo_send_secs;
-        let toast = adw::Toast::builder().priority(adw::ToastPriority::High).timeout(0).build();
+        let toast = adw::Toast::builder()
+            .priority(adw::ToastPriority::High)
+            .timeout(0)
+            .build();
         let o = crate::outgoing::Outgoing {
             ticket,
             account_id,
@@ -14056,15 +16061,20 @@ impl AppModel {
             // The timer is never cancelled: Undo or Send now take the
             // message off the list, and this finds nothing to do.
             let s = sender.clone();
-            gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(delay.into()), move || {
-                s.input(AppMsg::DispatchSend(ticket))
-            });
+            gtk::glib::timeout_add_local_once(
+                std::time::Duration::from_secs(delay.into()),
+                move || s.input(AppMsg::DispatchSend(ticket)),
+            );
             self.show_toast(&toast);
         } else {
             // With nothing to undo, there is no toast.
             self.send_to(
                 account_id,
-                MailRequest::Send { message: o.message.clone(), sent_path: o.sent_path.clone(), ticket },
+                MailRequest::Send {
+                    message: o.message.clone(),
+                    sent_path: o.sent_path.clone(),
+                    ticket,
+                },
             );
         }
         self.outgoing.borrow_mut().push(o);
@@ -14077,15 +16087,27 @@ impl AppModel {
     /// marks off again cannot clear what another send or client set.
     fn mark_answered_ahead(&mut self, ticket: u64, out: &OutgoingMessage) {
         let account_id = out.from_account_id;
-        let copies = crate::worker::answered_copies(self.cache.as_ref(), account_id, &out.in_reply_to, &out.forwards);
+        let copies = crate::worker::answered_copies(
+            self.cache.as_ref(),
+            account_id,
+            &out.in_reply_to,
+            &out.forwards,
+        );
         let mut marked = Vec::new();
         for (path, uid, forwarded) in copies {
-            let Some(fid) = self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)).map(|f| f.id)
+            let Some(fid) = self
+                .folders
+                .get(&account_id)
+                .and_then(|fs| fs.iter().find(|f| f.path == path))
+                .map(|f| f.id)
             else {
                 continue;
             };
-            let (answered, was_forwarded) =
-                self.cache.as_ref().map(|c| c.answer_state(account_id, &path, uid)).unwrap_or_default();
+            let (answered, was_forwarded) = self
+                .cache
+                .as_ref()
+                .map(|c| c.answer_state(account_id, &path, uid))
+                .unwrap_or_default();
             if if forwarded { was_forwarded } else { answered } {
                 continue;
             }
@@ -14099,7 +16121,9 @@ impl AppModel {
 
     /// The send was undone, or failed: its early marks come off.
     fn unmark_answered(&mut self, ticket: u64) {
-        for (account_id, fid, uid, forwarded) in self.pending_answers.remove(&ticket).unwrap_or_default() {
+        for (account_id, fid, uid, forwarded) in
+            self.pending_answers.remove(&ticket).unwrap_or_default()
+        {
             self.show_answered(account_id, fid, uid, forwarded, false);
         }
     }
@@ -14108,29 +16132,52 @@ impl AppModel {
     /// wherever the app holds it.
     fn show_answered(&mut self, account_id: u32, fid: u32, uid: u32, forwarded: bool, on: bool) {
         let same = |c: &Message| c.account_id == account_id && c.folder_id == fid && c.uid == uid;
-        let mark = |c: &mut Message| if forwarded { c.forwarded = on } else { c.answered = on };
+        let mark = |c: &mut Message| {
+            if forwarded {
+                c.forwarded = on
+            } else {
+                c.answered = on
+            }
+        };
         let mut id = None;
-        for msgs in [self.message_cache.get_mut(&(account_id, fid)).map(|c| &mut **c), self.unified_slices.get_mut(&(account_id, fid))]
-            .into_iter()
-            .flatten()
+        for msgs in [
+            self.message_cache
+                .get_mut(&(account_id, fid))
+                .map(|c| &mut **c),
+            self.unified_slices.get_mut(&(account_id, fid)),
+        ]
+        .into_iter()
+        .flatten()
         {
             for c in msgs.iter_mut().filter(|c| same(c)) {
                 mark(c);
                 id = Some(c.id);
             }
         }
-        self.current_thread.iter_mut().filter(|c| same(c)).for_each(mark);
+        self.current_thread
+            .iter_mut()
+            .filter(|c| same(c))
+            .for_each(mark);
         if let Some(cur) = self.current.as_mut().filter(|c| same(c)) {
             mark(cur);
         }
         if let Some(id) = id {
-            self.message_list.emit(MessageListInput::SetAnswered { slot: (account_id, fid, id), forwarded, on });
+            self.message_list.emit(MessageListInput::SetAnswered {
+                slot: (account_id, fid, id),
+                forwarded,
+                on,
+            });
         }
     }
 
     /// [`apply_pending_seen`] for the marks of a send still on its way: a
     /// list fetched before it went keeps them.
-    fn apply_pending_answers(&self, account_id: u32, folder_id: u32, mut messages: Vec<Message>) -> Vec<Message> {
+    fn apply_pending_answers(
+        &self,
+        account_id: u32,
+        folder_id: u32,
+        mut messages: Vec<Message>,
+    ) -> Vec<Message> {
         for &(a, f, uid, forwarded) in self.pending_answers.values().flatten() {
             if (a, f) != (account_id, folder_id) {
                 continue;
@@ -14151,13 +16198,22 @@ impl AppModel {
     fn dispatch_send(&mut self, ticket: u64) {
         let request = {
             let mut list = self.outgoing.borrow_mut();
-            let Some(o) = list.iter_mut().find(|o| o.ticket == ticket && o.held) else { return };
+            let Some(o) = list.iter_mut().find(|o| o.ticket == ticket && o.held) else {
+                return;
+            };
             o.held = false;
             o.toast.dismiss();
             (o.account_id, o.message.clone(), o.sent_path.clone())
         };
         let (account_id, message, sent_path) = request;
-        self.send_to(account_id, MailRequest::Send { message, sent_path, ticket });
+        self.send_to(
+            account_id,
+            MailRequest::Send {
+                message,
+                sent_path,
+                ticket,
+            },
+        );
         self.push_outbox();
     }
 
@@ -14167,7 +16223,9 @@ impl AppModel {
     fn undo_send(&mut self, ticket: u64, sender: &ComponentSender<Self>) {
         let taken = {
             let mut list = self.outgoing.borrow_mut();
-            list.iter().position(|o| o.ticket == ticket && o.held).map(|i| list.remove(i))
+            list.iter()
+                .position(|o| o.ticket == ticket && o.held)
+                .map(|i| list.remove(i))
         };
         let Some(o) = taken else { return };
         o.toast.dismiss();
@@ -14176,7 +16234,10 @@ impl AppModel {
         self.send_morph.finish();
         self.drop_provisional(&o.message.in_reply_to);
         if self.showing_outbox
-            && self.current.as_ref().is_some_and(|m| m.id == crate::outgoing::row_id(ticket))
+            && self
+                .current
+                .as_ref()
+                .is_some_and(|m| m.id == crate::outgoing::row_id(ticket))
         {
             self.current = None;
             self.show_message(None, false);
@@ -14195,7 +16256,9 @@ impl AppModel {
             {
                 self.open_inline_reply(account_id, prefill, Some(answering), sender);
             }
-            crate::outgoing::Origin::Pane if free => self.open_inline_reply(account_id, prefill, None, sender),
+            crate::outgoing::Origin::Pane if free => {
+                self.open_inline_reply(account_id, prefill, None, sender)
+            }
             _ => self.open_compose(account_id, prefill, sender),
         }
     }
@@ -14203,8 +16266,9 @@ impl AppModel {
     /// Tell the message list whether the folder(s) currently shown are fully
     /// indexed, so it knows whether to expect more rows while scrolling.
     fn push_index_complete(&self) {
-        self.message_list
-            .emit(MessageListInput::SetIndexComplete(self.current_index_complete()));
+        self.message_list.emit(MessageListInput::SetIndexComplete(
+            self.current_index_complete(),
+        ));
     }
 
     fn current_index_complete(&self) -> bool {
@@ -14213,7 +16277,8 @@ impl AppModel {
                 .iter()
                 .all(|(a, f, _)| self.indexed_folders.contains(&(*a, *f)))
         } else if let Some(sel) = &self.selected {
-            self.indexed_folders.contains(&(sel.account_id, sel.folder_id))
+            self.indexed_folders
+                .contains(&(sel.account_id, sel.folder_id))
         } else {
             true
         }
@@ -14239,7 +16304,11 @@ impl AppModel {
     fn show_network_state(&self) {
         let offline = !crate::power::online();
         crate::ui::show_refresh_offline(&self.sidebar_refresh, offline);
-        if let Some(button) = self.peek_refresh_stack.parent().and_downcast::<gtk::Button>() {
+        if let Some(button) = self
+            .peek_refresh_stack
+            .parent()
+            .and_downcast::<gtk::Button>()
+        {
             crate::ui::show_refresh_offline(&button, offline);
         }
         self.sidebars_emit(SidebarInput::SetOffline(offline));
@@ -14285,7 +16354,9 @@ impl AppModel {
     /// mail stays off that folder's list until the worker has run it,
     /// whichever of the many move paths sent it.
     fn send_to(&self, account_id: u32, req: MailRequest) {
-        let Some(worker) = self.workers.get(&account_id) else { return };
+        let Some(worker) = self.workers.get(&account_id) else {
+            return;
+        };
         let taken = match &req {
             MailRequest::MoveMessage { path, uid, .. }
             | MailRequest::MarkSpam { path, uid, .. }
@@ -14308,9 +16379,10 @@ impl AppModel {
 
     /// Whether mail taken out of `path` is still waiting on its move.
     fn pending_moves_in(&self, account_id: u32, path: &str) -> bool {
-        self.pending_moves.borrow().iter().any(|((a, p, _), at)| {
-            *a == account_id && p == path && at.elapsed() < PENDING_MOVE_MAX
-        })
+        self.pending_moves
+            .borrow()
+            .iter()
+            .any(|((a, p, _), at)| *a == account_id && p == path && at.elapsed() < PENDING_MOVE_MAX)
     }
 
     /// Take the mail whose move is still on its way off a folder list the
@@ -14354,7 +16426,10 @@ impl AppModel {
             .map(|s| s.account_id)
             .or_else(|| {
                 let first = self.ordered_emails().into_iter().next()?;
-                self.accounts.iter().find(|a| a.email == first).map(|a| a.id)
+                self.accounts
+                    .iter()
+                    .find(|a| a.email == first)
+                    .map(|a| a.id)
             })
             .or_else(|| self.accounts.first().map(|a| a.id))
             .unwrap_or(1)
@@ -14366,7 +16441,11 @@ impl AppModel {
     /// is still enabled; otherwise `fallback` (the open folder's or open
     /// message's account, as before) from its own address. Replies never
     /// come through here: they answer from the address written to.
-    fn new_message_from(&self, fallback: u32, mut prefill: ComposePrefill) -> (u32, ComposePrefill) {
+    fn new_message_from(
+        &self,
+        fallback: u32,
+        mut prefill: ComposePrefill,
+    ) -> (u32, ComposePrefill) {
         let want = self.compose_default_from.trim();
         if want.is_empty() {
             return (fallback, prefill);
@@ -14375,7 +16454,9 @@ impl AppModel {
             c.enabled
                 && (c.email.eq_ignore_ascii_case(want)
                     || c.aliases.iter().any(|al| {
-                        crate::config::split_identity(&al.identity).1.eq_ignore_ascii_case(want)
+                        crate::config::split_identity(&al.identity)
+                            .1
+                            .eq_ignore_ascii_case(want)
                     }))
         });
         match owner {
@@ -14396,9 +16477,14 @@ impl AppModel {
         if self.config.is_empty() {
             return;
         }
-        let owners: Vec<(u32, String)> =
-            self.config.iter().enumerate().map(|(i, a)| (i as u32 + 1, a.email.clone())).collect();
-        if let Err(e) = crate::cache::Cache::open().and_then(|cache| cache.claim_accounts(&owners)) {
+        let owners: Vec<(u32, String)> = self
+            .config
+            .iter()
+            .enumerate()
+            .map(|(i, a)| (i as u32 + 1, a.email.clone()))
+            .collect();
+        if let Err(e) = crate::cache::Cache::open().and_then(|cache| cache.claim_accounts(&owners))
+        {
             tracing::warn!("cache: could not match the cached mail to the accounts: {e}");
         }
     }
@@ -14411,7 +16497,9 @@ impl AppModel {
     /// the app last ran.
     fn prime_from_cache(&mut self) {
         self.claim_cached_accounts();
-        let Ok(cache) = crate::cache::Cache::open() else { return };
+        let Ok(cache) = crate::cache::Cache::open() else {
+            return;
+        };
         for (i, c) in self.config.iter().enumerate() {
             if !c.enabled {
                 continue;
@@ -14425,24 +16513,28 @@ impl AppModel {
             if let Some(inbox) = folders.iter().find(|f| f.kind == FolderKind::Inbox) {
                 let messages = cache.load_messages(account_id, &inbox.path, inbox.id);
                 if !messages.is_empty() {
-                    self.message_cache.insert((account_id, inbox.id), messages.clone().into());
+                    self.message_cache
+                        .insert((account_id, inbox.id), messages.clone().into());
                     self.unified_slices.insert((account_id, inbox.id), messages);
                 }
             }
             // The folders counting filters file into (#116) as well, so the
             // tray menu can list their unread mail before any sync.
             let counted = folders.iter().filter(|f| {
-                !matches!(f.kind, FolderKind::Inbox | FolderKind::Trash | FolderKind::Junk)
-                    && self.filters.iter().any(|r| {
-                        r.count_unread
-                            && r.account_email.eq_ignore_ascii_case(&c.email)
-                            && r.dest_path == f.path
-                    })
+                !matches!(
+                    f.kind,
+                    FolderKind::Inbox | FolderKind::Trash | FolderKind::Junk
+                ) && self.filters.iter().any(|r| {
+                    r.count_unread
+                        && r.account_email.eq_ignore_ascii_case(&c.email)
+                        && r.dest_path == f.path
+                })
             });
             for f in counted {
                 let messages = cache.load_messages(account_id, &f.path, f.id);
                 if !messages.is_empty() {
-                    self.message_cache.insert((account_id, f.id), messages.into());
+                    self.message_cache
+                        .insert((account_id, f.id), messages.into());
                 }
             }
             for f in &folders {
@@ -14456,7 +16548,8 @@ impl AppModel {
 
     fn spawn_workers(&mut self, sender: &ComponentSender<Self>) {
         self.workers.clear();
-        self.message_list.emit(MessageListInput::SetOwnAddresses(self.own_addresses()));
+        self.message_list
+            .emit(MessageListInput::SetOwnAddresses(self.own_addresses()));
         // account_id is the config index + 1 (a load-bearing invariant), so we keep
         // every account's slot but only spawn a worker for enabled ones — disabled
         // accounts simply have no worker (no sync, no sidebar presence). With no
@@ -14466,7 +16559,8 @@ impl AppModel {
         if self.config.is_empty() {
             if demo_mode() {
                 for account_id in [1, 2, 3] {
-                    self.workers.insert(account_id, Self::spawn_worker(account_id, None, sender));
+                    self.workers
+                        .insert(account_id, Self::spawn_worker(account_id, None, sender));
                 }
             }
         } else {
@@ -14569,8 +16663,11 @@ impl AppModel {
         self.effective_config()
             .iter()
             .flat_map(|a| {
-                std::iter::once(a.email.clone())
-                    .chain(a.aliases.iter().map(|alias| config::split_identity(&alias.identity).1))
+                std::iter::once(a.email.clone()).chain(
+                    a.aliases
+                        .iter()
+                        .map(|alias| config::split_identity(&alias.identity).1),
+                )
             })
             .map(|e| e.trim().to_lowercase())
             .filter(|e| !e.is_empty())
@@ -14622,8 +16719,11 @@ impl AppModel {
                 continue;
             }
             // Mail sent as a send-as alias (#34) is still from this mailbox.
-            let addresses = std::iter::once(cfg.email.clone())
-                .chain(cfg.aliases.iter().map(|al| config::split_identity(&al.identity).1));
+            let addresses = std::iter::once(cfg.email.clone()).chain(
+                cfg.aliases
+                    .iter()
+                    .map(|al| config::split_identity(&al.identity).1),
+            );
             faces.extend(
                 addresses
                     .filter(|address| !address.trim().is_empty())
@@ -14637,7 +16737,8 @@ impl AppModel {
     /// (#189): the list rebuilds its rows, and the reader — in the pane and
     /// in any popped-out window — its cards.
     fn refresh_faces(&self) {
-        self.message_list.emit(MessageListInput::ContactPhotosChanged);
+        self.message_list
+            .emit(MessageListInput::ContactPhotosChanged);
         self.message_view.emit(MessageViewInput::FacesChanged);
         for p in self.popouts.values() {
             p.controller.emit(MessageWindowInput::FacesChanged);
@@ -14655,8 +16756,11 @@ impl AppModel {
             }
             // An alias is an address of its own, and may have a Gravatar of
             // its own; each is asked about separately.
-            let addresses = std::iter::once(cfg.email.clone())
-                .chain(cfg.aliases.iter().map(|al| config::split_identity(&al.identity).1));
+            let addresses = std::iter::once(cfg.email.clone()).chain(
+                cfg.aliases
+                    .iter()
+                    .map(|al| config::split_identity(&al.identity).1),
+            );
             for address in addresses.filter(|a| !a.trim().is_empty()) {
                 if !crate::avatar::wants_own_gravatar(&address) {
                     continue;
@@ -14664,7 +16768,10 @@ impl AppModel {
                 let back = sender.input_sender().clone();
                 std::thread::spawn(move || {
                     let outcome = crate::avatar::fetch_own_gravatar(&address);
-                    let _ = back.send(AppMsg::OwnGravatarFetched { email: address, outcome });
+                    let _ = back.send(AppMsg::OwnGravatarFetched {
+                        email: address,
+                        outcome,
+                    });
                 });
             }
         }
@@ -14730,7 +16837,10 @@ impl AppModel {
     ) {
         // A message with no Message-ID can't be found again on the server, so
         // it can't be part of the step — and a step of nothing isn't undoable.
-        let rows: Vec<Message> = rows.into_iter().filter(|m| !m.message_id.is_empty()).collect();
+        let rows: Vec<Message> = rows
+            .into_iter()
+            .filter(|m| !m.message_id.is_empty())
+            .collect();
         if rows.is_empty() {
             return;
         }
@@ -14787,7 +16897,9 @@ impl AppModel {
             Some(FolderKind::Archive) => i18n("Archive"),
             Some(FolderKind::Junk) => i18n("Mark as Spam"),
             _ => {
-                let name = folder.map(|f| f.name.clone()).unwrap_or_else(|| dest.to_string());
+                let name = folder
+                    .map(|f| f.name.clone())
+                    .unwrap_or_else(|| dest.to_string());
                 i18n_f("Move to {name}", &[("name", &name)])
             }
         }
@@ -14863,7 +16975,11 @@ impl AppModel {
             compose.controller.emit(ComposeInput::History { redo });
             return;
         }
-        let entry = if redo { self.redo_stack.pop() } else { self.undo_stack.pop() };
+        let entry = if redo {
+            self.redo_stack.pop()
+        } else {
+            self.undo_stack.pop()
+        };
         // Nothing to say when there is nothing to do: the menu entry is
         // already greyed out, and the key should just be inert (#200).
         let Some(entry) = entry else { return };
@@ -14876,7 +16992,11 @@ impl AppModel {
             rows: entry.rows.clone(),
             threads: entry.threads.clone(),
             rows_return: !entry.rows_return,
-            also: entry.also.iter().map(|(a, step)| (*a, step.inverse())).collect(),
+            also: entry
+                .also
+                .iter()
+                .map(|(a, step)| (*a, step.inverse()))
+                .collect(),
         };
         // Hold on to the bodies whatever happens: the move is about to change
         // these messages' UIDs, and the reload that follows would otherwise
@@ -14923,7 +17043,13 @@ impl AppModel {
                             .and_then(|fs| fs.iter().find(|f| &f.path == from))
                             .map(|f| f.id)
                         {
-                            self.send_to(*account_id, MailRequest::SyncFolder { folder_id, path: from.clone() });
+                            self.send_to(
+                                *account_id,
+                                MailRequest::SyncFolder {
+                                    folder_id,
+                                    path: from.clone(),
+                                },
+                            );
                         }
                     }
                 }
@@ -14941,7 +17067,9 @@ impl AppModel {
     /// waiting for the server (#200). Only ever called inside the
     /// [`INSTANT_UNDO`] window, where the rows are still the truth.
     fn instant_move(&mut self, entry: &UndoEntry) {
-        let UndoStep::Move { from, to, .. } = &entry.step else { return };
+        let UndoStep::Move { from, to, .. } = &entry.step else {
+            return;
+        };
         let account_id = entry.account_id;
         // The folder the rows are in right now: where the step will put them
         // when it is returning them, and where it will take them from when it
@@ -14986,12 +17114,21 @@ impl AppModel {
             // Folder ids are positional and shift as folders come and go.
             m.folder_id = folder_id;
             if m.unread {
-                *self.folder_unread.entry((account_id, folder_id)).or_default() += 1;
+                *self
+                    .folder_unread
+                    .entry((account_id, folder_id))
+                    .or_default() += 1;
             }
             if self.is_unified_target(account_id, folder_id) {
-                self.unified_slices.entry((account_id, folder_id)).or_default().push(m.clone());
+                self.unified_slices
+                    .entry((account_id, folder_id))
+                    .or_default()
+                    .push(m.clone());
             }
-            self.message_cache.entry((account_id, folder_id)).or_default().push(m);
+            self.message_cache
+                .entry((account_id, folder_id))
+                .or_default()
+                .push(m);
             added = true;
         }
         tracing::debug!(target: "hylki::undo", "instant restore: added={added} to folder {folder_id}");
@@ -15032,7 +17169,11 @@ impl AppModel {
     /// which case the step is dropped rather than left to fail again.
     fn apply_undo_step(&mut self, account_id: u32, step: &UndoStep) -> bool {
         match step {
-            UndoStep::Move { from, to, message_ids } => {
+            UndoStep::Move {
+                from,
+                to,
+                message_ids,
+            } => {
                 let Some(dest_folder_id) = self
                     .folders
                     .get(&account_id)
@@ -15042,12 +17183,15 @@ impl AppModel {
                     tracing::info!("undo: {to:?} is no longer there, dropping the step");
                     return false;
                 };
-                self.send_to(account_id, MailRequest::UndoMove {
-                    path: from.clone(),
-                    dest: to.clone(),
-                    dest_folder_id,
-                    message_ids: message_ids.clone(),
-                });
+                self.send_to(
+                    account_id,
+                    MailRequest::UndoMove {
+                        path: from.clone(),
+                        dest: to.clone(),
+                        dest_folder_id,
+                        message_ids: message_ids.clone(),
+                    },
+                );
                 // Finding, moving and reloading the messages takes a few round
                 // trips — spin the refresh indicator until the worker's
                 // BulkComplete says it has landed.
@@ -15063,7 +17207,9 @@ impl AppModel {
                             .message_cache
                             .get(&(account_id, item.folder_id))
                             .and_then(|msgs| {
-                                msgs.iter().find(|m| m.uid == item.uid && m.id == item.id).cloned()
+                                msgs.iter()
+                                    .find(|m| m.uid == item.uid && m.id == item.id)
+                                    .cloned()
                             })
                         else {
                             continue;
@@ -15110,7 +17256,10 @@ impl AppModel {
         // The composer's history is the one on offer whenever it has one.
         let composing = self.menu_compose().is_some();
         let (undo_what, redo_what) = if composing {
-            (self.compose_history.0.clone(), self.compose_history.1.clone())
+            (
+                self.compose_history.0.clone(),
+                self.compose_history.1.clone(),
+            )
         } else {
             (
                 self.undo_stack.last().map(|e| e.what.clone()),
@@ -15203,7 +17352,11 @@ impl AppModel {
             self.push_undo(
                 account_id,
                 what.clone(),
-                UndoStep::Flags(vec![FlagChange { kind: kind.clone(), value: !value, items }]),
+                UndoStep::Flags(vec![FlagChange {
+                    kind: kind.clone(),
+                    value: !value,
+                    items,
+                }]),
             );
         }
     }
@@ -15211,10 +17364,11 @@ impl AppModel {
     /// Tell the reader how card actions should show (⋯ toggle / auto on
     /// hover / always).
     fn push_card_actions_mode(&self) {
-        self.message_view.emit(MessageViewInput::SetCardActionsMode {
-            hover_toggle: self.card_actions_hover,
-            hover_auto: self.card_actions_auto,
-        });
+        self.message_view
+            .emit(MessageViewInput::SetCardActionsMode {
+                hover_toggle: self.card_actions_hover,
+                hover_auto: self.card_actions_auto,
+            });
     }
 
     /// The message the toolbar's per-message actions act on: the open message
@@ -15282,7 +17436,9 @@ impl AppModel {
     fn rows_at(&self, slots: &[crate::ui::message_row::Slot]) -> Vec<Message> {
         slots
             .iter()
-            .filter_map(|&(account_id, folder_id, id)| self.shown_copy_in(account_id, folder_id, id))
+            .filter_map(|&(account_id, folder_id, id)| {
+                self.shown_copy_in(account_id, folder_id, id)
+            })
             // A queued message has no server flags to set.
             .filter(|m| self.outbox_item(m.account_id, m.id).is_none())
             .collect()
@@ -15290,14 +17446,16 @@ impl AppModel {
 
     /// `shown_copy`, held to one folder.
     fn shown_copy_in(&self, account_id: u32, folder_id: u32, id: u32) -> Option<Message> {
-        let same = |m: &&Message| m.account_id == account_id && m.folder_id == folder_id && m.id == id;
+        let same =
+            |m: &&Message| m.account_id == account_id && m.folder_id == folder_id && m.id == id;
         self.current
             .iter()
             .chain(self.current_thread.iter())
             .find(same)
             .or_else(|| {
                 self.message_cache
-                    .get(&(account_id, folder_id)).map(|c| &**c)
+                    .get(&(account_id, folder_id))
+                    .map(|c| &**c)
                     .into_iter()
                     .chain(self.unified_slices.get(&(account_id, folder_id)))
                     .flatten()
@@ -15383,15 +17541,18 @@ impl AppModel {
             return;
         }
         let welcome =
-            Welcome::builder().launch(()).forward(sender.input_sender(), |out| match out {
-                WelcomeOutput::AddAccount(account) => {
-                    AppMsg::AccountSaved { original_email: None, account }
-                }
-                WelcomeOutput::ImportGoa(account) => AppMsg::ImportGoaAccount(account),
-                WelcomeOutput::Prefs(p) => AppMsg::ApplyWelcomePrefs(p),
-                WelcomeOutput::Done => AppMsg::PresentWindow,
-                WelcomeOutput::Language(code) => AppMsg::WizardLanguage(code),
-            });
+            Welcome::builder()
+                .launch(())
+                .forward(sender.input_sender(), |out| match out {
+                    WelcomeOutput::AddAccount(account) => AppMsg::AccountSaved {
+                        original_email: None,
+                        account,
+                    },
+                    WelcomeOutput::ImportGoa(account) => AppMsg::ImportGoaAccount(account),
+                    WelcomeOutput::Prefs(p) => AppMsg::ApplyWelcomePrefs(p),
+                    WelcomeOutput::Done => AppMsg::PresentWindow,
+                    WelcomeOutput::Language(code) => AppMsg::WizardLanguage(code),
+                });
         welcome.widget().set_transient_for(Some(&self.window));
         welcome.widget().set_modal(true);
         // Light only while it is up; the preference returns when it goes,
@@ -15422,13 +17583,23 @@ impl AppModel {
         if let Some(path) = self.resolve_folder_path(m) {
             // Held like any other read mark, or a list fetched before the
             // worker stores it shows the message unread again (#255).
-            self.pending_seen
-                .insert((account_id, path.clone(), m.uid), (true, std::time::Instant::now()));
-            self.send_to(account_id, MailRequest::SetSeen { path, uid: m.uid, seen: true });
+            self.pending_seen.insert(
+                (account_id, path.clone(), m.uid),
+                (true, std::time::Instant::now()),
+            );
+            self.send_to(
+                account_id,
+                MailRequest::SetSeen {
+                    path,
+                    uid: m.uid,
+                    seen: true,
+                },
+            );
         }
         // Reading new mail clears that account's new-mail notification.
         crate::notify::withdraw_mail(account_id);
-        self.message_list.emit(MessageListInput::MarkRead((account_id, m.folder_id, m.id)));
+        self.message_list
+            .emit(MessageListInput::MarkRead((account_id, m.folder_id, m.id)));
         self.mark_cached_read(account_id, m.folder_id, m.id);
         // Optimistically drop the badge by one; the next server count
         // reconciles any drift.
@@ -15486,7 +17657,12 @@ impl AppModel {
     fn conversation_to_mark_unread(&self) -> Vec<Message> {
         self.current_thread
             .iter()
-            .filter(|m| !matches!(self.folder_kind(m.account_id, m.folder_id), Some(FolderKind::Sent | FolderKind::Drafts)))
+            .filter(|m| {
+                !matches!(
+                    self.folder_kind(m.account_id, m.folder_id),
+                    Some(FolderKind::Sent | FolderKind::Drafts)
+                )
+            })
             .cloned()
             .collect()
     }
@@ -15511,7 +17687,11 @@ impl AppModel {
     /// keyboard goes back to its row, which stays unread (#392). Checked
     /// rows stay as they are.
     fn close_after_unread(&self) {
-        if self.gmail_on() && self.current.is_some() && !self.many_selected() && self.reader_compose.is_none() {
+        if self.gmail_on()
+            && self.current.is_some()
+            && !self.many_selected()
+            && self.reader_compose.is_none()
+        {
             self.message_list.emit(MessageListInput::CloseOpen);
         }
     }
@@ -15533,8 +17713,12 @@ impl AppModel {
             return;
         }
         let order = |m: &Message| (m.timestamp, m.uid);
-        let start = (if self.selection_from_cards { self.reply_target() } else { None })
-            .or_else(|| self.current_thread.iter().max_by_key(|m| order(m)).cloned());
+        let start = (if self.selection_from_cards {
+            self.reply_target()
+        } else {
+            None
+        })
+        .or_else(|| self.current_thread.iter().max_by_key(|m| order(m)).cloned());
         let Some(start) = start else { return };
         let from = order(&start);
         let mut targets: Vec<Message> = self
@@ -15553,8 +17737,15 @@ impl AppModel {
     /// unread already is not, and would be read a moment later (#392).
     fn hold_unread(&self, targets: &[Message]) {
         for m in targets.iter().filter(|m| m.unread) {
-            if self.current_thread.iter().any(|t| (t.account_id, t.id) == (m.account_id, m.id)) {
-                self.message_view.emit(MessageViewInput::SuppressAutoRead { account_id: m.account_id, id: m.id });
+            if self
+                .current_thread
+                .iter()
+                .any(|t| (t.account_id, t.id) == (m.account_id, m.id))
+            {
+                self.message_view.emit(MessageViewInput::SuppressAutoRead {
+                    account_id: m.account_id,
+                    id: m.id,
+                });
             }
         }
     }
@@ -15582,11 +17773,18 @@ impl AppModel {
     /// Every address this account sends as: its own, plus its send-as
     /// aliases (#34). Lower-cased comparison is the caller's job.
     fn own_identities(&self, account_id: u32) -> Vec<String> {
-        let Some(cfg) = self.effective_config().get(account_id.saturating_sub(1) as usize) else {
+        let Some(cfg) = self
+            .effective_config()
+            .get(account_id.saturating_sub(1) as usize)
+        else {
             return self.email_of(account_id).into_iter().collect();
         };
         std::iter::once(cfg.email.clone())
-            .chain(cfg.aliases.iter().map(|al| config::split_identity(&al.identity).1))
+            .chain(
+                cfg.aliases
+                    .iter()
+                    .map(|al| config::split_identity(&al.identity).1),
+            )
             .filter(|a| !a.trim().is_empty())
             .collect()
     }
@@ -15630,7 +17828,9 @@ impl AppModel {
     }
 
     fn store_folder_order(&mut self, account_id: u32, paths: &[String]) {
-        let Some(email) = self.email_of(account_id) else { return };
+        let Some(email) = self.email_of(account_id) else {
+            return;
+        };
         let keys: Vec<String> = paths.iter().map(|p| format!("{email}\t{p}")).collect();
         self.folder_order.retain(|k| !keys.contains(k));
         self.folder_order.extend(keys);
@@ -15651,9 +17851,15 @@ impl AppModel {
 
     /// An account's folders in the order the sidebar shows them.
     fn shown_folders(&self, account_id: u32) -> Vec<Folder> {
-        let prefix = self.email_of(account_id).map(|e| format!("{e}\t")).unwrap_or_default();
-        let order: Vec<String> =
-            self.folder_order.iter().filter_map(|k| k.strip_prefix(&prefix).map(String::from)).collect();
+        let prefix = self
+            .email_of(account_id)
+            .map(|e| format!("{e}\t"))
+            .unwrap_or_default();
+        let order: Vec<String> = self
+            .folder_order
+            .iter()
+            .filter_map(|k| k.strip_prefix(&prefix).map(String::from))
+            .collect();
         crate::ui::sidebar::order_folders(
             self.folders.get(&account_id).cloned().unwrap_or_default(),
             &order,
@@ -15666,8 +17872,14 @@ impl AppModel {
     /// would otherwise put the old one back when its editor is saved.
     fn set_account_folder_sort(&mut self, account_id: u32, sort: Option<config::FolderSort>) {
         let demo = self.config.is_empty() && demo_mode();
-        let accounts = if demo { &mut self.demo_config } else { &mut self.config };
-        let Some(cfg) = accounts.get_mut(account_id.saturating_sub(1) as usize) else { return };
+        let accounts = if demo {
+            &mut self.demo_config
+        } else {
+            &mut self.config
+        };
+        let Some(cfg) = accounts.get_mut(account_id.saturating_sub(1) as usize) else {
+            return;
+        };
         if cfg.folder_sort == sort {
             return;
         }
@@ -15704,7 +17916,8 @@ impl AppModel {
             .map(|f| f.path)
             .collect();
         self.store_folder_order(account_id, &shown);
-        let sort = (self.folder_sort != config::FolderSort::Custom).then_some(config::FolderSort::Custom);
+        let sort =
+            (self.folder_sort != config::FolderSort::Custom).then_some(config::FolderSort::Custom);
         self.set_account_folder_sort(account_id, sort);
     }
 
@@ -15796,7 +18009,9 @@ impl AppModel {
     }
 
     fn set_sidebar_peek(&mut self, open: bool, animate: bool) {
-        let Some(peek) = self.peek_split.clone() else { return };
+        let Some(peek) = self.peek_split.clone() else {
+            return;
+        };
         tracing::info!(
             "peek: set open={open} animate={animate} (was peek={}, shown={})",
             self.sidebar_peek,
@@ -15834,9 +18049,17 @@ impl AppModel {
             .sidebar()
             .map(|w| w.width() as f64)
             .filter(|w| *w > 1.0)
-            .unwrap_or(if collapsing { 256.0 } else { SIDEBAR_RAIL_WIDTH });
+            .unwrap_or(if collapsing {
+                256.0
+            } else {
+                SIDEBAR_RAIL_WIDTH
+            });
         let expanded = (0.2 * self.window.width() as f64).clamp(220.0, 280.0);
-        let to = if collapsing { SIDEBAR_RAIL_WIDTH } else { expanded };
+        let to = if collapsing {
+            SIDEBAR_RAIL_WIDTH
+        } else {
+            expanded
+        };
 
         let s = split.clone();
         let target = adw::CallbackAnimationTarget::new(move |v| {
@@ -15869,14 +18092,18 @@ impl AppModel {
                 && if self.unified {
                     self.is_unified_target(a, f)
                 } else {
-                    self.selected.as_ref().is_some_and(|s| s.account_id == a && s.folder_id == f)
+                    self.selected
+                        .as_ref()
+                        .is_some_and(|s| s.account_id == a && s.folder_id == f)
                 }
         };
         let mut seen = self.unread_seen.borrow_mut();
         let mut changed = false;
         let mut fresh = HashSet::new();
         for (&(a, f), &n) in &self.folder_unread {
-            let (Some(email), Some(path)) = (self.email_of(a), self.folder_path(a, f)) else { continue };
+            let (Some(email), Some(path)) = (self.email_of(a), self.folder_path(a, f)) else {
+                continue;
+            };
             let key = format!("{email}\u{1f}{path}");
             let mark = seen.get(&key).copied();
             let next = match mark {
@@ -15913,7 +18140,11 @@ impl AppModel {
         let folders = self.folder_unread.clone();
         let unified = self.unified_unread();
         let fresh = self.seen_counts.then(|| self.fresh_unread());
-        self.sidebars_emit(SidebarInput::SetUnread { folders, unified: self.unified_inboxes_unread(), fresh });
+        self.sidebars_emit(SidebarInput::SetUnread {
+            folders,
+            unified: self.unified_inboxes_unread(),
+            fresh,
+        });
         // The counted total is what GNOME shows beside Hylki in Background
         // Apps, so a process with no window still says what it is there for.
         if self.run_in_background.get() {
@@ -15984,7 +18215,10 @@ impl AppModel {
         let dialog = adw::MessageDialog::new(
             Some(&self.icon_dialog_parent()),
             Some(i18n("Restarting Hylki").as_str()),
-            Some(i18n("Applying your new app icon. Hylki will close and reopen in a moment.").as_str()),
+            Some(
+                i18n("Applying your new app icon. Hylki will close and reopen in a moment.")
+                    .as_str(),
+            ),
         );
         let spinner = gtk::Spinner::new();
         spinner.set_size_request(32, 32);
@@ -16007,9 +18241,15 @@ impl AppModel {
         let dialog = adw::MessageDialog::new(
             Some(&self.icon_dialog_parent()),
             Some(i18n("Restart to finish switching icons?").as_str()),
-            Some(i18n("The dock and Hylki's own windows keep the old icon until Hylki restarts.").as_str()),
+            Some(
+                i18n("The dock and Hylki's own windows keep the old icon until Hylki restarts.")
+                    .as_str(),
+            ),
         );
-        dialog.add_responses(&[("later", i18n("Later").as_str()), ("restart", i18n("Restart Now").as_str())]);
+        dialog.add_responses(&[
+            ("later", i18n("Later").as_str()),
+            ("restart", i18n("Restart Now").as_str()),
+        ]);
         dialog.set_response_appearance("restart", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("later"));
         dialog.set_close_response("later");
@@ -16098,9 +18338,7 @@ impl AppModel {
     /// order and with each account's collapsed state.
     /// The Special Folders choices per account email (#82): every folder of
     /// every configured account, for the settings editor's combos.
-    fn folder_choice_map(
-        &self,
-    ) -> std::collections::HashMap<String, Vec<(String, String)>> {
+    fn folder_choice_map(&self) -> std::collections::HashMap<String, Vec<(String, String)>> {
         let mut map = std::collections::HashMap::new();
         // The demo's accounts live only at the backend, so give the
         // Accounts panel's stand-in configs their folders as well.
@@ -16110,7 +18348,11 @@ impl AppModel {
             let list = self
                 .folders
                 .get(&id)
-                .map(|fs| fs.iter().map(|f| (f.path.clone(), f.name.clone())).collect())
+                .map(|fs| {
+                    fs.iter()
+                        .map(|f| (f.path.clone(), f.name.clone()))
+                        .collect()
+                })
                 .unwrap_or_default();
             map.insert(cfg.email.clone(), list);
         }
@@ -16128,7 +18370,10 @@ impl AppModel {
         if let Some(cfg) = self.config.get(account_id as usize - 1) {
             map.insert(
                 cfg.email.clone(),
-                fresh.iter().map(|f| (f.path.clone(), f.name.clone())).collect(),
+                fresh
+                    .iter()
+                    .map(|f| (f.path.clone(), f.name.clone()))
+                    .collect(),
             );
         }
         map
@@ -16216,8 +18461,11 @@ impl AppModel {
         let multi_account = self.multi_account();
         let show_unified = self.unified_inboxes_shown();
         // The other unified rows are as pointless with one account.
-        let unified_kinds =
-            if multi_account { self.unified_kinds } else { config::UnifiedKinds::NONE };
+        let unified_kinds = if multi_account {
+            self.unified_kinds
+        } else {
+            config::UnifiedKinds::NONE
+        };
         let unified_unread = self.unified_inboxes_unread();
         let unified_folders = self.unified_folder_refs();
         let favorite_folders = self.favorite_folder_refs();
@@ -16240,7 +18488,11 @@ impl AppModel {
             tags_placement: self.tags_placement,
             favorites_placement: self.favorites_placement,
             contacts_placement: self.contacts_placement,
-            smart_folders: self.smart_folders.iter().map(|f| (f.id.clone(), f.name.clone())).collect(),
+            smart_folders: self
+                .smart_folders
+                .iter()
+                .map(|f| (f.id.clone(), f.name.clone()))
+                .collect(),
         });
 
         // Keep the list's per-account tint colors in sync, and what its
@@ -16252,8 +18504,11 @@ impl AppModel {
             .collect();
         self.message_list
             .emit(MessageListInput::SetAccountColors(colors));
-        let names: std::collections::HashMap<u32, String> =
-            self.accounts.iter().map(|a| (a.id, self.account_label(a.id))).collect();
+        let names: std::collections::HashMap<u32, String> = self
+            .accounts
+            .iter()
+            .map(|a| (a.id, self.account_label(a.id)))
+            .collect();
         let graph: std::collections::HashSet<u32> = self
             .accounts
             .iter()
@@ -16264,7 +18519,8 @@ impl AppModel {
             })
             .map(|a| a.id)
             .collect();
-        self.message_list.emit(MessageListInput::SetAccountNames { names, graph });
+        self.message_list
+            .emit(MessageListInput::SetAccountNames { names, graph });
     }
 
     fn remote_allowed(&self, m: &Message) -> bool {
@@ -16298,15 +18554,20 @@ impl AppModel {
             Some(first) => {
                 let mut all = first.clone();
                 all.keywords = first.tag_keywords(&self.tags);
-                all.keywords.retain(|k| many.iter().all(|m| self.carries_tag(m, k)));
+                all.keywords
+                    .retain(|k| many.iter().all(|m| self.carries_tag(m, k)));
                 all
             }
             None => self.reply_target()?,
         };
         let s = sender.input_sender().clone();
-        Some(crate::ui::message_list::tag_menu_entries(&self.tags, &target, move |keyword, _add| {
-            let _ = s.send(AppMsg::ToggleTagCurrent(keyword));
-        }))
+        Some(crate::ui::message_list::tag_menu_entries(
+            &self.tags,
+            &target,
+            move |keyword, _add| {
+                let _ = s.send(AppMsg::ToggleTagCurrent(keyword));
+            },
+        ))
     }
 
     /// The collapsed reader header's overflow menu: the right group of the
@@ -16338,13 +18599,28 @@ impl AppModel {
             if focus {
                 let many = has_current || self.many_selected();
                 sections.push(vec![
-                    entry!(i18n("Edit this message"), "document-edit", AppMsg::EditCurrentOutbox, has_current),
-                    entry!(i18n("Try to send this message now"), "mail-send", AppMsg::SendCurrentOutbox, has_current),
+                    entry!(
+                        i18n("Edit this message"),
+                        "document-edit",
+                        AppMsg::EditCurrentOutbox,
+                        has_current
+                    ),
+                    entry!(
+                        i18n("Try to send this message now"),
+                        "mail-send",
+                        AppMsg::SendCurrentOutbox,
+                        has_current
+                    ),
                     entry!(i18n("Send all"), "mail-send", AppMsg::RetryAllOutbox, true),
                     entry!(i18n("Delete"), "user-trash", AppMsg::Delete, many),
                 ]);
             }
-            sections.push(vec![entry!(i18n("View Source"), "code", AppMsg::ViewSource, has_current)]);
+            sections.push(vec![entry!(
+                i18n("View Source"),
+                "code",
+                AppMsg::ViewSource,
+                has_current
+            )]);
             sections
         } else {
             // Only the right group folds in here, in its own order; the left
@@ -16371,59 +18647,122 @@ impl AppModel {
             };
             let mut sections = Vec::new();
             for group in groups {
-            let mut section = Vec::new();
-            for item in group {
-                match item {
-                    T::Reply => section.push(entry!(i18n("Reply"), "mail-reply-sender", AppMsg::Reply, acts)),
-                    T::ReplyAll => section.push(entry!(i18n("Reply All"), "mail-reply-all", AppMsg::ReplyAll, acts)),
-                    T::Forward => section.push(entry!(i18n("Forward"), "mail-forward", AppMsg::Forward, acts)),
-                    T::Star => section.push(if starred {
-                        entry!(i18n("Remove Star"), "hylki-non-starred", AppMsg::ToggleStar, many)
-                    } else {
-                        entry!(i18n("Star"), "starred", AppMsg::ToggleStar, many)
-                    }),
-                    T::Archive => section.push(entry!(i18n("Archive"), "mail-archive", AppMsg::Archive, many)),
-                    T::Delete => section.push(entry!(i18n("Delete"), "user-trash", AppMsg::Delete, many)),
-                    T::Spam => section.push(if self.target_in_junk() {
-                        entry!(i18n("Not Spam"), "mail-mark-notjunk", AppMsg::MarkSpam, many)
-                    } else {
-                        entry!(i18n("Mark as Spam"), "mail-mark-junk", AppMsg::MarkSpam, many)
-                    }),
-                    T::ReadUnread => section.push(if target_unread {
-                        entry!(i18n("Mark as Read"), "hylki-mail-read", AppMsg::ToggleReadCurrent, many)
-                    } else {
-                        entry!(i18n("Mark as Unread"), "mail-unread", AppMsg::ToggleReadCurrent, many)
-                    }),
-                    // Tags (#71), where there are any and something to tag —
-                    // behind a submenu, as in the message list's menu.
-                    T::Tags => {
-                        if let Some(entries) = self.reader_tag_entries(sender) {
-                            section.push(
-                                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("tag-outline-symbolic"),
-                            );
+                let mut section = Vec::new();
+                for item in group {
+                    match item {
+                        T::Reply => section.push(entry!(
+                            i18n("Reply"),
+                            "mail-reply-sender",
+                            AppMsg::Reply,
+                            acts
+                        )),
+                        T::ReplyAll => section.push(entry!(
+                            i18n("Reply All"),
+                            "mail-reply-all",
+                            AppMsg::ReplyAll,
+                            acts
+                        )),
+                        T::Forward => section.push(entry!(
+                            i18n("Forward"),
+                            "mail-forward",
+                            AppMsg::Forward,
+                            acts
+                        )),
+                        T::Star => section.push(if starred {
+                            entry!(
+                                i18n("Remove Star"),
+                                "hylki-non-starred",
+                                AppMsg::ToggleStar,
+                                many
+                            )
+                        } else {
+                            entry!(i18n("Star"), "starred", AppMsg::ToggleStar, many)
+                        }),
+                        T::Archive => section.push(entry!(
+                            i18n("Archive"),
+                            "mail-archive",
+                            AppMsg::Archive,
+                            many
+                        )),
+                        T::Delete => {
+                            section.push(entry!(i18n("Delete"), "user-trash", AppMsg::Delete, many))
                         }
-                    }
-                    T::MoveTo => {
-                        if restorable {
-                            section.push(entry!(i18n("Move to Inbox"), "mail-inbox", AppMsg::MoveToInbox, acts));
+                        T::Spam => section.push(if self.target_in_junk() {
+                            entry!(
+                                i18n("Not Spam"),
+                                "mail-mark-notjunk",
+                                AppMsg::MarkSpam,
+                                many
+                            )
+                        } else {
+                            entry!(
+                                i18n("Mark as Spam"),
+                                "mail-mark-junk",
+                                AppMsg::MarkSpam,
+                                many
+                            )
+                        }),
+                        T::ReadUnread => section.push(if target_unread {
+                            entry!(
+                                i18n("Mark as Read"),
+                                "hylki-mail-read",
+                                AppMsg::ToggleReadCurrent,
+                                many
+                            )
+                        } else {
+                            entry!(
+                                i18n("Mark as Unread"),
+                                "mail-unread",
+                                AppMsg::ToggleReadCurrent,
+                                many
+                            )
+                        }),
+                        // Tags (#71), where there are any and something to tag —
+                        // behind a submenu, as in the message list's menu.
+                        T::Tags => {
+                            if let Some(entries) = self.reader_tag_entries(sender) {
+                                section.push(
+                                    MenuEntry::submenu(i18n("Tags"), vec![entries])
+                                        .icon("tag-outline-symbolic"),
+                                );
+                            }
                         }
-                        section.push(entry!(i18n("Move To…"), "folder", AppMsg::MoveToMenu, many));
+                        T::MoveTo => {
+                            if restorable {
+                                section.push(entry!(
+                                    i18n("Move to Inbox"),
+                                    "mail-inbox",
+                                    AppMsg::MoveToInbox,
+                                    acts
+                                ));
+                            }
+                            section.push(entry!(
+                                i18n("Move To…"),
+                                "folder",
+                                AppMsg::MoveToMenu,
+                                many
+                            ));
+                        }
+                        T::Find => section.push(entry!(
+                            i18n("Find in Message"),
+                            "loupe-with-arrow",
+                            AppMsg::OpenReaderFind,
+                            has_current
+                        )),
+                        // View Source is deliberately absent: it lives in the
+                        // message list's context menu only (the Outbox variant
+                        // above keeps it — queued rows have no such menu).
+                        T::Print => section.push(entry!(
+                            i18n("Print Preview"),
+                            "printer",
+                            AppMsg::PrintPreview,
+                            has_current
+                        )),
                     }
-                    T::Find => section.push(entry!(
-                        i18n("Find in Message"),
-                        "loupe-with-arrow",
-                        AppMsg::OpenReaderFind,
-                        has_current
-                    )),
-                    // View Source is deliberately absent: it lives in the
-                    // message list's context menu only (the Outbox variant
-                    // above keeps it — queued rows have no such menu).
-                    T::Print => section.push(entry!(i18n("Print Preview"), "printer", AppMsg::PrintPreview, has_current)),
                 }
-            }
-            if !section.is_empty() {
-                sections.push(section);
-            }
+                if !section.is_empty() {
+                    sections.push(section);
+                }
             }
             sections
         };
@@ -16439,8 +18778,13 @@ impl AppModel {
     /// Narrow the list to `filters`, and show them on the header's popover.
     fn set_quick_filters(&mut self, filters: QuickFilters) {
         self.quick_filters = filters;
-        let contacts = if filters.has(QuickFilter::Contacts) { self.saved_addresses.get() } else { None };
-        self.message_list.emit(MessageListInput::SetQuickFilters { filters, contacts });
+        let contacts = if filters.has(QuickFilter::Contacts) {
+            self.saved_addresses.get()
+        } else {
+            None
+        };
+        self.message_list
+            .emit(MessageListInput::SetQuickFilters { filters, contacts });
         if let Some(lh) = self.list_header_widgets.get() {
             lh.filter.sync(filters);
         }
@@ -16461,30 +18805,48 @@ impl AppModel {
             .map(|f| {
                 let on = self.quick_filters.has(f);
                 let s = sender.input_sender().clone();
-                MenuEntry::new(f.label(), move || s.emit(AppMsg::SetQuickFilter(f, !on))).icon(f.icon()).selected(on)
+                MenuEntry::new(f.label(), move || s.emit(AppMsg::SetQuickFilter(f, !on)))
+                    .icon(f.icon())
+                    .selected(on)
             })
             .collect();
         let s = sender.input_sender().clone();
-        let clear = MenuEntry::new(i18n("Clear Filters"), move || s.emit(AppMsg::ClearQuickFilters))
-            .enabled(!self.quick_filters.is_empty());
-        let filter = MenuEntry::submenu(i18n("Filter"), vec![filters, vec![clear]]).icon("filter-symbolic");
-        let current = lh.sort.state().and_then(|v| v.str().map(String::from)).unwrap_or_default();
+        let clear = MenuEntry::new(i18n("Clear Filters"), move || {
+            s.emit(AppMsg::ClearQuickFilters)
+        })
+        .enabled(!self.quick_filters.is_empty());
+        let filter =
+            MenuEntry::submenu(i18n("Filter"), vec![filters, vec![clear]]).icon("filter-symbolic");
+        let current = lh
+            .sort
+            .state()
+            .and_then(|v| v.str().map(String::from))
+            .unwrap_or_default();
         let orders: Vec<MenuEntry> = SORT_ORDERS
             .into_iter()
-        .map(|(label, key)| {
-            let action = lh.sort.clone();
-            // The same route the sort menu takes, so the list and the
-            // action's own state both follow.
-            MenuEntry::new(i18n(label), move || action.activate(Some(&key.to_variant()))).selected(current == key)
-        })
-        .collect();
-        let sort = MenuEntry::submenu(i18n("Sort"), vec![orders])
-            .icon("view-sort-descending-symbolic");
+            .map(|(label, key)| {
+                let action = lh.sort.clone();
+                // The same route the sort menu takes, so the list and the
+                // action's own state both follow.
+                MenuEntry::new(i18n(label), move || {
+                    action.activate(Some(&key.to_variant()))
+                })
+                .selected(current == key)
+            })
+            .collect();
+        let sort =
+            MenuEntry::submenu(i18n("Sort"), vec![orders]).icon("view-sort-descending-symbolic");
         let sections = vec![vec![search], vec![filter, sort]];
         // The message count heads the menu, where the header showed it.
         let header = (!self.list_count.is_empty()).then(|| self.list_count.clone());
         let btn = lh.overflow.clone();
-        show_context_menu_with_header(&btn, (btn.width() / 2) as f64, btn.height() as f64, header.as_deref(), sections);
+        show_context_menu_with_header(
+            &btn,
+            (btn.width() / 2) as f64,
+            btn.height() as f64,
+            header.as_deref(),
+            sections,
+        );
     }
 
     /// Focus Mode changed (the menu, the shortcut or Settings): save it,
@@ -16500,8 +18862,13 @@ impl AppModel {
                 self.sync_focus_chrome();
                 // Not while the inline composer covers the header: that
                 // path hides the ⋯ by hand and restores it on close.
-                if !self.reader_compose.as_ref().is_some_and(|r| r.window.is_none()) {
-                    self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
+                if !self
+                    .reader_compose
+                    .as_ref()
+                    .is_some_and(|r| r.window.is_none())
+                {
+                    self.reader_overflow_btn
+                        .set_visible(self.reader_overflow_wanted());
                 }
             }
             if changed(F::HideAccounts) || changed(F::FoldUnified) {
@@ -16601,7 +18968,9 @@ impl AppModel {
     /// full sidebar, Focus Mode has folded it, or the user collapsed it
     /// themselves. Only the last of those is ever saved.
     fn rail_wanted(&self) -> bool {
-        self.auto_rail || self.focus.active(config::FocusPart::RailSidebar) || self.sidebar_collapsed
+        self.auto_rail
+            || self.focus.active(config::FocusPart::RailSidebar)
+            || self.sidebar_collapsed
     }
 
     /// Whether the sidebar's layout is Focus Mode's for the while: the rail
@@ -16659,7 +19028,9 @@ impl AppModel {
             animate,
         });
         // A folded card in a conversation shows what a list row does (#326).
-        self.message_view.emit(MessageViewInput::SetFoldLook { preview_lines: self.list_preview_lines() });
+        self.message_view.emit(MessageViewInput::SetFoldLook {
+            preview_lines: self.list_preview_lines(),
+        });
     }
 
     /// What Reader View does on each open: Focus Mode's "on" while it holds,
@@ -16694,10 +19065,13 @@ impl AppModel {
     fn push_reader_focus(&self) {
         let policy = self.effective_reader_default();
         let mode = self.effective_reader_mode();
-        self.message_view.emit(MessageViewInput::SetReaderDefault(policy));
-        self.message_view.emit(MessageViewInput::SetReaderMode(mode));
+        self.message_view
+            .emit(MessageViewInput::SetReaderDefault(policy));
+        self.message_view
+            .emit(MessageViewInput::SetReaderMode(mode));
         for p in self.popouts.values() {
-            p.controller.emit(MessageWindowInput::SetReaderDefault(policy));
+            p.controller
+                .emit(MessageWindowInput::SetReaderDefault(policy));
             p.controller.emit(MessageWindowInput::SetReaderMode(mode));
         }
     }
@@ -16705,8 +19079,13 @@ impl AppModel {
     fn sync_attachment_drawer(&self) {
         // Switched off (#213), the drawer is simply never given anything:
         // empty hides it, seam and all.
-        let items = if self.drawer_enabled { self.attachments.clone() } else { Vec::new() };
-        self.attachment_drawer.emit(AttachmentDrawerInput::SetItems(items));
+        let items = if self.drawer_enabled {
+            self.attachments.clone()
+        } else {
+            Vec::new()
+        };
+        self.attachment_drawer
+            .emit(AttachmentDrawerInput::SetItems(items));
         self.push_card_attachments();
     }
 
@@ -16715,7 +19094,10 @@ impl AppModel {
         if self.current_thread.is_empty() {
             self.current.iter().map(|c| (c.account_id, c.id)).collect()
         } else {
-            self.current_thread.iter().map(|m| (m.account_id, m.id)).collect()
+            self.current_thread
+                .iter()
+                .map(|m| (m.account_id, m.id))
+                .collect()
         }
     }
 
@@ -16735,7 +19117,12 @@ impl AppModel {
     /// the id it goes by here, so that is taken back to its UID. `None` for a
     /// folder the app does not know.
     fn event_key(&self, account_id: u32, path: &str, message_id: u32) -> Option<BodyKey> {
-        let fid = self.folders.get(&account_id)?.iter().find(|f| f.path == path)?.id;
+        let fid = self
+            .folders
+            .get(&account_id)?
+            .iter()
+            .find(|f| f.path == path)?
+            .id;
         let uid = self
             .related_ids
             .iter()
@@ -16747,14 +19134,20 @@ impl AppModel {
     /// Give the message at `key` its paperclip or take it away, in its own
     /// folder only, where the list keeps it and on its row.
     fn set_has_attachment(&mut self, key: Option<BodyKey>, has: bool) {
-        let Some((account_id, folder_id, uid)) = key else { return };
+        let Some((account_id, folder_id, uid)) = key else {
+            return;
+        };
         if let Some(msgs) = self.message_cache.get_mut(&(account_id, folder_id)) {
             for m in msgs.iter_mut().filter(|m| m.uid == uid) {
                 m.has_attachment = has;
             }
         }
-        self.message_list
-            .emit(MessageListInput::SetHasAttachment { account_id, folder_id, uid, has });
+        self.message_list.emit(MessageListInput::SetHasAttachment {
+            account_id,
+            folder_id,
+            uid,
+            has,
+        });
     }
 
     /// Hand the reader what each message on screen has attached (#213), as
@@ -16764,17 +19157,24 @@ impl AppModel {
         use crate::ui::message_view::CardAttachment;
         let mut map: HashMap<(u32, u32), Vec<CardAttachment>> = HashMap::new();
         for key in self.conversation_members() {
-            if let Some(items) = self.member_key(key).and_then(|k| self.attachment_cache.get(&k)) {
+            if let Some(items) = self
+                .member_key(key)
+                .and_then(|k| self.attachment_cache.get(&k))
+            {
                 let atts: Vec<CardAttachment> = items
                     .iter()
-                    .map(|a| CardAttachment { name: a.name.clone(), size: a.data.len() as u64 })
+                    .map(|a| CardAttachment {
+                        name: a.name.clone(),
+                        size: a.data.len() as u64,
+                    })
                     .collect();
                 if !atts.is_empty() {
                     map.insert(key, atts);
                 }
             }
         }
-        self.message_view.emit(MessageViewInput::SetCardAttachments(map));
+        self.message_view
+            .emit(MessageViewInput::SetCardAttachments(map));
     }
 
     /// Fill the drawer for a whole conversation: ask the disk cache for every
@@ -16796,12 +19196,15 @@ impl AppModel {
             self.attachments_loading = true;
         }
         for (account_id, message_id, uid, path) in wanted {
-            self.send_to(account_id, MailRequest::LoadAttachments {
-                message_id,
-                path,
-                uid,
-                download: true,
-            });
+            self.send_to(
+                account_id,
+                MailRequest::LoadAttachments {
+                    message_id,
+                    path,
+                    uid,
+                    download: true,
+                },
+            );
         }
         self.refresh_thread_attachments();
     }
@@ -16866,7 +19269,12 @@ impl AppModel {
         let folders: Vec<(u32, String)> = self
             .gallery_scope()
             .iter()
-            .flat_map(|a| a.folders.iter().map(|f| (a.id, f.path.clone())).collect::<Vec<_>>())
+            .flat_map(|a| {
+                a.folders
+                    .iter()
+                    .map(|f| (a.id, f.path.clone()))
+                    .collect::<Vec<_>>()
+            })
             .collect();
         for (account_id, folder_path) in folders {
             self.send_to(account_id, MailRequest::ScanAttachments { folder_path });
@@ -16952,7 +19360,11 @@ impl AppModel {
     /// sidebar has already moved to the first inbox instead.
     fn reload_unified_views(&mut self, open: Option<UnifiedView>, sender: &ComponentSender<Self>) {
         self.tag_view_cache.retain(|(scope, _), _| scope.is_some());
-        if self.tag_view.as_ref().is_some_and(|(scope, _)| scope.is_none()) {
+        if self
+            .tag_view
+            .as_ref()
+            .is_some_and(|(scope, _)| scope.is_none())
+        {
             self.refresh_tag_view(sender);
         }
         let Some(view) = open else { return };
@@ -16960,7 +19372,9 @@ impl AppModel {
             UnifiedView::Kind(FolderKind::Inbox) => self.unified_inboxes_shown(),
             UnifiedView::Kind(kind) => self.multi_account() && self.unified_kinds.has(kind),
             UnifiedView::Filtered => self.filtered_shown(),
-            UnifiedView::Favorites => self.favorites_placement.shown() && !self.favorites.is_empty(),
+            UnifiedView::Favorites => {
+                self.favorites_placement.shown() && !self.favorites.is_empty()
+            }
         };
         if listed {
             // A reconnect has emptied the account list; each account's
@@ -16979,14 +19393,21 @@ impl AppModel {
     }
 
     /// Open a unified view, narrowed to one account when `account` names one.
-    fn open_unified_in(&mut self, view: UnifiedView, account: Option<u32>, sender: &ComponentSender<Self>) {
+    fn open_unified_in(
+        &mut self,
+        view: UnifiedView,
+        account: Option<u32>,
+        sender: &ComponentSender<Self>,
+    ) {
         let t_open = std::time::Instant::now();
         if view == UnifiedView::Kind(FolderKind::Inbox) && !demo_mode() {
             config::save_last_view(config::LastView::default());
         }
         self.close_sidebar_peek();
         self.mirror_selection(match view {
-            UnifiedView::Kind(kind) if let Some(acc) = account => crate::ui::sidebar::Sel::UnifiedKindRow(kind, acc),
+            UnifiedView::Kind(kind) if let Some(acc) = account => {
+                crate::ui::sidebar::Sel::UnifiedKindRow(kind, acc)
+            }
             UnifiedView::Kind(FolderKind::Inbox) => crate::ui::sidebar::Sel::Unified,
             UnifiedView::Kind(kind) => crate::ui::sidebar::Sel::UnifiedKind(kind),
             UnifiedView::Filtered => crate::ui::sidebar::Sel::UnifiedFiltered,
@@ -17022,22 +19443,35 @@ impl AppModel {
         self.show_message(None, false);
         self.message_list.emit(MessageListInput::SetSelected(None));
         self.message_list.emit(MessageListInput::ResetPaging);
-        self.message_list.emit(MessageListInput::SetScope(default_scope(view == UnifiedView::Kind(FolderKind::Inbox))));
-        self.message_list.emit(MessageListInput::SetColorize(account.is_none()));
+        self.message_list
+            .emit(MessageListInput::SetScope(default_scope(
+                view == UnifiedView::Kind(FolderKind::Inbox),
+            )));
+        self.message_list
+            .emit(MessageListInput::SetColorize(account.is_none()));
         // A Sent view's rows all come from you — name the recipients.
         self.message_list.emit(MessageListInput::SetShowRecipient(
             view == UnifiedView::Kind(FolderKind::Sent),
         ));
         // Unified Trash and Junk offer the way back as each account's own
         // folder does (#369); the move and Not Spam go per message.
-        let restorable = matches!(view, UnifiedView::Kind(FolderKind::Trash | FolderKind::Junk));
-        self.message_list.emit(MessageListInput::SetRestorable(restorable));
-        self.message_list.emit(MessageListInput::SetInJunk(view == UnifiedView::Kind(FolderKind::Junk)));
+        let restorable = matches!(
+            view,
+            UnifiedView::Kind(FolderKind::Trash | FolderKind::Junk)
+        );
         self.message_list
-            .emit(MessageListInput::SetInDrafts(view == UnifiedView::Kind(FolderKind::Drafts)));
-        self.message_list.emit(MessageListInput::SetInTemplates(false));
-        self.message_view
-            .emit(MessageViewInput::SetDraftsView(view == UnifiedView::Kind(FolderKind::Drafts)));
+            .emit(MessageListInput::SetRestorable(restorable));
+        self.message_list.emit(MessageListInput::SetInJunk(
+            view == UnifiedView::Kind(FolderKind::Junk),
+        ));
+        self.message_list.emit(MessageListInput::SetInDrafts(
+            view == UnifiedView::Kind(FolderKind::Drafts),
+        ));
+        self.message_list
+            .emit(MessageListInput::SetInTemplates(false));
+        self.message_view.emit(MessageViewInput::SetDraftsView(
+            view == UnifiedView::Kind(FolderKind::Drafts),
+        ));
         let reqs = self.unified_targets();
         // Keep every account's last known slice and top it up from the
         // folder caches, the way opening a single folder does. This used
@@ -17072,7 +19506,8 @@ impl AppModel {
                     let newest = self.apply_pending_seen(*account_id, *folder_id, newest);
                     let newest = self.apply_pending_answers(*account_id, *folder_id, newest);
                     let newest = self.apply_pending_tags(*account_id, *folder_id, newest);
-                    self.unified_slices.insert((*account_id, *folder_id), newest);
+                    self.unified_slices
+                        .insert((*account_id, *folder_id), newest);
                     unseen.push((*account_id, *folder_id, path.clone()));
                 }
             }
@@ -17085,23 +19520,34 @@ impl AppModel {
         let live: std::collections::HashSet<(u32, u32)> =
             reqs.iter().map(|(a, f, _)| (*a, *f)).collect();
         self.unified_slices.retain(|k, _| live.contains(k));
-        self.unified_unfilled.retain(|k| self.message_cache.get(k).is_some_and(|c| !c.is_empty()));
+        self.unified_unfilled
+            .retain(|k| self.message_cache.get(k).is_some_and(|c| !c.is_empty()));
         self.fill_unified_starred();
         // The list keeps the views it showed as built: one whose content is
         // the same as then comes back at once, without a merge or a regroup.
         let key = self.unified_view_key();
         self.list_fp.set(None);
         if self.unified_slices.is_empty() && self.unified_unfilled.is_empty() {
-            self.message_list.emit(MessageListInput::SetView { key: Some(key), fp: 0, restore: false });
-            self.message_list
-                .emit(MessageListInput::SetLoading);
+            self.message_list.emit(MessageListInput::SetView {
+                key: Some(key),
+                fp: 0,
+                restore: false,
+            });
+            self.message_list.emit(MessageListInput::SetLoading);
         } else {
             let fp = self.unified_fp();
             let kept = self.message_list.model().has_view(key, fp);
             if !kept {
-                tracing::debug!("unified: not kept by the list ({})", self.message_list.model().view_miss(key, fp));
+                tracing::debug!(
+                    "unified: not kept by the list ({})",
+                    self.message_list.model().view_miss(key, fp)
+                );
             }
-            self.message_list.emit(MessageListInput::SetView { key: Some(key), fp, restore: kept });
+            self.message_list.emit(MessageListInput::SetView {
+                key: Some(key),
+                fp,
+                restore: kept,
+            });
             if kept {
                 self.list_fp.set(Some(fp));
                 let s = sender.input_sender().clone();
@@ -17132,7 +19578,11 @@ impl AppModel {
                         .collect(),
                     Err(_) => Vec::new(),
                 };
-                tracing::debug!("unified: {} folders read from the index in {:?}", lists.len(), t.elapsed());
+                tracing::debug!(
+                    "unified: {} folders read from the index in {:?}",
+                    lists.len(),
+                    t.elapsed()
+                );
                 let _ = s.send(AppMsg::UnifiedFoldersLoaded { lists });
             });
         }
@@ -17178,7 +19628,11 @@ impl AppModel {
             MenuEntry::new(label, move || {
                 let message = Box::new(message.clone());
                 let _ = s.send(if popout.is_some() {
-                    AppMsg::RowAction { action, message, conversation: Vec::new() }
+                    AppMsg::RowAction {
+                        action,
+                        message,
+                        conversation: Vec::new(),
+                    }
                 } else {
                     AppMsg::CardAction { action, message }
                 });
@@ -17197,25 +19651,45 @@ impl AppModel {
             // A template (#360) is used or edited, never answered.
             if kind == Some(FolderKind::Templates) {
                 vec![
-                    item(RowAction::EditAsNew, i18n("Use Template"), "mail-message-new"),
-                    item(RowAction::EditTemplate, i18n("Edit Template"), "document-edit"),
+                    item(
+                        RowAction::EditAsNew,
+                        i18n("Use Template"),
+                        "mail-message-new",
+                    ),
+                    item(
+                        RowAction::EditTemplate,
+                        i18n("Edit Template"),
+                        "document-edit",
+                    ),
                 ]
             } else {
                 vec![
                     item(RowAction::Reply, i18n("Reply"), "mail-reply-sender"),
                     item(RowAction::ReplyAll, i18n("Reply All"), "mail-reply-all"),
                     item(RowAction::Forward, i18n("Forward"), "mail-forward"),
-                    item(RowAction::EditAsNew, i18n("Edit as New Message"), "document-edit"),
+                    item(
+                        RowAction::EditAsNew,
+                        i18n("Edit as New Message"),
+                        "document-edit",
+                    ),
                 ]
             },
             vec![
                 if m.starred {
-                    item(RowAction::ToggleStar, i18n("Remove Star"), "hylki-non-starred")
+                    item(
+                        RowAction::ToggleStar,
+                        i18n("Remove Star"),
+                        "hylki-non-starred",
+                    )
                 } else {
                     item(RowAction::ToggleStar, i18n("Star"), "starred")
                 },
                 if m.unread {
-                    item(RowAction::ToggleRead, i18n("Mark as Read"), "hylki-mail-read")
+                    item(
+                        RowAction::ToggleRead,
+                        i18n("Mark as Read"),
+                        "hylki-mail-read",
+                    )
                 } else {
                     item(RowAction::ToggleRead, i18n("Mark as Unread"), "mail-unread")
                 },
@@ -17233,17 +19707,29 @@ impl AppModel {
                     });
                 });
             sections.push(vec![
-                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("tag-outline-symbolic"),
+                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("tag-outline-symbolic")
             ]);
         }
         let mut acts = Vec::new();
         if in_junk {
-            acts.push(item(RowAction::NotSpam, i18n("Not Spam"), "mail-mark-notjunk"));
+            acts.push(item(
+                RowAction::NotSpam,
+                i18n("Not Spam"),
+                "mail-mark-notjunk",
+            ));
         } else {
             if restorable {
-                acts.push(item(RowAction::MoveToInbox, i18n("Move to Inbox"), "mail-inbox"));
+                acts.push(item(
+                    RowAction::MoveToInbox,
+                    i18n("Move to Inbox"),
+                    "mail-inbox",
+                ));
             }
-            acts.push(item(RowAction::Spam, i18n("Mark as Spam"), "mail-mark-junk"));
+            acts.push(item(
+                RowAction::Spam,
+                i18n("Mark as Spam"),
+                "mail-mark-junk",
+            ));
         }
         // The folder picker opens over the main window, so not from a pop-out.
         if popout.is_none() {
@@ -17265,8 +19751,16 @@ impl AppModel {
         acts.push(item(RowAction::Delete, i18n("Delete"), "user-trash"));
         sections.push(acts);
         sections.push(vec![
-            item(RowAction::AddContact, i18n("Add Sender to Contacts"), "contact-new"),
-            item(RowAction::CreateFilter, i18n("Create Filter from Message…"), "filter-folder"),
+            item(
+                RowAction::AddContact,
+                i18n("Add Sender to Contacts"),
+                "contact-new",
+            ),
+            item(
+                RowAction::CreateFilter,
+                i18n("Create Filter from Message…"),
+                "filter-folder",
+            ),
         ]);
         // Remote content, per message. The banner offers the same thing, but
         // it can be switched off (Settings → Privacy) and then there is
@@ -17281,9 +19775,17 @@ impl AppModel {
             } else {
                 i18n("Show Remote Content")
             };
-            let icon = if showing { "security-high" } else { "image-x-generic" };
+            let icon = if showing {
+                "security-high"
+            } else {
+                "image-x-generic"
+            };
             sections.push(vec![MenuEntry::new(label, move || {
-                let _ = s.send(AppMsg::SetRemoteContent { account_id, id, show: !showing });
+                let _ = s.send(AppMsg::SetRemoteContent {
+                    account_id,
+                    id,
+                    show: !showing,
+                });
             })
             .icon(format!("{icon}-symbolic"))]);
         }
@@ -17308,20 +19810,30 @@ impl AppModel {
             let (account_id, id) = (m.account_id, m.id);
             last.push(
                 MenuEntry::new(t.label, move || {
-                    t.reader.emit(crate::ui::message_view::MessageViewInput::Translate { account_id, id });
+                    t.reader
+                        .emit(crate::ui::message_view::MessageViewInput::Translate {
+                            account_id,
+                            id,
+                        });
                 })
                 .icon("translate-symbolic"),
             );
         }
         last.push(item(RowAction::ViewSource, i18n("View Source"), "code"));
-        last.push(item(RowAction::SaveAsFile, i18n("Save as File…"), "document-save"));
+        last.push(item(
+            RowAction::SaveAsFile,
+            i18n("Save as File…"),
+            "document-save",
+        ));
         sections.push(last);
         // Printing prints what the reader shows, the whole conversation in
         // it, so the reader that was right-clicked is the one asked (#359).
         {
             let print = |label: String, preview: bool| -> MenuEntry {
                 let s = sender.input_sender().clone();
-                let window = popout.and_then(|key| self.popouts.get(&key)).map(|p| p.controller.sender().clone());
+                let window = popout
+                    .and_then(|key| self.popouts.get(&key))
+                    .map(|p| p.controller.sender().clone());
                 MenuEntry::new(label, move || match &window {
                     Some(w) => w.emit(if preview {
                         MessageWindowInput::PrintPreview
@@ -17329,7 +19841,11 @@ impl AppModel {
                         MessageWindowInput::Print
                     }),
                     None => {
-                        let _ = s.send(if preview { AppMsg::PrintPreview } else { AppMsg::PrintMessage });
+                        let _ = s.send(if preview {
+                            AppMsg::PrintPreview
+                        } else {
+                            AppMsg::PrintMessage
+                        });
                     }
                 })
             };
@@ -17387,10 +19903,19 @@ impl AppModel {
 
     /// [`apply_pending_seen`] for tags: a list fetched before a tag reached
     /// the server keeps the tag as the user just set it.
-    fn apply_pending_tags(&mut self, account_id: u32, folder_id: u32, mut messages: Vec<Message>) -> Vec<Message> {
+    fn apply_pending_tags(
+        &mut self,
+        account_id: u32,
+        folder_id: u32,
+        mut messages: Vec<Message>,
+    ) -> Vec<Message> {
         let now = std::time::Instant::now();
         self.pending_tags.retain(|_, (_, until, _)| *until > now);
-        if !self.pending_tags.keys().any(|(a, _, _, _)| *a == account_id) {
+        if !self
+            .pending_tags
+            .keys()
+            .any(|(a, _, _, _)| *a == account_id)
+        {
             return messages;
         }
         let Some(path) = self
@@ -17407,7 +19932,11 @@ impl AppModel {
             }
             for m in messages.iter_mut().filter(|m| m.uid == *uid) {
                 if self.carries_tag(m, kw) != *on {
-                    match self.tags.iter().find(|t| t.keyword.eq_ignore_ascii_case(kw)) {
+                    match self
+                        .tags
+                        .iter()
+                        .find(|t| t.keyword.eq_ignore_ascii_case(kw))
+                    {
                         Some(t) if !*on => m.drop_tag(t),
                         _ => m.set_keyword(kw, *on),
                     }
@@ -17423,7 +19952,10 @@ impl AppModel {
     fn select_folder(&mut self, account_id: u32, folder_id: u32, _name: String, path: String) {
         // For "Open at startup" (#256). The demo's accounts are not real.
         if let Some(email) = self.email_of(account_id).filter(|_| !demo_mode()) {
-            config::save_last_view(config::LastView { email, path: path.clone() });
+            config::save_last_view(config::LastView {
+                email,
+                path: path.clone(),
+            });
         }
         self.leave_gallery();
         self.showing_contacts = false;
@@ -17444,9 +19976,10 @@ impl AppModel {
         self.attachments_loading = false;
         self.message_list.emit(MessageListInput::SetSelected(None));
         self.message_list.emit(MessageListInput::ResetPaging);
-        self.message_list.emit(MessageListInput::SetScope(default_scope(
-            self.folder_kind(account_id, folder_id) == Some(FolderKind::Inbox),
-        )));
+        self.message_list
+            .emit(MessageListInput::SetScope(default_scope(
+                self.folder_kind(account_id, folder_id) == Some(FolderKind::Inbox),
+            )));
         self.message_list.emit(MessageListInput::SetColorize(false));
         // A Sent folder's rows all come from you — name the recipients (#27).
         let is_sent = self
@@ -17454,20 +19987,28 @@ impl AppModel {
             .get(&account_id)
             .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
             .is_some_and(|f| f.kind == FolderKind::Sent);
-        self.message_list.emit(MessageListInput::SetShowRecipient(is_sent));
+        self.message_list
+            .emit(MessageListInput::SetShowRecipient(is_sent));
         // Trash and Junk offer the way back to the Inbox (#138); Junk's is
         // "Not Spam" (#168).
         let kind = self.folder_kind(account_id, folder_id);
         let restorable = kind.is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk));
-        self.message_list.emit(MessageListInput::SetRestorable(restorable));
-        self.message_list.emit(MessageListInput::SetInJunk(kind == Some(FolderKind::Junk)));
+        self.message_list
+            .emit(MessageListInput::SetRestorable(restorable));
+        self.message_list
+            .emit(MessageListInput::SetInJunk(kind == Some(FolderKind::Junk)));
         // A template is neither read nor unread either.
-        self.message_list.emit(MessageListInput::SetInDrafts(matches!(
-            kind,
-            Some(FolderKind::Drafts | FolderKind::Templates)
-        )));
-        self.message_list.emit(MessageListInput::SetInTemplates(kind == Some(FolderKind::Templates)));
-        self.message_view.emit(MessageViewInput::SetDraftsView(kind == Some(FolderKind::Drafts)));
+        self.message_list
+            .emit(MessageListInput::SetInDrafts(matches!(
+                kind,
+                Some(FolderKind::Drafts | FolderKind::Templates)
+            )));
+        self.message_list.emit(MessageListInput::SetInTemplates(
+            kind == Some(FolderKind::Templates),
+        ));
+        self.message_view.emit(MessageViewInput::SetDraftsView(
+            kind == Some(FolderKind::Drafts),
+        ));
         self.selected = Some(SelectedFolder {
             account_id,
             folder_id,
@@ -17499,7 +20040,8 @@ impl AppModel {
                     let newest = self.apply_pending_seen(account_id, folder_id, newest);
                     let newest = self.apply_pending_answers(account_id, folder_id, newest);
                     let newest = self.apply_pending_tags(account_id, folder_id, newest);
-                    self.message_list.emit(MessageListInput::SetMessages { messages: newest });
+                    self.message_list
+                        .emit(MessageListInput::SetMessages { messages: newest });
                 }
             }
         }
@@ -17644,18 +20186,22 @@ impl AppModel {
         dialog.set_title(&i18n("Save Message"));
         dialog.set_initial_name(Some(&name));
         let notifications = self.notifications.sender().clone();
-        dialog.save(Some(&self.window), gtk::gio::Cancellable::NONE, move |res| {
-            let Ok(file) = res else { return };
-            let Some(path) = file.path() else { return };
-            if let Err(e) = std::fs::write(&path, &raw) {
-                tracing::warn!("save {}: {e}", path.display());
-                let _ = notifications.send(NotifyInput::Push {
-                    text: i18n_f("Could not save the message: {e}", &[("e", &e.to_string())]),
-                    error: true,
-                    connectivity: false,
-                });
-            }
-        });
+        dialog.save(
+            Some(&self.window),
+            gtk::gio::Cancellable::NONE,
+            move |res| {
+                let Ok(file) = res else { return };
+                let Some(path) = file.path() else { return };
+                if let Err(e) = std::fs::write(&path, &raw) {
+                    tracing::warn!("save {}: {e}", path.display());
+                    let _ = notifications.send(NotifyInput::Push {
+                        text: i18n_f("Could not save the message: {e}", &[("e", &e.to_string())]),
+                        error: true,
+                        connectivity: false,
+                    });
+                }
+            },
+        );
     }
 
     /// Pick a message file to read (#398).
@@ -17672,11 +20218,15 @@ impl AppModel {
         filters.append(&filter);
         dialog.set_filters(Some(&filters));
         let s = sender.input_sender().clone();
-        dialog.open(Some(&self.window), gtk::gio::Cancellable::NONE, move |res| {
-            if let Some(path) = res.ok().and_then(|f| f.path()) {
-                let _ = s.send(AppMsg::OpenMessageFile(path));
-            }
-        });
+        dialog.open(
+            Some(&self.window),
+            gtk::gio::Cancellable::NONE,
+            move |res| {
+                if let Some(path) = res.ok().and_then(|f| f.path()) {
+                    let _ = s.send(AppMsg::OpenMessageFile(path));
+                }
+            },
+        );
     }
 
     /// Read a message file in a window of its own (#398), rendered as the
@@ -17685,7 +20235,9 @@ impl AppModel {
     fn open_message_file(&mut self, path: &std::path::Path, sender: &ComponentSender<Self>) {
         // An Outlook .msg is turned into a message first (see outlook_msg).
         let read = std::fs::read(path).and_then(|bytes| {
-            let outlook = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("msg"));
+            let outlook = path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("msg"));
             if crate::outlook_msg::is_msg(&bytes) {
                 crate::outlook_msg::to_eml(&bytes).map_err(std::io::Error::other)
             } else if outlook {
@@ -17700,7 +20252,10 @@ impl AppModel {
             Err(e) => {
                 tracing::warn!("open {}: {e}", path.display());
                 self.notifications.emit(NotifyInput::Push {
-                    text: i18n_f("Could not open {file}: {e}", &[("file", &path.display().to_string()), ("e", &e.to_string())]),
+                    text: i18n_f(
+                        "Could not open {file}: {e}",
+                        &[("file", &path.display().to_string()), ("e", &e.to_string())],
+                    ),
                     error: true,
                     connectivity: false,
                 });
@@ -17716,7 +20271,8 @@ impl AppModel {
         m.body = body.clone();
         let key = body_key(&m);
         self.body_cache.insert(key, body);
-        self.attachment_cache.insert(key, crate::worker::extract_attachments_of(&raw));
+        self.attachment_cache
+            .insert(key, crate::worker::extract_attachments_of(&raw));
         self.sender_cache.insert(key, Box::new(check));
         tracing::info!("open: {} as a message", path.display());
         self.open_message_window(m, Vec::new(), sender);
@@ -17767,11 +20323,14 @@ impl AppModel {
             .is_some_and(|c| c.id == m.id && c.account_id == account_id);
         if needs_body && !already_loading {
             if let Some(path) = self.resolve_folder_path(&m) {
-                self.send_to(account_id, MailRequest::LoadBody {
-                    message_id: m.id,
-                    path,
-                    uid: m.uid,
-                });
+                self.send_to(
+                    account_id,
+                    MailRequest::LoadBody {
+                        message_id: m.id,
+                        path,
+                        uid: m.uid,
+                    },
+                );
             }
         }
 
@@ -17780,7 +20339,10 @@ impl AppModel {
         // included), else what the list handed over. Members still missing
         // bodies get them fetched; the replies land via SetBody below.
         let mut thread = if thread.len() > 1 {
-            self.thread_cache.get(&body_key(&m)).cloned().unwrap_or(thread)
+            self.thread_cache
+                .get(&body_key(&m))
+                .cloned()
+                .unwrap_or(thread)
         } else {
             thread
         };
@@ -17795,11 +20357,14 @@ impl AppModel {
                 if let Some(body) = self.body_cache.get(&body_key(member)) {
                     member.body = body.clone();
                 } else if let Some(path) = self.resolve_folder_path(member) {
-                    self.send_to(member.account_id, MailRequest::LoadBody {
-                        message_id: member.id,
-                        path,
-                        uid: member.uid,
-                    });
+                    self.send_to(
+                        member.account_id,
+                        MailRequest::LoadBody {
+                            message_id: member.id,
+                            path,
+                            uid: member.uid,
+                        },
+                    );
                 }
             }
         }
@@ -17808,7 +20373,11 @@ impl AppModel {
         // cache where present; otherwise fetched (disk cache first, then the
         // server) with the reply routed to this window, as the main reader
         // does for a conversation.
-        let shown: Vec<Message> = if thread.is_empty() { vec![display.clone()] } else { thread.clone() };
+        let shown: Vec<Message> = if thread.is_empty() {
+            vec![display.clone()]
+        } else {
+            thread.clone()
+        };
         let mut atts: Vec<((u32, u32), Vec<Attachment>)> = Vec::new();
         let mut atts_loading: Vec<(u32, u32)> = Vec::new();
         for member in shown.iter().filter(|m| m.has_attachment) {
@@ -17817,15 +20386,21 @@ impl AppModel {
                 atts.push((mkey, cached));
             } else if let Some(path) = self.resolve_folder_path(member) {
                 atts_loading.push(mkey);
-                self.send_to(member.account_id, MailRequest::LoadAttachments {
-                    message_id: member.id,
-                    path,
-                    uid: member.uid,
-                    download: true,
-                });
+                self.send_to(
+                    member.account_id,
+                    MailRequest::LoadAttachments {
+                        message_id: member.id,
+                        path,
+                        uid: member.uid,
+                        download: true,
+                    },
+                );
             }
         }
-        let members = shown.iter().map(|m| (body_key(m), (m.account_id, m.id))).collect();
+        let members = shown
+            .iter()
+            .map(|m| (body_key(m), (m.account_id, m.id)))
+            .collect();
 
         let allow_remote = self.remote_allowed(&display);
         let folder_kind = self.folder_kind(display.account_id, display.folder_id);
@@ -17845,7 +20420,11 @@ impl AppModel {
             // star, file or delete on a server.
             toolbar: if init_from_file {
                 config::ReaderToolbar {
-                    left: vec![config::ToolbarItem::Reply, config::ToolbarItem::ReplyAll, config::ToolbarItem::Forward],
+                    left: vec![
+                        config::ToolbarItem::Reply,
+                        config::ToolbarItem::ReplyAll,
+                        config::ToolbarItem::Forward,
+                    ],
                     right: vec![config::ToolbarItem::Find, config::ToolbarItem::Print],
                 }
             } else {
@@ -17867,55 +20446,103 @@ impl AppModel {
             gmail_keys: self.gmail_keys.clone(),
         };
 
-        let controller = MessageWindow::builder()
-            .launch(init)
-            .forward(sender.input_sender(), move |out| match out {
-                MessageWindowOutput::Action { action, message } => {
-                    // The window's actions name the card they came from.
-                    AppMsg::RowAction { action, message, conversation: Vec::new() }
-                }
-                MessageWindowOutput::AddToContacts { name, email } => {
-                    AppMsg::AddContactFrom { name, email }
-                }
-                MessageWindowOutput::LoadAttachments(message) => AppMsg::LoadAttachmentsFor(message),
-                MessageWindowOutput::MoveTo { message, x, y } => AppMsg::PopoutMoveTo { key, message, x, y },
-                MessageWindowOutput::Shortcut { action, message, thread } => {
-                    AppMsg::PopoutShortcut { action, message, thread }
-                }
-                MessageWindowOutput::SetTag { message, keyword, add } => AppMsg::SetTag { message, keyword, add },
-                MessageWindowOutput::DeleteAttachment { message, attachment } => {
-                    AppMsg::DeletePopoutAttachment { key, message, attachment }
-                }
-                MessageWindowOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
-                MessageWindowOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
-                MessageWindowOutput::Notice(text) => AppMsg::Notice(text),
-                MessageWindowOutput::Zoom(step) => AppMsg::ZoomMessage(step),
-                MessageWindowOutput::Unsubscribe { message, info } => {
-                    AppMsg::Unsubscribe { message, info }
-                }
-                MessageWindowOutput::InviteAction { message, invite, action } => {
-                    AppMsg::InviteAction { message, invite, action }
-                }
-                MessageWindowOutput::ComposeTo(addr) => AppMsg::ComposeTo(addr),
-                MessageWindowOutput::CardMenu { message, x, y, hit } => {
-                    AppMsg::CardMenu { message, x, y, hit, popout: Some(key) }
-                }
-                MessageWindowOutput::Closed => AppMsg::PopoutClosed(key),
-            });
+        let controller =
+            MessageWindow::builder()
+                .launch(init)
+                .forward(sender.input_sender(), move |out| match out {
+                    MessageWindowOutput::Action { action, message } => {
+                        // The window's actions name the card they came from.
+                        AppMsg::RowAction {
+                            action,
+                            message,
+                            conversation: Vec::new(),
+                        }
+                    }
+                    MessageWindowOutput::AddToContacts { name, email } => {
+                        AppMsg::AddContactFrom { name, email }
+                    }
+                    MessageWindowOutput::LoadAttachments(message) => {
+                        AppMsg::LoadAttachmentsFor(message)
+                    }
+                    MessageWindowOutput::MoveTo { message, x, y } => {
+                        AppMsg::PopoutMoveTo { key, message, x, y }
+                    }
+                    MessageWindowOutput::Shortcut {
+                        action,
+                        message,
+                        thread,
+                    } => AppMsg::PopoutShortcut {
+                        action,
+                        message,
+                        thread,
+                    },
+                    MessageWindowOutput::SetTag {
+                        message,
+                        keyword,
+                        add,
+                    } => AppMsg::SetTag {
+                        message,
+                        keyword,
+                        add,
+                    },
+                    MessageWindowOutput::DeleteAttachment {
+                        message,
+                        attachment,
+                    } => AppMsg::DeletePopoutAttachment {
+                        key,
+                        message,
+                        attachment,
+                    },
+                    MessageWindowOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
+                    MessageWindowOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
+                    MessageWindowOutput::Notice(text) => AppMsg::Notice(text),
+                    MessageWindowOutput::Zoom(step) => AppMsg::ZoomMessage(step),
+                    MessageWindowOutput::Unsubscribe { message, info } => {
+                        AppMsg::Unsubscribe { message, info }
+                    }
+                    MessageWindowOutput::InviteAction {
+                        message,
+                        invite,
+                        action,
+                    } => AppMsg::InviteAction {
+                        message,
+                        invite,
+                        action,
+                    },
+                    MessageWindowOutput::ComposeTo(addr) => AppMsg::ComposeTo(addr),
+                    MessageWindowOutput::CardMenu { message, x, y, hit } => AppMsg::CardMenu {
+                        message,
+                        x,
+                        y,
+                        hit,
+                        popout: Some(key),
+                    },
+                    MessageWindowOutput::Closed => AppMsg::PopoutClosed(key),
+                });
 
         let window = controller.widget().clone();
         window.set_transient_for(Some(&self.window));
         window.present();
         controller.emit(MessageWindowInput::SetUnsubscribed(self.unsubscribed_map()));
         controller.emit(MessageWindowInput::SetIdentities(self.identities_map()));
-        controller.emit(MessageWindowInput::SetInviteAnswers(self.invite_answers_map()));
+        controller.emit(MessageWindowInput::SetInviteAnswers(
+            self.invite_answers_map(),
+        ));
         // A verdict already in hand reaches the window now, not only one that
         // arrives later: its seal, and a decrypted message's subject (#493).
         if let Some(check) = self.sender_cache.get(&body_key(&m)) {
             controller.emit(MessageWindowInput::SetSenderCheck(check.clone()));
         }
 
-        self.popouts.insert(key, PopOut { window, controller, message: body_key(&m), members });
+        self.popouts.insert(
+            key,
+            PopOut {
+                window,
+                controller,
+                message: body_key(&m),
+                members,
+            },
+        );
     }
 
     /// Push every cached sender verdict for the on-screen conversation into
@@ -17923,8 +20550,11 @@ impl AppModel {
     fn push_member_checks(&self) {
         // A single message never fills current_thread — the open message
         // itself is the one card then.
-        let mut keys: Vec<(u32, u32)> =
-            self.current_thread.iter().map(|m| (m.account_id, m.id)).collect();
+        let mut keys: Vec<(u32, u32)> = self
+            .current_thread
+            .iter()
+            .map(|m| (m.account_id, m.id))
+            .collect();
         if let Some(c) = &self.current {
             if keys.is_empty() {
                 keys.push((c.account_id, c.id));
@@ -17935,7 +20565,12 @@ impl AppModel {
         // chip (#300); the demo has no sender checks of its own.
         let showcase = std::env::var_os("HYLKI_DEMO")
             .and(std::env::var("HYLKI_SHOWCASE_PGP").ok())
-            .map(|v| Box::new(crate::models::SenderCheck { pgp: showcase_pgp(&v), ..Default::default() }));
+            .map(|v| {
+                Box::new(crate::models::SenderCheck {
+                    pgp: showcase_pgp(&v),
+                    ..Default::default()
+                })
+            });
         for key in keys {
             let stored = self.member_key(key).and_then(|k| self.sender_cache.get(&k));
             if let Some(check) = showcase.as_ref().or(stored) {
@@ -17973,7 +20608,8 @@ impl AppModel {
         if self.focus.active(config::FocusPart::ReaderToolbar) {
             return true;
         }
-        self.reader_actions_collapsed && (self.showing_outbox || !self.reader_toolbar.right.is_empty())
+        self.reader_actions_collapsed
+            && (self.showing_outbox || !self.reader_toolbar.right.is_empty())
     }
 
     /// Pack the header's action buttons in the saved order: the left group
@@ -17982,7 +20618,9 @@ impl AppModel {
     /// innermost slot of the right group. Buttons on neither side are left
     /// unpacked. Re-folds the row for the new count afterwards.
     fn relayout_reader_toolbar(&self) {
-        let (Some(header), Some(tb)) = (self.reader_header.get(), self.reader_toolbar_widgets.get()) else {
+        let (Some(header), Some(tb)) =
+            (self.reader_header.get(), self.reader_toolbar_widgets.get())
+        else {
             return;
         };
         for (_, w) in &tb.buttons {
@@ -17993,7 +20631,8 @@ impl AppModel {
         if tb.spinner.parent().is_some() {
             header.remove(&tb.spinner);
         }
-        let find = |item: config::ToolbarItem| tb.buttons.iter().find(|(i, _)| *i == item).map(|(_, w)| w);
+        let find =
+            |item: config::ToolbarItem| tb.buttons.iter().find(|(i, _)| *i == item).map(|(_, w)| w);
         // Each button's Focus Mode revealer slides towards the edge its
         // group sits against: GTK's SlideRight moves a folding child off to
         // the left, SlideLeft keeps it anchored and shrinks it from its
@@ -18038,11 +20677,12 @@ impl AppModel {
             tb.base,
             tb.controls.get()
         );
-        tb.breakpoint.set_condition(Some(&adw::BreakpointCondition::new_length(
-            adw::BreakpointConditionLengthType::MaxWidth,
-            threshold,
-            adw::LengthUnit::Px,
-        )));
+        tb.breakpoint
+            .set_condition(Some(&adw::BreakpointCondition::new_length(
+                adw::BreakpointConditionLengthType::MaxWidth,
+                threshold,
+                adw::LengthUnit::Px,
+            )));
         tb.bin.queue_resize();
     }
 
@@ -18063,7 +20703,12 @@ impl AppModel {
     /// [`AppMsg::SearchPoolBuilt`]. Copying a mailbox's messages took the
     /// main loop for a good part of a second as a search began (#515), so
     /// the folders go to another thread shared, not copied.
-    fn build_search_pool(&self, gen: u64, from_disk: Vec<Vec<Message>>, sender: &ComponentSender<Self>) {
+    fn build_search_pool(
+        &self,
+        gen: u64,
+        from_disk: Vec<Vec<Message>>,
+        sender: &ComponentSender<Self>,
+    ) {
         let kinds: HashMap<(u32, u32), FolderKind> = self
             .folders
             .iter()
@@ -18073,14 +20718,22 @@ impl AppModel {
         let s = sender.clone();
         std::thread::spawn(move || {
             let t = std::time::Instant::now();
-            let pool = build_search_pool(opened.iter().map(|f| &**f).chain(from_disk.iter()), |m| {
-                pool_rank(kinds.get(&(m.account_id, m.folder_id)).copied())
-            });
+            let pool =
+                build_search_pool(opened.iter().map(|f| &**f).chain(from_disk.iter()), |m| {
+                    pool_rank(kinds.get(&(m.account_id, m.folder_id)).copied())
+                });
             // Let go of the folders before the answer is in, or the next
             // change to one of them copies it.
             drop(opened);
-            let text = pool.iter().map(crate::ui::message_list::search_text_of).collect();
-            tracing::debug!("search: pool of {} messages put together in {:?}", pool.len(), t.elapsed());
+            let text = pool
+                .iter()
+                .map(crate::ui::message_list::search_text_of)
+                .collect();
+            tracing::debug!(
+                "search: pool of {} messages put together in {:?}",
+                pool.len(),
+                t.elapsed()
+            );
             s.input(AppMsg::SearchPoolBuilt { gen, pool, text });
         });
     }
@@ -18109,7 +20762,10 @@ impl AppModel {
         let s = sender.clone();
         std::thread::spawn(move || {
             let Ok(cache) = crate::cache::Cache::open() else {
-                s.input(AppMsg::SearchPoolLoaded { gen, lists: Vec::new() });
+                s.input(AppMsg::SearchPoolLoaded {
+                    gen,
+                    lists: Vec::new(),
+                });
                 return;
             };
             let t = std::time::Instant::now();
@@ -18160,7 +20816,10 @@ impl AppModel {
             .get(&account_id)
             .and_then(|fs| fs.iter().find(|f| f.kind == FolderKind::Drafts))
             .map(|f| (f.id, f.path.clone()))
-            .or_else(|| self.default_folder_path(account_id, FolderKind::Drafts).map(|p| (0, p)))
+            .or_else(|| {
+                self.default_folder_path(account_id, FolderKind::Drafts)
+                    .map(|p| (0, p))
+            })
     }
 
     /// The Templates folder a template of `account_id` is saved to (#360):
@@ -18168,36 +20827,59 @@ impl AppModel {
     fn templates_target(&self, account_id: u32) -> Option<(u32, String)> {
         self.folder_of_kind(account_id, FolderKind::Templates)
             .map(|f| (f.id, f.path.clone()))
-            .or_else(|| self.default_folder_path(account_id, FolderKind::Templates).map(|p| (0, p)))
+            .or_else(|| {
+                self.default_folder_path(account_id, FolderKind::Templates)
+                    .map(|p| (0, p))
+            })
     }
 
     /// Where a just-saved draft is, by its Message-ID, among the Drafts
     /// folder's messages the save has reloaded.
     fn find_draft(&self, account_id: u32, message_id: &str) -> Option<crate::models::DraftOrigin> {
         let (folder_id, path) = self.drafts_target(account_id)?;
-        let want = message_id.trim().trim_start_matches('<').trim_end_matches('>');
+        let want = message_id
+            .trim()
+            .trim_start_matches('<')
+            .trim_end_matches('>');
         let m = self
             .message_cache
             .get(&(account_id, folder_id))?
             .iter()
-            .find(|m| m.message_id.trim_start_matches('<').trim_end_matches('>').eq_ignore_ascii_case(want))?;
-        Some(crate::models::DraftOrigin { account_id, folder_id, path, uid: m.uid })
+            .find(|m| {
+                m.message_id
+                    .trim_start_matches('<')
+                    .trim_end_matches('>')
+                    .eq_ignore_ascii_case(want)
+            })?;
+        Some(crate::models::DraftOrigin {
+            account_id,
+            folder_id,
+            path,
+            uid: m.uid,
+        })
     }
 
     /// Take a draft out of its folder for good, and list the folder again.
     fn purge_draft(&self, origin: &crate::models::DraftOrigin) {
         self.send_to(
             origin.account_id,
-            MailRequest::PurgeMessages { path: origin.path.clone(), uids: vec![origin.uid] },
+            MailRequest::PurgeMessages {
+                path: origin.path.clone(),
+                uids: vec![origin.uid],
+            },
         );
         self.send_to(
             origin.account_id,
-            MailRequest::LoadMessages { folder_id: origin.folder_id, path: origin.path.clone() },
+            MailRequest::LoadMessages {
+                folder_id: origin.folder_id,
+                path: origin.path.clone(),
+            },
         );
     }
 
     fn composer_exists(&self, id: u32) -> bool {
-        self.composers.iter().any(|h| h.id == id) || self.reader_compose.as_ref().is_some_and(|r| r.id == id)
+        self.composers.iter().any(|h| h.id == id)
+            || self.reader_compose.as_ref().is_some_and(|r| r.id == id)
     }
 
     fn emit_to_composer(&self, id: u32, input: ComposeInput) {
@@ -18215,7 +20897,13 @@ impl AppModel {
     /// (a selected draft); otherwise it gets a window (a draft opened by
     /// double-click or Enter). `extra` carries files handed in from GNOME
     /// Files to attach (or upload) on top of the draft's own.
-    fn open_draft(&mut self, m: Message, inline: bool, extra: HandOffFiles, sender: &ComponentSender<Self>) {
+    fn open_draft(
+        &mut self,
+        m: Message,
+        inline: bool,
+        extra: HandOffFiles,
+        sender: &ComponentSender<Self>,
+    ) {
         let Some(path) = self.resolve_folder_path(&m) else {
             self.open_draft_body(m, inline, extra, sender);
             return;
@@ -18223,14 +20911,28 @@ impl AppModel {
         let token = self.next_transfer;
         self.next_transfer += 1;
         self.pending_draft_token = Some(token);
-        self.send_to(m.account_id, MailRequest::ExportRaw { token, path, uid: m.uid, for_reader: true });
+        self.send_to(
+            m.account_id,
+            MailRequest::ExportRaw {
+                token,
+                path,
+                uid: m.uid,
+                for_reader: true,
+            },
+        );
         self.pending_draft = Some((m, inline, extra));
     }
 
     /// Open a draft from its body alone, when its bytes can't be had: a
     /// cached body if there is one, otherwise fetched, with the editor
     /// opening once it arrives (see the `Body` handler).
-    fn open_draft_body(&mut self, m: Message, inline: bool, extra: HandOffFiles, sender: &ComponentSender<Self>) {
+    fn open_draft_body(
+        &mut self,
+        m: Message,
+        inline: bool,
+        extra: HandOffFiles,
+        sender: &ComponentSender<Self>,
+    ) {
         let body = if !m.body.is_empty() {
             Some(m.body.clone())
         } else {
@@ -18242,7 +20944,11 @@ impl AppModel {
                 if let Some(path) = self.resolve_folder_path(&m) {
                     self.send_to(
                         m.account_id,
-                        MailRequest::LoadBody { message_id: m.id, path, uid: m.uid },
+                        MailRequest::LoadBody {
+                            message_id: m.id,
+                            path,
+                            uid: m.uid,
+                        },
                     );
                 }
                 self.pending_draft = Some((m, inline, extra));
@@ -18256,11 +20962,16 @@ impl AppModel {
         let mut message = item.as_message();
         // A message on its way out has no bytes yet (#434): it shows as
         // its card in Sent will.
-        let outgoing = self.outgoing.borrow().iter().find(|o| crate::outgoing::row_id(o.ticket) == item.id).map(|o| {
-            let body = crate::worker::sent_body_preview(&o.account, &o.message)
-                .unwrap_or_else(|| crate::worker::wrap_plain(&o.message.body));
-            (body, o.message.attachments.is_empty())
-        });
+        let outgoing = self
+            .outgoing
+            .borrow()
+            .iter()
+            .find(|o| crate::outgoing::row_id(o.ticket) == item.id)
+            .map(|o| {
+                let body = crate::worker::sent_body_preview(&o.account, &o.message)
+                    .unwrap_or_else(|| crate::worker::wrap_plain(&o.message.body));
+                (body, o.message.attachments.is_empty())
+            });
         if let Some((body, no_files)) = outgoing {
             message.body = crate::legacy::current_markup(body);
             message.date = item.status.clone();
@@ -18301,8 +21012,10 @@ impl AppModel {
         };
         let editable = crate::worker::editable_from_raw(&item.raw, &item.rcpts);
 
-        let attachments =
-            stage_attachments(&format!("hylki-outbox-{account_id}-{id}"), &editable.attachments);
+        let attachments = stage_attachments(
+            &format!("hylki-outbox-{account_id}-{id}"),
+            &editable.attachments,
+        );
 
         let prefill = ComposePrefill {
             to: editable.to,
@@ -18390,8 +21103,10 @@ impl AppModel {
         sender: &ComponentSender<Self>,
     ) {
         let e = crate::worker::editable_from_raw(raw, &[]);
-        let mut attachments =
-            stage_attachments(&format!("hylki-draft-{}-{}", m.account_id, m.uid), &e.attachments);
+        let mut attachments = stage_attachments(
+            &format!("hylki-draft-{}-{}", m.account_id, m.uid),
+            &e.attachments,
+        );
         attachments.extend(extra.attach);
         let prefill = ComposePrefill {
             to: e.to,
@@ -18432,7 +21147,8 @@ impl AppModel {
         });
         // A template opened this way is being edited (#360): saving puts it
         // back in Templates, and sending leaves it there.
-        prefill.template = self.folder_kind(m.account_id, m.folder_id) == Some(FolderKind::Templates);
+        prefill.template =
+            self.folder_kind(m.account_id, m.folder_id) == Some(FolderKind::Templates);
         if inline {
             self.attachments.clear();
             self.attachments_loading = false;
@@ -18465,7 +21181,11 @@ impl AppModel {
             if let Some(path) = self.resolve_folder_path(&m) {
                 self.send_to(
                     m.account_id,
-                    MailRequest::LoadBody { message_id: m.id, path, uid: m.uid },
+                    MailRequest::LoadBody {
+                        message_id: m.id,
+                        path,
+                        uid: m.uid,
+                    },
                 );
                 self.pending_forward = Some((m, inline));
                 return;
@@ -18473,12 +21193,15 @@ impl AppModel {
         }
         if m.has_attachment && !self.attachment_cache.contains_key(&body_key(&m)) {
             if let Some(path) = self.resolve_folder_path(&m) {
-                self.send_to(m.account_id, MailRequest::LoadAttachments {
-                    message_id: m.id,
-                    path,
-                    uid: m.uid,
-                    download: true,
-                });
+                self.send_to(
+                    m.account_id,
+                    MailRequest::LoadAttachments {
+                        message_id: m.id,
+                        path,
+                        uid: m.uid,
+                        download: true,
+                    },
+                );
                 self.pending_forward = Some((m, inline));
                 return;
             }
@@ -18486,7 +21209,9 @@ impl AppModel {
         let attachments = self
             .attachment_cache
             .get(&body_key(&m))
-            .map(|items| stage_attachments(&format!("hylki-forward-{}-{}", m.account_id, m.id), items))
+            .map(|items| {
+                stage_attachments(&format!("hylki-forward-{}-{}", m.account_id, m.id), items)
+            })
             .unwrap_or_default();
         tracing::info!(
             "forward: {}:{} with {} attachment(s)",
@@ -18519,7 +21244,11 @@ impl AppModel {
             if let Some(path) = self.resolve_folder_path(&m) {
                 self.send_to(
                     m.account_id,
-                    MailRequest::LoadBody { message_id: m.id, path, uid: m.uid },
+                    MailRequest::LoadBody {
+                        message_id: m.id,
+                        path,
+                        uid: m.uid,
+                    },
                 );
                 self.pending_edit_as_new = Some(m);
                 return;
@@ -18527,12 +21256,15 @@ impl AppModel {
         }
         if m.has_attachment && !self.attachment_cache.contains_key(&body_key(&m)) {
             if let Some(path) = self.resolve_folder_path(&m) {
-                self.send_to(m.account_id, MailRequest::LoadAttachments {
-                    message_id: m.id,
-                    path,
-                    uid: m.uid,
-                    download: true,
-                });
+                self.send_to(
+                    m.account_id,
+                    MailRequest::LoadAttachments {
+                        message_id: m.id,
+                        path,
+                        uid: m.uid,
+                        download: true,
+                    },
+                );
                 self.pending_edit_as_new = Some(m);
                 return;
             }
@@ -18540,9 +21272,7 @@ impl AppModel {
         let attachments = self
             .attachment_cache
             .get(&body_key(&m))
-            .map(|items| {
-                stage_attachments(&format!("hylki-copy-{}-{}", m.account_id, m.id), items)
-            })
+            .map(|items| stage_attachments(&format!("hylki-copy-{}-{}", m.account_id, m.id), items))
             .unwrap_or_default();
         tracing::info!(
             "edit as new: copying {}:{} ({} attachment(s))",
@@ -18562,7 +21292,11 @@ impl AppModel {
                 subject: m.subject.clone(),
                 body_html: editable_copy_html(&m.body),
                 attachments,
-                from_address: if template { m.from_addr.clone() } else { String::new() },
+                from_address: if template {
+                    m.from_addr.clone()
+                } else {
+                    String::new()
+                },
                 resumed: template,
                 no_signature: true,
                 ..Default::default()
@@ -18597,9 +21331,7 @@ impl AppModel {
         let config = self.effective_config();
         let mut emails: Vec<String> = Vec::new();
         for email in &self.account_order {
-            if config.iter().any(|c| c.enabled && &c.email == email)
-                && !emails.contains(email)
-            {
+            if config.iter().any(|c| c.enabled && &c.email == email) && !emails.contains(email) {
                 emails.push(email.clone());
             }
         }
@@ -18611,8 +21343,7 @@ impl AppModel {
         let accounts: Vec<ComposeAccount> = emails
             .iter()
             .flat_map(|email| {
-                let Some((idx, cfg)) =
-                    config.iter().enumerate().find(|(_, c)| &c.email == email)
+                let Some((idx, cfg)) = config.iter().enumerate().find(|(_, c)| &c.email == email)
                 else {
                     return Vec::new();
                 };
@@ -18624,7 +21355,9 @@ impl AppModel {
                 };
                 let cfg = Some(cfg);
                 let (signatures, default) = cfg.map(|c| c.signature_set()).unwrap_or_default();
-                let signature = default.map(|i| signatures[i].html.clone()).unwrap_or_default();
+                let signature = default
+                    .map(|i| signatures[i].html.clone())
+                    .unwrap_or_default();
                 let pgp_key = cfg.and_then(|c| c.pgp_key.clone());
                 let sign_default = cfg.is_some_and(|c| c.sign_by_default);
                 let mut identities = vec![ComposeAccount {
@@ -18661,8 +21394,17 @@ impl AppModel {
                 // A JMAP server's own identities (#346), unless the account
                 // already lists the address. A catch-all (`*@domain`) is no
                 // address to send from; typing one into From uses it.
-                for (name, addr) in self.server_identities.get(&id).map(Vec::as_slice).unwrap_or_default() {
-                    if addr.starts_with("*@") || identities.iter().any(|i| i.email.eq_ignore_ascii_case(addr)) {
+                for (name, addr) in self
+                    .server_identities
+                    .get(&id)
+                    .map(Vec::as_slice)
+                    .unwrap_or_default()
+                {
+                    if addr.starts_with("*@")
+                        || identities
+                            .iter()
+                            .any(|i| i.email.eq_ignore_ascii_case(addr))
+                    {
                         continue;
                     }
                     let display = if name.is_empty() || name.eq_ignore_ascii_case(addr) {
@@ -18693,18 +21435,23 @@ impl AppModel {
         // (#347) answers from that address, as typed, through the identity.
         let plus = (prefill.custom_from.trim().is_empty())
             .then(|| {
-                crate::worker::parse_recipients(&prefill.reply_addressed_to).into_iter().find_map(|(_, addr)| {
-                    let (user, host) = addr.split_once('@')?;
-                    let (base, _tag) = user.split_once('+')?;
-                    let plain = format!("{base}@{host}");
-                    let i = accounts
-                        .iter()
-                        .position(|c| c.id == account_id && c.email.eq_ignore_ascii_case(&plain))?;
-                    let (name, _) = crate::config::split_identity(
-                        &accounts[i].alias_from.clone().unwrap_or_else(|| accounts[i].label.clone()),
-                    );
-                    Some((i, crate::worker::format_recipient(&name, &addr)))
-                })
+                crate::worker::parse_recipients(&prefill.reply_addressed_to)
+                    .into_iter()
+                    .find_map(|(_, addr)| {
+                        let (user, host) = addr.split_once('@')?;
+                        let (base, _tag) = user.split_once('+')?;
+                        let plain = format!("{base}@{host}");
+                        let i = accounts.iter().position(|c| {
+                            c.id == account_id && c.email.eq_ignore_ascii_case(&plain)
+                        })?;
+                        let (name, _) = crate::config::split_identity(
+                            &accounts[i]
+                                .alias_from
+                                .clone()
+                                .unwrap_or_else(|| accounts[i].label.clone()),
+                        );
+                        Some((i, crate::worker::format_recipient(&name, &addr)))
+                    })
             })
             .flatten();
         let mut prefill = prefill;
@@ -18726,12 +21473,13 @@ impl AppModel {
             .map(|(i, _)| i)
             .or_else(by_reply)
             .or_else(|| {
-                (!want.is_empty()).then(|| {
-                    accounts
-                        .iter()
-                        .position(|c| c.id == account_id && c.email.to_lowercase() == want)
-                })
-                .flatten()
+                (!want.is_empty())
+                    .then(|| {
+                        accounts
+                            .iter()
+                            .position(|c| c.id == account_id && c.email.to_lowercase() == want)
+                    })
+                    .flatten()
             })
             .or_else(|| {
                 accounts
@@ -18748,7 +21496,11 @@ impl AppModel {
             self.compose_format
         };
         // The user's own addresses go last in the recipient suggestions.
-        let own: Vec<(String, String)> = self.config.iter().map(|c| (c.name.clone(), c.email.clone())).collect();
+        let own: Vec<(String, String)> = self
+            .config
+            .iter()
+            .map(|c| (c.name.clone(), c.email.clone()))
+            .collect();
         let id = self.next_compose_id;
         self.next_compose_id += 1;
         let init = ComposeInit {
@@ -18776,11 +21528,16 @@ impl AppModel {
         Compose::builder()
             .launch(init)
             .forward(sender.input_sender(), |out| match out {
-                ComposeOutput::Send { id, message } => AppMsg::SendMessage { from: id, out: message },
+                ComposeOutput::Send { id, message } => AppMsg::SendMessage {
+                    from: id,
+                    out: message,
+                },
                 ComposeOutput::SaveDraft(msg) => AppMsg::SaveDraftMessage(msg),
                 ComposeOutput::SaveTemplate(msg) => AppMsg::SaveTemplateMessage(msg),
                 ComposeOutput::AutoSave { id, message } => AppMsg::AutoSaveDraft { id, message },
-                ComposeOutput::DiscardAutosave { id, origin } => AppMsg::DiscardAutosave { id, origin },
+                ComposeOutput::DiscardAutosave { id, origin } => {
+                    AppMsg::DiscardAutosave { id, origin }
+                }
                 ComposeOutput::DeleteDraft { id, origin } => AppMsg::DeleteDraft { id, origin },
                 ComposeOutput::ToggleWindow(id) => AppMsg::ComposeToggleWindow(id),
                 ComposeOutput::Close(id) => AppMsg::ComposeClosed(id),
@@ -18841,15 +21598,26 @@ impl AppModel {
         if !dropped.is_empty() {
             let names: Vec<String> = dropped
                 .iter()
-                .map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string()))
+                .map(|p| {
+                    p.file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| p.display().to_string())
+                })
                 .collect();
             let text = crate::i18n::ni18n_f(
                 "Could not attach {names}: Hylki cannot read the file.",
                 "Could not attach {n} files (Hylki cannot read them): {names}",
                 dropped.len() as u32,
-                &[("n", &dropped.len().to_string()), ("names", &names.join(", "))],
+                &[
+                    ("n", &dropped.len().to_string()),
+                    ("names", &names.join(", ")),
+                ],
             );
-            self.notifications.emit(NotifyInput::Push { text, error: true, connectivity: false });
+            self.notifications.emit(NotifyInput::Push {
+                text,
+                error: true,
+                connectivity: false,
+            });
         }
         gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(900), move || {
             // Any window of ours in front will do: the composer, the main
@@ -18901,8 +21669,22 @@ impl AppModel {
         let size = crate::models::human_size(hand_off_size(&hand_off.files));
         let dialog = adw::MessageDialog::new(
             Some(&self.window),
-            Some(ni18n_f("Send {n} file with Hylki", "Send {n} files with Hylki", n, &[("n", &n.to_string())]).as_str()),
-            Some(i18n_f("{names} ({size}). What should the files go into?", &[("names", &names), ("size", &size)]).as_str()),
+            Some(
+                ni18n_f(
+                    "Send {n} file with Hylki",
+                    "Send {n} files with Hylki",
+                    n,
+                    &[("n", &n.to_string())],
+                )
+                .as_str(),
+            ),
+            Some(
+                i18n_f(
+                    "{names} ({size}). What should the files go into?",
+                    &[("names", &names), ("size", &size)],
+                )
+                .as_str(),
+            ),
         );
         dialog.add_response("cancel", &i18n("Cancel"));
         dialog.add_response("reply", &i18n("Reply to a Message…"));
@@ -18916,7 +21698,9 @@ impl AppModel {
         let hand_off = std::rc::Rc::new(std::cell::RefCell::new(Some(hand_off)));
         let s = sender.clone();
         dialog.connect_response(None, move |_, resp| {
-            let Some(hand_off) = hand_off.borrow_mut().take() else { return };
+            let Some(hand_off) = hand_off.borrow_mut().take() else {
+                return;
+            };
             let action = match resp {
                 "new" => config::FilesAction::New,
                 "draft" => config::FilesAction::Draft,
@@ -18926,14 +21710,23 @@ impl AppModel {
                     return;
                 }
             };
-            s.input(AppMsg::HandOffAction { hand_off, action, remember: remember.is_active() });
+            s.input(AppMsg::HandOffAction {
+                hand_off,
+                action,
+                remember: remember.is_active(),
+            });
         });
         dialog.present();
     }
 
     /// A destination is known: a new message goes on to the size check;
     /// a draft or reply first needs one picked.
-    fn hand_off_action(&mut self, hand_off: FileHandOff, action: config::FilesAction, sender: &ComponentSender<Self>) {
+    fn hand_off_action(
+        &mut self,
+        hand_off: FileHandOff,
+        action: config::FilesAction,
+        sender: &ComponentSender<Self>,
+    ) {
         match action {
             config::FilesAction::Ask | config::FilesAction::New => {
                 self.hand_off_size_check(hand_off, HandOffTarget::New, sender);
@@ -18946,7 +21739,13 @@ impl AppModel {
                 for (account_id, drafts) in self.drafts_folders() {
                     if !self.message_cache.contains_key(&(account_id, drafts.id)) {
                         waiting.insert((account_id, drafts.id));
-                        self.send_to(account_id, MailRequest::SyncFolder { folder_id: drafts.id, path: drafts.path.clone() });
+                        self.send_to(
+                            account_id,
+                            MailRequest::SyncFolder {
+                                folder_id: drafts.id,
+                                path: drafts.path.clone(),
+                            },
+                        );
                     }
                 }
                 if waiting.is_empty() {
@@ -18954,7 +21753,9 @@ impl AppModel {
                 } else {
                     self.pending_draft_pick = Some((hand_off, waiting));
                     let s = sender.clone();
-                    gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::HandOffDraftPickNow));
+                    gtk::glib::timeout_add_seconds_local_once(3, move || {
+                        s.input(AppMsg::HandOffDraftPickNow)
+                    });
                 }
             }
             config::FilesAction::Reply => {
@@ -18976,7 +21777,12 @@ impl AppModel {
 
     /// Over the size limit, with cloud storage set up: attach anyway, or
     /// upload and link, per the preference or a dialog.
-    fn hand_off_size_check(&mut self, hand_off: FileHandOff, target: HandOffTarget, sender: &ComponentSender<Self>) {
+    fn hand_off_size_check(
+        &mut self,
+        hand_off: FileHandOff,
+        target: HandOffTarget,
+        sender: &ComponentSender<Self>,
+    ) {
         let total = hand_off_size(&hand_off.files);
         let limit = self.files_prefs.limit_bytes();
         let cloud_ready = !crate::cloud::load_enabled_accounts().is_empty();
@@ -19021,7 +21827,9 @@ impl AppModel {
                 let pending = std::rc::Rc::new(std::cell::RefCell::new(Some((hand_off, target))));
                 let s = sender.clone();
                 dialog.connect_response(None, move |_, resp| {
-                    let Some((hand_off, target)) = pending.borrow_mut().take() else { return };
+                    let Some((hand_off, target)) = pending.borrow_mut().take() else {
+                        return;
+                    };
                     let cloud = match resp {
                         "cloud" => true,
                         "attach" => false,
@@ -19030,7 +21838,12 @@ impl AppModel {
                             return;
                         }
                     };
-                    s.input(AppMsg::HandOffOpen { hand_off, target, cloud, remember: remember.is_active() });
+                    s.input(AppMsg::HandOffOpen {
+                        hand_off,
+                        target,
+                        cloud,
+                        remember: remember.is_active(),
+                    });
                 });
                 dialog.present();
             }
@@ -19038,7 +21851,13 @@ impl AppModel {
     }
 
     /// The last step: open the composer the files were meant for.
-    fn hand_off_open(&mut self, hand_off: FileHandOff, target: HandOffTarget, cloud: bool, sender: &ComponentSender<Self>) {
+    fn hand_off_open(
+        &mut self,
+        hand_off: FileHandOff,
+        target: HandOffTarget,
+        cloud: bool,
+        sender: &ComponentSender<Self>,
+    ) {
         let files = HandOffFiles::of(hand_off.files, cloud);
         tracing::info!(
             "file hand-off: {} to attach, {} to upload, into {}",
@@ -19085,7 +21904,14 @@ impl AppModel {
                     }
                     None => {
                         if let Some(path) = self.resolve_folder_path(&m) {
-                            self.send_to(m.account_id, MailRequest::LoadBody { message_id: m.id, path, uid: m.uid });
+                            self.send_to(
+                                m.account_id,
+                                MailRequest::LoadBody {
+                                    message_id: m.id,
+                                    path,
+                                    uid: m.uid,
+                                },
+                            );
                         }
                         self.pending_reply = Some((m, files));
                     }
@@ -19098,7 +21924,12 @@ impl AppModel {
     /// the reading pane when `m` is what it is showing, as Reply does; a
     /// message picked from elsewhere gets its reply in a window, the pane
     /// left as it was.
-    fn open_hand_off_reply(&mut self, m: Message, files: HandOffFiles, sender: &ComponentSender<Self>) {
+    fn open_hand_off_reply(
+        &mut self,
+        m: Message,
+        files: HandOffFiles,
+        sender: &ComponentSender<Self>,
+    ) {
         let mut prefill = self.reply_context(&m, reply_prefill(&m));
         prefill.attachments = files.attach;
         prefill.cloud_uploads = files.cloud;
@@ -19106,7 +21937,10 @@ impl AppModel {
             .current
             .as_ref()
             .is_some_and(|c| c.account_id == m.account_id && c.id == m.id)
-            || self.current_thread.iter().any(|t| t.account_id == m.account_id && t.id == m.id);
+            || self
+                .current_thread
+                .iter()
+                .any(|t| t.account_id == m.account_id && t.id == m.id);
         if on_screen {
             self.open_reply(m.account_id, prefill, (m.account_id, m.id), sender);
         } else {
@@ -19176,10 +22010,13 @@ impl AppModel {
             .folders
             .iter()
             .flat_map(|(account_id, fs)| {
-                fs.iter().filter(|f| f.kind == FolderKind::Templates).map(move |f| (*account_id, f.id))
+                fs.iter()
+                    .filter(|f| f.kind == FolderKind::Templates)
+                    .map(move |f| (*account_id, f.id))
             })
             .collect();
-        self.message_view.emit(MessageViewInput::SetTemplateFolders(folders));
+        self.message_view
+            .emit(MessageViewInput::SetTemplateFolders(folders));
     }
 
     /// Each account's Drafts folder, in account order.
@@ -19188,7 +22025,11 @@ impl AppModel {
         ids.sort_unstable();
         ids.into_iter()
             .filter_map(|id| {
-                let f = self.folders.get(&id)?.iter().find(|f| f.kind == FolderKind::Drafts)?;
+                let f = self
+                    .folders
+                    .get(&id)?
+                    .iter()
+                    .find(|f| f.kind == FolderKind::Drafts)?;
                 Some((id, f.clone()))
             })
             .collect()
@@ -19230,12 +22071,18 @@ impl AppModel {
         let mut ids: Vec<u32> = self.folders.keys().copied().collect();
         ids.sort_unstable();
         for account_id in ids {
-            let Some(folders) = self.folders.get(&account_id) else { continue };
+            let Some(folders) = self.folders.get(&account_id) else {
+                continue;
+            };
             let name = self.account_name(account_id);
             for f in folders {
                 if matches!(
                     f.kind,
-                    FolderKind::Drafts | FolderKind::Templates | FolderKind::Sent | FolderKind::Junk | FolderKind::Trash
+                    FolderKind::Drafts
+                        | FolderKind::Templates
+                        | FolderKind::Sent
+                        | FolderKind::Junk
+                        | FolderKind::Trash
                 ) {
                     continue;
                 }
@@ -19294,7 +22141,11 @@ impl AppModel {
         let controller = self.spawn_compose(init, sender);
         let window = self.compose_window_host(controller.widget(), id, sender);
         controller.emit(ComposeInput::FocusInitial);
-        self.composers.push(ComposeHost { id, controller, window });
+        self.composers.push(ComposeHost {
+            id,
+            controller,
+            window,
+        });
     }
 
     /// Open (or replace) the reader's inline reply/forward drop-down pane.
@@ -19310,7 +22161,10 @@ impl AppModel {
 
     /// Hide and empty every inline-composer slot (only one ever holds it).
     fn clear_compose_slots(&self) {
-        for r in [&self.reader_compose_revealer, &self.contacts_compose_revealer] {
+        for r in [
+            &self.reader_compose_revealer,
+            &self.contacts_compose_revealer,
+        ] {
             r.set_reveal_child(false);
             // Without this the hidden, pane-covering revealer keeps
             // swallowing every click and scroll over the pane beneath.
@@ -19358,7 +22212,10 @@ impl AppModel {
     /// reparenting keeps using the instant clear: it needs the widget freed
     /// immediately.
     fn animate_cover_close(&self) {
-        for r in [&self.reader_compose_revealer, &self.contacts_compose_revealer] {
+        for r in [
+            &self.reader_compose_revealer,
+            &self.contacts_compose_revealer,
+        ] {
             let Some(child) = r.child() else { continue };
             r.set_can_target(false);
             if !r.reveals_child() {
@@ -19383,7 +22240,9 @@ impl AppModel {
     /// allowed to shrink below the composer's minimum. The teardown at the
     /// end is skipped if a new reply has taken the slot meanwhile.
     fn animate_split_close(&self) {
-        let Some((slot, split, bottom)) = self.live_split() else { return };
+        let Some((slot, split, bottom)) = self.live_split() else {
+            return;
+        };
         let Some(wrap) = slot.child() else { return };
         // Settle any running slide first, so the height saved below is the
         // real one and not a mid-animation reading.
@@ -19447,7 +22306,9 @@ impl AppModel {
             tracing::info!(target: "hylki::morph", "no send morph: {why}");
             false
         };
-        let Some(r) = self.reader_compose.as_ref().filter(|r| r.id == from) else { return false };
+        let Some(r) = self.reader_compose.as_ref().filter(|r| r.id == from) else {
+            return false;
+        };
         if r.window.is_some() || self.showing_contacts || self.live_split().is_none() {
             return skip("not sent from the split beside the reader");
         }
@@ -19456,13 +22317,17 @@ impl AppModel {
         if out.send_at.is_some() {
             return skip("sent later");
         }
-        let Some(current) = self.current.as_ref() else { return skip("nothing open in the reader") };
+        let Some(current) = self.current.as_ref() else {
+            return skip("nothing open in the reader");
+        };
         // The reply answers a card of the conversation on screen: the one
         // the split was opened from, or failing that, by its Message-ID.
-        let joins = std::iter::once(current).chain(self.current_thread.iter()).any(|m| {
-            r.answering == Some((m.account_id, m.id))
-                || (!out.in_reply_to.is_empty() && m.message_id == out.in_reply_to)
-        });
+        let joins = std::iter::once(current)
+            .chain(self.current_thread.iter())
+            .any(|m| {
+                r.answering == Some((m.account_id, m.id))
+                    || (!out.in_reply_to.is_empty() && m.message_id == out.in_reply_to)
+            });
         if !joins {
             return skip("answers a message not in the conversation on screen");
         }
@@ -19474,7 +22339,9 @@ impl AppModel {
     /// will be filed.
     fn provisional_message(&mut self, out: &OutgoingMessage) -> Option<Message> {
         let account_id = out.from_account_id;
-        let account = self.effective_config().get(account_id.checked_sub(1)? as usize)?;
+        let account = self
+            .effective_config()
+            .get(account_id.checked_sub(1)? as usize)?;
         // The body its copy will have; failing that, what was written.
         let body = worker::sent_body_preview(account, out).unwrap_or_else(|| {
             tracing::info!(target: "hylki::morph", "the reply's card shows the text as written");
@@ -19485,11 +22352,21 @@ impl AppModel {
             .as_deref()
             .and_then(|a| worker::parse_recipients(a).into_iter().next())
             .unwrap_or_else(|| (account.name.clone(), account.email.clone()));
-        let folder_id = worker::reply_copy_path(account, account_id, self.cache.as_ref(), &out.in_reply_to)
-            .or_else(|| self.sent_copy_path(account_id))
-            .and_then(|p| self.folders.get(&account_id)?.iter().find(|f| f.path == p).map(|f| f.id))
-            .or_else(|| self.folder_of_kind(account_id, FolderKind::Sent).map(|f| f.id))
-            .or_else(|| self.current.as_ref().map(|m| m.folder_id))?;
+        let folder_id =
+            worker::reply_copy_path(account, account_id, self.cache.as_ref(), &out.in_reply_to)
+                .or_else(|| self.sent_copy_path(account_id))
+                .and_then(|p| {
+                    self.folders
+                        .get(&account_id)?
+                        .iter()
+                        .find(|f| f.path == p)
+                        .map(|f| f.id)
+                })
+                .or_else(|| {
+                    self.folder_of_kind(account_id, FolderKind::Sent)
+                        .map(|f| f.id)
+                })
+                .or_else(|| self.current.as_ref().map(|m| m.folder_id))?;
         self.related_id_seq = self.related_id_seq.saturating_sub(1);
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -19517,7 +22394,9 @@ impl AppModel {
             keywords: Vec::new(),
             has_attachment: !out.attachments.is_empty(),
             message_id: String::new(),
-            references: format!("{} {}", out.references, out.in_reply_to).trim().to_string(),
+            references: format!("{} {}", out.references, out.in_reply_to)
+                .trim()
+                .to_string(),
             importance: Default::default(),
             due: 0,
             labels: Vec::new(),
@@ -19531,7 +22410,9 @@ impl AppModel {
     /// split to morph from; the composer then slides away as it always has.
     fn begin_send_morph(&mut self, message: Message, composer: &gtk::Widget) -> bool {
         use crate::ui::send_morph::{find_widget, Pieces};
-        let Some((slot, _, _)) = self.live_split() else { return false };
+        let Some((slot, _, _)) = self.live_split() else {
+            return false;
+        };
         let reader = self.reader_split_lower.start_child();
         let view = self.reader_web_view();
         let editor = find_widget(composer, &|w| w.has_css_class("compose-editor-card"));
@@ -19542,16 +22423,26 @@ impl AppModel {
         if self.send_morph.parent().is_none() {
             return false;
         }
-        let Some(conversation) = self.current.as_ref().map(|c| (c.account_id, c.id)) else { return false };
+        let Some(conversation) = self.current.as_ref().map(|c| (c.account_id, c.id)) else {
+            return false;
+        };
         tracing::info!(target: "hylki::morph", "send morph: starting");
-        self.morph_pending = Some(MorphPending { message, composer: composer.clone(), conversation });
-        let header = self.reader_header.get().map(|h| h.clone().upcast::<gtk::Widget>());
+        self.morph_pending = Some(MorphPending {
+            message,
+            composer: composer.clone(),
+            conversation,
+        });
+        let header = self
+            .reader_header
+            .get()
+            .map(|h| h.clone().upcast::<gtk::Widget>());
         let header_shown = header
             .as_ref()
             .and_then(|h| h.ancestor(adw::ToolbarView::static_type()))
             .and_downcast::<adw::ToolbarView>()
             .is_some_and(|tv| tv.reveals_top_bars());
-        let editor_view = find_widget(&editor, &|w| w.is::<webkit6::WebView>()).and_downcast::<webkit6::WebView>();
+        let editor_view = find_widget(&editor, &|w| w.is::<webkit6::WebView>())
+            .and_downcast::<webkit6::WebView>();
         let pieces = Pieces {
             root: self.reader_split.clone().upcast(),
             composer: slot.upcast(),
@@ -19564,7 +22455,11 @@ impl AppModel {
         };
         let s = self.self_sender.clone();
         crate::ui::send_morph::start(&self.send_morph, pieces, move |ok| {
-            s.emit(if ok { AppMsg::SendMorphMeasured } else { AppMsg::SendMorphFailed });
+            s.emit(if ok {
+                AppMsg::SendMorphMeasured
+            } else {
+                AppMsg::SendMorphFailed
+            });
         });
         true
     }
@@ -19572,7 +22467,9 @@ impl AppModel {
     /// The pane could not be captured for the send morph: the composer
     /// slides away instead, and the reply joins its conversation plainly.
     fn send_morph_failed(&mut self) {
-        let Some(pending) = self.morph_pending.take() else { return };
+        let Some(pending) = self.morph_pending.take() else {
+            return;
+        };
         // The reply never leaves the pane: the composer goes at once and
         // the card is in the conversation in the same moment.
         if self.composer_in_split(&pending.composer) {
@@ -19588,7 +22485,9 @@ impl AppModel {
     /// carries the editor to it. A morph ended early (another message
     /// opened, a new reply begun) leaves only the reply joining.
     fn send_morph_swap(&mut self) {
-        let Some(pending) = self.morph_pending.take() else { return };
+        let Some(pending) = self.morph_pending.take() else {
+            return;
+        };
         let morphing = self.send_morph.running();
         if morphing {
             self.send_morph.show();
@@ -19607,10 +22506,23 @@ impl AppModel {
             return;
         }
         let root: gtk::Widget = self.reader_split.clone().upcast();
-        match (self.reader_split_lower.start_child(), self.reader_web_view()) {
+        match (
+            self.reader_split_lower.start_child(),
+            self.reader_web_view(),
+        ) {
             (Some(reader), Some(view)) if joined => {
-                let header = self.reader_header.get().map(|h| h.clone().upcast::<gtk::Widget>());
-                crate::ui::send_morph::await_arrival(&self.send_morph, &root, &reader, &view, header, format!("{account_id}:{id}"));
+                let header = self
+                    .reader_header
+                    .get()
+                    .map(|h| h.clone().upcast::<gtk::Widget>());
+                crate::ui::send_morph::await_arrival(
+                    &self.send_morph,
+                    &root,
+                    &reader,
+                    &view,
+                    header,
+                    format!("{account_id}:{id}"),
+                );
             }
             _ => self.send_morph.abort(),
         }
@@ -19618,13 +22530,16 @@ impl AppModel {
 
     /// The reader's web view, which shows the conversation.
     fn reader_web_view(&self) -> Option<webkit6::WebView> {
-        crate::ui::send_morph::find_widget(self.message_view.widget().upcast_ref(), &|w| w.is::<webkit6::WebView>())
-            .and_downcast::<webkit6::WebView>()
+        crate::ui::send_morph::find_widget(self.message_view.widget().upcast_ref(), &|w| {
+            w.is::<webkit6::WebView>()
+        })
+        .and_downcast::<webkit6::WebView>()
     }
 
     /// Whether `composer` is still the one in the split slot.
     fn composer_in_split(&self, composer: &gtk::Widget) -> bool {
-        self.live_split().is_some_and(|(slot, _, _)| composer.is_ancestor(&slot))
+        self.live_split()
+            .is_some_and(|(slot, _, _)| composer.is_ancestor(&slot))
     }
 
     /// Put a sent reply's card in the conversation it answers, if that is
@@ -19632,9 +22547,24 @@ impl AppModel {
     /// until the copy is read back from Sent. True when it went on screen.
     fn join_conversation(&mut self, message: Message, conversation: (u32, u32), pin: bool) -> bool {
         let (account_id, id) = (message.account_id, message.id);
-        let answers = message.references.split_whitespace().last().unwrap_or_default().to_string();
-        self.provisionals.insert((account_id, id), Provisional { message: message.clone(), answers });
-        let Some(current) = self.current.clone().filter(|c| (c.account_id, c.id) == conversation) else {
+        let answers = message
+            .references
+            .split_whitespace()
+            .last()
+            .unwrap_or_default()
+            .to_string();
+        self.provisionals.insert(
+            (account_id, id),
+            Provisional {
+                message: message.clone(),
+                answers,
+            },
+        );
+        let Some(current) = self
+            .current
+            .clone()
+            .filter(|c| (c.account_id, c.id) == conversation)
+        else {
             return false;
         };
         if self.current_thread.is_empty() {
@@ -19645,7 +22575,8 @@ impl AppModel {
         // place, never behind the spinner.
         self.thread_painted = true;
         if pin {
-            self.message_view.emit(MessageViewInput::PinArrival { account_id, id });
+            self.message_view
+                .emit(MessageViewInput::PinArrival { account_id, id });
         }
         self.show_thread();
         true
@@ -19654,8 +22585,12 @@ impl AppModel {
     /// Take a sent reply's stand-in card out of the conversation: its send
     /// was refused, and the composer is back.
     fn drop_provisional(&mut self, in_reply_to: &str) {
-        let refused: Vec<(u32, u32)> =
-            self.provisionals.iter().filter(|(_, p)| p.answers == in_reply_to).map(|(k, _)| *k).collect();
+        let refused: Vec<(u32, u32)> = self
+            .provisionals
+            .iter()
+            .filter(|(_, p)| p.answers == in_reply_to)
+            .map(|(k, _)| *k)
+            .collect();
         if refused.is_empty() {
             return;
         }
@@ -19663,7 +22598,8 @@ impl AppModel {
             self.provisionals.remove(k);
         }
         let before = self.current_thread.len();
-        self.current_thread.retain(|m| !refused.contains(&(m.account_id, m.id)));
+        self.current_thread
+            .retain(|m| !refused.contains(&(m.account_id, m.id)));
         if self.current_thread.len() != before {
             self.show_thread();
         }
@@ -19673,8 +22609,11 @@ impl AppModel {
     /// stage is drawing the pane meanwhile, and needs the header where it
     /// ends up, now.
     fn reveal_reader_header_at_once(&self) {
-        self.message_view.emit(MessageViewInput::SetUnderSplit(false));
-        let Some(header) = self.reader_header.get() else { return };
+        self.message_view
+            .emit(MessageViewInput::SetUnderSplit(false));
+        let Some(header) = self.reader_header.get() else {
+            return;
+        };
         header.set_opacity(1.0);
         let tv = header
             .ancestor(adw::ToolbarView::static_type())
@@ -19700,8 +22639,11 @@ impl AppModel {
     fn show_reader_header(&self, shown: bool) {
         // The header bar goes only while a split reply sits above the
         // reader; the subject block under it wants more air then.
-        self.message_view.emit(MessageViewInput::SetUnderSplit(!shown));
-        let Some(header) = self.reader_header.get() else { return };
+        self.message_view
+            .emit(MessageViewInput::SetUnderSplit(!shown));
+        let Some(header) = self.reader_header.get() else {
+            return;
+        };
         let tv = header
             .ancestor(adw::ToolbarView::static_type())
             .and_downcast::<adw::ToolbarView>();
@@ -19728,7 +22670,11 @@ impl AppModel {
     /// that edge is the panel's bottom; beneath it (#212), its top, where the
     /// divider position is the reader's height rather than the panel's.
     fn build_split_grab_pill(&self, bottom: bool) -> gtk::Box {
-        let paned = if bottom { &self.reader_split_lower } else { &self.reader_split };
+        let paned = if bottom {
+            &self.reader_split_lower
+        } else {
+            &self.reader_split
+        };
         let pill = crate::ui::grab_pill::paned_grab_pill(paned, move |split, want| {
             if bottom {
                 want.clamp(200, (split.height() - 220).max(200))
@@ -19736,7 +22682,11 @@ impl AppModel {
                 want.clamp(220, (split.height() - 200).max(220))
             }
         });
-        pill.set_valign(if bottom { gtk::Align::Start } else { gtk::Align::End });
+        pill.set_valign(if bottom {
+            gtk::Align::Start
+        } else {
+            gtk::Align::End
+        });
         // Bias the centred bar 6px away from the editor inside its hit zone
         // (a margin shifts the centring by half its size): more air between
         // the editor card and the bar, matching the attachment drawer's
@@ -19755,9 +22705,17 @@ impl AppModel {
     /// it is the one beneath the reader; `None` while no split reply is open.
     fn live_split(&self) -> Option<(gtk::Revealer, gtk::Paned, bool)> {
         if self.reader_split_top.child().is_some() {
-            Some((self.reader_split_top.clone(), self.reader_split.clone(), false))
+            Some((
+                self.reader_split_top.clone(),
+                self.reader_split.clone(),
+                false,
+            ))
         } else if self.reader_split_bottom.child().is_some() {
-            Some((self.reader_split_bottom.clone(), self.reader_split_lower.clone(), true))
+            Some((
+                self.reader_split_bottom.clone(),
+                self.reader_split_lower.clone(),
+                true,
+            ))
         } else {
             None
         }
@@ -19858,8 +22816,11 @@ impl AppModel {
             let pane_h = split.height();
             let pane_h = if pane_h > 0 { pane_h } else { 900 };
             let saved = config::load_split_reply_height();
-            let h =
-                if saved > 0 { saved } else { ((pane_h as f64 * 0.45) as i32).clamp(300, 560) };
+            let h = if saved > 0 {
+                saved
+            } else {
+                ((pane_h as f64 * 0.45) as i32).clamp(300, 560)
+            };
             // Keep a usable slice of reader on screen whatever was saved —
             // and slide the panel in the way it slides out: the divider IS
             // the animation, driven from zero to the opening height (the
@@ -19906,8 +22867,10 @@ impl AppModel {
             if let Some((fa, fid)) = focus {
                 // Put the card being answered at the top of the shortened
                 // reader, wearing the selection outline.
-                self.message_view
-                    .emit(MessageViewInput::FocusCard { account_id: fa, id: fid });
+                self.message_view.emit(MessageViewInput::FocusCard {
+                    account_id: fa,
+                    id: fid,
+                });
             }
         } else {
             // Composing clears the reader toolbar too (decorations excepted);
@@ -19926,7 +22889,12 @@ impl AppModel {
             gtk::glib::idle_add_local_once(move || s.set_reveal_child(true));
             controller.emit(ComposeInput::FocusInitial);
         }
-        self.reader_compose = Some(ReaderCompose { id, controller, window: None, answering: focus });
+        self.reader_compose = Some(ReaderCompose {
+            id,
+            controller,
+            window: None,
+            answering: focus,
+        });
         // A fresh composer has nothing to take back yet; the last one's
         // labels must not carry over into its menu.
         self.compose_history = (None, None);
@@ -19944,7 +22912,11 @@ impl AppModel {
         self.refresh_undo_menu();
         match r.window {
             Some(window) => {
-                self.composers.push(ComposeHost { id: r.id, controller: r.controller, window });
+                self.composers.push(ComposeHost {
+                    id: r.id,
+                    controller: r.controller,
+                    window,
+                });
             }
             None => {
                 // Either kind of inline composer slides out the way it
@@ -19954,7 +22926,8 @@ impl AppModel {
                 } else {
                     self.animate_cover_close();
                 }
-                self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
+                self.reader_overflow_btn
+                    .set_visible(self.reader_overflow_wanted());
                 r.controller.emit(ComposeInput::SaveDraftIfDirty);
                 self.draining_composers.push((r.id, r.controller));
             }
@@ -19976,7 +22949,8 @@ impl AppModel {
             None => {
                 // inline → window: unparent from the revealer, then host in a window.
                 self.clear_compose_slots();
-                self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
+                self.reader_overflow_btn
+                    .set_visible(self.reader_overflow_wanted());
                 let window = self.compose_window_host(&widget, id, sender);
                 r.window = Some(window);
                 r.controller.emit(ComposeInput::SetWindowed(true));
@@ -20028,11 +23002,17 @@ impl AppModel {
                             if !animated {
                                 tracing::info!(target: "hylki::morph", "no send morph: animations are off");
                             }
-                            if !(animated && self.begin_send_morph(m.clone(), r.controller.widget().upcast_ref())) {
+                            if !(animated
+                                && self.begin_send_morph(
+                                    m.clone(),
+                                    r.controller.widget().upcast_ref(),
+                                ))
+                            {
                                 // No morph, but the reply still never
                                 // leaves the pane: the composer goes at once
                                 // and the card is in the conversation.
-                                let conversation = self.current.as_ref().map(|c| (c.account_id, c.id));
+                                let conversation =
+                                    self.current.as_ref().map(|c| (c.account_id, c.id));
                                 self.reveal_reader_header_at_once();
                                 self.clear_compose_slots();
                                 if let Some(conversation) = conversation {
@@ -20043,7 +23023,8 @@ impl AppModel {
                         None if self.live_split().is_some() => self.animate_split_close(),
                         None => self.animate_cover_close(),
                     }
-                    self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
+                    self.reader_overflow_btn
+                        .set_visible(self.reader_overflow_wanted());
                 }
             }
             return;
@@ -20072,17 +23053,28 @@ impl AppModel {
     /// it belongs to `account_id`. The answer goes through [`merge_related`],
     /// which adds only what the conversation lacks.
     fn reload_related(&mut self, account_id: u32) {
-        let Some(current) = self.current.clone() else { return };
+        let Some(current) = self.current.clone() else {
+            return;
+        };
         if current.account_id != account_id || !self.threading {
             return;
         }
         let only = [current.clone()];
-        let ids =
-            thread_ids(if self.current_thread.is_empty() { &only[..] } else { &self.current_thread });
+        let ids = thread_ids(if self.current_thread.is_empty() {
+            &only[..]
+        } else {
+            &self.current_thread
+        });
         if ids.is_empty() {
             return;
         }
-        self.send_to(account_id, MailRequest::LoadRelated { message_id: current.id, ids });
+        self.send_to(
+            account_id,
+            MailRequest::LoadRelated {
+                message_id: current.id,
+                ids,
+            },
+        );
         self.thread_related_pending = true;
     }
 
@@ -20100,7 +23092,9 @@ impl AppModel {
     }
 
     fn merge_related(&mut self, account_id: u32, message_id: u32, messages: Vec<Message>) {
-        let Some(current) = self.current.clone() else { return };
+        let Some(current) = self.current.clone() else {
+            return;
+        };
         if current.account_id != account_id || current.id != message_id || !self.threading {
             return;
         }
@@ -20116,10 +23110,15 @@ impl AppModel {
         // same bytes, built the same way.
         let mut stood_in: HashMap<(u32, u32, u32), String> = HashMap::new();
         for r in &messages {
-            let took_over = self.provisionals.iter().find(|(_, p)| p.copied_by(r)).map(|(k, _)| *k);
+            let took_over = self
+                .provisionals
+                .iter()
+                .find(|(_, p)| p.copied_by(r))
+                .map(|(k, _)| *k);
             if let Some(key) = took_over {
                 let p = self.provisionals.remove(&key).expect("found above");
-                self.related_ids.insert((r.account_id, r.folder_id, r.uid), key.1);
+                self.related_ids
+                    .insert((r.account_id, r.folder_id, r.uid), key.1);
                 conv.retain(|m| (m.account_id, m.id) != key);
                 stood_in.insert((r.account_id, r.folder_id, r.uid), p.message.body);
             }
@@ -20129,7 +23128,10 @@ impl AppModel {
         let retired: Vec<(u32, u32)> = self
             .provisionals
             .iter()
-            .filter(|(k, p)| conv.iter().any(|m| (m.account_id, m.id) != **k && p.copied_by(m)))
+            .filter(|(k, p)| {
+                conv.iter()
+                    .any(|m| (m.account_id, m.id) != **k && p.copied_by(m))
+            })
             .map(|(k, _)| *k)
             .collect();
         for k in &retired {
@@ -20138,7 +23140,10 @@ impl AppModel {
         }
         let mut added = Vec::new();
         for mut r in messages {
-            if conv.iter().any(|m| m.folder_id == r.folder_id && m.uid == r.uid) {
+            if conv
+                .iter()
+                .any(|m| m.folder_id == r.folder_id && m.uid == r.uid)
+            {
                 continue; // already in the conversation, from this folder's own index
             }
             let body = stood_in.remove(&(r.account_id, r.folder_id, r.uid));
@@ -20155,7 +23160,9 @@ impl AppModel {
         // in the conversation it answers, however the conversation was put
         // together again.
         for (k, p) in &self.provisionals {
-            if !conv.iter().any(|m| (m.account_id, m.id) == *k) && conv.iter().any(|m| m.message_id == p.answers) {
+            if !conv.iter().any(|m| (m.account_id, m.id) == *k)
+                && conv.iter().any(|m| m.message_id == p.answers)
+            {
                 added.push(p.message.clone());
             }
         }
@@ -20166,8 +23173,8 @@ impl AppModel {
         }
         conv.extend(added);
         conv.sort_by(|a, b| a.timestamp.cmp(&b.timestamp)); // oldest first, as the list threads
-        // Late arrivals bring bodies of their own; give them the same grace
-        // period so they join the first paint instead of causing a second.
+                                                            // Late arrivals bring bodies of their own; give them the same grace
+                                                            // period so they join the first paint instead of causing a second.
         self.thread_opened_at = Some(std::time::Instant::now());
         self.current_thread = conv;
         self.load_missing_thread_bodies(None);
@@ -20188,7 +23195,10 @@ impl AppModel {
             .current_thread
             .iter()
             .filter(|tm| tm.body.is_empty() && except != Some((tm.account_id, tm.id)))
-            .filter_map(|tm| self.resolve_folder_path(tm).map(|p| (tm.account_id, tm.id, tm.uid, p)))
+            .filter_map(|tm| {
+                self.resolve_folder_path(tm)
+                    .map(|p| (tm.account_id, tm.id, tm.uid, p))
+            })
             .collect();
         for ((aid, path), items) in batch_bodies_by_folder(to_load) {
             self.send_to(aid, MailRequest::LoadBodies { items, path });
@@ -20199,13 +23209,15 @@ impl AppModel {
     /// can't mean "move to Trash" any more, so it has to mean erase for good.
     fn in_trash(&self, m: &Message) -> bool {
         self.folders.get(&m.account_id).is_some_and(|fs| {
-            fs.iter().any(|f| f.id == m.folder_id && f.kind == FolderKind::Trash)
+            fs.iter()
+                .any(|f| f.id == m.folder_id && f.kind == FolderKind::Trash)
         })
     }
 
     fn in_junk(&self, m: &Message) -> bool {
         self.folders.get(&m.account_id).is_some_and(|fs| {
-            fs.iter().any(|f| f.id == m.folder_id && f.kind == FolderKind::Junk)
+            fs.iter()
+                .any(|f| f.id == m.folder_id && f.kind == FolderKind::Junk)
         })
     }
 
@@ -20263,11 +23275,17 @@ impl AppModel {
     /// The message on screen that carries the attachment `name` (of `len`
     /// bytes, when known), as the drawer's Show in Message finds it.
     fn attachment_target(&self, name: &str, len: Option<usize>) -> Option<AttachmentTarget> {
-        let (m, size) = self.current_thread.iter().chain(self.current.iter()).find_map(|m| {
-            let items = self.attachment_cache.get(&body_key(m))?;
-            let a = items.iter().find(|a| a.name == name && len.is_none_or(|l| a.data.len() == l))?;
-            Some((m, a.data.len() as u64))
-        })?;
+        let (m, size) = self
+            .current_thread
+            .iter()
+            .chain(self.current.iter())
+            .find_map(|m| {
+                let items = self.attachment_cache.get(&body_key(m))?;
+                let a = items
+                    .iter()
+                    .find(|a| a.name == name && len.is_none_or(|l| a.data.len() == l))?;
+                Some((m, a.data.len() as u64))
+            })?;
         Some(AttachmentTarget {
             account_id: m.account_id,
             message_id: m.id,
@@ -20279,17 +23297,26 @@ impl AppModel {
     }
 
     /// Forget a deletion the worker has answered, handing back what it was.
-    fn take_deleting(&mut self, account_id: u32, message_id: u32, name: &str) -> Option<AttachmentTarget> {
-        let at = self
-            .deleting_attachments
-            .iter()
-            .position(|t| t.account_id == account_id && t.message_id == message_id && t.name == name)?;
+    fn take_deleting(
+        &mut self,
+        account_id: u32,
+        message_id: u32,
+        name: &str,
+    ) -> Option<AttachmentTarget> {
+        let at = self.deleting_attachments.iter().position(|t| {
+            t.account_id == account_id && t.message_id == message_id && t.name == name
+        })?;
         Some(self.deleting_attachments.remove(at))
     }
 
     /// Removing an attachment cannot be undone, and reaches every device
     /// that reads the account: ask (#289).
-    fn confirm_delete_attachment(&self, target: AttachmentTarget, parent: &gtk::Window, sender: &ComponentSender<Self>) {
+    fn confirm_delete_attachment(
+        &self,
+        target: AttachmentTarget,
+        parent: &gtk::Window,
+        sender: &ComponentSender<Self>,
+    ) {
         let heading = i18n("Delete the attachment from the server?");
         let body = i18n_f(
             "“{name}” will be removed from the message on the server. The rest of the message stays. This can’t be undone.",
@@ -20318,7 +23345,12 @@ impl AppModel {
         if n == 0 {
             return;
         }
-        let heading = ni18n_f("Delete this message permanently?", "Delete {n} messages permanently?", n as u32, &[("n", &n.to_string())]);
+        let heading = ni18n_f(
+            "Delete this message permanently?",
+            "Delete {n} messages permanently?",
+            n as u32,
+            &[("n", &n.to_string())],
+        );
         let binned = messages.iter().all(|m| self.in_trash(m));
         let body = match (binned, n == 1) {
             (true, true) => i18n("It is already in Trash, so it will be erased from the server. This can’t be undone."),
@@ -20350,13 +23382,17 @@ impl AppModel {
     fn purge_messages(&mut self, messages: Vec<Message>) {
         // One card of the open conversation, erased: the rest stays open.
         let leaving = match messages.as_slice() {
-            [m] => self.leave_conversation(m).map(|head| ((m.account_id, m.id), head)),
+            [m] => self
+                .leave_conversation(m)
+                .map(|head| ((m.account_id, m.id), head)),
             _ => None,
         };
         let mut groups: HashMap<(u32, String), Vec<u32>> = HashMap::new();
         let mut removed_ids = Vec::with_capacity(messages.len());
         for m in &messages {
-            let Some(src) = self.resolve_folder_path(m) else { continue };
+            let Some(src) = self.resolve_folder_path(m) else {
+                continue;
+            };
             groups.entry((m.account_id, src)).or_default().push(m.uid);
             self.discard_message_local(m);
             removed_ids.push(m.id);
@@ -20387,7 +23423,10 @@ impl AppModel {
         }
         let Some(dest) = self.folder_path_for(m.account_id, kind) else {
             self.notifications.emit(NotifyInput::Push {
-                text: i18n_f("No {v1} folder available", &[("v1", &(kind_label(kind)).to_string())]),
+                text: i18n_f(
+                    "No {v1} folder available",
+                    &[("v1", &(kind_label(kind)).to_string())],
+                ),
                 error: true,
                 connectivity: false,
             });
@@ -20406,7 +23445,14 @@ impl AppModel {
             return; // already in that folder
         }
         self.push_undo_move(m.account_id, &dest, &src, vec![m.clone()]);
-        self.send_to(m.account_id, MailRequest::MoveMessage { path: src, uid: m.uid, dest });
+        self.send_to(
+            m.account_id,
+            MailRequest::MoveMessage {
+                path: src,
+                uid: m.uid,
+                dest,
+            },
+        );
         self.discard_message(&m);
     }
 
@@ -20417,9 +23463,11 @@ impl AppModel {
         if demo_mode() {
             return true;
         }
-        self.config.get(account_id.saturating_sub(1) as usize).is_some_and(|c| {
-            c.enabled && matches!(c.protocol, config::Protocol::Imap | config::Protocol::Jmap)
-        })
+        self.config
+            .get(account_id.saturating_sub(1) as usize)
+            .is_some_and(|c| {
+                c.enabled && matches!(c.protocol, config::Protocol::Imap | config::Protocol::Jmap)
+            })
     }
 
     /// What the Move To picker lists: `own` account's folders less
@@ -20433,14 +23481,27 @@ impl AppModel {
         use crate::ui::folder_picker::PickerAccount;
         let mut out = Vec::new();
         if let Some(folders) = self.folders.get(&own).filter(|f| !f.is_empty()) {
-            out.push(PickerAccount { account_id: own, heading: None, folders: folders.clone(), exclude });
+            out.push(PickerAccount {
+                account_id: own,
+                heading: None,
+                folders: folders.clone(),
+                exclude,
+            });
         }
         for email in self.ordered_emails() {
-            let Some(a) = self.accounts.iter().find(|a| a.email == email && a.id != own) else { continue };
+            let Some(a) = self
+                .accounts
+                .iter()
+                .find(|a| a.email == email && a.id != own)
+            else {
+                continue;
+            };
             if !self.can_receive(a.id) {
                 continue;
             }
-            let Some(folders) = self.folders.get(&a.id).filter(|f| !f.is_empty()) else { continue };
+            let Some(folders) = self.folders.get(&a.id).filter(|f| !f.is_empty()) else {
+                continue;
+            };
             out.push(PickerAccount {
                 account_id: a.id,
                 heading: Some(self.account_name(a.id)),
@@ -20456,7 +23517,12 @@ impl AppModel {
     /// its read and starred state, and only once the copy is stored is the
     /// original put in its own account's Trash (erased where there is
     /// none). The rows leave the list at once and come back if it fails.
-    fn transfer_messages(&mut self, items: Vec<(u32, u32, u32, u32)>, dest_account: u32, dest: String) {
+    fn transfer_messages(
+        &mut self,
+        items: Vec<(u32, u32, u32, u32)>,
+        dest_account: u32,
+        dest: String,
+    ) {
         let mut removed_ids = Vec::new();
         for (aid, fid, uid, id) in items {
             let cached = self.find_cached_message(aid, id);
@@ -20468,30 +23534,46 @@ impl AppModel {
             let src_folder = cached.as_ref().map_or(fid, |m| m.folder_id);
             let token = self.next_transfer;
             self.next_transfer += 1;
-            self.transfers.insert(token, Transfer {
-                src_account: aid,
-                src_folder,
-                src_path: src.clone(),
-                uid,
-                dest_account,
-                dest_path: dest.clone(),
-                seen: cached.as_ref().is_none_or(|m| !m.unread),
-                flagged: cached.as_ref().is_some_and(|m| m.starred),
-                row: cached.clone(),
-            });
+            self.transfers.insert(
+                token,
+                Transfer {
+                    src_account: aid,
+                    src_folder,
+                    src_path: src.clone(),
+                    uid,
+                    dest_account,
+                    dest_path: dest.clone(),
+                    seen: cached.as_ref().is_none_or(|m| !m.unread),
+                    flagged: cached.as_ref().is_some_and(|m| m.starred),
+                    row: cached.clone(),
+                },
+            );
             // Off the source's lists until the move has landed or failed.
-            self.pending_moves.borrow_mut().insert((aid, src.clone(), uid), std::time::Instant::now());
+            self.pending_moves
+                .borrow_mut()
+                .insert((aid, src.clone(), uid), std::time::Instant::now());
             if let Some(m) = &cached {
                 self.discard_message_local(m);
             }
             removed_ids.push(id);
             self.transfer_tally.total += 1;
-            self.send_to(aid, MailRequest::ExportRaw { token, path: src, uid, for_reader: false });
+            self.send_to(
+                aid,
+                MailRequest::ExportRaw {
+                    token,
+                    path: src,
+                    uid,
+                    for_reader: false,
+                },
+            );
         }
         self.transfer_tally.dest_accounts.insert(dest_account);
-        self.transfer_tally.dest_folders.insert((dest_account, dest));
+        self.transfer_tally
+            .dest_folders
+            .insert((dest_account, dest));
         if !removed_ids.is_empty() {
-            self.message_list.emit(MessageListInput::RemoveMany(removed_ids));
+            self.message_list
+                .emit(MessageListInput::RemoveMany(removed_ids));
             self.push_unread_counts();
         }
         self.show_transfer_status();
@@ -20499,7 +23581,9 @@ impl AppModel {
 
     /// A message is stored in its new account: take the original out.
     fn transfer_landed(&mut self, token: u64) {
-        let Some(t) = self.transfers.remove(&token) else { return };
+        let Some(t) = self.transfers.remove(&token) else {
+            return;
+        };
         let trash = self
             .folder_path_for(t.src_account, FolderKind::Trash)
             .filter(|trash| *trash != t.src_path);
@@ -20514,8 +23598,15 @@ impl AppModel {
             });
         }
         let req = match trash {
-            Some(dest) => MailRequest::MoveMessage { path: t.src_path, uid: t.uid, dest },
-            None => MailRequest::PurgeMessages { path: t.src_path, uids: vec![t.uid] },
+            Some(dest) => MailRequest::MoveMessage {
+                path: t.src_path,
+                uid: t.uid,
+                dest,
+            },
+            None => MailRequest::PurgeMessages {
+                path: t.src_path,
+                uids: vec![t.uid],
+            },
         };
         self.send_to(t.src_account, req);
         self.transfer_tally.done += 1;
@@ -20525,10 +23616,20 @@ impl AppModel {
     /// A message could not be copied across: it stays where it was, and
     /// comes back on its folder's list.
     fn transfer_failed(&mut self, token: u64, error: String) {
-        let Some(t) = self.transfers.remove(&token) else { return };
+        let Some(t) = self.transfers.remove(&token) else {
+            return;
+        };
         tracing::warn!("move to another account failed: {error}");
-        self.pending_moves.borrow_mut().remove(&(t.src_account, t.src_path.clone(), t.uid));
-        self.send_to(t.src_account, MailRequest::SyncFolder { folder_id: t.src_folder, path: t.src_path });
+        self.pending_moves
+            .borrow_mut()
+            .remove(&(t.src_account, t.src_path.clone(), t.uid));
+        self.send_to(
+            t.src_account,
+            MailRequest::SyncFolder {
+                folder_id: t.src_folder,
+                path: t.src_path,
+            },
+        );
         self.transfer_tally.failed += 1;
         self.transfer_tally.error.get_or_insert(error);
         self.transfer_step();
@@ -20544,7 +23645,8 @@ impl AppModel {
             return;
         }
         let mut tally = std::mem::take(&mut self.transfer_tally);
-        self.notifications.emit(NotifyInput::SetStatus(String::new()));
+        self.notifications
+            .emit(NotifyInput::SetStatus(String::new()));
         self.record_transfer_undo(std::mem::take(&mut tally.landed));
         for (account_id, path) in &tally.dest_folders {
             if let Some(folder_id) = self
@@ -20553,13 +23655,23 @@ impl AppModel {
                 .and_then(|fs| fs.iter().find(|f| f.path == *path))
                 .map(|f| f.id)
             {
-                self.send_to(*account_id, MailRequest::SyncFolder { folder_id, path: path.clone() });
+                self.send_to(
+                    *account_id,
+                    MailRequest::SyncFolder {
+                        folder_id,
+                        path: path.clone(),
+                    },
+                );
             }
         }
         // The bar only speaks up for a failure: a move that worked shows
         // itself, in the folders.
         if tally.failed > 0 {
-            let names: Vec<String> = tally.dest_accounts.iter().map(|a| self.account_name(*a)).collect();
+            let names: Vec<String> = tally
+                .dest_accounts
+                .iter()
+                .map(|a| self.account_name(*a))
+                .collect();
             let text = ni18n_f(
                 "One message could not be moved to {account}: {error}",
                 "{n} messages could not be moved to {account}: {error}",
@@ -20570,7 +23682,11 @@ impl AppModel {
                     ("error", tally.error.as_deref().unwrap_or("")),
                 ],
             );
-            self.notifications.emit(NotifyInput::Push { text, error: true, connectivity: false });
+            self.notifications.emit(NotifyInput::Push {
+                text,
+                error: true,
+                connectivity: false,
+            });
         }
     }
 
@@ -20580,16 +23696,26 @@ impl AppModel {
     /// Mail that was erased at the source, or that went to an account with
     /// no Trash, is left out: undoing it would leave a copy behind.
     fn record_transfer_undo(&mut self, landed: Vec<Landed>) {
-        let mut groups: Vec<((u32, String, String, u32, String, String), Vec<Message>)> = Vec::new();
+        let mut groups: Vec<((u32, String, String, u32, String, String), Vec<Message>)> =
+            Vec::new();
         for l in landed {
-            let Some(src_trash) = l.src_trash else { continue };
+            let Some(src_trash) = l.src_trash else {
+                continue;
+            };
             let Some(dest_trash) = self
                 .folder_path_for(l.dest_account, FolderKind::Trash)
                 .filter(|t| *t != l.dest_path)
             else {
                 continue;
             };
-            let key = (l.src_account, l.src_path, src_trash, l.dest_account, l.dest_path, dest_trash);
+            let key = (
+                l.src_account,
+                l.src_path,
+                src_trash,
+                l.dest_account,
+                l.dest_path,
+                dest_trash,
+            );
             match groups.iter_mut().find(|(k, _)| *k == key) {
                 Some((_, rows)) => rows.push(l.row),
                 None => groups.push((key, vec![l.row])),
@@ -20600,23 +23726,49 @@ impl AppModel {
         else {
             return;
         };
-        let ids = |rows: &[Message]| rows.iter().map(|m| m.message_id.clone()).collect::<Vec<_>>();
+        let ids = |rows: &[Message]| {
+            rows.iter()
+                .map(|m| m.message_id.clone())
+                .collect::<Vec<_>>()
+        };
         // The first source folder is the entry's own step, so a quick undo
         // puts its rows straight back; everything else rides along.
         let mut also = vec![(
             dest_account,
-            UndoStep::Move { from: dest_path.clone(), to: dest_trash, message_ids: ids(&rows) },
+            UndoStep::Move {
+                from: dest_path.clone(),
+                to: dest_trash,
+                message_ids: ids(&rows),
+            },
         )];
         for ((sa, sp, st, da, dp, dt), rows) in groups.iter().skip(1) {
-            also.push((*sa, UndoStep::Move { from: st.clone(), to: sp.clone(), message_ids: ids(rows) }));
-            also.push((*da, UndoStep::Move { from: dp.clone(), to: dt.clone(), message_ids: ids(rows) }));
+            also.push((
+                *sa,
+                UndoStep::Move {
+                    from: st.clone(),
+                    to: sp.clone(),
+                    message_ids: ids(rows),
+                },
+            ));
+            also.push((
+                *da,
+                UndoStep::Move {
+                    from: dp.clone(),
+                    to: dt.clone(),
+                    message_ids: ids(rows),
+                },
+            ));
         }
         let what = self.move_label(dest_account, &dest_path);
         let threads = Vec::new();
         self.push_undo_entry(UndoEntry {
             account_id: src_account,
             what,
-            step: UndoStep::Move { from: src_trash, to: src_path, message_ids: ids(&rows) },
+            step: UndoStep::Move {
+                from: src_trash,
+                to: src_path,
+                message_ids: ids(&rows),
+            },
             at: std::time::Instant::now(),
             rows,
             threads,
@@ -20631,7 +23783,11 @@ impl AppModel {
         if left == 0 {
             return;
         }
-        let names: Vec<String> = tally.dest_accounts.iter().map(|a| self.account_name(*a)).collect();
+        let names: Vec<String> = tally
+            .dest_accounts
+            .iter()
+            .map(|a| self.account_name(*a))
+            .collect();
         self.notifications.emit(NotifyInput::SetStatus(ni18n_f(
             "Moving one message to {account}…",
             "Moving {n} messages to {account}…",
@@ -20649,8 +23805,9 @@ impl AppModel {
     fn drop_move(&mut self, dest_account: u32, dest: String, items: Vec<(u32, u32, u32, u32)>) {
         let mut groups: HashMap<String, (Vec<u32>, Vec<Message>)> = HashMap::new();
         let mut removed_ids: Vec<u32> = Vec::new();
-        let (foreign, items): (Vec<_>, Vec<_>) =
-            items.into_iter().partition(|(aid, ..)| *aid != dest_account);
+        let (foreign, items): (Vec<_>, Vec<_>) = items
+            .into_iter()
+            .partition(|(aid, ..)| *aid != dest_account);
         // Mail from another account is copied across when this one can take
         // it (#265); otherwise it stays put, and says so.
         let foreign = if !foreign.is_empty() && self.can_receive(dest_account) {
@@ -20691,7 +23848,10 @@ impl AppModel {
                 text: if foreign == 1 {
                     i18n("One message stayed put: this account can't take mail from another")
                 } else {
-                    i18n_f("{foreign} messages stayed put: this account can't take mail from another", &[("foreign", &foreign.to_string())])
+                    i18n_f(
+                        "{foreign} messages stayed put: this account can't take mail from another",
+                        &[("foreign", &foreign.to_string())],
+                    )
                 },
                 error: true,
                 connectivity: false,
@@ -20705,10 +23865,15 @@ impl AppModel {
             self.push_undo_move(dest_account, &dest, &src, rows);
             self.send_to(
                 dest_account,
-                MailRequest::MoveMessages { path: src, uids, dest: dest.clone() },
+                MailRequest::MoveMessages {
+                    path: src,
+                    uids,
+                    dest: dest.clone(),
+                },
             );
         }
-        self.message_list.emit(MessageListInput::RemoveMany(removed_ids));
+        self.message_list
+            .emit(MessageListInput::RemoveMany(removed_ids));
         self.push_unread_counts();
     }
 
@@ -20747,7 +23912,9 @@ impl AppModel {
     /// sync after it, leaves them out. A hidden folder that was open gives
     /// way to nothing, like a deleted one.
     fn hide_folders(&mut self, account_id: u32, paths: Vec<String>) {
-        let Some(cfg) = self.config.get_mut(account_id as usize - 1) else { return };
+        let Some(cfg) = self.config.get_mut(account_id as usize - 1) else {
+            return;
+        };
         let mut changed = false;
         for path in paths {
             if !cfg.hidden_folders.contains(&path) {
@@ -20766,11 +23933,9 @@ impl AppModel {
                 connectivity: false,
             });
         }
-        if self
-            .selected
-            .as_ref()
-            .is_some_and(|s| s.account_id == account_id && crate::models::folder_is_hidden(&s.path, None, &hidden))
-        {
+        if self.selected.as_ref().is_some_and(|s| {
+            s.account_id == account_id && crate::models::folder_is_hidden(&s.path, None, &hidden)
+        }) {
             self.current = None;
             self.current_thread.clear();
             self.show_message(None, false);
@@ -20786,7 +23951,11 @@ impl AppModel {
     fn delete_folder(&mut self, account_id: u32, path: String) {
         let trash = self.folder_path_for(account_id, FolderKind::Trash);
         // If the deleted folder is currently open, clear the view.
-        if self.selected.as_ref().is_some_and(|s| s.account_id == account_id && s.path == path) {
+        if self
+            .selected
+            .as_ref()
+            .is_some_and(|s| s.account_id == account_id && s.path == path)
+        {
             self.current = None;
             self.current_thread.clear();
             self.show_message(None, false);
@@ -20797,7 +23966,8 @@ impl AppModel {
             let own = format!("{email}\t{path}");
             let inside = format!("{own}{}", self.folder_delimiter(account_id));
             let before = self.favorites.len();
-            self.favorites.retain(|k| *k != own && !k.starts_with(&inside));
+            self.favorites
+                .retain(|k| *k != own && !k.starts_with(&inside));
             if self.favorites.len() != before {
                 self.save_sidebar_state();
                 self.rebuild_sidebar();
@@ -20826,7 +23996,9 @@ impl AppModel {
         // Only your own folders (or the top level) can hold other folders —
         // moving one under Sent or Trash is never what a drop meant.
         if !dest.is_empty()
-            && !folders.iter().any(|f| f.path == dest && f.kind == FolderKind::Custom)
+            && !folders
+                .iter()
+                .any(|f| f.path == dest && f.kind == FolderKind::Custom)
         {
             return None;
         }
@@ -20843,7 +24015,12 @@ impl AppModel {
             complain(self, &format!("A folder named {leaf:?} is already there."));
             return None;
         }
-        self.apply_folder_rename(account_id, path, new_path.clone(), Some(i18n("Move Folder")));
+        self.apply_folder_rename(
+            account_id,
+            path,
+            new_path.clone(),
+            Some(i18n("Move Folder")),
+        );
         Some(new_path)
     }
 
@@ -20853,7 +24030,9 @@ impl AppModel {
     /// and the selection. Run after any optimistic mutation (move, rename,
     /// create) so the confirming server refresh is a recognised no-op.
     fn normalize_folders(&mut self, account_id: u32) {
-        let Some(folders) = self.folders.get_mut(&account_id) else { return };
+        let Some(folders) = self.folders.get_mut(&account_id) else {
+            return;
+        };
         for f in folders.iter_mut() {
             if let Some(u) = self.folder_unread.get(&(account_id, f.id)) {
                 f.unread = *u;
@@ -20894,10 +24073,14 @@ impl AppModel {
         // Recorded as the rename that puts it back. `None` while an undo or
         // redo is doing exactly that — it keeps its own history.
         if let Some(what) = record {
-            self.push_undo(account_id, what, UndoStep::RenameFolder {
-                from: new_path.clone(),
-                to: path.clone(),
-            });
+            self.push_undo(
+                account_id,
+                what,
+                UndoStep::RenameFolder {
+                    from: new_path.clone(),
+                    to: path.clone(),
+                },
+            );
         }
         let delim = self.folder_delimiter(account_id);
         // If the affected folder (or one of its children) is open, clear the
@@ -20933,8 +24116,11 @@ impl AppModel {
         }
         self.normalize_folders(account_id);
         // Collapsed tree nodes follow the moved subtree to its new home.
-        if let Some(email) =
-            self.accounts.iter().find(|a| a.id == account_id).map(|a| a.email.clone())
+        if let Some(email) = self
+            .accounts
+            .iter()
+            .find(|a| a.id == account_id)
+            .map(|a| a.email.clone())
         {
             let key_prefix = format!("{email}\t");
             for k in self.tree_collapsed.iter_mut() {
@@ -20986,7 +24172,9 @@ impl AppModel {
             if s.path == path {
                 Some(new_path.clone())
             } else {
-                s.path.strip_prefix(&old_prefix).map(|rest| format!("{new_prefix}{rest}"))
+                s.path
+                    .strip_prefix(&old_prefix)
+                    .map(|rest| format!("{new_prefix}{rest}"))
             }
         });
         if let Some(moved) = followed {
@@ -21007,14 +24195,23 @@ impl AppModel {
                 path: sel.path.clone(),
             });
         }
-        self.send_to(account_id, MailRequest::RenameFolder { old_path: path, new_path });
+        self.send_to(
+            account_id,
+            MailRequest::RenameFolder {
+                old_path: path,
+                new_path,
+            },
+        );
         // The worker runs requests in order: the reload queues behind the
         // RENAME and refills the cleared view from the folder's new name.
         if let Some(sel) = self.selected.clone().filter(|s| s.account_id == account_id) {
-            self.send_to(account_id, MailRequest::LoadMessages {
-                folder_id: sel.folder_id,
-                path: sel.path,
-            });
+            self.send_to(
+                account_id,
+                MailRequest::LoadMessages {
+                    folder_id: sel.folder_id,
+                    path: sel.path,
+                },
+            );
         }
     }
 
@@ -21059,8 +24256,10 @@ impl AppModel {
             .find_map(|f| f.path.chars().find(|c| matches!(c, '/' | '.' | '\\')))
             .unwrap_or('/');
         let root = format!("INBOX{delim}");
-        let customs: Vec<&Folder> =
-            folders.iter().filter(|f| f.kind == FolderKind::Custom).collect();
+        let customs: Vec<&Folder> = folders
+            .iter()
+            .filter(|f| f.kind == FolderKind::Custom)
+            .collect();
         if !customs.is_empty()
             && customs.iter().all(|f| {
                 f.path
@@ -21267,7 +24466,10 @@ impl AppModel {
             .is_some_and(|fs| fs.iter().any(|f| f.path == new_path))
         {
             self.notifications.emit(NotifyInput::Push {
-                text: i18n_f("A folder named {new_name} is already there.", &[("new_name", &format!("{new_name:?}"))]),
+                text: i18n_f(
+                    "A folder named {new_name} is already there.",
+                    &[("new_name", &format!("{new_name:?}"))],
+                ),
                 error: true,
                 connectivity: false,
             });
@@ -21290,9 +24492,11 @@ impl AppModel {
             Some(&self.window),
             Some(&format!("Delete “{name}”?")),
             Some(
-                i18n("Its messages are moved to Trash and the folder is removed from the \
-                      server. This cannot be undone.")
-                    .as_str(),
+                i18n(
+                    "Its messages are moved to Trash and the folder is removed from the \
+                      server. This cannot be undone.",
+                )
+                .as_str(),
             ),
         );
         dialog.add_response("cancel", &i18n("Cancel"));
@@ -21322,7 +24526,10 @@ impl AppModel {
         let dialog = adw::MessageDialog::new(
             Some(&self.window),
             Some(&i18n_f("Empty “{name}”?", &[("name", &name)])),
-            Some(i18n("Every message in it will be erased from the server. This can’t be undone.").as_str()),
+            Some(
+                i18n("Every message in it will be erased from the server. This can’t be undone.")
+                    .as_str(),
+            ),
         );
         dialog.add_response("cancel", &i18n("Cancel"));
         dialog.add_response("empty", &i18n("Empty"));
@@ -21332,7 +24539,11 @@ impl AppModel {
         let s = sender.clone();
         dialog.connect_response(None, move |_, resp| {
             if resp == "empty" {
-                s.input(AppMsg::EmptyFolder { account_id, folder_id, path: path.clone() });
+                s.input(AppMsg::EmptyFolder {
+                    account_id,
+                    folder_id,
+                    path: path.clone(),
+                });
             }
         });
         dialog.present();
@@ -21353,7 +24564,13 @@ impl AppModel {
         match targets.as_slice() {
             [] => {}
             [(account_id, folder_id, name, path, _)] => {
-                self.confirm_empty_folder(*account_id, *folder_id, name.clone(), path.clone(), sender);
+                self.confirm_empty_folder(
+                    *account_id,
+                    *folder_id,
+                    name.clone(),
+                    path.clone(),
+                    sender,
+                );
             }
             _ => {
                 let heading = if kind == FolderKind::Trash {
@@ -21367,7 +24584,8 @@ impl AppModel {
                     i18n("Every message in them will be erased from the server. This can’t be undone."),
                     accounts.join("\n")
                 );
-                let dialog = adw::MessageDialog::new(Some(&self.window), Some(&heading), Some(&body));
+                let dialog =
+                    adw::MessageDialog::new(Some(&self.window), Some(&heading), Some(&body));
                 dialog.add_response("cancel", &i18n("Cancel"));
                 dialog.add_response("empty", &i18n("Empty"));
                 dialog.set_default_response(Some("cancel"));
@@ -21377,7 +24595,11 @@ impl AppModel {
                 dialog.connect_response(None, move |_, resp| {
                     if resp == "empty" {
                         for (account_id, folder_id, _, path, _) in &targets {
-                            s.input(AppMsg::EmptyFolder { account_id: *account_id, folder_id: *folder_id, path: path.clone() });
+                            s.input(AppMsg::EmptyFolder {
+                                account_id: *account_id,
+                                folder_id: *folder_id,
+                                path: path.clone(),
+                            });
                         }
                     }
                 });
@@ -21401,7 +24623,14 @@ impl AppModel {
             return;
         };
         self.push_undo_move(m.account_id, &dest, &src, vec![m.clone()]);
-        self.send_to(m.account_id, MailRequest::MarkSpam { path: src, uid: m.uid, dest });
+        self.send_to(
+            m.account_id,
+            MailRequest::MarkSpam {
+                path: src,
+                uid: m.uid,
+                dest,
+            },
+        );
         self.discard_message(&m);
     }
 
@@ -21420,7 +24649,14 @@ impl AppModel {
             return;
         };
         self.push_undo_move_as(m.account_id, i18n("Not Spam"), &dest, &src, vec![m.clone()]);
-        self.send_to(m.account_id, MailRequest::MarkHam { path: src, uid: m.uid, dest });
+        self.send_to(
+            m.account_id,
+            MailRequest::MarkHam {
+                path: src,
+                uid: m.uid,
+                dest,
+            },
+        );
         self.discard_message(&m);
     }
 
@@ -21486,8 +24722,10 @@ impl AppModel {
     /// Forget assembled conversations for an account — its mail has changed
     /// underneath them, so what they hold may no longer be the conversation.
     fn forget_threads(&mut self, account_id: u32) {
-        self.thread_cache.retain(|(aid, _, _), _| *aid != account_id);
-        self.thread_cache_order.retain(|(aid, _, _)| *aid != account_id);
+        self.thread_cache
+            .retain(|(aid, _, _), _| *aid != account_id);
+        self.thread_cache_order
+            .retain(|(aid, _, _)| *aid != account_id);
     }
 
     /// Reply headers for every cached message, so the list can see that two
@@ -21520,7 +24758,8 @@ impl AppModel {
             .collect();
         links.sort();
         links.dedup();
-        self.message_list.emit(MessageListInput::SetThreadLinks(links));
+        self.message_list
+            .emit(MessageListInput::SetThreadLinks(links));
     }
 
     /// Ask each account's cache what the conversations on the list's page
@@ -21591,7 +24830,9 @@ impl AppModel {
     /// next follows a moment later, so the window keeps drawing between.
     fn prebuild_next(&mut self, sender: &ComponentSender<Self>) {
         while let Some(view) = self.prebuild_queue.pop() {
-            let UnifiedView::Kind(kind) = view else { continue };
+            let UnifiedView::Kind(kind) = view else {
+                continue;
+            };
             let key = view_key_of(view, None);
             if self.unified && self.unified_view_key() == key {
                 continue;
@@ -21605,7 +24846,12 @@ impl AppModel {
             if targets.is_empty() || targets.iter().any(|k| !self.message_cache.contains_key(k)) {
                 continue;
             }
-            let content = || targets.iter().filter_map(|k| self.message_cache.get(k)).flatten();
+            let content = || {
+                targets
+                    .iter()
+                    .filter_map(|k| self.message_cache.get(k))
+                    .flatten()
+            };
             if content().count() > crate::ui::message_list::KEEP_AT_MOST {
                 continue;
             }
@@ -21615,8 +24861,13 @@ impl AppModel {
             }
             let mut messages: Vec<Message> = content().cloned().collect();
             messages.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-            tracing::debug!("prebuild: {view:?}, {} messages ({})", messages.len(), self.message_list.model().view_miss(key, fp));
-            self.message_list.emit(MessageListInput::Prebuild { key, fp, messages });
+            tracing::debug!(
+                "prebuild: {view:?}, {} messages ({})",
+                messages.len(),
+                self.message_list.model().view_miss(key, fp)
+            );
+            self.message_list
+                .emit(MessageListInput::Prebuild { key, fp, messages });
             let s = sender.input_sender().clone();
             gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
                 let _ = s.send(AppMsg::PrebuildNext);
@@ -21712,7 +24963,11 @@ impl AppModel {
             .iter()
             .filter(|(k, _)| !self.unified_unfilled.contains(k))
             .flat_map(|(_, v)| v.iter());
-        let unfilled = self.unified_unfilled.iter().filter_map(|k| self.message_cache.get(k)).flat_map(|v| v.iter());
+        let unfilled = self
+            .unified_unfilled
+            .iter()
+            .filter_map(|k| self.message_cache.get(k))
+            .flat_map(|v| v.iter());
         filled.chain(unfilled)
     }
 
@@ -21728,9 +24983,15 @@ impl AppModel {
     /// The folders on show: the open unified view's, or the open folder.
     fn folders_on_show(&self) -> HashSet<(u32, u32)> {
         if self.unified {
-            self.unified_targets().into_iter().map(|(a, f, _)| (a, f)).collect()
+            self.unified_targets()
+                .into_iter()
+                .map(|(a, f, _)| (a, f))
+                .collect()
         } else {
-            self.selected.iter().map(|s| (s.account_id, s.folder_id)).collect()
+            self.selected
+                .iter()
+                .map(|s| (s.account_id, s.folder_id))
+                .collect()
         }
     }
 
@@ -21739,7 +25000,12 @@ impl AppModel {
     /// more than [`crate::ui::message_list::KEEP_AT_MOST`]. Inboxes and the
     /// folders whose unread mail is counted are always kept: what arrives
     /// next is compared with them.
-    fn too_large_off_screen(&self, key: (u32, u32), len: usize, on_show: &HashSet<(u32, u32)>) -> bool {
+    fn too_large_off_screen(
+        &self,
+        key: (u32, u32),
+        len: usize,
+        on_show: &HashSet<(u32, u32)>,
+    ) -> bool {
         use crate::ui::message_list::KEEP_AT_MOST;
         let kind_of = |k: &(u32, u32)| self.folder_kind(k.0, k.1).unwrap_or(FolderKind::Custom);
         let kind = kind_of(&key);
@@ -21775,7 +25041,11 @@ impl AppModel {
         if shed.is_empty() {
             return;
         }
-        let n: usize = shed.iter().filter_map(|k| self.message_cache.remove(k)).map(|l| l.len()).sum();
+        let n: usize = shed
+            .iter()
+            .filter_map(|k| self.message_cache.remove(k))
+            .map(|l| l.len())
+            .sum();
         tracing::debug!("let go of {} folders off screen, {n} messages", shed.len());
         // Handed back once the list has let go of its rows too, a frame or
         // so on, rather than at the next half-minute trim: a system monitor
@@ -21814,7 +25084,9 @@ impl AppModel {
     fn emit_unified(&self) {
         let t = std::time::Instant::now();
         let fp = self.unified_fp();
-        if self.list_fp.get() == Some(fp) && self.message_list.model().view_key() == Some(self.unified_view_key()) {
+        if self.list_fp.get() == Some(fp)
+            && self.message_list.model().view_key() == Some(self.unified_view_key())
+        {
             tracing::debug!("unified: unchanged, not merged ({:?})", t.elapsed());
             return;
         }
@@ -21823,8 +25095,13 @@ impl AppModel {
         self.unified_emitted_at.set(t);
         let mut merged: Vec<Message> = self.unified_content().cloned().collect();
         merged.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-        tracing::debug!("unified: merged {} messages in {:?}", merged.len(), t.elapsed());
-        self.message_list.emit(MessageListInput::SetMessages { messages: merged });
+        tracing::debug!(
+            "unified: merged {} messages in {:?}",
+            merged.len(),
+            t.elapsed()
+        );
+        self.message_list
+            .emit(MessageListInput::SetMessages { messages: merged });
     }
 
     /// The keywords a tag view answers: one, or — the unified Tags row —
@@ -21835,7 +25112,9 @@ impl AppModel {
     /// refresh right after opening one, must not walk every folder twice.
     fn sync_tag_keywords(&mut self) {
         const PAUSE: std::time::Duration = std::time::Duration::from_secs(15);
-        let Some((scope, _)) = self.tag_view.clone() else { return };
+        let Some((scope, _)) = self.tag_view.clone() else {
+            return;
+        };
         let keywords: Vec<String> = self.tags.iter().map(|t| t.keyword.clone()).collect();
         if keywords.is_empty() {
             return;
@@ -21848,11 +25127,20 @@ impl AppModel {
             .filter(|id| self.in_tag_scope(scope, *id))
             .collect();
         for id in ids {
-            if self.keyword_sync_at.get(&id).is_some_and(|t| now.duration_since(*t) < PAUSE) {
+            if self
+                .keyword_sync_at
+                .get(&id)
+                .is_some_and(|t| now.duration_since(*t) < PAUSE)
+            {
                 continue;
             }
             self.keyword_sync_at.insert(id, now);
-            self.send_to(id, MailRequest::RefreshKeywords { keywords: keywords.clone() });
+            self.send_to(
+                id,
+                MailRequest::RefreshKeywords {
+                    keywords: keywords.clone(),
+                },
+            );
         }
     }
 
@@ -21873,11 +25161,13 @@ impl AppModel {
     /// loading list if it never ran); [`refresh_tag_view`] brings it up to
     /// date behind.
     fn show_tag_view(&self) {
-        let Some(key) = self.tag_view.as_ref() else { return };
+        let Some(key) = self.tag_view.as_ref() else {
+            return;
+        };
         match self.tag_view_cache.get(key) {
-            Some(cached) => {
-                self.message_list.emit(MessageListInput::SetMessages { messages: cached.clone() })
-            }
+            Some(cached) => self.message_list.emit(MessageListInput::SetMessages {
+                messages: cached.clone(),
+            }),
             None => self.message_list.emit(MessageListInput::SetLoading),
         }
     }
@@ -21888,11 +25178,14 @@ impl AppModel {
     /// demo's mail never reaches the database, so its view is assembled
     /// here from the folders loaded so far.
     fn refresh_tag_view(&mut self, sender: &ComponentSender<Self>) {
-        let Some(key) = self.tag_view.clone() else { return };
+        let Some(key) = self.tag_view.clone() else {
+            return;
+        };
         if demo_mode() && self.config.is_empty() {
             let out = self.assemble_tag_view(&key, Vec::new());
             self.tag_view_cache.insert(key, out.clone());
-            self.message_list.emit(MessageListInput::SetMessages { messages: out });
+            self.message_list
+                .emit(MessageListInput::SetMessages { messages: out });
             return;
         }
         if self.tag_view_loading {
@@ -21906,7 +25199,11 @@ impl AppModel {
             .tag_view_keywords(&kw)
             .into_iter()
             .map(|k| {
-                let name = self.tags.iter().find(|t| t.keyword.eq_ignore_ascii_case(&k)).map(|t| t.name.clone());
+                let name = self
+                    .tags
+                    .iter()
+                    .find(|t| t.keyword.eq_ignore_ascii_case(&k))
+                    .map(|t| t.name.clone());
                 let name = name.unwrap_or_else(|| k.clone());
                 (k, name)
             })
@@ -21955,7 +25252,11 @@ impl AppModel {
             .map(|a| {
                 let folders = self.folders.get(&a.id).map(Vec::as_slice).unwrap_or(&[]);
                 let paths_of = |kinds: &[FolderKind]| -> Vec<String> {
-                    folders.iter().filter(|x| kinds.contains(&x.kind)).map(|x| x.path.clone()).collect()
+                    folders
+                        .iter()
+                        .filter(|x| kinds.contains(&x.kind))
+                        .map(|x| x.path.clone())
+                        .collect()
                 };
                 match f.folder {
                     Some(k) => (a.id, Some(paths_of(&[k.kind()])), Vec::new()),
@@ -21971,18 +25272,24 @@ impl AppModel {
         SmartContext {
             tags: self.tags.iter().map(|t| t.keyword.to_lowercase()).collect(),
             tag_list: self.tags.clone(),
-            contacts: if f.needs_contacts() { self.saved_addresses.get() } else { None },
+            contacts: if f.needs_contacts() {
+                self.saved_addresses.get()
+            } else {
+                None
+            },
         }
     }
 
     /// Show the open smart folder from its last result at once (a loading
     /// list if it never ran); [`refresh_smart_view`] brings it up to date.
     fn show_smart_view(&self) {
-        let Some(id) = self.smart_view.as_ref() else { return };
+        let Some(id) = self.smart_view.as_ref() else {
+            return;
+        };
         match self.smart_view_cache.get(id) {
-            Some(cached) => {
-                self.message_list.emit(MessageListInput::SetMessages { messages: cached.clone() })
-            }
+            Some(cached) => self.message_list.emit(MessageListInput::SetMessages {
+                messages: cached.clone(),
+            }),
             None => self.message_list.emit(MessageListInput::SetLoading),
         }
     }
@@ -21992,11 +25299,14 @@ impl AppModel {
     /// never reaches the database, so its view is matched here from the
     /// folders loaded so far.
     fn refresh_smart_view(&mut self, sender: &ComponentSender<Self>) {
-        let Some(folder) = self.open_smart_folder().cloned() else { return };
+        let Some(folder) = self.open_smart_folder().cloned() else {
+            return;
+        };
         if demo_mode() && self.config.is_empty() {
             let out = self.assemble_smart_view(&folder, Vec::new());
             self.smart_view_cache.insert(folder.id.clone(), out.clone());
-            self.message_list.emit(MessageListInput::SetMessages { messages: out });
+            self.message_list
+                .emit(MessageListInput::SetMessages { messages: out });
             return;
         }
         if self.smart_view_loading {
@@ -22022,16 +25332,27 @@ impl AppModel {
                     rows.extend(found.into_iter().map(|(path, m)| (account_id, path, m)));
                 }
             }
-            s.input(AppMsg::SmartViewLoaded { id: folder.id, rows });
+            s.input(AppMsg::SmartViewLoaded {
+                id: folder.id,
+                rows,
+            });
         });
     }
 
     /// A smart folder from its rows: newest first, Gmail's per-label copies
     /// of one message as one row, the inbox copy where there is one.
-    fn assemble_smart_view(&self, folder: &config::SmartFolder, rows: Vec<(u32, String, Message)>) -> Vec<Message> {
+    fn assemble_smart_view(
+        &self,
+        folder: &config::SmartFolder,
+        rows: Vec<(u32, String, Message)>,
+    ) -> Vec<Message> {
         let mut out: Vec<Message> = Vec::new();
         for (account_id, path, mut m) in rows {
-            let Some(f) = self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)) else {
+            let Some(f) = self
+                .folders
+                .get(&account_id)
+                .and_then(|fs| fs.iter().find(|f| f.path == path))
+            else {
                 continue;
             };
             m.folder_id = f.id;
@@ -22041,7 +25362,8 @@ impl AppModel {
             let ctx = self.smart_context(folder);
             for (account_id, include, exclude) in self.smart_scope(folder) {
                 for f in self.folders.get(&account_id).into_iter().flatten() {
-                    let looked_in = include.as_ref().is_none_or(|p| p.contains(&f.path)) && !exclude.contains(&f.path);
+                    let looked_in = include.as_ref().is_none_or(|p| p.contains(&f.path))
+                        && !exclude.contains(&f.path);
                     if !looked_in {
                         continue;
                     }
@@ -22051,10 +25373,17 @@ impl AppModel {
                 }
             }
         }
-        let inbox_first = |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
-        out.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| inbox_first(a).cmp(&inbox_first(b))));
+        let inbox_first =
+            |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
+        out.sort_by(|a, b| {
+            b.timestamp
+                .cmp(&a.timestamp)
+                .then_with(|| inbox_first(a).cmp(&inbox_first(b)))
+        });
         let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
-        out.retain(|m| m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone())));
+        out.retain(|m| {
+            m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone()))
+        });
         out
     }
 
@@ -22079,7 +25408,11 @@ impl AppModel {
             return;
         }
         let demo = demo_mode() && self.config.is_empty();
-        let jobs: Vec<(config::SmartFolder, Vec<(u32, Option<Vec<String>>, Vec<String>)>, SmartContext)> = self
+        let jobs: Vec<(
+            config::SmartFolder,
+            Vec<(u32, Option<Vec<String>>, Vec<String>)>,
+            SmartContext,
+        )> = self
             .smart_folders
             .iter()
             .map(|f| (f.clone(), self.smart_scope(f), self.smart_context(f)))
@@ -22088,7 +25421,11 @@ impl AppModel {
             let counts = jobs
                 .iter()
                 .map(|(f, _, _)| {
-                    let n = self.assemble_smart_view(f, Vec::new()).iter().filter(|m| m.unread).count() as u32;
+                    let n = self
+                        .assemble_smart_view(f, Vec::new())
+                        .iter()
+                        .filter(|m| m.unread)
+                        .count() as u32;
                     (f.id.clone(), n)
                 })
                 .collect();
@@ -22109,12 +25446,18 @@ impl AppModel {
                         continue;
                     }
                     pre.unread = Some(true);
-                    let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
+                    let mut seen: std::collections::HashSet<(u32, String)> =
+                        std::collections::HashSet::new();
                     let mut n = 0u32;
                     for (account_id, include, exclude) in scope {
-                        for (_, m) in cache.smart_scan(account_id, include.as_deref(), &exclude, pre, usize::MAX, |m| {
-                            ctx.matches(&folder, m)
-                        }) {
+                        for (_, m) in cache.smart_scan(
+                            account_id,
+                            include.as_deref(),
+                            &exclude,
+                            pre,
+                            usize::MAX,
+                            |m| ctx.matches(&folder, m),
+                        ) {
                             if m.message_id.is_empty() || seen.insert((account_id, m.message_id)) {
                                 n += 1;
                             }
@@ -22130,10 +25473,14 @@ impl AppModel {
     /// Delete a smart folder from the sidebar's menu: it is only a search,
     /// so nothing else goes with it, but it still asks.
     fn confirm_delete_smart_folder(&self, id: String, sender: &ComponentSender<Self>) {
-        let Some(folder) = self.smart_folders.iter().find(|f| f.id == id) else { return };
+        let Some(folder) = self.smart_folders.iter().find(|f| f.id == id) else {
+            return;
+        };
         let dialog = adw::AlertDialog::new(
             Some(&i18n_f("Delete “{name}”?", &[("name", &folder.name)])),
-            Some(&i18n("The smart folder goes from the sidebar. The mail it shows stays where it is.")),
+            Some(&i18n(
+                "The smart folder goes from the sidebar. The mail it shows stays where it is.",
+            )),
         );
         dialog.add_response("cancel", &i18n("Cancel"));
         dialog.add_response("delete", &i18n("Delete"));
@@ -22141,7 +25488,12 @@ impl AppModel {
         dialog.set_close_response("cancel");
         dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
         let s = sender.clone();
-        let rest: Vec<config::SmartFolder> = self.smart_folders.iter().filter(|f| f.id != id).cloned().collect();
+        let rest: Vec<config::SmartFolder> = self
+            .smart_folders
+            .iter()
+            .filter(|f| f.id != id)
+            .cloned()
+            .collect();
         dialog.connect_response(None, move |_, resp| {
             if resp == "delete" {
                 s.input(AppMsg::SetSmartFolders(rest.clone()));
@@ -22167,8 +25519,12 @@ impl AppModel {
         let mut seen_rows: std::collections::HashSet<(u32, u32, u32)> =
             std::collections::HashSet::new();
         for (account_id, path, mut m) in rows {
-            let Some(folders) = self.folders.get(&account_id) else { continue };
-            let Some(f) = folders.iter().find(|f| f.path == path) else { continue };
+            let Some(folders) = self.folders.get(&account_id) else {
+                continue;
+            };
+            let Some(f) = folders.iter().find(|f| f.path == path) else {
+                continue;
+            };
             if matches!(f.kind, FolderKind::Trash | FolderKind::Junk) {
                 continue;
             }
@@ -22198,14 +25554,17 @@ impl AppModel {
                 );
             }
         }
-        let inbox_first = |m: &Message| {
-            self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox)
-        };
+        let inbox_first =
+            |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
         out.sort_by(|a, b| {
-            b.timestamp.cmp(&a.timestamp).then_with(|| inbox_first(a).cmp(&inbox_first(b)))
+            b.timestamp
+                .cmp(&a.timestamp)
+                .then_with(|| inbox_first(a).cmp(&inbox_first(b)))
         });
         let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
-        out.retain(|m| m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone())));
+        out.retain(|m| {
+            m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone()))
+        });
         out
     }
 
@@ -22267,7 +25626,11 @@ impl AppModel {
     /// Whether a message carries the tag with this keyword: the keyword, or
     /// a Gmail label standing for the tag (#374).
     fn carries_tag(&self, m: &Message, keyword: &str) -> bool {
-        match self.tags.iter().find(|t| t.keyword.eq_ignore_ascii_case(keyword)) {
+        match self
+            .tags
+            .iter()
+            .find(|t| t.keyword.eq_ignore_ascii_case(keyword))
+        {
             Some(t) => m.has_tag(t),
             None => m.has_keyword(keyword),
         }
@@ -22291,22 +25654,35 @@ impl AppModel {
         if self.outbox_item(m.account_id, m.id).is_some() {
             return;
         }
-        let Some(path) = self.resolve_folder_path(m) else { return };
+        let Some(path) = self.resolve_folder_path(m) else {
+            return;
+        };
         self.pending_tags.insert(
             (m.account_id, path.clone(), m.uid, keyword.to_lowercase()),
-            (add, std::time::Instant::now() + PENDING_TAG_MAX, keyword.to_string()),
+            (
+                add,
+                std::time::Instant::now() + PENDING_TAG_MAX,
+                keyword.to_string(),
+            ),
         );
-        self.send_to(m.account_id, MailRequest::SetKeyword {
-            path,
-            uid: m.uid,
-            message_id: m.message_id.clone(),
-            keyword: keyword.to_string(),
-            add,
-        });
+        self.send_to(
+            m.account_id,
+            MailRequest::SetKeyword {
+                path,
+                uid: m.uid,
+                message_id: m.message_id.clone(),
+                keyword: keyword.to_string(),
+                add,
+            },
+        );
         let mut patched = m.clone();
         // Taking a tag off takes the Gmail labels that stand for it too
         // (#374), or its pill would stay.
-        match self.tags.iter().find(|t| t.keyword.eq_ignore_ascii_case(keyword)) {
+        match self
+            .tags
+            .iter()
+            .find(|t| t.keyword.eq_ignore_ascii_case(keyword))
+        {
             Some(t) if !add => patched.drop_tag(t),
             _ => patched.set_keyword(keyword, add),
         }
@@ -22323,7 +25699,10 @@ impl AppModel {
         if let Some(msgs) = self.unified_slices.get_mut(&(aid, fid)) {
             msgs.iter_mut().filter(|c| same(c)).for_each(patch);
         }
-        self.current_thread.iter_mut().filter(|c| same(c)).for_each(patch);
+        self.current_thread
+            .iter_mut()
+            .filter(|c| same(c))
+            .for_each(patch);
         if let Some(cur) = self.current.as_mut().filter(|c| same(c)) {
             patch(cur);
         }
@@ -22339,14 +25718,15 @@ impl AppModel {
             labels: labels.clone(),
         });
         if let Some(p) = self.popouts.get(&(aid, id)) {
-            p.controller.emit(MessageWindowInput::SetKeywords(keywords, labels));
+            p.controller
+                .emit(MessageWindowInput::SetKeywords(keywords, labels));
         }
         // In this tag's own view an untagged message has no row to keep.
         if !add
-            && self
-                .tag_view
-                .as_ref()
-                .is_some_and(|(_, v)| v.as_deref().is_some_and(|v| v.eq_ignore_ascii_case(keyword)))
+            && self.tag_view.as_ref().is_some_and(|(_, v)| {
+                v.as_deref()
+                    .is_some_and(|v| v.eq_ignore_ascii_case(keyword))
+            })
         {
             self.message_list.emit(MessageListInput::Remove(id));
         }
@@ -22361,7 +25741,9 @@ impl AppModel {
             self.show_smart_view();
         } else if let Some(sel) = self.selected.as_ref() {
             if let Some(msgs) = self.message_cache.get(&(sel.account_id, sel.folder_id)) {
-                self.message_list.emit(MessageListInput::SetMessages { messages: msgs.to_vec() });
+                self.message_list.emit(MessageListInput::SetMessages {
+                    messages: msgs.to_vec(),
+                });
             }
         }
     }
@@ -22369,8 +25751,13 @@ impl AppModel {
     /// The window a dialog opened from Settings belongs to: Settings while
     /// it is open, else the main window.
     fn dialog_parent(&self) -> Option<gtk::Window> {
-        let prefs = self.prefs.as_ref().map(|p| p.widget().clone().upcast::<gtk::Window>());
-        prefs.filter(|w| w.is_visible()).or_else(|| Some(self.window.clone().upcast()))
+        let prefs = self
+            .prefs
+            .as_ref()
+            .map(|p| p.widget().clone().upcast::<gtk::Window>());
+        prefs
+            .filter(|w| w.is_visible())
+            .or_else(|| Some(self.window.clone().upcast()))
     }
 
     /// Dialog to add an email to GNOME Contacts (choosing the address book).
@@ -22596,22 +25983,39 @@ impl AppModel {
             accounts_sender: accounts.sender().clone(),
             // Sidebar order, so the list reads like the accounts do (#261).
             identities: {
-                let mut enabled: Vec<&AccountConfig> = self.config.iter().filter(|a| a.enabled).collect();
+                let mut enabled: Vec<&AccountConfig> =
+                    self.config.iter().filter(|a| a.enabled).collect();
                 enabled.sort_by_key(|a| {
-                    self.account_order.iter().position(|e| *e == a.email).unwrap_or(usize::MAX)
+                    self.account_order
+                        .iter()
+                        .position(|e| *e == a.email)
+                        .unwrap_or(usize::MAX)
                 });
                 enabled
             }
             .into_iter()
             .flat_map(|a| {
-                std::iter::once((a.name.clone(), a.email.clone())).chain(a.aliases.iter().map(|al| {
-                    let (name, addr) = crate::config::split_identity(&al.identity);
-                    (if name.is_empty() { a.name.clone() } else { name }, addr)
-                }))
+                std::iter::once((a.name.clone(), a.email.clone())).chain(a.aliases.iter().map(
+                    |al| {
+                        let (name, addr) = crate::config::split_identity(&al.identity);
+                        (
+                            if name.is_empty() {
+                                a.name.clone()
+                            } else {
+                                name
+                            },
+                            addr,
+                        )
+                    },
+                ))
             })
             .collect(),
             start_on_accounts: on_accounts,
-            start_page: if on_accounts { Some("accounts".to_string()) } else { self.last_settings_page.clone() },
+            start_page: if on_accounts {
+                Some("accounts".to_string())
+            } else {
+                self.last_settings_page.clone()
+            },
         };
         let prefs = Preferences::builder()
             .transient_for(&self.window)
@@ -22633,7 +26037,10 @@ impl AppModel {
         // Sent through the app so it reaches whichever panel is current
         // when it fires: an open right after the pre-warm may have swapped
         // in a fresh one.
-        if let Some(Ok(i)) = std::env::var("HYLKI_SHOWCASE_EDIT_FILTER").ok().map(|v| v.parse::<usize>()) {
+        if let Some(Ok(i)) = std::env::var("HYLKI_SHOWCASE_EDIT_FILTER")
+            .ok()
+            .map(|v| v.parse::<usize>())
+        {
             if demo_mode() {
                 let s = sender.clone();
                 gtk::glib::timeout_add_seconds_local_once(2, move || {
@@ -22650,7 +26057,10 @@ impl AppModel {
         }
         // HYLKI_SHOWCASE_EDIT_TAG=<index> likewise opens that tag's editor
         // (#147); an index past the end opens the Add Tag dialog.
-        if let Some(Ok(i)) = std::env::var("HYLKI_SHOWCASE_EDIT_TAG").ok().map(|v| v.parse::<usize>()) {
+        if let Some(Ok(i)) = std::env::var("HYLKI_SHOWCASE_EDIT_TAG")
+            .ok()
+            .map(|v| v.parse::<usize>())
+        {
             if demo_mode() {
                 let a = accounts.sender().clone();
                 let n = self.tags.len();
@@ -22665,7 +26075,10 @@ impl AppModel {
         }
         // HYLKI_SHOWCASE_EDIT_SMART=<index> likewise opens that smart
         // folder's editor (#417); an index past the end opens a new one.
-        if let Some(Ok(i)) = std::env::var("HYLKI_SHOWCASE_EDIT_SMART").ok().map(|v| v.parse::<usize>()) {
+        if let Some(Ok(i)) = std::env::var("HYLKI_SHOWCASE_EDIT_SMART")
+            .ok()
+            .map(|v| v.parse::<usize>())
+        {
             if demo_mode() {
                 let a = accounts.sender().clone();
                 let n = self.smart_folders.len();
@@ -22710,13 +26123,13 @@ impl AppModel {
         }
         // The accounts panel component (embedded behind the "Accounts" tab).
         crate::ui::accounts::AccountsInit {
-                accounts,
-                allowed_senders: self.allowed_senders.clone(),
-                blacklist: self.blacklist.clone(),
-                filters: self.filters.clone(),
-                tags: self.tags.clone(),
-                smart_folders: self.smart_folders.clone(),
-            }
+            accounts,
+            allowed_senders: self.allowed_senders.clone(),
+            blacklist: self.blacklist.clone(),
+            filters: self.filters.clone(),
+            tags: self.tags.clone(),
+            smart_folders: self.smart_folders.clone(),
+        }
     }
 
     /// Launch an accounts panel over `init`.
@@ -22724,12 +26137,16 @@ impl AppModel {
         init: crate::ui::accounts::AccountsInit,
         sender: &ComponentSender<Self>,
     ) -> Controller<AccountsWindow> {
-        let accounts = AccountsWindow::builder()
-            .launch(init)
-            .forward(sender.input_sender(), |out| match out {
-                AccountsOutput::Saved { original_email, account } => {
-                    AppMsg::AccountSaved { original_email, account }
-                }
+        let accounts = AccountsWindow::builder().launch(init).forward(
+            sender.input_sender(),
+            |out| match out {
+                AccountsOutput::Saved {
+                    original_email,
+                    account,
+                } => AppMsg::AccountSaved {
+                    original_email,
+                    account,
+                },
                 AccountsOutput::Removed { email } => AppMsg::AccountRemoved { email },
                 AccountsOutput::Reordered(emails) => AppMsg::AccountsReordered(emails),
                 AccountsOutput::EnabledChanged { email, enabled } => {
@@ -22748,11 +26165,14 @@ impl AppModel {
                 AccountsOutput::FindTags => AppMsg::FindTags,
                 AccountsOutput::WantQuota(email) => AppMsg::WantQuota(email),
                 AccountsOutput::WantIdentities(email) => AppMsg::WantIdentities(email),
-                AccountsOutput::LeftEditor(page) => AppMsg::SettingsLeaveEditor { page, ask: false },
+                AccountsOutput::LeftEditor(page) => {
+                    AppMsg::SettingsLeaveEditor { page, ask: false }
+                }
                 AccountsOutput::LeaveNeedsPrompt(page) => {
                     AppMsg::SettingsLeaveEditor { page, ask: true }
                 }
-            });
+            },
+        );
 
         // The host window: the preferences component, carrying the accounts
         // panel behind its other tab.
@@ -22765,7 +26185,9 @@ impl AppModel {
     /// the report to the Tags page — bringing Settings back if it was closed
     /// meanwhile.
     fn finish_tag_scan(&mut self, sender: &ComponentSender<Self>) {
-        let Some(scan) = self.tag_scan.take() else { return };
+        let Some(scan) = self.tag_scan.take() else {
+            return;
+        };
         let many = scan.found.len() > 1;
         let mut merged: Vec<(KeywordFinding, Vec<String>)> = Vec::new();
         for (account_id, findings) in scan.found {
@@ -22773,11 +26195,20 @@ impl AppModel {
                 .accounts
                 .iter()
                 .find(|a| a.id == account_id)
-                .map(|a| if a.name.trim().is_empty() { a.email.clone() } else { a.name.clone() })
+                .map(|a| {
+                    if a.name.trim().is_empty() {
+                        a.email.clone()
+                    } else {
+                        a.name.clone()
+                    }
+                })
                 .unwrap_or_default();
             for f in findings {
                 if crate::worker::is_system_keyword(&f.keyword)
-                    || self.tags.iter().any(|t| t.keyword.eq_ignore_ascii_case(&f.keyword))
+                    || self
+                        .tags
+                        .iter()
+                        .any(|t| t.keyword.eq_ignore_ascii_case(&f.keyword))
                 {
                     continue;
                 }
@@ -22790,7 +26221,10 @@ impl AppModel {
                 } else {
                     vec![f.folders.join(", ")]
                 };
-                match merged.iter_mut().find(|(m, _)| m.keyword.eq_ignore_ascii_case(&f.keyword)) {
+                match merged
+                    .iter_mut()
+                    .find(|(m, _)| m.keyword.eq_ignore_ascii_case(&f.keyword))
+                {
                     Some((m, p)) => {
                         m.count += f.count;
                         if m.name.is_none() {
@@ -22809,14 +26243,21 @@ impl AppModel {
         let proposals: Vec<crate::ui::accounts::TagProposal> = merged
             .into_iter()
             .map(|(f, places)| {
-                let name = f.name.clone().unwrap_or_else(|| config::Tag::name_for_keyword(&f.keyword));
+                let name = f
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| config::Tag::name_for_keyword(&f.keyword));
                 let color = f
                     .color
                     .clone()
                     .unwrap_or_else(|| config::Tag::color_for_keyword(&f.keyword, &taken));
                 taken.push(color.clone());
                 crate::ui::accounts::TagProposal {
-                    tag: config::Tag { name, keyword: f.keyword, color },
+                    tag: config::Tag {
+                        name,
+                        keyword: f.keyword,
+                        color,
+                    },
                     count: f.count,
                     places,
                 }
@@ -22840,7 +26281,10 @@ impl AppModel {
         add_new: bool,
     ) {
         let t_open = std::time::Instant::now();
-        let hidden = self.prefs.as_ref().is_some_and(|p| !p.widget().is_visible());
+        let hidden = self
+            .prefs
+            .as_ref()
+            .is_some_and(|p| !p.widget().is_visible());
         if self.prefs.is_none() {
             self.build_settings_window(sender, on_accounts);
         } else if hidden {
@@ -22852,7 +26296,9 @@ impl AppModel {
             let page = if on_accounts {
                 "accounts".to_string()
             } else {
-                self.last_settings_page.clone().unwrap_or_else(|| "general".to_string())
+                self.last_settings_page
+                    .clone()
+                    .unwrap_or_else(|| "general".to_string())
             };
             if self.accounts_seed.as_deref() == Some(seed.as_str()) {
                 if let Some(a) = &self.accounts_win {
@@ -22898,7 +26344,10 @@ impl AppModel {
         {
             let t = t_open;
             gtk::glib::idle_add_local_once(move || {
-                tracing::debug!("settings window: first idle after open at {:?}", t.elapsed());
+                tracing::debug!(
+                    "settings window: first idle after open at {:?}",
+                    t.elapsed()
+                );
             });
             if let Some(p) = &self.prefs {
                 p.widget().add_tick_callback(move |_, _| {
@@ -22931,7 +26380,9 @@ impl AppModel {
         let s = sender.clone();
         dialog.connect_response(None, move |_, resp| {
             if resp == "remove" {
-                s.input(AppMsg::AccountRemoved { email: email.clone() });
+                s.input(AppMsg::AccountRemoved {
+                    email: email.clone(),
+                });
             }
         });
         dialog.present();
@@ -23003,10 +26454,13 @@ impl AppModel {
 
         if cfg!(feature = "beta") {
             let warn = gtk::Label::new(Some(
-                i18n("This is a beta build for trying upcoming changes early. \
+                i18n(
+                    "This is a beta build for trying upcoming changes early. \
                  Expect bugs and instability — please report anything broken \
                  on GitHub. It shares your accounts and mail with the stable \
-                 Hylki install.").as_str(),
+                 Hylki install.",
+                )
+                .as_str(),
             ));
             warn.set_wrap(true);
             warn.set_justify(gtk::Justification::Center);
@@ -23065,7 +26519,10 @@ impl AppModel {
         links.add_css_class("boxed-list");
         links.set_selection_mode(gtk::SelectionMode::None);
         let mk_row = |title: &str, url: &str| -> adw::ActionRow {
-            let row = adw::ActionRow::builder().title(title).activatable(true).build();
+            let row = adw::ActionRow::builder()
+                .title(title)
+                .activatable(true)
+                .build();
             row.set_tooltip_text(Some(url));
             row.add_suffix(&gtk::Image::from_icon_name("adw-external-link-symbolic"));
             let u = url.to_string();
@@ -23079,8 +26536,14 @@ impl AppModel {
         ));
         links.append(&mk_row("Discord", "https://discord.gg/YfEJ4b6PFW"));
         links.append(&mk_row("hyprlab@proton.me", "mailto:hyprlab@proton.me"));
-        links.append(&mk_row(&i18n("Source Code"), "https://github.com/hyprlab/hylki"));
-        links.append(&mk_row(&i18n("License (GNU AGPL v3)"), "https://www.gnu.org/licenses/agpl-3.0.html"));
+        links.append(&mk_row(
+            &i18n("Source Code"),
+            "https://github.com/hyprlab/hylki",
+        ));
+        links.append(&mk_row(
+            &i18n("License (GNU AGPL v3)"),
+            "https://www.gnu.org/licenses/agpl-3.0.html",
+        ));
 
         // Buy Me a Coffee — with a coffee-cup glyph as its leading icon.
         let coffee = adw::ActionRow::builder()
@@ -23092,12 +26555,14 @@ impl AppModel {
         cup.add_css_class("about-coffee");
         coffee.add_prefix(&cup);
         coffee.add_suffix(&gtk::Image::from_icon_name("adw-external-link-symbolic"));
-        coffee.connect_activated(move |_| crate::oauth::open_uri("https://buymeacoffee.com/hyprlab"));
+        coffee
+            .connect_activated(move |_| crate::oauth::open_uri("https://buymeacoffee.com/hyprlab"));
         links.append(&coffee);
         page.append(&links);
 
         // Contributors — people outside Hyprlab whose patches are in the app.
-        let thanks_title = gtk::Label::new(Some(i18n("Special thanks to these contributors").as_str()));
+        let thanks_title =
+            gtk::Label::new(Some(i18n("Special thanks to these contributors").as_str()));
         thanks_title.add_css_class("heading");
         thanks_title.set_halign(gtk::Align::Start);
         thanks_title.set_margin_top(20);
@@ -23190,9 +26655,18 @@ impl AppModel {
             return;
         };
         self.note_flag_star(m, &path, starred);
-        self.send_to(m.account_id, MailRequest::SetFlagged { path, uid: m.uid, flagged: starred });
-        self.message_list
-            .emit(MessageListInput::SetStarred { slot: (m.account_id, m.folder_id, m.id), starred });
+        self.send_to(
+            m.account_id,
+            MailRequest::SetFlagged {
+                path,
+                uid: m.uid,
+                flagged: starred,
+            },
+        );
+        self.message_list.emit(MessageListInput::SetStarred {
+            slot: (m.account_id, m.folder_id, m.id),
+            starred,
+        });
         for tm in self
             .current_thread
             .iter_mut()
@@ -23216,7 +26690,10 @@ impl AppModel {
                 id: m.id,
                 starred,
             });
-        } else if self.current.as_ref().is_some_and(|c| c.id == m.id && c.account_id == m.account_id)
+        } else if self
+            .current
+            .as_ref()
+            .is_some_and(|c| c.id == m.id && c.account_id == m.account_id)
         {
             let current = self.current.clone();
             self.show_message(current, false);
@@ -23240,17 +26717,28 @@ impl AppModel {
         let Some(path) = self.resolve_folder_path(m) else {
             return;
         };
-        self.pending_seen
-            .insert((m.account_id, path.clone(), m.uid), (read, std::time::Instant::now()));
-        self.send_to(m.account_id, MailRequest::SetSeen { path, uid: m.uid, seen: read });
+        self.pending_seen.insert(
+            (m.account_id, path.clone(), m.uid),
+            (read, std::time::Instant::now()),
+        );
+        self.send_to(
+            m.account_id,
+            MailRequest::SetSeen {
+                path,
+                uid: m.uid,
+                seen: read,
+            },
+        );
         if read {
             // The mail was read (or marked read) in the app — the desktop
             // notification for this account's new mail is answered, clear it
             // instead of leaving it stranded in the panel (issue #41).
             crate::notify::withdraw_mail(m.account_id);
         }
-        self.message_list
-            .emit(MessageListInput::SetRead { slot: (m.account_id, m.folder_id, m.id), read });
+        self.message_list.emit(MessageListInput::SetRead {
+            slot: (m.account_id, m.folder_id, m.id),
+            read,
+        });
         self.set_cached_unread(m.account_id, m.folder_id, m.id, !read);
         if let Some(p) = self.popouts.get(&(m.account_id, m.id)) {
             p.controller.emit(MessageWindowInput::SetUnread(!read));
@@ -23331,7 +26819,13 @@ impl AppModel {
             let mut seen = HashSet::new();
             messages
                 .into_iter()
-                .filter_map(|m| if self.archives_in_place(&m) { self.inbox_copy(&m) } else { Some(m) })
+                .filter_map(|m| {
+                    if self.archives_in_place(&m) {
+                        self.inbox_copy(&m)
+                    } else {
+                        Some(m)
+                    }
+                })
                 .filter(|m| seen.insert((m.account_id, m.id)))
                 .collect()
         } else {
@@ -23351,12 +26845,13 @@ impl AppModel {
         };
         // (account, source path) → (dest path, uids, the rows for undo).
         // dest is per-account.
-        let mut groups: HashMap<(u32, String), (String, Vec<u32>, Vec<Message>)> =
-            HashMap::new();
+        let mut groups: HashMap<(u32, String), (String, Vec<u32>, Vec<Message>)> = HashMap::new();
         let mut removed_ids = Vec::with_capacity(messages.len());
         let mut missing_dest = false;
         for m in &messages {
-            let Some(src) = self.resolve_folder_path(m) else { continue };
+            let Some(src) = self.resolve_folder_path(m) else {
+                continue;
+            };
             let Some(dest) = self.folder_path_for(m.account_id, kind) else {
                 missing_dest = true;
                 continue;
@@ -23374,7 +26869,10 @@ impl AppModel {
         }
         if missing_dest {
             self.notifications.emit(NotifyInput::Push {
-                text: i18n_f("No {v1} folder available for some messages", &[("v1", &(kind_label(kind)).to_string())]),
+                text: i18n_f(
+                    "No {v1} folder available for some messages",
+                    &[("v1", &(kind_label(kind)).to_string())],
+                ),
                 error: true,
                 connectivity: false,
             });
@@ -23395,24 +26893,41 @@ impl AppModel {
                 self.push_undo_move(account_id, &dest, &src, rows);
             }
             let req = if action == BulkAction::NotSpam {
-                MailRequest::MarkHamMany { path: src, uids, dest }
+                MailRequest::MarkHamMany {
+                    path: src,
+                    uids,
+                    dest,
+                }
             } else {
-                MailRequest::MoveMessages { path: src, uids, dest }
+                MailRequest::MoveMessages {
+                    path: src,
+                    uids,
+                    dest,
+                }
             };
             self.send_to(account_id, req);
         }
         self.update_busy_indicator();
-        self.message_list.emit(MessageListInput::RemoveMany(removed_ids));
+        self.message_list
+            .emit(MessageListInput::RemoveMany(removed_ids));
         self.push_unread_counts();
     }
 
     /// Whether the account is Gmail, where every folder but the Inbox, Trash
     /// and Spam is a label.
     fn gmail_labels(&self, account_id: u32) -> bool {
-        self.config.get(account_id.saturating_sub(1) as usize).is_some_and(|c| {
-            c.protocol == config::Protocol::Imap
-                && crate::worker::has_gmail_labels(c, self.folders.get(&account_id).map(Vec::as_slice).unwrap_or(&[]))
-        })
+        self.config
+            .get(account_id.saturating_sub(1) as usize)
+            .is_some_and(|c| {
+                c.protocol == config::Protocol::Imap
+                    && crate::worker::has_gmail_labels(
+                        c,
+                        self.folders
+                            .get(&account_id)
+                            .map(Vec::as_slice)
+                            .unwrap_or(&[]),
+                    )
+            })
     }
 
     /// Whether archiving `m` takes it out of the Inbox rather than out of
@@ -23423,7 +26938,12 @@ impl AppModel {
         self.gmail_labels(m.account_id)
             && matches!(
                 self.folder_kind(m.account_id, m.folder_id),
-                Some(FolderKind::Starred | FolderKind::Sent | FolderKind::Archive | FolderKind::Custom)
+                Some(
+                    FolderKind::Starred
+                        | FolderKind::Sent
+                        | FolderKind::Archive
+                        | FolderKind::Custom
+                )
             )
     }
 
@@ -23435,7 +26955,8 @@ impl AppModel {
         }
         let key = (m.account_id, self.inbox_of(m.account_id)?.id);
         self.message_cache
-            .get(&key).map(|c| &**c)
+            .get(&key)
+            .map(|c| &**c)
             .into_iter()
             .chain(self.unified_slices.get(&key))
             .flatten()
@@ -23471,7 +26992,11 @@ impl AppModel {
                 *n = n.saturating_sub(1);
             }
         }
-        if self.current.as_ref().is_some_and(|c| c.id == m.id && c.account_id == m.account_id) {
+        if self
+            .current
+            .as_ref()
+            .is_some_and(|c| c.id == m.id && c.account_id == m.account_id)
+        {
             // Drop the reader's view state, but DON'T blank it here: the list's
             // Remove handler advances to the next message (or emits SelectionCleared
             // when the folder is empty), which drives the reader. Blanking now would
@@ -23489,7 +27014,10 @@ impl AppModel {
             // The conversation moved on first, so the message is no longer
             // the one the reader was opened on and nothing here closes it.
             self.discard_message_local(m);
-            self.message_list.emit(MessageListInput::LeaveConversation { gone: (m.account_id, m.id), head });
+            self.message_list.emit(MessageListInput::LeaveConversation {
+                gone: (m.account_id, m.id),
+                head,
+            });
             self.push_unread_counts();
             return;
         }
@@ -23524,9 +27052,13 @@ impl AppModel {
         self.current_thread.remove(pos);
         self.listed_thread.retain(|k| *k != key);
         self.list_selection.retain(|k| *k != key);
-        self.list_slots.retain(|&(a, f, id)| (a, f, id) != (m.account_id, m.folder_id, m.id));
+        self.list_slots
+            .retain(|&(a, f, id)| (a, f, id) != (m.account_id, m.folder_id, m.id));
         self.list_heard.retain(|k| *k != key);
-        let was_current = self.current.as_ref().is_some_and(|c| (c.account_id, c.id) == key);
+        let was_current = self
+            .current
+            .as_ref()
+            .is_some_and(|c| (c.account_id, c.id) == key);
         if was_current {
             self.thread_key = Some(body_key(&head));
             self.current = Some(head.clone());
@@ -23534,12 +27066,18 @@ impl AppModel {
         // The card picked in the reader was the one that went: the selection
         // is the conversation's row again, as when it was opened, so the
         // toolbar still has a message to act on.
-        if let Some(c) = self.current.as_ref().filter(|_| self.list_selection.is_empty()) {
+        if let Some(c) = self
+            .current
+            .as_ref()
+            .filter(|_| self.list_selection.is_empty())
+        {
             self.list_selection = vec![(c.account_id, c.id)];
             self.list_slots = vec![(c.account_id, c.folder_id, c.id)];
             self.list_heard = self.list_selection.clone();
             self.selection_from_cards = false;
-            self.message_view.emit(MessageViewInput::SetSelectedCards(self.list_selection.clone()));
+            self.message_view.emit(MessageViewInput::SetSelectedCards(
+                self.list_selection.clone(),
+            ));
         }
         if self.current_thread.len() > 1 {
             self.thread_painted = true;
@@ -23579,9 +27117,7 @@ impl AppModel {
         folder_id: u32,
         messages: Vec<Message>,
     ) -> Vec<Message> {
-        if self.blacklist.is_empty()
-            || self.inbox_of(account_id).map(|f| f.id) != Some(folder_id)
-        {
+        if self.blacklist.is_empty() || self.inbox_of(account_id).map(|f| f.id) != Some(folder_id) {
             return messages;
         }
         let folders = self.folders.get(&account_id);
@@ -23595,11 +27131,14 @@ impl AppModel {
         for m in messages {
             if self.is_blacklisted(&m.from_addr) {
                 if let (Some(trash), Some(src)) = (&trash, &src) {
-                    self.send_to(account_id, MailRequest::MoveMessage {
-                        path: src.clone(),
-                        uid: m.uid,
-                        dest: trash.clone(),
-                    });
+                    self.send_to(
+                        account_id,
+                        MailRequest::MoveMessage {
+                            path: src.clone(),
+                            uid: m.uid,
+                            dest: trash.clone(),
+                        },
+                    );
                 }
             } else {
                 kept.push(m);
@@ -23694,9 +27233,14 @@ impl AppModel {
         let files_replies = self
             .effective_config()
             .get(account_id.saturating_sub(1) as usize)
-            .is_some_and(|c| c.reply_copies != crate::config::ReplyCopies::WithSent && !c.server_saves_sent);
-        let diverted = (files_replies || self.sent_copy_path(account_id).as_deref() == src.as_deref())
-            && self.folder_of_kind(account_id, FolderKind::Sent).map(|f| f.path.as_str())
+            .is_some_and(|c| {
+                c.reply_copies != crate::config::ReplyCopies::WithSent && !c.server_saves_sent
+            });
+        let diverted = (files_replies
+            || self.sent_copy_path(account_id).as_deref() == src.as_deref())
+            && self
+                .folder_of_kind(account_id, FolderKind::Sent)
+                .map(|f| f.path.as_str())
                 != src.as_deref();
         let own: Vec<String> = if diverted {
             self.own_identities(account_id)
@@ -23706,7 +27250,11 @@ impl AppModel {
         let hits = self.body_hits.get(&(account_id, folder_id));
         // The address books are read once per pass, and only when a rule asks
         // for them. An empty read counts as unknown: see FilterField::FromInContacts.
-        let contacts = if rules.iter().any(|r| r.needs_contacts()) { self.saved_addresses.get() } else { None };
+        let contacts = if rules.iter().any(|r| r.needs_contacts()) {
+            self.saved_addresses.get()
+        } else {
+            None
+        };
         for mut m in messages {
             if own.iter().any(|a| a.eq_ignore_ascii_case(&m.from_addr)) {
                 kept.push(m);
@@ -23717,7 +27265,10 @@ impl AppModel {
                 .filter(|s| !s.trim().is_empty())
                 .collect::<Vec<_>>()
                 .join(", ");
-            let body_hits = hits.and_then(|h| h.get(&m.uid)).map(Vec::as_slice).unwrap_or(&[]);
+            let body_hits = hits
+                .and_then(|h| h.get(&m.uid))
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
             let input = config::FilterInput {
                 from_addr: &m.from_addr,
                 from_name: &m.from_name,
@@ -23726,7 +27277,11 @@ impl AppModel {
                 reply_to: &m.reply_to,
                 // The list rarely carries a body (the demo's does); the
                 // preview is what a sync brings for every message.
-                body: if m.body.is_empty() { &m.preview } else { &m.body },
+                body: if m.body.is_empty() {
+                    &m.preview
+                } else {
+                    &m.body
+                },
                 body_hits,
                 contacts: contacts.as_deref(),
             };
@@ -23751,7 +27306,11 @@ impl AppModel {
                 let wanted: Vec<(String, String)> = matching
                     .iter()
                     .filter(|r| !r.tag.is_empty() && !self.carries_tag(&m, &r.tag))
-                    .filter(|r| self.tags.iter().any(|t| t.keyword.eq_ignore_ascii_case(&r.tag)))
+                    .filter(|r| {
+                        self.tags
+                            .iter()
+                            .any(|t| t.keyword.eq_ignore_ascii_case(&r.tag))
+                    })
                     .map(|r| (r.tag.clone(), r.label()))
                     .collect();
                 for (tag, rule) in wanted {
@@ -23760,13 +27319,16 @@ impl AppModel {
                     }
                     tagged += 1;
                     tracing::info!("filter: {} tagged {tag} [{rule}]", m.from_addr);
-                    self.send_to(account_id, MailRequest::SetKeyword {
-                        path: src.clone(),
-                        uid: m.uid,
-                        message_id: m.message_id.clone(),
-                        keyword: tag.clone(),
-                        add: true,
-                    });
+                    self.send_to(
+                        account_id,
+                        MailRequest::SetKeyword {
+                            path: src.clone(),
+                            uid: m.uid,
+                            message_id: m.message_id.clone(),
+                            keyword: tag.clone(),
+                            add: true,
+                        },
+                    );
                     m.keywords.push(tag);
                 }
             }
@@ -23793,11 +27355,14 @@ impl AppModel {
                         rule.dest_path,
                         rule.label(),
                     );
-                    self.send_to(account_id, MailRequest::MoveMessage {
-                        path: src.clone(),
-                        uid: m.uid,
-                        dest: rule.dest_path.clone(),
-                    });
+                    self.send_to(
+                        account_id,
+                        MailRequest::MoveMessage {
+                            path: src.clone(),
+                            uid: m.uid,
+                            dest: rule.dest_path.clone(),
+                        },
+                    );
                     filed.push((m, rule.dest_path.clone()));
                 }
                 _ => kept.push(m),
@@ -23806,15 +27371,24 @@ impl AppModel {
         // UIDs absent from this sync have completed their move server-side;
         // dropping them keeps the set from growing without bound.
         if !still_pending.is_empty() {
-            self.filter_moved.insert((account_id, folder_id), still_pending);
+            self.filter_moved
+                .insert((account_id, folder_id), still_pending);
         }
         if manual {
             let folder = src.as_deref().unwrap_or("?");
             for (rule, n) in rules.iter().zip(&per_rule) {
-                tracing::info!("filter: [{}] matched {n} of {checked} in {folder}", rule.label());
+                tracing::info!(
+                    "filter: [{}] matched {n} of {checked} in {folder}",
+                    rule.label()
+                );
             }
         }
-        let pass = FolderTally { checked, matched, tagged, filed: filed.len() };
+        let pass = FolderTally {
+            checked,
+            matched,
+            tagged,
+            filed: filed.len(),
+        };
         (kept, filed, pass)
     }
 
@@ -23824,7 +27398,9 @@ impl AppModel {
     fn filter_run_targets(&self, targets: Vec<(u32, u32)>) -> Vec<(u32, u32)> {
         let has_rules = |account_id: u32| {
             self.email_of(account_id).is_some_and(|email| {
-                self.filters.iter().any(|r| r.account_email.eq_ignore_ascii_case(&email))
+                self.filters
+                    .iter()
+                    .any(|r| r.account_email.eq_ignore_ascii_case(&email))
             })
         };
         let targets = if targets.is_empty() {
@@ -23861,7 +27437,10 @@ impl AppModel {
         );
         self.set_filters_applying(true);
         self.filter_run = Some(FilterRun {
-            folders: targets.iter().map(|t| (*t, FolderTally::default())).collect(),
+            folders: targets
+                .iter()
+                .map(|t| (*t, FolderTally::default()))
+                .collect(),
             pending: targets.iter().copied().collect(),
             reported: false,
             dialog: None,
@@ -23907,7 +27486,8 @@ impl AppModel {
             .filter(|w| w.is_visible())
             .map(|w| w.upcast())
             .or_else(|| Some(self.window.clone().upcast()));
-        let dialog = adw::MessageDialog::new(parent.as_ref(), Some(&i18n("Applying Filters")), None);
+        let dialog =
+            adw::MessageDialog::new(parent.as_ref(), Some(&i18n("Applying Filters")), None);
         dialog.set_body_use_markup(false);
         dialog.add_response(FILTER_RUN_RESPONSE, &i18n("Run in Background"));
         dialog.set_close_response(FILTER_RUN_RESPONSE);
@@ -23933,7 +27513,11 @@ impl AppModel {
             });
         }
         dialog.present();
-        FilterRunDialog { dialog, spinner, body }
+        FilterRunDialog {
+            dialog,
+            spinner,
+            body,
+        }
     }
 
     /// Rewrite the progress dialog's live count, if it is still up and still
@@ -23941,7 +27525,9 @@ impl AppModel {
     /// a later pass (the scope outlives the report, so an ordinary sync of
     /// one of these folders still runs the rules) must not write over it.
     fn update_filter_run_dialog(&self) {
-        let Some(run) = self.filter_run.as_ref() else { return };
+        let Some(run) = self.filter_run.as_ref() else {
+            return;
+        };
         if run.reported {
             return;
         }
@@ -24005,7 +27591,9 @@ impl AppModel {
 
     /// One folder of a manual run has been to the server and back.
     fn filter_run_folder_synced(&mut self, account_id: u32, folder_id: u32) {
-        let Some(run) = self.filter_run.as_mut() else { return };
+        let Some(run) = self.filter_run.as_mut() else {
+            return;
+        };
         if !run.pending.remove(&(account_id, folder_id)) {
             return;
         }
@@ -24021,7 +27609,9 @@ impl AppModel {
     /// once it has reported, the dialog was only holding the report, so this
     /// is an ordinary close.
     fn filter_run_dismissed(&mut self) {
-        let Some(run) = self.filter_run.as_mut() else { return };
+        let Some(run) = self.filter_run.as_mut() else {
+            return;
+        };
         run.dialog = None;
         if run.reported {
             self.filter_run = None;
@@ -24035,7 +27625,9 @@ impl AppModel {
     /// and the server's answer to the same load is filtered too. Reports once
     /// either way.
     fn report_filter_run(&mut self, end: bool) {
-        let Some(run) = self.filter_run.as_mut() else { return };
+        let Some(run) = self.filter_run.as_mut() else {
+            return;
+        };
         if std::mem::replace(&mut run.reported, true) {
             if end {
                 self.filter_run = None;
@@ -24053,7 +27645,8 @@ impl AppModel {
             t.filed,
         );
         self.set_filters_applying(false);
-        self.notifications.emit(NotifyInput::SetStatus(String::new()));
+        self.notifications
+            .emit(NotifyInput::SetStatus(String::new()));
         // Always says how many messages the rules were held up against: with
         // nothing matching, that is the whole answer to "are my rules working"
         // (#198). The plural follows that count throughout.
@@ -24113,7 +27706,8 @@ impl AppModel {
                 d.body.remove_css_class("dim-label");
                 d.body.set_label(&text);
                 d.dialog.set_heading(Some(&i18n("Filters Applied")));
-                d.dialog.set_response_label(FILTER_RUN_RESPONSE, &i18n("Close"));
+                d.dialog
+                    .set_response_label(FILTER_RUN_RESPONSE, &i18n("Close"));
                 d.dialog.set_response_appearance(
                     FILTER_RUN_RESPONSE,
                     adw::ResponseAppearance::Suggested,
@@ -24174,7 +27768,12 @@ impl AppModel {
     /// own is a placeholder. Only answers use it: a reply to an encrypted
     /// message starts encrypted, and its subject travels inside again.
     fn decrypted_subject(&self, m: &Message) -> Option<String> {
-        self.sender_cache.get(&body_key(m))?.pgp.as_ref()?.subject.clone()
+        self.sender_cache
+            .get(&body_key(m))?
+            .pgp
+            .as_ref()?
+            .subject
+            .clone()
     }
 
     /// A composer quoting or copying `m` loads its remote pictures only
@@ -24202,7 +27801,10 @@ impl AppModel {
     /// the account has neither — the message is sent without a copy.
     /// The lists left, as the readers take them: key → when.
     fn unsubscribed_map(&self) -> HashMap<String, i64> {
-        self.unsubscribed.iter().map(|l| (l.key.clone(), l.at)).collect()
+        self.unsubscribed
+            .iter()
+            .map(|l| (l.key.clone(), l.at))
+            .collect()
     }
 
     /// Tell every reader (the main one and the pop-outs) where a card's
@@ -24240,9 +27842,11 @@ impl AppModel {
         });
         config::save_unsubscribed(&self.unsubscribed);
         let map = self.unsubscribed_map();
-        self.message_view.emit(MessageViewInput::SetUnsubscribed(map.clone()));
+        self.message_view
+            .emit(MessageViewInput::SetUnsubscribed(map.clone()));
         for p in self.popouts.values() {
-            p.controller.emit(MessageWindowInput::SetUnsubscribed(map.clone()));
+            p.controller
+                .emit(MessageWindowInput::SetUnsubscribed(map.clone()));
         }
     }
 
@@ -24255,8 +27859,9 @@ impl AppModel {
         for (i, cfg) in self.effective_config().iter().enumerate() {
             let mut addresses = vec![cfg.email.trim().to_lowercase()];
             for alias in &cfg.aliases {
-                if let Some((_, addr)) =
-                    crate::worker::parse_recipients(&alias.identity).into_iter().next()
+                if let Some((_, addr)) = crate::worker::parse_recipients(&alias.identity)
+                    .into_iter()
+                    .next()
                 {
                     addresses.push(addr.to_lowercase());
                 }
@@ -24354,14 +27959,19 @@ impl AppModel {
                 i18n_f("Declined: {subject}", &[("subject", &invite.summary)])
             }
         };
-        let who = if name.trim().is_empty() { address.clone() } else { name.clone() };
+        let who = if name.trim().is_empty() {
+            address.clone()
+        } else {
+            name.clone()
+        };
         let body = match rsvp {
             crate::models::Rsvp::Accepted => {
                 i18n_f("{name} has accepted this invitation.", &[("name", &who)])
             }
-            crate::models::Rsvp::Tentative => {
-                i18n_f("{name} has tentatively accepted this invitation.", &[("name", &who)])
-            }
+            crate::models::Rsvp::Tentative => i18n_f(
+                "{name} has tentatively accepted this invitation.",
+                &[("name", &who)],
+            ),
             crate::models::Rsvp::Declined => {
                 i18n_f("{name} has declined this invitation.", &[("name", &who)])
             }
@@ -24394,7 +28004,11 @@ impl AppModel {
         };
         self.send_to(
             message.account_id,
-            MailRequest::Send { message: Box::new(out), sent_path: None, ticket: 0 },
+            MailRequest::Send {
+                message: Box::new(out),
+                sent_path: None,
+                ticket: 0,
+            },
         );
         self.record_invite_answer(invite, rsvp);
         self.notifications.emit(NotifyInput::Push {
@@ -24423,11 +28037,15 @@ impl AppModel {
         let Some(cfg) = cfg.get(message.account_id.saturating_sub(1) as usize) else {
             return (None, String::new(), String::new());
         };
-        let invited: Vec<String> =
-            invite.attendees.iter().map(|a| a.email.to_lowercase()).collect();
+        let invited: Vec<String> = invite
+            .attendees
+            .iter()
+            .map(|a| a.email.to_lowercase())
+            .collect();
         for alias in &cfg.aliases {
-            if let Some((name, addr)) =
-                crate::worker::parse_recipients(&alias.identity).into_iter().next()
+            if let Some((name, addr)) = crate::worker::parse_recipients(&alias.identity)
+                .into_iter()
+                .next()
             {
                 if invited.iter().any(|i| *i == addr.to_lowercase()) {
                     return (Some(alias.identity.clone()), name, addr);
@@ -24454,11 +28072,7 @@ impl AppModel {
     }
 
     /// Remember an answer, and tell the readers so the banner says so.
-    fn record_invite_answer(
-        &mut self,
-        invite: &crate::models::Invite,
-        rsvp: crate::models::Rsvp,
-    ) {
+    fn record_invite_answer(&mut self, invite: &crate::models::Invite, rsvp: crate::models::Rsvp) {
         let key = invite.key();
         if key.is_empty() {
             return;
@@ -24472,9 +28086,11 @@ impl AppModel {
         });
         config::save_invite_answers(&self.invite_answers);
         let map = self.invite_answers_map();
-        self.message_view.emit(MessageViewInput::SetInviteAnswers(map.clone()));
+        self.message_view
+            .emit(MessageViewInput::SetInviteAnswers(map.clone()));
         for p in self.popouts.values() {
-            p.controller.emit(MessageWindowInput::SetInviteAnswers(map.clone()));
+            p.controller
+                .emit(MessageWindowInput::SetInviteAnswers(map.clone()));
         }
     }
 
@@ -24493,7 +28109,10 @@ impl AppModel {
             .map(|(_, e)| e.to_lowercase())
             .collect();
         for alias in &cfg.aliases {
-            if let Some((_, addr)) = crate::worker::parse_recipients(&alias.identity).into_iter().next() {
+            if let Some((_, addr)) = crate::worker::parse_recipients(&alias.identity)
+                .into_iter()
+                .next()
+            {
                 if recipients.iter().any(|r| *r == addr.to_lowercase()) {
                     return (Some(alias.identity.clone()), addr);
                 }
@@ -24508,33 +28127,53 @@ impl AppModel {
     fn unsubscribe_mail_target(
         info: &crate::models::Unsubscribe,
     ) -> Option<crate::unsubscribe::MailtoTarget> {
-        if let Some(t) = info.mailto.as_deref().and_then(crate::unsubscribe::parse_mailto) {
+        if let Some(t) = info
+            .mailto
+            .as_deref()
+            .and_then(crate::unsubscribe::parse_mailto)
+        {
             return Some(t);
         }
-        info.reply.as_ref().map(|r| crate::unsubscribe::MailtoTarget {
-            to: r.to.clone(),
-            subject: r.subject.clone(),
-            body: r.subject.clone(),
-        })
+        info.reply
+            .as_ref()
+            .map(|r| crate::unsubscribe::MailtoTarget {
+                to: r.to.clone(),
+                subject: r.subject.clone(),
+                body: r.subject.clone(),
+            })
     }
 
     /// The mail in an account from `addr` that leaving a list can take with
     /// it (#407): every folder but Sent, Drafts, Templates and Trash, where
     /// it is either the user's own or already on its way out.
     fn mail_from_address(&self, account_id: u32, addr: &str) -> Vec<Message> {
-        let Some(cache) = self.cache.as_ref() else { return Vec::new() };
-        let Some(folders) = self.folders.get(&account_id) else { return Vec::new() };
+        let Some(cache) = self.cache.as_ref() else {
+            return Vec::new();
+        };
+        let Some(folders) = self.folders.get(&account_id) else {
+            return Vec::new();
+        };
         let mut by_path: HashMap<String, std::collections::HashSet<u32>> = HashMap::new();
         for (path, uid) in cache.messages_from_address(account_id, addr) {
             by_path.entry(path).or_default().insert(uid);
         }
         let mut out = Vec::new();
         for f in folders {
-            if matches!(f.kind, FolderKind::Sent | FolderKind::Drafts | FolderKind::Templates | FolderKind::Trash) {
+            if matches!(
+                f.kind,
+                FolderKind::Sent | FolderKind::Drafts | FolderKind::Templates | FolderKind::Trash
+            ) {
                 continue;
             }
-            let Some(uids) = by_path.get(&f.path) else { continue };
-            out.extend(cache.load_messages(account_id, &f.path, f.id).into_iter().filter(|m| uids.contains(&m.uid)));
+            let Some(uids) = by_path.get(&f.path) else {
+                continue;
+            };
+            out.extend(
+                cache
+                    .load_messages(account_id, &f.path, f.id)
+                    .into_iter()
+                    .filter(|m| uids.contains(&m.uid)),
+            );
         }
         out
     }
@@ -24547,7 +28186,10 @@ impl AppModel {
         info: crate::models::Unsubscribe,
         sender: &ComponentSender<Self>,
     ) {
-        let heading = i18n_f("Unsubscribe from {name}?", &[("name", &sender_label(&message))]);
+        let heading = i18n_f(
+            "Unsubscribe from {name}?",
+            &[("name", &sender_label(&message))],
+        );
         let mut body = if info.one_click.is_some() {
             i18n("Hylki will ask the list to stop sending you mail. A list can take a few days to act on the request.")
         } else if let Some(t) = Self::unsubscribe_mail_target(&info) {
@@ -24563,7 +28205,9 @@ impl AppModel {
         // guess, but the user should know it is one before anything is sent.
         if !info.in_headers {
             body.push(' ');
-            body.push_str(&i18n("This message carries no unsubscribe header, so Hylki is going by the link in it."));
+            body.push_str(&i18n(
+                "This message carries no unsubscribe header, so Hylki is going by the link in it.",
+            ));
         }
         let parent = relm4::main_application()
             .active_window()
@@ -24576,7 +28220,9 @@ impl AppModel {
         dialog.set_response_appearance("unsub", adw::ResponseAppearance::Suggested);
         // The mail already received from the list's address can go with it
         // (#407). Off unless ticked: the address may send other mail too.
-        let n = self.mail_from_address(message.account_id, &message.from_addr).len();
+        let n = self
+            .mail_from_address(message.account_id, &message.from_addr)
+            .len();
         let delete_too = (n > 0).then(|| {
             let check = gtk::CheckButton::with_label(&ni18n_f(
                 "Also delete the message from {addr}",
@@ -24593,7 +28239,10 @@ impl AppModel {
         let info = Box::new(info);
         dialog.connect_response(None, move |_, resp| {
             if resp == "unsub" {
-                s.input(AppMsg::UnsubscribeGo { message: message.clone(), info: info.clone() });
+                s.input(AppMsg::UnsubscribeGo {
+                    message: message.clone(),
+                    info: info.clone(),
+                });
                 if delete_too.as_ref().is_some_and(|c| c.is_active()) {
                     s.input(AppMsg::DeleteFromAddress {
                         account_id: message.account_id,
@@ -24646,20 +28295,33 @@ impl AppModel {
             let s = sender.clone();
             let info = Box::new(info);
             std::thread::spawn(move || match crate::unsubscribe::one_click_post(&url) {
-                Ok(()) => s.input(AppMsg::UnsubscribeDone { message, result: Ok(true) }),
+                Ok(()) => s.input(AppMsg::UnsubscribeDone {
+                    message,
+                    result: Ok(true),
+                }),
                 Err(why) if info.mailto.is_some() || info.reply.is_some() => {
-                    tracing::warn!("one-click unsubscribe failed ({why}); writing to the list instead");
+                    tracing::warn!(
+                        "one-click unsubscribe failed ({why}); writing to the list instead"
+                    );
                     s.input(AppMsg::UnsubscribeByMail { message, info });
                 }
                 // The one-click handle is the list's web page as well: a
                 // POST it refused (a redirect, most often) may still work
                 // in the browser, which is the last route anyway.
                 Err(why) if info.web.is_some() => {
-                    tracing::warn!("one-click unsubscribe failed ({why}); opening the list's page instead");
-                    let info = Box::new(crate::models::Unsubscribe { one_click: None, ..*info });
+                    tracing::warn!(
+                        "one-click unsubscribe failed ({why}); opening the list's page instead"
+                    );
+                    let info = Box::new(crate::models::Unsubscribe {
+                        one_click: None,
+                        ..*info
+                    });
                     s.input(AppMsg::UnsubscribeGo { message, info });
                 }
-                Err(why) => s.input(AppMsg::UnsubscribeDone { message, result: Err(why) }),
+                Err(why) => s.input(AppMsg::UnsubscribeDone {
+                    message,
+                    result: Err(why),
+                }),
             });
             return;
         }
@@ -24670,7 +28332,10 @@ impl AppModel {
         match info.web.as_deref() {
             Some(url) => {
                 crate::ui::launch::open_link(url, Some(self.window.upcast_ref()));
-                sender.input(AppMsg::UnsubscribeDone { message, result: Ok(false) });
+                sender.input(AppMsg::UnsubscribeDone {
+                    message,
+                    result: Ok(false),
+                });
             }
             None => sender.input(AppMsg::UnsubscribeDone {
                 message,
@@ -24710,7 +28375,11 @@ impl AppModel {
             attachments: Vec::new(),
             // A "reply with UNSUBSCRIBE" is a reply: the list matches it to
             // the message it sent. A `mailto:` handle is a fresh message.
-            in_reply_to: if info.mailto.is_some() { String::new() } else { message.message_id.clone() },
+            in_reply_to: if info.mailto.is_some() {
+                String::new()
+            } else {
+                message.message_id.clone()
+            },
             references: String::new(),
             forwards: String::new(),
             draft_origin: None,
@@ -24720,25 +28389,43 @@ impl AppModel {
             calendar: None,
             send_at: None,
         };
-        self.send_to(message.account_id, MailRequest::Send { message: Box::new(out), sent_path: None, ticket: 0 });
-        sender.input(AppMsg::UnsubscribeDone { message: Box::new(message), result: Ok(true) });
+        self.send_to(
+            message.account_id,
+            MailRequest::Send {
+                message: Box::new(out),
+                sent_path: None,
+                ticket: 0,
+            },
+        );
+        sender.input(AppMsg::UnsubscribeDone {
+            message: Box::new(message),
+            result: Ok(true),
+        });
     }
 
     fn sent_copy_path(&self, account_id: u32) -> Option<String> {
-        let cfg = self.effective_config().get(account_id.saturating_sub(1) as usize);
+        let cfg = self
+            .effective_config()
+            .get(account_id.saturating_sub(1) as usize);
         // The server files its own copy: appending a second one is what makes
         // a Gmail account show every sent message twice.
         if cfg.is_some_and(|c| c.server_saves_sent) {
             return None;
         }
         let chosen = cfg.and_then(|c| c.sent_copy_path.as_deref());
-        pick_sent_copy(chosen, self.folders.get(&account_id).map_or(&[], Vec::as_slice))
+        pick_sent_copy(
+            chosen,
+            self.folders.get(&account_id).map_or(&[], Vec::as_slice),
+        )
     }
 
     /// An account's folder of a kind, if it has one (the first, for the
     /// special kinds a server lists once).
     fn folder_of_kind(&self, account_id: u32, kind: FolderKind) -> Option<&Folder> {
-        self.folders.get(&account_id)?.iter().find(|f| f.kind == kind)
+        self.folders
+            .get(&account_id)?
+            .iter()
+            .find(|f| f.kind == kind)
     }
 
     /// Whether an account's mail belongs in the open unified view: it is in
@@ -24754,7 +28441,10 @@ impl AppModel {
                 .accounts
                 .iter()
                 .filter(|a| self.in_unified_view(a.id))
-                .filter_map(|a| self.folder_of_kind(a.id, kind).map(|f| (a.id, f.id, f.path.clone())))
+                .filter_map(|a| {
+                    self.folder_of_kind(a.id, kind)
+                        .map(|f| (a.id, f.id, f.path.clone()))
+                })
                 .collect(),
             UnifiedView::Filtered => self
                 .unified_folder_refs()
@@ -24824,9 +28514,19 @@ impl AppModel {
             let t = std::time::Instant::now();
             let mut rows: HashMap<u32, Vec<(String, Message)>> = HashMap::new();
             if let Ok(cache) = crate::cache::Cache::open() {
-                let starred = config::SmartPrefilter { starred: Some(true), ..Default::default() };
+                let starred = config::SmartPrefilter {
+                    starred: Some(true),
+                    ..Default::default()
+                };
                 for (account_id, exclude) in scope {
-                    let found = cache.smart_scan(account_id, None, &exclude, starred, SMART_VIEW_LIMIT, |_| true);
+                    let found = cache.smart_scan(
+                        account_id,
+                        None,
+                        &exclude,
+                        starred,
+                        SMART_VIEW_LIMIT,
+                        |_| true,
+                    );
                     rows.insert(account_id, found);
                 }
             }
@@ -24858,18 +28558,31 @@ impl AppModel {
         }
         let mut found: Vec<Message> = Vec::new();
         for account_id in &flagged {
-            let Some(folders) = self.folders.get(account_id) else { continue };
-            for (path, m) in self.unified_starred_rows.get(account_id).into_iter().flatten() {
+            let Some(folders) = self.folders.get(account_id) else {
+                continue;
+            };
+            for (path, m) in self
+                .unified_starred_rows
+                .get(account_id)
+                .into_iter()
+                .flatten()
+            {
                 if !m.starred {
                     continue;
                 }
-                let Some(f) = folders.iter().find(|f| f.path == *path) else { continue };
+                let Some(f) = folders.iter().find(|f| f.path == *path) else {
+                    continue;
+                };
                 let mut m = m.clone();
                 m.folder_id = f.id;
                 // A folder open this session knows better what was read,
                 // replied to or tagged since the index was read; the star
                 // is this list's own, which starring keeps.
-                if let Some(c) = self.message_cache.get(&(m.account_id, f.id)).and_then(|ms| ms.iter().find(|c| c.uid == m.uid)) {
+                if let Some(c) = self
+                    .message_cache
+                    .get(&(m.account_id, f.id))
+                    .and_then(|ms| ms.iter().find(|c| c.uid == m.uid))
+                {
                     m.unread = c.unread;
                     m.answered = c.answered;
                     m.forwarded = c.forwarded;
@@ -24880,13 +28593,23 @@ impl AppModel {
             }
         }
         // One row for a message filed twice, the inbox copy where there is one.
-        let inbox_first = |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
-        found.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| inbox_first(a).cmp(&inbox_first(b))));
+        let inbox_first =
+            |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
+        found.sort_by(|a, b| {
+            b.timestamp
+                .cmp(&a.timestamp)
+                .then_with(|| inbox_first(a).cmp(&inbox_first(b)))
+        });
         let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
-        found.retain(|m| m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone())));
+        found.retain(|m| {
+            m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone()))
+        });
         let mut slices: HashMap<(u32, u32), Vec<Message>> = HashMap::new();
         for m in found {
-            slices.entry((m.account_id, m.folder_id)).or_default().push(m);
+            slices
+                .entry((m.account_id, m.folder_id))
+                .or_default()
+                .push(m);
         }
         let mut fresh: HashMap<(u32, u32), Vec<Message>> = HashMap::new();
         for ((account_id, folder_id), messages) in slices {
@@ -24895,8 +28618,12 @@ impl AppModel {
             let messages = self.apply_pending_tags(account_id, folder_id, messages);
             fresh.insert((account_id, folder_id), messages);
         }
-        let held = self.unified_slices.iter().filter(|((a, _), _)| flagged.contains(a));
-        let same = held.clone().count() == fresh.len() && held.into_iter().all(|(k, v)| fresh.get(k) == Some(v));
+        let held = self
+            .unified_slices
+            .iter()
+            .filter(|((a, _), _)| flagged.contains(a));
+        let same = held.clone().count() == fresh.len()
+            && held.into_iter().all(|(k, v)| fresh.get(k) == Some(v));
         if same {
             return false;
         }
@@ -24908,7 +28635,9 @@ impl AppModel {
     /// Keep a star set or taken off here in `unified_starred_rows`, so the
     /// unified Starred view opens with it before the index is read again.
     fn note_flag_star(&mut self, m: &Message, path: &str, starred: bool) {
-        let Some(rows) = self.unified_starred_rows.get_mut(&m.account_id) else { return };
+        let Some(rows) = self.unified_starred_rows.get_mut(&m.account_id) else {
+            return;
+        };
         match rows.iter_mut().find(|(p, r)| p == path && r.uid == m.uid) {
             Some((_, r)) => r.starred = starred,
             None if starred => {
@@ -24925,7 +28654,9 @@ impl AppModel {
         match self.unified_view {
             UnifiedView::Kind(kind) => {
                 self.in_unified_view(account_id)
-                    && self.folder_of_kind(account_id, kind).is_some_and(|f| f.id == folder_id)
+                    && self
+                        .folder_of_kind(account_id, kind)
+                        .is_some_and(|f| f.id == folder_id)
             }
             UnifiedView::Filtered => self
                 .unified_folder_refs()
@@ -24944,11 +28675,20 @@ impl AppModel {
     /// An inbox destination is the account's Inbox row already.
     fn account_filtered_folders(&self, account_id: u32) -> Vec<Folder> {
         let mut out: Vec<Folder> = Vec::new();
-        let Some(folders) = self.folders.get(&account_id) else { return out };
-        let Some(email) = self.email_of(account_id) else { return out };
-        let rules = self.filters.iter().filter(|r| r.account_email.eq_ignore_ascii_case(&email));
+        let Some(folders) = self.folders.get(&account_id) else {
+            return out;
+        };
+        let Some(email) = self.email_of(account_id) else {
+            return out;
+        };
+        let rules = self
+            .filters
+            .iter()
+            .filter(|r| r.account_email.eq_ignore_ascii_case(&email));
         for r in rules {
-            let Some(f) = folders.iter().find(|f| f.path == r.dest_path) else { continue };
+            let Some(f) = folders.iter().find(|f| f.path == r.dest_path) else {
+                continue;
+            };
             if f.kind == FolderKind::Inbox || out.iter().any(|o| o.id == f.id) {
                 continue;
             }
@@ -24969,14 +28709,20 @@ impl AppModel {
         if let Some(inbox) = self.inbox_of(account_id) {
             out.push(inbox);
         }
-        let Some(folders) = self.folders.get(&account_id) else { return out };
-        let Some(email) = self.email_of(account_id) else { return out };
+        let Some(folders) = self.folders.get(&account_id) else {
+            return out;
+        };
+        let Some(email) = self.email_of(account_id) else {
+            return out;
+        };
         let rules = self
             .filters
             .iter()
             .filter(|r| r.count_unread && r.account_email.eq_ignore_ascii_case(&email));
         for r in rules {
-            let Some(f) = folders.iter().find(|f| f.path == r.dest_path) else { continue };
+            let Some(f) = folders.iter().find(|f| f.path == r.dest_path) else {
+                continue;
+            };
             if matches!(f.kind, FolderKind::Trash | FolderKind::Junk)
                 || out.iter().any(|o| o.id == f.id)
             {
@@ -25002,10 +28748,17 @@ impl AppModel {
             .filter_map(|key| {
                 let (email, path) = key.split_once('\t')?;
                 let account = self.accounts.iter().find(|a| a.email == email)?;
-                let f = self.folders.get(&account.id)?.iter().find(|f| f.path == path)?;
+                let f = self
+                    .folders
+                    .get(&account.id)?
+                    .iter()
+                    .find(|f| f.path == path)?;
                 let mut folder = f.clone();
                 folder.unread = self.folder_unread_of(f);
-                Some(UnifiedFolderRef { account_id: account.id, folder })
+                Some(UnifiedFolderRef {
+                    account_id: account.id,
+                    folder,
+                })
             })
             .collect()
     }
@@ -25021,22 +28774,36 @@ impl AppModel {
             return out;
         }
         for email in self.ordered_emails() {
-            let Some(account) = self.accounts.iter().find(|a| a.email == email) else { continue };
+            let Some(account) = self.accounts.iter().find(|a| a.email == email) else {
+                continue;
+            };
             if !self.in_unified(account.id) {
                 continue;
             }
-            let Some(folders) = self.folders.get(&account.id) else { continue };
-            let rules = self.filters.iter().filter(|r| r.account_email.eq_ignore_ascii_case(&email));
+            let Some(folders) = self.folders.get(&account.id) else {
+                continue;
+            };
+            let rules = self
+                .filters
+                .iter()
+                .filter(|r| r.account_email.eq_ignore_ascii_case(&email));
             for r in rules {
-                let Some(f) = folders.iter().find(|f| f.path == r.dest_path) else { continue };
+                let Some(f) = folders.iter().find(|f| f.path == r.dest_path) else {
+                    continue;
+                };
                 if f.kind == FolderKind::Inbox
-                    || out.iter().any(|o| o.account_id == account.id && o.folder.id == f.id)
+                    || out
+                        .iter()
+                        .any(|o| o.account_id == account.id && o.folder.id == f.id)
                 {
                     continue;
                 }
                 let mut folder = f.clone();
                 folder.unread = self.folder_unread_of(f);
-                out.push(UnifiedFolderRef { account_id: account.id, folder });
+                out.push(UnifiedFolderRef {
+                    account_id: account.id,
+                    folder,
+                });
             }
         }
         out
@@ -25052,18 +28819,27 @@ impl AppModel {
     }
 
     fn folder_unread_of(&self, f: &Folder) -> u32 {
-        self.folder_unread.get(&(f.account_id, f.id)).copied().unwrap_or(0)
+        self.folder_unread
+            .get(&(f.account_id, f.id))
+            .copied()
+            .unwrap_or(0)
     }
 
     /// An account's unread total over its [`counted_folders`](Self::counted_folders).
     fn counted_unread(&self, account_id: u32) -> u32 {
-        self.counted_folders(account_id).iter().map(|f| self.folder_unread_of(f)).sum()
+        self.counted_folders(account_id)
+            .iter()
+            .map(|f| self.folder_unread_of(f))
+            .sum()
     }
 
     /// The number behind the tray icon's dot and menu and the Background
     /// Apps status: every account's counted unread mail.
     fn unified_unread(&self) -> u32 {
-        self.accounts.iter().map(|a| self.counted_unread(a.id)).sum()
+        self.accounts
+            .iter()
+            .map(|a| self.counted_unread(a.id))
+            .sum()
     }
 
     /// The number behind the tray icon's dot and its menu: every
@@ -25120,7 +28896,9 @@ impl AppModel {
             .map(|(_, f)| *f)
             .filter(|f| {
                 !self.pending_seen_in_folder(account_id, *f)
-                    && !self.folder_path(account_id, *f).is_some_and(|p| self.pending_moves_in(account_id, &p))
+                    && !self
+                        .folder_path(account_id, *f)
+                        .is_some_and(|p| self.pending_moves_in(account_id, &p))
             })
             .collect();
         if ready.is_empty() {
@@ -25134,8 +28912,10 @@ impl AppModel {
     }
 
     fn sync_background_folder(&self, account_id: u32, folder_id: u32) {
-        let Some(folder) =
-            self.counted_folders(account_id).into_iter().find(|f| f.id == folder_id)
+        let Some(folder) = self
+            .counted_folders(account_id)
+            .into_iter()
+            .find(|f| f.id == folder_id)
         else {
             return;
         };
@@ -25198,10 +28978,13 @@ impl AppModel {
         for a in &self.accounts {
             for f in self.counted_folders(a.id) {
                 if !self.message_cache.contains_key(&(a.id, f.id)) {
-                    self.send_to(a.id, MailRequest::SyncFolder {
-                        folder_id: f.id,
-                        path: f.path.clone(),
-                    });
+                    self.send_to(
+                        a.id,
+                        MailRequest::SyncFolder {
+                            folder_id: f.id,
+                            path: f.path.clone(),
+                        },
+                    );
                 }
             }
         }
@@ -25217,9 +29000,17 @@ impl AppModel {
     /// own folder's, and the unified view's slice of it. Only that folder:
     /// a UID names a different message in each folder, and marking every
     /// folder's message with this UID read set the wrong mail read (#333).
-    fn set_cached_unread(&mut self, account_id: u32, folder_id: u32, message_id: u32, unread: bool) {
+    fn set_cached_unread(
+        &mut self,
+        account_id: u32,
+        folder_id: u32,
+        message_id: u32,
+        unread: bool,
+    ) {
         let lists = [
-            self.message_cache.get_mut(&(account_id, folder_id)).map(|c| &mut **c),
+            self.message_cache
+                .get_mut(&(account_id, folder_id))
+                .map(|c| &mut **c),
             self.unified_slices.get_mut(&(account_id, folder_id)),
         ];
         for msgs in lists.into_iter().flatten() {
@@ -25229,13 +29020,15 @@ impl AppModel {
         }
         if let Some(path) = self.folder_path(account_id, folder_id) {
             if let Some(rows) = self.unified_starred_rows.get_mut(&account_id) {
-                if let Some((_, m)) = rows.iter_mut().find(|(p, m)| *p == path && m.id == message_id) {
+                if let Some((_, m)) = rows
+                    .iter_mut()
+                    .find(|(p, m)| *p == path && m.id == message_id)
+                {
                     m.unread = unread;
                 }
             }
         }
     }
-
 }
 
 /// The desktop's interface font ("Adwaita Sans 11") as a Pango description:
@@ -25281,7 +29074,12 @@ fn current_release_notes() -> String {
 /// The About window's "Release Notes" page: this release's notes, with the
 /// full history a button away on GitHub.
 fn release_notes_page() -> adw::NavigationPage {
-    notes_page("Release Notes", "notes", &current_release_notes(), Some((i18n("Full Release Notes on GitHub"), RELEASE_NOTES_URL)))
+    notes_page(
+        "Release Notes",
+        "notes",
+        &current_release_notes(),
+        Some((i18n("Full Release Notes on GitHub"), RELEASE_NOTES_URL)),
+    )
 }
 
 /// Inline Markdown → Pango markup: `**bold**`, `*italic*`, `` `code` `` and
@@ -25405,11 +29203,15 @@ fn md_column(md: &str) -> gtk::Box {
         } else if let Some(rest) = trimmed.strip_prefix("### ") {
             flush(&mut cur, &mut blocks);
             blocks.push(Block::H3(rest.to_string()));
-        } else if let Some(rest) =
-            trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* "))
+        } else if let Some(rest) = trimmed
+            .strip_prefix("- ")
+            .or_else(|| trimmed.strip_prefix("* "))
         {
             flush(&mut cur, &mut blocks);
-            cur = Some(Block::Bullet { nested: indent >= 2, text: rest.to_string() });
+            cur = Some(Block::Bullet {
+                nested: indent >= 2,
+                text: rest.to_string(),
+            });
         } else {
             // A plain line continues the open bullet/paragraph, or starts one.
             match &mut cur {
@@ -25418,7 +29220,10 @@ fn md_column(md: &str) -> gtk::Box {
                     text.push_str(trimmed);
                 }
                 _ => {
-                    cur = Some(Block::Para { indented: indent >= 2, text: trimmed.to_string() })
+                    cur = Some(Block::Para {
+                        indented: indent >= 2,
+                        text: trimmed.to_string(),
+                    })
                 }
             }
         }
@@ -25478,7 +29283,12 @@ fn md_column(md: &str) -> gtk::Box {
 /// Build a scrollable About sub-page from Markdown for the navigation stack,
 /// reachable by `tag`. Pushed pages get a back button and slide animation from
 /// the parent `NavigationView`.
-fn notes_page(title: &str, tag: &str, md: &str, link: Option<(String, &'static str)>) -> adw::NavigationPage {
+fn notes_page(
+    title: &str,
+    tag: &str,
+    md: &str,
+    link: Option<(String, &'static str)>,
+) -> adw::NavigationPage {
     let scroller = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)
         .vexpand(true)
@@ -25662,7 +29472,10 @@ pub(crate) fn gmail_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shor
         Key::N => Shortcut::Refresh,
         Key::Down => Shortcut::NextMessage,
         Key::Up => Shortcut::PrevMessage,
-        _ => return shortcut_for(key, shift).filter(|s| matches!(s, Shortcut::Tag(_) | Shortcut::ClearTags)),
+        _ => {
+            return shortcut_for(key, shift)
+                .filter(|s| matches!(s, Shortcut::Tag(_) | Shortcut::ClearTags))
+        }
     };
     Some(action)
 }
@@ -25694,19 +29507,38 @@ pub(crate) fn reader_keeps(key: gtk::gdk::Key) -> bool {
     use gtk::gdk::Key;
     matches!(
         key,
-        Key::Up | Key::Down | Key::Left | Key::Right | Key::Page_Up | Key::Page_Down | Key::Home | Key::End
-            | Key::space | Key::Return | Key::KP_Enter | Key::Tab | Key::ISO_Left_Tab | Key::BackSpace
+        Key::Up
+            | Key::Down
+            | Key::Left
+            | Key::Right
+            | Key::Page_Up
+            | Key::Page_Down
+            | Key::Home
+            | Key::End
+            | Key::space
+            | Key::Return
+            | Key::KP_Enter
+            | Key::Tab
+            | Key::ISO_Left_Tab
+            | Key::BackSpace
     )
 }
 
 /// The key as it would read with Caps Lock off. Caps Lock capitalises the
 /// letters, so `j` arrived as `J` and no single key worked while it was on
 /// (#392). Shift alone decides the case of a letter here.
-pub(crate) fn without_caps_lock(key: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> gtk::gdk::Key {
+pub(crate) fn without_caps_lock(
+    key: gtk::gdk::Key,
+    state: gtk::gdk::ModifierType,
+) -> gtk::gdk::Key {
     if !state.contains(gtk::gdk::ModifierType::LOCK_MASK) || key.is_upper() == key.is_lower() {
         return key;
     }
-    if state.contains(gtk::gdk::ModifierType::SHIFT_MASK) { key.to_upper() } else { key.to_lower() }
+    if state.contains(gtk::gdk::ModifierType::SHIFT_MASK) {
+        key.to_upper()
+    } else {
+        key.to_lower()
+    }
 }
 
 /// The shortcut for a key press, if any. `shift` distinguishes `r` from `R`.
@@ -25765,7 +29597,10 @@ fn palette_key(sender: &ComponentSender<AppModel>) -> gtk::EventControllerKey {
             let dialog = keys.widget().is_some_and(|w| {
                 w.downcast_ref::<adw::ApplicationWindow>()
                     .map(|w| w.visible_dialog().is_some())
-                    .or_else(|| w.downcast_ref::<adw::Window>().map(|w| w.visible_dialog().is_some()))
+                    .or_else(|| {
+                        w.downcast_ref::<adw::Window>()
+                            .map(|w| w.visible_dialog().is_some())
+                    })
                     .unwrap_or(false)
             });
             if dialog {
@@ -25875,12 +29710,18 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("f", i18n_noop("Forward")),
             ("a", i18n_noop("Archive")),
             ("d  or  Delete", i18n_noop("Delete")),
-            ("D  or  Shift+Delete", i18n_noop("Delete permanently, without going to Trash")),
+            (
+                "D  or  Shift+Delete",
+                i18n_noop("Delete permanently, without going to Trash"),
+            ),
             ("!", i18n_noop("Mark as spam")),
             ("s", i18n_noop("Star or unstar")),
             ("m", i18n_noop("Mark read or unread")),
             ("x", i18n_noop("Select this row (for a bulk action)")),
-            ("1 … 9", i18n_noop("Add or remove a tag (the first nine, in Settings order)")),
+            (
+                "1 … 9",
+                i18n_noop("Add or remove a tag (the first nine, in Settings order)"),
+            ),
             ("0", i18n_noop("Remove every tag")),
             ("Ctrl+U", i18n_noop("View Source")),
             ("Ctrl+P", i18n_noop("Print the message you are reading")),
@@ -25894,37 +29735,79 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("Ctrl+Shift+N", i18n_noop("New message from a template")),
             ("Ctrl+Enter", i18n_noop("Send the message you are writing")),
             ("Ctrl+Shift+A", i18n_noop("Attach files")),
-            ("Ctrl+Shift+T  /  C  /  B", i18n_noop("Go to To, Cc or Bcc, showing the row")),
-            ("Esc", i18n_noop("Back out of a reply and return to the list")),
-            ("Ctrl+.  or  Ctrl+;", i18n_noop("Emoji chooser, at the cursor")),
-            ("Shift+Return", i18n_noop("New paragraph (Return starts a new line, unless Settings swaps them)")),
-            ("Ctrl+B  /  Ctrl+I  /  Ctrl+U", i18n_noop("Bold, italic, underline")),
+            (
+                "Ctrl+Shift+T  /  C  /  B",
+                i18n_noop("Go to To, Cc or Bcc, showing the row"),
+            ),
+            (
+                "Esc",
+                i18n_noop("Back out of a reply and return to the list"),
+            ),
+            (
+                "Ctrl+.  or  Ctrl+;",
+                i18n_noop("Emoji chooser, at the cursor"),
+            ),
+            (
+                "Shift+Return",
+                i18n_noop("New paragraph (Return starts a new line, unless Settings swaps them)"),
+            ),
+            (
+                "Ctrl+B  /  Ctrl+I  /  Ctrl+U",
+                i18n_noop("Bold, italic, underline"),
+            ),
         ],
     ),
     (
         i18n_noop("Attachments"),
         &[
-            ("Space  or  Enter", i18n_noop("Preview the highlighted attachment")),
-            ("←  /  →", i18n_noop("Previous or next in the gallery's preview")),
+            (
+                "Space  or  Enter",
+                i18n_noop("Preview the highlighted attachment"),
+            ),
+            (
+                "←  /  →",
+                i18n_noop("Previous or next in the gallery's preview"),
+            ),
             ("Esc", i18n_noop("Close the gallery's preview")),
         ],
     ),
     (
         i18n_noop("Everything else"),
         &[
-            ("Ctrl+Z", i18n_noop("Undo the last action, or the last edit while you are writing")),
+            (
+                "Ctrl+Z",
+                i18n_noop("Undo the last action, or the last edit while you are writing"),
+            ),
             ("Ctrl+Shift+Z", i18n_noop("Redo it (Ctrl+Y does the same)")),
-            ("Ctrl+Shift+S", i18n_noop("Reveal the status bar (also: long-press Refresh)")),
-            ("Ctrl+Shift+A", i18n_noop("Show or hide the accounts in the sidebar")),
+            (
+                "Ctrl+Shift+S",
+                i18n_noop("Reveal the status bar (also: long-press Refresh)"),
+            ),
+            (
+                "Ctrl+Shift+A",
+                i18n_noop("Show or hide the accounts in the sidebar"),
+            ),
             ("Ctrl+Shift+F", i18n_noop("Focus Mode on or off")),
             ("Ctrl++  /  Ctrl+-", i18n_noop("Message zoom in or out")),
             ("Ctrl+0", i18n_noop("Message zoom back to the default")),
             ("Ctrl+,", i18n_noop("Settings")),
-            ("Ctrl+F", i18n_noop("Search the Settings window, when it is open")),
-            ("Ctrl+Shift+C", i18n_noop("Console mode (when enabled in Settings)")),
-            ("Ctrl+W", i18n_noop("Close the window (background sync keeps running)")),
+            (
+                "Ctrl+F",
+                i18n_noop("Search the Settings window, when it is open"),
+            ),
+            (
+                "Ctrl+Shift+C",
+                i18n_noop("Console mode (when enabled in Settings)"),
+            ),
+            (
+                "Ctrl+W",
+                i18n_noop("Close the window (background sync keeps running)"),
+            ),
             ("Ctrl+Q", i18n_noop("Quit Hylki entirely")),
-            ("Ctrl+K", i18n_noop("Command palette: search actions, folders and tags")),
+            (
+                "Ctrl+K",
+                i18n_noop("Command palette: search actions, folders and tags"),
+            ),
             ("Ctrl+Shift+K", i18n_noop("Command palette, actions only")),
             ("?  or  Ctrl+?  or  F1", i18n_noop("This list")),
         ],
@@ -26008,7 +29891,10 @@ pub(crate) fn finish_keyring_writes() {
         return;
     }
     let tops = gtk::Window::toplevels();
-    for w in (0..tops.n_items()).filter_map(|i| tops.item(i)).filter_map(|o| o.downcast::<gtk::Window>().ok()) {
+    for w in (0..tops.n_items())
+        .filter_map(|i| tops.item(i))
+        .filter_map(|o| o.downcast::<gtk::Window>().ok())
+    {
         w.set_visible(false);
     }
     if let Some(display) = gtk::gdk::Display::default() {
@@ -26016,7 +29902,9 @@ pub(crate) fn finish_keyring_writes() {
     }
     tracing::info!("waiting for the keyring before quitting");
     if !config::keyring_drain(limit) {
-        tracing::warn!("quit with keyring work still queued: the keyring did not answer in {limit:?}");
+        tracing::warn!(
+            "quit with keyring work still queued: the keyring did not answer in {limit:?}"
+        );
     }
 }
 
@@ -26026,7 +29914,12 @@ pub(crate) fn finish_keyring_writes() {
 fn forget_account_secrets(removed: &[String], config: &[AccountConfig]) {
     let gone: Vec<(String, Option<AccountConfig>)> = removed
         .iter()
-        .map(|email| (email.clone(), config.iter().find(|c| &c.email == email).cloned()))
+        .map(|email| {
+            (
+                email.clone(),
+                config.iter().find(|c| &c.email == email).cloned(),
+            )
+        })
         .collect();
     config::keyring_later(move || {
         for (email, account) in gone {
@@ -26078,18 +29971,23 @@ fn secrets_kept(old: &AccountConfig, new: &AccountConfig) -> bool {
     let kept = |new: &str, old: &str, stored: &dyn Fn() -> Option<String>| {
         new.is_empty() || new == old || stored().as_deref() == Some(new)
     };
-    kept(&new.password, &old.password, &|| config::load_password(&old.email))
-        && kept(&new.smtp_password, &old.smtp_password, &|| config::load_smtp_password(&old.email))
-        && kept(&new.oauth_refresh, &old.oauth_refresh, &|| config::load_oauth_refresh(&old.email))
-        && new.aliases.iter().all(|alias| {
-            let addr = alias.address();
-            let before = old
-                .aliases
-                .iter()
-                .find(|a| a.address().eq_ignore_ascii_case(&addr))
-                .map_or("", |a| a.smtp_password.as_str());
-            kept(&alias.smtp_password, before, &|| config::load_alias_smtp_password(&old.email, &addr))
+    kept(&new.password, &old.password, &|| {
+        config::load_password(&old.email)
+    }) && kept(&new.smtp_password, &old.smtp_password, &|| {
+        config::load_smtp_password(&old.email)
+    }) && kept(&new.oauth_refresh, &old.oauth_refresh, &|| {
+        config::load_oauth_refresh(&old.email)
+    }) && new.aliases.iter().all(|alias| {
+        let addr = alias.address();
+        let before = old
+            .aliases
+            .iter()
+            .find(|a| a.address().eq_ignore_ascii_case(&addr))
+            .map_or("", |a| a.smtp_password.as_str());
+        kept(&alias.smtp_password, before, &|| {
+            config::load_alias_smtp_password(&old.email, &addr)
         })
+    })
 }
 
 fn demo_account_configs_saved() -> Vec<AccountConfig> {
@@ -26165,7 +30063,12 @@ fn demo_account_configs() -> Vec<AccountConfig> {
     vec![
         mk("Jason M.", "jason@hylki.hyprlab.co", "#3584e4", Some("🚀")),
         mk("Hyprlab", "hello@hyprlab.dev", "#f6d32d", None),
-        mk("Jason (Personal)", "jason.m@fastmail.com", "#f66151", Some("🌎")),
+        mk(
+            "Jason (Personal)",
+            "jason.m@fastmail.com",
+            "#f66151",
+            Some("🌎"),
+        ),
     ]
 }
 
@@ -26191,7 +30094,12 @@ fn demo_tags() -> Vec<config::Tag> {
 /// only make it vanish from the list.
 fn demo_filters() -> Vec<config::FilterRule> {
     use config::{FilterField, FilterMatch, FilterRule};
-    let mk = |name: &str, email: &str, field: FilterField, matcher: FilterMatch, value: &str, dest: &str| FilterRule {
+    let mk = |name: &str,
+              email: &str,
+              field: FilterField,
+              matcher: FilterMatch,
+              value: &str,
+              dest: &str| FilterRule {
         name: name.into(),
         account_email: email.into(),
         field,
@@ -26204,26 +30112,59 @@ fn demo_filters() -> Vec<config::FilterRule> {
         count_unread: true,
     };
     vec![
-        mk("Substack", "jason@hylki.hyprlab.co", FilterField::FromAddress, FilterMatch::EndsWith, "substack.com", "Newsletters"),
-        mk("Invoices", "hello@hyprlab.dev", FilterField::Subject, FilterMatch::Contains, "invoice", "Invoices"),
-        mk("", "jason.m@fastmail.com", FilterField::Subject, FilterMatch::Contains, "order", "Orders"),
+        mk(
+            "Substack",
+            "jason@hylki.hyprlab.co",
+            FilterField::FromAddress,
+            FilterMatch::EndsWith,
+            "substack.com",
+            "Newsletters",
+        ),
+        mk(
+            "Invoices",
+            "hello@hyprlab.dev",
+            FilterField::Subject,
+            FilterMatch::Contains,
+            "invoice",
+            "Invoices",
+        ),
+        mk(
+            "",
+            "jason.m@fastmail.com",
+            FilterField::Subject,
+            FilterMatch::Contains,
+            "order",
+            "Orders",
+        ),
     ]
 }
 
 /// What the Undo menu calls a star change.
 fn star_label(starred: bool) -> String {
-    if starred { i18n("Star") } else { i18n("Unstar") }
+    if starred {
+        i18n("Star")
+    } else {
+        i18n("Unstar")
+    }
 }
 
 /// The same for a read/unread change.
 fn read_label(read: bool) -> String {
-    if read { i18n("Mark as Read") } else { i18n("Mark as Unread") }
+    if read {
+        i18n("Mark as Read")
+    } else {
+        i18n("Mark as Unread")
+    }
 }
 
 /// A sender as a dialog or toast names them: the display name, else the address.
 fn sender_label(message: &Message) -> String {
     let name = message.from_name.trim();
-    if name.is_empty() { message.from_addr.clone() } else { name.to_string() }
+    if name.is_empty() {
+        message.from_addr.clone()
+    } else {
+        name.to_string()
+    }
 }
 
 /// GNOME Shell turns animations off in every app while a remote desktop
@@ -26239,7 +30180,9 @@ fn follow_motion_setting() {
     let readable = gio::SettingsSchemaSource::default()
         .and_then(|s| s.lookup("org.gnome.desktop.interface", true))
         .is_some_and(|s| s.has_key("enable-animations"));
-    let Some(gtk_settings) = gtk::Settings::default().filter(|_| readable) else { return };
+    let Some(gtk_settings) = gtk::Settings::default().filter(|_| readable) else {
+        return;
+    };
     // The binding holds the settings object for as long as GTK's lives.
     gio::Settings::new("org.gnome.desktop.interface")
         .bind("enable-animations", &gtk_settings, "gtk-enable-animations")
@@ -26272,7 +30215,14 @@ fn content_fp<'a>(msgs: impl Iterator<Item = &'a Message>) -> u64 {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         (m.account_id, m.folder_id, m.uid, m.id, m.timestamp).hash(&mut h);
         (m.unread, m.starred, m.answered, m.forwarded).hash(&mut h);
-        (&m.keywords, &m.labels, m.subject.len(), m.preview.len(), m.from_addr.len()).hash(&mut h);
+        (
+            &m.keywords,
+            &m.labels,
+            m.subject.len(),
+            m.preview.len(),
+            m.from_addr.len(),
+        )
+            .hash(&mut h);
         (m.message_id.len(), m.references.len()).hash(&mut h);
         sum = sum.wrapping_add(h.finish());
         n += 1;
@@ -26305,7 +30255,9 @@ impl AppModel {
         let in_front = self.window.is_active()
             || (demo_mode() && std::env::var_os("HYLKI_SHOWCASE_IN_FRONT").is_some());
         if !in_front {
-            crate::notify::new_mail(account_id, folder_id, message_id, from, subject, others, in_place);
+            crate::notify::new_mail(
+                account_id, folder_id, message_id, from, subject, others, in_place,
+            );
         } else if crate::config::sound_when_focused() {
             tracing::info!("new mail with the window in front: the sound alone");
             crate::notify::sound_for_new_mail();
@@ -26384,7 +30336,9 @@ fn prune_downloads(days: u32) {
     std::thread::spawn(move || {
         match crate::cache::Cache::open().and_then(|c| c.remove_downloaded(Some(before))) {
             Ok(0) => {}
-            Ok(n) => tracing::info!("storage: removed {n} downloaded message(s) older than {days} days"),
+            Ok(n) => {
+                tracing::info!("storage: removed {n} downloaded message(s) older than {days} days")
+            }
             Err(e) => tracing::warn!("storage: could not remove old downloaded mail: {e}"),
         }
     });
@@ -26408,18 +30362,29 @@ pub fn queue_message_file(path: std::path::PathBuf) {
 fn eml_file_name(subject: &str) -> String {
     let stem: String = subject
         .chars()
-        .map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() { '-' } else { c })
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() {
+                '-'
+            } else {
+                c
+            }
+        })
         .collect();
     let stem = stem.trim().trim_matches('.');
     let stem: String = stem.chars().take(80).collect();
-    if stem.is_empty() { "message.eml".to_string() } else { format!("{stem}.eml") }
+    if stem.is_empty() {
+        "message.eml".to_string()
+    } else {
+        format!("{stem}.eml")
+    }
 }
 
 /// Whether a file handed in is a message to read rather than one to attach:
 /// a `.eml`, the usual name for a message saved whole, or Outlook's `.msg`
 /// (#398).
 pub fn is_message_file(path: &std::path::Path) -> bool {
-    path.extension().is_some_and(|e| e.eq_ignore_ascii_case("eml") || e.eq_ignore_ascii_case("msg"))
+    path.extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("eml") || e.eq_ignore_ascii_case("msg"))
 }
 
 /// The folder id a message read from a file carries (#398): no folder has
@@ -26443,7 +30408,9 @@ pub fn queue_mid(uri: String) {
 /// stores them: percent-decoded, angle brackets and whitespace stripped,
 /// lowercased, and without any `/cid` part. `None` for anything else.
 fn parse_mid(uri: &str) -> Option<String> {
-    let rest = uri.strip_prefix("mid:").or_else(|| uri.strip_prefix("MID:"))?;
+    let rest = uri
+        .strip_prefix("mid:")
+        .or_else(|| uri.strip_prefix("MID:"))?;
     // GLib normalizes a scheme it does not know to `mid:///…` on the way
     // through GFile (and decodes some of the escapes), so leading slashes
     // are not part of the id.
@@ -26456,7 +30423,12 @@ fn parse_mid(uri: &str) -> Option<String> {
         Some(i) => &decoded[..at + i],
         None => &decoded,
     };
-    let id = id.trim().trim_start_matches('<').trim_end_matches('>').trim().to_ascii_lowercase();
+    let id = id
+        .trim()
+        .trim_start_matches('<')
+        .trim_end_matches('>')
+        .trim()
+        .to_ascii_lowercase();
     (!id.is_empty()).then_some(id)
 }
 
@@ -26478,11 +30450,14 @@ pub fn queue_mailto(uri: String) {
 /// each card.
 fn tray_mail_key(mail: &crate::tray::TrayMailList) -> Vec<(u32, u32, String, String)> {
     std::iter::once((u32::MAX, mail.unread, String::new(), String::new()))
-        .chain(
-            mail.items
-                .iter()
-                .map(|m| (m.account_id, m.message_id, m.heading.clone(), m.subject.clone())),
-        )
+        .chain(mail.items.iter().map(|m| {
+            (
+                m.account_id,
+                m.message_id,
+                m.heading.clone(),
+                m.subject.clone(),
+            )
+        }))
         .collect()
 }
 
@@ -26492,7 +30467,12 @@ fn notified_message(
     message_id: u32,
     folders: &std::collections::HashMap<u32, Vec<Folder>>,
 ) -> Option<Message> {
-    let path = folders.get(&account_id)?.iter().find(|f| f.id == folder_id)?.path.clone();
+    let path = folders
+        .get(&account_id)?
+        .iter()
+        .find(|f| f.id == folder_id)?
+        .path
+        .clone();
     let cache = crate::cache::Cache::open().ok()?;
     cache
         .load_messages(account_id, &path, folder_id)
@@ -26521,7 +30501,10 @@ fn parse_mailto(uri: &str) -> Option<crate::ui::compose::ComposePrefill> {
     for piece in query.split('&').filter(|p| !p.is_empty()) {
         let continues = !piece.contains('=')
             && pairs.last().is_some_and(|p| {
-                let key = p.split_once('=').map_or("", |(k, _)| k).to_ascii_lowercase();
+                let key = p
+                    .split_once('=')
+                    .map_or("", |(k, _)| k)
+                    .to_ascii_lowercase();
                 key == "attach" || key == "attachment"
             });
         match pairs.last_mut() {
@@ -26626,16 +30609,35 @@ fn showcase_at(v: &str, default: u32) -> (&str, u32) {
 /// A made-up OpenPGP verdict for HYLKI_SHOWCASE_PGP (demo only).
 fn showcase_pgp(which: &str) -> Option<crate::models::PgpStatus> {
     use crate::models::{PgpSignature as S, PgpStatus, PgpTrust};
-    let good = |trust| S::Good { signer: "Priya Nair <priya@studio.dev>".into(), key_id: "8F2A6C1D9B3E4F70".into(), trust };
+    let good = |trust| S::Good {
+        signer: "Priya Nair <priya@studio.dev>".into(),
+        key_id: "8F2A6C1D9B3E4F70".into(),
+        trust,
+    };
     let (encrypted, signature) = match which {
         "good" => (false, good(PgpTrust::Full)),
         "untrusted" => (false, good(PgpTrust::Unknown)),
-        "bad" => (false, S::Bad { signer: "Priya Nair <priya@studio.dev>".into() }),
-        "nokey" => (false, S::NoKey { key_id: "8F2A6C1D9B3E4F70".into() }),
+        "bad" => (
+            false,
+            S::Bad {
+                signer: "Priya Nair <priya@studio.dev>".into(),
+            },
+        ),
+        "nokey" => (
+            false,
+            S::NoKey {
+                key_id: "8F2A6C1D9B3E4F70".into(),
+            },
+        ),
         "enc" => (true, good(PgpTrust::Full)),
         _ => return None,
     };
-    Some(PgpStatus { encrypted, decrypted: encrypted, signature, ..Default::default() })
+    Some(PgpStatus {
+        encrypted,
+        decrypted: encrypted,
+        signature,
+        ..Default::default()
+    })
 }
 
 pub(crate) fn showcase_capture(win: &gtk::Widget, path: &str) {
@@ -26777,20 +30779,20 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         SidebarOutput::UnifiedKindSelected(kind) => {
             AppMsg::UnifiedSelected(UnifiedView::Kind(kind))
         }
-        SidebarOutput::AccountStarredSelected(account_id) => AppMsg::AccountStarredSelected(account_id),
-        SidebarOutput::UnifiedFilteredSelected => {
-            AppMsg::UnifiedSelected(UnifiedView::Filtered)
+        SidebarOutput::AccountStarredSelected(account_id) => {
+            AppMsg::AccountStarredSelected(account_id)
         }
-        SidebarOutput::UnifiedFavoritesSelected => {
-            AppMsg::UnifiedSelected(UnifiedView::Favorites)
-        }
-        SidebarOutput::UnifiedTagsSelected => {
-            AppMsg::TagSelected { keyword: None, account: None }
-        }
+        SidebarOutput::UnifiedFilteredSelected => AppMsg::UnifiedSelected(UnifiedView::Filtered),
+        SidebarOutput::UnifiedFavoritesSelected => AppMsg::UnifiedSelected(UnifiedView::Favorites),
+        SidebarOutput::UnifiedTagsSelected => AppMsg::TagSelected {
+            keyword: None,
+            account: None,
+        },
         SidebarOutput::SmartSelected(id) => AppMsg::SmartSelected(id),
-        SidebarOutput::TagSelected { keyword, account } => {
-            AppMsg::TagSelected { keyword: Some(keyword), account }
-        }
+        SidebarOutput::TagSelected { keyword, account } => AppMsg::TagSelected {
+            keyword: Some(keyword),
+            account,
+        },
         SidebarOutput::ToggleAccountTags(id) => AppMsg::ToggleAccountTags(id),
         SidebarOutput::AttachmentsSelected => AppMsg::ShowAttachments,
         SidebarOutput::ContactsClicked => AppMsg::OpenContacts,
@@ -26802,9 +30804,17 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         SidebarOutput::ContactTreeAction(action) => AppMsg::ContactTreeAction(action),
         SidebarOutput::ContactsFolded(keys) => AppMsg::ContactsFolded(keys),
         SidebarOutput::OutboxSelected => AppMsg::ShowOutbox,
-        SidebarOutput::FolderSelected { account_id, folder_id, name, path } => {
-            AppMsg::FolderSelected { account_id, folder_id, name, path }
-        }
+        SidebarOutput::FolderSelected {
+            account_id,
+            folder_id,
+            name,
+            path,
+        } => AppMsg::FolderSelected {
+            account_id,
+            folder_id,
+            name,
+            path,
+        },
         SidebarOutput::AccountFolded { id, folded } => AppMsg::AccountFolded { id, folded },
         SidebarOutput::ToggleCustomFolders(id) => AppMsg::ToggleCustomFolders(id),
         SidebarOutput::CollapsedChanged(collapsed) => AppMsg::SidebarCollapsed(collapsed),
@@ -26835,25 +30845,53 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
             smart,
             contacts,
         },
-        SidebarOutput::FolderNodeCollapsed { account_id, path, collapsed } => {
-            AppMsg::FolderNodeCollapsed { account_id, path, collapsed }
-        }
+        SidebarOutput::FolderNodeCollapsed {
+            account_id,
+            path,
+            collapsed,
+        } => AppMsg::FolderNodeCollapsed {
+            account_id,
+            path,
+            collapsed,
+        },
         SidebarOutput::AddAccount => AppMsg::AddFirstAccount,
         SidebarOutput::ComposeRequested => AppMsg::Compose,
         SidebarOutput::ComposeFromTemplateRequested => AppMsg::NewFromTemplate,
         SidebarOutput::Context(action) => AppMsg::SidebarContext(action),
-        SidebarOutput::MoveMessages { dest_account, dest, items } => {
-            AppMsg::DropMoveMessages { dest_account, dest, items }
-        }
-        SidebarOutput::MoveFolder { account_id, path, dest } => {
-            AppMsg::MoveFolder { account_id, path, dest }
-        }
+        SidebarOutput::MoveMessages {
+            dest_account,
+            dest,
+            items,
+        } => AppMsg::DropMoveMessages {
+            dest_account,
+            dest,
+            items,
+        },
+        SidebarOutput::MoveFolder {
+            account_id,
+            path,
+            dest,
+        } => AppMsg::MoveFolder {
+            account_id,
+            path,
+            dest,
+        },
         SidebarOutput::ReorderFolders { account_id, paths } => {
             AppMsg::ReorderFolders { account_id, paths }
         }
-        SidebarOutput::PlaceFolder { account_id, path, dest, target, after } => {
-            AppMsg::PlaceFolder { account_id, path, dest, target, after }
-        }
+        SidebarOutput::PlaceFolder {
+            account_id,
+            path,
+            dest,
+            target,
+            after,
+        } => AppMsg::PlaceFolder {
+            account_id,
+            path,
+            dest,
+            target,
+            after,
+        },
         SidebarOutput::SetFolderSort { account_id, sort } => {
             AppMsg::SetAccountFolderSort { account_id, sort }
         }
@@ -26894,7 +30932,8 @@ fn save_all_attachments(atts: Vec<Attachment>, parent: Option<adw::ApplicationWi
 /// Set while the welcome wizard is open. Its blue ground is designed for the
 /// light scheme only, and libadwaita has no per-window scheme, so the whole
 /// app is held light until the wizard closes.
-static WIZARD_HOLDS_LIGHT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static WIZARD_HOLDS_LIGHT: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// Force (or release) the app-wide color scheme per the appearance
 /// preference — the whole chrome, not just message content, which has its own
@@ -26967,7 +31006,9 @@ fn register_icons(desktop: bool) {
 /// system. With nothing foreign left to search, the bundle answers for every
 /// name.
 fn apply_icon_theme(desktop: bool) {
-    let Some(settings) = gtk::Settings::default() else { return };
+    let Some(settings) = gtk::Settings::default() else {
+        return;
+    };
     if desktop {
         // Back to whatever the desktop says, now and when it changes.
         settings.reset_property("gtk-icon-theme-name");
@@ -26976,7 +31017,9 @@ fn apply_icon_theme(desktop: bool) {
         // whenever it changes: GTK would otherwise switch the theme back to it.
         settings.set_gtk_icon_theme_name(Some(ICON_THEME));
     }
-    let Some(display) = gtk::gdk::Display::default() else { return };
+    let Some(display) = gtk::gdk::Display::default() else {
+        return;
+    };
     let theme = gtk::IconTheme::for_display(&display);
     let mut paths: Vec<std::path::PathBuf> = Vec::new();
     if desktop {
@@ -27023,22 +31066,45 @@ pub(crate) fn desktop_icon_theme() -> gtk::IconTheme {
 /// the culprit when an icon looks wrong on someone's system.
 fn check_icon_sources(theme: &gtk::IconTheme) {
     let dir = format!("{ICON_RESOURCE}/scalable/actions");
-    let names = gtk::gio::resources_enumerate_children(&dir, gtk::gio::ResourceLookupFlags::NONE).unwrap_or_default();
+    let names = gtk::gio::resources_enumerate_children(&dir, gtk::gio::ResourceLookupFlags::NONE)
+        .unwrap_or_default();
     let mut foreign = 0;
     for file in &names {
-        let Some(name) = file.strip_suffix(".svg") else { continue };
-        let icon = theme.lookup_icon(name, &[], 16, 1, gtk::TextDirection::Ltr, gtk::IconLookupFlags::empty());
+        let Some(name) = file.strip_suffix(".svg") else {
+            continue;
+        };
+        let icon = theme.lookup_icon(
+            name,
+            &[],
+            16,
+            1,
+            gtk::TextDirection::Ltr,
+            gtk::IconLookupFlags::empty(),
+        );
         let uri = icon.file().map(|f| f.uri().to_string()).unwrap_or_default();
         if !uri.starts_with(&format!("resource://{ICON_RESOURCE}/")) {
             foreign += 1;
             tracing::warn!("icon {name} is drawn from {uri}, not from Hylki's own icons");
         }
     }
-    tracing::debug!("icons: {} bundled, {foreign} drawn from elsewhere", names.len());
+    tracing::debug!(
+        "icons: {} bundled, {foreign} drawn from elsewhere",
+        names.len()
+    );
     // The app icon may come from a source checkout's data/icons, which is
     // the same art, so it is only reported.
-    let app = theme.lookup_icon(crate::APP_ID, &[], 128, 1, gtk::TextDirection::Ltr, gtk::IconLookupFlags::empty());
-    tracing::debug!("app icon: {}", app.file().map(|f| f.uri().to_string()).unwrap_or_default());
+    let app = theme.lookup_icon(
+        crate::APP_ID,
+        &[],
+        128,
+        1,
+        gtk::TextDirection::Ltr,
+        gtk::IconLookupFlags::empty(),
+    );
+    tracing::debug!(
+        "app icon: {}",
+        app.file().map(|f| f.uri().to_string()).unwrap_or_default()
+    );
 }
 
 /// One message being moved to another account (#265): copied out of its
@@ -27105,9 +31171,10 @@ fn showcase_log_focus(main: &adw::ApplicationWindow) {
         .filter(|w| w.is_visible())
         .max_by_key(|w| *w != main)
         .and_then(|w| gtk::prelude::GtkWindowExt::focus(&w));
-    let row = focus
-        .as_ref()
-        .and_then(|f| f.ancestor(adw::EntryRow::static_type()).and_downcast::<adw::EntryRow>());
+    let row = focus.as_ref().and_then(|f| {
+        f.ancestor(adw::EntryRow::static_type())
+            .and_downcast::<adw::EntryRow>()
+    });
     match (row, focus) {
         (Some(row), _) => tracing::info!("showcase: focus in the {:?} row", row.title()),
         (None, Some(f)) => {
@@ -27117,7 +31184,13 @@ fn showcase_log_focus(main: &adw::ApplicationWindow) {
             while let Some(p) = w {
                 let classes = p.css_classes();
                 if !classes.is_empty() {
-                    path.push(classes.iter().map(|c| c.to_string()).collect::<Vec<_>>().join("."));
+                    path.push(
+                        classes
+                            .iter()
+                            .map(|c| c.to_string())
+                            .collect::<Vec<_>>()
+                            .join("."),
+                    );
                 }
                 if path.len() > 5 {
                     break;
@@ -27149,93 +31222,235 @@ fn showcase_log_focus(main: &adw::ApplicationWindow) {
 
 fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
     match event {
-        WorkerEvent::AttachmentsScanned { folder_path, added, remaining } => {
-            AppMsg::AttachmentsScanned { account_id, folder_path, added, remaining }
-        }
+        WorkerEvent::AttachmentsScanned {
+            folder_path,
+            added,
+            remaining,
+        } => AppMsg::AttachmentsScanned {
+            account_id,
+            folder_path,
+            added,
+            remaining,
+        },
         WorkerEvent::BulkComplete => AppMsg::BulkComplete,
-        WorkerEvent::Related { message_id, messages } => {
-            AppMsg::Related { account_id, message_id, messages }
-        }
-        WorkerEvent::ThreadSummaries { summaries } => {
-            AppMsg::ThreadSummaries { account_id, summaries }
-        }
+        WorkerEvent::Related {
+            message_id,
+            messages,
+        } => AppMsg::Related {
+            account_id,
+            message_id,
+            messages,
+        },
+        WorkerEvent::ThreadSummaries { summaries } => AppMsg::ThreadSummaries {
+            account_id,
+            summaries,
+        },
         WorkerEvent::Account(a) => AppMsg::SetAccount(a),
-        WorkerEvent::Identities(identities) => AppMsg::ServerIdentities { account_id, identities },
-        WorkerEvent::Folders(folders) => AppMsg::SetFolders { account_id, folders },
-        WorkerEvent::Messages { folder_id, messages } => {
-            AppMsg::Messages { account_id, folder_id, messages }
-        }
-        WorkerEvent::BodyHits { folder_id, hits } => AppMsg::BodyHits { account_id, folder_id, hits },
-        WorkerEvent::MessagesAppend { folder_id, messages } => {
-            AppMsg::MessagesAppend { account_id, folder_id, messages }
-        }
-        WorkerEvent::Located { message_id, hit } => AppMsg::MidLocated { account_id, message_id, hit },
-        WorkerEvent::KeywordsFound(findings) => AppMsg::KeywordsFound { account_id, findings },
+        WorkerEvent::Identities(identities) => AppMsg::ServerIdentities {
+            account_id,
+            identities,
+        },
+        WorkerEvent::Folders(folders) => AppMsg::SetFolders {
+            account_id,
+            folders,
+        },
+        WorkerEvent::Messages {
+            folder_id,
+            messages,
+        } => AppMsg::Messages {
+            account_id,
+            folder_id,
+            messages,
+        },
+        WorkerEvent::BodyHits { folder_id, hits } => AppMsg::BodyHits {
+            account_id,
+            folder_id,
+            hits,
+        },
+        WorkerEvent::MessagesAppend {
+            folder_id,
+            messages,
+        } => AppMsg::MessagesAppend {
+            account_id,
+            folder_id,
+            messages,
+        },
+        WorkerEvent::Located { message_id, hit } => AppMsg::MidLocated {
+            account_id,
+            message_id,
+            hit,
+        },
+        WorkerEvent::KeywordsFound(findings) => AppMsg::KeywordsFound {
+            account_id,
+            findings,
+        },
         WorkerEvent::Quota(quota) => AppMsg::QuotaFound { account_id, quota },
         WorkerEvent::KeywordsSynced { paths } => AppMsg::KeywordsSynced { account_id, paths },
-        WorkerEvent::Restored { folder_id, message_ids } => {
-            AppMsg::UndoRestored { account_id, folder_id, message_ids }
-        }
-        WorkerEvent::BackfillDone { folder_id } => AppMsg::BackfillDone { account_id, folder_id },
-        WorkerEvent::FolderSynced { folder_id } => {
-            AppMsg::FolderSynced { account_id, folder_id }
-        }
-        WorkerEvent::FolderUnread { folder_id, unread } => {
-            AppMsg::FolderUnread { account_id, folder_id, unread }
-        }
-        WorkerEvent::FolderUnreadByPath { path, unread } => {
-            AppMsg::FolderUnreadByPath { account_id, path, unread }
-        }
-        WorkerEvent::SeenSettled { path, uid } => AppMsg::SeenSettled { account_id, path, uid },
-        WorkerEvent::Answered { path, uid, forwarded } => AppMsg::Answered { account_id, path, uid, forwarded },
-        WorkerEvent::TagSettled { path, uid, keyword } => AppMsg::TagSettled { account_id, path, uid, keyword },
-        WorkerEvent::MovesSettled { path, uids } => AppMsg::MovesSettled { account_id, path, uids },
+        WorkerEvent::Restored {
+            folder_id,
+            message_ids,
+        } => AppMsg::UndoRestored {
+            account_id,
+            folder_id,
+            message_ids,
+        },
+        WorkerEvent::BackfillDone { folder_id } => AppMsg::BackfillDone {
+            account_id,
+            folder_id,
+        },
+        WorkerEvent::FolderSynced { folder_id } => AppMsg::FolderSynced {
+            account_id,
+            folder_id,
+        },
+        WorkerEvent::FolderUnread { folder_id, unread } => AppMsg::FolderUnread {
+            account_id,
+            folder_id,
+            unread,
+        },
+        WorkerEvent::FolderUnreadByPath { path, unread } => AppMsg::FolderUnreadByPath {
+            account_id,
+            path,
+            unread,
+        },
+        WorkerEvent::SeenSettled { path, uid } => AppMsg::SeenSettled {
+            account_id,
+            path,
+            uid,
+        },
+        WorkerEvent::Answered {
+            path,
+            uid,
+            forwarded,
+        } => AppMsg::Answered {
+            account_id,
+            path,
+            uid,
+            forwarded,
+        },
+        WorkerEvent::TagSettled { path, uid, keyword } => AppMsg::TagSettled {
+            account_id,
+            path,
+            uid,
+            keyword,
+        },
+        WorkerEvent::MovesSettled { path, uids } => AppMsg::MovesSettled {
+            account_id,
+            path,
+            uids,
+        },
         WorkerEvent::RawExported { token, raw } => AppMsg::RawExported { token, raw },
         WorkerEvent::RawImported { token, result } => AppMsg::RawImported { token, result },
-        WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid, name, size } => {
-            AppMsg::AttachmentDeleted { account_id, message_id, path, uid, new_uid, name, size }
-        }
-        WorkerEvent::AttachmentNotDeleted { message_id, name, size } => {
-            AppMsg::AttachmentNotDeleted { account_id, message_id, name, size }
-        }
-        WorkerEvent::Gone { message_id, path, uid } => {
-            AppMsg::MessageGone { account_id, message_id, path, uid }
-        }
-        WorkerEvent::RefsRepaired { folder_id } => {
-            AppMsg::RefsRepaired { account_id, folder_id }
-        }
-        WorkerEvent::Body { message_id, path, body } => {
+        WorkerEvent::AttachmentDeleted {
+            message_id,
+            path,
+            uid,
+            new_uid,
+            name,
+            size,
+        } => AppMsg::AttachmentDeleted {
+            account_id,
+            message_id,
+            path,
+            uid,
+            new_uid,
+            name,
+            size,
+        },
+        WorkerEvent::AttachmentNotDeleted {
+            message_id,
+            name,
+            size,
+        } => AppMsg::AttachmentNotDeleted {
+            account_id,
+            message_id,
+            name,
+            size,
+        },
+        WorkerEvent::Gone {
+            message_id,
+            path,
+            uid,
+        } => AppMsg::MessageGone {
+            account_id,
+            message_id,
+            path,
+            uid,
+        },
+        WorkerEvent::RefsRepaired { folder_id } => AppMsg::RefsRepaired {
+            account_id,
+            folder_id,
+        },
+        WorkerEvent::Body {
+            message_id,
+            path,
+            body,
+        } => {
             let body = crate::legacy::current_markup(body);
-            AppMsg::Body { account_id, message_id, path, body }
+            AppMsg::Body {
+                account_id,
+                message_id,
+                path,
+                body,
+            }
         }
-        WorkerEvent::SenderChecked { path, message_id, check } => {
-            AppMsg::SenderChecked { account_id, path, message_id, check: Box::new(check) }
-        }
+        WorkerEvent::SenderChecked {
+            path,
+            message_id,
+            check,
+        } => AppMsg::SenderChecked {
+            account_id,
+            path,
+            message_id,
+            check: Box::new(check),
+        },
         WorkerEvent::Source { text, .. } => AppMsg::Source { text },
-        WorkerEvent::Attachments { path, message_id, items } => {
-            AppMsg::Attachments { account_id, path, message_id, items }
-        }
-        WorkerEvent::AttachmentsPending { path, message_id } => {
-            AppMsg::AttachmentsPending { account_id, path, message_id }
-        }
-        WorkerEvent::NoAttachments { path, message_id } => {
-            AppMsg::NoAttachments { account_id, path, message_id }
-        }
-        WorkerEvent::HasAttachments { path, message_id } => {
-            AppMsg::HasAttachments { account_id, path, message_id }
-        }
+        WorkerEvent::Attachments {
+            path,
+            message_id,
+            items,
+        } => AppMsg::Attachments {
+            account_id,
+            path,
+            message_id,
+            items,
+        },
+        WorkerEvent::AttachmentsPending { path, message_id } => AppMsg::AttachmentsPending {
+            account_id,
+            path,
+            message_id,
+        },
+        WorkerEvent::NoAttachments { path, message_id } => AppMsg::NoAttachments {
+            account_id,
+            path,
+            message_id,
+        },
+        WorkerEvent::HasAttachments { path, message_id } => AppMsg::HasAttachments {
+            account_id,
+            path,
+            message_id,
+        },
         WorkerEvent::Sent => AppMsg::Sent { account_id },
         WorkerEvent::SendDone { ticket, sent } => AppMsg::SendDone { ticket, sent },
-        WorkerEvent::Unsent(message) => AppMsg::Unsent { account_id, message },
+        WorkerEvent::Unsent(message) => AppMsg::Unsent {
+            account_id,
+            message,
+        },
         WorkerEvent::Outbox { items } => AppMsg::OutboxItems { account_id, items },
         WorkerEvent::Notice(text) => AppMsg::Notice(text),
-        WorkerEvent::DraftSaved { autosave, message_id } => {
-            AppMsg::DraftSaved { account_id, autosave, message_id }
-        }
+        WorkerEvent::DraftSaved {
+            autosave,
+            message_id,
+        } => AppMsg::DraftSaved {
+            account_id,
+            autosave,
+            message_id,
+        },
         WorkerEvent::Status(text) => AppMsg::Status { account_id, text },
-        WorkerEvent::Error { text, connectivity } => {
-            AppMsg::Error { account_id, text, connectivity }
-        }
+        WorkerEvent::Error { text, connectivity } => AppMsg::Error {
+            account_id,
+            text,
+            connectivity,
+        },
     }
 }
 
@@ -27368,20 +31583,30 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
 fn hand_off_names(files: &[std::path::PathBuf]) -> String {
     files
         .iter()
-        .map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string()))
+        .map(|p| {
+            p.file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| p.display().to_string())
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }
 
 /// What the handed-in files add up to on disk.
 fn hand_off_size(files: &[std::path::PathBuf]) -> u64 {
-    files.iter().filter_map(|p| std::fs::metadata(p).ok()).map(|m| m.len()).sum()
+    files
+        .iter()
+        .filter_map(|p| std::fs::metadata(p).ok())
+        .map(|m| m.len())
+        .sum()
 }
 
 /// The "remember this" check a hand-off dialog carries: on, the answer
 /// becomes the Settings → System → GNOME Files preference.
 fn remember_check() -> gtk::CheckButton {
-    let check = gtk::CheckButton::with_label(&i18n("Always do this (change it in Settings → System → GNOME Files)"));
+    let check = gtk::CheckButton::with_label(&i18n(
+        "Always do this (change it in Settings → System → GNOME Files)",
+    ));
     check.set_halign(gtk::Align::Start);
     check.set_margin_top(6);
     check
@@ -27430,10 +31655,22 @@ fn show_message_picker<T: 'static>(
         column.append(&search);
         for (m, account) in items.iter() {
             let row = adw::ActionRow::new();
-            let subject = if m.subject.trim().is_empty() { i18n("(no subject)") } else { m.subject.clone() };
+            let subject = if m.subject.trim().is_empty() {
+                i18n("(no subject)")
+            } else {
+                m.subject.clone()
+            };
             row.set_title(&gtk::glib::markup_escape_text(&subject));
-            let who = if m.from_name.trim().is_empty() { m.from_addr.clone() } else { m.from_name.clone() };
-            let who = if who.trim().is_empty() { m.to.clone() } else { who };
+            let who = if m.from_name.trim().is_empty() {
+                m.from_addr.clone()
+            } else {
+                m.from_name.clone()
+            };
+            let who = if who.trim().is_empty() {
+                m.to.clone()
+            } else {
+                who
+            };
             let mut sub = vec![who, m.date.clone()];
             if !account.trim().is_empty() {
                 sub.push(account.clone());
@@ -27456,7 +31693,9 @@ fn show_message_picker<T: 'static>(
             if needle.trim().is_empty() {
                 return true;
             }
-            let Some((m, account)) = filter_items.get(row.index().max(0) as usize) else { return true };
+            let Some((m, account)) = filter_items.get(row.index().max(0) as usize) else {
+                return true;
+            };
             [&m.from_name, &m.from_addr, &m.subject, &m.to, account]
                 .iter()
                 .any(|f| f.to_lowercase().contains(needle.trim()))
@@ -27474,7 +31713,9 @@ fn show_message_picker<T: 'static>(
         column.append(&scroller);
         {
             let dialog = dialog.clone();
-            list.connect_row_selected(move |_, row| dialog.set_response_enabled("pick", row.is_some()));
+            list.connect_row_selected(move |_, row| {
+                dialog.set_response_enabled("pick", row.is_some())
+            });
         }
         // The first row (the message on screen, or the newest draft) starts
         // selected, so Enter takes the likeliest answer.
@@ -27492,11 +31733,16 @@ fn show_message_picker<T: 'static>(
 
     let hand_off = std::rc::Rc::new(std::cell::RefCell::new(Some(hand_off)));
     dialog.connect_response(None, move |_, resp| {
-        let Some(hand_off) = hand_off.borrow_mut().take() else { return };
+        let Some(hand_off) = hand_off.borrow_mut().take() else {
+            return;
+        };
         match resp {
             "new" => on_pick(hand_off, None),
             "pick" => {
-                let picked = list.selected_row().and_then(|r| items.get(r.index().max(0) as usize)).map(|(m, _)| m.clone());
+                let picked = list
+                    .selected_row()
+                    .and_then(|r| items.get(r.index().max(0) as usize))
+                    .map(|(m, _)| m.clone());
                 match picked {
                     Some(m) => on_pick(hand_off, Some(m)),
                     None => on_pick(hand_off, None),
@@ -27510,13 +31756,26 @@ fn show_message_picker<T: 'static>(
 
 /// Files dropped on the main window, for [`AppMsg::DropFiles`]. Folders
 /// are passed over: there is nothing to attach.
-fn window_drop_target(sender: &ComponentSender<AppModel>, phase: gtk::PropagationPhase) -> gtk::DropTarget {
-    let drop = gtk::DropTarget::new(gtk::gdk::FileList::static_type(), gtk::gdk::DragAction::COPY);
+fn window_drop_target(
+    sender: &ComponentSender<AppModel>,
+    phase: gtk::PropagationPhase,
+) -> gtk::DropTarget {
+    let drop = gtk::DropTarget::new(
+        gtk::gdk::FileList::static_type(),
+        gtk::gdk::DragAction::COPY,
+    );
     drop.set_propagation_phase(phase);
     let s = sender.input_sender().clone();
     drop.connect_drop(move |_, value, _, _| {
-        let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
-        let paths: Vec<_> = list.files().iter().filter_map(|f| f.path()).filter(|p| p.is_file()).collect();
+        let Ok(list) = value.get::<gtk::gdk::FileList>() else {
+            return false;
+        };
+        let paths: Vec<_> = list
+            .files()
+            .iter()
+            .filter_map(|f| f.path())
+            .filter(|p| p.is_file())
+            .collect();
         if paths.is_empty() {
             return false;
         }
@@ -27542,7 +31801,11 @@ fn reply_prefill(m: &Message) -> ComposePrefill {
         // A Reply-To header is the sender saying "answer me here instead" —
         // a mailing list, a no-reply address with a monitored counterpart. It
         // wins over the From address whenever it is present.
-        to: if m.reply_to.is_empty() { m.from_addr.clone() } else { m.reply_to.clone() },
+        to: if m.reply_to.is_empty() {
+            m.from_addr.clone()
+        } else {
+            m.reply_to.clone()
+        },
         cc: String::new(),
         subject,
         // Who the original went to, so a mail addressed to one of the
@@ -27566,7 +31829,11 @@ fn reply_prefill(m: &Message) -> ComposePrefill {
 /// with `m` itself appended, de-duplicated and in order.
 fn thread_chain(m: &Message) -> String {
     let mut chain: Vec<&str> = Vec::new();
-    for id in m.references.split_whitespace().chain(std::iter::once(m.message_id.as_str())) {
+    for id in m
+        .references
+        .split_whitespace()
+        .chain(std::iter::once(m.message_id.as_str()))
+    {
         if !id.is_empty() && !chain.contains(&id) {
             chain.push(id);
         }
@@ -27593,10 +31860,14 @@ fn is_own_address(recipient: &str, own: &[String]) -> bool {
         return false;
     }
     let untagged = match (addr.split_once('@'), addr.find('+')) {
-        (Some((local, domain)), Some(_)) => format!("{}@{domain}", local.split('+').next().unwrap_or(local)),
+        (Some((local, domain)), Some(_)) => {
+            format!("{}@{domain}", local.split('+').next().unwrap_or(local))
+        }
         _ => addr.clone(),
     };
-    own.iter().map(|o| bare_address(o)).any(|o| !o.is_empty() && (o == addr || o == untagged))
+    own.iter()
+        .map(|o| bare_address(o))
+        .any(|o| !o.is_empty() && (o == addr || o == untagged))
 }
 
 /// Reply-all: To = the original sender (or their Reply-To); Cc = every other
@@ -27607,13 +31878,21 @@ fn is_own_address(recipient: &str, own: &[String]) -> bool {
 fn reply_all_prefill(m: &Message, own: &[String]) -> ComposePrefill {
     let mut prefill = reply_prefill(m);
     let split = |list: &str| -> Vec<String> {
-        list.split(',').map(str::trim).filter(|a| !a.is_empty()).map(str::to_string).collect()
+        list.split(',')
+            .map(str::trim)
+            .filter(|a| !a.is_empty())
+            .map(str::to_string)
+            .collect()
     };
     let mut to: Vec<String> = Vec::new();
     let mut cc: Vec<String> = Vec::new();
     let push = |list: &mut Vec<String>, a: &str, taken: &[String]| {
         let b = bare_address(a);
-        if !taken.iter().chain(list.iter()).any(|x| bare_address(x) == b) {
+        if !taken
+            .iter()
+            .chain(list.iter())
+            .any(|x| bare_address(x) == b)
+        {
             list.push(a.to_string());
         }
     };
@@ -27657,7 +31936,12 @@ fn unsent_prefill(m: crate::worker::OutgoingMessage) -> ComposePrefill {
     let body_html = if m.html.trim().is_empty() {
         m.body
             .split("\n\n")
-            .map(|p| format!("<p>{}</p>", gtk::glib::markup_escape_text(p).replace('\n', "<br>")))
+            .map(|p| {
+                format!(
+                    "<p>{}</p>",
+                    gtk::glib::markup_escape_text(p).replace('\n', "<br>")
+                )
+            })
             .collect()
     } else {
         m.html
@@ -27703,7 +31987,10 @@ fn unsent_prefill(m: crate::worker::OutgoingMessage) -> ComposePrefill {
 /// Write attachments out to a private temp directory: the composer attaches
 /// files by path, and these exist only as bytes — in a queued message's
 /// stored MIME, or in a cached message being copied.
-fn stage_attachments(dir_name: &str, items: &[crate::models::Attachment]) -> Vec<std::path::PathBuf> {
+fn stage_attachments(
+    dir_name: &str,
+    items: &[crate::models::Attachment],
+) -> Vec<std::path::PathBuf> {
     if items.is_empty() {
         return Vec::new();
     }
@@ -27716,7 +32003,11 @@ fn stage_attachments(dir_name: &str, items: &[crate::models::Attachment]) -> Vec
         // The name came out of a message header; keep it to a single
         // path component.
         let safe = att.name.replace(['/', '\\'], "_");
-        let name = if safe.trim().is_empty() { format!("attachment-{}", i + 1) } else { safe };
+        let name = if safe.trim().is_empty() {
+            format!("attachment-{}", i + 1)
+        } else {
+            safe
+        };
         let path = dir.join(&name);
         match std::fs::write(&path, &att.data) {
             Ok(()) => staged.push(path),
@@ -27791,31 +32082,50 @@ fn sanitize_forward_html(html: &str) -> String {
         html.to_string()
     });
     let mut b = ammonia::Builder::default();
-    b.add_tags(["table", "thead", "tbody", "tfoot", "tr", "td", "th", "font", "center", "u", "span", "img"])
-        .add_generic_attributes([
-            "style", "width", "height", "align", "valign", "bgcolor", "border", "cellpadding",
-            "cellspacing", "color", "face", "size", "colspan", "rowspan", "dir",
-        ])
-        .add_tag_attributes("img", ["src", "alt"])
-        // A document's title is not part of its body.
-        .add_clean_content_tags(["title"])
-        .url_schemes(HashSet::from(["http", "https", "mailto", "data"]))
-        .attribute_filter(|element, attribute, value| match (element, attribute) {
-            (_, "style") => quote_style(value).map(Into::into),
-            // `data:` for the pictures the message carried inside itself,
-            // and nowhere else.
-            (_, "href" | "src") if starts_with_ignore_case(value.trim_start(), "data:") => {
-                (element == "img" && starts_with_ignore_case(value.trim_start(), "data:image/"))
-                    .then(|| value.into())
-            }
-            _ => Some(value.into()),
-        });
+    b.add_tags([
+        "table", "thead", "tbody", "tfoot", "tr", "td", "th", "font", "center", "u", "span", "img",
+    ])
+    .add_generic_attributes([
+        "style",
+        "width",
+        "height",
+        "align",
+        "valign",
+        "bgcolor",
+        "border",
+        "cellpadding",
+        "cellspacing",
+        "color",
+        "face",
+        "size",
+        "colspan",
+        "rowspan",
+        "dir",
+    ])
+    .add_tag_attributes("img", ["src", "alt"])
+    // A document's title is not part of its body.
+    .add_clean_content_tags(["title"])
+    .url_schemes(HashSet::from(["http", "https", "mailto", "data"]))
+    .attribute_filter(|element, attribute, value| match (element, attribute) {
+        (_, "style") => quote_style(value).map(Into::into),
+        // `data:` for the pictures the message carried inside itself,
+        // and nowhere else.
+        (_, "href" | "src") if starts_with_ignore_case(value.trim_start(), "data:") => {
+            (element == "img" && starts_with_ignore_case(value.trim_start(), "data:image/"))
+                .then(|| value.into())
+        }
+        _ => Some(value.into()),
+    });
     let inner = b.clean(&inlined).to_string();
     let inner = trim_empty_blocks(&inner);
     // The body's own background, font and spacing, which the sanitizer
     // would otherwise drop with the body tag.
-    let Some(body) = body_look(&inlined) else { return inner.to_string() };
-    let wrapper = b.clean(&format!("<div style=\"{body}\"></div>")).to_string();
+    let Some(body) = body_look(&inlined) else {
+        return inner.to_string();
+    };
+    let wrapper = b
+        .clean(&format!("<div style=\"{body}\"></div>"))
+        .to_string();
     match wrapper.strip_suffix("</div>") {
         Some(open) if open != "<div>" => format!("{open}{inner}</div>"),
         _ => inner.to_string(),
@@ -27826,21 +32136,82 @@ fn sanitize_forward_html(html: &str) -> String {
 /// Positioning is left out, so nothing quoted can cover the composer, and
 /// so is anything that takes an image.
 const QUOTE_STYLE_PROPERTIES: &[&str] = &[
-    "background-color", "background", "border", "border-bottom", "border-bottom-color",
-    "border-bottom-left-radius", "border-bottom-right-radius", "border-bottom-style",
-    "border-bottom-width", "border-collapse", "border-color", "border-left", "border-left-color",
-    "border-left-style", "border-left-width", "border-radius", "border-right",
-    "border-right-color", "border-right-style", "border-right-width", "border-spacing",
-    "border-style", "border-top", "border-top-color", "border-top-left-radius",
-    "border-top-right-radius", "border-top-style", "border-top-width", "border-width",
-    "box-sizing", "clear", "color", "direction", "display", "float", "font", "font-family",
-    "font-size", "font-style", "font-variant", "font-weight", "height", "letter-spacing",
-    "line-height", "list-style", "list-style-position", "list-style-type", "margin",
-    "margin-bottom", "margin-left", "margin-right", "margin-top", "max-height", "max-width",
-    "min-height", "min-width", "opacity", "overflow", "overflow-wrap", "padding",
-    "padding-bottom", "padding-left", "padding-right", "padding-top", "table-layout",
-    "text-align", "text-decoration", "text-indent", "text-transform", "vertical-align",
-    "visibility", "white-space", "width", "word-break", "word-spacing", "word-wrap",
+    "background-color",
+    "background",
+    "border",
+    "border-bottom",
+    "border-bottom-color",
+    "border-bottom-left-radius",
+    "border-bottom-right-radius",
+    "border-bottom-style",
+    "border-bottom-width",
+    "border-collapse",
+    "border-color",
+    "border-left",
+    "border-left-color",
+    "border-left-style",
+    "border-left-width",
+    "border-radius",
+    "border-right",
+    "border-right-color",
+    "border-right-style",
+    "border-right-width",
+    "border-spacing",
+    "border-style",
+    "border-top",
+    "border-top-color",
+    "border-top-left-radius",
+    "border-top-right-radius",
+    "border-top-style",
+    "border-top-width",
+    "border-width",
+    "box-sizing",
+    "clear",
+    "color",
+    "direction",
+    "display",
+    "float",
+    "font",
+    "font-family",
+    "font-size",
+    "font-style",
+    "font-variant",
+    "font-weight",
+    "height",
+    "letter-spacing",
+    "line-height",
+    "list-style",
+    "list-style-position",
+    "list-style-type",
+    "margin",
+    "margin-bottom",
+    "margin-left",
+    "margin-right",
+    "margin-top",
+    "max-height",
+    "max-width",
+    "min-height",
+    "min-width",
+    "opacity",
+    "overflow",
+    "overflow-wrap",
+    "padding",
+    "padding-bottom",
+    "padding-left",
+    "padding-right",
+    "padding-top",
+    "table-layout",
+    "text-align",
+    "text-decoration",
+    "text-indent",
+    "text-transform",
+    "vertical-align",
+    "visibility",
+    "white-space",
+    "width",
+    "word-break",
+    "word-spacing",
+    "word-wrap",
 ];
 
 /// A quoted element's `style`, cut down to [`QUOTE_STYLE_PROPERTIES`].
@@ -27853,7 +32224,9 @@ fn quote_style(style: &str) -> Option<String> {
     const FUNCTIONS: [&str; 5] = ["rgb", "rgba", "hsl", "hsla", "calc"];
     let mut kept = String::new();
     for declaration in style.split(';') {
-        let Some((name, value)) = declaration.split_once(':') else { continue };
+        let Some((name, value)) = declaration.split_once(':') else {
+            continue;
+        };
         let name = name.trim().to_ascii_lowercase();
         let value = value.trim();
         if value.is_empty() || value.contains(['\\', '<', '>']) {
@@ -27878,7 +32251,8 @@ fn quote_style(style: &str) -> Option<String> {
 }
 
 fn starts_with_ignore_case(s: &str, prefix: &str) -> bool {
-    s.get(..prefix.len()).is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+    s.get(..prefix.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
 }
 
 /// The inline style of a document's `<body>`, with its `bgcolor` folded in,
@@ -27894,7 +32268,9 @@ fn body_look(html: &str) -> Option<String> {
         if rest.is_empty() || rest.starts_with('>') || rest.starts_with("/>") {
             break;
         }
-        let name_end = rest.find(|c: char| c == '=' || c == '>' || c.is_whitespace()).unwrap_or(rest.len());
+        let name_end = rest
+            .find(|c: char| c == '=' || c == '>' || c.is_whitespace())
+            .unwrap_or(rest.len());
         let name = rest[..name_end].to_ascii_lowercase();
         rest = rest[name_end..].trim_start();
         let Some(after_eq) = rest.strip_prefix('=') else {
@@ -27911,14 +32287,21 @@ fn body_look(html: &str) -> Option<String> {
                 (&body[..end], &body[end + 1..])
             }
             _ => {
-                let end = after_eq.find(|c: char| c == '>' || c.is_whitespace()).unwrap_or(after_eq.len());
+                let end = after_eq
+                    .find(|c: char| c == '>' || c.is_whitespace())
+                    .unwrap_or(after_eq.len());
                 (&after_eq[..end], &after_eq[end..])
             }
         };
         attrs.push((name, value.to_string()));
         rest = tail;
     }
-    let get = |n: &str| attrs.iter().find(|(k, _)| k == n).map(|(_, v)| v.trim().to_string());
+    let get = |n: &str| {
+        attrs
+            .iter()
+            .find(|(k, _)| k == n)
+            .map(|(_, v)| v.trim().to_string())
+    };
     let mut look = get("style").unwrap_or_default();
     if let Some(bg) = get("bgcolor").filter(|v| !v.is_empty()) {
         if !look.is_empty() && !look.ends_with(';') {
@@ -27955,7 +32338,9 @@ fn hard_wrap_plain_regions(html: &str) -> String {
     // A whole document of plain text (the worker's `wrap_plain`): the rule is
     // on `body`, so every newline in it is a break.
     if body_is_pre_wrap(html) {
-        let open = html.find("<body").and_then(|i| html[i..].find('>').map(|j| i + j + 1));
+        let open = html
+            .find("<body")
+            .and_then(|i| html[i..].find('>').map(|j| i + j + 1));
         let close = html.rfind("</body>");
         return match (open, close) {
             (Some(open), Some(close)) if open <= close => format!(
@@ -27973,8 +32358,12 @@ fn hard_wrap_plain_regions(html: &str) -> String {
     let mut out = String::with_capacity(html.len());
     let mut rest = html;
     while let Some(at) = rest.find("class=\"hylki-plain\"") {
-        let Some(open) = rest[at..].find('>').map(|i| at + i + 1) else { break };
-        let Some(close) = rest[open..].find("</div>").map(|i| open + i) else { break };
+        let Some(open) = rest[at..].find('>').map(|i| at + i + 1) else {
+            break;
+        };
+        let Some(close) = rest[open..].find("</div>").map(|i| open + i) else {
+            break;
+        };
         out.push_str(&rest[..open]);
         out.push_str(&breaks(&rest[open..close]));
         rest = &rest[close..];
@@ -27987,7 +32376,9 @@ fn hard_wrap_plain_regions(html: &str) -> String {
 /// carriage return left in front of the `<br>` is read back as a second
 /// line break, under the `pre-wrap` the quote keeps.
 fn breaks(text: &str) -> String {
-    text.replace("\r\n", "\n").replace('\r', "\n").replace('\n', "<br>")
+    text.replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .replace('\n', "<br>")
 }
 
 /// Whether a body, as the worker renders it, came from mail with no HTML
@@ -28000,15 +32391,23 @@ pub(crate) fn body_is_plain_text(body: &str) -> bool {
         return !body.trim().is_empty();
     }
     let lower = body.to_ascii_lowercase();
-    let Some(open) = lower.find("<body").and_then(|i| lower[i..].find('>').map(|j| i + j + 1)) else {
+    let Some(open) = lower
+        .find("<body")
+        .and_then(|i| lower[i..].find('>').map(|j| i + j + 1))
+    else {
         return false;
     };
-    let close = lower.rfind("</body>").filter(|&c| c >= open).unwrap_or(lower.len());
+    let close = lower
+        .rfind("</body>")
+        .filter(|&c| c >= open)
+        .unwrap_or(lower.len());
     let whole = body_is_pre_wrap(body);
     let mut text = whole;
     let mut rest = &lower[open..close];
     while let Some(at) = rest.find('<') {
-        let Some(end) = rest[at..].find('>').map(|i| at + i) else { return false };
+        let Some(end) = rest[at..].find('>').map(|i| at + i) else {
+            return false;
+        };
         let tag = rest[at + 1..end].trim();
         let ok = match tag.split_whitespace().next().unwrap_or("") {
             // `linkify`'s links, the one markup inside the text.
@@ -28034,11 +32433,21 @@ pub(crate) fn body_is_plain_text(body: &str) -> bool {
 pub(crate) fn body_is_pre_wrap(html: &str) -> bool {
     let mut rest = html;
     while let Some(at) = rest.find("<style") {
-        let Some(open) = rest[at..].find('>').map(|i| at + i + 1) else { return false };
-        let close = rest[open..].find("</style>").map(|i| open + i).unwrap_or(rest.len());
-        let css: String = rest[open..close].chars().filter(|c| !c.is_whitespace()).collect();
+        let Some(open) = rest[at..].find('>').map(|i| at + i + 1) else {
+            return false;
+        };
+        let close = rest[open..]
+            .find("</style>")
+            .map(|i| open + i)
+            .unwrap_or(rest.len());
+        let css: String = rest[open..close]
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect();
         for rule in css.split('}') {
-            let Some((selectors, decls)) = rule.split_once('{') else { continue };
+            let Some((selectors, decls)) = rule.split_once('{') else {
+                continue;
+            };
             if selectors.split(',').any(|s| s == "body") && decls.contains("white-space:pre-wrap") {
                 return true;
             }
@@ -28053,7 +32462,13 @@ pub(crate) fn body_is_pre_wrap(html: &str) -> bool {
 /// carry that blank line in as the first line of the quote.
 fn trim_empty_blocks(html: &str) -> &str {
     const EMPTY: [&str; 8] = [
-        "<br>", "<br/>", "<br />", "<p></p>", "<div></div>", "<p><br></p>", "<div><br></div>",
+        "<br>",
+        "<br/>",
+        "<br />",
+        "<p></p>",
+        "<div></div>",
+        "<p><br></p>",
+        "<div><br></div>",
         "&nbsp;",
     ];
     let mut out = html.trim();
@@ -28079,11 +32494,17 @@ fn trim_empty_blocks(html: &str) -> &str {
 /// would leave its dark text unreadable.
 fn quote_block_html(attribution: &str, inner_html: &str) -> String {
     let esc = |s: &str| gtk::glib::markup_escape_text(s).replace('\n', "<br>");
-    let colored = ["color:", "color=\"", "background:"].iter().any(|c| inner_html.contains(c));
+    let colored = ["color:", "color=\"", "background:"]
+        .iter()
+        .any(|c| inner_html.contains(c));
     format!(
         "<p class=\"hylki-quote-attr\">{}</p><blockquote{}>{}</blockquote>",
         esc(attribution),
-        if colored { " class=\"hylki-quote-mail\"" } else { "" },
+        if colored {
+            " class=\"hylki-quote-mail\""
+        } else {
+            ""
+        },
         inner_html
     )
 }
@@ -28165,7 +32586,10 @@ impl From<Vec<Message>> for FolderMessages {
 /// Gmail files one message under every label it carries, so an archived mail
 /// sits in All Mail and its labels, and an inbox one in INBOX and All Mail
 /// too (#472). Each mail is kept once, from the folder `rank` puts first.
-fn build_search_pool<'a>(lists: impl IntoIterator<Item = &'a Vec<Message>>, rank: impl Fn(&Message) -> u8) -> Vec<Message> {
+fn build_search_pool<'a>(
+    lists: impl IntoIterator<Item = &'a Vec<Message>>,
+    rank: impl Fn(&Message) -> u8,
+) -> Vec<Message> {
     let mut out: Vec<Message> = Vec::new();
     let mut copies: HashMap<(u32, &str), Vec<usize>> = HashMap::new();
     for m in lists.into_iter().flatten() {
@@ -28173,7 +32597,9 @@ fn build_search_pool<'a>(lists: impl IntoIterator<Item = &'a Vec<Message>>, rank
             out.push(m.clone());
             continue;
         }
-        let slots = copies.entry((m.account_id, m.message_id.as_str())).or_default();
+        let slots = copies
+            .entry((m.account_id, m.message_id.as_str()))
+            .or_default();
         match slots.iter().copied().find(|&i| same_mail(&out[i], m)) {
             Some(i) => {
                 if rank(m) < rank(&out[i]) {
@@ -28247,7 +32673,11 @@ fn same_mail(a: &Message, b: &Message) -> bool {
 /// The copy from the folder the reader is showing wins, so the "from folder X"
 /// label and the actions on a message refer to the mail actually on screen. A
 /// message with no Message-ID can't be matched this way and is left alone.
-fn dedupe_label_copies(messages: Vec<Message>, conv: &[Message], shown_folder: u32) -> Vec<Message> {
+fn dedupe_label_copies(
+    messages: Vec<Message>,
+    conv: &[Message],
+    shown_folder: u32,
+) -> Vec<Message> {
     let mut out: Vec<Message> = Vec::new();
     for r in messages {
         if r.message_id.is_empty() {
@@ -28339,7 +32769,11 @@ mod tests {
             for (at, _) in text.match_indices("-symbolic\"") {
                 let start = text[..at].rfind('"').map_or(at, |q| q + 1);
                 let name = &text[start..at + "-symbolic".len()];
-                if !name.starts_with('-') && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+                if !name.starts_with('-')
+                    && name
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                {
                     let entry = format!("icons/scalable/actions/{name}.svg");
                     if !manifest.contains(&entry) {
                         missing.insert(name.to_string());
@@ -28347,7 +32781,10 @@ mod tests {
                 }
             }
         }
-        assert!(missing.is_empty(), "not in the icon bundle, run tools/gen-icon-gresource.sh: {missing:?}");
+        assert!(
+            missing.is_empty(),
+            "not in the icon bundle, run tools/gen-icon-gresource.sh: {missing:?}"
+        );
     }
 
     /// Saving a new signature or color leaves the account connected (#382);
@@ -28357,7 +32794,10 @@ mod tests {
         let old = super::demo_account_configs().remove(0);
         let mut new = old.clone();
         new.set_signatures(
-            vec![crate::config::NamedSignature { name: "Short".into(), html: "Jason".into() }],
+            vec![crate::config::NamedSignature {
+                name: "Short".into(),
+                html: "Jason".into(),
+            }],
             None,
         );
         new.color = Some("#ff0000".into());
@@ -28372,7 +32812,10 @@ mod tests {
         name.name = "Someone Else".into();
         assert!(!(super::look_only_change(&old, &name) && super::secrets_kept(&old, &name)));
         let mut alias = new.clone();
-        alias.aliases.push(crate::config::AliasConfig { identity: "me@alias.org".into(), ..Default::default() });
+        alias.aliases.push(crate::config::AliasConfig {
+            identity: "me@alias.org".into(),
+            ..Default::default()
+        });
         assert!(!(super::look_only_change(&old, &alias) && super::secrets_kept(&old, &alias)));
     }
 
@@ -28397,10 +32840,19 @@ mod tests {
         let want = Some("cah5b6q=abc123@example.com".to_string());
         assert_eq!(super::parse_mid("mid:CAH5B6Q=abc123@example.com"), want);
         assert_eq!(super::parse_mid("mid:CAH5B6Q%3Dabc123%40example.com"), want);
-        assert_eq!(super::parse_mid("mid:%3CCAH5B6Q%3Dabc123%40example.com%3E"), want);
-        assert_eq!(super::parse_mid("mid:<CAH5B6Q=abc123@example.com>/part1"), want);
+        assert_eq!(
+            super::parse_mid("mid:%3CCAH5B6Q%3Dabc123%40example.com%3E"),
+            want
+        );
+        assert_eq!(
+            super::parse_mid("mid:<CAH5B6Q=abc123@example.com>/part1"),
+            want
+        );
         assert_eq!(super::parse_mid("MID:CAH5B6Q=abc123@example.com"), want);
-        assert_eq!(super::parse_mid("mid:///%3CCAH5B6Q=abc123@example.com%3E"), want);
+        assert_eq!(
+            super::parse_mid("mid:///%3CCAH5B6Q=abc123@example.com%3E"),
+            want
+        );
         // Slashes inside the id are part of it; one after the domain is a cid.
         assert_eq!(
             super::parse_mid("mid:hyprlab/hylki/issues/128/5558573653@github.com/att1"),
@@ -28424,7 +32876,11 @@ mod tests {
         };
         // Byte six falls inside a character in these top-level paths.
         for path in ["abcd摘要", "a收摘要", "📧摘要", "é日語"] {
-            assert_eq!(super::AppModel::infer_folder_namespace(&[custom(path)]), "", "{path}");
+            assert_eq!(
+                super::AppModel::infer_folder_namespace(&[custom(path)]),
+                "",
+                "{path}"
+            );
         }
         for (path, expected) in [
             ("INBOX/中文", "INBOX/"),
@@ -28437,7 +32893,11 @@ mod tests {
             ("INBOX", ""),
             ("", ""),
         ] {
-            assert_eq!(super::AppModel::infer_folder_namespace(&[custom(path)]), expected, "{path}");
+            assert_eq!(
+                super::AppModel::infer_folder_namespace(&[custom(path)]),
+                expected,
+                "{path}"
+            );
         }
         assert_eq!(
             super::AppModel::infer_folder_namespace(&[custom("INBOX/中文"), custom("abcd摘要")]),
@@ -28446,7 +32906,10 @@ mod tests {
         assert_eq!(super::AppModel::infer_folder_namespace(&[]), "");
         let mut inbox = custom("INBOX");
         inbox.kind = FolderKind::Inbox;
-        assert_eq!(super::AppModel::infer_folder_namespace(&[inbox.clone()]), "");
+        assert_eq!(
+            super::AppModel::infer_folder_namespace(&[inbox.clone()]),
+            ""
+        );
         assert_eq!(
             super::AppModel::infer_folder_namespace(&[inbox, custom("INBOX/中文")]),
             "INBOX/"
@@ -28484,7 +32947,10 @@ mod tests {
         assert_eq!(kind_of("Rubbish"), FolderKind::Trash);
         assert_eq!(kind_of("INBOX"), FolderKind::Inbox);
         // Ids survive the re-sort (cached messages reference them).
-        assert_eq!(folders.iter().find(|f| f.path == "Sent Items").unwrap().id, 2);
+        assert_eq!(
+            folders.iter().find(|f| f.path == "Sent Items").unwrap().id,
+            2
+        );
     }
 
     #[test]
@@ -28500,17 +32966,32 @@ mod tests {
                 FlagChange {
                     kind: FlagKind::Read,
                     value: false,
-                    items: vec![FlagRef { folder_id: 1, uid: 7, id: 7 }],
+                    items: vec![FlagRef {
+                        folder_id: 1,
+                        uid: 7,
+                        id: 7,
+                    }],
                 },
                 FlagChange {
                     kind: FlagKind::Tag("Work".into()),
                     value: true,
-                    items: vec![FlagRef { folder_id: 1, uid: 8, id: 8 }],
+                    items: vec![FlagRef {
+                        folder_id: 1,
+                        uid: 8,
+                        id: 8,
+                    }],
                 },
             ]),
-            UndoStep::CreateFolder { path: "Projects".into() },
-            UndoStep::DeleteFolder { path: "Projects".into() },
-            UndoStep::RenameFolder { from: "Old".into(), to: "New".into() },
+            UndoStep::CreateFolder {
+                path: "Projects".into(),
+            },
+            UndoStep::DeleteFolder {
+                path: "Projects".into(),
+            },
+            UndoStep::RenameFolder {
+                from: "Old".into(),
+                to: "New".into(),
+            },
         ];
         for step in &steps {
             assert_eq!(&step.inverse().inverse(), step, "{step:?} round-trips");
@@ -28529,8 +33010,13 @@ mod tests {
         // Undoing a folder someone made deletes it again; there is no step
         // that undoes a folder the user deleted.
         assert_eq!(
-            UndoStep::CreateFolder { path: "Projects".into() }.inverse(),
-            UndoStep::DeleteFolder { path: "Projects".into() }
+            UndoStep::CreateFolder {
+                path: "Projects".into()
+            }
+            .inverse(),
+            UndoStep::DeleteFolder {
+                path: "Projects".into()
+            }
         );
     }
 
@@ -28550,31 +33036,66 @@ mod tests {
             f(3, "Archive", FolderKind::Archive),
         ];
         // Nothing chosen: the Sent folder, as before.
-        assert_eq!(super::pick_sent_copy(None, &folders).as_deref(), Some("Sent"));
+        assert_eq!(
+            super::pick_sent_copy(None, &folders).as_deref(),
+            Some("Sent")
+        );
         // The Inbox is a legitimate choice (#199) — unlike a role (#136), a
         // destination takes nothing away from the folder it names.
-        assert_eq!(super::pick_sent_copy(Some("INBOX"), &folders).as_deref(), Some("INBOX"));
-        assert_eq!(super::pick_sent_copy(Some("Archive"), &folders).as_deref(), Some("Archive"));
+        assert_eq!(
+            super::pick_sent_copy(Some("INBOX"), &folders).as_deref(),
+            Some("INBOX")
+        );
+        assert_eq!(
+            super::pick_sent_copy(Some("Archive"), &folders).as_deref(),
+            Some("Archive")
+        );
         // A folder that has gone from the server falls back to Sent.
-        assert_eq!(super::pick_sent_copy(Some("Gone"), &folders).as_deref(), Some("Sent"));
+        assert_eq!(
+            super::pick_sent_copy(Some("Gone"), &folders).as_deref(),
+            Some("Sent")
+        );
         // No Sent folder and no choice: the message goes out uncopied.
         let bare = vec![f(1, "INBOX", FolderKind::Inbox)];
         assert_eq!(super::pick_sent_copy(None, &bare), None);
         assert_eq!(super::pick_sent_copy(Some("Gone"), &bare), None);
-        assert_eq!(super::pick_sent_copy(Some("INBOX"), &bare).as_deref(), Some("INBOX"));
+        assert_eq!(
+            super::pick_sent_copy(Some("INBOX"), &bare).as_deref(),
+            Some("INBOX")
+        );
     }
 
     #[test]
     fn a_role_never_takes_the_inbox() {
         let mut folders = vec![
-            Folder { id: 1, account_id: 1, name: "Inbox".into(), path: "INBOX".into(), kind: FolderKind::Inbox, unread: 0 },
-            Folder { id: 2, account_id: 1, name: "Sent".into(), path: "Sent".into(), kind: FolderKind::Sent, unread: 0 },
+            Folder {
+                id: 1,
+                account_id: 1,
+                name: "Inbox".into(),
+                path: "INBOX".into(),
+                kind: FolderKind::Inbox,
+                unread: 0,
+            },
+            Folder {
+                id: 2,
+                account_id: 1,
+                name: "Sent".into(),
+                path: "Sent".into(),
+                kind: FolderKind::Sent,
+                unread: 0,
+            },
         ];
         let mut roles = std::collections::BTreeMap::new();
         roles.insert("sent".to_string(), "INBOX".to_string());
         super::apply_folder_roles(&roles, &mut folders);
-        assert_eq!(folders.iter().find(|f| f.path == "INBOX").unwrap().kind, FolderKind::Inbox);
-        assert_eq!(folders.iter().find(|f| f.path == "Sent").unwrap().kind, FolderKind::Sent);
+        assert_eq!(
+            folders.iter().find(|f| f.path == "INBOX").unwrap().kind,
+            FolderKind::Inbox
+        );
+        assert_eq!(
+            folders.iter().find(|f| f.path == "Sent").unwrap().kind,
+            FolderKind::Sent
+        );
     }
 
     #[test]
@@ -28643,7 +33164,10 @@ mod tests {
             <blockquote><div>tagada</div></blockquote></body></html>";
         let quoted = super::quoted_original("On Tuesday, Bo wrote:", body);
         let inner = quoted.split_once("</p>").expect("attribution line").1;
-        assert!(inner.contains("<blockquote><div>tagada</div></blockquote>"), "{quoted}");
+        assert!(
+            inner.contains("<blockquote><div>tagada</div></blockquote>"),
+            "{quoted}"
+        );
         assert_eq!(inner.matches("<blockquote>").count(), 2, "{quoted}");
     }
 
@@ -28693,7 +33217,9 @@ mod tests {
         assert!(!super::body_is_plain_text(&alternative), "{alternative}");
         // HTML set in <pre> is still HTML, and so is a pre-wrap body with
         // markup of its own.
-        assert!(!super::body_is_plain_text("<html><body><pre>text</pre></body></html>"));
+        assert!(!super::body_is_plain_text(
+            "<html><body><pre>text</pre></body></html>"
+        ));
         assert!(!super::body_is_plain_text(
             "<html><head><style>body{white-space:pre-wrap}</style></head><body><b>Hi</b></body></html>"
         ));
@@ -28722,12 +33248,16 @@ mod tests {
         // CRLF mail: a carriage return left before the <br> read back as a
         // second break under the quote's pre-wrap. The indent stays, and so
         // does the escaped-text path's.
-        let body = crate::worker::extract_body(b"Content-Type: text/plain\r\n\r\nHi,\r\n  indented\r\n");
+        let body =
+            crate::worker::extract_body(b"Content-Type: text/plain\r\n\r\nHi,\r\n  indented\r\n");
         let quoted = super::quoted_original("hdr", &body);
         assert!(quoted.contains("Hi,<br>  indented"), "{quoted}");
         assert!(!quoted.contains(['\r', '\n']), "{quoted}");
         let raw = super::quoted_original("hdr", "Hi,\n  indented");
-        assert!(raw.contains("<div style=\"white-space:pre-wrap\">Hi,<br>  indented</div>"), "{raw}");
+        assert!(
+            raw.contains("<div style=\"white-space:pre-wrap\">Hi,<br>  indented</div>"),
+            "{raw}"
+        );
     }
 
     #[test]
@@ -28737,7 +33267,10 @@ mod tests {
         let body = "<html><body><div><br></div><div>yada yada</div><br></body></html>";
         let quoted = super::quoted_original("hdr", body);
         let inner = quoted.split_once("</p>").expect("attribution line").1;
-        assert!(inner.starts_with("<blockquote><div>yada yada</div>"), "{quoted}");
+        assert!(
+            inner.starts_with("<blockquote><div>yada yada</div>"),
+            "{quoted}"
+        );
         assert!(!inner.contains("<br></blockquote>"), "{quoted}");
     }
 
@@ -28751,12 +33284,21 @@ mod tests {
             <div style="background:url(https://tracker.example/p.gif)">hi</div>"#;
         let clean = sanitize_forward_html(dirty);
         assert!(!clean.contains("script"), "{clean}");
-        assert!(!clean.contains("onclick") && !clean.contains("onmouseover"), "{clean}");
+        assert!(
+            !clean.contains("onclick") && !clean.contains("onmouseover"),
+            "{clean}"
+        );
         assert!(!clean.contains("javascript:"), "{clean}");
         assert!(!clean.contains("style"), "{clean}");
         // The structure and safe pieces survive.
-        assert!(clean.contains("<table>") && clean.contains("<b>$40</b>"), "{clean}");
-        assert!(clean.contains(r#"<a href="https://example.com""#), "{clean}");
+        assert!(
+            clean.contains("<table>") && clean.contains("<b>$40</b>"),
+            "{clean}"
+        );
+        assert!(
+            clean.contains(r#"<a href="https://example.com""#),
+            "{clean}"
+        );
     }
 
     #[test]
@@ -28766,8 +33308,13 @@ mod tests {
             <font color="#333333" size="2">Invoice</font></td></tr></table>
             <img src="https://example.com/logo.png" width="120" alt="logo">"##;
         let clean = sanitize_forward_html(html);
-        for keep in ["width=\"600\"", "align=\"right\"", "bgcolor=\"#eeeeee\"",
-                     "color=\"#333333\"", "src=\"https://example.com/logo.png\""] {
+        for keep in [
+            "width=\"600\"",
+            "align=\"right\"",
+            "bgcolor=\"#eeeeee\"",
+            "color=\"#333333\"",
+            "src=\"https://example.com/logo.png\"",
+        ] {
             assert!(clean.contains(keep), "missing {keep} in {clean}");
         }
     }
@@ -28781,7 +33328,10 @@ mod tests {
             @media (max-width:600px){.bar{padding:4px}}</style></head>\
             <body bgcolor=\"#eeeeee\" style=\"margin:0\"><div class=\"bar\">Order placed</div></body></html>";
         let clean = super::sanitize_forward_html(html);
-        assert!(!clean.contains("<style") && !clean.contains("class="), "{clean}");
+        assert!(
+            !clean.contains("<style") && !clean.contains("class="),
+            "{clean}"
+        );
         assert!(!clean.contains("Your order"), "{clean}");
         assert!(clean.contains("background-color:#34495e;"), "{clean}");
         assert!(clean.contains("color:#ffffff;"), "{clean}");
@@ -28796,7 +33346,9 @@ mod tests {
     fn quoted_styles_fetch_nothing_and_cover_nothing() {
         use super::quote_style;
         assert_eq!(
-            quote_style("position:fixed; top:0; color:red; background:#fff url(https://t.example/p.gif)"),
+            quote_style(
+                "position:fixed; top:0; color:red; background:#fff url(https://t.example/p.gif)"
+            ),
             Some("color:red;".into())
         );
         assert_eq!(quote_style("background-image:url(x)"), None);
@@ -28816,7 +33368,10 @@ mod tests {
             <img src="data:text/html;base64,PHNjcmlwdD4=">
             <a href="data:text/html,hi">x</a>"#;
         let clean = super::sanitize_forward_html(html);
-        assert!(clean.contains(r#"src="data:image/png;base64,iVBORw0KGgo=""#), "{clean}");
+        assert!(
+            clean.contains(r#"src="data:image/png;base64,iVBORw0KGgo=""#),
+            "{clean}"
+        );
         assert!(!clean.contains("data:text"), "{clean}");
     }
 
@@ -28827,7 +33382,10 @@ mod tests {
             split_identity("Ann Work <ann@work.example>"),
             ("Ann Work".into(), "ann@work.example".into())
         );
-        assert_eq!(split_identity("ann@shop.example"), (String::new(), "ann@shop.example".into()));
+        assert_eq!(
+            split_identity("ann@shop.example"),
+            (String::new(), "ann@shop.example".into())
+        );
         assert_eq!(
             split_identity("\"Quoted\" <q@x.example>"),
             ("Quoted".into(), "q@x.example".into())
@@ -28881,7 +33439,10 @@ mod tests {
         ];
         let kept = dedupe_label_copies(related, &[], 1);
         assert_eq!(kept.len(), 2, "two messages, not four copies");
-        let a = kept.iter().find(|m| m.message_id == "<a@example.com>").unwrap();
+        let a = kept
+            .iter()
+            .find(|m| m.message_id == "<a@example.com>")
+            .unwrap();
         assert_eq!(
             (a.folder_id, a.uid),
             (1, 42),
@@ -28904,7 +33465,11 @@ mod tests {
         mine.from_addr = "me@real.example".into();
 
         let kept = dedupe_label_copies(vec![mine, spam], &[], 1);
-        assert_eq!(kept.len(), 2, "a shared id from another sender is other mail");
+        assert_eq!(
+            kept.len(),
+            2,
+            "a shared id from another sender is other mail"
+        );
     }
 
     #[test]
@@ -28940,7 +33505,10 @@ mod tests {
             (2, 13, 7, "INBOX".into()),
         ]);
         assert_eq!(batches.len(), 3);
-        assert_eq!(batches[0], ((1, "INBOX".to_string()), vec![(10, 100), (12, 101)]));
+        assert_eq!(
+            batches[0],
+            ((1, "INBOX".to_string()), vec![(10, 100), (12, 101)])
+        );
         assert_eq!(batches[1], ((1, "Sent".to_string()), vec![(11, 55)]));
         assert_eq!(batches[2], ((2, "INBOX".to_string()), vec![(13, 7)]));
         let members: usize = batches.iter().map(|(_, items)| items.len()).sum();
@@ -28967,7 +33535,10 @@ mod tests {
 
     #[test]
     fn save_as_file_offers_the_subject() {
-        assert_eq!(super::eml_file_name("Re: Q3 roadmap / review?"), "Re- Q3 roadmap - review-.eml");
+        assert_eq!(
+            super::eml_file_name("Re: Q3 roadmap / review?"),
+            "Re- Q3 roadmap - review-.eml"
+        );
         assert_eq!(super::eml_file_name("   "), "message.eml");
         assert_eq!(super::eml_file_name("..."), "message.eml");
         assert!(super::is_message_file(std::path::Path::new("/tmp/A.EML")));
@@ -28977,33 +33548,87 @@ mod tests {
     #[test]
     fn gmail_map_matches_gmail() {
         use gtk::gdk::Key;
-        assert_eq!(gmail_shortcut_for(Key::j, false), Some(Shortcut::MoveCursor(1)));
-        assert_eq!(gmail_shortcut_for(Key::k, false), Some(Shortcut::MoveCursor(-1)));
-        assert_eq!(gmail_shortcut_for(Key::o, false), Some(Shortcut::OpenCursor));
+        assert_eq!(
+            gmail_shortcut_for(Key::j, false),
+            Some(Shortcut::MoveCursor(1))
+        );
+        assert_eq!(
+            gmail_shortcut_for(Key::k, false),
+            Some(Shortcut::MoveCursor(-1))
+        );
+        assert_eq!(
+            gmail_shortcut_for(Key::o, false),
+            Some(Shortcut::OpenCursor)
+        );
         assert_eq!(gmail_shortcut_for(Key::e, false), Some(Shortcut::Archive));
-        assert_eq!(gmail_shortcut_for(Key::numbersign, true), Some(Shortcut::Delete));
+        assert_eq!(
+            gmail_shortcut_for(Key::numbersign, true),
+            Some(Shortcut::Delete)
+        );
         assert_eq!(gmail_shortcut_for(Key::a, false), Some(Shortcut::ReplyAll));
-        assert_eq!(gmail_shortcut_for(Key::U, true), Some(Shortcut::MarkRead(false)));
-        assert_eq!(gmail_shortcut_for(Key::underscore, true), Some(Shortcut::MarkUnreadFrom));
-        assert_eq!(gmail_shortcut_for(Key::semicolon, false), Some(Shortcut::FoldAll(false)));
-        assert_eq!(gmail_shortcut_for(Key::colon, true), Some(Shortcut::FoldAll(true)));
-        assert_eq!(gmail_shortcut_for(Key::I, true), Some(Shortcut::MarkRead(true)));
-        assert_eq!(gmail_shortcut_for(Key::n, false), Some(Shortcut::NextInThread));
+        assert_eq!(
+            gmail_shortcut_for(Key::U, true),
+            Some(Shortcut::MarkRead(false))
+        );
+        assert_eq!(
+            gmail_shortcut_for(Key::underscore, true),
+            Some(Shortcut::MarkUnreadFrom)
+        );
+        assert_eq!(
+            gmail_shortcut_for(Key::semicolon, false),
+            Some(Shortcut::FoldAll(false))
+        );
+        assert_eq!(
+            gmail_shortcut_for(Key::colon, true),
+            Some(Shortcut::FoldAll(true))
+        );
+        assert_eq!(
+            gmail_shortcut_for(Key::I, true),
+            Some(Shortcut::MarkRead(true))
+        );
+        assert_eq!(
+            gmail_shortcut_for(Key::n, false),
+            Some(Shortcut::NextInThread)
+        );
         assert_eq!(gmail_shortcut_for(Key::_3, false), Some(Shortcut::Tag(3)));
-        assert_eq!(gmail_shortcut_for(Key::bracketright, false), Some(Shortcut::ArchiveAndStep(1)));
-        assert_eq!(gmail_shortcut_for(Key::braceleft, true), Some(Shortcut::ArchiveAndStep(-1)));
-        assert_eq!(gmail_shortcut_for(Key::R, true), Some(Shortcut::InWindow(WindowCompose::Reply)));
+        assert_eq!(
+            gmail_shortcut_for(Key::bracketright, false),
+            Some(Shortcut::ArchiveAndStep(1))
+        );
+        assert_eq!(
+            gmail_shortcut_for(Key::braceleft, true),
+            Some(Shortcut::ArchiveAndStep(-1))
+        );
+        assert_eq!(
+            gmail_shortcut_for(Key::R, true),
+            Some(Shortcut::InWindow(WindowCompose::Reply))
+        );
         assert_eq!(gmail_shortcut_for(Key::N, true), Some(Shortcut::Refresh));
         // d is Gmail's compose in a window, not Hylki's delete.
-        assert_eq!(gmail_shortcut_for(Key::d, false), Some(Shortcut::InWindow(WindowCompose::New)));
+        assert_eq!(
+            gmail_shortcut_for(Key::d, false),
+            Some(Shortcut::InWindow(WindowCompose::New))
+        );
         // Hylki's own keys that Gmail does not have stay off.
         assert_eq!(gmail_shortcut_for(Key::w, false), None);
         assert_eq!(gmail_shortcut_for(Key::h, false), None);
-        assert_eq!(gmail_sequence('g', Key::i), Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Inbox))));
-        assert_eq!(gmail_sequence('g', Key::t), Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Sent))));
+        assert_eq!(
+            gmail_sequence('g', Key::i),
+            Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Inbox)))
+        );
+        assert_eq!(
+            gmail_sequence('g', Key::t),
+            Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Sent)))
+        );
         assert_eq!(gmail_sequence('*', Key::a), Some(Shortcut::SelectAll));
-        assert_eq!(gmail_sequence('*', Key::u), Some(Shortcut::SelectWhere(CheckFilter::Unread)));
-        assert_eq!(gmail_sequence('*', Key::t), Some(Shortcut::SelectWhere(CheckFilter::Unstarred)));
+        assert_eq!(
+            gmail_sequence('*', Key::u),
+            Some(Shortcut::SelectWhere(CheckFilter::Unread))
+        );
+        assert_eq!(
+            gmail_sequence('*', Key::t),
+            Some(Shortcut::SelectWhere(CheckFilter::Unstarred))
+        );
         assert_eq!(gmail_sequence('g', Key::q), None);
         // The reader keeps what scrolls it, and only that.
         assert!(reader_keeps(Key::space) && reader_keeps(Key::Down));
@@ -29014,9 +33639,18 @@ mod tests {
     fn caps_lock_leaves_the_keys_alone() {
         use gtk::gdk::{Key, ModifierType as M};
         assert_eq!(without_caps_lock(Key::J, M::LOCK_MASK), Key::j);
-        assert_eq!(without_caps_lock(Key::r, M::LOCK_MASK | M::SHIFT_MASK), Key::R);
-        assert_eq!(without_caps_lock(Key::R, M::LOCK_MASK | M::SHIFT_MASK), Key::R);
-        assert_eq!(without_caps_lock(Key::numbersign, M::LOCK_MASK | M::SHIFT_MASK), Key::numbersign);
+        assert_eq!(
+            without_caps_lock(Key::r, M::LOCK_MASK | M::SHIFT_MASK),
+            Key::R
+        );
+        assert_eq!(
+            without_caps_lock(Key::R, M::LOCK_MASK | M::SHIFT_MASK),
+            Key::R
+        );
+        assert_eq!(
+            without_caps_lock(Key::numbersign, M::LOCK_MASK | M::SHIFT_MASK),
+            Key::numbersign
+        );
         assert_eq!(without_caps_lock(Key::_3, M::LOCK_MASK), Key::_3);
         // Without Caps Lock the key is as typed.
         assert_eq!(without_caps_lock(Key::J, M::empty()), Key::J);
@@ -29059,12 +33693,30 @@ mod tests {
     fn ctrl_shortcuts_follow_other_mail_apps() {
         use gtk::gdk::Key;
         // #328. Shift arrives as the capital, and Caps Lock alone as well.
-        assert!(matches!(ctrl_shortcut_for(Key::n, false), Some(AppMsg::Shortcut(Shortcut::Compose))));
-        assert!(matches!(ctrl_shortcut_for(Key::r, false), Some(AppMsg::Shortcut(Shortcut::Reply))));
-        assert!(matches!(ctrl_shortcut_for(Key::R, false), Some(AppMsg::Shortcut(Shortcut::Reply))));
-        assert!(matches!(ctrl_shortcut_for(Key::R, true), Some(AppMsg::Shortcut(Shortcut::ReplyAll))));
-        assert!(matches!(ctrl_shortcut_for(Key::u, false), Some(AppMsg::ViewSource)));
-        assert!(matches!(ctrl_shortcut_for(Key::N, true), Some(AppMsg::NewFromTemplate)));
+        assert!(matches!(
+            ctrl_shortcut_for(Key::n, false),
+            Some(AppMsg::Shortcut(Shortcut::Compose))
+        ));
+        assert!(matches!(
+            ctrl_shortcut_for(Key::r, false),
+            Some(AppMsg::Shortcut(Shortcut::Reply))
+        ));
+        assert!(matches!(
+            ctrl_shortcut_for(Key::R, false),
+            Some(AppMsg::Shortcut(Shortcut::Reply))
+        ));
+        assert!(matches!(
+            ctrl_shortcut_for(Key::R, true),
+            Some(AppMsg::Shortcut(Shortcut::ReplyAll))
+        ));
+        assert!(matches!(
+            ctrl_shortcut_for(Key::u, false),
+            Some(AppMsg::ViewSource)
+        ));
+        assert!(matches!(
+            ctrl_shortcut_for(Key::N, true),
+            Some(AppMsg::NewFromTemplate)
+        ));
         // Taken elsewhere, or not ours.
         assert!(ctrl_shortcut_for(Key::U, true).is_none());
         assert!(ctrl_shortcut_for(Key::f, false).is_none());
@@ -29079,8 +33731,21 @@ mod tests {
             .flat_map(|(_, keys)| keys.iter().map(|(key, _)| *key))
             .collect();
         for key in [
-            "j  or  ↓", "r  or  Ctrl+R", "R  or  Ctrl+Shift+R", "c  or  Ctrl+N", "Ctrl+U", "a", "d  or  Delete", "w", "b",
-            "x", "?  or  Ctrl+?  or  F1", "1 … 9", "0", "/  or  Ctrl+F", "Ctrl+.  or  Ctrl+;",
+            "j  or  ↓",
+            "r  or  Ctrl+R",
+            "R  or  Ctrl+Shift+R",
+            "c  or  Ctrl+N",
+            "Ctrl+U",
+            "a",
+            "d  or  Delete",
+            "w",
+            "b",
+            "x",
+            "?  or  Ctrl+?  or  F1",
+            "1 … 9",
+            "0",
+            "/  or  Ctrl+F",
+            "Ctrl+.  or  Ctrl+;",
         ] {
             assert!(documented.contains(&key), "{key} is not in the reference");
         }
@@ -29122,7 +33787,11 @@ mod tests {
     #[test]
     fn current_release_has_notes() {
         let notes = current_release_notes();
-        assert!(notes.lines().count() > 2, "RELEASE_NOTES.md has no section for {}", crate::VERSION);
+        assert!(
+            notes.lines().count() > 2,
+            "RELEASE_NOTES.md has no section for {}",
+            crate::VERSION
+        );
         assert!(notes.starts_with(&format!("## {}\n", crate::VERSION)));
     }
 
@@ -29204,14 +33873,20 @@ mod tests {
 
         let ra = reply_all_prefill(&m, &["me@example.com".to_string()]);
         assert_eq!(ra.to, "editor@example.com");
-        assert_eq!(ra.cc, "other@example.com", "no sender, no self, no repeat of To");
+        assert_eq!(
+            ra.cc, "other@example.com",
+            "no sender, no self, no repeat of To"
+        );
     }
 
     /// Reply All leaves out every address of the account (#448): an alias,
     /// a "Name <address>" form, a +tag form and another spelling alike.
     #[test]
     fn reply_all_leaves_out_every_own_address() {
-        let own = vec!["me@example.com".to_string(), "Me Alias <alias@example.org>".to_string()];
+        let own = vec![
+            "me@example.com".to_string(),
+            "Me Alias <alias@example.org>".to_string(),
+        ];
         let mut m = msg(1, 1, 10);
         m.from_addr = "ada@example.com".into();
         m.to = "Me <ME@example.com>, alias@example.org, bob@example.com".into();
@@ -29237,7 +33912,10 @@ mod tests {
         m.to = String::new();
         m.cc = "bob@example.com, carol@example.com".into();
         let ra = reply_all_prefill(&m, &own);
-        assert_eq!((ra.to.as_str(), ra.cc.as_str()), ("bob@example.com", "carol@example.com"));
+        assert_eq!(
+            (ra.to.as_str(), ra.cc.as_str()),
+            ("bob@example.com", "carol@example.com")
+        );
     }
 
     /// Without a Reply-To the sender's own address is still the reply target.
@@ -29283,7 +33961,10 @@ mod tests {
 
     #[test]
     fn search_pool_is_empty_when_nothing_indexed() {
-        assert!(build_search_pool(HashMap::<(u32, u32), Vec<Message>>::new().values(), |_| 0).is_empty());
+        assert!(
+            build_search_pool(HashMap::<(u32, u32), Vec<Message>>::new().values(), |_| 0)
+                .is_empty()
+        );
     }
 
     /// Gmail's label copies of one mail are one result, from the folder that
@@ -29299,7 +33980,11 @@ mod tests {
         };
         // INBOX = 1, All Mail = 2, a label = 3.
         let inbox = vec![copy(1, 10, "in@x")];
-        let all_mail = vec![copy(2, 20, "in@x"), copy(2, 21, "archived@x"), copy(2, 22, "only@x")];
+        let all_mail = vec![
+            copy(2, 20, "in@x"),
+            copy(2, 21, "archived@x"),
+            copy(2, 22, "only@x"),
+        ];
         let label = vec![copy(3, 30, "archived@x")];
         let rank = |m: &Message| match m.folder_id {
             1 => pool_rank(Some(FolderKind::Inbox)),
@@ -29358,7 +34043,11 @@ mod tests {
     /// nothing after the handle.
     #[test]
     fn credits_notes_are_translator_languages() {
-        assert!(credits(CONTRIBUTORS).iter().all(|(_, _, note)| note.is_empty()));
-        assert!(credits(TRANSLATORS).iter().all(|(_, _, note)| !note.is_empty()));
+        assert!(credits(CONTRIBUTORS)
+            .iter()
+            .all(|(_, _, note)| note.is_empty()));
+        assert!(credits(TRANSLATORS)
+            .iter()
+            .all(|(_, _, note)| !note.is_empty()));
     }
 }

@@ -9,15 +9,17 @@
 use adw::prelude::*;
 use relm4::prelude::*;
 
+use crate::app::Shortcut;
 use crate::config::{ReaderToolbar, Tag, ToolbarItem};
+use crate::i18n::i18n;
 use crate::models::{Attachment, Message};
-use crate::ui::attachment_drawer::{AttachmentDrawer, AttachmentDrawerInput, DrawerInit, DrawerOutput};
+use crate::ui::attachment_drawer::{
+    AttachmentDrawer, AttachmentDrawerInput, DrawerInit, DrawerOutput,
+};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::ui::lightbox::{Lightbox, LightboxInput};
 use crate::ui::message_list::RowAction;
 use crate::ui::message_view::{MessageView, MessageViewInput, MessageViewOutput};
-use crate::app::Shortcut;
-use crate::i18n::i18n;
 
 /// Everything needed to open a popout reader for one message.
 #[derive(Debug)]
@@ -121,7 +123,11 @@ pub enum MessageWindowInput {
     Ignore,
     /// A message body arrived from the server — the popped-out message itself
     /// or, in a conversation window, any member of the thread.
-    SetBody { account_id: u32, id: u32, body: String },
+    SetBody {
+        account_id: u32,
+        id: u32,
+        body: String,
+    },
     /// The sender-authentication verdict for this message.
     SetSenderCheck(Box<crate::models::SenderCheck>),
     /// The OpenPGP chip's words on or off (#300).
@@ -136,9 +142,16 @@ pub enum MessageWindowInput {
     /// The tag definitions changed.
     SetTags(Vec<crate::config::Tag>),
     /// A member's downloaded attachments are now available.
-    SetAttachments { account_id: u32, id: u32, items: Vec<Attachment> },
+    SetAttachments {
+        account_id: u32,
+        id: u32,
+        items: Vec<Attachment>,
+    },
     /// A member's attachments exist but were not on disk: fetch them.
-    AttachmentsPending { account_id: u32, id: u32 },
+    AttachmentsPending {
+        account_id: u32,
+        id: u32,
+    },
     /// Reflect a read/unread change that happened elsewhere.
     SetUnread(bool),
     /// Settings changed the reader toolbar's layout.
@@ -150,9 +163,17 @@ pub enum MessageWindowInput {
     /// Hand this to the attachment drawer (a deletion's progress, #289).
     Drawer(AttachmentDrawerInput),
     /// Show the lightbox over these previewable attachments.
-    Lightbox { items: Vec<Attachment>, start: usize },
+    Lightbox {
+        items: Vec<Attachment>,
+        start: usize,
+    },
     /// A card's attachment row: open or save that member's file at `index`.
-    CardAttachment { account_id: u32, id: u32, index: usize, save: bool },
+    CardAttachment {
+        account_id: u32,
+        id: u32,
+        index: usize,
+        save: bool,
+    },
     /// The drawer's Delete from Server.
     DeleteAttachment(Attachment),
     /// The drawer's Show in Message.
@@ -189,7 +210,11 @@ pub enum MessageWindowInput {
     /// The folder picker, under the Move To button (or the ⋯).
     MoveTo,
     /// The folder picker at a window point (a card's Move to…).
-    MoveToAt { message: Box<Message>, x: f64, y: f64 },
+    MoveToAt {
+        message: Box<Message>,
+        x: f64,
+        y: f64,
+    },
     TagMenu,
     OverflowMenu,
     Find,
@@ -204,7 +229,10 @@ pub enum MessageWindowInput {
     /// The message card's own Reply/Reply all/Forward button.
     /// An action chosen on one card — in a conversation window, possibly a
     /// member other than the popped-out message itself.
-    CardAction { action: RowAction, message: Box<Message> },
+    CardAction {
+        action: RowAction,
+        message: Box<Message>,
+    },
     /// A card's "Add sender to Contacts" — for that card's message.
     ContactFor(Box<Message>),
     /// An email address in a card header was clicked — compose to it.
@@ -212,10 +240,18 @@ pub enum MessageWindowInput {
     /// "Add to Contacts" from an address's right-click menu.
     AddContactAddr(String),
     /// A right-click in the message: its menu, at this window's point (x, y).
-    CardMenu { message: Box<Message>, x: f64, y: f64, hit: crate::ui::message_view::MenuHit },
+    CardMenu {
+        message: Box<Message>,
+        x: f64,
+        y: f64,
+        hit: crate::ui::message_view::MenuHit,
+    },
     /// A card's Unsubscribe button — handed to the app, which owns the
     /// request.
-    Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    Unsubscribe {
+        message: Box<Message>,
+        info: Box<crate::models::Unsubscribe>,
+    },
     /// The lists left so far, for the cards' banners.
     SetUnsubscribed(std::collections::HashMap<String, i64>),
     /// Where a card's unsubscribe request stands.
@@ -240,7 +276,10 @@ pub enum MessageWindowInput {
 #[derive(Debug)]
 pub enum MessageWindowOutput {
     /// A card's Unsubscribe button: leave the list, by these handles.
-    Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    Unsubscribe {
+        message: Box<Message>,
+        info: Box<crate::models::Unsubscribe>,
+    },
     /// A card's invitation button: answer the organiser, or hand the
     /// meeting to a calendar application (#223).
     InviteAction {
@@ -252,20 +291,41 @@ pub enum MessageWindowOutput {
     /// default (0).
     Zoom(i8),
     /// A per-message action handled exactly like a list/context-menu action.
-    Action { action: RowAction, message: Box<Message> },
+    Action {
+        action: RowAction,
+        message: Box<Message>,
+    },
     /// Add this sender to Contacts.
-    AddToContacts { name: String, email: String },
+    AddToContacts {
+        name: String,
+        email: String,
+    },
     /// Download this message's attachments from the server.
     LoadAttachments(Box<Message>),
     /// The folder picker for this message, at window point (x, y).
-    MoveTo { message: Box<Message>, x: f64, y: f64 },
+    MoveTo {
+        message: Box<Message>,
+        x: f64,
+        y: f64,
+    },
     /// A shortcut that reaches past this message: to the rest of the
     /// conversation, or to the app (#392).
-    Shortcut { action: Shortcut, message: Box<Message>, thread: Vec<Message> },
+    Shortcut {
+        action: Shortcut,
+        message: Box<Message>,
+        thread: Vec<Message>,
+    },
     /// Put a tag on this message, or take it off (#71).
-    SetTag { message: Box<Message>, keyword: String, add: bool },
+    SetTag {
+        message: Box<Message>,
+        keyword: String,
+        add: bool,
+    },
     /// Take this attachment out of the message on the server (#289).
-    DeleteAttachment { message: Box<Message>, attachment: Box<Attachment> },
+    DeleteAttachment {
+        message: Box<Message>,
+        attachment: Box<Attachment>,
+    },
     /// Persist a remote-content allowlist entry.
     /// Fetch a message's body again (its OpenPGP verdict changed, #133).
     ReloadBody(Box<Message>),
@@ -275,7 +335,12 @@ pub enum MessageWindowOutput {
     /// An email address in a card header was clicked — compose to it.
     ComposeTo(String),
     /// A right-click in the message: the app shows its menu over this window.
-    CardMenu { message: Box<Message>, x: f64, y: f64, hit: crate::ui::message_view::MenuHit },
+    CardMenu {
+        message: Box<Message>,
+        x: f64,
+        y: f64,
+        hit: crate::ui::message_view::MenuHit,
+    },
     /// The window was closed.
     Closed,
 }
@@ -328,49 +393,64 @@ impl Component for MessageWindow {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let view = MessageView::builder()
-            .launch(())
-            .forward(sender.input_sender(), |out| match out {
-                MessageViewOutput::AllowSender(addr) => MessageWindowInput::AllowSender(addr),
-                // A popout is already its own window; opening another from its
-                // single card is a no-op that keeps the match total.
-                MessageViewOutput::OpenWindow(_) => MessageWindowInput::Ignore,
-                // Card actions carry their own message, so in a conversation
-                // window each card acts on its member — the head card behaves
-                // exactly like the toolbar's buttons.
-                MessageViewOutput::CardAction { action, message } => {
-                    MessageWindowInput::CardAction { action, message }
-                }
-                MessageViewOutput::ContactSender(m) => MessageWindowInput::ContactFor(m),
-                MessageViewOutput::MarkSeen { .. } => MessageWindowInput::Ignore,
-                MessageViewOutput::CardMenu { message, x, y, hit } => {
-                    MessageWindowInput::CardMenu { message, x, y, hit }
-                }
-                MessageViewOutput::CardMoveTo { message, x, y } => {
-                    MessageWindowInput::MoveToAt { message, x, y }
-                }
-                MessageViewOutput::SelectCards(_) => MessageWindowInput::Ignore,
-                MessageViewOutput::AttachmentAction { account_id, id, index, save } => {
-                    MessageWindowInput::CardAttachment { account_id, id, index, save }
-                }
-                // The pop-out keeps its own view's state; the main window's
-                // per-message record is not its to write.
-                MessageViewOutput::SetRemote { .. } => MessageWindowInput::Ignore,
-                MessageViewOutput::ComposeTo(addr) => MessageWindowInput::ComposeTo(addr),
-                MessageViewOutput::ReloadBody(m) => MessageWindowInput::ReloadBody(m),
-                MessageViewOutput::Notice(text) => MessageWindowInput::Notice(text),
-                MessageViewOutput::ReaderMode(on) => MessageWindowInput::ReaderMode(on),
-                MessageViewOutput::Zoom(step) => MessageWindowInput::Zoom(step),
-                MessageViewOutput::Unsubscribe { message, info } => {
-                    MessageWindowInput::Unsubscribe { message, info }
-                }
-                MessageViewOutput::InviteAction { message, invite, action } => {
-                    MessageWindowInput::InviteAction { message, invite, action }
-                }
-                MessageViewOutput::AddContactAddr(addr) => {
-                    MessageWindowInput::AddContactAddr(addr)
-                }
-            });
+        let view =
+            MessageView::builder()
+                .launch(())
+                .forward(sender.input_sender(), |out| match out {
+                    MessageViewOutput::AllowSender(addr) => MessageWindowInput::AllowSender(addr),
+                    // A popout is already its own window; opening another from its
+                    // single card is a no-op that keeps the match total.
+                    MessageViewOutput::OpenWindow(_) => MessageWindowInput::Ignore,
+                    // Card actions carry their own message, so in a conversation
+                    // window each card acts on its member — the head card behaves
+                    // exactly like the toolbar's buttons.
+                    MessageViewOutput::CardAction { action, message } => {
+                        MessageWindowInput::CardAction { action, message }
+                    }
+                    MessageViewOutput::ContactSender(m) => MessageWindowInput::ContactFor(m),
+                    MessageViewOutput::MarkSeen { .. } => MessageWindowInput::Ignore,
+                    MessageViewOutput::CardMenu { message, x, y, hit } => {
+                        MessageWindowInput::CardMenu { message, x, y, hit }
+                    }
+                    MessageViewOutput::CardMoveTo { message, x, y } => {
+                        MessageWindowInput::MoveToAt { message, x, y }
+                    }
+                    MessageViewOutput::SelectCards(_) => MessageWindowInput::Ignore,
+                    MessageViewOutput::AttachmentAction {
+                        account_id,
+                        id,
+                        index,
+                        save,
+                    } => MessageWindowInput::CardAttachment {
+                        account_id,
+                        id,
+                        index,
+                        save,
+                    },
+                    // The pop-out keeps its own view's state; the main window's
+                    // per-message record is not its to write.
+                    MessageViewOutput::SetRemote { .. } => MessageWindowInput::Ignore,
+                    MessageViewOutput::ComposeTo(addr) => MessageWindowInput::ComposeTo(addr),
+                    MessageViewOutput::ReloadBody(m) => MessageWindowInput::ReloadBody(m),
+                    MessageViewOutput::Notice(text) => MessageWindowInput::Notice(text),
+                    MessageViewOutput::ReaderMode(on) => MessageWindowInput::ReaderMode(on),
+                    MessageViewOutput::Zoom(step) => MessageWindowInput::Zoom(step),
+                    MessageViewOutput::Unsubscribe { message, info } => {
+                        MessageWindowInput::Unsubscribe { message, info }
+                    }
+                    MessageViewOutput::InviteAction {
+                        message,
+                        invite,
+                        action,
+                    } => MessageWindowInput::InviteAction {
+                        message,
+                        invite,
+                        action,
+                    },
+                    MessageViewOutput::AddContactAddr(addr) => {
+                        MessageWindowInput::AddContactAddr(addr)
+                    }
+                });
         // Apply the message-content theme before the first render.
         view.emit(MessageViewInput::SetContentTheme(init.content_dark));
         view.emit(MessageViewInput::SetReaderStyle(init.reader_style.clone()));
@@ -383,7 +463,9 @@ impl Component for MessageWindow {
         view.emit(MessageViewInput::SetReaderDefault(init.reader_default));
         view.emit(MessageViewInput::SetTags(init.tags.clone()));
         view.emit(MessageViewInput::SetAttachmentDrawer(init.drawer_enabled));
-        view.emit(MessageViewInput::SetCardAttachmentsShown(init.card_attachments));
+        view.emit(MessageViewInput::SetCardAttachmentsShown(
+            init.card_attachments,
+        ));
 
         // The drawer docks beneath the reader, as in the main window.
         let drawer = AttachmentDrawer::builder()
@@ -392,7 +474,9 @@ impl Component for MessageWindow {
                 reader: view.widget().clone().upcast(),
             })
             .forward(sender.input_sender(), |out| match out {
-                DrawerOutput::ShowLightbox { items, start } => MessageWindowInput::Lightbox { items, start },
+                DrawerOutput::ShowLightbox { items, start } => {
+                    MessageWindowInput::Lightbox { items, start }
+                }
                 DrawerOutput::ShowInMessage(att) => MessageWindowInput::ShowAttachment(att),
                 DrawerOutput::DeleteFromServer(att) => MessageWindowInput::DeleteAttachment(att),
             });
@@ -466,7 +550,8 @@ impl Component for MessageWindow {
             let gmail = init.gmail_keys;
             // When Gmail's g or * came: the key after it names a folder or a
             // selection in the main window, and is no action here.
-            let sequence: std::rc::Rc<std::cell::Cell<Option<std::time::Instant>>> = Default::default();
+            let sequence: std::rc::Rc<std::cell::Cell<Option<std::time::Instant>>> =
+                Default::default();
             keys.connect_key_pressed(move |_, keyval, _, state| {
                 use gtk::gdk::Key;
                 let keyval = crate::app::without_caps_lock(keyval, state);
@@ -494,7 +579,9 @@ impl Component for MessageWindow {
                     }
                     return gtk::glib::Propagation::Proceed;
                 }
-                if state.contains(gtk::gdk::ModifierType::ALT_MASK) || crate::app::focus_is_text(&window) {
+                if state.contains(gtk::gdk::ModifierType::ALT_MASK)
+                    || crate::app::focus_is_text(&window)
+                {
                     return gtk::glib::Propagation::Proceed;
                 }
                 // Escape closes the window, as it backs out of a message in
@@ -504,7 +591,11 @@ impl Component for MessageWindow {
                 }
                 // Delete and Shift+Delete too, as in the list (#486).
                 if matches!(keyval, Key::Delete | Key::KP_Delete) {
-                    return key(if shift { Shortcut::DeleteForever } else { Shortcut::Delete });
+                    return key(if shift {
+                        Shortcut::DeleteForever
+                    } else {
+                        Shortcut::Delete
+                    });
                 }
                 if !single_key.get() || matches!(keyval, Key::Shift_L | Key::Shift_R) {
                     return gtk::glib::Propagation::Proceed;
@@ -513,7 +604,9 @@ impl Component for MessageWindow {
                     return gtk::glib::Propagation::Proceed;
                 }
                 if gmail.get() {
-                    let after = sequence.take().is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(1500));
+                    let after = sequence
+                        .take()
+                        .is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(1500));
                     if after {
                         return gtk::glib::Propagation::Stop;
                     }
@@ -581,8 +674,16 @@ impl Component for MessageWindow {
             MessageWindowInput::SetUnsubscribed(lists) => {
                 self.view.emit(MessageViewInput::SetUnsubscribed(lists));
             }
-            MessageWindowInput::InviteAction { message, invite, action } => {
-                let _ = sender.output(MessageWindowOutput::InviteAction { message, invite, action });
+            MessageWindowInput::InviteAction {
+                message,
+                invite,
+                action,
+            } => {
+                let _ = sender.output(MessageWindowOutput::InviteAction {
+                    message,
+                    invite,
+                    action,
+                });
             }
             MessageWindowInput::SetIdentities(identities) => {
                 self.view.emit(MessageViewInput::SetIdentities(identities));
@@ -590,8 +691,16 @@ impl Component for MessageWindow {
             MessageWindowInput::SetInviteAnswers(answers) => {
                 self.view.emit(MessageViewInput::SetInviteAnswers(answers));
             }
-            MessageWindowInput::UnsubscribeState { account_id, id, state } => {
-                self.view.emit(MessageViewInput::UnsubscribeState { account_id, id, state });
+            MessageWindowInput::UnsubscribeState {
+                account_id,
+                id,
+                state,
+            } => {
+                self.view.emit(MessageViewInput::UnsubscribeState {
+                    account_id,
+                    id,
+                    state,
+                });
             }
             MessageWindowInput::FacesChanged => {
                 self.view.emit(MessageViewInput::FacesChanged);
@@ -599,7 +708,9 @@ impl Component for MessageWindow {
             MessageWindowInput::SetSpoofBannerShown(show) => {
                 self.view.emit(MessageViewInput::SetSpoofBannerShown(show));
             }
-            MessageWindowInput::SetPgpLabels(on) => self.view.emit(MessageViewInput::SetPgpLabels(on)),
+            MessageWindowInput::SetPgpLabels(on) => {
+                self.view.emit(MessageViewInput::SetPgpLabels(on))
+            }
             MessageWindowInput::SetSenderCheck(check) => {
                 // Decrypted, the window is named by the subject inside (#493).
                 if let Some(subject) = check.pgp.as_ref().and_then(|p| p.subject.as_deref()) {
@@ -613,7 +724,11 @@ impl Component for MessageWindow {
                 });
                 self.view.emit(MessageViewInput::SetSenderCheck(check));
             }
-            MessageWindowInput::SetBody { account_id, id, body } => {
+            MessageWindowInput::SetBody {
+                account_id,
+                id,
+                body,
+            } => {
                 let mine = self.msg.account_id == account_id && self.msg.id == id;
                 let member = self
                     .thread
@@ -660,7 +775,11 @@ impl Component for MessageWindow {
                 self.view.emit(MessageViewInput::SetTags(tags));
                 self.sync_toolbar();
             }
-            MessageWindowInput::SetAttachments { account_id, id, items } => {
+            MessageWindowInput::SetAttachments {
+                account_id,
+                id,
+                items,
+            } => {
                 let key = (account_id, id);
                 self.attachments.retain(|(k, _)| *k != key);
                 self.attachments.push((key, items));
@@ -671,7 +790,9 @@ impl Component for MessageWindow {
             MessageWindowInput::AttachmentsPending { account_id, id } => {
                 // Opening the message was the request: fetch them, as the
                 // main reader does, rather than wait for a click.
-                let Some(m) = self.member(account_id, id).cloned() else { return };
+                let Some(m) = self.member(account_id, id).cloned() else {
+                    return;
+                };
                 self.attachments_loading.insert((account_id, id));
                 let _ = sender.output(MessageWindowOutput::LoadAttachments(Box::new(m)));
                 self.sync_toolbar();
@@ -689,7 +810,8 @@ impl Component for MessageWindow {
                 self.sync_attachments();
             }
             MessageWindowInput::SetCardAttachmentsShown(on) => {
-                self.view.emit(MessageViewInput::SetCardAttachmentsShown(on));
+                self.view
+                    .emit(MessageViewInput::SetCardAttachmentsShown(on));
             }
             MessageWindowInput::SetCollapsed(on) => {
                 self.collapsed = on;
@@ -699,27 +821,50 @@ impl Component for MessageWindow {
             MessageWindowInput::Lightbox { items, start } => {
                 self.lightbox.emit(LightboxInput::Show { items, start });
             }
-            MessageWindowInput::CardAttachment { account_id, id, index, save } => {
-                let Some(files) = self.attachments.iter().find(|(k, _)| *k == (account_id, id)).map(|(_, f)| f)
+            MessageWindowInput::CardAttachment {
+                account_id,
+                id,
+                index,
+                save,
+            } => {
+                let Some(files) = self
+                    .attachments
+                    .iter()
+                    .find(|(k, _)| *k == (account_id, id))
+                    .map(|(_, f)| f)
                 else {
                     return;
                 };
-                let Some(att) = files.get(index).cloned() else { return };
+                let Some(att) = files.get(index).cloned() else {
+                    return;
+                };
                 if save {
                     save_attachment(att, root);
                 } else if crate::ui::attachment_drawer::previewable(&att) {
                     // The lightbox pages through this message's previewable
                     // files, starting at the one clicked.
-                    let previewable = |a: &&Attachment| crate::ui::attachment_drawer::previewable(a);
-                    let items: Vec<Attachment> = files.iter().filter(previewable).cloned().collect();
-                    let start = files[..=index].iter().filter(previewable).count().saturating_sub(1);
+                    let previewable =
+                        |a: &&Attachment| crate::ui::attachment_drawer::previewable(a);
+                    let items: Vec<Attachment> =
+                        files.iter().filter(previewable).cloned().collect();
+                    let start = files[..=index]
+                        .iter()
+                        .filter(previewable)
+                        .count()
+                        .saturating_sub(1);
                     self.lightbox.emit(LightboxInput::Show { items, start });
                 } else {
-                    crate::ui::attachments_gallery::open_bytes(&att.name, &att.data, Some(root.upcast_ref()));
+                    crate::ui::attachments_gallery::open_bytes(
+                        &att.name,
+                        &att.data,
+                        Some(root.upcast_ref()),
+                    );
                 }
             }
             MessageWindowInput::DeleteAttachment(att) => {
-                let Some(message) = self.owner(&att).cloned() else { return };
+                let Some(message) = self.owner(&att).cloned() else {
+                    return;
+                };
                 let _ = sender.output(MessageWindowOutput::DeleteAttachment {
                     message: Box::new(message),
                     attachment: Box::new(att),
@@ -727,7 +872,10 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::ShowAttachment(att) => {
                 if let Some(m) = self.owner(&att) {
-                    self.view.emit(MessageViewInput::ScrollToAttachments { account_id: m.account_id, id: m.id });
+                    self.view.emit(MessageViewInput::ScrollToAttachments {
+                        account_id: m.account_id,
+                        id: m.id,
+                    });
                 }
             }
             MessageWindowInput::Reply => self.emit_action(RowAction::Reply, &sender),
@@ -754,7 +902,11 @@ impl Component for MessageWindow {
                 root.close();
             }
             MessageWindowInput::Spam => {
-                let action = if self.in_junk { RowAction::NotSpam } else { RowAction::Spam };
+                let action = if self.in_junk {
+                    RowAction::NotSpam
+                } else {
+                    RowAction::Spam
+                };
                 self.emit_action(action, &sender);
                 root.close();
             }
@@ -765,11 +917,14 @@ impl Component for MessageWindow {
             MessageWindowInput::MoveTo => {
                 // Under the Move To button, or under the ⋯ that stands in
                 // for it while the toolbar is folded.
-                let button = self.button(ToolbarItem::MoveTo).filter(|b| b.is_mapped()).unwrap_or(&self.bar.overflow);
-                let Some(point) = button.compute_point(root, &gtk::graphene::Point::new(
-                    button.width() as f32 / 2.0,
-                    button.height() as f32,
-                )) else {
+                let button = self
+                    .button(ToolbarItem::MoveTo)
+                    .filter(|b| b.is_mapped())
+                    .unwrap_or(&self.bar.overflow);
+                let Some(point) = button.compute_point(
+                    root,
+                    &gtk::graphene::Point::new(button.width() as f32 / 2.0, button.height() as f32),
+                ) else {
                     return;
                 };
                 let _ = sender.output(MessageWindowOutput::MoveTo {
@@ -828,8 +983,12 @@ impl MessageWindow {
             Shortcut::BackToList => root.close(),
             Shortcut::OpenMessage => self.view.emit(MessageViewInput::FocusBody),
             Shortcut::NextInThread if conversation => self.view.emit(MessageViewInput::StepCard(1)),
-            Shortcut::PrevInThread if conversation => self.view.emit(MessageViewInput::StepCard(-1)),
-            Shortcut::FoldAll(folded) if conversation => self.view.emit(MessageViewInput::FoldAll(folded)),
+            Shortcut::PrevInThread if conversation => {
+                self.view.emit(MessageViewInput::StepCard(-1))
+            }
+            Shortcut::FoldAll(folded) if conversation => {
+                self.view.emit(MessageViewInput::FoldAll(folded))
+            }
             Shortcut::Star => input(MessageWindowInput::ToggleStar),
             Shortcut::ToggleRead => input(MessageWindowInput::ToggleRead),
             Shortcut::Delete => input(MessageWindowInput::Delete),
@@ -912,14 +1071,18 @@ impl MessageWindow {
 
     /// A member of the window's conversation (or the lone message).
     fn member(&self, account_id: u32, id: u32) -> Option<&Message> {
-        self.thread.iter().find(|m| m.account_id == account_id && m.id == id)
+        self.thread
+            .iter()
+            .find(|m| m.account_id == account_id && m.id == id)
     }
 
     /// The message a file of the drawer came with: the first carrying one
     /// of that name and size, since the drawer shows such a pair once.
     fn owner(&self, att: &Attachment) -> Option<&Message> {
         let (key, _) = self.attachments.iter().find(|(_, files)| {
-            files.iter().any(|a| a.name == att.name && a.data.len() == att.data.len())
+            files
+                .iter()
+                .any(|a| a.name == att.name && a.data.len() == att.data.len())
         })?;
         self.member(key.0, key.1)
     }
@@ -933,7 +1096,9 @@ impl MessageWindow {
         let mut rows = std::collections::HashMap::new();
         for m in &self.thread {
             let key = (m.account_id, m.id);
-            let Some((_, files)) = self.attachments.iter().find(|(k, _)| *k == key) else { continue };
+            let Some((_, files)) = self.attachments.iter().find(|(k, _)| *k == key) else {
+                continue;
+            };
             for a in files {
                 if seen.insert((a.name.clone(), a.data.len())) {
                     merged.push(a.clone());
@@ -942,14 +1107,22 @@ impl MessageWindow {
             if !files.is_empty() {
                 let row = files
                     .iter()
-                    .map(|a| crate::ui::message_view::CardAttachment { name: a.name.clone(), size: a.data.len() as u64 })
+                    .map(|a| crate::ui::message_view::CardAttachment {
+                        name: a.name.clone(),
+                        size: a.data.len() as u64,
+                    })
                     .collect::<Vec<_>>();
                 rows.insert(key, row);
             }
         }
         // Switched off (#213), the drawer is simply never given anything:
         // empty hides it, seam and all.
-        self.drawer.emit(AttachmentDrawerInput::SetItems(if self.drawer_enabled { merged } else { Vec::new() }));
+        self.drawer
+            .emit(AttachmentDrawerInput::SetItems(if self.drawer_enabled {
+                merged
+            } else {
+                Vec::new()
+            }));
         self.view.emit(MessageViewInput::SetCardAttachments(rows));
         self.fit_min_width();
     }
@@ -969,7 +1142,11 @@ impl MessageWindow {
     }
 
     fn button(&self, item: ToolbarItem) -> Option<&gtk::Button> {
-        self.bar.buttons.iter().find(|(i, _)| *i == item).map(|(_, b)| b)
+        self.bar
+            .buttons
+            .iter()
+            .find(|(i, _)| *i == item)
+            .map(|(_, b)| b)
     }
 
     /// Pack the buttons in the saved order, as the main window does: the
@@ -1018,11 +1195,13 @@ impl MessageWindow {
             b.set_visible(visible);
         }
         self.bar.overflow.set_visible(overflow);
-        self.bar.breakpoint.set_condition(Some(&adw::BreakpointCondition::new_length(
-            adw::BreakpointConditionLengthType::MaxWidth,
-            f64::from(need + 24),
-            adw::LengthUnit::Px,
-        )));
+        self.bar
+            .breakpoint
+            .set_condition(Some(&adw::BreakpointCondition::new_length(
+                adw::BreakpointConditionLengthType::MaxWidth,
+                f64::from(need + 24),
+                adw::LengthUnit::Px,
+            )));
     }
 
     /// The buttons' state: which show (the right group only while the row
@@ -1037,7 +1216,11 @@ impl MessageWindow {
             b.set_visible(visible);
             match item {
                 ToolbarItem::Star => {
-                    b.set_tooltip_text(Some(&if self.msg.starred { i18n("Remove Star") } else { i18n("Star") }));
+                    b.set_tooltip_text(Some(&if self.msg.starred {
+                        i18n("Remove Star")
+                    } else {
+                        i18n("Star")
+                    }));
                     if self.msg.starred {
                         b.add_css_class("star-active");
                     } else {
@@ -1047,17 +1230,35 @@ impl MessageWindow {
                 // The icon shows the ACTION (read envelope = "mark as
                 // read"), matching the menus.
                 ToolbarItem::ReadUnread => {
-                    b.set_icon_name(if self.msg.unread { "hylki-mail-read-symbolic" } else { "mail-unread-symbolic" });
-                    b.set_tooltip_text(Some(&if self.msg.unread { i18n("Mark as Read") } else { i18n("Mark as Unread") }));
+                    b.set_icon_name(if self.msg.unread {
+                        "hylki-mail-read-symbolic"
+                    } else {
+                        "mail-unread-symbolic"
+                    });
+                    b.set_tooltip_text(Some(&if self.msg.unread {
+                        i18n("Mark as Read")
+                    } else {
+                        i18n("Mark as Unread")
+                    }));
                 }
                 ToolbarItem::Spam => {
-                    b.set_icon_name(if self.in_junk { "mail-mark-notjunk-symbolic" } else { "mail-mark-junk-symbolic" });
-                    b.set_tooltip_text(Some(&if self.in_junk { i18n("Not Spam") } else { i18n("Mark as Spam") }));
+                    b.set_icon_name(if self.in_junk {
+                        "mail-mark-notjunk-symbolic"
+                    } else {
+                        "mail-mark-junk-symbolic"
+                    });
+                    b.set_tooltip_text(Some(&if self.in_junk {
+                        i18n("Not Spam")
+                    } else {
+                        i18n("Mark as Spam")
+                    }));
                 }
                 _ => {}
             }
         }
-        self.bar.overflow.set_visible(self.collapsed && !self.toolbar.right.is_empty());
+        self.bar
+            .overflow
+            .set_visible(self.collapsed && !self.toolbar.right.is_empty());
         let loading = !self.attachments_loading.is_empty();
         self.bar.spinner.set_spinning(loading);
         self.bar.spinner.set_visible(loading);
@@ -1068,7 +1269,11 @@ impl MessageWindow {
         let s = sender.output_sender().clone();
         let message = self.msg.clone();
         crate::ui::message_list::tag_menu_entries(&self.tags, &self.msg, move |keyword, add| {
-            let _ = s.send(MessageWindowOutput::SetTag { message: Box::new(message.clone()), keyword, add });
+            let _ = s.send(MessageWindowOutput::SetTag {
+                message: Box::new(message.clone()),
+                keyword,
+                add,
+            });
         })
     }
 
@@ -1082,7 +1287,12 @@ impl MessageWindow {
             Some(b) => b.clone().upcast(),
             None => self.bar.header.clone().upcast(),
         };
-        show_context_menu(&b, f64::from(b.width() / 2), f64::from(b.height()), vec![self.tag_entries(sender)]);
+        show_context_menu(
+            &b,
+            f64::from(b.width() / 2),
+            f64::from(b.height()),
+            vec![self.tag_entries(sender)],
+        );
     }
 
     /// The folded toolbar's ⋯ menu: the right group, in its own order, with
@@ -1098,51 +1308,89 @@ impl MessageWindow {
         let mut section = Vec::new();
         for item in &self.toolbar.right {
             match item {
-                ToolbarItem::Reply => section.push(entry(i18n("Reply"), "mail-reply-sender", || MessageWindowInput::Reply)),
-                ToolbarItem::ReplyAll => {
-                    section.push(entry(i18n("Reply All"), "mail-reply-all", || MessageWindowInput::ReplyAll))
+                ToolbarItem::Reply => {
+                    section.push(entry(i18n("Reply"), "mail-reply-sender", || {
+                        MessageWindowInput::Reply
+                    }))
                 }
-                ToolbarItem::Forward => section.push(entry(i18n("Forward"), "mail-forward", || MessageWindowInput::Forward)),
+                ToolbarItem::ReplyAll => {
+                    section.push(entry(i18n("Reply All"), "mail-reply-all", || {
+                        MessageWindowInput::ReplyAll
+                    }))
+                }
+                ToolbarItem::Forward => {
+                    section.push(entry(i18n("Forward"), "mail-forward", || {
+                        MessageWindowInput::Forward
+                    }))
+                }
                 ToolbarItem::Star => section.push(if self.msg.starred {
-                    entry(i18n("Remove Star"), "hylki-non-starred", || MessageWindowInput::ToggleStar)
+                    entry(i18n("Remove Star"), "hylki-non-starred", || {
+                        MessageWindowInput::ToggleStar
+                    })
                 } else {
                     entry(i18n("Star"), "starred", || MessageWindowInput::ToggleStar)
                 }),
-                ToolbarItem::Archive => section.push(entry(i18n("Archive"), "mail-archive", || MessageWindowInput::Archive)),
-                ToolbarItem::Delete => section.push(entry(i18n("Delete"), "user-trash", || MessageWindowInput::Delete)),
+                ToolbarItem::Archive => {
+                    section.push(entry(i18n("Archive"), "mail-archive", || {
+                        MessageWindowInput::Archive
+                    }))
+                }
+                ToolbarItem::Delete => section.push(entry(i18n("Delete"), "user-trash", || {
+                    MessageWindowInput::Delete
+                })),
                 ToolbarItem::Spam => section.push(if self.in_junk {
-                    entry(i18n("Not Spam"), "mail-mark-notjunk", || MessageWindowInput::Spam)
+                    entry(i18n("Not Spam"), "mail-mark-notjunk", || {
+                        MessageWindowInput::Spam
+                    })
                 } else {
-                    entry(i18n("Mark as Spam"), "mail-mark-junk", || MessageWindowInput::Spam)
+                    entry(i18n("Mark as Spam"), "mail-mark-junk", || {
+                        MessageWindowInput::Spam
+                    })
                 }),
                 ToolbarItem::ReadUnread => section.push(if self.msg.unread {
-                    entry(i18n("Mark as Read"), "hylki-mail-read", || MessageWindowInput::ToggleRead)
+                    entry(i18n("Mark as Read"), "hylki-mail-read", || {
+                        MessageWindowInput::ToggleRead
+                    })
                 } else {
-                    entry(i18n("Mark as Unread"), "mail-unread", || MessageWindowInput::ToggleRead)
+                    entry(i18n("Mark as Unread"), "mail-unread", || {
+                        MessageWindowInput::ToggleRead
+                    })
                 }),
                 ToolbarItem::Tags => {
                     if !self.tags.is_empty() {
                         section.push(
-                            MenuEntry::submenu(i18n("Tags"), vec![self.tag_entries(sender)]).icon("tag-outline-symbolic"),
+                            MenuEntry::submenu(i18n("Tags"), vec![self.tag_entries(sender)])
+                                .icon("tag-outline-symbolic"),
                         );
                     }
                 }
                 ToolbarItem::MoveTo => {
                     if self.restorable {
-                        section.push(entry(i18n("Move to Inbox"), "mail-inbox", || MessageWindowInput::MoveToInbox));
+                        section.push(entry(i18n("Move to Inbox"), "mail-inbox", || {
+                            MessageWindowInput::MoveToInbox
+                        }));
                     }
-                    section.push(entry(i18n("Move To…"), "folder", || MessageWindowInput::MoveTo));
+                    section.push(entry(i18n("Move To…"), "folder", || {
+                        MessageWindowInput::MoveTo
+                    }));
                 }
                 ToolbarItem::Find => {
-                    section.push(entry(i18n("Find in Message"), "loupe-with-arrow", || MessageWindowInput::Find))
+                    section.push(entry(i18n("Find in Message"), "loupe-with-arrow", || {
+                        MessageWindowInput::Find
+                    }))
                 }
-                ToolbarItem::Print => {
-                    section.push(entry(i18n("Print Preview"), "printer", || MessageWindowInput::PrintPreview))
-                }
+                ToolbarItem::Print => section.push(entry(i18n("Print Preview"), "printer", || {
+                    MessageWindowInput::PrintPreview
+                })),
             }
         }
         let b = &self.bar.overflow;
-        show_context_menu(b, f64::from(b.width() / 2), f64::from(b.height()), vec![section]);
+        show_context_menu(
+            b,
+            f64::from(b.width() / 2),
+            f64::from(b.height()),
+            vec![section],
+        );
     }
 }
 
@@ -1163,36 +1411,64 @@ fn build_toolbar(header: &adw::HeaderBar, sender: &ComponentSender<MessageWindow
         .iter()
         .map(|item| {
             let b = match item {
-                ToolbarItem::Reply => button("mail-reply-sender-symbolic", i18n("Reply"), || MessageWindowInput::Reply),
+                ToolbarItem::Reply => button("mail-reply-sender-symbolic", i18n("Reply"), || {
+                    MessageWindowInput::Reply
+                }),
                 ToolbarItem::ReplyAll => {
-                    button("mail-reply-all-symbolic", i18n("Reply All"), || MessageWindowInput::ReplyAll)
+                    button("mail-reply-all-symbolic", i18n("Reply All"), || {
+                        MessageWindowInput::ReplyAll
+                    })
                 }
-                ToolbarItem::Forward => button("mail-forward-symbolic", i18n("Forward"), || MessageWindowInput::Forward),
+                ToolbarItem::Forward => button("mail-forward-symbolic", i18n("Forward"), || {
+                    MessageWindowInput::Forward
+                }),
                 // One glyph in both states, as in the main window; the
                 // starred state carries color only.
-                ToolbarItem::Star => button("hylki-non-starred-symbolic", i18n("Star"), || MessageWindowInput::ToggleStar),
-                ToolbarItem::Archive => button("mail-archive-symbolic", i18n("Archive"), || MessageWindowInput::Archive),
-                ToolbarItem::Delete => button("user-trash-symbolic", i18n("Delete"), || MessageWindowInput::Delete),
-                ToolbarItem::Spam => button("mail-mark-junk-symbolic", i18n("Mark as Spam"), || MessageWindowInput::Spam),
+                ToolbarItem::Star => button("hylki-non-starred-symbolic", i18n("Star"), || {
+                    MessageWindowInput::ToggleStar
+                }),
+                ToolbarItem::Archive => button("mail-archive-symbolic", i18n("Archive"), || {
+                    MessageWindowInput::Archive
+                }),
+                ToolbarItem::Delete => button("user-trash-symbolic", i18n("Delete"), || {
+                    MessageWindowInput::Delete
+                }),
+                ToolbarItem::Spam => {
+                    button("mail-mark-junk-symbolic", i18n("Mark as Spam"), || {
+                        MessageWindowInput::Spam
+                    })
+                }
                 ToolbarItem::ReadUnread => {
-                    button("mail-unread-symbolic", i18n("Mark as Unread"), || MessageWindowInput::ToggleRead)
+                    button("mail-unread-symbolic", i18n("Mark as Unread"), || {
+                        MessageWindowInput::ToggleRead
+                    })
                 }
-                ToolbarItem::Tags => button("tag-outline-symbolic", i18n("Tags"), || MessageWindowInput::TagMenu),
-                ToolbarItem::MoveTo => button("folder-symbolic", i18n("Move To…"), || MessageWindowInput::MoveTo),
-                ToolbarItem::Find => {
-                    button("loupe-with-arrow-symbolic", i18n("Find in message (Ctrl+F)"), || MessageWindowInput::Find)
-                }
+                ToolbarItem::Tags => button("tag-outline-symbolic", i18n("Tags"), || {
+                    MessageWindowInput::TagMenu
+                }),
+                ToolbarItem::MoveTo => button("folder-symbolic", i18n("Move To…"), || {
+                    MessageWindowInput::MoveTo
+                }),
+                ToolbarItem::Find => button(
+                    "loupe-with-arrow-symbolic",
+                    i18n("Find in message (Ctrl+F)"),
+                    || MessageWindowInput::Find,
+                ),
                 // The preview, not the print dialog: it shows what will come
                 // out and prints from there (#359).
-                ToolbarItem::Print => {
-                    button("printer-symbolic", i18n("Print Preview (Ctrl+Shift+P)"), || MessageWindowInput::PrintPreview)
-                }
+                ToolbarItem::Print => button(
+                    "printer-symbolic",
+                    i18n("Print Preview (Ctrl+Shift+P)"),
+                    || MessageWindowInput::PrintPreview,
+                ),
             };
             (*item, b)
         })
         .collect();
     // Rightmost, beside the window controls, as in the main window.
-    let overflow = button("view-more-horizontal-symbolic", i18n("Actions"), || MessageWindowInput::OverflowMenu);
+    let overflow = button("view-more-horizontal-symbolic", i18n("Actions"), || {
+        MessageWindowInput::OverflowMenu
+    });
     overflow.set_visible(false);
     header.pack_end(&overflow);
     let spinner = gtk::Spinner::new();
@@ -1213,7 +1489,10 @@ fn build_toolbar(header: &adw::HeaderBar, sender: &ComponentSender<MessageWindow
 
 /// Save one attachment where the user picks.
 fn save_attachment(att: Attachment, parent: &adw::Window) {
-    let dialog = gtk::FileDialog::builder().initial_name(&att.name).title(&i18n("Save Attachment")).build();
+    let dialog = gtk::FileDialog::builder()
+        .initial_name(&att.name)
+        .title(&i18n("Save Attachment"))
+        .build();
     dialog.save(Some(parent), gtk::gio::Cancellable::NONE, move |res| {
         if let Ok(file) = res {
             if let Some(path) = file.path() {

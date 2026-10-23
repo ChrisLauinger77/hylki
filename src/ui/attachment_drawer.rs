@@ -33,13 +33,13 @@ use gtk::glib;
 use relm4::prelude::*;
 
 use crate::config::{self, DrawerState};
-use crate::models::{is_image_name, Attachment};
-use crate::ui::context_menu::{show_context_menu, MenuEntry};
-use crate::ui::attachments_gallery::{
-    deleting_label, deleting_over, deleting_veil, fade_out, icon_color_class, icon_for, is_pdf_name, open_bytes,
-    spawn_thumbnail_render, texture_from, thumbnail_texture, Thumbnail,
-};
 use crate::i18n::{i18n, ni18n_f};
+use crate::models::{is_image_name, Attachment};
+use crate::ui::attachments_gallery::{
+    deleting_label, deleting_over, deleting_veil, fade_out, icon_color_class, icon_for,
+    is_pdf_name, open_bytes, spawn_thumbnail_render, texture_from, thumbnail_texture, Thumbnail,
+};
+use crate::ui::context_menu::{show_context_menu, MenuEntry};
 
 /// Whether an attachment can be shown in the drawer's lightbox: a decodable
 /// image, or a PDF (whose first page renders on demand).
@@ -158,7 +158,10 @@ pub struct AttachmentDrawer {
 pub enum DrawerOutput {
     /// Show the app's full-window lightbox over these previewable
     /// attachments, starting at `start`.
-    ShowLightbox { items: Vec<Attachment>, start: usize },
+    ShowLightbox {
+        items: Vec<Attachment>,
+        start: usize,
+    },
     /// Scroll the reader to the message this attachment came with (#213).
     ShowInMessage(Attachment),
     /// Take this attachment out of its message on the server (#289); the
@@ -469,9 +472,13 @@ impl SimpleComponent for AttachmentDrawer {
             let flow_ref = flow.clone();
             key.connect_key_pressed(move |_, keyval, _, _| {
                 use gtk::gdk::Key;
-                if matches!(keyval, Key::space | Key::KP_Space | Key::Return | Key::KP_Enter) {
+                if matches!(
+                    keyval,
+                    Key::space | Key::KP_Space | Key::Return | Key::KP_Enter
+                ) {
                     if let Some(child) = flow_ref.selected_children().first() {
-                        s.input_sender().emit(AttachmentDrawerInput::Activate(child.index() as usize));
+                        s.input_sender()
+                            .emit(AttachmentDrawerInput::Activate(child.index() as usize));
                         return gtk::glib::Propagation::Stop;
                     }
                 }
@@ -499,7 +506,10 @@ impl SimpleComponent for AttachmentDrawer {
                 &pill,
                 &root,
                 move |_| s.input_sender().emit(AttachmentDrawerInput::PillDragBegin),
-                move |want| s2.input_sender().emit(AttachmentDrawerInput::PillDrag { want }),
+                move |want| {
+                    s2.input_sender()
+                        .emit(AttachmentDrawerInput::PillDrag { want })
+                },
             );
             let click = gtk::GestureClick::new();
             let s = sender.clone();
@@ -564,7 +574,9 @@ impl SimpleComponent for AttachmentDrawer {
             root.set_end_child(None::<&gtk::Widget>);
             frame.set_child(Some(&body));
             frame.add_overlay(&swapping);
-            body.bind_property("visible", &frame, "visible").sync_create().build();
+            body.bind_property("visible", &frame, "visible")
+                .sync_create()
+                .build();
             root.set_end_child(Some(&frame));
             root.set_resize_end_child(false);
             root.set_shrink_end_child(false);
@@ -596,8 +608,9 @@ impl SimpleComponent for AttachmentDrawer {
             let controllers = root.observe_controllers();
             let mut doomed: Vec<gtk::EventController> = Vec::new();
             for i in 0..controllers.n_items() {
-                let Some(c) =
-                    controllers.item(i).and_then(|o| o.downcast::<gtk::EventController>().ok())
+                let Some(c) = controllers
+                    .item(i)
+                    .and_then(|o| o.downcast::<gtk::EventController>().ok())
                 else {
                     continue;
                 };
@@ -640,13 +653,19 @@ impl SimpleComponent for AttachmentDrawer {
                 &widgets.drawer_edge,
                 &root,
                 move |_| s.input_sender().emit(AttachmentDrawerInput::PillDragBegin),
-                move |want| s2.input_sender().emit(AttachmentDrawerInput::PillDrag { want }),
+                move |want| {
+                    s2.input_sender()
+                        .emit(AttachmentDrawerInput::PillDrag { want })
+                },
             );
         }
         // HYLKI_SHOWCASE_DRAWER=N clicks the header's count button N times,
         // one a second from 6s — the real button press, so the capture proves
         // the click path and not just the input it sends.
-        if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_DRAWER").ok().map(|v| v.parse::<u32>()) {
+        if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_DRAWER")
+            .ok()
+            .map(|v| v.parse::<u32>())
+        {
             let btn = widgets.count_btn.clone();
             for i in 0..n {
                 let btn = btn.clone();
@@ -673,7 +692,8 @@ impl SimpleComponent for AttachmentDrawer {
                     let gen = self.empty_gen;
                     let s = sender.clone();
                     glib::idle_add_local_full(glib::Priority::HIGH_IDLE, move || {
-                        s.input_sender().emit(AttachmentDrawerInput::SettleEmpty(gen));
+                        s.input_sender()
+                            .emit(AttachmentDrawerInput::SettleEmpty(gen));
                         glib::ControlFlow::Break
                     });
                     return;
@@ -738,9 +758,11 @@ impl SimpleComponent for AttachmentDrawer {
                     let data = att.data.clone();
                     let window = self.window();
                     gtk::glib::spawn_future_local(async move {
-                        let r = gtk::gio::spawn_blocking(move || crate::pgp::import_keys(&crate::pgp::Gpg::system(), &data))
-                            .await
-                            .unwrap_or_else(|_| Err("task failed".into()));
+                        let r = gtk::gio::spawn_blocking(move || {
+                            crate::pgp::import_keys(&crate::pgp::Gpg::system(), &data)
+                        })
+                        .await
+                        .unwrap_or_else(|_| Err("task failed".into()));
                         let (title, body) = match r {
                             Ok(s) if s.imported > 0 => (
                                 i18n("Key imported"),
@@ -749,7 +771,8 @@ impl SimpleComponent for AttachmentDrawer {
                             Ok(_) => (i18n("Already in your keyring"), i18n("That key was imported before.")),
                             Err(e) => (i18n("Could not import the key"), e),
                         };
-                        let dialog = adw::MessageDialog::new(window.as_ref(), Some(&title), Some(&body));
+                        let dialog =
+                            adw::MessageDialog::new(window.as_ref(), Some(&title), Some(&body));
                         dialog.add_response("ok", &i18n("OK"));
                         dialog.present();
                     });
@@ -780,11 +803,17 @@ impl SimpleComponent for AttachmentDrawer {
                     return;
                 }
                 let shown = (0..self.display_order.len())
-                    .find(|&i| self.item_at(i).is_some_and(|a| a.name == name && a.data.len() == len))
+                    .find(|&i| {
+                        self.item_at(i)
+                            .is_some_and(|a| a.name == name && a.data.len() == len)
+                    })
                     .and_then(|i| self.flow.child_at_index(i as i32));
                 self.fading += 1;
                 let s = sender.clone();
-                let done = move || s.input_sender().emit(AttachmentDrawerInput::FadeDone(name.clone(), len));
+                let done = move || {
+                    s.input_sender()
+                        .emit(AttachmentDrawerInput::FadeDone(name.clone(), len))
+                };
                 match shown {
                     Some(child) => fade_out(&child, done),
                     None => done(),
@@ -793,11 +822,18 @@ impl SimpleComponent for AttachmentDrawer {
             AttachmentDrawerInput::FadeDone(name, len) => {
                 self.fading = self.fading.saturating_sub(1);
                 self.deleting.retain(|d| *d != (name.clone(), len));
-                if let Some(at) = self.items.iter().position(|a| a.name == name && a.data.len() == len) {
+                if let Some(at) = self
+                    .items
+                    .iter()
+                    .position(|a| a.name == name && a.data.len() == len)
+                {
                     self.items.remove(at);
                 }
                 if self.fading == 0 {
-                    let items = self.pending_items.take().unwrap_or_else(|| self.items.clone());
+                    let items = self
+                        .pending_items
+                        .take()
+                        .unwrap_or_else(|| self.items.clone());
                     self.apply_items(items, &sender);
                 }
             }
@@ -812,8 +848,12 @@ impl SimpleComponent for AttachmentDrawer {
                 // double-click unreachable). Double-click previews images and
                 // PDFs in the lightbox, whose Open button launches the default
                 // app; anything else opens externally at once.
-                let Some(orig) = self.display_order.get(i).copied() else { return };
-                let Some(att) = self.items.get(orig) else { return };
+                let Some(orig) = self.display_order.get(i).copied() else {
+                    return;
+                };
+                let Some(att) = self.items.get(orig) else {
+                    return;
+                };
                 if previewable(att) {
                     self.show_lightbox(orig, &sender);
                 } else {
@@ -899,7 +939,9 @@ impl SimpleComponent for AttachmentDrawer {
 /// Whether two lists show the same files, in the same order.
 fn same_files(a: &[Attachment], b: &[Attachment]) -> bool {
     a.len() == b.len()
-        && a.iter().zip(b).all(|(x, y)| x.name == y.name && x.data.len() == y.data.len())
+        && a.iter()
+            .zip(b)
+            .all(|(x, y)| x.name == y.name && x.data.len() == y.data.len())
 }
 
 impl AttachmentDrawer {
@@ -965,7 +1007,9 @@ impl AttachmentDrawer {
     fn fade_in_drawer(&self) {
         self.finish_presence_fade();
         self.finish_swap();
-        let Some(body) = &self.drawer_body else { return };
+        let Some(body) = &self.drawer_body else {
+            return;
+        };
         let faded: [gtk::Widget; 2] = [body.clone().upcast(), self.pill.clone().upcast()];
         for w in &faded {
             w.set_opacity(0.0);
@@ -978,7 +1022,13 @@ impl AttachmentDrawer {
         // Timed on the split, which is on screen: the body isn't shown until
         // the view catches up, and an animation on an unmapped widget
         // jumps straight to its end.
-        let anim = adw::TimedAnimation::new(&self.paned, 0.0, 1.0, crate::ui::message_view::PAGE_FADE_MS, target);
+        let anim = adw::TimedAnimation::new(
+            &self.paned,
+            0.0,
+            1.0,
+            crate::ui::message_view::PAGE_FADE_MS,
+            target,
+        );
         anim.set_easing(adw::Easing::Linear);
         anim.play();
         *self.presence_anim.borrow_mut() = Some(anim);
@@ -990,7 +1040,9 @@ impl AttachmentDrawer {
     /// message's hidden end for a beat before the new one arrives.
     fn fade_out_drawer(&self) {
         self.finish_presence_fade();
-        let Some((still, height)) = self.drawer_still() else { return };
+        let Some((still, height)) = self.drawer_still() else {
+            return;
+        };
         self.finish_swap();
         self.leaving.set_size_request(-1, height);
         self.dissolve(&self.leaving, still, &self.presence_anim);
@@ -1010,7 +1062,9 @@ impl AttachmentDrawer {
         if waiting {
             return;
         }
-        let Some((still, _)) = self.drawer_still() else { return };
+        let Some((still, _)) = self.drawer_still() else {
+            return;
+        };
         self.finish_swap();
         self.dissolve(&self.swapping, still, &self.swap_anim);
     }
@@ -1030,7 +1084,13 @@ impl AttachmentDrawer {
             let picture = picture.clone();
             adw::CallbackAnimationTarget::new(move |v| picture.set_opacity(v))
         };
-        let anim = adw::TimedAnimation::new(&self.paned, 1.0, 0.0, crate::ui::message_view::PAGE_FADE_MS, target);
+        let anim = adw::TimedAnimation::new(
+            &self.paned,
+            1.0,
+            0.0,
+            crate::ui::message_view::PAGE_FADE_MS,
+            target,
+        );
         anim.set_easing(adw::Easing::Linear);
         {
             let picture = picture.clone();
@@ -1086,7 +1146,11 @@ impl AttachmentDrawer {
             self.collapsed = false;
         }
         config::save_drawer_collapsed(closing);
-        let target_h = if closing { Self::header_height(&self.paned) } else { self.height };
+        let target_h = if closing {
+            Self::header_height(&self.paned)
+        } else {
+            self.height
+        };
 
         let paned = self.paned.clone();
         // The whole ride is programmatic — position-notify must not read it
@@ -1115,7 +1179,10 @@ impl AttachmentDrawer {
         // handler restores state in the right order instead.
         anim.connect_done(move |_| {
             cell.borrow_mut().take();
-            s.input_sender().emit(AttachmentDrawerInput::ToggleSettled { collapsed: closing, gen });
+            s.input_sender().emit(AttachmentDrawerInput::ToggleSettled {
+                collapsed: closing,
+                gen,
+            });
         });
         *self.toggle_anim.borrow_mut() = Some((anim.clone(), closing));
         anim.play();
@@ -1126,7 +1193,9 @@ impl AttachmentDrawer {
     /// way out is voided by bumping the generation.
     fn finish_running_toggle(&mut self) {
         let running = self.toggle_anim.borrow_mut().take();
-        let Some((anim, closing)) = running else { return };
+        let Some((anim, closing)) = running else {
+            return;
+        };
         self.toggle_gen += 1;
         anim.skip();
         if closing {
@@ -1148,9 +1217,14 @@ impl AttachmentDrawer {
     fn header_height(paned: &gtk::Paned) -> i32 {
         // The collapsed drawer keeps everything above the scroller: the edge
         // strip and the header row.
-        let Some(end) = paned.end_child() else { return 44 };
+        let Some(end) = paned.end_child() else {
+            return 44;
+        };
         // The body sits in the drawer's overlay (see init).
-        let body = end.downcast_ref::<gtk::Overlay>().and_then(|o| o.child()).unwrap_or(end);
+        let body = end
+            .downcast_ref::<gtk::Overlay>()
+            .and_then(|o| o.child())
+            .unwrap_or(end);
         let mut sum = 0;
         let mut child = body.first_child();
         while let Some(c) = child {
@@ -1160,7 +1234,11 @@ impl AttachmentDrawer {
             sum += c.measure(gtk::Orientation::Vertical, -1).1;
             child = c.next_sibling();
         }
-        if sum > 0 { sum } else { 44 }
+        if sum > 0 {
+            sum
+        } else {
+            44
+        }
     }
 
     /// Move the Paned divider so the drawer body is the desired height: the
@@ -1232,7 +1310,11 @@ impl AttachmentDrawer {
             if total <= 1 {
                 return; // still unallocated; a later SetItems will retry
             }
-            let drawer_h = if collapsed { Self::header_height(&paned) } else { height };
+            let drawer_h = if collapsed {
+                Self::header_height(&paned)
+            } else {
+                height
+            };
             adjusting.set(true);
             paned.set_position((total - drawer_h).max(0));
             adjusting.set(false);
@@ -1260,7 +1342,10 @@ impl AttachmentDrawer {
         let mut order: Vec<usize> = (0..self.items.len()).collect();
         if self.list_view {
             order.sort_by(|&a, &b| {
-                self.items[a].name.to_lowercase().cmp(&self.items[b].name.to_lowercase())
+                self.items[a]
+                    .name
+                    .to_lowercase()
+                    .cmp(&self.items[b].name.to_lowercase())
             });
             if self.sort_desc {
                 order.reverse();
@@ -1269,7 +1354,10 @@ impl AttachmentDrawer {
         self.display_order = order;
         for (i, &orig) in self.display_order.iter().enumerate() {
             let att = &self.items[orig];
-            let deleting = self.deleting.iter().any(|(n, l)| *n == att.name && *l == att.data.len());
+            let deleting = self
+                .deleting
+                .iter()
+                .any(|(n, l)| *n == att.name && *l == att.data.len());
             let cell = if self.list_view {
                 build_list_row(i, att, deleting, sender)
             } else {
@@ -1299,13 +1387,17 @@ impl AttachmentDrawer {
             .title(&i18n("Save Attachment"))
             .build();
         let data = att.data.clone();
-        dialog.save(self.window().as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-            if let Ok(file) = res {
-                if let Some(path) = file.path() {
-                    let _ = std::fs::write(path, &data);
+        dialog.save(
+            self.window().as_ref(),
+            gtk::gio::Cancellable::NONE,
+            move |res| {
+                if let Ok(file) = res {
+                    if let Some(path) = file.path() {
+                        let _ = std::fs::write(path, &data);
+                    }
                 }
-            }
-        });
+            },
+        );
     }
 
     /// Ask for a folder and write every attachment into it ("Save All").
@@ -1314,39 +1406,51 @@ impl AttachmentDrawer {
             return;
         }
         let atts = self.items.clone();
-        let dialog = gtk::FileDialog::builder().title(&i18n("Save All Attachments")).build();
-        dialog.select_folder(self.window().as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-            if let Ok(folder) = res {
-                if let Some(dir) = folder.path() {
-                    for att in &atts {
-                        let safe = att.name.replace(['/', '\\'], "_");
-                        let _ = std::fs::write(dir.join(&safe), &att.data);
+        let dialog = gtk::FileDialog::builder()
+            .title(&i18n("Save All Attachments"))
+            .build();
+        dialog.select_folder(
+            self.window().as_ref(),
+            gtk::gio::Cancellable::NONE,
+            move |res| {
+                if let Ok(folder) = res {
+                    if let Some(dir) = folder.path() {
+                        for att in &atts {
+                            let safe = att.name.replace(['/', '\\'], "_");
+                            let _ = std::fs::write(dir.join(&safe), &att.data);
+                        }
                     }
                 }
-            }
-        });
+            },
+        );
     }
 
     /// Right-click menu: Open / Download, Show in Message, and Delete from
     /// Server, matching the gallery's actions.
     fn show_context_menu(&self, index: usize, x: f64, y: f64, sender: &ComponentSender<Self>) {
         let s = sender.clone();
-        let open = MenuEntry::new(i18n("Open"), move || s.input_sender().emit(AttachmentDrawerInput::Open(index)))
-            .icon("document-open-symbolic");
+        let open = MenuEntry::new(i18n("Open"), move || {
+            s.input_sender().emit(AttachmentDrawerInput::Open(index))
+        })
+        .icon("document-open-symbolic");
         let s = sender.clone();
-        let download =
-            MenuEntry::new(i18n("Download…"), move || s.input_sender().emit(AttachmentDrawerInput::Download(index)))
-                .icon("folder-download-symbolic");
+        let download = MenuEntry::new(i18n("Download…"), move || {
+            s.input_sender()
+                .emit(AttachmentDrawerInput::Download(index))
+        })
+        .icon("folder-download-symbolic");
         // The drawer gathers the whole conversation's files; this finds the
         // message a file came with (#213).
         let s = sender.clone();
         let show = MenuEntry::new(i18n("Show in Message"), move || {
-            s.input_sender().emit(AttachmentDrawerInput::ShowInMessage(index))
+            s.input_sender()
+                .emit(AttachmentDrawerInput::ShowInMessage(index))
         })
         .icon("mail-unread-symbolic");
         let s = sender.clone();
         let delete = MenuEntry::new(i18n("Delete from Server…"), move || {
-            s.input_sender().emit(AttachmentDrawerInput::DeleteFromServer(index))
+            s.input_sender()
+                .emit(AttachmentDrawerInput::DeleteFromServer(index))
         })
         .icon("user-trash-symbolic");
 
@@ -1357,7 +1461,12 @@ impl AttachmentDrawer {
             .child_at_index(index as i32)
             .map(|c| c.upcast())
             .unwrap_or_else(|| self.flow.clone().upcast());
-        show_context_menu(&parent, x, y, vec![vec![open, download], vec![show], vec![delete]]);
+        show_context_menu(
+            &parent,
+            x,
+            y,
+            vec![vec![open, download], vec![show], vec![delete]],
+        );
     }
 
     /// Ask the app to show its full-window lightbox over the message's
@@ -1365,8 +1474,12 @@ impl AttachmentDrawer {
     /// (attachments order). The overlay lives at the window level so it fills
     /// Hylki itself — a separate preview window meant double chrome.
     fn show_lightbox(&self, start: usize, sender: &ComponentSender<Self>) {
-        let items: Vec<Attachment> =
-            self.items.iter().filter(|a| previewable(a)).cloned().collect();
+        let items: Vec<Attachment> = self
+            .items
+            .iter()
+            .filter(|a| previewable(a))
+            .cloned()
+            .collect();
         if items.is_empty() {
             return;
         }
@@ -1377,7 +1490,10 @@ impl AttachmentDrawer {
             .filter(|a| previewable(a))
             .count()
             .saturating_sub(1);
-        let _ = sender.output(DrawerOutput::ShowLightbox { items, start: start_pos });
+        let _ = sender.output(DrawerOutput::ShowLightbox {
+            items,
+            start: start_pos,
+        });
     }
 }
 
@@ -1391,7 +1507,10 @@ fn is_key_attachment(att: &Attachment) -> bool {
         return true;
     }
     let name = att.name.to_ascii_lowercase();
-    (name.ends_with(".asc") || name.ends_with(".gpg") || name.ends_with(".pgp") || name.ends_with(".key"))
+    (name.ends_with(".asc")
+        || name.ends_with(".gpg")
+        || name.ends_with(".pgp")
+        || name.ends_with(".key"))
         && !head.starts_with(b"-----BEGIN PGP MESSAGE-----")
         && !head.starts_with(b"-----BEGIN PGP SIGNATURE-----")
 }
@@ -1460,7 +1579,10 @@ fn build_cell(
     };
     let download = action_btn("folder-download-symbolic", &i18n("Download"));
     let s = sender.clone();
-    download.connect_clicked(move |_| s.input_sender().emit(AttachmentDrawerInput::Download(index)));
+    download.connect_clicked(move |_| {
+        s.input_sender()
+            .emit(AttachmentDrawerInput::Download(index))
+    });
     actions.append(&download);
     let open = action_btn("document-open-symbolic", &i18n("Open"));
     let s = sender.clone();
@@ -1470,7 +1592,10 @@ fn build_cell(
     if is_key_attachment(att) {
         let import = action_btn("channel-secure-symbolic", &i18n("Import OpenPGP key"));
         let s = sender.clone();
-        import.connect_clicked(move |_| s.input_sender().emit(AttachmentDrawerInput::ImportKey(index)));
+        import.connect_clicked(move |_| {
+            s.input_sender()
+                .emit(AttachmentDrawerInput::ImportKey(index))
+        });
         actions.append(&import);
     }
     if deleting {
@@ -1484,7 +1609,11 @@ fn build_cell(
 
     // The name, or "Deleting…" while the file is deleted from the server:
     // whole, even where it is wider than the smallest thumbnail.
-    let name = if deleting { deleting_label() } else { gtk::Label::new(Some(&att.name)) };
+    let name = if deleting {
+        deleting_label()
+    } else {
+        gtk::Label::new(Some(&att.name))
+    };
     if !deleting {
         name.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
         name.set_max_width_chars(1);
@@ -1512,7 +1641,8 @@ fn build_cell(
     right.set_button(gtk::gdk::BUTTON_SECONDARY);
     let s = sender.clone();
     right.connect_pressed(move |_, _, x, y| {
-        s.input_sender().emit(AttachmentDrawerInput::ContextMenu { index, x, y });
+        s.input_sender()
+            .emit(AttachmentDrawerInput::ContextMenu { index, x, y });
     });
     child.add_controller(right);
     add_double_click_open(&child, index, sender);
@@ -1532,7 +1662,8 @@ fn add_double_click_open(
     let s = sender.clone();
     dbl.connect_pressed(move |_, n, _, _| {
         if n == 2 {
-            s.input_sender().emit(AttachmentDrawerInput::Activate(index));
+            s.input_sender()
+                .emit(AttachmentDrawerInput::Activate(index));
         }
     });
     child.add_controller(dbl);
@@ -1579,7 +1710,10 @@ fn build_list_row(
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let download = action_btn("folder-download-symbolic", &i18n("Download"));
     let s = sender.clone();
-    download.connect_clicked(move |_| s.input_sender().emit(AttachmentDrawerInput::Download(index)));
+    download.connect_clicked(move |_| {
+        s.input_sender()
+            .emit(AttachmentDrawerInput::Download(index))
+    });
     actions.append(&download);
     let open = action_btn("document-open-symbolic", &i18n("Open"));
     let s = sender.clone();
@@ -1606,7 +1740,8 @@ fn build_list_row(
     right.set_button(gtk::gdk::BUTTON_SECONDARY);
     let s = sender.clone();
     right.connect_pressed(move |_, _, x, y| {
-        s.input_sender().emit(AttachmentDrawerInput::ContextMenu { index, x, y });
+        s.input_sender()
+            .emit(AttachmentDrawerInput::ContextMenu { index, x, y });
     });
     child.add_controller(right);
     add_double_click_open(&child, index, sender);

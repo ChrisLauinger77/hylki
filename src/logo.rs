@@ -69,7 +69,10 @@ thread_local! {
 pub fn cache_stats() -> (usize, u64, usize) {
     let (n, bytes) = CACHE.with(|c| {
         let c = c.borrow();
-        (c.len(), c.values().map(crate::memory_report::texture_bytes).sum())
+        (
+            c.len(),
+            c.values().map(crate::memory_report::texture_bytes).sum(),
+        )
     });
     (n, bytes, MISSES.with(|m| m.borrow().len()))
 }
@@ -120,41 +123,146 @@ fn stored_bimi(domain: &str) -> Option<Vec<u8>> {
 /// `brand.rs`, a different question from who sent a message.
 const MAILBOX_HOSTS: &[&str] = &[
     // Google
-    "gmail.com", "googlemail.com",
+    "gmail.com",
+    "googlemail.com",
     // Microsoft
-    "outlook.com", "outlook.co.uk", "hotmail.com", "hotmail.co.uk", "hotmail.fr",
-    "hotmail.it", "hotmail.es", "hotmail.de", "live.com", "live.co.uk", "live.fr",
-    "live.nl", "live.ca", "msn.com",
+    "outlook.com",
+    "outlook.co.uk",
+    "hotmail.com",
+    "hotmail.co.uk",
+    "hotmail.fr",
+    "hotmail.it",
+    "hotmail.es",
+    "hotmail.de",
+    "live.com",
+    "live.co.uk",
+    "live.fr",
+    "live.nl",
+    "live.ca",
+    "msn.com",
     // Apple
-    "icloud.com", "me.com", "mac.com", "privaterelay.appleid.com",
+    "icloud.com",
+    "me.com",
+    "mac.com",
+    "privaterelay.appleid.com",
     // Yahoo / AOL
-    "yahoo.com", "yahoo.co.uk", "yahoo.co.jp", "yahoo.fr", "yahoo.de", "yahoo.es",
-    "yahoo.it", "yahoo.ca", "yahoo.com.au", "yahoo.com.br", "yahoo.co.in",
-    "ymail.com", "rocketmail.com", "aol.com", "aol.co.uk",
+    "yahoo.com",
+    "yahoo.co.uk",
+    "yahoo.co.jp",
+    "yahoo.fr",
+    "yahoo.de",
+    "yahoo.es",
+    "yahoo.it",
+    "yahoo.ca",
+    "yahoo.com.au",
+    "yahoo.com.br",
+    "yahoo.co.in",
+    "ymail.com",
+    "rocketmail.com",
+    "aol.com",
+    "aol.co.uk",
     // Privacy-minded providers
-    "proton.me", "protonmail.com", "protonmail.ch", "pm.me", "tutanota.com",
-    "tutanota.de", "tuta.com", "tuta.io", "mailbox.org", "posteo.de", "posteo.net",
-    "hushmail.com", "runbox.com", "startmail.com", "disroot.org", "riseup.net",
+    "proton.me",
+    "protonmail.com",
+    "protonmail.ch",
+    "pm.me",
+    "tutanota.com",
+    "tutanota.de",
+    "tuta.com",
+    "tuta.io",
+    "mailbox.org",
+    "posteo.de",
+    "posteo.net",
+    "hushmail.com",
+    "runbox.com",
+    "startmail.com",
+    "disroot.org",
+    "riseup.net",
     // Other mailbox hosts
-    "fastmail.com", "fastmail.fm", "zoho.com", "zoho.eu", "hey.com", "duck.com",
-    "mail.com", "email.com", "usa.com", "gmx.com", "gmx.net", "gmx.de", "gmx.at",
-    "gmx.ch", "web.de", "t-online.de", "freenet.de", "arcor.de",
+    "fastmail.com",
+    "fastmail.fm",
+    "zoho.com",
+    "zoho.eu",
+    "hey.com",
+    "duck.com",
+    "mail.com",
+    "email.com",
+    "usa.com",
+    "gmx.com",
+    "gmx.net",
+    "gmx.de",
+    "gmx.at",
+    "gmx.ch",
+    "web.de",
+    "t-online.de",
+    "freenet.de",
+    "arcor.de",
     // Russia / Ukraine
-    "yandex.com", "yandex.ru", "yandex.by", "yandex.kz", "mail.ru", "bk.ru",
-    "list.ru", "inbox.ru", "internet.ru", "rambler.ru", "ukr.net", "i.ua",
+    "yandex.com",
+    "yandex.ru",
+    "yandex.by",
+    "yandex.kz",
+    "mail.ru",
+    "bk.ru",
+    "list.ru",
+    "inbox.ru",
+    "internet.ru",
+    "rambler.ru",
+    "ukr.net",
+    "i.ua",
     // Asia
-    "qq.com", "foxmail.com", "163.com", "126.com", "yeah.net", "sina.com",
-    "sina.cn", "sohu.com", "naver.com", "daum.net", "hanmail.net",
+    "qq.com",
+    "foxmail.com",
+    "163.com",
+    "126.com",
+    "yeah.net",
+    "sina.com",
+    "sina.cn",
+    "sohu.com",
+    "naver.com",
+    "daum.net",
+    "hanmail.net",
     "rediffmail.com",
     // Europe / Americas ISPs and portals
-    "orange.fr", "wanadoo.fr", "free.fr", "sfr.fr", "laposte.net", "gmx.fr",
-    "libero.it", "virgilio.it", "alice.it", "tiscali.it", "seznam.cz",
-    "centrum.cz", "wp.pl", "o2.pl", "onet.pl", "interia.pl",
-    "btinternet.com", "sky.com", "talktalk.net", "ntlworld.com", "bigpond.com",
-    "comcast.net", "verizon.net", "att.net", "sbcglobal.net", "bellsouth.net",
-    "cox.net", "charter.net", "earthlink.net", "juno.com", "optonline.net",
-    "shaw.ca", "rogers.com", "sympatico.ca", "telus.net",
-    "uol.com.br", "bol.com.br", "terra.com.br", "ig.com.br",
+    "orange.fr",
+    "wanadoo.fr",
+    "free.fr",
+    "sfr.fr",
+    "laposte.net",
+    "gmx.fr",
+    "libero.it",
+    "virgilio.it",
+    "alice.it",
+    "tiscali.it",
+    "seznam.cz",
+    "centrum.cz",
+    "wp.pl",
+    "o2.pl",
+    "onet.pl",
+    "interia.pl",
+    "btinternet.com",
+    "sky.com",
+    "talktalk.net",
+    "ntlworld.com",
+    "bigpond.com",
+    "comcast.net",
+    "verizon.net",
+    "att.net",
+    "sbcglobal.net",
+    "bellsouth.net",
+    "cox.net",
+    "charter.net",
+    "earthlink.net",
+    "juno.com",
+    "optonline.net",
+    "shaw.ca",
+    "rogers.com",
+    "sympatico.ca",
+    "telus.net",
+    "uol.com.br",
+    "bol.com.br",
+    "terra.com.br",
+    "ig.com.br",
 ];
 
 /// Whether this address is at a [`MAILBOX_HOSTS`] domain, so it names a
@@ -172,7 +280,12 @@ pub(crate) fn is_mailbox_domain(domain: &str) -> bool {
 /// The host part of an address, lowercased — the sending host itself
 /// (`notifications.usbank.com`), as BIMI is looked up on it first.
 fn host_of(email: &str) -> Option<String> {
-    let host = email.rsplit('@').next()?.trim().trim_end_matches('.').to_ascii_lowercase();
+    let host = email
+        .rsplit('@')
+        .next()?
+        .trim()
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
     if host.is_empty() || !host.contains('.') || host.parse::<std::net::IpAddr>().is_ok() {
         return None;
     }
@@ -433,7 +546,11 @@ fn bimi_logo(email: &str) -> Bimi {
             }
         }
     }
-    if unreachable { Bimi::Unreachable } else { Bimi::None }
+    if unreachable {
+        Bimi::Unreachable
+    } else {
+        Bimi::None
+    }
 }
 
 /// The logo URL in `default._bimi.<name>`'s TXT record: `Ok(None)` when
@@ -447,7 +564,9 @@ fn bimi_record_url(name: &str) -> Result<Option<String>, ()> {
         gtk::gio::Cancellable::NONE,
     ) {
         Ok(r) => r,
-        Err(e) if e.kind::<gtk::gio::ResolverError>() == Some(gtk::gio::ResolverError::NotFound) => {
+        Err(e)
+            if e.kind::<gtk::gio::ResolverError>() == Some(gtk::gio::ResolverError::NotFound) =>
+        {
             tracing::debug!("bimi: no record for {name}");
             return Ok(None);
         }
@@ -477,7 +596,9 @@ pub(crate) fn parse_bimi_record(txt: &str) -> Option<String> {
     let mut is_bimi = false;
     let mut location: Option<String> = None;
     for tag in txt.split(';') {
-        let Some((k, v)) = tag.split_once('=') else { continue };
+        let Some((k, v)) = tag.split_once('=') else {
+            continue;
+        };
         let (k, v) = (k.trim().to_ascii_lowercase(), v.trim());
         match k.as_str() {
             "v" => is_bimi = v.eq_ignore_ascii_case("BIMI1"),
@@ -486,7 +607,9 @@ pub(crate) fn parse_bimi_record(txt: &str) -> Option<String> {
         }
     }
     let url = location.filter(|_| is_bimi)?;
-    url.to_ascii_lowercase().starts_with("https://").then_some(url)
+    url.to_ascii_lowercase()
+        .starts_with("https://")
+        .then_some(url)
 }
 
 /// The BIMI SVG at `url`: small, served as an image or XML, and an SVG.
@@ -510,7 +633,10 @@ fn bimi_fetch(url: &str) -> Option<String> {
         return None;
     }
     let mut buf = Vec::new();
-    resp.into_reader().take(BIMI_MAX_BYTES + 1).read_to_end(&mut buf).ok()?;
+    resp.into_reader()
+        .take(BIMI_MAX_BYTES + 1)
+        .read_to_end(&mut buf)
+        .ok()?;
     if buf.is_empty() || buf.len() as u64 > BIMI_MAX_BYTES || !looks_like_svg(&buf) {
         tracing::debug!("bimi: {url}: {} bytes, not usable", buf.len());
         return None;
@@ -551,7 +677,10 @@ fn bundled_map() -> &'static HashMap<String, LogoEntry> {
                 LogoFile { logo: Vec::new() }
             }
         };
-        file.logo.into_iter().map(|e| (e.domain.clone(), e)).collect()
+        file.logo
+            .into_iter()
+            .map(|e| (e.domain.clone(), e))
+            .collect()
     })
 }
 
@@ -579,7 +708,8 @@ fn bundled_bytes(entry: &LogoEntry) -> Option<Vec<u8>> {
         "brand" => crate::brand::png(&entry.file).map(<[u8]>::to_vec),
         "simple" | "gilbarbara" => {
             let path = format!("/co/hyprlab/Hylki/logos/{}/{}", entry.source, entry.file);
-            let data = gtk::gio::resources_lookup_data(&path, gtk::gio::ResourceLookupFlags::NONE).ok()?;
+            let data =
+                gtk::gio::resources_lookup_data(&path, gtk::gio::ResourceLookupFlags::NONE).ok()?;
             let svg = std::str::from_utf8(&data).ok()?;
             let framed = if entry.source == "simple" {
                 let bg = entry.color.as_deref().unwrap_or("#000000");
@@ -601,7 +731,13 @@ fn bundled_bytes(entry: &LogoEntry) -> Option<Vec<u8>> {
 /// the nested element, so namespaces, styles and gradients keep working;
 /// a root with no `viewBox` gets one from its width and height. `None`
 /// for anything that is not an SVG document.
-pub(crate) fn square_svg(svg: &str, px: u32, bg: Option<&str>, pad: f32, fill: Option<&str>) -> Option<String> {
+pub(crate) fn square_svg(
+    svg: &str,
+    px: u32,
+    bg: Option<&str>,
+    pad: f32,
+    fill: Option<&str>,
+) -> Option<String> {
     let lower = svg.to_ascii_lowercase();
     let start = svg_root_start(&lower)?;
     let open_end = start + svg[start..].find('>')?;
@@ -621,7 +757,12 @@ pub(crate) fn square_svg(svg: &str, px: u32, bg: Option<&str>, pad: f32, fill: O
                 attrs
                     .iter()
                     .find(|(k, _)| k == name)
-                    .and_then(|(_, v)| v.trim().trim_end_matches(|c: char| c.is_ascii_alphabetic() || c == '%').parse::<f32>().ok())
+                    .and_then(|(_, v)| {
+                        v.trim()
+                            .trim_end_matches(|c: char| c.is_ascii_alphabetic() || c == '%')
+                            .parse::<f32>()
+                            .ok()
+                    })
                     .filter(|n| *n > 0.0)
             };
             Some(format!("0 0 {} {}", dim("width")?, dim("height")?))
@@ -630,8 +771,10 @@ pub(crate) fn square_svg(svg: &str, px: u32, bg: Option<&str>, pad: f32, fill: O
     let inner = px as f32 - 2.0 * inset;
     let mut kept = String::new();
     for (k, v) in &attrs {
-        if matches!(k.as_str(), "width" | "height" | "x" | "y" | "viewbox" | "preserveaspectratio")
-            || (fill.is_some() && k == "fill")
+        if matches!(
+            k.as_str(),
+            "width" | "height" | "x" | "y" | "viewbox" | "preserveaspectratio"
+        ) || (fill.is_some() && k == "fill")
         {
             continue;
         }
@@ -673,7 +816,9 @@ fn parse_attrs(tag: &str) -> Vec<(String, String)> {
     let mut out = Vec::new();
     let mut rest = tag.trim();
     while !rest.is_empty() {
-        let name_len = rest.find(|c: char| c == '=' || c.is_whitespace()).unwrap_or(rest.len());
+        let name_len = rest
+            .find(|c: char| c == '=' || c.is_whitespace())
+            .unwrap_or(rest.len());
         let name = rest[..name_len].trim().to_ascii_lowercase();
         rest = rest[name_len..].trim_start();
         let mut value = String::new();
@@ -699,7 +844,12 @@ fn parse_attrs(tag: &str) -> Vec<(String, String)> {
 
 /// Whether these bytes are an SVG document (an `<svg` tag near the top).
 fn looks_like_svg(bytes: &[u8]) -> bool {
-    let head: String = bytes.iter().take(1024).map(|b| *b as char).collect::<String>().to_ascii_lowercase();
+    let head: String = bytes
+        .iter()
+        .take(1024)
+        .map(|b| *b as char)
+        .collect::<String>()
+        .to_ascii_lowercase();
     svg_root_start(&head).is_some()
 }
 
@@ -755,13 +905,19 @@ fn get_text(url: &str) -> Option<(String, String)> {
     use std::io::Read;
     let resp = ureq::get(url)
         .set("User-Agent", USER_AGENT)
-        .set("Accept", "text/html,application/manifest+json,application/json;q=0.9,*/*;q=0.5")
+        .set(
+            "Accept",
+            "text/html,application/manifest+json,application/json;q=0.9,*/*;q=0.5",
+        )
         .timeout(std::time::Duration::from_secs(5))
         .call()
         .ok()?;
     let final_url = resp.get_url().to_string();
     let mut buf = Vec::new();
-    resp.into_reader().take(512 * 1024).read_to_end(&mut buf).ok()?;
+    resp.into_reader()
+        .take(512 * 1024)
+        .read_to_end(&mut buf)
+        .ok()?;
     Some((final_url, String::from_utf8_lossy(&buf).into_owned()))
 }
 
@@ -775,7 +931,13 @@ fn link_tags(html: &str) -> Vec<Vec<(String, String)>> {
     fn walk(node: &Handle, tags: &mut Vec<Vec<(String, String)>>) {
         if let NodeData::Element { name, attrs, .. } = &node.data {
             if name.local.as_ref() == "link" {
-                tags.push(attrs.borrow().iter().map(|a| (a.name.local.to_string(), a.value.to_string())).collect());
+                tags.push(
+                    attrs
+                        .borrow()
+                        .iter()
+                        .map(|a| (a.name.local.to_string(), a.value.to_string()))
+                        .collect(),
+                );
             }
         }
         for child in node.children.borrow().iter() {
@@ -789,7 +951,10 @@ fn link_tags(html: &str) -> Vec<Vec<(String, String)>> {
 }
 
 fn attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
-    attrs.iter().find(|(n, _)| n == name).map(|(_, v)| v.as_str())
+    attrs
+        .iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, v)| v.as_str())
 }
 
 /// The largest edge a `sizes` attribute claims ("32x32 192x192" → 192;
@@ -803,7 +968,12 @@ fn largest_size(sizes: Option<&str>) -> Option<u32> {
 
 fn is_svg(href: &str, mime: Option<&str>) -> bool {
     mime.is_some_and(|t| t.to_ascii_lowercase().contains("svg"))
-        || href.split(['?', '#']).next().unwrap_or("").to_ascii_lowercase().ends_with(".svg")
+        || href
+            .split(['?', '#'])
+            .next()
+            .unwrap_or("")
+            .to_ascii_lowercase()
+            .ends_with(".svg")
 }
 
 /// The icon links a page declares, with their claimed (or assumed) sizes.
@@ -813,14 +983,23 @@ fn is_svg(href: &str, mime: Option<&str>) -> bool {
 fn link_icons(html: &str, base: &str) -> Vec<(u32, String)> {
     let mut out = Vec::new();
     for attrs in link_tags(html) {
-        let Some(href) = attr(&attrs, "href").map(str::trim).filter(|h| !h.is_empty()) else { continue };
+        let Some(href) = attr(&attrs, "href")
+            .map(str::trim)
+            .filter(|h| !h.is_empty())
+        else {
+            continue;
+        };
         let rel = attr(&attrs, "rel").unwrap_or("").to_ascii_lowercase();
         let rels: Vec<&str> = rel.split_whitespace().collect();
         if rels.contains(&"mask-icon") {
             continue;
         }
         let claimed = largest_size(attr(&attrs, "sizes"));
-        let size = if is_svg(href, attr(&attrs, "type")) && rels.iter().any(|r| *r == "icon" || r.starts_with("apple-touch-icon")) {
+        let size = if is_svg(href, attr(&attrs, "type"))
+            && rels
+                .iter()
+                .any(|r| *r == "icon" || r.starts_with("apple-touch-icon"))
+        {
             256
         } else if rels.iter().any(|r| r.starts_with("apple-touch-icon")) {
             claimed.unwrap_or(180)
@@ -851,7 +1030,9 @@ fn link_manifest(html: &str, base: &str) -> Option<String> {
 
 /// The icons a web manifest lists, with their claimed sizes.
 fn manifest_icons(json: &str, base: &str) -> Vec<(u32, String)> {
-    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return Vec::new() };
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else {
+        return Vec::new();
+    };
     v["icons"]
         .as_array()
         .into_iter()
@@ -1053,7 +1234,10 @@ mod tests {
 
     #[test]
     fn the_brand_domain_is_found_under_its_sending_subdomains() {
-        assert_eq!(domain_of("no-reply@apple.com").as_deref(), Some("apple.com"));
+        assert_eq!(
+            domain_of("no-reply@apple.com").as_deref(),
+            Some("apple.com")
+        );
         assert_eq!(
             domain_of("news@mail.notifications.apple.com").as_deref(),
             Some("apple.com")
@@ -1064,7 +1248,10 @@ mod tests {
         );
         // Country-code pairs keep three labels.
         assert_eq!(domain_of("a@mail.bbc.co.uk").as_deref(), Some("bbc.co.uk"));
-        assert_eq!(domain_of("a@shop.example.com.au").as_deref(), Some("example.com.au"));
+        assert_eq!(
+            domain_of("a@shop.example.com.au").as_deref(),
+            Some("example.com.au")
+        );
     }
 
     #[test]
@@ -1083,14 +1270,23 @@ mod tests {
         assert_eq!(
             icons,
             vec![
-                (32, "https://www.example.com/img/favicon-32x32.png".to_string()),
-                (192, "https://cdn.example.com/icon-192.png?v=2&x=1".to_string()),
+                (
+                    32,
+                    "https://www.example.com/img/favicon-32x32.png".to_string()
+                ),
+                (
+                    192,
+                    "https://cdn.example.com/icon-192.png?v=2&x=1".to_string()
+                ),
                 (180, "https://www.example.com/a/b/touch.png".to_string()),
                 // A vector icon is rasterised at logo size, so it ranks high.
                 (256, "https://www.example.com/icon.svg".to_string()),
             ]
         );
-        assert_eq!(link_manifest(html, base).as_deref(), Some("https://www.example.com/a/site.webmanifest"));
+        assert_eq!(
+            link_manifest(html, base).as_deref(),
+            Some("https://www.example.com/a/site.webmanifest")
+        );
         let manifest = r#"{"icons":[{"src":"/i/512.png","sizes":"512x512","type":"image/png"},
                                      {"src":"v.svg","sizes":"any","type":"image/svg+xml"},
                                      {"src":"i/any.png","sizes":"any"}]}"#;
@@ -1103,13 +1299,31 @@ mod tests {
             ]
         );
         assert_eq!(largest_size(Some("16x16 48x48 32x32")), Some(48));
-        assert_eq!(resolve_url("https://example.com", "favicon.ico").as_deref(), Some("https://example.com/favicon.ico"));
-        assert_eq!(resolve_url("https://example.com/", "data:image/png;base64,AAAA"), None);
+        assert_eq!(
+            resolve_url("https://example.com", "favicon.ico").as_deref(),
+            Some("https://example.com/favicon.ico")
+        );
+        assert_eq!(
+            resolve_url("https://example.com/", "data:image/png;base64,AAAA"),
+            None
+        );
         let base = "https://www.example.com/a/b/page.html";
-        assert_eq!(resolve_url(base, "../i.png").as_deref(), Some("https://www.example.com/a/i.png"));
-        assert_eq!(resolve_url(base, "./i.png").as_deref(), Some("https://www.example.com/a/b/i.png"));
-        assert_eq!(resolve_url(base, "/i.png").as_deref(), Some("https://www.example.com/i.png"));
-        assert_eq!(resolve_url(base, "//cdn.example.net/i.png").as_deref(), Some("https://cdn.example.net/i.png"));
+        assert_eq!(
+            resolve_url(base, "../i.png").as_deref(),
+            Some("https://www.example.com/a/i.png")
+        );
+        assert_eq!(
+            resolve_url(base, "./i.png").as_deref(),
+            Some("https://www.example.com/a/b/i.png")
+        );
+        assert_eq!(
+            resolve_url(base, "/i.png").as_deref(),
+            Some("https://www.example.com/i.png")
+        );
+        assert_eq!(
+            resolve_url(base, "//cdn.example.net/i.png").as_deref(),
+            Some("https://cdn.example.net/i.png")
+        );
         assert_eq!(resolve_url(base, "mailto:x@example.com"), None);
     }
 
@@ -1145,7 +1359,10 @@ mod tests {
             Some("https://www.apple.com/bimi/v2/apple.svg")
         );
         // Tags in any order, spacing free.
-        assert_eq!(parse_bimi_record("l=https://x.example/l.svg;v=bimi1").as_deref(), Some("https://x.example/l.svg"));
+        assert_eq!(
+            parse_bimi_record("l=https://x.example/l.svg;v=bimi1").as_deref(),
+            Some("https://x.example/l.svg")
+        );
         // A declared opt-out, a plain-http location, an SPF record.
         assert_eq!(parse_bimi_record("v=BIMI1; l=;"), None);
         assert_eq!(parse_bimi_record("v=BIMI1; l=http://x.example/l.svg"), None);
@@ -1157,17 +1374,31 @@ mod tests {
         let glyph = r##"<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>PayPal</title><path d="M1 1h22v22H1z"/></svg>"##;
         let out = square_svg(glyph, 160, Some("#002991"), 0.22, Some("#ffffff")).unwrap();
         assert!(out.starts_with(r##"<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">"##), "{out}");
-        assert!(out.contains(r##"<rect width="160" height="160" fill="#002991"/>"##), "{out}");
+        assert!(
+            out.contains(r##"<rect width="160" height="160" fill="#002991"/>"##),
+            "{out}"
+        );
         assert!(out.contains(r##"<svg x="35" y="35" width="90" height="90" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" role="img" xmlns="http://www.w3.org/2000/svg" fill="#ffffff">"##), "{out}");
-        assert!(out.ends_with(r##"<path d="M1 1h22v22H1z"/></svg></svg>"##), "{out}");
+        assert!(
+            out.ends_with(r##"<path d="M1 1h22v22H1z"/></svg></svg>"##),
+            "{out}"
+        );
         // A prologue, a doctype and px-suffixed dimensions in place of a viewBox.
         let mark = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE svg><svg width=\"256px\" height=\"128px\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><rect width=\"256\" height=\"128\"/></svg>";
         let out = square_svg(mark, 160, Some("#ffffff"), 0.0, None).unwrap();
         assert!(out.contains(r##"viewBox="0 0 256 128""##), "{out}");
-        assert!(out.contains(r##"xmlns:xlink="http://www.w3.org/1999/xlink""##), "{out}");
+        assert!(
+            out.contains(r##"xmlns:xlink="http://www.w3.org/1999/xlink""##),
+            "{out}"
+        );
         // Not an SVG at all.
-        assert_eq!(square_svg("<html><body>no</body></html>", 160, None, 0.0, None), None);
-        assert!(looks_like_svg(b"<?xml version=\"1.0\"?>\n<!-- x -->\n<svg viewBox=\"0 0 1 1\"/>"));
+        assert_eq!(
+            square_svg("<html><body>no</body></html>", 160, None, 0.0, None),
+            None
+        );
+        assert!(looks_like_svg(
+            b"<?xml version=\"1.0\"?>\n<!-- x -->\n<svg viewBox=\"0 0 1 1\"/>"
+        ));
         assert!(!looks_like_svg(b"<svgfoo>"));
     }
 
@@ -1178,9 +1409,15 @@ mod tests {
         assert_eq!(paypal.file, "paypal.svg");
         assert!(paypal.color.is_some());
         // The sending host wins over the registrable domain when both are listed.
-        assert_eq!(bundled_entry("no-reply@aws.amazon.com").map(|e| e.file.as_str()), Some("aws.svg"));
+        assert_eq!(
+            bundled_entry("no-reply@aws.amazon.com").map(|e| e.file.as_str()),
+            Some("aws.svg")
+        );
         // A subdomain falls back to the registrable domain's mark.
-        assert_eq!(bundled_entry("noreply@mail.spotify.com").map(|e| e.source.as_str()), Some("gilbarbara"));
+        assert_eq!(
+            bundled_entry("noreply@mail.spotify.com").map(|e| e.source.as_str()),
+            Some("gilbarbara")
+        );
         // The app's own service marks cover the mail providers.
         assert!(bundled_entry("someone@example.org").is_none());
         assert!(has_bundled("x@paypal.com") && !known_missing("x@paypal.com"));
@@ -1213,7 +1450,11 @@ mod tests {
     /// not the companies behind them, that are excluded.
     #[test]
     fn brands_behind_mailbox_hosts_keep_their_marks() {
-        for addr in ["no-reply@google.com", "news@apple.com", "billing@microsoft.com"] {
+        for addr in [
+            "no-reply@google.com",
+            "news@apple.com",
+            "billing@microsoft.com",
+        ] {
             assert!(!is_mailbox_host(addr), "{addr} is the brand, not a mailbox");
             assert!(has_bundled(addr), "{addr} should keep its bundled mark");
         }
@@ -1227,7 +1468,9 @@ mod tests {
         assert!(looks_like_markup(b"  <html lang=\"en\">"));
         // An XML prologue is a page unless an SVG follows it.
         assert!(looks_like_markup(b"<?xml version=\"1.0\"?><html>"));
-        assert!(!looks_like_markup(b"<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"/>"));
+        assert!(!looks_like_markup(
+            b"<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"/>"
+        ));
         assert!(!looks_like_markup(b"\x89PNG\r\n\x1a\n"));
         assert!(!looks_like_markup(b"\x00\x00\x01\x00"));
     }

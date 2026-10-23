@@ -16,14 +16,17 @@ pub fn is_flatpak() -> bool {
 
 /// The user's home: the host's, from inside the sandbox too.
 pub fn home() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from).or_else(dirs::home_dir)
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .or_else(dirs::home_dir)
 }
 
 /// A key file (a `.desktop` entry, an EDS `.source`, a D-Bus `.service`,
 /// `/.flatpak-info`), or `None` if it does not parse.
 pub fn keyfile(data: &str) -> Option<gtk::glib::KeyFile> {
     let kf = gtk::glib::KeyFile::new();
-    kf.load_from_data(data, gtk::glib::KeyFileFlags::NONE).ok()?;
+    kf.load_from_data(data, gtk::glib::KeyFileFlags::NONE)
+        .ok()?;
     Some(kf)
 }
 
@@ -58,7 +61,11 @@ pub fn is_appimage() -> bool {
 
 /// Contents of the *host* os-release (falls back to the local one natively).
 fn os_release() -> String {
-    for path in ["/run/host/os-release", "/etc/os-release", "/usr/lib/os-release"] {
+    for path in [
+        "/run/host/os-release",
+        "/etc/os-release",
+        "/usr/lib/os-release",
+    ] {
         if let Ok(text) = fs::read_to_string(path) {
             if !text.trim().is_empty() {
                 return text;
@@ -150,10 +157,16 @@ mod tests {
 
     #[test]
     fn install_command_follows_the_distribution_family() {
-        assert_eq!(install_command_for(FEDORA), Some("sudo dnf install nautilus-python"));
+        assert_eq!(
+            install_command_for(FEDORA),
+            Some("sudo dnf install nautilus-python")
+        );
         // Mint is not listed itself but says it is like ubuntu/debian… and
         // is listed anyway; either path gives apt.
-        assert_eq!(install_command_for(MINT), Some("sudo apt install python3-nautilus"));
+        assert_eq!(
+            install_command_for(MINT),
+            Some("sudo apt install python3-nautilus")
+        );
         assert_eq!(
             install_command_for("ID=nobara\nID_LIKE=fedora"),
             Some("sudo dnf install nautilus-python")
