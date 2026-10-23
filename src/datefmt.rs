@@ -25,6 +25,11 @@ use std::sync::{Mutex, OnceLock};
 static DATE_STYLE: AtomicU8 = AtomicU8::new(0);
 static CLOCK_STYLE: AtomicU8 = AtomicU8::new(0);
 
+/// Held by a test that changes the style and by a test that pins a formatted
+/// date, so the one never formats under the other's passing style.
+#[cfg(test)]
+pub(crate) static TEST_STYLE_LOCK: Mutex<()> = Mutex::new(());
+
 /// Apply the user's preference. Called at startup and whenever it changes.
 pub fn set_style(date: DateStyle, clock: ClockStyle) {
     DATE_STYLE.store(
@@ -436,6 +441,7 @@ mod tests {
 
     #[test]
     fn a_chosen_format_overrides_the_locale() {
+        let _style = TEST_STYLE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // The C locale this test runs under writes month-first on a 24-hour clock;
         // each choice has to hold regardless of that.
         let ts = 1787478020; // 2026-08-23, 09:40 UTC

@@ -61,6 +61,9 @@ const CORPUS: &[(&str, &str)] = &[
 
 #[test]
 fn the_corpus_parses_as_it_did() {
+    let _style = crate::datefmt::TEST_STYLE_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let mut out = String::new();
     for (name, card) in CORPUS {
         out += &format!(
@@ -69,6 +72,14 @@ fn the_corpus_parses_as_it_did() {
             is_group_vcard(card),
             parse_vcard_fields(card),
         );
+    }
+    // How a birthday is written follows the locale and the date style, which
+    // are process-wide and settle on whatever the first date formatted in the
+    // test run saw. The golden file pins where the formatted birthday goes;
+    // the formatting itself is datefmt's and is compared live.
+    for raw in ["1985-04-12", "--04-12"] {
+        let shown = format!("birthday: {:?},", pretty_birthday(raw));
+        out = out.replace(&shown, &format!("birthday: <pretty_birthday({raw:?})>,"));
     }
     assert_golden("contacts/testdata/parsed.txt", &out);
 }

@@ -7,7 +7,7 @@ Some(
         nickname: "Patty",
         org: "Acme, Inc.",
         title: "Boss",
-        birthday: "Apr 12, 1985",
+        birthday: <pretty_birthday("1985-04-12")>,
         note: "Line one\nline two",
         emails: [
             Labeled {
@@ -148,7 +148,7 @@ Some(
         nickname: "",
         org: "",
         title: "",
-        birthday: "Apr 12",
+        birthday: <pretty_birthday("--04-12")>,
         note: "",
         emails: [
             Labeled {
