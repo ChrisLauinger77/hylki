@@ -148,9 +148,7 @@ pub fn language_name(code: &str) -> String {
 pub fn ui_language() -> String {
     let chosen = crate::config::load_language();
     let raw = if chosen.is_empty() {
-        ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"]
-            .iter()
-            .filter_map(|k| std::env::var(k).ok())
+        crate::i18n::locale_env(true)
             .map(|v| v.split(':').next().unwrap_or_default().to_string())
             .find(|v| !v.is_empty() && v != "C" && v != "POSIX" && !v.starts_with("C."))
             .unwrap_or_else(|| "en".into())
@@ -191,14 +189,11 @@ fn service_code(service: Service, code: &str) -> String {
     match (service, code) {
         (Service::DeepL, "en") => {
             // DeepL wants the variety; the session's locale says which.
-            let british = ["LC_ALL", "LC_MESSAGES", "LANG"]
-                .iter()
-                .filter_map(|k| std::env::var(k).ok())
-                .any(|v| {
-                    ["en_GB", "en_IE", "en_AU", "en_NZ", "en_ZA", "en_IN"]
-                        .iter()
-                        .any(|p| v.starts_with(p))
-                });
+            let british = crate::i18n::locale_env(false).any(|v| {
+                ["en_GB", "en_IE", "en_AU", "en_NZ", "en_ZA", "en_IN"]
+                    .iter()
+                    .any(|p| v.starts_with(p))
+            });
             if british { "EN-GB" } else { "EN-US" }.into()
         }
         (Service::DeepL, _) => code.to_uppercase(),

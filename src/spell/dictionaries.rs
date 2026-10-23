@@ -15,9 +15,7 @@ pub fn system_spell_languages() -> Vec<String> {
 
 /// The session locale as a dictionary-style code ("en_US.UTF-8" → "en_US").
 fn locale_language() -> Option<String> {
-    ["LC_ALL", "LC_MESSAGES", "LANG"]
-        .iter()
-        .filter_map(|v| std::env::var(v).ok())
+    crate::i18n::locale_env(false)
         .map(|l| l.split('.').next().unwrap_or_default().to_string())
         .find(|l| !l.is_empty() && l != "C" && l != "POSIX")
 }
