@@ -18,7 +18,7 @@ use super::types::FolderMessages;
 /// Gmail files one message under every label it carries, so an archived mail
 /// sits in All Mail and its labels, and an inbox one in INBOX and All Mail
 /// too (#472). Each mail is kept once, from the folder `rank` puts first.
-pub(super) fn build_search_pool<'a>(
+fn build_search_pool<'a>(
     lists: impl IntoIterator<Item = &'a Vec<Message>>,
     rank: impl Fn(&Message) -> u8,
 ) -> Vec<Message> {
@@ -51,7 +51,7 @@ pub(super) fn build_search_pool<'a>(
 /// first: the inbox's, then a folder of its own, then the folders that
 /// gather everything (Gmail's All Mail and Starred), and Trash and Junk last,
 /// which "All folders" leaves out.
-pub(super) fn pool_rank(kind: Option<FolderKind>) -> u8 {
+fn pool_rank(kind: Option<FolderKind>) -> u8 {
     match kind {
         Some(FolderKind::Inbox) => 0,
         Some(FolderKind::Archive | FolderKind::Starred) => 2,
@@ -77,7 +77,7 @@ impl AppModel {
     /// [`AppMsg::SearchPoolBuilt`]. Copying a mailbox's messages took the
     /// main loop for a good part of a second as a search began (#515), so
     /// the folders go to another thread shared, not copied.
-    pub(super) fn build_search_pool(
+    fn build_search_pool(
         &self,
         gen: u64,
         from_disk: Vec<Vec<Message>>,
@@ -116,7 +116,7 @@ impl AppModel {
     /// background index keeps every folder whole, and hand them to the
     /// search with [`AppMsg::SearchPoolLoaded`] (#472). Gmail's All Mail is
     /// the one archived mail lives in, and it is rarely opened.
-    pub(super) fn load_search_pool(&self, sender: &ComponentSender<Self>) {
+    fn load_search_pool(&self, sender: &ComponentSender<Self>) {
         let gen = self.search_gen;
         if self.cache.is_none() {
             self.build_search_pool(gen, Vec::new(), sender);

@@ -105,7 +105,7 @@ impl AppModel {
     }
 
     /// Open a unified view, narrowed to one account when `account` names one.
-    pub(super) fn open_unified_in(
+    fn open_unified_in(
         &mut self,
         view: UnifiedView,
         account: Option<u32>,

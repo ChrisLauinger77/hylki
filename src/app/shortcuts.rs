@@ -26,7 +26,7 @@ use super::undo::{FlagChange, FlagKind, FlagRef, UndoStep};
 
 impl AppModel {
     /// Carry out a single-key shortcut.
-    pub(super) fn run_shortcut(&mut self, action: Shortcut, sender: &ComponentSender<Self>) {
+    fn run_shortcut(&mut self, action: Shortcut, sender: &ComponentSender<Self>) {
         // Contacts covers the list and the reader: a key there must not
         // act on mail out of sight, Delete outside its list above all.
         if self.showing_contacts && action.acts_on_selection() {
@@ -358,7 +358,7 @@ impl AppModel {
 
     /// Open the keyboard-shortcut reference, or close it if it is already up:
     /// the key that summons a cheatsheet is the obvious one to dismiss it with.
-    pub(super) fn show_shortcuts(&mut self) {
+    fn show_shortcuts(&mut self) {
         if let Some(win) = self.shortcuts_win.take() {
             if win.is_visible() {
                 win.close();

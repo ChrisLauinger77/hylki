@@ -40,7 +40,7 @@ pub(super) fn same_mail(a: &Message, b: &Message) -> bool {
 /// The copy from the folder the reader is showing wins, so the "from folder X"
 /// label and the actions on a message refer to the mail actually on screen. A
 /// message with no Message-ID can't be matched this way and is left alone.
-pub(super) fn dedupe_label_copies(
+fn dedupe_label_copies(
     messages: Vec<Message>,
     conv: &[Message],
     shown_folder: u32,
@@ -68,7 +68,7 @@ pub(super) fn dedupe_label_copies(
 
 /// A conversation member still waiting for its body:
 /// `(account_id, message_id, uid, folder_path)`.
-pub(super) type MissingBody = (u32, u32, u32, String);
+type MissingBody = (u32, u32, u32, String);
 
 /// One `LoadBodies` request: the `(account_id, folder_path)` it goes to, and the
 /// `(message_id, uid)` of every member it covers.
@@ -82,7 +82,7 @@ type BodyBatch = ((u32, String), Vec<(u32, u32)>);
 /// batch and renders first — and a conversation that spans folders (or, in the
 /// unified inbox, accounts) splits into one batch per folder rather than losing
 /// the members that don't fit the first one.
-pub(super) fn batch_bodies_by_folder(to_load: Vec<MissingBody>) -> Vec<BodyBatch> {
+fn batch_bodies_by_folder(to_load: Vec<MissingBody>) -> Vec<BodyBatch> {
     let mut batches: Vec<BodyBatch> = Vec::new();
     for (account_id, message_id, uid, path) in to_load {
         match batches
@@ -152,7 +152,7 @@ pub(super) const THREAD_BODY_WAIT: std::time::Duration = std::time::Duration::fr
 /// at all. They matter for the join that runs through a message that isn't
 /// shown, most often your own reply in Sent. The newest are kept, since that is
 /// where the mail being read lives.
-pub(super) const THREAD_LINK_LIMIT: usize = 20_000;
+const THREAD_LINK_LIMIT: usize = 20_000;
 
 /// How many carried-over bodies to hold before giving up on them. They are
 /// meant to be claimed by the very next reload; a build-up means the reloads

@@ -41,7 +41,7 @@ pub(super) fn apply_folder_roles(
 /// still has it, else the Sent folder, else nowhere. A choice whose folder was
 /// renamed or removed server-side falls back rather than appending into a
 /// mailbox the server would have to create under an old name.
-pub(super) fn pick_sent_copy(chosen: Option<&str>, folders: &[Folder]) -> Option<String> {
+fn pick_sent_copy(chosen: Option<&str>, folders: &[Folder]) -> Option<String> {
     chosen
         .filter(|path| folders.iter().any(|f| f.path == *path))
         .map(str::to_string)
@@ -98,13 +98,7 @@ pub(super) fn same_folder_list(old: &[Folder], new: &[Folder]) -> bool {
 /// A sidebar key ("email\tpath", `key_prefix` being "email\t") after the
 /// folder `path` became `new_path`: the folder's own key and its children's
 /// follow it, any other key is left alone.
-pub(super) fn rekey_folder_key(
-    key: &mut String,
-    key_prefix: &str,
-    path: &str,
-    new_path: &str,
-    delim: char,
-) {
+fn rekey_folder_key(key: &mut String, key_prefix: &str, path: &str, new_path: &str, delim: char) {
     let Some(rest) = key.strip_prefix(key_prefix) else {
         return;
     };

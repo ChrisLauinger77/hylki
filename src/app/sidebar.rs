@@ -92,7 +92,7 @@ impl AppModel {
     /// Keep a run of sibling folders in its new order. The run goes to the
     /// end of the list; only the order within a run counts, so the others
     /// stand as they were.
-    pub(super) fn keep_folder_order(&mut self, account_id: u32, paths: &[String]) {
+    fn keep_folder_order(&mut self, account_id: u32, paths: &[String]) {
         self.store_folder_order(account_id, paths);
         self.save_sidebar_state();
         self.rebuild_sidebar();
@@ -119,7 +119,7 @@ impl AppModel {
     }
 
     /// An account's folders in the order the sidebar shows them.
-    pub(super) fn shown_folders(&self, account_id: u32) -> Vec<Folder> {
+    fn shown_folders(&self, account_id: u32) -> Vec<Folder> {
         let prefix = self
             .email_of(account_id)
             .map(|e| format!("{e}\t"))
@@ -139,11 +139,7 @@ impl AppModel {
     /// Give an account its own folder order (`None` follows Settings), in
     /// the file and in the Settings window's copy of the account, which
     /// would otherwise put the old one back when its editor is saved.
-    pub(super) fn set_account_folder_sort(
-        &mut self,
-        account_id: u32,
-        sort: Option<config::FolderSort>,
-    ) {
+    fn set_account_folder_sort(&mut self, account_id: u32, sort: Option<config::FolderSort>) {
         let demo = self.config.is_empty() && demo_mode();
         let accounts = if demo {
             &mut self.demo_config
@@ -174,7 +170,7 @@ impl AppModel {
     /// Dragging a custom folder is arranging them by hand, so an account
     /// sorted another way switches to Custom Order, every custom folder kept
     /// first where the old sort showed it: only the dragged one moves.
-    pub(super) fn adopt_custom_order(&mut self, account_id: u32) {
+    fn adopt_custom_order(&mut self, account_id: u32) {
         if self.folder_sort_of(account_id) == config::FolderSort::Custom {
             return;
         }

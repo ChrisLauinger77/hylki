@@ -16,7 +16,7 @@ use super::theme::{apply_app_theme, apply_icon_theme, refresh_scheme_css};
 impl AppModel {
     /// Push the date and clock preference into the formatter and redraw whatever
     /// shows a date: every row carries one, as does the open message.
-    pub(super) fn apply_date_style(&self) {
+    fn apply_date_style(&self) {
         crate::datefmt::set_style(self.date_style, self.clock_style);
         self.message_list.emit(MessageListInput::RefreshDates);
         let current = self.current.clone();

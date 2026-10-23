@@ -15,7 +15,7 @@ use super::types::UnifiedView;
 
 /// A unified view, and the account it is narrowed to, as one number: the
 /// key the message list keeps it under.
-pub(super) fn view_key_of(view: UnifiedView, account: Option<u32>) -> u64 {
+fn view_key_of(view: UnifiedView, account: Option<u32>) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     format!("{view:?}{account:?}").hash(&mut h);
@@ -25,7 +25,7 @@ pub(super) fn view_key_of(view: UnifiedView, account: Option<u32>) -> u64 {
 /// What a list holds, as one number: every message's place, state and
 /// tags, whatever order they come in. A few milliseconds for tens of
 /// thousands of messages, against a merge and a regrouping many times that.
-pub(super) fn content_fp<'a>(msgs: impl Iterator<Item = &'a Message>) -> u64 {
+fn content_fp<'a>(msgs: impl Iterator<Item = &'a Message>) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut sum = 0u64;
     let mut n = 0u64;
@@ -54,7 +54,7 @@ pub(super) const LIST_NEWEST: usize = 300;
 
 /// How long after an account's folders arrive the unified rows' folders are
 /// read into memory: past the start's own rush of work.
-pub(super) const PRELOAD_AFTER_SECS: u32 = 5;
+const PRELOAD_AFTER_SECS: u32 = 5;
 
 impl AppModel {
     /// Merge the unified view's slices for the list shortly (and hand it the
@@ -82,7 +82,7 @@ impl AppModel {
 
     /// `PrebuildViews` shortly, once for however many folder reads land
     /// meanwhile.
-    pub(super) fn schedule_prebuild(&mut self, sender: &ComponentSender<Self>) {
+    fn schedule_prebuild(&mut self, sender: &ComponentSender<Self>) {
         if std::mem::replace(&mut self.prebuild_due, true) {
             return;
         }
@@ -95,7 +95,7 @@ impl AppModel {
     /// Hand the message list the next unified row to build ahead: one whose
     /// folders are all in memory, not on show, and not kept as it is. The
     /// next follows a moment later, so the window keeps drawing between.
-    pub(super) fn prebuild_next(&mut self, sender: &ComponentSender<Self>) {
+    fn prebuild_next(&mut self, sender: &ComponentSender<Self>) {
         while let Some(view) = self.prebuild_queue.pop() {
             let UnifiedView::Kind(kind) = view else {
                 continue;
@@ -160,7 +160,7 @@ impl AppModel {
     /// section) into memory off the main thread, those not there yet. The
     /// first visit to a row after a start then opens from memory as later
     /// ones do; the folders were going to be held from that visit on anyway.
-    pub(super) fn preload(&mut self, sender: &ComponentSender<Self>) {
+    fn preload(&mut self, sender: &ComponentSender<Self>) {
         if self.cache.is_none() || demo_mode() && self.config.is_empty() {
             return;
         }

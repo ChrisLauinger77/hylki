@@ -136,7 +136,7 @@ pub(super) struct UndoEntry {
 /// than waiting for the server (#200). Long enough to cover "that was a
 /// mistake", short enough that the rows it puts back are still what is
 /// there — past this, another client or a sync may have moved on.
-pub(super) const INSTANT_UNDO: std::time::Duration = std::time::Duration::from_secs(10);
+const INSTANT_UNDO: std::time::Duration = std::time::Duration::from_secs(10);
 
 impl AppModel {
     /// Sets or clears one kind of flag on a message, through the setter
@@ -303,7 +303,7 @@ impl AppModel {
     /// covers the body and its attachments, and nobody writing a reply means
     /// "archive that message again" by Ctrl+Z. The menu entries follow the
     /// same rule, so what they say is always what the key would do.
-    pub(super) fn undo_redo(&mut self, redo: bool) {
+    fn undo_redo(&mut self, redo: bool) {
         if let Some(compose) = self.menu_compose() {
             compose.controller.emit(ComposeInput::History { redo });
             return;

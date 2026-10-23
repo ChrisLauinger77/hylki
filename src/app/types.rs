@@ -6,7 +6,7 @@ use crate::models::{FolderKind, Message};
 /// not copied, with a search pool being put together on another thread
 /// (#515). A change copies the folder only while such a pool still holds it.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct FolderMessages(std::sync::Arc<Vec<Message>>);
+pub(super) struct FolderMessages(std::sync::Arc<Vec<Message>>);
 
 impl std::ops::Deref for FolderMessages {
     type Target = Vec<Message>;

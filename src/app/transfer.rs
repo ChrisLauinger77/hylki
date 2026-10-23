@@ -188,7 +188,7 @@ impl AppModel {
     }
 
     /// A message is stored in its new account: take the original out.
-    pub(super) fn transfer_landed(&mut self, token: u64) {
+    fn transfer_landed(&mut self, token: u64) {
         let Some(t) = self.transfers.remove(&token) else {
             return;
         };
@@ -223,7 +223,7 @@ impl AppModel {
 
     /// A message could not be copied across: it stays where it was, and
     /// comes back on its folder's list.
-    pub(super) fn transfer_failed(&mut self, token: u64, error: String) {
+    fn transfer_failed(&mut self, token: u64, error: String) {
         let Some(t) = self.transfers.remove(&token) else {
             return;
         };

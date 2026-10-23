@@ -46,7 +46,7 @@ impl AppModel {
     }
 
     /// One of a card's invitation buttons (#223).
-    pub(super) fn invite_action(
+    fn invite_action(
         &mut self,
         message: Message,
         invite: crate::models::Invite,

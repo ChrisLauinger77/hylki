@@ -15,13 +15,13 @@ use super::release_notes::release_notes_page;
 /// person per line, `Display Name <github-handle>`, with a translator's
 /// languages after a dash. What each person contributed is credited in
 /// `docs/CREDITS.md` and the changelog, not in the files.
-pub(super) const CONTRIBUTORS: &str = include_str!("../../data/CONTRIBUTORS");
-pub(super) const TRANSLATORS: &str = include_str!("../../data/TRANSLATORS");
+const CONTRIBUTORS: &str = include_str!("../../data/CONTRIBUTORS");
+const TRANSLATORS: &str = include_str!("../../data/TRANSLATORS");
 
 /// One of those files as (display name, GitHub handle, note) rows. Comments,
 /// blank lines and any line without a handle are skipped, so a typo in the
 /// file costs that one row rather than the list.
-pub(super) fn credits(file: &'static str) -> Vec<(&'static str, &'static str, &'static str)> {
+fn credits(file: &'static str) -> Vec<(&'static str, &'static str, &'static str)> {
     file.lines()
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
@@ -243,7 +243,7 @@ impl AppModel {
     /// A custom, scrollable About window: app identity up top (icon, name, a
     /// version chip, and a one-line description under it), then the feature
     /// sections laid out on the page itself, and project links.
-    pub(super) fn open_about(&self, sender: &ComponentSender<Self>) {
+    fn open_about(&self, sender: &ComponentSender<Self>) {
         let win = adw::Window::builder()
             .transient_for(&self.window)
             .modal(false)

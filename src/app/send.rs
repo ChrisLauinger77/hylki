@@ -66,7 +66,7 @@ impl AppModel {
     /// Send's first stop (#434): the message waits out the Undo Send delay
     /// with Undo on offer in a toast, listed in the Outbox, then goes to its
     /// worker.
-    pub(super) fn queue_send(
+    fn queue_send(
         &mut self,
         origin: crate::outgoing::Origin,
         out: Box<OutgoingMessage>,
@@ -169,7 +169,7 @@ impl AppModel {
     }
 
     /// The send was undone, or failed: its early marks come off.
-    pub(super) fn unmark_answered(&mut self, ticket: u64) {
+    fn unmark_answered(&mut self, ticket: u64) {
         for (account_id, fid, uid, forwarded) in
             self.pending_answers.remove(&ticket).unwrap_or_default()
         {

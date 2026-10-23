@@ -31,7 +31,7 @@ impl AppModel {
 
     /// Tell every reader (the main one and the pop-outs) where a card's
     /// unsubscribe request stands.
-    pub(super) fn push_unsubscribe_state(&self, key: (u32, u32), state: Option<UnsubState>) {
+    fn push_unsubscribe_state(&self, key: (u32, u32), state: Option<UnsubState>) {
         self.message_view.emit(MessageViewInput::UnsubscribeState {
             account_id: key.0,
             id: key.1,
@@ -47,7 +47,7 @@ impl AppModel {
     }
 
     /// Remember that this message's list was left, and tell the readers.
-    pub(super) fn record_unsubscribed(&mut self, message: &Message) {
+    fn record_unsubscribed(&mut self, message: &Message) {
         let Some(info) = self
             .sender_cache
             .get(&body_key(message))
@@ -151,7 +151,7 @@ impl AppModel {
 
     /// Ask before leaving a list: what will happen depends on the route the
     /// list offers, and a mail sent in the user's name is said so up front.
-    pub(super) fn confirm_unsubscribe(
+    fn confirm_unsubscribe(
         &self,
         message: Message,
         info: crate::models::Unsubscribe,
@@ -238,7 +238,7 @@ impl AppModel {
     /// Leave the list, by the best route it offers: the one-click POST
     /// (RFC 8058), falling back to its `mailto:` handle when that fails or
     /// is not there, and only then the web page in the browser.
-    pub(super) fn unsubscribe_go(
+    fn unsubscribe_go(
         &self,
         message: Message,
         info: crate::models::Unsubscribe,
@@ -319,7 +319,7 @@ impl AppModel {
     /// through the account the message arrived in (as the alias it was
     /// addressed to, when it was one). No copy is filed in Sent. A send that
     /// fails is reported and queued in the Outbox like any other.
-    pub(super) fn unsubscribe_by_mail(
+    fn unsubscribe_by_mail(
         &self,
         message: Message,
         info: &crate::models::Unsubscribe,

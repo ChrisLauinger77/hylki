@@ -21,7 +21,7 @@ pub(super) const SMART_VIEW_LIMIT: usize = 5000;
 
 /// What a smart folder's conditions need besides the message itself, made
 /// on the main thread and taken to the one that reads the index.
-pub(super) struct SmartContext {
+struct SmartContext {
     /// The tags' keywords, lower case.
     pub(super) tags: Vec<String>,
     /// The tags themselves, for the Gmail labels that stand for them (#374).
@@ -65,7 +65,7 @@ impl SmartContext {
 type SmartScope = Vec<(u32, Option<Vec<String>>, Vec<String>)>;
 
 impl AppModel {
-    pub(super) fn open_smart_folder(&self) -> Option<&config::SmartFolder> {
+    fn open_smart_folder(&self) -> Option<&config::SmartFolder> {
         let id = self.smart_view.as_ref()?;
         self.smart_folders.iter().find(|f| &f.id == id)
     }
@@ -238,7 +238,7 @@ impl AppModel {
 
     /// A smart folder from its rows: newest first, Gmail's per-label copies
     /// of one message as one row, the inbox copy where there is one.
-    pub(super) fn assemble_smart_view(
+    fn assemble_smart_view(
         &self,
         folder: &config::SmartFolder,
         rows: Vec<(u32, String, Message)>,
@@ -283,7 +283,7 @@ impl AppModel {
 
     /// Each smart folder's unread mail for its sidebar row, read off the
     /// main thread: only the unread rows are looked at.
-    pub(super) fn count_smart_folders(&mut self, sender: &ComponentSender<Self>) {
+    fn count_smart_folders(&mut self, sender: &ComponentSender<Self>) {
         if self.smart_counts_running {
             // A count in flight answers for what it read; this one comes
             // after it.

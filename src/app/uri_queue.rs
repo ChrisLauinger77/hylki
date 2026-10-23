@@ -32,10 +32,9 @@ pub(crate) fn queue_mailto(uri: String) {
 /// A `mailto:` handed to the app before its component was up. `queue_mailto`
 /// runs on GApplication's `open` signal, which can fire before `AppModel::init`
 /// installs the sender — anything early waits here and is drained by init.
-pub(super) static MAILTO_PENDING: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+static MAILTO_PENDING: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
-pub(super) static MAILTO_SENDER: std::sync::OnceLock<relm4::Sender<AppMsg>> =
-    std::sync::OnceLock::new();
+static MAILTO_SENDER: std::sync::OnceLock<relm4::Sender<AppMsg>> = std::sync::OnceLock::new();
 
 /// Turn a `mailto:` URI into a composer prefill (RFC 6068: address part plus
 /// to/cc/bcc/subject/body query keys, all percent-encoded).
@@ -143,12 +142,12 @@ pub(crate) fn queue_mid(uri: String) {
 }
 
 /// `mid:` links that arrived before the component was up (see `MAILTO_PENDING`).
-pub(super) static MID_PENDING: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+static MID_PENDING: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
 /// The Message-ID a `mid:` URI (RFC 2392) names, normalized the way the cache
 /// stores them: percent-decoded, angle brackets and whitespace stripped,
 /// lowercased, and without any `/cid` part. `None` for anything else.
-pub(super) fn parse_mid(uri: &str) -> Option<String> {
+fn parse_mid(uri: &str) -> Option<String> {
     let rest = uri
         .strip_prefix("mid:")
         .or_else(|| uri.strip_prefix("MID:"))?;
@@ -179,8 +178,7 @@ pub(crate) fn queue_message_file(path: std::path::PathBuf) {
 }
 
 /// Message files that arrived before the component was up (see `MAILTO_PENDING`).
-pub(super) static FILE_PENDING: std::sync::Mutex<Vec<std::path::PathBuf>> =
-    std::sync::Mutex::new(Vec::new());
+static FILE_PENDING: std::sync::Mutex<Vec<std::path::PathBuf>> = std::sync::Mutex::new(Vec::new());
 
 /// Whether a file handed in is a message to read rather than one to attach:
 /// a `.eml`, the usual name for a message saved whole, or Outlook's `.msg`
@@ -224,7 +222,7 @@ pub(crate) fn queue_attach_files(paths: Vec<std::path::PathBuf>) {
 /// Files handed in (via `connect_open`) before the app's component was up —
 /// same early-arrival race as `MAILTO_PENDING`, queued separately since each
 /// batch opens its own composer.
-pub(super) static ATTACH_PENDING: std::sync::Mutex<Vec<Vec<std::path::PathBuf>>> =
+static ATTACH_PENDING: std::sync::Mutex<Vec<Vec<std::path::PathBuf>>> =
     std::sync::Mutex::new(Vec::new());
 
 impl AppModel {
@@ -253,7 +251,7 @@ impl AppModel {
     }
 
     /// Pick a message file to read (#398).
-    pub(super) fn pick_message_file(&self, sender: &ComponentSender<Self>) {
+    fn pick_message_file(&self, sender: &ComponentSender<Self>) {
         let dialog = gtk::FileDialog::new();
         dialog.set_title(&i18n("Open Message File"));
         let filter = gtk::FileFilter::new();
@@ -280,11 +278,7 @@ impl AppModel {
     /// Read a message file in a window of its own (#398), rendered as the
     /// reader renders mail from a server. It belongs to the account in view,
     /// which is where Reply and Forward send from, and to no folder.
-    pub(super) fn open_message_file(
-        &mut self,
-        path: &std::path::Path,
-        sender: &ComponentSender<Self>,
-    ) {
+    fn open_message_file(&mut self, path: &std::path::Path, sender: &ComponentSender<Self>) {
         // An Outlook .msg is turned into a message first (see outlook_msg).
         let read = std::fs::read(path).and_then(|bytes| {
             let outlook = path

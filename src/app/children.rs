@@ -22,7 +22,7 @@ use super::msg::AppMsg;
 use super::types::UnifiedView;
 
 /// What the message list reports, as the message it means here.
-pub(super) fn message_list_output_msg(out: MessageListOutput) -> AppMsg {
+fn message_list_output_msg(out: MessageListOutput) -> AppMsg {
     match out {
         MessageListOutput::Selected {
             message,
@@ -104,7 +104,7 @@ pub(super) fn message_list_output_msg(out: MessageListOutput) -> AppMsg {
 }
 
 /// What the message view reports, as the message it means here.
-pub(super) fn message_view_output_msg(out: MessageViewOutput) -> AppMsg {
+fn message_view_output_msg(out: MessageViewOutput) -> AppMsg {
     match out {
         MessageViewOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
         MessageViewOutput::SetRemote {
@@ -170,9 +170,7 @@ pub(super) fn message_view_output_msg(out: MessageViewOutput) -> AppMsg {
 }
 
 /// What the attachment drawer reports, as the message it means here.
-pub(super) fn attachment_drawer_output_msg(
-    out: crate::ui::attachment_drawer::DrawerOutput,
-) -> AppMsg {
+fn attachment_drawer_output_msg(out: crate::ui::attachment_drawer::DrawerOutput) -> AppMsg {
     match out {
         crate::ui::attachment_drawer::DrawerOutput::ShowLightbox { items, start } => {
             AppMsg::ShowLightbox { items, start }
@@ -187,7 +185,7 @@ pub(super) fn attachment_drawer_output_msg(
 }
 
 /// What the gallery reports, as the message it means here.
-pub(super) fn gallery_output_msg(out: GalleryOutput) -> AppMsg {
+fn gallery_output_msg(out: GalleryOutput) -> AppMsg {
     match out {
         GalleryOutput::OpenMessage {
             account_id,
@@ -226,7 +224,7 @@ pub(super) fn gallery_output_msg(out: GalleryOutput) -> AppMsg {
 }
 
 /// What the contacts page reports, as the message it means here.
-pub(super) fn contacts_page_output_msg(out: ContactsPageOutput) -> AppMsg {
+fn contacts_page_output_msg(out: ContactsPageOutput) -> AppMsg {
     match out {
         ContactsPageOutput::Compose(email) => AppMsg::ComposeTo(email),
         ContactsPageOutput::ComposeBcc(field) => AppMsg::ComposeBcc(field),
@@ -282,7 +280,7 @@ pub(super) fn contacts_page_output_msg(out: ContactsPageOutput) -> AppMsg {
 }
 
 /// What the notifications reports, as the message it means here.
-pub(super) fn notifications_output_msg(out: NotifyOutput) -> AppMsg {
+fn notifications_output_msg(out: NotifyOutput) -> AppMsg {
     match out {
         NotifyOutput::CountChanged(n) => AppMsg::NotifyCount(n),
         NotifyOutput::ExportLog => AppMsg::Pref(PrefOutput::ExportLog),

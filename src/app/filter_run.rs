@@ -14,11 +14,11 @@ use super::msg::AppMsg;
 /// How long a manual "Apply Filters" run (#198) waits for the folders it asked
 /// for before reporting on whatever came back. A folder that is offline, or
 /// that errors, would otherwise leave the run without an answer for good.
-pub(super) const FILTER_RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
+const FILTER_RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
 
 /// The one response of the manual run's progress dialog: "Run in Background"
 /// while it works, "Close" once it holds the report.
-pub(super) const FILTER_RUN_RESPONSE: &str = "close";
+const FILTER_RUN_RESPONSE: &str = "close";
 
 /// What the rules did in one folder of a manual run.
 #[derive(Default, Clone, Copy)]
@@ -284,7 +284,7 @@ impl AppModel {
     }
 
     /// One folder of a manual run has been to the server and back.
-    pub(super) fn filter_run_folder_synced(&mut self, account_id: u32, folder_id: u32) {
+    fn filter_run_folder_synced(&mut self, account_id: u32, folder_id: u32) {
         let Some(run) = self.filter_run.as_mut() else {
             return;
         };
@@ -302,7 +302,7 @@ impl AppModel {
     /// means "carry on without me", and the report will go to the status bar;
     /// once it has reported, the dialog was only holding the report, so this
     /// is an ordinary close.
-    pub(super) fn filter_run_dismissed(&mut self) {
+    fn filter_run_dismissed(&mut self) {
         let Some(run) = self.filter_run.as_mut() else {
             return;
         };
@@ -318,7 +318,7 @@ impl AppModel {
     /// folders stop counting as manually swept; without it the scope stands,
     /// and the server's answer to the same load is filtered too. Reports once
     /// either way.
-    pub(super) fn report_filter_run(&mut self, end: bool) {
+    fn report_filter_run(&mut self, end: bool) {
         let Some(run) = self.filter_run.as_mut() else {
             return;
         };

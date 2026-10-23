@@ -160,7 +160,7 @@ impl AppModel {
     /// While a restart waits for the desktop to take the launcher in: a
     /// modal with a spinner, so the pause reads as progress rather than a
     /// stuck app. It has no way to close — the app quits from under it.
-    pub(super) fn show_restarting_dialog(&self) {
+    fn show_restarting_dialog(&self) {
         let dialog = adw::MessageDialog::new(
             Some(&self.icon_dialog_parent()),
             Some(i18n("Restarting Hylki").as_str()),

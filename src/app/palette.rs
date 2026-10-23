@@ -55,7 +55,7 @@ pub(super) fn keyed_item(label: &str, action: &str, accel: &str) -> gtk::gio::Me
 }
 
 /// Every shortcut with its key and description, for the reference window.
-pub(super) const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
+const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
     (
         i18n_noop("Move around"),
         &[
@@ -182,7 +182,7 @@ pub(super) const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
 
 /// Gmail's keys (#392), shown in place of the first two sections of
 /// `SHORTCUT_HELP` when Settings turns them on.
-pub(super) const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
+const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
     (
         i18n_noop("Move around"),
         &[

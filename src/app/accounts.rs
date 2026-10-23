@@ -21,7 +21,7 @@ use super::theme::{apply_app_theme, WIZARD_HOLDS_LIGHT};
 /// never read those, so the account need not reconnect for them (#382). A
 /// password counts as changed unless it is the one already stored, which
 /// [`secrets_kept`] asks the keyring.
-pub(super) fn look_only_change(old: &AccountConfig, new: &AccountConfig) -> bool {
+fn look_only_change(old: &AccountConfig, new: &AccountConfig) -> bool {
     let mut probe = new.clone();
     probe.signature = old.signature.clone();
     probe.signature_html = old.signature_html;
@@ -43,7 +43,7 @@ pub(super) fn look_only_change(old: &AccountConfig, new: &AccountConfig) -> bool
 /// Whether `new` keeps the secrets of `old`. The editor hands every secret
 /// back, read from the keyring, while the config in hand may hold none:
 /// compare with what is stored. Blocking: run it on the keyring thread.
-pub(super) fn secrets_kept(old: &AccountConfig, new: &AccountConfig) -> bool {
+fn secrets_kept(old: &AccountConfig, new: &AccountConfig) -> bool {
     let kept = |new: &str, old: &str, stored: &dyn Fn() -> Option<String>| {
         new.is_empty() || new == old || stored().as_deref() == Some(new)
     };
@@ -239,7 +239,7 @@ impl AppModel {
     ///
     /// `problem` is true when this is shown because a save actually failed;
     /// false for the proactive one-time tip (which offers "Don't show again").
-    pub(super) fn show_keyring_help(&self, problem: bool) {
+    fn show_keyring_help(&self, problem: bool) {
         let mint = crate::platform::is_mint_cinnamon();
 
         let heading = if problem {

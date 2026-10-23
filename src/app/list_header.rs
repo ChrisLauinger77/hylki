@@ -17,7 +17,7 @@ use super::AppModelWidgets;
 /// out on one line, and how far back before it returns to cards (#334).
 pub(super) const LIST_WIDE_ON: i32 = 600;
 
-pub(super) const LIST_WIDE_OFF: i32 = 560;
+const LIST_WIDE_OFF: i32 = 560;
 
 /// The message list header's controls that Focus Mode folds into a ⋯ menu:
 /// each sits in a revealer so it can slide away, and the toggles are kept so
@@ -31,7 +31,7 @@ pub(super) struct ListHeaderWidgets {
 
 /// The orders the list header offers, by their keys in `SortOrder`. The
 /// column headings can set more (#443); none of these is ticked then.
-pub(super) const SORT_ORDERS: [(&str, &str); 6] = [
+const SORT_ORDERS: [(&str, &str); 6] = [
     (i18n_noop("Date (Newest first)"), "date_newest"),
     (i18n_noop("Date (Oldest first)"), "date_oldest"),
     (i18n_noop("Sender (A–Z)"), "sender"),
@@ -178,7 +178,7 @@ impl AppModel {
     /// the ⋯ in its header offers while Focus Mode has them folded away.
     /// The toggles are flipped through their own buttons, so the filtering
     /// happens where it always does.
-    pub(super) fn show_list_overflow_menu(&self, sender: &ComponentSender<Self>) {
+    fn show_list_overflow_menu(&self, sender: &ComponentSender<Self>) {
         use crate::ui::context_menu::{show_context_menu_with_header, MenuEntry};
         let Some(lh) = self.list_header_widgets.get() else {
             return;

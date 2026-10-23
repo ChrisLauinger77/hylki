@@ -16,7 +16,7 @@ use super::undo::UndoStep;
 
 impl AppModel {
     /// Prompt for a new custom folder name and create it under `account_id`.
-    pub(super) fn prompt_new_folder(&self, account_id: u32, sender: &ComponentSender<Self>) {
+    fn prompt_new_folder(&self, account_id: u32, sender: &ComponentSender<Self>) {
         let dialog = adw::MessageDialog::new(
             Some(&self.window),
             Some(i18n("New Folder").as_str()),
@@ -43,7 +43,7 @@ impl AppModel {
     }
 
     /// Prompt for a folder's new name and rename it in place.
-    pub(super) fn prompt_rename_folder(
+    fn prompt_rename_folder(
         &self,
         account_id: u32,
         name: String,
@@ -82,7 +82,7 @@ impl AppModel {
 
     /// Rename a custom folder's leaf in place: same parent, new (encoded)
     /// name, the same optimistic machinery as a drag-and-drop move.
-    pub(super) fn rename_folder_to(&mut self, account_id: u32, path: String, new_name: String) {
+    fn rename_folder_to(&mut self, account_id: u32, path: String, new_name: String) {
         let delim = self.folder_delimiter(account_id);
         let new_name = new_name.trim();
         // The path's parent (everything up to and including the last
@@ -112,7 +112,7 @@ impl AppModel {
     /// Confirm deleting a custom folder (contents moved to Trash). Deliberately
     /// outside the undo history (#200): the mailbox itself is gone from the
     /// server, so the dialog says as much instead of promising a way back.
-    pub(super) fn confirm_delete_folder(
+    fn confirm_delete_folder(
         &self,
         account_id: u32,
         name: String,
@@ -146,7 +146,7 @@ impl AppModel {
     }
 
     /// Empty Trash / Empty Junk (#152): there is no undo, so always ask.
-    pub(super) fn confirm_empty_folder(
+    fn confirm_empty_folder(
         &self,
         account_id: u32,
         folder_id: u32,
@@ -173,7 +173,7 @@ impl AppModel {
 
     /// Empty every unified account's Trash or Junk (#413). One folder asks
     /// the way its own row does; more name each account they belong to.
-    pub(super) fn confirm_empty_all(&self, kind: FolderKind, sender: &ComponentSender<Self>) {
+    fn confirm_empty_all(&self, kind: FolderKind, sender: &ComponentSender<Self>) {
         let targets: Vec<(u32, u32, String, String, String)> = self
             .accounts
             .iter()

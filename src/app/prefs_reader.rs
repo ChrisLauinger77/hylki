@@ -65,7 +65,7 @@ impl AppModel {
     }
 
     /// Hand the current reader style to the reader and every popped-out window.
-    pub(super) fn push_reader_style(&self) {
+    fn push_reader_style(&self) {
         let style = self.reader_style();
         self.message_view
             .emit(MessageViewInput::SetReaderStyle(style.clone()));
@@ -74,7 +74,7 @@ impl AppModel {
 
     /// Tell the reader how card actions should show (⋯ toggle / auto on
     /// hover / always).
-    pub(super) fn push_card_actions_mode(&self) {
+    fn push_card_actions_mode(&self) {
         self.message_view
             .emit(MessageViewInput::SetCardActionsMode {
                 hover_toggle: self.card_actions_hover,

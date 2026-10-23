@@ -20,7 +20,7 @@ use super::undo::FlagKind;
 /// cached [`Message`] (#38): the notified message may not be in the current
 /// view, but the worker upserts it into the cache before notifying, so the
 /// cache always has it.
-pub(super) fn notified_message(
+fn notified_message(
     account_id: u32,
     folder_id: u32,
     message_id: u32,

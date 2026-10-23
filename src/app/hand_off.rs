@@ -21,7 +21,7 @@ use super::prefill::reply_prefill;
 use super::AppModelWidgets;
 
 /// The handed-in files' names, joined, for a dialog.
-pub(super) fn hand_off_names(files: &[std::path::PathBuf]) -> String {
+fn hand_off_names(files: &[std::path::PathBuf]) -> String {
     files
         .iter()
         .map(|p| {
@@ -34,7 +34,7 @@ pub(super) fn hand_off_names(files: &[std::path::PathBuf]) -> String {
 }
 
 /// What the handed-in files add up to on disk.
-pub(super) fn hand_off_size(files: &[std::path::PathBuf]) -> u64 {
+fn hand_off_size(files: &[std::path::PathBuf]) -> u64 {
     files
         .iter()
         .filter_map(|p| std::fs::metadata(p).ok())
@@ -44,7 +44,7 @@ pub(super) fn hand_off_size(files: &[std::path::PathBuf]) -> u64 {
 
 /// The "remember this" check a hand-off dialog carries: on, the answer
 /// becomes the Settings → System → GNOME Files preference.
-pub(super) fn remember_check() -> gtk::CheckButton {
+fn remember_check() -> gtk::CheckButton {
     let check = gtk::CheckButton::with_label(&i18n(
         "Always do this (change it in Settings → System → GNOME Files)",
     ));
@@ -55,7 +55,7 @@ pub(super) fn remember_check() -> gtk::CheckButton {
 
 /// Files dropped on the main window, for [`AppMsg::DropFiles`]. Folders
 /// are passed over: there is nothing to attach.
-pub(super) fn window_drop_target(
+fn window_drop_target(
     sender: &ComponentSender<AppModel>,
     phase: gtk::PropagationPhase,
 ) -> gtk::DropTarget {
@@ -108,7 +108,7 @@ pub(crate) enum HandOffTarget {
 /// A hand-off's files split by how the composer takes them: attached, or
 /// uploaded to cloud storage and linked (the ones over the size limit).
 #[derive(Debug, Default, Clone)]
-pub(crate) struct HandOffFiles {
+pub(super) struct HandOffFiles {
     pub(super) attach: Vec<std::path::PathBuf>,
     pub(super) cloud: Vec<std::path::PathBuf>,
 }
@@ -197,7 +197,7 @@ impl AppModel {
 
     /// Hand the current Files preferences to an open Settings window, so a
     /// "remember this" choice in a dialog shows there at once.
-    pub(super) fn push_files_prefs(&self) {
+    fn push_files_prefs(&self) {
         if let Some(p) = self.prefs.as_ref() {
             p.emit(PrefInput::SetFilesPrefs(self.files_prefs));
         }
@@ -262,7 +262,7 @@ impl AppModel {
 
     /// A destination is known: a new message goes on to the size check;
     /// a draft or reply first needs one picked.
-    pub(super) fn hand_off_action(
+    fn hand_off_action(
         &mut self,
         hand_off: FileHandOff,
         action: config::FilesAction,
@@ -318,7 +318,7 @@ impl AppModel {
 
     /// Over the size limit, with cloud storage set up: attach anyway, or
     /// upload and link, per the preference or a dialog.
-    pub(super) fn hand_off_size_check(
+    fn hand_off_size_check(
         &mut self,
         hand_off: FileHandOff,
         target: HandOffTarget,
@@ -392,7 +392,7 @@ impl AppModel {
     }
 
     /// The last step: open the composer the files were meant for.
-    pub(super) fn hand_off_open(
+    fn hand_off_open(
         &mut self,
         hand_off: FileHandOff,
         target: HandOffTarget,

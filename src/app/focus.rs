@@ -13,7 +13,7 @@ use super::model::AppModel;
 
 /// Slide a Focus Mode revealer's content away (and fade it, through the
 /// `away` class's opacity transition) or bring it back.
-pub(super) fn focus_reveal(r: &gtk::Revealer, shown: bool) {
+fn focus_reveal(r: &gtk::Revealer, shown: bool) {
     if shown {
         r.remove_css_class("away");
     } else {

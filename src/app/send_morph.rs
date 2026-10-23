@@ -203,7 +203,7 @@ impl AppModel {
 
     /// The pane could not be captured for the send morph: the composer
     /// slides away instead, and the reply joins its conversation plainly.
-    pub(super) fn send_morph_failed(&mut self) {
+    fn send_morph_failed(&mut self) {
         let Some(pending) = self.morph_pending.take() else {
             return;
         };
@@ -221,7 +221,7 @@ impl AppModel {
     /// conversation pinned in view. Once its card has settled the stage
     /// carries the editor to it. A morph ended early (another message
     /// opened, a new reply begun) leaves only the reply joining.
-    pub(super) fn send_morph_swap(&mut self) {
+    fn send_morph_swap(&mut self) {
         let Some(pending) = self.morph_pending.take() else {
             return;
         };

@@ -148,7 +148,7 @@ impl AppModel {
     /// but stay out; Gmail's per-label copies of one message collapse to one
     /// row, the inbox copy where there is one (its actions land where
     /// expected).
-    pub(super) fn assemble_tag_view(
+    fn assemble_tag_view(
         &self,
         key: &(Option<u32>, Option<String>),
         rows: Vec<(u32, String, Message)>,
@@ -240,7 +240,7 @@ impl AppModel {
     /// that are tags already, propose a name and color for each, and hand
     /// the report to the Tags page — bringing Settings back if it was closed
     /// meanwhile.
-    pub(super) fn finish_tag_scan(&mut self, sender: &ComponentSender<Self>) {
+    fn finish_tag_scan(&mut self, sender: &ComponentSender<Self>) {
         let Some(scan) = self.tag_scan.take() else {
             return;
         };

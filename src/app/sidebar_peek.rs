@@ -19,7 +19,7 @@ impl AppModel {
     /// the arrow inside the peek, clicked at a width that can host the full
     /// sidebar, persists the expanded state: drop the panel, expand the
     /// docked sidebar's rows, and save.
-    pub(super) fn pin_sidebar_from_peek(&mut self) {
+    fn pin_sidebar_from_peek(&mut self) {
         tracing::info!("peek: pinned to side-by-side");
         self.sidebar_peek = false;
         if !self.sidebar_layout_borrowed() {
@@ -50,7 +50,7 @@ impl AppModel {
     }
 
     /// Hide or show the sidebar header's title and window controls (icon rail).
-    pub(super) fn compact_sidebar_header(&self, compact: bool) {
+    fn compact_sidebar_header(&self, compact: bool) {
         if let (Some(header), Some(title), Some(menu)) = (
             self.sidebar_header.as_ref(),
             self.app_title.as_ref(),
@@ -66,7 +66,7 @@ impl AppModel {
     /// overlay mode. The docked rail is not involved: it keeps its rows,
     /// header and width throughout and stays clickable beside the panel.
     /// `animate` is advisory — libadwaita animates the overlay itself.
-    pub(super) fn set_sidebar_peek(&mut self, open: bool, animate: bool) {
+    fn set_sidebar_peek(&mut self, open: bool, animate: bool) {
         let Some(peek) = self.peek_split.clone() else {
             return;
         };
@@ -98,7 +98,7 @@ impl AppModel {
 
     /// Smoothly animate the sidebar rail between its expanded width and the
     /// narrow icon-only width by interpolating the split view's pinned width.
-    pub(super) fn animate_sidebar(&mut self, collapsing: bool) {
+    fn animate_sidebar(&mut self, collapsing: bool) {
         let Some(split) = self.sidebar_split.clone() else {
             return;
         };
@@ -148,7 +148,7 @@ impl AppModel {
     /// Whether the rail belongs on screen: the window is too narrow for the
     /// full sidebar, Focus Mode has folded it, or the user collapsed it
     /// themselves. Only the last of those is ever saved.
-    pub(super) fn rail_wanted(&self) -> bool {
+    fn rail_wanted(&self) -> bool {
         self.auto_rail
             || self.focus.active(config::FocusPart::RailSidebar)
             || self.sidebar_collapsed
@@ -159,7 +159,7 @@ impl AppModel {
     /// as the mode lasts and never the layout the user keeps. Nothing is
     /// saved while this holds, and ending the mode gives back exactly the
     /// sidebar it took over — whatever was done to it meanwhile.
-    pub(super) fn sidebar_layout_borrowed(&self) -> bool {
+    fn sidebar_layout_borrowed(&self) -> bool {
         self.focus.active(config::FocusPart::RailSidebar)
     }
 

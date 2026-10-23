@@ -20,7 +20,7 @@ use super::picker::show_message_picker;
 impl AppModel {
     /// New Message from Template (#360): every template the app knows, to
     /// start a message from.
-    pub(super) fn show_template_picker(&self, sender: &ComponentSender<Self>) {
+    fn show_template_picker(&self, sender: &ComponentSender<Self>) {
         let mut templates = Vec::new();
         for (account_id, folder) in self.templates_folders() {
             let list = self.listed_or_cached(account_id, &folder);
@@ -42,7 +42,7 @@ impl AppModel {
     }
 
     /// Each account's Templates folder (#360), in account order.
-    pub(super) fn templates_folders(&self) -> Vec<(u32, Folder)> {
+    fn templates_folders(&self) -> Vec<(u32, Folder)> {
         self.folders_of_kind(FolderKind::Templates)
     }
 

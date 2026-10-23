@@ -254,7 +254,7 @@ impl AppModel {
 
     /// Promote the reader's inline pane to a window, or collapse a window back
     /// inline — reparenting the live pane so the editor state survives the move.
-    pub(super) fn toggle_compose_window(&mut self, id: u32, sender: &ComponentSender<Self>) {
+    fn toggle_compose_window(&mut self, id: u32, sender: &ComponentSender<Self>) {
         let Some(mut r) = self.reader_compose.take() else {
             return;
         };

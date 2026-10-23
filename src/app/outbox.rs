@@ -63,7 +63,7 @@ impl AppModel {
 
     /// The ticket of the message on its way out behind an Outbox row, while
     /// Undo can still take it back.
-    pub(super) fn outgoing_ticket(&self, row: u32) -> Option<u64> {
+    fn outgoing_ticket(&self, row: u32) -> Option<u64> {
         self.outgoing
             .borrow()
             .iter()
@@ -140,12 +140,7 @@ impl AppModel {
     /// copy of the message. Attachments are written to a private temp directory,
     /// because the composer attaches files by path and the originals are long
     /// gone (under Flatpak the portal's paths expire).
-    pub(super) fn compose_from_outbox(
-        &mut self,
-        account_id: u32,
-        id: u32,
-        sender: &ComponentSender<Self>,
-    ) {
+    fn compose_from_outbox(&mut self, account_id: u32, id: u32, sender: &ComponentSender<Self>) {
         let Some(item) = self
             .outbox_by_account
             .get(&account_id)

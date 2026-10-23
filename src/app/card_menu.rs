@@ -150,7 +150,7 @@ fn source_entries(
 impl AppModel {
     /// The menu a right-click on a reader card opens (the message list
     /// row's menu, for that one message), anchored on the window at (x, y).
-    pub(super) fn show_card_menu(
+    fn show_card_menu(
         &self,
         m: Message,
         x: f64,

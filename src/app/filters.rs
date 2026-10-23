@@ -12,7 +12,7 @@ use super::msg::AppMsg;
 /// The rules among `rules` that match `m`, as indexes in order. The list
 /// rarely carries a body (the demo's does); the preview is what a sync
 /// brings for every message, so it stands in for an empty body.
-pub(super) fn rules_matching(
+fn rules_matching(
     rules: &[&config::FilterRule],
     m: &Message,
     body_hits: &[String],

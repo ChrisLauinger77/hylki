@@ -14,14 +14,14 @@ use super::AppModelWidgets;
 
 /// Largest cached attachment whose bytes ride along with a gallery page, so a
 /// thumbnail or preview is instant. Anything bigger is fetched when opened.
-pub(super) const GALLERY_DATA_CAP: i64 = 6 * 1024 * 1024;
+const GALLERY_DATA_CAP: i64 = 6 * 1024 * 1024;
 
 impl AppModel {
     /// Set the attachment scan going over every folder in the gallery's scope,
     /// newest mail first. One chunk per folder per pass; each answer asks for
     /// the next, so the archive fills in behind the user while they browse and
     /// stops as soon as a folder is fully described.
-    pub(super) fn start_attachment_scan(&self) {
+    fn start_attachment_scan(&self) {
         let folders: Vec<(u32, String)> = self
             .gallery_scope()
             .iter()
@@ -40,7 +40,7 @@ impl AppModel {
     /// The accounts and folders the attachments gallery may draw on: every
     /// folder the cache's gallery query can return, which is all of them bar
     /// Drafts, Junk and Trash. The folders are already in sidebar order.
-    pub(super) fn gallery_scope(&self) -> Vec<GalleryAccount> {
+    fn gallery_scope(&self) -> Vec<GalleryAccount> {
         self.accounts
             .iter()
             .map(|a| GalleryAccount {

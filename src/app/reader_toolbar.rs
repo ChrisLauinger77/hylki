@@ -18,7 +18,7 @@ use super::AppModelWidgets;
 /// into the overflow menu. Normally the threshold is *measured* at startup from the
 /// real row (see the breakpoint in init) so it tracks the user's decoration
 /// layout; this value only stands in if that measurement comes back empty.
-pub(super) const READER_ACTIONS_BREAKPOINT: f64 = 490.0;
+const READER_ACTIONS_BREAKPOINT: f64 = 490.0;
 
 /// The reader header's action buttons and fold breakpoint, kept for
 /// re-packing when the layout changes (see relayout_reader_toolbar).
@@ -106,7 +106,7 @@ impl AppModel {
     /// The collapsed reader header's overflow menu: the right group of the
     /// toolbar (Tags, Read/Unread, Spam, Move To, Find, Print), same icons,
     /// enabled under the same conditions. The left group never folds.
-    pub(super) fn show_reader_overflow_menu(&self, sender: &ComponentSender<Self>) {
+    fn show_reader_overflow_menu(&self, sender: &ComponentSender<Self>) {
         let has_current = self.current.is_some();
         let focus = self.focus.active(config::FocusPart::ReaderToolbar);
         let sections = if self.showing_outbox {
@@ -416,7 +416,7 @@ impl AppModel {
     /// row's fixed cost, the window controls, and one button's worth per
     /// shown item (hidden-for-now buttons like Tags without tags count too —
     /// that slack keeps the fold a step ahead of a squeeze).
-    pub(super) fn refresh_reader_breakpoint(&self) {
+    fn refresh_reader_breakpoint(&self) {
         let Some(tb) = self.reader_toolbar_widgets.get() else {
             return;
         };

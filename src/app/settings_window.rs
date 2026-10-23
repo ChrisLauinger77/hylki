@@ -31,11 +31,7 @@ impl AppModel {
     /// kept for the life of the app once built: `open_settings_window`
     /// presents it, and closing it hides it, so opening never waits on
     /// hundreds of rows being built and laid out again.
-    pub(super) fn build_settings_window(
-        &mut self,
-        sender: &ComponentSender<Self>,
-        on_accounts: bool,
-    ) {
+    fn build_settings_window(&mut self, sender: &ComponentSender<Self>, on_accounts: bool) {
         let t_open = std::time::Instant::now();
         // Pass accounts in display order. Passwords stay in the keyring until
         // an account's editor opens (the panel fetches them then, off the

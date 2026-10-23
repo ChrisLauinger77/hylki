@@ -26,7 +26,7 @@ use super::palette::palette_key;
 /// hid the From row entirely.
 /// The demo's stand-in accounts count here too, so a demo reply
 /// carries a signature like a real one.
-pub(super) fn compose_identities(
+fn compose_identities(
     account_order: &[String],
     config: &[AccountConfig],
     server_identities: &HashMap<u32, Vec<(String, String)>>,
@@ -153,7 +153,7 @@ fn account_identities(
 ///
 /// Returns the index into `accounts`; a `+tag` reply also sets
 /// `prefill.custom_from`.
-pub(super) fn choose_identity(
+fn choose_identity(
     accounts: &[ComposeAccount],
     account_id: u32,
     prefill: &mut ComposePrefill,
