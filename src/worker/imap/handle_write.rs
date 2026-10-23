@@ -17,11 +17,10 @@ use crate::worker::imap::mutate::{
     move_messages, purge_messages, rename_folder, store_flag, store_keyword,
 };
 use crate::worker::imap::retry::load_messages_retry;
-use crate::worker::imap::strip_attachment::{
-    cache_rewritten, strip_imap_attachment, strip_refused,
-};
+use crate::worker::imap::strip_attachment::strip_imap_attachment;
 use crate::worker::imap::summary::message_id_of;
 use crate::worker::imap::wire::{append_msg, search_uids, sel, uid_set};
+use crate::worker::strip::{cache_rewritten, strip_refused};
 use crate::worker::{has_gmail_labels, WorkerEvent};
 
 impl<E: Emit> ImapWorker<E> {

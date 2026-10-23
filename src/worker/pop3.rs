@@ -11,12 +11,12 @@ use crate::worker::auth::sign_in_password;
 use crate::worker::compose::build::restore_msgid_case;
 use crate::worker::ids::hash_uid;
 use crate::worker::imap::send::{flush_outbox, mark_answered};
-use crate::worker::imap::strip_attachment::strip_refused;
 use crate::worker::outbox::{delete_queued, drop_superseded_outbox, emit_outbox, send_failed};
 use crate::worker::pop3::client::Pop3;
 use crate::worker::render::attachments::{attachments_of, extract_attachments};
 use crate::worker::render::body_cacheable;
 use crate::worker::smtp::{send_smtp, smtp_refused};
+use crate::worker::strip::strip_refused;
 use crate::worker::{accent_for, render_raw, summary_from_raw, MailRequest, WorkerEvent};
 
 pub(super) mod client;

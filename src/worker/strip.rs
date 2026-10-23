@@ -8,7 +8,9 @@
 
 use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 
-use crate::worker::render::attachments::attachment_parts;
+use crate::cache::Cache;
+use crate::worker::render::attachments::{attachment_parts, extract_attachments, guess_mime};
+use crate::worker::WorkerEvent;
 
 /// Whether a part is the note left where an attachment was removed.
 pub(super) fn is_placeholder(part: &MessagePart<'_>) -> bool {
@@ -176,6 +178,50 @@ pub(super) fn note_date() -> String {
     chrono::Local::now()
         .format("%a %b %e %H:%M:%S %Y")
         .to_string()
+}
+
+/// Put what a message holds after an attachment was removed (#289) into
+/// the cache: the files, the paperclip, and the gallery's index of them.
+pub(in crate::worker) fn cache_rewritten(
+    c: &Cache,
+    account_id: u32,
+    path: &str,
+    uid: u32,
+    raw: &[u8],
+) {
+    let items = extract_attachments(raw);
+    c.save_attachments(account_id, path, uid, &items);
+    c.mark_attachments_checked(account_id, path, uid);
+    c.set_has_attachment(account_id, path, uid, !items.is_empty());
+    let metas: Vec<crate::models::AttachmentMeta> = items
+        .iter()
+        .enumerate()
+        .map(|(i, a)| crate::models::AttachmentMeta {
+            idx: i as u32,
+            name: a.name.clone(),
+            mime: guess_mime(&a.name),
+            size: a.data.len() as u64,
+            section: String::new(),
+        })
+        .collect();
+    c.save_attachment_meta(account_id, path, uid, &metas);
+}
+
+/// An attachment removal that did not happen (#289): the error, and word
+/// to the views showing the file as being deleted that it is not.
+pub(in crate::worker) fn strip_refused(
+    emit: &impl Fn(WorkerEvent),
+    text: String,
+    message_id: u32,
+    name: String,
+    size: u64,
+) {
+    emit(WorkerEvent::error(text));
+    emit(WorkerEvent::AttachmentNotDeleted {
+        message_id,
+        name,
+        size,
+    });
 }
 
 /// A message with a body and two files, for the tests here and the live
