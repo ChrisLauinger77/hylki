@@ -30,11 +30,11 @@ pub(super) fn wired<T>(cmd: &str, r: &Result<T, async_imap::error::Error>) {
 }
 
 /// The command's verb and first argument, for the terse OK line.
-pub(in crate::worker) fn cmd_head(cmd: &str) -> String {
+pub(super) fn cmd_head(cmd: &str) -> String {
     cmd.split_whitespace().take(3).collect::<Vec<_>>().join(" ")
 }
 
-pub(in crate::worker) async fn sel(
+pub(super) async fn sel(
     session: &mut ImapSession,
     path: &str,
 ) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
@@ -78,7 +78,7 @@ pub(super) async fn select_for_read(
     Ok(())
 }
 
-pub(in crate::worker) async fn fetch_uids<'a, S1: AsRef<str>, S2: AsRef<str>>(
+pub(super) async fn fetch_uids<'a, S1: AsRef<str>, S2: AsRef<str>>(
     session: &'a mut ImapSession,
     set: S1,
     items: S2,
@@ -173,7 +173,7 @@ pub(super) async fn search_uids<S: AsRef<str>>(
     r
 }
 
-pub(in crate::worker) async fn create_box(
+pub(super) async fn create_box(
     session: &mut ImapSession,
     path: &str,
 ) -> Result<(), async_imap::error::Error> {
@@ -184,7 +184,7 @@ pub(in crate::worker) async fn create_box(
     r
 }
 
-pub(in crate::worker) async fn subscribe_box(
+pub(super) async fn subscribe_box(
     session: &mut ImapSession,
     path: &str,
 ) -> Result<(), async_imap::error::Error> {
@@ -218,7 +218,7 @@ pub(super) async fn rename_box(
     r
 }
 
-pub(in crate::worker) async fn delete_box(
+pub(super) async fn delete_box(
     session: &mut ImapSession,
     path: &str,
 ) -> Result<(), async_imap::error::Error> {
@@ -259,7 +259,7 @@ pub(super) async fn append_msg(
     r
 }
 
-pub(in crate::worker) async fn append_dated(
+pub(super) async fn append_dated(
     session: &mut ImapSession,
     path: &str,
     flags: Option<&str>,

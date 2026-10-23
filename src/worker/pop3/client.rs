@@ -164,7 +164,7 @@ impl Pop3 {
     }
 }
 
-pub(in crate::worker) fn strip_crlf(line: &[u8]) -> &[u8] {
+fn strip_crlf(line: &[u8]) -> &[u8] {
     let mut end = line.len();
     while end > 0 && (line[end - 1] == b'\n' || line[end - 1] == b'\r') {
         end -= 1;

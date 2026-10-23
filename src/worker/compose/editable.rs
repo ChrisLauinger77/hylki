@@ -236,13 +236,11 @@ pub fn editable_from_raw(raw: &[u8], envelope_rcpts: &[String]) -> EditableMessa
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::config::AccountConfig;
-    use crate::worker::compose::build::build_draft;
-    use crate::worker::compose::build::build_email;
-    use crate::worker::summary_from_raw;
-    use crate::worker::test_support::sample_account;
-    use crate::worker::test_support::sample_outgoing;
-    use crate::worker::OutgoingMessage;
+    use crate::worker::compose::build::{build_draft, build_email};
+    use crate::worker::test_support::{sample_account, sample_outgoing};
+    use crate::worker::{summary_from_raw, OutgoingMessage};
 
     #[test]
     fn a_queued_message_can_be_taken_apart_for_editing() {

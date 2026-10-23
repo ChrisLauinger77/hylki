@@ -3,5 +3,5 @@
 
 pub(super) mod build;
 pub(super) mod editable;
-pub(super) mod pgp_mime;
+mod pgp_mime;
 pub(super) mod recipients;

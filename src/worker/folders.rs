@@ -134,6 +134,7 @@ pub(super) fn number_folders<T>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::worker::imap::watch::watchable;
 
     fn folder(path: &str, kind: FolderKind) -> Folder {

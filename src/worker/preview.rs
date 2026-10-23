@@ -25,7 +25,7 @@ fn looks_binary(bytes: &[u8]) -> bool {
 }
 
 /// Longest preview stored per message.
-pub(super) const PREVIEW_CHARS: usize = 240;
+const PREVIEW_CHARS: usize = 240;
 
 /// Turn the first bytes of a message's body part into a one-line snippet for the
 /// message list.
@@ -385,7 +385,7 @@ fn decode_mime_body(body: &[u8], encoding: &str, charset: Option<&str>) -> Strin
 /// worth of it as base64 turned a Cloudflare newsletter's preview into a row
 /// of replacement characters. A truncated fetch of real base64 simply has no
 /// padding in it at all.
-pub(super) fn looks_like_base64(bytes: &[u8]) -> bool {
+fn looks_like_base64(bytes: &[u8]) -> bool {
     let mut significant = 0;
     let mut padding = 0;
     for &c in bytes {

@@ -231,7 +231,7 @@ fn is_href(bytes: &[u8], at: usize) -> bool {
 
 /// The `image/<subtype>` MIME type of a part, if it is an image we can inline.
 /// The subtype is validated so it can't break out of the `data:` URI.
-pub(in crate::worker) fn image_mime(part: &mail_parser::MessagePart) -> Option<String> {
+pub(super) fn image_mime(part: &mail_parser::MessagePart) -> Option<String> {
     use mail_parser::MimeHeaders;
     let ty = part.content_type()?;
     if !ty.ctype().eq_ignore_ascii_case("image") {
@@ -254,7 +254,7 @@ pub(in crate::worker) fn escape_html(text: &str) -> String {
 /// `<a href>` whose scheme is always http(s) (a bare `www.` host is prefixed with
 /// `https://`), so no `javascript:`-style link can be forged. Links open in the
 /// external browser via the reader's navigation policy.
-pub(in crate::worker) fn linkify(text: &str) -> String {
+pub(super) fn linkify(text: &str) -> String {
     let mut out = String::new();
     let mut i = 0;
     while let Some((start, end, href)) = next_url(text, i) {

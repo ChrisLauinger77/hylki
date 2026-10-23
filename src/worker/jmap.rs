@@ -19,7 +19,12 @@
 //! Proven against a local Stalwart container; Fastmail speaks the same
 //! standard but has not been tried by hand.
 
-use super::*;
+use std::time::Duration;
+
+use tokio::sync::mpsc;
+
+use crate::cache::Cache;
+use crate::config::AccountConfig;
 use crate::worker::auth::load_or_migrate_password;
 use crate::worker::index_queue::index_pause;
 use crate::worker::jmap::folders::refresh_jmap_folders;
@@ -27,6 +32,8 @@ use crate::worker::jmap::index::{jmap_backfill_step, JmapState, JMAP_BACKFILL_BA
 use crate::worker::jmap::push::{jmap_poll_inbox, spawn_jmap_push};
 use crate::worker::jmap::send::emit_jmap_identities;
 use crate::worker::jmap::wire::{jmap_base_url, jmap_session};
+use crate::worker::lane::{related_from_cache, thread_summaries_with_members};
+use crate::worker::{MailRequest, WorkerEvent};
 
 mod chores;
 mod folders;

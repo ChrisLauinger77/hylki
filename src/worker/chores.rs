@@ -96,6 +96,7 @@ pub(super) fn clean_lists_query(days: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::worker::test_support::sample_account;
 
     /// Auto-empty (#140): only the roles with an age are swept.

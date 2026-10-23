@@ -10,7 +10,7 @@ use crate::worker::smtp::SmtpError;
 use crate::worker::{parse_recipients, OutgoingMessage};
 
 /// A message body before OpenPGP wrapping: one MIME entity either way.
-pub(in crate::worker) enum PgpEntity {
+pub(super) enum PgpEntity {
     Multi(lettre::message::MultiPart),
     Single(lettre::message::SinglePart),
 }
@@ -29,13 +29,13 @@ impl PgpEntity {
 }
 
 /// The outer Subject of an encrypted message, as Thunderbird sends it.
-pub(in crate::worker) const PROTECTED_SUBJECT: &str = "...";
+pub(super) const PROTECTED_SUBJECT: &str = "...";
 
 /// Protected headers (#493, RFC 9788): the encrypted entity carries the real
 /// Subject and who the message is from and to, flagged so the reader takes
 /// them from there, and the Subject outside is [`PROTECTED_SUBJECT`]. Bcc
 /// stays out, as every recipient can decrypt what is inside.
-pub(in crate::worker) fn protect_headers(
+pub(super) fn protect_headers(
     entity: PgpEntity,
     msg: &OutgoingMessage,
     from: &Mailbox,
@@ -87,7 +87,7 @@ fn signing_key(account: &AccountConfig, from_addr: &str) -> Option<crate::pgp::K
 }
 
 /// Sign and/or encrypt an outgoing entity into PGP/MIME (RFC 3156).
-pub(in crate::worker) fn pgp_wrap(
+pub(super) fn pgp_wrap(
     account: &AccountConfig,
     msg: &OutgoingMessage,
     from_addr: &str,

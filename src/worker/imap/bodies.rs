@@ -141,7 +141,7 @@ fn no_content_error(uid: u32) -> async_imap::error::Error {
     ))
 }
 
-pub(in crate::worker) async fn load_raw(
+pub(super) async fn load_raw(
     session: &mut ImapSession,
     path: &str,
     uid: u32,

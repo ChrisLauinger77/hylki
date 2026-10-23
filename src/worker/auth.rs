@@ -223,6 +223,7 @@ pub(super) fn load_smtp_password(account: &mut AccountConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::worker::test_support::sample_account;
 
     /// A password the worker holds is used as it is, and an OAuth account

@@ -21,7 +21,7 @@ use crate::worker::{MailRequest, WorkerEvent};
 
 /// Result of an IDLE wait: a request to handle, a folder that was refreshed
 /// (new mail arrived), or the channel closing.
-pub(in crate::worker) enum IdleOutcome {
+pub(super) enum IdleOutcome {
     Request(MailRequest),
     Refreshed,
     Quiet,
@@ -60,7 +60,7 @@ pub(super) async fn idle_done(
 /// prefetch pass and re-IDLE); `Request` to be handled normally; `Closed` when
 /// the channel ends. Any IDLE error falls back to a plain receive.
 #[allow(clippy::too_many_arguments)]
-pub(in crate::worker) async fn idle_wait(
+pub(super) async fn idle_wait(
     session: &mut Option<ImapSession>,
     account: &AccountConfig,
     account_id: u32,
@@ -187,7 +187,7 @@ static SYNCED_UID_NEXT: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashMap<(u32, String), u32>>,
 > = std::sync::LazyLock::new(Default::default);
 
-pub(in crate::worker) fn note_synced_uid_next(account_id: u32, path: &str, uid_next: Option<u32>) {
+pub(super) fn note_synced_uid_next(account_id: u32, path: &str, uid_next: Option<u32>) {
     if let Some(next) = uid_next {
         SYNCED_UID_NEXT
             .lock()
@@ -198,11 +198,7 @@ pub(in crate::worker) fn note_synced_uid_next(account_id: u32, path: &str, uid_n
 
 /// Whether a folder's UIDNEXT has moved past what its last loaded list saw:
 /// mail arrived that no sync has picked up.
-pub(in crate::worker) fn missed_new_mail(
-    account_id: u32,
-    path: &str,
-    uid_next: Option<u32>,
-) -> bool {
+fn missed_new_mail(account_id: u32, path: &str, uid_next: Option<u32>) -> bool {
     let seen = SYNCED_UID_NEXT
         .lock()
         .unwrap()

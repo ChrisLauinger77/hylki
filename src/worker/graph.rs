@@ -11,13 +11,21 @@
 //! wire header in `build_email`) because the real References header isn't
 //! available from list queries.
 
-use super::*;
+use std::time::Duration;
+
+use tokio::sync::mpsc;
+
+use crate::cache::Cache;
+use crate::config::AccountConfig;
+use crate::i18n::{i18n, i18n_f};
 use crate::worker::graph::folders::{graph_poll_inbox, refresh_graph_folders};
 use crate::worker::graph::http::graph_token;
 use crate::worker::graph::index::{graph_backfill_step, GraphState};
 use crate::worker::graph::ops::graph_fetch_raw;
 use crate::worker::graph::send::graph_flush_outbox;
 use crate::worker::index_queue::index_pause;
+use crate::worker::lane::{related_from_cache, thread_summaries_with_members};
+use crate::worker::{MailRequest, WorkerEvent};
 
 mod chores;
 mod folders;
@@ -378,8 +386,8 @@ mod tests;
 #[cfg(test)]
 mod characterization_tests {
     use super::*;
-    use crate::worker::graph::http::graph_err;
-    use crate::worker::graph::http::graph_throttle_wait;
+
+    use crate::worker::graph::http::{graph_err, graph_throttle_wait};
 
     fn status(code: u16, body: &str) -> ureq::Error {
         ureq::Error::Status(code, ureq::Response::new(code, "x", body).unwrap())

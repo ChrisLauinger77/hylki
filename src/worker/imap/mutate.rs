@@ -15,7 +15,7 @@ use crate::worker::imap::ImapSession;
 /// `UID EXPUNGE` (RFC 4315) removes only the UIDs we asked for, leaving alone
 /// anything another client flagged `\Deleted` in the meantime. Servers without
 /// UIDPLUS reject it, so fall back to a plain `EXPUNGE`.
-pub(in crate::worker) async fn purge_messages(
+pub(super) async fn purge_messages(
     session: &mut ImapSession,
     path: &str,
     uids: &[u32],
@@ -52,7 +52,7 @@ pub(super) async fn flag_deleted_and_expunge(
 }
 
 /// The IMAP flags a message moved in from another account (#265) keeps.
-pub(in crate::worker) fn import_flags(seen: bool, flagged: bool) -> Option<String> {
+pub(super) fn import_flags(seen: bool, flagged: bool) -> Option<String> {
     let flags: Vec<&str> = [(seen, "\\Seen"), (flagged, "\\Flagged")]
         .into_iter()
         .filter(|(on, _)| *on)
@@ -63,7 +63,7 @@ pub(in crate::worker) fn import_flags(seen: bool, flagged: bool) -> Option<Strin
 
 /// The flags a rewritten message carries over: all but the ones the server
 /// sets itself or that would delete it.
-pub(in crate::worker) fn kept_flags<'a>(flags: impl Iterator<Item = Flag<'a>>) -> Vec<String> {
+pub(super) fn kept_flags<'a>(flags: impl Iterator<Item = Flag<'a>>) -> Vec<String> {
     flags
         .filter_map(|f| match f {
             Flag::Seen => Some("\\Seen".to_string()),
@@ -230,7 +230,7 @@ pub(super) async fn create_folder(
 
 /// RENAME a mailbox — the server carries any inferior hierarchy along
 /// (RFC 3501 §6.3.5) — and follow the subscription to the new name.
-pub(in crate::worker) async fn rename_folder(
+pub(super) async fn rename_folder(
     session: &mut ImapSession,
     old_path: &str,
     new_path: &str,
@@ -350,6 +350,7 @@ pub(super) async fn mark_ham(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use std::borrow::Cow;
 
     /// A message moved in from another account keeps its read and starred

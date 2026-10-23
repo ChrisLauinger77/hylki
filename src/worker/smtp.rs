@@ -75,7 +75,7 @@ pub(super) fn smtp_tls_parameters(
 /// The account's send-as alias matching `addr` (case-insensitive), when that
 /// alias carries its own SMTP transport (#34). Plain aliases — and the
 /// account's own address — resolve to `None`: the account's transport.
-pub(super) fn alias_with_own_smtp<'a>(
+fn alias_with_own_smtp<'a>(
     account: &'a AccountConfig,
     addr: &str,
 ) -> Option<&'a crate::config::AliasConfig> {
@@ -252,6 +252,7 @@ pub(super) fn smtp_host(account: &AccountConfig) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::worker::test_support::sample_account;
 
     #[test]

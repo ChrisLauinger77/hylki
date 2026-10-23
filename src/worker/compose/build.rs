@@ -72,7 +72,7 @@ pub(in crate::worker) fn build_draft(
     build_message(account, msg, true)
 }
 
-pub(in crate::worker) fn build_message(
+fn build_message(
     account: &AccountConfig,
     msg: &OutgoingMessage,
     draft: bool,
@@ -408,9 +408,9 @@ pub(in crate::worker) fn bracketed(ids: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::worker::render::attachments::extract_attachments;
-    use crate::worker::test_support::sample_account;
-    use crate::worker::test_support::sample_outgoing;
+    use crate::worker::test_support::{sample_account, sample_outgoing};
     use crate::worker::CalendarPart;
 
     /// `alt` arrives from outside on any quoted reply and lands in a header,

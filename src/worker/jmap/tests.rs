@@ -4,6 +4,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use super::*;
+use crate::cache::Cache;
+use crate::config::AccountConfig;
 use crate::models::{FolderKind, MailboxQuota, Message};
 use crate::worker::compose::build::build_email;
 use crate::worker::ids::hash_uid;
@@ -26,6 +28,7 @@ use crate::worker::jmap::wire::{
 };
 use crate::worker::render::attachments::extract_attachments;
 use crate::worker::test_support::sample_account;
+use crate::worker::{OutgoingMessage, WorkerEvent};
 
 /// #414: lone LFs become CRLF; CRLFs stay as they are.
 #[test]

@@ -58,7 +58,7 @@ fn is_calendar(common: &async_imap::imap_proto::types::BodyContentCommon) -> boo
 /// What counts as an attachment is [`structure_has_attachment`]'s rule, kept
 /// deliberately identical so a message the list gives a paperclip to is a
 /// message the gallery lists parts for.
-pub(in crate::worker) fn structure_attachments(
+pub(super) fn structure_attachments(
     bs: &async_imap::imap_proto::types::BodyStructure,
 ) -> Vec<crate::models::AttachmentMeta> {
     use async_imap::imap_proto::types::{BodyStructure as Bs, ContentEncoding};
@@ -151,13 +151,15 @@ pub(in crate::worker) fn structure_attachments(
 
 #[cfg(test)]
 mod attachment_scan_tests {
-    use super::{mime_extension, structure_attachments, INLINE_ATTACHMENT_MIN};
-    use crate::worker::imap::structure::structure_has_attachment;
+    use std::borrow::Cow;
+
     use async_imap::imap_proto::types::{
         BodyContentCommon, BodyContentSinglePart, BodyStructure, ContentDisposition,
         ContentEncoding, ContentType,
     };
-    use std::borrow::Cow;
+
+    use super::{mime_extension, structure_attachments, INLINE_ATTACHMENT_MIN};
+    use crate::worker::imap::structure::structure_has_attachment;
 
     fn ctype(
         ty: &'static str,

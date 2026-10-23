@@ -14,7 +14,7 @@ use crate::worker::strip;
 
 /// Why [`strip_imap_attachment`] failed, and whether the connection went
 /// with it.
-pub(in crate::worker) struct StripFailure {
+pub(super) struct StripFailure {
     pub(in crate::worker) text: String,
     pub(in crate::worker) connection: bool,
 }
@@ -33,7 +33,7 @@ impl From<async_imap::error::Error> for StripFailure {
 /// stored before the original is deleted, so a failure part way leaves the
 /// message as it was, or at worst twice. Returns the copy's UID, when it
 /// can be found again, and its bytes.
-pub(in crate::worker) async fn strip_imap_attachment(
+pub(super) async fn strip_imap_attachment(
     session: &mut Option<ImapSession>,
     account: &AccountConfig,
     path: &str,
@@ -78,7 +78,7 @@ pub(in crate::worker) async fn strip_imap_attachment(
 /// folder's UIDNEXT from before it, the one with its Message-ID (or, with
 /// none, the lowest). Read from the headers rather than searched for, as
 /// Stalwart's full-text index answers `SEARCH HEADER Message-ID` with nothing.
-pub(in crate::worker) async fn find_appended(
+pub(super) async fn find_appended(
     sess: &mut ImapSession,
     old_uid: u32,
     uid_next: Option<u32>,

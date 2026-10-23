@@ -178,9 +178,8 @@ pub(in crate::worker) fn mailbox(name: &str, addr: &str) -> Result<Mailbox, Smtp
 #[cfg(test)]
 mod recipient_tests {
     use super::{format_recipient, parse_recipients};
-    use crate::worker::clean_recipient_field;
     use crate::worker::compose::recipients::mailbox;
-    use crate::worker::invalid_recipient;
+    use crate::worker::{clean_recipient_field, invalid_recipient};
 
     fn pair(name: &str, email: &str) -> (String, String) {
         (name.to_string(), email.to_string())

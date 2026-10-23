@@ -203,7 +203,7 @@ async fn fetch_window(
 /// [`Cache::upsert_messages`] does. Otherwise the list this returns never
 /// matched the one served from the cache a moment earlier, and every quiet
 /// sync looked to the app like new mail (#330).
-pub(in crate::worker) fn merge_index(cached: Vec<Message>, recent: Vec<Message>) -> Vec<Message> {
+fn merge_index(cached: Vec<Message>, recent: Vec<Message>) -> Vec<Message> {
     let mut map: std::collections::HashMap<u32, Message> =
         cached.into_iter().map(|m| (m.uid, m)).collect();
     for mut m in recent {
@@ -228,6 +228,7 @@ pub(in crate::worker) fn merge_index(cached: Vec<Message>, recent: Vec<Message>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::worker::test_support::flagged_message;
 
     /// A sync whose recent window came back without some previews must give

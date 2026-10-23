@@ -87,7 +87,7 @@ pub(super) async fn connect_and_list(
 }
 
 /// XOAUTH2 SASL authenticator for async-imap.
-pub(in crate::worker) struct XOAuth2 {
+struct XOAuth2 {
     user: String,
     token: String,
     step: u8,
@@ -115,7 +115,7 @@ impl async_imap::Authenticator for XOAuth2 {
 /// and 143 is the conventional STARTTLS port; a local bridge listens on a port
 /// of its own (Proton Bridge defaults to 1143) and speaks STARTTLS there.
 /// GNOME Online Accounts records which it is, and is followed (#254).
-pub(in crate::worker) fn imap_uses_starttls(account: &AccountConfig) -> bool {
+fn imap_uses_starttls(account: &AccountConfig) -> bool {
     if let Some(sec) = &account.security {
         return sec.imap_starttls;
     }
@@ -237,6 +237,7 @@ async fn connect_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::worker::smtp::SmtpTls;
     use crate::worker::test_support::sample_account;
 

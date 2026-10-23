@@ -8,11 +8,8 @@
 //! (in practice, the component's input sender). The mock path implements the
 //! exact same protocol so the app behaves identically offline.
 
-use std::time::Duration;
-
 use tokio::sync::mpsc;
 
-use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::i18n::{i18n, i18n_f};
 
@@ -60,7 +57,7 @@ pub use imap::fetch_mode::readable_error;
 pub(crate) use imap::gmail::has_gmail_labels;
 pub use imap::keywords::is_system_keyword;
 use imap::run_imap;
-use lane::{cache_lane, related_from_cache, thread_summaries_with_members};
+use lane::cache_lane;
 use mock::run_mock;
 pub(crate) use outbox::{answered_copies, park_for_next_launch, reply_copy_path};
 use pop3::run_pop3;

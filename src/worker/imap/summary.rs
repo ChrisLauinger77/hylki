@@ -229,7 +229,7 @@ pub(super) fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> M
 /// What comes back is a small header block (the requested headers that the
 /// message has, each folded across lines like any other, terminated by a
 /// blank line) or nothing at all.
-pub(in crate::worker) fn header_fields(raw: &[u8]) -> Vec<(String, String)> {
+fn header_fields(raw: &[u8]) -> Vec<(String, String)> {
     let text = String::from_utf8_lossy(raw);
     let mut out: Vec<(String, String)> = Vec::new();
     for line in text.lines() {
@@ -309,9 +309,7 @@ fn address_list(addrs: Option<&Vec<async_imap::imap_proto::types::Address>>) -> 
         .unwrap_or_default()
 }
 
-pub(in crate::worker) fn address_parts(
-    addr: &async_imap::imap_proto::types::Address,
-) -> (String, String) {
+fn address_parts(addr: &async_imap::imap_proto::types::Address) -> (String, String) {
     let mailbox = addr
         .mailbox
         .as_deref()

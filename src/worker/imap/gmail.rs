@@ -361,7 +361,7 @@ where
 
 /// The UID and shown labels in one `FETCH` reply's attributes, if it carries
 /// `X-GM-LABELS`.
-pub(in crate::worker) fn gmail_labels_of(
+fn gmail_labels_of(
     attrs: &[async_imap::imap_proto::AttributeValue<'_>],
     folder: &str,
 ) -> Option<(u32, Vec<String>)> {
@@ -384,10 +384,7 @@ pub(in crate::worker) fn gmail_labels_of(
 /// `\Important`, `\Starred`…), which the folder list and the star already
 /// show, and not the one the folder being read is, which every message in
 /// it carries.
-pub(in crate::worker) fn shown_gmail_labels<'a>(
-    labels: impl Iterator<Item = &'a str>,
-    folder: &str,
-) -> Vec<String> {
+fn shown_gmail_labels<'a>(labels: impl Iterator<Item = &'a str>, folder: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for l in labels {
         if l.is_empty() || l.starts_with('\\') || l.eq_ignore_ascii_case(folder) {
@@ -468,7 +465,9 @@ pub(super) async fn run_one_label_fill(
 #[cfg(test)]
 mod gmail_label_tests {
     use super::*;
+
     use std::time::Duration;
+
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream};
 
     async fn session() -> (Session<DuplexStream>, BufReader<DuplexStream>) {

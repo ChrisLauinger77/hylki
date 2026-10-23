@@ -26,14 +26,14 @@ static ATTACHMENT_PREFETCH_TRIED: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashSet<(u32, String, u32)>>,
 > = std::sync::LazyLock::new(Default::default);
 
-pub(in crate::worker) fn attachment_prefetch_tried(account_id: u32, path: &str, uid: u32) -> bool {
+fn attachment_prefetch_tried(account_id: u32, path: &str, uid: u32) -> bool {
     ATTACHMENT_PREFETCH_TRIED
         .lock()
         .map(|s| s.contains(&(account_id, path.to_string(), uid)))
         .unwrap_or(false)
 }
 
-pub(in crate::worker) fn note_attachment_prefetch_tried(account_id: u32, path: &str, uid: u32) {
+fn note_attachment_prefetch_tried(account_id: u32, path: &str, uid: u32) {
     if let Ok(mut s) = ATTACHMENT_PREFETCH_TRIED.lock() {
         s.insert((account_id, path.to_string(), uid));
     }
@@ -41,7 +41,7 @@ pub(in crate::worker) fn note_attachment_prefetch_tried(account_id: u32, path: &
 
 /// Download and cache one queued attachment (body + attachments), if the session
 /// is live. Connects on demand; clears the queue if offline.
-pub(in crate::worker) async fn run_one_prefetch(
+pub(super) async fn run_one_prefetch(
     prefetch: &mut std::collections::VecDeque<(String, u32)>,
     session: &mut Option<ImapSession>,
     account: &AccountConfig,
@@ -152,7 +152,7 @@ pub(super) fn folder_is_gallery(cache: Option<&Cache>, account_id: u32, path: &s
 
 /// Queue the newest messages that have attachments (not already cached) for
 /// background attachment pre-download, so new mail's attachments are ready too.
-pub(in crate::worker) fn queue_attachment_prefetch(
+pub(super) fn queue_attachment_prefetch(
     queue: &mut std::collections::VecDeque<(String, u32)>,
     path: &str,
     messages: &[Message],
@@ -285,6 +285,7 @@ pub(super) fn prefetch_status(remaining: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::worker::test_support::flagged_message;
 
     /// The loop behind the 2.6 GB report: a message the attachment prefetch

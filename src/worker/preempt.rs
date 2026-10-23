@@ -111,11 +111,11 @@ pub(super) async fn interrupt_read_for_reader<F: std::future::Future>(
 #[cfg(test)]
 mod reader_preemption_tests {
     use super::*;
-    use crate::worker::imap::backfill::restore_interrupted_backfill;
-    use crate::worker::imap::backfill::Backfill;
-    use crate::worker::preempt::interrupt_read_for_reader;
-    use crate::worker::preempt::reorder_reader_loads;
+
     use std::time::Duration;
+
+    use crate::worker::imap::backfill::{restore_interrupted_backfill, Backfill};
+    use crate::worker::preempt::{interrupt_read_for_reader, reorder_reader_loads};
 
     fn body() -> MailRequest {
         MailRequest::LoadBody {

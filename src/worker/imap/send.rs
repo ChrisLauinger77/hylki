@@ -61,7 +61,7 @@ pub(in crate::worker) async fn mark_answered(
 /// File a sent copy: beside the original when `reply` names a folder, and
 /// in `sent` when there is none or that folder will not take it (one the
 /// user may only read). The folder that took it, or why none did.
-pub(in crate::worker) async fn file_sent_copy(
+pub(super) async fn file_sent_copy(
     session: &mut ImapSession,
     reply: Option<&str>,
     sent: Option<&str>,
@@ -198,7 +198,7 @@ pub(in crate::worker) async fn flush_outbox(
     emit_outbox(Some(cache), account_id, emit);
 }
 
-pub(in crate::worker) async fn append_to_sent(
+pub(super) async fn append_to_sent(
     session: &mut ImapSession,
     path: &str,
     raw: &[u8],
@@ -256,7 +256,7 @@ pub(super) async fn index_sent_copy(
 
 /// APPEND a draft to the Drafts folder (flagged `\Draft \Seen`), creating the
 /// mailbox first if the server doesn't have one yet.
-pub(in crate::worker) async fn append_draft(
+pub(super) async fn append_draft(
     session: &mut ImapSession,
     path: &str,
     raw: &[u8],
@@ -280,7 +280,7 @@ pub(in crate::worker) async fn append_draft(
 
 /// Delete a superseded draft (the previous version being replaced or sent):
 /// flag it `\Deleted` and expunge it from the Drafts folder.
-pub(in crate::worker) async fn delete_draft(
+pub(super) async fn delete_draft(
     session: &mut ImapSession,
     path: &str,
     uid: u32,

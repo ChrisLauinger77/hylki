@@ -347,7 +347,7 @@ pub(in crate::worker) async fn emit_body_hits(
 /// needle beyond ASCII needs the CHARSET key in front (RFC 3501 §6.4.4),
 /// which must lead the keys; quotes and backslashes are escaped as in any
 /// quoted string, and line breaks can never be in a quoted string at all.
-pub(in crate::worker) fn body_search_query(set: &str, needle: &str) -> String {
+fn body_search_query(set: &str, needle: &str) -> String {
     let clean: String = needle
         .chars()
         .filter(|c| !matches!(c, '\r' | '\n'))

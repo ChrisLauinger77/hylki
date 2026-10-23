@@ -5,13 +5,13 @@ use std::collections::HashSet;
 
 use crate::cache::Cache;
 use crate::i18n::i18n;
-use crate::worker::blocking;
 use crate::worker::ids::hash_uid;
 use crate::worker::jmap::index::{jmap_load_folder, JmapState, JMAP_RELIST_AFTER};
 use crate::worker::jmap::messages::{jmap_get_messages, jmap_list_messages, jmap_query_ids};
 use crate::worker::jmap::wire::{
     args, call, jmap_call, jmap_download, jmap_upload, JmapSession, CAP_CORE, CAP_MAIL,
 };
+use crate::worker::{blocking, strip};
 
 /// How [`jmap_submit`] says the copy was refused before anything was sent,
 /// so a reply filed beside its original (#468) can go to Sent instead.
@@ -471,8 +471,8 @@ pub(super) async fn jmap_strip_attachment(
         .await
         .ok_or_else(|| "message not found".to_string())?;
     let raw = jmap_fetch_raw(s, state, path, uid).await?;
-    let stripped = super::strip::without_attachment(&raw, name, size, &super::strip::note_date())
-        .map_err(|e| e.text())?;
+    let stripped =
+        strip::without_attachment(&raw, name, size, &strip::note_date()).map_err(|e| e.text())?;
     let sess = s.clone();
     blocking(move || {
         let responses = jmap_call(

@@ -12,7 +12,7 @@ use tokio::time::Sleep;
 
 use crate::i18n::i18n;
 
-pub(in crate::worker) const IO_TIMEOUT: Duration = Duration::from_secs(60);
+const IO_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug)]
 pub(in crate::worker) struct ImapIo<S> {
@@ -154,6 +154,7 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for ImapIo<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use futures::TryStreamExt;
     use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, DuplexStream};
     use tokio::time::{sleep, Instant};

@@ -15,9 +15,7 @@ use crate::worker::{chip_counts_all, WorkerEvent};
 
 /// The mailbox size out of a GETQUOTAROOT answer: the first quota with a
 /// STORAGE resource and a limit, whose figures are in units of 1024 octets.
-pub(in crate::worker) fn imap_storage_quota(
-    quotas: &[async_imap::types::Quota],
-) -> Option<MailboxQuota> {
+pub(super) fn imap_storage_quota(quotas: &[async_imap::types::Quota]) -> Option<MailboxQuota> {
     use async_imap::types::QuotaResourceName;
     quotas
         .iter()

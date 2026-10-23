@@ -23,34 +23,34 @@ use crate::worker::preempt::reorder_reader_loads;
 use crate::worker::{MailRequest, WorkerEvent};
 
 pub(super) mod backfill;
-pub(super) mod bodies;
+mod bodies;
 pub(super) mod connect;
 mod dispatch;
 pub(super) mod fetch_mode;
-pub(super) mod folders;
+mod folders;
 pub(super) mod gmail;
 mod handle_read;
 mod handle_send;
 mod handle_write;
-pub(super) mod idle;
+mod idle;
 pub(super) mod keywords;
 mod ladder;
 #[cfg(test)]
 mod live_tests;
-pub(super) mod mutate;
-pub(super) mod prefetch;
-pub(super) mod preview_fetch;
-pub(super) mod retry;
+mod mutate;
+mod prefetch;
+mod preview_fetch;
+mod retry;
 pub(super) mod send;
 mod setup;
 pub(super) mod stream;
-pub(super) mod strip_attachment;
-pub(super) mod structure;
-pub(super) mod summary;
-pub(super) mod sweep;
-pub(super) mod sync;
+mod strip_attachment;
+mod structure;
+mod summary;
+mod sweep;
+mod sync;
 pub(super) mod watch;
-pub(super) mod wire;
+mod wire;
 
 /// Number of most-recent messages to fetch attachment info (BODYSTRUCTURE) for;
 /// older messages get an envelope-only index row and resolve attachments on open.

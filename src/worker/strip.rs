@@ -255,6 +255,7 @@ a,b\r\n\
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::worker::render::attachments::extract_attachments;
 
     fn names(raw: &[u8]) -> Vec<String> {

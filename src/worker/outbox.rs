@@ -234,7 +234,7 @@ pub(super) fn current_sent_copy_path(
 }
 
 /// [`current_sent_copy_path`] once the folder list is in hand.
-pub(super) fn pick_queued_sent_copy(
+fn pick_queued_sent_copy(
     account: &AccountConfig,
     folders: &[Folder],
     queued: Option<&str>,
@@ -320,7 +320,7 @@ pub(crate) fn reply_copy_path(
 }
 
 /// [`reply_copy_path`] once it is known which folders hold the original.
-pub(super) fn pick_reply_folder(
+fn pick_reply_folder(
     choice: ReplyCopies,
     folders: &[Folder],
     holding: &[String],
@@ -395,11 +395,9 @@ pub(super) fn due_outbox_items(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::models::Message;
-    use crate::worker::test_support::flagged_message;
-    use crate::worker::test_support::queued;
-    use crate::worker::test_support::sample_account;
-    use crate::worker::test_support::sample_outgoing;
+    use crate::worker::test_support::{flagged_message, queued, sample_account, sample_outgoing};
 
     /// A sent message marks what it answers in its own account only, the
     /// reply's original as replied and the forward's as forwarded (#454).

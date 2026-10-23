@@ -2,6 +2,7 @@
 //! index and folder loads against a local HTTP server standing in for Graph.
 
 use super::*;
+use crate::cache::Cache;
 use crate::models::Message;
 use crate::worker::graph::index::{
     graph_backfill_with, graph_index_plan, graph_sync_folder, GraphRun, GRAPH_BACKFILL_CHUNK,
@@ -12,6 +13,7 @@ use crate::worker::graph::messages::{
 use crate::worker::ids::hash_uid;
 use crate::worker::index_queue::IndexQueue;
 use crate::worker::reconcile::window_gone;
+use crate::worker::WorkerEvent;
 
 /// A Graph message summary as `/messages` lists it.
 fn graph_msg(id: &str, at: &str) -> serde_json::Value {
