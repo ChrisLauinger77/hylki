@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::i18n::{i18n, i18n_f};
-use crate::models::{Account, Folder, FolderKind, KeywordFinding, MailboxQuota, Message};
+use crate::models::{Account, FolderKind, KeywordFinding};
 
 mod api;
 mod auth;
@@ -164,26 +164,6 @@ async fn run(
     }
 }
 
-// ---------------------------------------------------------------------------
-// IMAP path
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Outbox
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// POP3 path
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Mock path (offline fallback)
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /// A plain IMAP account for the tests here and in the child modules.
 #[cfg(test)]
 pub(super) fn sample_account() -> AccountConfig {
@@ -245,6 +225,9 @@ pub(super) fn sample_account() -> AccountConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::Folder;
+    use crate::models::MailboxQuota;
+    use crate::models::Message;
     use crate::worker::auth::sign_in_password_blocking;
     use crate::worker::chores::auto_empty_due;
     use crate::worker::chores::auto_empty_roles;

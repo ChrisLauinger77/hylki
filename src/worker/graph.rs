@@ -1268,6 +1268,7 @@ pub(super) async fn run_graph(
 
 #[cfg(test)]
 mod tests {
+    use crate::models::Message;
     use crate::worker::graph::index::graph_backfill_with;
     use crate::worker::graph::index::graph_index_plan;
     use crate::worker::graph::index::GraphRun;
