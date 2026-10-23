@@ -1832,4 +1832,84 @@ mod tests {
                     <blockquote><p>quoted</p></blockquote>";
         assert_eq!(html_to_text(html), "tail\n\n> quoted");
     }
+
+    // Characterization tests (restructure, area D): they pin what the code
+    // does today, quirks included. See REFACTOR_NOTES.md, suspected bugs.
+
+    const MARK: &str = "<mark style=\"background:#fff3a3;color:#000\">";
+
+    #[test]
+    fn pinned_a_lone_highlight_mark_closes_with_its_paragraph() {
+        assert_eq!(
+            to_html("a == b\n\nnext para"),
+            format!("<p>a {MARK} b</mark></p>\n<p>next para</p>\n")
+        );
+        assert_eq!(
+            to_html("==hi== there"),
+            format!("<p>{MARK}hi</mark> there</p>\n")
+        );
+    }
+
+    #[test]
+    fn pinned_an_unclosed_highlight_inverts_the_next_block() {
+        assert_eq!(
+            to_html("x ==a\n\n- item ==b== c"),
+            format!("<p>x {MARK}a</mark></p>\n<ul>\n<li>item b{MARK} c</mark></li>\n</ul>\n")
+        );
+    }
+
+    #[test]
+    fn pinned_links_and_images_are_written_unescaped() {
+        assert_eq!(
+            from_html("<p><a href=\"http://x.y/a b)\">t</a></p>"),
+            "[t](http://x.y/a b))"
+        );
+        assert_eq!(
+            from_html("<p><img alt=\"a]\" src=\"x y.png\"></p>"),
+            "![a]](x y.png)"
+        );
+    }
+
+    #[test]
+    fn pinned_block_markers_in_text_are_not_escaped() {
+        assert_eq!(
+            from_html("<p># not heading</p><p>1. not list</p><p>&gt; quote</p><p>- dash</p>"),
+            "# not heading\n\n1. not list\n\n> quote\n\n- dash"
+        );
+        assert_eq!(
+            from_html("<p>:tada: ==x== H~2~O x^2^ a_b_c</p>"),
+            ":tada: ==x== H~2~O x^2^ a_b_c"
+        );
+    }
+
+    #[test]
+    fn pinned_inline_markup_characters_are_backslashed() {
+        let html = "<p>a*b [c] \\ d `e` &lt;f&gt;</p>";
+        assert_eq!(from_html(html), "a\\*b \\[c\\] \\\\ d \\`e\\` \\<f>");
+        assert_eq!(html_to_text(html), from_html(html));
+    }
+
+    #[test]
+    fn pinned_pretty_html_keeps_a_pre_block_whatever_its_case() {
+        assert_eq!(
+            pretty_html("<div><PRE>a\n<b>b</b></PRE><p>x</p></div>"),
+            "<div>\n<PRE>a\n<b>b</b></PRE>\n<p>x</p>\n</div>"
+        );
+        assert_eq!(
+            pretty_html("<div><pre>a\n\n\nb</pre><p>x</p></div>"),
+            "<div>\n<pre>a\n\nb</pre>\n<p>x</p>\n</div>"
+        );
+    }
+
+    #[test]
+    fn pinned_plain_text_trims_no_break_spaces() {
+        assert_eq!(
+            plain_text("<p>&nbsp;a&nbsp;&nbsp;b&nbsp;</p><p>c</p>"),
+            "a b\n\nc"
+        );
+        assert_eq!(
+            plain_text("<div>\u{a0}</div><p>x</p><br><br><br><p>y</p>"),
+            "x\n\ny"
+        );
+    }
 }

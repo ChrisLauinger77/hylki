@@ -1735,4 +1735,28 @@ mod tests {
         assert!(!is_whole_address("Ann <ann@example.com"));
         assert!(!is_whole_address("ann@"));
     }
+
+    // Characterization tests (restructure, area D).
+
+    #[test]
+    fn pinned_separators_skip_quoted_names_and_angle_brackets() {
+        assert_eq!(last_separator("\"a\\\", b\" <x@y.z>, c"), Some(16));
+        assert_eq!(last_separator("\"a\\\\\", b"), Some(5));
+        assert_eq!(last_separator("Ann <a,b@x.y>; c"), Some(13));
+        // A backslash outside quotes escapes nothing.
+        assert_eq!(last_separator("x\\\"y, z"), None);
+        assert_eq!(normalise_separators("Ann <a,b@x.y>; c"), "Ann <a,b@x.y>, c");
+        assert_eq!(
+            normalise_separators("\"a\\\", b\" <x@y.z>, c"),
+            "\"a\\\", b\" <x@y.z>, c"
+        );
+    }
+
+    #[test]
+    fn pinned_an_escaped_quote_counts_as_a_quote() {
+        assert!(!is_whole_address("\"A \\\" B\" <a@b.c>"));
+        assert!(is_whole_address("\"A B\" <a@b.c>"));
+        assert!(!is_whole_address("Name <>"));
+        assert!(is_whole_address("a@b"));
+    }
 }

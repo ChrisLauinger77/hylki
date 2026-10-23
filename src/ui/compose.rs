@@ -5729,4 +5729,125 @@ mod tests {
         assert!(sig_source(SourceKind::Markdown, "Ann", true).starts_with("\n\n-- \n"));
         assert_eq!(sig_source(SourceKind::Markdown, "", true), "");
     }
+
+    // Characterization tests (restructure, area D).
+
+    #[test]
+    fn pinned_an_html_source_signature_is_the_rich_block() {
+        assert_eq!(
+            sig_source(SourceKind::Html, "Ann\nB", true),
+            "\n<div class=\"hylki-sig\"><br>-- <br>Ann<br>B</div>\n"
+        );
+        // Anything with a `<` is taken as HTML.
+        assert_eq!(
+            sig_source(SourceKind::Markdown, "Ann\nB <x>", false),
+            "\n\nAnn B\n"
+        );
+    }
+
+    #[test]
+    fn pinned_froms_compare_by_name_and_address() {
+        assert!(super::same_from("Ann <ann@x.org>", "\"Ann\" <ANN@x.org>"));
+        assert!(super::same_from("Ann <ann@x.org>", "Ann  <ann@x.org>"));
+        assert!(!super::same_from("Ann <ann@x.org>", "ann@x.org"));
+        assert!(!super::same_from("", ""));
+    }
+
+    #[test]
+    fn pinned_attachment_labels() {
+        let pdf = std::path::Path::new("/a/b.pdf");
+        assert_eq!(
+            super::attachment_label("Attach {name}", pdf, 1),
+            "Attach b.pdf"
+        );
+        assert_eq!(
+            super::attachment_label("Attach {name}", pdf, 3),
+            "Attach 3 attachments"
+        );
+        assert_eq!(
+            super::attachment_label("Attach {name}", std::path::Path::new("/"), 1),
+            "Attach "
+        );
+    }
+
+    #[test]
+    fn pinned_format_icons() {
+        use crate::config::ComposeFormat;
+        assert_eq!(
+            super::format_icon(ComposeFormat::Rich),
+            "format-text-rich-symbolic"
+        );
+        assert_eq!(
+            super::format_icon(ComposeFormat::Markdown),
+            "markdown-symbolic"
+        );
+        assert_eq!(super::format_icon(ComposeFormat::Html), "code-symbolic");
+        assert_eq!(
+            super::format_icon(ComposeFormat::Plain),
+            "text-x-generic-symbolic"
+        );
+    }
+
+    #[test]
+    fn pinned_key_tables() {
+        use gtk::gdk::{Key, ModifierType as M};
+        let cs = M::CONTROL_MASK | M::SHIFT_MASK;
+        assert!(matches!(
+            super::composer_key(Key::A, cs),
+            Some(super::ComposeInput::AttachFiles)
+        ));
+        assert!(matches!(
+            super::composer_key(Key::t, cs),
+            Some(super::ComposeInput::FocusField(super::Field::To))
+        ));
+        assert!(matches!(
+            super::composer_key(Key::c, cs),
+            Some(super::ComposeInput::FocusField(super::Field::Cc))
+        ));
+        assert!(matches!(
+            super::composer_key(Key::b, cs),
+            Some(super::ComposeInput::FocusField(super::Field::Bcc))
+        ));
+        assert!(super::composer_key(Key::a, M::CONTROL_MASK).is_none());
+        assert!(super::composer_key(Key::a, cs | M::ALT_MASK).is_none());
+        assert!(super::composer_key(Key::x, cs).is_none());
+
+        let c = M::CONTROL_MASK;
+        for (key, step) in [
+            (Key::plus, 1),
+            (Key::equal, 1),
+            (Key::KP_Add, 1),
+            (Key::minus, -1),
+            (Key::KP_Subtract, -1),
+            (Key::_0, 0),
+            (Key::KP_0, 0),
+        ] {
+            assert_eq!(super::zoom_key(key, c), Some(step), "{key:?}");
+            assert_eq!(super::zoom_key(key, c | M::SHIFT_MASK), Some(step));
+            assert_eq!(super::zoom_key(key, c | M::ALT_MASK), None);
+            assert_eq!(super::zoom_key(key, M::empty()), None);
+        }
+        assert_eq!(super::zoom_key(Key::_1, c), None);
+    }
+
+    /// The translate scripts are pasted into the page as they are: pin their
+    /// bytes so moving them cannot change them.
+    #[test]
+    fn pinned_translate_scripts_are_unchanged() {
+        fn fnv(s: &str) -> (usize, u64) {
+            let mut h: u64 = 0xcbf29ce484222325;
+            for b in s.bytes() {
+                h ^= u64::from(b);
+                h = h.wrapping_mul(0x100000001b3);
+            }
+            (s.len(), h)
+        }
+        assert_eq!(fnv(super::SHOWCASE_PLAIN_LOG), (393, 0x667da3e64a4a676e));
+        assert_eq!(fnv(super::TR_QUOTE_TEXT), (453, 0xc2a237f0c7dc2fab));
+        assert_eq!(fnv(super::TR_RICH_BEGIN), (1701, 0xd3cb51e10a1c983c));
+        assert_eq!(fnv(super::TR_RICH_END), (731, 0x866624ea47866e35));
+        assert_eq!(fnv(super::TR_SOURCE_BEGIN), (780, 0x3eff7dececcface9));
+        assert_eq!(fnv(super::TR_SOURCE_END), (721, 0xdfc354ea9d805901));
+        assert_eq!(fnv(super::TR_CANCEL), (197, 0x2cb5c4f7c3471566));
+    }
 }

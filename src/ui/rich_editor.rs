@@ -4142,3 +4142,68 @@ mod compose_font_tests {
         assert_eq!(first_family("'Comfortaa', sans-serif"), "Comfortaa");
     }
 }
+
+#[cfg(test)]
+mod pinned_tests {
+    //! Characterization tests (restructure, area D).
+    use super::*;
+
+    fn fnv(s: &str) -> (usize, u64) {
+        let mut h: u64 = 0xcbf29ce484222325;
+        for b in s.bytes() {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        (s.len(), h)
+    }
+
+    /// The scripts go into every editor page as they are: pin their bytes so
+    /// moving them into files cannot change them.
+    #[test]
+    fn embedded_scripts_are_unchanged() {
+        assert_eq!(fnv(HISTORY_SCRIPT), (1287, 0x8e997368982bb599));
+        assert_eq!(fnv(EMOJI_SCRIPT), (1621, 0x748b009b19f3f0ec));
+        assert_eq!(fnv(PASTE_SCRIPT), (37862, 0x6fa3db610728331e));
+    }
+
+    #[test]
+    fn history_keys() {
+        use gtk::gdk::{Key, ModifierType as M};
+        let c = M::CONTROL_MASK;
+        let cs = c | M::SHIFT_MASK;
+        assert_eq!(history_key(Key::z, c), Some(false));
+        assert_eq!(history_key(Key::z, cs), Some(true));
+        assert_eq!(history_key(Key::Z, cs), Some(true));
+        assert_eq!(history_key(Key::Z, c), None);
+        assert_eq!(history_key(Key::y, c), Some(true));
+        assert_eq!(history_key(Key::y, cs), Some(true));
+        assert_eq!(history_key(Key::z, M::empty()), None);
+        assert_eq!(history_key(Key::x, c), None);
+    }
+
+    #[test]
+    fn js_escape_quotes_breaks_and_tags() {
+        assert_eq!(
+            js_escape("a'b\"c\\d\ne\rf\tg<h>"),
+            "a\\'b\\\"c\\\\d\\ne\\rf\\tg\\x3ch>"
+        );
+        assert_eq!(js_escape("plain"), "plain");
+    }
+
+    #[test]
+    fn src_attributes_are_found_after_a_space_in_any_case() {
+        assert_eq!(find_src_attr("<img SRC=\"a\">"), Some(5));
+        assert_eq!(find_src_attr("<img data-src=\"a\" src='b'>"), Some(18));
+        assert_eq!(find_src_attr("src=\"a\""), None);
+        assert_eq!(quoted_value("src=\"a b\" x"), Some(("src=\"", "a b")));
+        assert_eq!(quoted_value("src='c'"), Some(("src='", "c")));
+        assert_eq!(quoted_value("src=c"), None);
+        assert_eq!(quoted_value("src=\"open"), None);
+    }
+
+    #[test]
+    fn a_signature_with_a_less_than_sign_is_taken_as_html() {
+        assert_eq!(signature_to_html("a < b"), "a < b");
+        assert_eq!(signature_to_html("a & b\nc"), "a &amp; b<br>c");
+    }
+}

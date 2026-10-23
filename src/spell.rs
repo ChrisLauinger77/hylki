@@ -551,7 +551,10 @@ pub fn remove_personal_word(word: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::{checkable_words, misspelled_in_all, resolve_languages, toggle_language};
+    use super::{
+        checkable_words, join_languages, language_display_name, misspelled_in_all, parse_languages,
+        resolve_languages, toggle_language,
+    };
 
     #[test]
     fn words_are_found_and_noise_is_skipped() {
@@ -656,5 +659,25 @@ mod tests {
         // No dictionary at all flags nothing.
         let none: [&[&str]; 0] = [];
         assert!(!misspelled_in_all(&none, "wrold", rejects));
+    }
+
+    // Characterization tests (restructure, area D).
+
+    #[test]
+    fn pinned_settings_parse_and_join() {
+        assert_eq!(
+            parse_languages(" en_US;de_DE  fr,en_US,, "),
+            codes(&["en_US", "de_DE", "fr"])
+        );
+        assert_eq!(join_languages(&codes(&["en_US", "de_DE"])), "en_US, de_DE");
+        assert_eq!(parse_languages(""), Vec::<String>::new());
+    }
+
+    #[test]
+    fn pinned_display_names_fall_back_to_the_code() {
+        assert_eq!(language_display_name("xx_YY"), "xx_YY");
+        assert_eq!(language_display_name("de"), "Deutsch");
+        assert_eq!(language_display_name("de_DE"), "Deutsch (Deutschland)");
+        assert_eq!(language_display_name("de_ZZ"), "Deutsch (ZZ)");
     }
 }

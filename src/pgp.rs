@@ -1689,4 +1689,80 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
             let _ = std::fs::remove_dir_all(h);
         }
     }
+
+    // Characterization tests (restructure, area D).
+
+    #[test]
+    fn pinned_armored_blocks_and_entities() {
+        let text = "pre\n-----BEGIN PGP MESSAGE-----\nabc\n-----END PGP MESSAGE-----\npost";
+        assert_eq!(
+            armored_block(text, "MESSAGE"),
+            "-----BEGIN PGP MESSAGE-----\nabc\n-----END PGP MESSAGE-----"
+        );
+        assert_eq!(armored_block("no block", "MESSAGE"), "no block");
+        assert_eq!(
+            text_entity(b"hi"),
+            b"Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\nhi"
+                .to_vec()
+        );
+    }
+
+    #[test]
+    fn pinned_signed_bytes_end_at_the_first_boundary_prefix() {
+        let crlf = b"Content-Type: x\r\n\r\nbody\r\n--b\r\n";
+        assert_eq!(
+            signed_bytes(crlf, 0, "b").as_deref(),
+            Some(&b"Content-Type: x\r\n\r\nbody"[..])
+        );
+        assert_eq!(
+            signed_bytes(b"head\n\nbody\n--b\n", 0, "b").as_deref(),
+            Some(&b"head\n\nbody"[..])
+        );
+        // An inner boundary that starts with the outer one cuts it short.
+        assert_eq!(
+            signed_bytes(b"a\r\n--bb\r\ninner\r\n--b\r\n", 0, "b").as_deref(),
+            Some(&b"a"[..])
+        );
+        assert_eq!(signed_bytes(b"abc", 3, "b"), None);
+        assert_eq!(signed_bytes(b"abc", 0, "b"), None);
+    }
+
+    #[test]
+    fn pinned_protected_header_blocks() {
+        assert!(protected_header_block(
+            "Subject: x\r\nContent-Type: text/plain\r\n\r\nbody"
+        ));
+        assert!(!protected_header_block("Subject: x\n\nbody"));
+        assert!(!protected_header_block("not a header line\n"));
+        assert!(!protected_header_block("Content-Type: a\n folded\n"));
+        assert!(protected_header_block("Content-Type: a\n folded\n\n"));
+    }
+
+    #[test]
+    fn pinned_colon_uids_unescape_only_colons() {
+        let text = "\
+pub:u:255:22:ABCDEF0123456789:1700000000:::u:::scESC:\n\
+fpr:::::::::0123456789ABCDEF0123456789ABCDEF01234567:\n\
+uid:u::::1700000000::HASH::Ann \\x5c Bee \\x3a x <ann@example.org>::::::::::0:\n\
+pub:e:255:22:1111222233334444:1700000000:1::e:::scD:\n\
+fpr:::::::::AAAABBBBCCCCDDDDEEEEFFFF1111222233334444:\n";
+        let keys = parse_colons(text, true);
+        assert_eq!(keys.len(), 2);
+        let k = &keys[0];
+        assert_eq!(k.uids, vec!["Ann \\x5c Bee : x <ann@example.org>"]);
+        assert_eq!(k.primary_uid(), "Ann \\x5c Bee : x <ann@example.org>");
+        assert_eq!(k.emails(), vec!["ann@example.org"]);
+        assert!(k.matches_address(" ANN@example.org "));
+        assert!(k.usable() && k.secret && k.can_sign && k.can_encrypt);
+        assert_eq!(
+            k.fingerprint_display(),
+            "0123 4567 89AB CDEF 0123 4567 89AB CDEF 0123 4567"
+        );
+        let old = &keys[1];
+        assert_eq!(old.expires, Some(1));
+        assert_eq!(old.validity, KeyValidity::Expired);
+        assert!(old.disabled && !old.usable() && old.uids.is_empty());
+        assert_eq!(old.primary_uid(), "");
+        assert!(!KeyValidity::Marginal.trusted() && KeyValidity::Full.trusted());
+    }
 }
