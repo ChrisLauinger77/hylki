@@ -14,7 +14,7 @@ use relm4::prelude::*;
 use std::rc::Rc;
 
 impl Row {
-    pub fn toggle_palette(&self) {
+    pub(crate) fn toggle_palette(&self) {
         if self.data().is_none() {
             return;
         }

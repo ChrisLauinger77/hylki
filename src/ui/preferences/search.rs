@@ -272,7 +272,7 @@ fn search_hit(
 }
 
 /// The class that keeps a row, and what it holds, out of the settings search.
-pub const NOT_SEARCHED: &str = "settings-not-searched";
+pub(crate) const NOT_SEARCHED: &str = "settings-not-searched";
 
 /// Walk a page for its groups and rows; `place` is where they sit so far.
 fn index_widget(page: &'static str, w: &gtk::Widget, place: &str, out: &mut Vec<SearchHit>) {

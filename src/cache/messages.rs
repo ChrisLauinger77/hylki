@@ -33,7 +33,7 @@ const MSGID_CASE_PENDING_CAP: usize = 50_000;
 
 /// Remember how `exact` (one Message-ID, no angle brackets) is spelt, when
 /// that differs from the lowercase form the cache stores.
-pub fn note_msgid_case(exact: &str) {
+pub(crate) fn note_msgid_case(exact: &str) {
     if exact.is_empty() || !exact.bytes().any(|b| b.is_ascii_uppercase()) {
         return;
     }
@@ -50,7 +50,7 @@ pub fn note_msgid_case(exact: &str) {
 
 /// Compare folder lists ignoring the volatile id, but including unread counts so
 /// a changed count re-emits the list and refreshes the sidebar badges.
-pub fn folders_equal(a: &[Folder], b: &[Folder]) -> bool {
+pub(crate) fn folders_equal(a: &[Folder], b: &[Folder]) -> bool {
     a.len() == b.len()
         && a.iter().zip(b).all(|(x, y)| {
             x.path == y.path && x.name == y.name && x.kind == y.kind && x.unread == y.unread
@@ -92,7 +92,7 @@ impl Cache {
     /// lowercase) Message-ID, as `(account_id, folder_path, uid)`, newest
     /// first — a `mid:` link (#130) is resolved from here before any server
     /// is asked.
-    pub fn locate_by_message_id(&self, message_id: &str) -> Vec<(u32, String, u32)> {
+    pub(crate) fn locate_by_message_id(&self, message_id: &str) -> Vec<(u32, String, u32)> {
         if message_id.is_empty() {
             return Vec::new();
         }
@@ -108,7 +108,7 @@ impl Cache {
         .unwrap_or_default()
     }
 
-    pub fn load_folders(&self, account_id: u32) -> Vec<Folder> {
+    pub(crate) fn load_folders(&self, account_id: u32) -> Vec<Folder> {
         let run = || -> rusqlite::Result<Vec<Folder>> {
             let mut stmt = self.conn.prepare(
                 "SELECT path, name, kind, unread FROM folders WHERE account_id = ?1 ORDER BY ord",
@@ -141,7 +141,7 @@ impl Cache {
         })
     }
 
-    pub fn save_folders(&self, account_id: u32, folders: &[Folder]) {
+    pub(crate) fn save_folders(&self, account_id: u32, folders: &[Folder]) {
         let run = || -> rusqlite::Result<()> {
             let tx = self.conn.unchecked_transaction()?;
             tx.execute("DELETE FROM folders WHERE account_id = ?1", [account_id])?;
@@ -168,7 +168,7 @@ impl Cache {
 
     /// Every message in an account from `addr`, as (folder path, uid): what
     /// Unsubscribe offers to delete along with leaving the list (#407).
-    pub fn messages_from_address(&self, account_id: u32, addr: &str) -> Vec<(String, u32)> {
+    pub(crate) fn messages_from_address(&self, account_id: u32, addr: &str) -> Vec<(String, u32)> {
         let run = || -> rusqlite::Result<Vec<(String, u32)>> {
             let mut stmt = self
                 .conn
@@ -184,7 +184,7 @@ impl Cache {
         })
     }
 
-    pub fn load_messages(
+    pub(crate) fn load_messages(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -194,7 +194,7 @@ impl Cache {
     }
 
     /// How many messages a folder holds.
-    pub fn count_messages(&self, account_id: u32, folder_path: &str) -> usize {
+    pub(crate) fn count_messages(&self, account_id: u32, folder_path: &str) -> usize {
         self.conn
             .query_row(
                 "SELECT COUNT(*) FROM messages WHERE account_id = ?1 AND folder_path = ?2",
@@ -206,7 +206,7 @@ impl Cache {
 
     /// A folder's `limit` newest messages, newest first: what a list shows
     /// at once while the whole folder is read.
-    pub fn load_newest(
+    pub(crate) fn load_newest(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -262,7 +262,7 @@ impl Cache {
     /// UIDs whose attachments have been fetched (`attachments_checked`) but which
     /// turned out to hold no real attachments — used to correct false "has
     /// attachment" summary flags.
-    pub fn attachmentless_uids(
+    pub(crate) fn attachmentless_uids(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -285,7 +285,7 @@ impl Cache {
         run().unwrap_or_default()
     }
 
-    pub fn save_messages(&self, account_id: u32, folder_path: &str, messages: &[Message]) {
+    pub(crate) fn save_messages(&self, account_id: u32, folder_path: &str, messages: &[Message]) {
         let run = || -> rusqlite::Result<()> {
             let tx = self.conn.unchecked_transaction()?;
             tx.execute(
@@ -305,7 +305,7 @@ impl Cache {
     /// Insert-or-replace message summaries without clearing the folder first.
     /// Used to grow the search index (fast first page + background backfill)
     /// without wiping already-indexed messages.
-    pub fn upsert_messages(&self, account_id: u32, folder_path: &str, messages: &[Message]) {
+    pub(crate) fn upsert_messages(&self, account_id: u32, folder_path: &str, messages: &[Message]) {
         let run = || -> rusqlite::Result<()> {
             let tx = self.conn.unchecked_transaction()?;
             // The exact spellings noted while these (and any earlier) headers
@@ -384,7 +384,7 @@ impl Cache {
     /// A space-separated list of stored Message-IDs (In-Reply-To, References)
     /// spelt the way each arrived, for a header about to go on the wire. Ids
     /// never seen with capitals go out as stored.
-    pub fn exact_msgids(&self, ids: &str) -> String {
+    pub(crate) fn exact_msgids(&self, ids: &str) -> String {
         ids.split_whitespace()
             .map(|id| self.exact_msgid(id).unwrap_or_else(|| id.to_string()))
             .collect::<Vec<_>>()
@@ -392,7 +392,7 @@ impl Cache {
     }
 
     /// The set of message UIDs already cached for a folder (for backfill diffing).
-    pub fn cached_uids(
+    pub(crate) fn cached_uids(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -411,7 +411,7 @@ impl Cache {
     /// Each cached message's UID with its timestamp, for a folder: what a
     /// Graph or JMAP listing is reconciled against (#429), since a row newer
     /// than the listing itself must not be taken for one deleted.
-    pub fn cached_uid_times(
+    pub(crate) fn cached_uid_times(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -429,7 +429,7 @@ impl Cache {
     }
 
     /// Up to `limit` cached uids in a folder below `below_uid`, newest first.
-    pub fn uids_below(
+    pub(crate) fn uids_below(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -454,7 +454,7 @@ impl Cache {
     /// changed.
     /// Add Gmail labels to one cached message, or take them off (#374): what
     /// tagging on Gmail changed, before the next sync says it again.
-    pub fn set_gmail_label(
+    pub(crate) fn set_gmail_label(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -481,7 +481,7 @@ impl Cache {
         );
     }
 
-    pub fn set_gmail_labels(
+    pub(crate) fn set_gmail_labels(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -515,7 +515,7 @@ impl Cache {
     /// `uids` in `from_path`, found by Message-ID, except the one in
     /// `keep_path` (where they went) and the rows in `from_path` itself,
     /// which the caller removes. Returns how many were dropped.
-    pub fn drop_label_copies(
+    pub(crate) fn drop_label_copies(
         &self,
         account_id: u32,
         from_path: &str,
@@ -555,7 +555,7 @@ impl Cache {
         copies.len()
     }
 
-    pub fn delete_message(&self, account_id: u32, folder_path: &str, uid: u32) {
+    pub(crate) fn delete_message(&self, account_id: u32, folder_path: &str, uid: u32) {
         for table in ["messages", "bodies", "attachments", "attachments_checked"] {
             let _ = self.conn.execute(
                 &format!(

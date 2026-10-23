@@ -22,8 +22,8 @@ mod schema;
 mod smart;
 mod threads;
 
-pub use gallery::*;
-pub use messages::*;
+pub(crate) use gallery::*;
+pub(crate) use messages::*;
 
 #[cfg(test)]
 use schema::*;
@@ -130,6 +130,6 @@ fn split_labels(col: String) -> Vec<String> {
 
 /// One connection to the cache database. Each worker thread opens its own;
 /// the methods live in the child modules by what they touch.
-pub struct Cache {
+pub(crate) struct Cache {
     conn: Connection,
 }

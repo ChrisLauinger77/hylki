@@ -52,7 +52,7 @@ impl Endpoint {
 /// The accounts a search asks: Microsoft 365 over Graph with the switch on,
 /// signed in within Hylki. A token from GNOME Online Accounts carries only
 /// the scopes GNOME asked for, which do not include the directory.
-pub fn usable(account: &AccountConfig) -> bool {
+pub(crate) fn usable(account: &AccountConfig) -> bool {
     account.enabled
         && account.protocol == Protocol::Graph
         && account.graph_directory
@@ -61,7 +61,7 @@ pub fn usable(account: &AccountConfig) -> bool {
 }
 
 /// The configured accounts a search would ask (reads the accounts file).
-pub fn accounts() -> Vec<AccountConfig> {
+pub(crate) fn accounts() -> Vec<AccountConfig> {
     crate::config::load()
         .unwrap_or_default()
         .into_iter()
@@ -302,7 +302,7 @@ fn get(token: &str, endpoint: Endpoint, typed: &str) -> Result<serde_json::Value
 /// The people whose name or address starts with what was typed, from the
 /// directory of each of `accounts` that may be asked. Blocking: call it off
 /// the main thread. A failure is logged and costs only the suggestions.
-pub fn search(typed: &str, accounts: &[AccountConfig]) -> Vec<Suggestion> {
+pub(crate) fn search(typed: &str, accounts: &[AccountConfig]) -> Vec<Suggestion> {
     let typed = typed.trim();
     if typed.chars().count() < crate::directory::MIN_QUERY || typed.len() > 128 {
         return Vec::new();

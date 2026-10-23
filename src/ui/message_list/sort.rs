@@ -88,7 +88,7 @@ pub(super) fn text_key_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 
 /// The order a click on a column's heading sorts by (#334). In Sent the
 /// sender column names the recipients, and sorts by them.
-pub fn column_sort(column: crate::config::ListColumn, show_recipient: bool) -> SortOrder {
+pub(super) fn column_sort(column: crate::config::ListColumn, show_recipient: bool) -> SortOrder {
     use crate::config::ListColumn as C;
     match column {
         C::Star => SortOrder::FlaggedFirst,
@@ -174,7 +174,7 @@ pub(super) fn correspondents(msgs: &[&Message]) -> String {
 
 /// How the message list is ordered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SortOrder {
+pub(crate) enum SortOrder {
     DateNewest,
     DateOldest,
     Sender,
@@ -209,7 +209,7 @@ impl SortOrder {
         (SortOrder::Replied, "replied"),
     ];
 
-    pub fn from_key(key: &str) -> Self {
+    pub(crate) fn from_key(key: &str) -> Self {
         SortOrder::KEYS
             .iter()
             .find(|(_, k)| *k == key)
@@ -217,7 +217,7 @@ impl SortOrder {
             .unwrap_or(SortOrder::DateNewest)
     }
 
-    pub fn key(self) -> &'static str {
+    pub(crate) fn key(self) -> &'static str {
         SortOrder::KEYS
             .iter()
             .find(|(o, _)| *o == self)

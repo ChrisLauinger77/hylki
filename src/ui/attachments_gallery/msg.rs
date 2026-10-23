@@ -8,19 +8,19 @@ use super::GalleryAccount;
 /// One page's worth of question for the cache: everything the database needs to
 /// narrow and order the archive before cutting the page out of it.
 #[derive(Debug, Clone)]
-pub struct GalleryRequest {
+pub(crate) struct GalleryRequest {
     /// `(account id, folder path)` for every folder in scope.
-    pub folders: Vec<(u32, String)>,
-    pub account_id: Option<u32>,
-    pub tokens: Vec<String>,
-    pub bucket: u32,
-    pub sort: GallerySort,
-    pub offset: u32,
-    pub limit: u32,
+    pub(crate) folders: Vec<(u32, String)>,
+    pub(crate) account_id: Option<u32>,
+    pub(crate) tokens: Vec<String>,
+    pub(crate) bucket: u32,
+    pub(crate) sort: GallerySort,
+    pub(crate) offset: u32,
+    pub(crate) limit: u32,
 }
 
 /// One attachment in the gallery: account, folder, message UID, file name.
-pub type FileKey = (u32, String, u32, String);
+pub(crate) type FileKey = (u32, String, u32, String);
 
 pub(super) fn key_of(item: &GalleryItem) -> FileKey {
     (
@@ -32,7 +32,7 @@ pub(super) fn key_of(item: &GalleryItem) -> FileKey {
 }
 
 #[derive(Debug)]
-pub enum GalleryInput {
+pub(crate) enum GalleryInput {
     /// A page came back from the cache: `offset` 0 replaces the list, anything
     /// else appends. `total` is how many the query matches altogether.
     Page {
@@ -147,7 +147,7 @@ pub enum GalleryInput {
 }
 
 #[derive(Debug)]
-pub enum GalleryOutput {
+pub(crate) enum GalleryOutput {
     /// Open the source message of an attachment in the reader.
     OpenMessage {
         account_id: u32,

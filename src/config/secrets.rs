@@ -47,7 +47,7 @@ fn keyring_thread() -> Option<&'static std::sync::mpsc::Sender<KeyringJob>> {
 }
 
 /// Queue `job` for the keyring thread and return at once.
-pub fn keyring_later(job: impl FnOnce() + Send + 'static) {
+pub(crate) fn keyring_later(job: impl FnOnce() + Send + 'static) {
     use std::sync::atomic::Ordering;
     // Counted down even when the job panics.
     struct Done;
@@ -76,7 +76,7 @@ pub fn keyring_later(job: impl FnOnce() + Send + 'static) {
 /// Wait, up to `limit`, for the jobs queued with [`keyring_later`] to be
 /// done; whether they were. Called on the way out: a password saved just
 /// before quitting would otherwise go with the process.
-pub fn keyring_drain(limit: std::time::Duration) -> bool {
+pub(crate) fn keyring_drain(limit: std::time::Duration) -> bool {
     let started = std::time::Instant::now();
     while KEYRING_QUEUED.load(std::sync::atomic::Ordering::SeqCst) > 0 {
         if started.elapsed() >= limit {
@@ -89,7 +89,7 @@ pub fn keyring_drain(limit: std::time::Duration) -> bool {
 
 /// Run `job` on the keyring thread and hand its answer to `done` on the main
 /// loop. Called from the main thread.
-pub fn keyring_then<T: Send + 'static>(
+pub(crate) fn keyring_then<T: Send + 'static>(
     job: impl FnOnce() -> T + Send + 'static,
     done: impl FnOnce(T) + 'static,
 ) {
@@ -164,30 +164,30 @@ pub(super) fn oauth_key(email: &str) -> String {
     format!("oauth:{email}")
 }
 
-pub fn store_oauth_refresh(email: &str, token: &str) -> keyring::Result<()> {
+pub(crate) fn store_oauth_refresh(email: &str, token: &str) -> keyring::Result<()> {
     set_secret(&oauth_key(email), token)
 }
 
-pub fn load_oauth_refresh(email: &str) -> Option<String> {
+pub(crate) fn load_oauth_refresh(email: &str) -> Option<String> {
     load_key(&oauth_key(email))
 }
 
-pub fn store_password(email: &str, password: &str) -> keyring::Result<()> {
+pub(crate) fn store_password(email: &str, password: &str) -> keyring::Result<()> {
     set_secret(email, password)
 }
 
 /// Cloud attachments (#144): an account's app password, by `CloudAccount::key`.
 /// The LDAP directories keep theirs through the same three functions, under
 /// `ldap:<source uid>` (see `crate::directory`).
-pub fn store_cloud_password(key: &str, password: &str) -> keyring::Result<()> {
+pub(crate) fn store_cloud_password(key: &str, password: &str) -> keyring::Result<()> {
     set_secret(key, password)
 }
 
-pub fn load_cloud_password(key: &str) -> Option<String> {
+pub(crate) fn load_cloud_password(key: &str) -> Option<String> {
     load_key(key)
 }
 
-pub fn delete_cloud_password(key: &str) {
+pub(crate) fn delete_cloud_password(key: &str) {
     let _ = delete_secret(key);
 }
 
@@ -220,35 +220,35 @@ fn eds_entry(uid: &str, label: &str) -> keyring::Result<keyring::Entry> {
 
 /// Store the password EDS signs in to the source `uid` with; `label` names
 /// the source in the keyring's own app.
-pub fn store_eds_password(uid: &str, label: &str, password: &str) -> keyring::Result<()> {
+pub(crate) fn store_eds_password(uid: &str, label: &str, password: &str) -> keyring::Result<()> {
     let (uid, label, password) = (uid.to_owned(), label.to_owned(), password.to_owned());
     on_keyring_thread(move || eds_entry(&uid, &label)?.set_password(&password))
 }
 
 /// Whether the keyring holds EDS's password for the source `uid`.
-pub fn has_eds_password(uid: &str) -> bool {
+pub(crate) fn has_eds_password(uid: &str) -> bool {
     let uid = uid.to_owned();
     on_keyring_thread(move || eds_entry(&uid, "").and_then(|e| e.get_password()).is_ok())
 }
 
-pub fn delete_eds_password(uid: &str) {
+pub(crate) fn delete_eds_password(uid: &str) {
     let uid = uid.to_owned();
     let _ = on_keyring_thread(move || eds_entry(&uid, "")?.delete_credential());
 }
 
-pub fn load_password(email: &str) -> Option<String> {
+pub(crate) fn load_password(email: &str) -> Option<String> {
     load_key(email)
 }
 
-pub fn store_smtp_password(email: &str, password: &str) -> keyring::Result<()> {
+pub(crate) fn store_smtp_password(email: &str, password: &str) -> keyring::Result<()> {
     set_secret(&smtp_key(email), password)
 }
 
-pub fn load_smtp_password(email: &str) -> Option<String> {
+pub(crate) fn load_smtp_password(email: &str) -> Option<String> {
     load_key(&smtp_key(email))
 }
 
-pub fn store_alias_smtp_password(
+pub(crate) fn store_alias_smtp_password(
     email: &str,
     alias_addr: &str,
     password: &str,
@@ -256,11 +256,11 @@ pub fn store_alias_smtp_password(
     set_secret(&alias_smtp_key(email, alias_addr), password)
 }
 
-pub fn load_alias_smtp_password(email: &str, alias_addr: &str) -> Option<String> {
+pub(crate) fn load_alias_smtp_password(email: &str, alias_addr: &str) -> Option<String> {
     load_key(&alias_smtp_key(email, alias_addr))
 }
 
-pub fn delete_alias_smtp_password(email: &str, alias_addr: &str) {
+pub(crate) fn delete_alias_smtp_password(email: &str, alias_addr: &str) {
     delete_key(&alias_smtp_key(email, alias_addr));
 }
 
@@ -268,7 +268,7 @@ pub fn delete_alias_smtp_password(email: &str, alias_addr: &str) {
 /// each alias's own SMTP password. Prefer this over bare [`delete_password`]
 /// whenever the account's config is still at hand — the alias entries are keyed
 /// by address, which only the config knows.
-pub fn delete_account_secrets(account: &AccountConfig) {
+pub(crate) fn delete_account_secrets(account: &AccountConfig) {
     delete_password(&account.email);
     for alias in &account.aliases {
         delete_alias_smtp_password(&account.email, &alias.address());
@@ -298,12 +298,12 @@ fn read_key(key: &str) -> Result<Option<String>, String> {
 }
 
 /// [`load_password`], with a keyring that could not be read as an error.
-pub fn read_password(email: &str) -> Result<Option<String>, String> {
+pub(crate) fn read_password(email: &str) -> Result<Option<String>, String> {
     read_key(email)
 }
 
 /// [`load_smtp_password`], with a keyring that could not be read as an error.
-pub fn read_smtp_password(email: &str) -> Result<Option<String>, String> {
+pub(crate) fn read_smtp_password(email: &str) -> Result<Option<String>, String> {
     read_key(&smtp_key(email))
 }
 
@@ -331,7 +331,7 @@ fn load_legacy_key(key: &str) -> Option<String> {
     None
 }
 
-pub fn delete_password(email: &str) {
+pub(crate) fn delete_password(email: &str) {
     delete_key(email);
     // Also drop the account's separate SMTP password and OAuth token, if any.
     delete_key(&smtp_key(email));

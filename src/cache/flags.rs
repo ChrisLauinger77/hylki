@@ -8,7 +8,7 @@ use crate::models::Message;
 use super::{split_keywords, Cache, KEYWORDS_COL};
 
 impl Cache {
-    pub fn set_unread(&self, account_id: u32, folder_path: &str, uid: u32, unread: bool) {
+    pub(crate) fn set_unread(&self, account_id: u32, folder_path: &str, uid: u32, unread: bool) {
         let _ = self.conn.execute(
             "UPDATE messages SET unread = ?1 WHERE account_id = ?2 AND folder_path = ?3 AND uid = ?4",
             params![unread, account_id, folder_path, uid],
@@ -17,7 +17,13 @@ impl Cache {
 
     /// Correct a message's attachment flag once its body has proved the answer,
     /// so the paperclip survives a restart rather than being re-guessed.
-    pub fn set_has_attachment(&self, account_id: u32, folder_path: &str, uid: u32, has: bool) {
+    pub(crate) fn set_has_attachment(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        uid: u32,
+        has: bool,
+    ) {
         let _ = self.conn.execute(
             "UPDATE messages SET has_attachment = ?4 \
              WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
@@ -25,14 +31,14 @@ impl Cache {
         );
     }
 
-    pub fn mark_folder_read(&self, account_id: u32, folder_path: &str) {
+    pub(crate) fn mark_folder_read(&self, account_id: u32, folder_path: &str) {
         let _ = self.conn.execute(
             "UPDATE messages SET unread = 0 WHERE account_id = ?1 AND folder_path = ?2",
             params![account_id, folder_path],
         );
     }
 
-    pub fn set_starred(&self, account_id: u32, folder_path: &str, uid: u32, starred: bool) {
+    pub(crate) fn set_starred(&self, account_id: u32, folder_path: &str, uid: u32, starred: bool) {
         let _ = self.conn.execute(
             "UPDATE messages SET starred = ?1 WHERE account_id = ?2 AND folder_path = ?3 AND uid = ?4",
             params![starred, account_id, folder_path, uid],
@@ -40,7 +46,13 @@ impl Cache {
     }
 
     /// Mark a cached row replied to, or forwarded (#454).
-    pub fn set_answered(&self, account_id: u32, folder_path: &str, uid: u32, forwarded: bool) {
+    pub(crate) fn set_answered(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        uid: u32,
+        forwarded: bool,
+    ) {
         let column = if forwarded { "forwarded" } else { "answered" };
         let _ = self.conn.execute(
             &format!("UPDATE messages SET {column} = 1 WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3"),
@@ -49,7 +61,12 @@ impl Cache {
     }
 
     /// Whether a cached row is marked replied to and forwarded (#454).
-    pub fn answer_state(&self, account_id: u32, folder_path: &str, uid: u32) -> (bool, bool) {
+    pub(crate) fn answer_state(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        uid: u32,
+    ) -> (bool, bool) {
         self.conn
             .query_row(
                 "SELECT answered, forwarded FROM messages WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
@@ -60,7 +77,7 @@ impl Cache {
     }
 
     /// Add or drop a keyword on a cached row (the server copy just changed).
-    pub fn set_keyword(
+    pub(crate) fn set_keyword(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -84,7 +101,12 @@ impl Cache {
     /// The uids in one folder whose cached server-side keywords include
     /// `keyword` (the keyword re-sync of #166 diffs this against the
     /// server's own search).
-    pub fn uids_with_keyword(&self, account_id: u32, folder_path: &str, keyword: &str) -> Vec<u32> {
+    pub(crate) fn uids_with_keyword(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        keyword: &str,
+    ) -> Vec<u32> {
         let needle = format!(" {} ", keyword.to_ascii_lowercase());
         let run = || -> rusqlite::Result<Vec<u32>> {
             let mut stmt = self.conn.prepare(
@@ -99,7 +121,7 @@ impl Cache {
     }
 
     /// The server-side keywords cached for one message (local tags excluded).
-    pub fn keywords_of(&self, account_id: u32, folder_path: &str, uid: u32) -> Vec<String> {
+    pub(crate) fn keywords_of(&self, account_id: u32, folder_path: &str, uid: u32) -> Vec<String> {
         self.conn
             .query_row(
                 "SELECT keywords FROM messages WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
@@ -114,7 +136,13 @@ impl Cache {
     /// can't hold it: POP3, or IMAP without `\*` in PERMANENTFLAGS. Keyed by
     /// Message-ID so the tag follows the message between folders and
     /// survives a re-sync of the row.
-    pub fn set_local_tag(&self, account_id: u32, message_id: &str, keyword: &str, add: bool) {
+    pub(crate) fn set_local_tag(
+        &self,
+        account_id: u32,
+        message_id: &str,
+        keyword: &str,
+        add: bool,
+    ) {
         if message_id.is_empty() {
             return;
         }
@@ -133,7 +161,7 @@ impl Cache {
 
     /// Fold the account's locally-kept tags into freshly fetched summaries, so
     /// what the worker hands the app matches what a cache load would show.
-    pub fn apply_local_tags(&self, account_id: u32, messages: &mut [Message]) {
+    pub(crate) fn apply_local_tags(&self, account_id: u32, messages: &mut [Message]) {
         let run = || -> rusqlite::Result<Vec<(String, String)>> {
             let mut stmt = self
                 .conn
@@ -157,7 +185,7 @@ impl Cache {
     /// How many cached messages of the account carry `keyword` (server or
     /// local), for the tag finder's report where the server itself gives no
     /// count (Microsoft 365 categories).
-    pub fn count_with_keyword(&self, account_id: u32, keyword: &str) -> usize {
+    pub(crate) fn count_with_keyword(&self, account_id: u32, keyword: &str) -> usize {
         let needle = format!(" {} ", keyword.to_ascii_lowercase());
         let sql = format!(
             "SELECT count(*) FROM messages \

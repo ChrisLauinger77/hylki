@@ -26,7 +26,7 @@ mod wordmark;
 
 use goa::rebuild_goa_rows;
 use manual::{form_has_input, wizard_providers};
-pub use messages::{WelcomeCmd, WelcomeInput, WelcomeOutput, WelcomePrefs};
+pub(crate) use messages::{WelcomeCmd, WelcomeInput, WelcomeOutput, WelcomePrefs};
 use pages::{
     build_done_page, build_goa_page, build_hero_page, build_personalize_page, build_privacy_page,
     build_wordmark, card, page, pill, scrolled, title, GoaPage, PersonalizePage, PrivacyPage,
@@ -37,7 +37,7 @@ pub(crate) use wordmark::{
     wordmark_height, wordmark_height_of, wordmark_picture, wordmark_picture_of, Wordmark,
 };
 
-pub struct Welcome {
+pub(crate) struct Welcome {
     goa: Vec<crate::goa::GoaMailAccount>,
     /// Emails added so far (either path), shown on the account page and used
     /// to relabel the final button.
@@ -52,7 +52,7 @@ pub struct Welcome {
     manual_added: bool,
 }
 
-pub struct WelcomeWidgets {
+pub(crate) struct WelcomeWidgets {
     carousel: adw::Carousel,
     back_btn: gtk::Button,
     wordmark_frame: gtk::Box,

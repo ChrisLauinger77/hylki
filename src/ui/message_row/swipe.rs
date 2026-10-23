@@ -17,7 +17,7 @@ use std::rc::Rc;
 // `foreground` is the row's real content, translated across it via a
 // `GskTransform` on its allocation as the swipe drags it, Gmail-style.
 glib::wrapper! {
-    pub struct SwipeSurface(ObjectSubclass<swipe_surface_imp::SwipeSurface>)
+    pub(crate) struct SwipeSurface(ObjectSubclass<swipe_surface_imp::SwipeSurface>)
         @extends gtk::Widget,
         @implements adw::Swipeable;
 }
@@ -77,12 +77,12 @@ pub(super) mod swipe_surface_imp {
     use gtk::glib;
     use gtk::prelude::*;
 
-    pub struct SwipeSurface {
-        pub progress_px: Cell<f64>,
+    pub(crate) struct SwipeSurface {
+        pub(crate) progress_px: Cell<f64>,
         /// Trackpad sensitivity (see `super::SWIPE_MAX`). Never 0 — that
         /// would divide by zero in `distance`/`progress` — so this can't
         /// simply be `#[derive(Default)]`.
-        pub sensitivity: Cell<f64>,
+        pub(crate) sensitivity: Cell<f64>,
     }
 
     impl Default for SwipeSurface {
@@ -249,7 +249,7 @@ pub(super) mod swipe_surface_imp {
 /// touchscreen drag exactly 1:1 with the pointer, whatever the preference
 /// says), and caps the result at one full swipe so a long trackpad scroll
 /// can't push the row on past the action strip.
-pub fn swipe_progress_px(progress: f64, sensitivity: f64) -> f64 {
+pub(crate) fn swipe_progress_px(progress: f64, sensitivity: f64) -> f64 {
     (progress * SWIPE_MAX * sensitivity).clamp(-SWIPE_MAX, SWIPE_MAX)
 }
 
@@ -528,7 +528,7 @@ impl Row {
     }
 
     /// Drive a full swipe and release (a screenshot hook).
-    pub fn debug_swipe(&self, left: bool) {
+    pub(crate) fn debug_swipe(&self, left: bool) {
         let px = if left { -SWIPE_MAX } else { SWIPE_MAX };
         self.swipe_update(px);
         self.swipe_end();

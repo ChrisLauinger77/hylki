@@ -11,27 +11,27 @@ use relm4::prelude::*;
 /// a picture, selected text. Each adds its own entries at the top of the
 /// message's menu.
 #[derive(Debug, Clone, Default)]
-pub struct MenuHit {
+pub(crate) struct MenuHit {
     /// A link the reader would open on a click (web and mail links only).
-    pub link: Option<String>,
+    pub(crate) link: Option<String>,
     /// The picture's URI: a `data:` one for mail's own pictures.
-    pub image: Option<String>,
+    pub(crate) image: Option<String>,
     /// The selected text, when the click was on it.
-    pub selection: Option<String>,
+    pub(crate) selection: Option<String>,
     /// The message's translation entry (#327), when a service is set up:
     /// what it says, and the reader to tell.
-    pub translate: Option<TranslateEntry>,
+    pub(crate) translate: Option<TranslateEntry>,
     /// Expand All and Collapse All (#326), in a conversation: whether any
     /// message is folded, whether any is open, and the reader to tell.
-    pub folds: Option<(bool, bool, relm4::Sender<MessageViewInput>)>,
+    pub(crate) folds: Option<(bool, bool, relm4::Sender<MessageViewInput>)>,
 }
 
 /// Translate, Show Original or Show Translation in a message's menu, sent
 /// back to the reader that showed the menu (the main one or a pop-out's).
 #[derive(Clone)]
-pub struct TranslateEntry {
-    pub label: String,
-    pub reader: relm4::Sender<MessageViewInput>,
+pub(crate) struct TranslateEntry {
+    pub(crate) label: String,
+    pub(crate) reader: relm4::Sender<MessageViewInput>,
 }
 
 impl std::fmt::Debug for TranslateEntry {

@@ -18,7 +18,7 @@ use std::rc::Rc;
 /// row is so each sits over its column. `sorted` is the column the list is
 /// sorted by and whether it runs downwards; a heading sorts the list by its
 /// column when clicked.
-pub fn fill_headings(
+pub(crate) fn fill_headings(
     bar: &gtk::Box,
     look: &RowLook,
     sorted: Option<(ListColumn, bool)>,
@@ -259,7 +259,7 @@ pub(super) fn due_label(due: i64) -> String {
 
 /// A pill as a GTK label: a tag in its color class, a Gmail label in the
 /// palette color its name picks (both from the app's tag stylesheet).
-pub fn pill_label(pill: &crate::models::Pill) -> gtk::Label {
+pub(crate) fn pill_label(pill: &crate::models::Pill) -> gtk::Label {
     match pill {
         crate::models::Pill::Tag(t) => {
             let chip = gtk::Label::new(Some(&t.name));
@@ -281,7 +281,7 @@ pub fn pill_label(pill: &crate::models::Pill) -> gtk::Label {
 /// The tag section of a message menu (#71): one entry per tag, its swatch
 /// filled where the message carries it; choosing an entry toggles that tag
 /// through `toggle(keyword, add)`.
-pub fn tag_menu_entries(
+pub(crate) fn tag_menu_entries(
     tags: &[crate::config::Tag],
     msg: &Message,
     toggle: impl Fn(String, bool) + Clone + 'static,

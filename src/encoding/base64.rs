@@ -2,7 +2,7 @@
 //! body's wrapped lines and truncated fetches need.
 
 /// Standard base64, for inline `data:` URIs.
-pub fn base64_encode(data: &[u8]) -> String {
+pub(crate) fn base64_encode(data: &[u8]) -> String {
     use base64::Engine;
     base64::engine::general_purpose::STANDARD.encode(data)
 }
@@ -11,7 +11,7 @@ pub fn base64_encode(data: &[u8]) -> String {
 /// MIME body wraps its lines) and a lone last character that cannot make a
 /// byte. `None` if the input isn't valid (which for a truncated fetch is a
 /// real possibility, not a bug).
-pub fn base64_decode(text: &str) -> Option<Vec<u8>> {
+pub(crate) fn base64_decode(text: &str) -> Option<Vec<u8>> {
     use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
     use base64::Engine;
     const LENIENT: GeneralPurpose = GeneralPurpose::new(

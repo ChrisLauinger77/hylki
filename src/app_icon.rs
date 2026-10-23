@@ -23,25 +23,25 @@ mod launcher;
 mod restart;
 
 use launcher::Launcher;
-pub use launcher::{launcher_settle_remaining, sync_mime_cache};
-pub use restart::{launch_restart_helper, run_restart_helper, RESTART_FLAG};
+pub(crate) use launcher::{launcher_settle_remaining, sync_mime_cache};
+pub(crate) use restart::{launch_restart_helper, run_restart_helper, RESTART_FLAG};
 
 /// One gallery entry: the id stored in settings, its label, and the art.
-pub struct IconChoice {
-    pub id: &'static str,
-    pub label: &'static str,
-    pub png: &'static [u8],
+pub(crate) struct IconChoice {
+    pub(crate) id: &'static str,
+    pub(crate) label: &'static str,
+    pub(crate) png: &'static [u8],
 }
 
 /// The id meaning "whatever this build ships".
-pub const DEFAULT_ID: &str = "default";
+pub(crate) const DEFAULT_ID: &str = "default";
 /// Bumped when a release's new default icon is to replace every existing
 /// choice once (1.23's blue bird envelope was generation 1; the Hylki
 /// envelope of 1.35, the first release under the new name, was 2; the
 /// opened envelope of 1.40 is 3): the first start on such a release resets
 /// the stored choice to the default, and records the generation so a
 /// choice made afterwards stands.
-pub const ICON_GENERATION: u32 = 3;
+pub(crate) const ICON_GENERATION: u32 = 3;
 
 /// The icon this build installs under its app ID.
 #[cfg(not(feature = "beta"))]
@@ -86,7 +86,7 @@ const CATALOG: &[IconChoice] = &[
 ];
 
 /// Every choice the gallery offers.
-pub fn catalog() -> impl Iterator<Item = &'static IconChoice> {
+pub(crate) fn catalog() -> impl Iterator<Item = &'static IconChoice> {
     CATALOG.iter()
 }
 
@@ -107,7 +107,7 @@ fn effective(id: &str) -> &'static str {
 }
 
 /// The artwork for an id (the default's for an unknown one).
-pub fn png_for(id: &str) -> &'static [u8] {
+pub(crate) fn png_for(id: &str) -> &'static [u8] {
     let id = effective(id);
     CATALOG
         .iter()
@@ -120,7 +120,7 @@ pub fn png_for(id: &str) -> &'static [u8] {
 /// That is the launcher's own icon when somebody set one outside Hylki
 /// (#252), a file or a name in the icon theme, and otherwise the gallery
 /// choice. An icon that cannot be read falls back to the choice.
-pub fn tray_image(id: &str) -> std::borrow::Cow<'static, [u8]> {
+pub(crate) fn tray_image(id: &str) -> std::borrow::Cow<'static, [u8]> {
     use std::borrow::Cow;
     let Some(icon) = custom_icon() else {
         return Cow::Borrowed(png_for(id));
@@ -153,7 +153,7 @@ pub fn tray_image(id: &str) -> std::borrow::Cow<'static, [u8]> {
 /// default) never silently swaps the icon someone chose, unless the
 /// launcher carries an icon set outside Hylki: that one is left alone
 /// until a pick in the app replaces it (#252).
-pub fn init_on_startup() -> String {
+pub(crate) fn init_on_startup() -> String {
     if std::env::var("HYLKI_DEMO").is_ok() {
         return DEFAULT_ID.to_string();
     }
@@ -179,7 +179,7 @@ pub fn init_on_startup() -> String {
 
 /// Persist a choice and put it on the desktop, over an icon set outside
 /// Hylki too: this is the user picking one in the app.
-pub fn set(id: &str) -> String {
+pub(crate) fn set(id: &str) -> String {
     let id = effective(id).to_string();
     crate::config::save_app_icon(&id);
     if std::env::var("HYLKI_DEMO").is_err() {
@@ -192,7 +192,7 @@ pub fn set(id: &str) -> String {
 /// there: a menu editor, a hand edit, an icon theme's name (#252). Hylki
 /// only ever writes the app's own icon name or the file of a gallery
 /// choice, so anything else was the user's doing.
-pub fn custom_icon() -> Option<String> {
+pub(crate) fn custom_icon() -> Option<String> {
     if std::env::var("HYLKI_DEMO").is_ok() {
         return None;
     }
@@ -219,7 +219,7 @@ fn icon_is_ours(value: &str) -> bool {
 /// caches app icons by name for the life of the session and never re-reads
 /// a file it has already shown, so swapping the art under one name shows
 /// nothing until the next login.
-pub fn icon_name(id: &str) -> String {
+pub(crate) fn icon_name(id: &str) -> String {
     format!("{}-{id}", crate::APP_ID)
 }
 
@@ -243,7 +243,7 @@ fn hicolor_dir() -> Option<PathBuf> {
 /// An icon folder only Hylki writes to, which its own icon lookups search in
 /// place of the shared ones (`icon_theme::apply_icon_theme`): the chosen app
 /// icon is copied here so the window finds it by name.
-pub fn private_icons_root() -> Option<PathBuf> {
+pub(crate) fn private_icons_root() -> Option<PathBuf> {
     Some(dirs::data_dir()?.join("hylki/icons"))
 }
 
@@ -418,7 +418,7 @@ fn touch(dir: &std::path::Path) {
 
 /// A texture of an icon, decoded at `px` pixels (call with 2x the display
 /// size for HiDPI) rather than the full 512, to keep a gallery cheap.
-pub fn texture(id: &str, px: i32) -> Option<gtk::gdk::Texture> {
+pub(crate) fn texture(id: &str, px: i32) -> Option<gtk::gdk::Texture> {
     use gtk::gdk_pixbuf::PixbufLoader;
     use gtk::prelude::PixbufLoaderExt;
     thread_local! {

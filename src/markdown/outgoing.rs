@@ -10,7 +10,7 @@
 /// spam folder, and a `<style>` block restyles whatever it lands in. The
 /// structure mail actually needs — tables, inline styles, images, the tags
 /// Markdown emits — all survives.
-pub fn sanitize_outgoing(html: &str) -> String {
+pub(crate) fn sanitize_outgoing(html: &str) -> String {
     use std::collections::HashSet;
     let mut b = ammonia::Builder::default();
     b.add_tags([
@@ -83,7 +83,7 @@ pub fn sanitize_outgoing(html: &str) -> String {
 /// message into the HTML view shows something a person can edit rather than
 /// one unbroken line. Nothing inside a `<pre>` is touched, where a line
 /// break would change the message.
-pub fn pretty_html(html: &str) -> String {
+pub(crate) fn pretty_html(html: &str) -> String {
     const BLOCKS: &[&str] = &[
         "p",
         "div",

@@ -39,7 +39,7 @@ mod body;
 mod html;
 mod text;
 
-pub use action::{one_click_post, parse_mailto, MailtoTarget};
+pub(crate) use action::{one_click_post, parse_mailto, MailtoTarget};
 use body::BodyFindings;
 use html::scan_html;
 use text::scan_text;
@@ -56,7 +56,7 @@ fn detect_raw(raw: &[u8]) -> Option<Unsubscribe> {
 }
 
 /// Read everything a parsed message offers, headers and body.
-pub fn detect(parsed: &mail_parser::Message) -> Option<Unsubscribe> {
+pub(crate) fn detect(parsed: &mail_parser::Message) -> Option<Unsubscribe> {
     let headers = header_handles(parsed);
     let post = raw_header_values(parsed, "List-Unsubscribe-Post")
         .into_iter()
@@ -174,7 +174,7 @@ fn raw_header_values(parsed: &mail_parser::Message, name: &str) -> Vec<String> {
 
 /// Build the handles from header values: every `List-Unsubscribe`-like
 /// value, the `List-Unsubscribe-Post` value and the `List-Id`.
-pub fn from_headers(
+pub(crate) fn from_headers(
     list_unsubscribe: &[String],
     post: Option<&str>,
     list_id: Option<&str>,

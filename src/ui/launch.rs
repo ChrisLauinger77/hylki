@@ -32,7 +32,7 @@ use std::rc::Rc;
 
 /// The stored choice that means "let the desktop's app chooser ask, every
 /// time" rather than naming one browser (#232).
-pub const ASK: &str = "ask";
+pub(crate) const ASK: &str = "ask";
 
 thread_local! {
     /// Settings → System → Links: empty for the desktop's default handler,
@@ -43,16 +43,16 @@ thread_local! {
 }
 
 /// Point every following link at `choice` (see [`BROWSER`]).
-pub fn set_browser(choice: &str) {
+pub(crate) fn set_browser(choice: &str) {
     BROWSER.with(|b| *b.borrow_mut() = choice.to_string());
 }
 
 /// One browser the user can send links to: the desktop entry that launches
 /// it, and the name to show.
 #[derive(Debug, Clone)]
-pub struct Browser {
-    pub id: String,
-    pub name: String,
+pub(crate) struct Browser {
+    pub(crate) id: String,
+    pub(crate) name: String,
 }
 
 /// The browsers this process can actually launch — the desktop entries
@@ -62,7 +62,7 @@ pub struct Browser {
 /// not visible there, and nothing in them could be run from inside anyway.
 /// Links then go out through the portal, which is what the "Ask each time"
 /// choice is for.
-pub fn browsers() -> Vec<Browser> {
+pub(crate) fn browsers() -> Vec<Browser> {
     let mut found: Vec<Browser> = Vec::new();
     for info in gio::AppInfo::all_for_type("x-scheme-handler/https") {
         let Some(id) = info.id().map(|s| s.to_string()) else {
@@ -85,7 +85,7 @@ pub fn browsers() -> Vec<Browser> {
 
 /// Open a web or mail link in the app the desktop has for it — or, when one
 /// was chosen in Settings, in that browser (#232).
-pub fn open_link(uri: &str, parent: Option<&gtk::Window>) {
+pub(crate) fn open_link(uri: &str, parent: Option<&gtk::Window>) {
     tracing::info!("link: opening {}", describe(uri));
     let choice = BROWSER.with(|b| b.borrow().clone());
     // A mailto: link is not a browser's business: it goes to whatever the

@@ -67,14 +67,14 @@ use crate::encoding::percent;
 pub(crate) use crate::single_instance::primary_instance_running;
 use crate::single_instance::{relay_to_primary, UriKind};
 
-pub const APP_ID: &str = if cfg!(feature = "beta") {
+pub(crate) const APP_ID: &str = if cfg!(feature = "beta") {
     "co.hyprlab.Hylki.Beta"
 } else {
     "co.hyprlab.Hylki"
 };
 
 /// The user-visible application name.
-pub const APP_NAME: &str = if cfg!(feature = "beta") {
+pub(crate) const APP_NAME: &str = if cfg!(feature = "beta") {
     "Hylki (beta)"
 } else {
     "Hylki"
@@ -83,7 +83,7 @@ pub const APP_NAME: &str = if cfg!(feature = "beta") {
 /// The user-visible version — the crate version verbatim. Beta builds carry a
 /// semver prerelease in Cargo.toml itself (e.g. "1.18.2-beta.2" on the beta
 /// branch), so no suffix is bolted on here.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Counts what Rust code holds, for the memory section of an exported log.
 #[global_allocator]
@@ -91,15 +91,16 @@ static ALLOCATOR: memory_report::CountingAllocator = memory_report::CountingAllo
 
 /// Command-line flag for starting without a window (used by the autostart entry
 /// the background portal writes).
-pub const HIDDEN_FLAG: &str = "--hidden";
+pub(crate) const HIDDEN_FLAG: &str = "--hidden";
 /// Set in the environment before the restart the welcome wizard's language
 /// pick asks for, so the instance that comes back opens the wizard again
 /// (the restart helper keeps it; app init clears it).
-pub const WIZARD_AGAIN_VAR: &str = "HYLKI_WIZARD_AGAIN";
+pub(crate) const WIZARD_AGAIN_VAR: &str = "HYLKI_WIZARD_AGAIN";
 
 /// Whether this run started hidden. Read once the UI is built, to keep the first
 /// activation from presenting the window that was deliberately not shown.
-pub static HIDDEN_START: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub(crate) static HIDDEN_START: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// Marks a `GSK_RENDERER` that Hylki set itself, so a restart, which
 /// inherits the environment, does not take it for the session's own.

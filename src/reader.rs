@@ -29,7 +29,7 @@ pub(crate) use walk::is_hidden;
 /// The reader document for one message body: the extracted content in a
 /// full HTML document carrying the reader sheet. `body` is the message as
 /// cached (HTML, or the plain-text wrapper the worker builds).
-pub fn render(body: &str, dark: bool, accent: &str) -> String {
+pub(crate) fn render(body: &str, dark: bool, accent: &str) -> String {
     format!(
         // The content sits directly in the body, no wrapper: the wrapper
         // script's quote fold looks for a quote's topmost ancestor *under
@@ -43,7 +43,7 @@ pub fn render(body: &str, dark: bool, accent: &str) -> String {
 }
 
 /// The message's content as a clean HTML fragment (see the module notes).
-pub fn extract(body: &str) -> String {
+pub(crate) fn extract(body: &str) -> String {
     // A body with no markup at all is plain text, cached as it came: shown
     // line for line, as the ordinary view shows it (see `body_html`).
     if !body.contains('<') {
@@ -57,7 +57,7 @@ pub fn extract(body: &str) -> String {
 
 /// [`extract`]'s fragment as its top-level blocks, in order: what a
 /// translation (#327) splits a long message at.
-pub fn extract_blocks(body: &str) -> Vec<String> {
+pub(crate) fn extract_blocks(body: &str) -> Vec<String> {
     if !body.contains('<') {
         return vec![format!(
             "<div class=\"hylki-plain\">{}</div>",

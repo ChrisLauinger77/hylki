@@ -17,7 +17,7 @@ mod editor;
 use editor::build_editor;
 
 /// How a kind is named in the editor and the list.
-pub struct CloudAccounts {
+pub(crate) struct CloudAccounts {
     accounts: Vec<CloudAccount>,
     /// Keyring keys of the servers already asked which product they are
     /// (accounts from before the picker told them apart), so a list
@@ -42,7 +42,7 @@ pub struct CloudAccounts {
 type SaveAction = Rc<RefCell<Option<Rc<dyn Fn() -> bool>>>>;
 
 #[derive(Debug)]
-pub enum CloudAccountsInput {
+pub(crate) enum CloudAccountsInput {
     Add,
     /// The editor for a new account of that kind.
     AddOf(CloudKind),
@@ -82,13 +82,13 @@ pub enum CloudAccountsInput {
 }
 
 #[derive(Debug)]
-pub enum CloudAccountsOutput {
+pub(crate) enum CloudAccountsOutput {
     /// The editor page is up (or gone): the settings window hides its
     /// shared header meanwhile and asks before moving on.
     EditorOpen(bool),
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl SimpleComponent for CloudAccounts {
     type Init = ();
     type Input = CloudAccountsInput;

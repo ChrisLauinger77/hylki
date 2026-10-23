@@ -26,17 +26,17 @@ use crate::directory::eds_source::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Account {
+pub(crate) struct Account {
     /// The EDS source UID; empty for one not made yet.
-    pub uid: String,
-    pub name: String,
+    pub(crate) uid: String,
+    pub(crate) name: String,
     /// The server as given: an address EDS starts looking for the address
     /// books from (`https://cloud.example.org`, or a full CardDAV URL).
-    pub url: String,
-    pub user: String,
-    pub enabled: bool,
+    pub(crate) url: String,
+    pub(crate) user: String,
+    pub(crate) enabled: bool,
     /// The address books EDS found on the server, by name.
-    pub books: Vec<String>,
+    pub(crate) books: Vec<String>,
     /// The registry's object for the source, for writing and removing it.
     path: String,
     /// The source as EDS keeps it, so saving keeps the keys Hylki does not
@@ -45,7 +45,7 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Account {
             uid: String::new(),
             name: String::new(),
@@ -59,7 +59,7 @@ impl Account {
     }
 
     /// The name shown in lists: the given one, or the user at the server.
-    pub fn title(&self) -> String {
+    pub(crate) fn title(&self) -> String {
         if !self.name.trim().is_empty() {
             return self.name.trim().to_string();
         }
@@ -125,17 +125,17 @@ impl Account {
 
 /// A server address taken apart the way EDS keeps it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerUrl {
+pub(crate) struct ServerUrl {
     /// The whole address, with its scheme.
-    pub url: String,
-    pub host: String,
-    pub port: u16,
-    pub tls: bool,
+    pub(crate) url: String,
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) tls: bool,
 }
 
 /// Read what was typed as the server. A bare name is taken as HTTPS, which
 /// every hosted CardDAV service speaks.
-pub fn parse_url(text: &str) -> Result<ServerUrl, String> {
+pub(crate) fn parse_url(text: &str) -> Result<ServerUrl, String> {
     let text = text.trim();
     if text.is_empty() {
         return Err(i18n("Enter the server's address."));
@@ -173,7 +173,7 @@ pub fn parse_url(text: &str) -> Result<ServerUrl, String> {
 
 /// Every CardDAV account EDS knows that is not GNOME Online Accounts', with
 /// the address books found for each, Evolution's own accounts included.
-pub fn list() -> Result<Vec<Account>, String> {
+pub(crate) fn list() -> Result<Vec<Account>, String> {
     let sources = crate::contacts::registry_sources().ok_or_else(not_available)?;
     let mut books: HashMap<String, Vec<String>> = HashMap::new();
     for (_, _, data) in &sources {
@@ -209,7 +209,7 @@ pub fn list() -> Result<Vec<Account>, String> {
 
 /// Make or update an account; a new password replaces the kept one, none
 /// keeps it. Answers the account's UID.
-pub fn save(account: &Account, password: Option<&str>) -> Result<String, String> {
+pub(crate) fn save(account: &Account, password: Option<&str>) -> Result<String, String> {
     let url = parse_url(&account.url)?;
     let conn = bus()?;
     let dest = registry()?;
@@ -238,7 +238,7 @@ pub fn save(account: &Account, password: Option<&str>) -> Result<String, String>
 }
 
 /// Switch an account on or off without touching the rest of it.
-pub fn set_enabled(account: &Account, enabled: bool) -> Result<(), String> {
+pub(crate) fn set_enabled(account: &Account, enabled: bool) -> Result<(), String> {
     let mut a = account.clone();
     a.enabled = enabled;
     save(&a, None).map(|_| ())
@@ -246,7 +246,7 @@ pub fn set_enabled(account: &Account, enabled: bool) -> Result<(), String> {
 
 /// Remove an account and its address books from EDS. Nothing on the server
 /// changes.
-pub fn remove(account: &Account) -> Result<(), String> {
+pub(crate) fn remove(account: &Account) -> Result<(), String> {
     let conn = bus()?;
     let dest = registry()?;
     remove_source(&conn, &dest, &account.path)?;
@@ -255,13 +255,13 @@ pub fn remove(account: &Account) -> Result<(), String> {
 }
 
 /// Whether the keyring holds the account's password.
-pub fn has_password(account: &Account) -> bool {
+pub(crate) fn has_password(account: &Account) -> bool {
     crate::config::has_eds_password(&account.uid)
 }
 
 /// How an account is doing, for its row in Settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Status {
+pub(crate) enum Status {
     /// Signed in; the address books are those in [`Account::books`].
     Connected,
     /// EDS is still signing in, or looking for the address books.
@@ -273,7 +273,7 @@ pub enum Status {
 
 impl Status {
     /// What went wrong, in words, or `None` when nothing did.
-    pub fn problem(&self) -> Option<String> {
+    pub(crate) fn problem(&self) -> Option<String> {
         match self {
             Status::Connected | Status::Connecting => None,
             Status::NeedsPassword => Some(i18n("Enter the password to sign in.")),
@@ -284,7 +284,7 @@ impl Status {
 }
 
 /// Ask EDS how the account's sign-in went. Blocking: it asks the keyring too.
-pub fn status(account: &Account) -> Status {
+pub(crate) fn status(account: &Account) -> Status {
     let (Ok(conn), Ok(dest)) = (bus(), registry()) else {
         return Status::Failed(not_available());
     };
@@ -387,7 +387,7 @@ fn server_books() -> Vec<String> {
 /// synced in the last few minutes (all of them, with `force`) to fetch what
 /// changed. Blocking: run it off the main thread. Answers whether any book
 /// was synced, so the caller can read the contacts again.
-pub fn sync_books(force: bool) -> bool {
+pub(crate) fn sync_books(force: bool) -> bool {
     let (Ok(conn), Some(factory)) = (bus(), crate::contacts::factory_dest()) else {
         return false;
     };
@@ -433,7 +433,7 @@ const SIGN_IN_GRACE: Duration = Duration::from_secs(6);
 /// `limit`, then sync them. Answers the account as it stands then. With
 /// `signing_in`, a new password is being tried, so the books found with the
 /// old one prove nothing until EDS has had its time to sign in.
-pub fn await_books(uid: &str, limit: Duration, signing_in: bool) -> Option<Account> {
+pub(crate) fn await_books(uid: &str, limit: Duration, signing_in: bool) -> Option<Account> {
     let started = Instant::now();
     loop {
         let account = list()

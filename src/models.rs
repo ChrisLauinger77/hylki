@@ -8,11 +8,11 @@ mod message;
 mod outbox;
 mod verdicts;
 
-pub use attachments::*;
-pub use folders::*;
-pub use message::*;
-pub use outbox::*;
-pub use verdicts::*;
+pub(crate) use attachments::*;
+pub(crate) use folders::*;
+pub(crate) use message::*;
+pub(crate) use outbox::*;
+pub(crate) use verdicts::*;
 
 #[cfg(test)]
 pub(crate) mod test_util;
@@ -21,13 +21,13 @@ mod tests;
 
 /// A configured mail account (one IMAP/SMTP identity).
 #[derive(Debug, Clone)]
-pub struct Account {
-    pub id: u32,
-    pub name: String,
-    pub email: String,
+pub(crate) struct Account {
+    pub(crate) id: u32,
+    pub(crate) name: String,
+    pub(crate) email: String,
     /// How the account is labelled in the UI (All Inboxes, reader chip). Defaults
     /// to the email address.
-    pub label: String,
+    pub(crate) label: String,
     /// Accent color used for the account dot, as a CSS color string.
-    pub accent: String,
+    pub(crate) accent: String,
 }

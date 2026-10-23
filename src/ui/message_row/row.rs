@@ -15,8 +15,8 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 /// The row's widgets, built once.
-pub struct RowWidgets {
-    pub host: gtk::Box,
+pub(crate) struct RowWidgets {
+    pub(crate) host: gtk::Box,
     pub(super) revealer: gtk::Revealer,
     pub(super) surface: SwipeSurface,
     pub(super) swipe_bg: gtk::Box,
@@ -139,10 +139,10 @@ pub(super) struct RowState {
     pub(super) swipe_anim: Option<adw::TimedAnimation>,
 }
 
-pub struct Row {
+pub(crate) struct Row {
     pub(super) me: Weak<Row>,
     pub(super) shared: Weak<RowShared>,
-    pub w: RowWidgets,
+    pub(crate) w: RowWidgets,
     pub(super) st: RefCell<RowState>,
     pub(super) list_item: RefCell<glib::WeakRef<gtk::ListItem>>,
     /// Kept alive for as long as the row: the tracker stops firing once
@@ -178,12 +178,12 @@ impl Row {
         }
     }
 
-    pub fn data(&self) -> Option<Rc<RowData>> {
+    pub(crate) fn data(&self) -> Option<Rc<RowData>> {
         self.st.borrow().item.as_ref().map(|i| i.data())
     }
 
     /// The list position this row shows, while bound.
-    pub fn position(&self) -> Option<usize> {
+    pub(crate) fn position(&self) -> Option<usize> {
         let item = self.list_item.borrow().upgrade()?;
         self.st.borrow().item.as_ref()?;
         let pos = item.position();
@@ -192,7 +192,7 @@ impl Row {
 
     /// Whether the keyboard is on this row: on it, inside it, or on the list
     /// item around it, which is where the list view puts its focus.
-    pub fn has_focus_within(&self) -> bool {
+    pub(crate) fn has_focus_within(&self) -> bool {
         let host = self.w.host.upcast_ref::<gtk::Widget>();
         host.root().and_then(|r| r.focus()).is_some_and(|f| {
             f == *host || f.is_ancestor(host) || host.parent().is_some_and(|p| p == f)

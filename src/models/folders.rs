@@ -6,7 +6,7 @@ use crate::i18n::{i18n, i18n_f};
 
 /// The well-known role of a folder, used to pick an icon and ordering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FolderKind {
+pub(crate) enum FolderKind {
     Inbox,
     Starred,
     Sent,
@@ -21,7 +21,7 @@ pub enum FolderKind {
 }
 
 impl FolderKind {
-    pub fn icon(self) -> &'static str {
+    pub(crate) fn icon(self) -> &'static str {
         match self {
             FolderKind::Inbox => "mail-inbox-symbolic",
             FolderKind::Starred => "starred-symbolic",
@@ -40,31 +40,31 @@ impl FolderKind {
 /// Tags → Find Tags…) reports per account, before the user decides which
 /// become tags.
 #[derive(Debug, Clone)]
-pub struct KeywordFinding {
+pub(crate) struct KeywordFinding {
     /// The keyword as the server spells it (a Microsoft 365 category's name).
-    pub keyword: String,
+    pub(crate) keyword: String,
     /// A display name the server itself carries (Microsoft 365 categories).
-    pub name: Option<String>,
+    pub(crate) name: Option<String>,
     /// A color the server itself carries, `#rrggbb`.
-    pub color: Option<String>,
+    pub(crate) color: Option<String>,
     /// Messages carrying it, where the server could say (0 = not counted).
-    pub count: usize,
+    pub(crate) count: usize,
     /// The folders it was seen in (display names).
-    pub folders: Vec<String>,
+    pub(crate) folders: Vec<String>,
 }
 
 /// How much of an account's mail storage the server says is in use (#298),
 /// in bytes. Only servers that report a limit give one: IMAP's QUOTA
 /// extension and JMAP's quotas; Microsoft 365 and POP3 do not.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MailboxQuota {
-    pub used: u64,
-    pub limit: u64,
+pub(crate) struct MailboxQuota {
+    pub(crate) used: u64,
+    pub(crate) limit: u64,
 }
 
 impl MailboxQuota {
     /// The share in use, 0 to 1.
-    pub fn fraction(&self) -> f64 {
+    pub(crate) fn fraction(&self) -> f64 {
         if self.limit == 0 {
             return 0.0;
         }
@@ -72,7 +72,7 @@ impl MailboxQuota {
     }
 
     /// "2.1 GB of 15 GB used".
-    pub fn used_line(&self) -> String {
+    pub(crate) fn used_line(&self) -> String {
         i18n_f(
             "{used} of {limit} used",
             &[
@@ -83,7 +83,7 @@ impl MailboxQuota {
     }
 
     /// "12.9 GB free (86%)".
-    pub fn free_line(&self) -> String {
+    pub(crate) fn free_line(&self) -> String {
         let free = self.limit.saturating_sub(self.used);
         let pct = ((1.0 - self.fraction()) * 100.0).round() as u32;
         i18n_f(
@@ -95,17 +95,17 @@ impl MailboxQuota {
 
 /// A mail folder within an account.
 #[derive(Debug, Clone)]
-pub struct Folder {
-    pub id: u32,
-    pub account_id: u32,
-    pub name: String,
+pub(crate) struct Folder {
+    pub(crate) id: u32,
+    pub(crate) account_id: u32,
+    pub(crate) name: String,
     /// IMAP mailbox path (e.g. "INBOX", "INBOX.Sent"). For the mock backend
     /// this mirrors `name`.
-    pub path: String,
-    pub kind: FolderKind,
+    pub(crate) path: String,
+    pub(crate) kind: FolderKind,
     /// The sidebar chip's number: unread mail, except Drafts, where it is
     /// how many drafts there are (see `worker::chip_counts_all`).
-    pub unread: u32,
+    pub(crate) unread: u32,
 }
 
 /// Show the special folders under the app's own names for them in a language
@@ -114,7 +114,7 @@ pub struct Folder {
 /// keeps that name, and so does every folder in English: "Deleted Items"
 /// stays "Deleted Items" rather than becoming "Trash". Only the label
 /// changes; the path the server knows the folder by is left alone.
-pub fn localize_special_folder_names(folders: &mut [Folder]) {
+pub(crate) fn localize_special_folder_names(folders: &mut [Folder]) {
     for f in folders {
         let (label, english): (&str, &[&str]) = match f.kind {
             FolderKind::Inbox => ("Inbox", &["inbox"]),
@@ -156,7 +156,7 @@ pub fn localize_special_folder_names(folders: &mut [Folder]) {
 /// Whether `path` is one of an account's hidden folders (#239), or lies
 /// under one: hiding a folder hides its sub-folders with it. `delimiter`
 /// is the server's, when known; otherwise any of the usual three counts.
-pub fn folder_is_hidden(path: &str, delimiter: Option<&str>, hidden: &[String]) -> bool {
+pub(crate) fn folder_is_hidden(path: &str, delimiter: Option<&str>, hidden: &[String]) -> bool {
     hidden.iter().any(|h| {
         if h == path {
             return true;
@@ -178,7 +178,7 @@ pub fn folder_is_hidden(path: &str, delimiter: Option<&str>, hidden: &[String]) 
 /// Tasks and Journal sit at the top level; a lone "Notes" folder on any
 /// other server is somebody's mail. Top-level paths only: a sub-folder
 /// follows its parent through [`folder_is_hidden`].
-pub fn exchange_non_mail_folders(folders: &[Folder]) -> Vec<String> {
+pub(crate) fn exchange_non_mail_folders(folders: &[Folder]) -> Vec<String> {
     const MARKERS: [&str; 4] = ["calendar", "contacts", "tasks", "journal"];
     const HIDDEN: [&str; 10] = [
         "calendar",
@@ -213,7 +213,7 @@ pub fn exchange_non_mail_folders(folders: &[Folder]) -> Vec<String> {
 /// Whether a folder's own name makes it the Templates folder (#360). No
 /// server marks one, so the name is all there is to go by; any other is
 /// assigned under Special Folders.
-pub fn is_templates_name(name: &str) -> bool {
+pub(crate) fn is_templates_name(name: &str) -> bool {
     matches!(
         name.trim().to_lowercase().as_str(),
         "templates" | "template"
@@ -221,7 +221,7 @@ pub fn is_templates_name(name: &str) -> bool {
 }
 
 /// The [`FolderKind`] behind a Special Folders role key (#82).
-pub fn role_kind(role: &str) -> Option<FolderKind> {
+pub(crate) fn role_kind(role: &str) -> Option<FolderKind> {
     match role {
         "sent" => Some(FolderKind::Sent),
         "drafts" => Some(FolderKind::Drafts),
@@ -240,7 +240,7 @@ pub fn role_kind(role: &str) -> Option<FolderKind> {
 /// every listing so its counts see the assignment too — a folder assigned
 /// as Drafts counts every draft, like a detected one, rather than the
 /// unseen mail (none) its detected kind would count.
-pub fn assign_folder_roles(
+pub(crate) fn assign_folder_roles(
     roles: &std::collections::BTreeMap<String, String>,
     folders: &mut [Folder],
 ) {

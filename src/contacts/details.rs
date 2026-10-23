@@ -16,15 +16,15 @@ use super::vcard::{
 
 /// A postal address in the parts of a vCard ADR.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Postal {
-    pub label: String,
-    pub pobox: String,
-    pub extended: String,
-    pub street: String,
-    pub locality: String,
-    pub region: String,
-    pub code: String,
-    pub country: String,
+pub(crate) struct Postal {
+    pub(crate) label: String,
+    pub(crate) pobox: String,
+    pub(crate) extended: String,
+    pub(crate) street: String,
+    pub(crate) locality: String,
+    pub(crate) region: String,
+    pub(crate) code: String,
+    pub(crate) country: String,
 }
 
 impl Postal {
@@ -45,7 +45,7 @@ impl Postal {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         [
             &self.pobox,
             &self.extended,
@@ -78,7 +78,7 @@ impl Postal {
 
 /// A birthday as (year, month, day) from a stored BDAY, the year `None`
 /// when it has none ("--04-12").
-pub fn birthday_parts(raw: &str) -> Option<(Option<i32>, u32, u32)> {
+pub(crate) fn birthday_parts(raw: &str) -> Option<(Option<i32>, u32, u32)> {
     let head = raw.split('T').next().unwrap_or(raw).trim();
     let digits: String = head.chars().filter(|c| c.is_ascii_digit()).collect();
     let (year, month, day) = if head.starts_with("--") && digits.len() == 4 {
@@ -93,7 +93,7 @@ pub fn birthday_parts(raw: &str) -> Option<(Option<i32>, u32, u32)> {
 }
 
 /// A BDAY value from its parts, with no year as "--MM-DD".
-pub fn birthday_value(year: Option<i32>, month: u32, day: u32) -> String {
+pub(crate) fn birthday_value(year: Option<i32>, month: u32, day: u32) -> String {
     match year {
         Some(y) => format!("{y:04}-{month:02}-{day:02}"),
         None => format!("--{month:02}-{day:02}"),
@@ -103,47 +103,47 @@ pub fn birthday_value(year: Option<i32>, month: u32, day: u32) -> String {
 /// One labelled value on a contact (a "Home" email, a "Mobile" phone…). The
 /// label may be empty when the vCard carries no usable TYPE.
 #[derive(Debug, Clone)]
-pub struct Labeled {
-    pub label: String,
-    pub value: String,
+pub(crate) struct Labeled {
+    pub(crate) label: String,
+    pub(crate) value: String,
 }
 
 /// A fully parsed address-book entry, everything the in-app Contacts view
 /// shows. Read straight from the EDS vCards, so it matches GNOME Contacts.
 #[derive(Debug, Clone, Default)]
-pub struct ContactDetails {
-    pub name: String,
-    pub nickname: String,
-    pub org: String,
-    pub title: String,
-    pub birthday: String,
-    pub note: String,
-    pub emails: Vec<Labeled>,
-    pub phones: Vec<Labeled>,
-    pub addresses: Vec<Labeled>,
+pub(crate) struct ContactDetails {
+    pub(crate) name: String,
+    pub(crate) nickname: String,
+    pub(crate) org: String,
+    pub(crate) title: String,
+    pub(crate) birthday: String,
+    pub(crate) note: String,
+    pub(crate) emails: Vec<Labeled>,
+    pub(crate) phones: Vec<Labeled>,
+    pub(crate) addresses: Vec<Labeled>,
     /// The same addresses in their parts, for the editor.
-    pub postal: Vec<Postal>,
+    pub(crate) postal: Vec<Postal>,
     /// BDAY as stored ("1985-04-12", "--04-12"…), for the editor;
     /// `birthday` is it in words.
-    pub birthday_raw: String,
-    pub urls: Vec<String>,
-    pub photo: Option<Vec<u8>>,
+    pub(crate) birthday_raw: String,
+    pub(crate) urls: Vec<String>,
+    pub(crate) photo: Option<Vec<u8>>,
     /// [`photo_key`] of `photo`, set by [`read_contact_details`]; 0 when
     /// there is none or it was not worked out.
-    pub photo_key: u64,
+    pub(crate) photo_key: u64,
     /// EDS source UID of the book this contact came from — where edits go.
-    pub book_uid: String,
+    pub(crate) book_uid: String,
     /// That book's display name ("On This Computer", the CardDAV account…).
-    pub book_name: String,
+    pub(crate) book_name: String,
     /// The contact's own EDS UID (for deletion and deep links).
-    pub eds_uid: String,
+    pub(crate) eds_uid: String,
     /// The stored vCard, verbatim; edits patch this so unknown properties
     /// (PHOTO, UID, X-…) survive the round trip.
-    pub raw_vcard: String,
+    pub(crate) raw_vcard: String,
     /// Set for a contact group, with how its vCard keeps the members. A
     /// group has no `emails` of its own: its addresses are the members'.
-    pub group: Option<GroupFormat>,
-    pub members: Vec<Member>,
+    pub(crate) group: Option<GroupFormat>,
+    pub(crate) members: Vec<Member>,
     /// Members named by the UID of a contact in the same book
     /// (`urn:uuid:`), with the line naming them, until [`resolve_members`]
     /// looks them up.
@@ -155,20 +155,20 @@ pub struct ContactDetails {
     /// Mail to the group puts its members in Bcc, so they do not see each
     /// other's addresses: Evolution's "Hide addresses when sending mail to
     /// this list".
-    pub hide_addresses: bool,
+    pub(crate) hide_addresses: bool,
 }
 
 impl ContactDetails {
     /// Whether the card has a photo, held here or let go by the Contacts
     /// list once it made the list's thumbnail.
-    pub fn has_photo(&self) -> bool {
+    pub(crate) fn has_photo(&self) -> bool {
         self.photo.is_some() || self.photo_key != 0
     }
 
     /// The photo's bytes: those held, or read again from the card. The
     /// Contacts list keeps only thumbnails, since iCloud's megapixel photos
     /// came to some 40 MB held for the whole session (#504).
-    pub fn photo_bytes(&self) -> Option<Vec<u8>> {
+    pub(crate) fn photo_bytes(&self) -> Option<Vec<u8>> {
         if self.photo.is_some() || self.photo_key == 0 {
             return self.photo.clone();
         }
@@ -179,17 +179,17 @@ impl ContactDetails {
     }
 
     /// The address used for avatars and as the compose default.
-    pub fn primary_email(&self) -> Option<&str> {
+    pub(crate) fn primary_email(&self) -> Option<&str> {
         self.emails.first().map(|e| e.value.as_str())
     }
 
-    pub fn is_group(&self) -> bool {
+    pub(crate) fn is_group(&self) -> bool {
         self.group.is_some()
     }
 
     /// Whether the group can be changed here: Evolution's lists and
     /// Apple's groups, the kinds Hylki writes. A vCard 4 group is only read.
-    pub fn group_editable(&self) -> bool {
+    pub(crate) fn group_editable(&self) -> bool {
         matches!(
             self.group,
             Some(GroupFormat::Evolution | GroupFormat::Apple)
@@ -197,18 +197,18 @@ impl ContactDetails {
     }
 
     /// How a group member found by card is known in a set of addresses.
-    pub fn grouped_key(&self) -> String {
+    pub(crate) fn grouped_key(&self) -> String {
         format!("card:{}:{}", self.book_uid, self.eds_uid)
     }
 
     /// The members with an address to send to: an Apple group may hold
     /// people known only by a phone number.
-    pub fn reachable(&self) -> impl Iterator<Item = &Member> {
+    pub(crate) fn reachable(&self) -> impl Iterator<Item = &Member> {
         self.members.iter().filter(|m| !m.email.is_empty())
     }
 
     /// The members' addresses as one recipient field.
-    pub fn members_field(&self) -> String {
+    pub(crate) fn members_field(&self) -> String {
         self.reachable()
             .map(|m| crate::worker::format_recipient(&m.name, &m.email))
             .collect::<Vec<_>>()
@@ -218,7 +218,7 @@ impl ContactDetails {
 
 /// How a group's vCard lists its members.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GroupFormat {
+pub(crate) enum GroupFormat {
     /// `X-EVOLUTION-LIST:TRUE`, one `EMAIL` per member: what Evolution
     /// makes, and what Hylki writes, so an exported group imports there.
     Evolution,
@@ -232,9 +232,9 @@ pub enum GroupFormat {
 
 /// One person in a contact group.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Member {
-    pub name: String,
-    pub email: String,
+pub(crate) struct Member {
+    pub(crate) name: String,
+    pub(crate) email: String,
     /// The vCard line the member was read from, unfolded. An edit writes it
     /// back as it was, so what Evolution keeps about the member (the
     /// contact it was picked from, HTML mail) survives. Empty for a member
@@ -255,21 +255,21 @@ pub struct Member {
 impl Member {
     /// Whether `other` is the same person: the same card, or the same
     /// address.
-    pub fn same(&self, other: &Member) -> bool {
+    pub(crate) fn same(&self, other: &Member) -> bool {
         (!self.uid.is_empty() && self.uid == other.uid)
             || (!self.email.is_empty() && self.email.eq_ignore_ascii_case(&other.email))
             || (self.source.is_some() && self.source == other.source)
     }
 
     /// The key [`ContactDetails::grouped_key`] gives the member's card.
-    pub fn card_key(&self, book_uid: &str) -> Option<String> {
+    pub(crate) fn card_key(&self, book_uid: &str) -> Option<String> {
         (!self.uid.is_empty()).then(|| format!("card:{book_uid}:{}", self.uid))
     }
 }
 
 /// Every contact from the local + cached (CardDAV) EDS books, fully parsed
 /// and sorted by display name, contact groups among them.
-pub fn read_contact_details() -> Vec<ContactDetails> {
+pub(crate) fn read_contact_details() -> Vec<ContactDetails> {
     let mut out: Vec<ContactDetails> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
     let active = registry_books();
@@ -297,7 +297,7 @@ pub fn read_contact_details() -> Vec<ContactDetails> {
 
 /// A photo's identity, for the decoded avatars kept between reads. Never 0,
 /// which stands for no photo.
-pub fn photo_key(bytes: &[u8]) -> u64 {
+pub(crate) fn photo_key(bytes: &[u8]) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     bytes.hash(&mut hasher);

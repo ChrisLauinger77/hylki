@@ -4,7 +4,7 @@
 use super::*;
 
 #[derive(Debug)]
-pub enum AccountsInput {
+pub(crate) enum AccountsInput {
     /// Read GNOME Online Accounts again, for accounts added there since the
     /// list was made: the refresh button, and GOA saying one was added.
     RefreshGoa,
@@ -213,16 +213,16 @@ pub enum AccountsInput {
 /// One keyword the tag finder proposes as a tag: the tag as it would be
 /// added (name, keyword, color) and where the keyword was seen.
 #[derive(Debug, Clone)]
-pub struct TagProposal {
-    pub tag: crate::config::Tag,
+pub(crate) struct TagProposal {
+    pub(crate) tag: crate::config::Tag,
     /// Messages carrying it, where known (0 = not counted).
-    pub count: usize,
+    pub(crate) count: usize,
     /// "Folder" or "account: Folder" entries, for the report's subtitle.
-    pub places: Vec<String>,
+    pub(crate) places: Vec<String>,
 }
 
 #[derive(Debug)]
-pub enum AccountsOutput {
+pub(crate) enum AccountsOutput {
     /// `original_email` is `Some` (the pre-edit email) when editing, `None` when adding.
     Saved {
         original_email: Option<String>,
@@ -274,7 +274,7 @@ pub(super) type SignInResult = Result<(String, Option<(String, String)>), String
 
 /// Background command results for the editor.
 #[derive(Debug)]
-pub enum AccountsCmd {
+pub(crate) enum AccountsCmd {
     /// Test-connection result.
     Test(ConnTest),
     /// OAuth sign-in result: the refresh token, or an error message.
@@ -304,11 +304,11 @@ pub enum AccountsCmd {
 /// plus the mail-hygiene lists that live on this tab (filters, allow list,
 /// blocklist).
 #[derive(Debug, Clone)]
-pub struct AccountsInit {
-    pub accounts: Vec<AccountConfig>,
-    pub allowed_senders: Vec<String>,
-    pub blacklist: Vec<String>,
-    pub filters: Vec<crate::config::FilterRule>,
-    pub tags: Vec<crate::config::Tag>,
-    pub smart_folders: Vec<crate::config::SmartFolder>,
+pub(crate) struct AccountsInit {
+    pub(crate) accounts: Vec<AccountConfig>,
+    pub(crate) allowed_senders: Vec<String>,
+    pub(crate) blacklist: Vec<String>,
+    pub(crate) filters: Vec<crate::config::FilterRule>,
+    pub(crate) tags: Vec<crate::config::Tag>,
+    pub(crate) smart_folders: Vec<crate::config::SmartFolder>,
 }

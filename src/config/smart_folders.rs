@@ -12,28 +12,28 @@ use super::{config_file, is_false, save_private_toml};
 /// or every folder but Trash and Junk, and keeps the messages its
 /// conditions match, all of them or any one.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct SmartFolder {
+pub(crate) struct SmartFolder {
     /// A name of its own for the sidebar to find it by, kept when renamed.
-    pub id: String,
-    pub name: String,
+    pub(crate) id: String,
+    pub(crate) name: String,
     /// The account it looks in; empty for every account in the unified
     /// section.
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub account_email: String,
+    pub(crate) account_email: String,
     /// The kind of folder it looks in; none for every folder but Trash and
     /// Junk.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub folder: Option<SmartFolderKind>,
+    pub(crate) folder: Option<SmartFolderKind>,
     #[serde(default, skip_serializing_if = "is_false")]
-    pub any: bool,
+    pub(crate) any: bool,
     #[serde(default)]
-    pub conditions: Vec<SmartCondition>,
+    pub(crate) conditions: Vec<SmartCondition>,
 }
 
 /// The kinds of folder a smart folder can be held to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SmartFolderKind {
+pub(crate) enum SmartFolderKind {
     Inbox,
     Sent,
     Drafts,
@@ -44,7 +44,7 @@ pub enum SmartFolderKind {
 
 impl SmartFolderKind {
     /// Every kind, in the order the editor lists them.
-    pub const ALL: [SmartFolderKind; 6] = [
+    pub(crate) const ALL: [SmartFolderKind; 6] = [
         SmartFolderKind::Inbox,
         SmartFolderKind::Sent,
         SmartFolderKind::Drafts,
@@ -53,7 +53,7 @@ impl SmartFolderKind {
         SmartFolderKind::Trash,
     ];
 
-    pub fn kind(self) -> crate::models::FolderKind {
+    pub(crate) fn kind(self) -> crate::models::FolderKind {
         use crate::models::FolderKind;
         match self {
             SmartFolderKind::Inbox => FolderKind::Inbox,
@@ -69,14 +69,14 @@ impl SmartFolderKind {
 /// One condition of a [`SmartFolder`]: the filter conditions, which look at
 /// text, and the message's own state, which a filter has no use for.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct SmartCondition {
-    pub field: SmartField,
+pub(crate) struct SmartCondition {
+    pub(crate) field: SmartField,
     #[serde(default = "contains_match")]
-    pub matcher: FilterMatch,
+    pub(crate) matcher: FilterMatch,
     /// The text to match, commas separating alternatives, or for
     /// [`SmartField::Tagged`] the tag's keyword (empty for any tag).
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub value: String,
+    pub(crate) value: String,
 }
 
 fn contains_match() -> FilterMatch {
@@ -85,7 +85,7 @@ fn contains_match() -> FilterMatch {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SmartField {
+pub(crate) enum SmartField {
     FromAddress,
     FromName,
     Subject,
@@ -105,7 +105,7 @@ pub enum SmartField {
 
 impl SmartField {
     /// Every field, in the order the editor lists them.
-    pub const ALL: [SmartField; 14] = [
+    pub(crate) const ALL: [SmartField; 14] = [
         SmartField::Starred,
         SmartField::NotStarred,
         SmartField::Unread,
@@ -124,7 +124,7 @@ impl SmartField {
 
     /// The filter field the condition matches through, for the ones that
     /// look at text or the address books.
-    pub fn filter_field(self) -> Option<FilterField> {
+    pub(crate) fn filter_field(self) -> Option<FilterField> {
         Some(match self {
             SmartField::FromAddress => FilterField::FromAddress,
             SmartField::FromName => FilterField::FromName,
@@ -139,25 +139,25 @@ impl SmartField {
     }
 
     /// Whether the field takes text to match.
-    pub fn takes_text(self) -> bool {
+    pub(crate) fn takes_text(self) -> bool {
         self.filter_field().is_some_and(|f| !f.is_contact_check())
     }
 }
 
 /// What a smart folder's conditions look at in one message.
-pub struct SmartInput<'a> {
-    pub text: FilterInput<'a>,
-    pub starred: bool,
-    pub unread: bool,
-    pub attachment: bool,
-    pub keywords: &'a [String],
+pub(crate) struct SmartInput<'a> {
+    pub(crate) text: FilterInput<'a>,
+    pub(crate) starred: bool,
+    pub(crate) unread: bool,
+    pub(crate) attachment: bool,
+    pub(crate) keywords: &'a [String],
     /// The keywords of the tags there are, lower case: what "any tag" means,
     /// since a server sets keywords of its own ($Forwarded, $Junk) too.
-    pub tags: &'a [String],
+    pub(crate) tags: &'a [String],
 }
 
 impl SmartCondition {
-    pub fn matches(&self, input: &SmartInput) -> bool {
+    pub(crate) fn matches(&self, input: &SmartInput) -> bool {
         match self.field {
             SmartField::Starred => input.starred,
             SmartField::NotStarred => !input.starred,
@@ -190,16 +190,16 @@ impl SmartCondition {
 /// What the cache can rule out before a message is read: the state the
 /// conditions require when every one of them must hold.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct SmartPrefilter {
-    pub starred: Option<bool>,
-    pub unread: Option<bool>,
-    pub attachment: Option<bool>,
+pub(crate) struct SmartPrefilter {
+    pub(crate) starred: Option<bool>,
+    pub(crate) unread: Option<bool>,
+    pub(crate) attachment: Option<bool>,
 }
 
 impl SmartFolder {
     /// Every condition holds, or with `any` one does. A folder with no
     /// conditions keeps everything it looks at.
-    pub fn matches(&self, input: &SmartInput) -> bool {
+    pub(crate) fn matches(&self, input: &SmartInput) -> bool {
         if self.conditions.is_empty() {
             return true;
         }
@@ -210,7 +210,7 @@ impl SmartFolder {
         }
     }
 
-    pub fn prefilter(&self) -> SmartPrefilter {
+    pub(crate) fn prefilter(&self) -> SmartPrefilter {
         let mut pre = SmartPrefilter::default();
         if self.any {
             return pre;
@@ -230,7 +230,7 @@ impl SmartFolder {
 
     /// Whether a condition asks about the address books, which are read
     /// only when one does.
-    pub fn needs_contacts(&self) -> bool {
+    pub(crate) fn needs_contacts(&self) -> bool {
         self.conditions.iter().any(|c| {
             matches!(
                 c.field,
@@ -242,7 +242,7 @@ impl SmartFolder {
 
 /// A new smart folder's id: random, so a folder renamed or recreated under
 /// an old name is never taken for another.
-pub fn new_smart_folder_id() -> String {
+pub(crate) fn new_smart_folder_id() -> String {
     crate::rng::token(12).unwrap_or_else(|_| {
         format!(
             "{:x}",
@@ -263,7 +263,7 @@ fn smart_folders_path() -> Option<PathBuf> {
     config_file("smart_folders.toml")
 }
 
-pub fn load_smart_folders() -> Vec<SmartFolder> {
+pub(crate) fn load_smart_folders() -> Vec<SmartFolder> {
     let Some(path) = smart_folders_path() else {
         return Vec::new();
     };
@@ -278,7 +278,7 @@ pub fn load_smart_folders() -> Vec<SmartFolder> {
         })
 }
 
-pub fn save_smart_folders(folders: &[SmartFolder]) {
+pub(crate) fn save_smart_folders(folders: &[SmartFolder]) {
     let file = SmartFoldersFile {
         folders: folders.to_vec(),
     };

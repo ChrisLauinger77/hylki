@@ -14,7 +14,7 @@ use crate::i18n::{i18n, i18n_f};
 /// and each is swapped for the closest installed dictionary when its own
 /// is missing, since a language without a dictionary silently checks
 /// nothing. WebKit accepts a word any of the languages knows (#365).
-pub fn apply_spellcheck() {
+pub(crate) fn apply_spellcheck() {
     let ctx = crate::ui::message_view::shared_web_context();
     let on = crate::config::load_privacy().spellcheck;
     ctx.set_spell_checking_enabled(on);

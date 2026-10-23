@@ -25,7 +25,7 @@ mod tests;
 
 use capture::{record_final, record_frame, sample, slow_motion};
 use draw::{cut, inflate};
-pub use flow::{await_arrival, capture_next_frame, find_widget, start, Pieces};
+pub(crate) use flow::{await_arrival, capture_next_frame, find_widget, start, Pieces};
 
 /// How long the editor card takes to reach its place in the conversation.
 const MOTION_MS: f64 = 480.0;
@@ -45,52 +45,53 @@ const CARD_RADIUS: f32 = 12.0;
 /// One conversation card as the reader document lays it out, in stage
 /// coordinates.
 #[derive(Clone, Debug)]
-pub struct Card {
-    pub key: String,
-    pub rect: graphene::Rect,
+pub(crate) struct Card {
+    pub(crate) key: String,
+    pub(crate) rect: graphene::Rect,
     /// The height of its header line, where the sender and date sit.
-    pub head: f32,
+    pub(crate) head: f32,
     /// Where its first line of text begins, and the size it is set in.
-    pub text: Option<(graphene::Point, f32)>,
+    pub(crate) text: Option<(graphene::Point, f32)>,
 }
 
 /// The pane at the moment Send was pressed.
-pub struct Before {
-    pub still: gdk::Texture,
+pub(crate) struct Before {
+    pub(crate) still: gdk::Texture,
     /// The split slot the composer fills.
-    pub composer: graphene::Rect,
+    pub(crate) composer: graphene::Rect,
     /// The editor card inside it.
-    pub editor: graphene::Rect,
-    /// The reader beside the composer, and its web view.
-    pub reader: graphene::Rect,
-    pub view: graphene::Rect,
+    pub(crate) editor: graphene::Rect,
+    /// The reader's web view, beside the composer. (The reader's own box is
+    /// only measured, for where the window's ground shows.)
+    pub(crate) view: graphene::Rect,
+
     /// The reader's header bar, when it was showing (a split above the
     /// reader hides it).
-    pub header: Option<graphene::Rect>,
+    pub(crate) header: Option<graphene::Rect>,
     /// What the window paints behind the pane, where the stills are
     /// see-through: the pane's own widgets leave their background to it.
-    pub ground: Option<gdk::RGBA>,
+    pub(crate) ground: Option<gdk::RGBA>,
     /// The conversation's cards as the document had them, once measured.
-    pub cards: Vec<Card>,
+    pub(crate) cards: Vec<Card>,
     /// Where the first line written in the editor begins, and its size.
-    pub text: Option<(graphene::Point, f32)>,
+    pub(crate) text: Option<(graphene::Point, f32)>,
 }
 
 /// The pane with the composer gone and the reply in the conversation.
-pub struct After {
-    pub still: gdk::Texture,
-    pub reader: graphene::Rect,
-    pub view: graphene::Rect,
-    pub header: Option<graphene::Rect>,
+pub(crate) struct After {
+    pub(crate) still: gdk::Texture,
+    pub(crate) reader: graphene::Rect,
+    pub(crate) view: graphene::Rect,
+    pub(crate) header: Option<graphene::Rect>,
     /// Every card, in document order.
-    pub cards: Vec<Card>,
+    pub(crate) cards: Vec<Card>,
     /// The reply's own card among them.
-    pub arrival: String,
+    pub(crate) arrival: String,
 }
 
 /// Everything the frames are drawn from, worked out once when the motion
 /// starts.
-pub struct Scene {
+pub(crate) struct Scene {
     after: After,
     /// The reply's card, cut to what the web view shows of it.
     card: graphene::Rect,
@@ -120,7 +121,7 @@ pub struct Scene {
 /// A piece of a still in a texture of its own, and where it sits. Faded on
 /// its own, a piece costs the GPU only its own size; faded as a clip of the
 /// whole still, it costs the whole pane, every frame.
-pub struct Cut {
+pub(crate) struct Cut {
     tex: gdk::Texture,
     at: graphene::Rect,
 }
@@ -129,28 +130,28 @@ mod imp {
     use super::*;
 
     #[derive(Default)]
-    pub struct SendMorph {
-        pub before: RefCell<Option<Before>>,
-        pub scene: RefCell<Option<Scene>>,
+    pub(crate) struct SendMorph {
+        pub(crate) before: RefCell<Option<Before>>,
+        pub(crate) scene: RefCell<Option<Scene>>,
         /// The texture scale: device pixels per logical pixel.
-        pub scale: Cell<f32>,
+        pub(crate) scale: Cell<f32>,
         /// Frame times (µs) the chrome fade and the motion started at; 0
         /// until the first frame after they were asked for.
-        pub chrome_start: Cell<i64>,
-        pub motion_start: Cell<i64>,
+        pub(crate) chrome_start: Cell<i64>,
+        pub(crate) motion_start: Cell<i64>,
         /// Frames the landed scene has been drawn at rest, before the clock
         /// starts.
-        pub rest_frames: Cell<u32>,
-        pub now: Cell<i64>,
-        pub tick: RefCell<Option<gtk::TickCallbackId>>,
+        pub(crate) rest_frames: Cell<u32>,
+        pub(crate) now: Cell<i64>,
+        pub(crate) tick: RefCell<Option<gtk::TickCallbackId>>,
         /// The stage's size when it went up: a resize mid-flight ends it.
-        pub size: Cell<(i32, i32)>,
-        pub fading: RefCell<Option<adw::TimedAnimation>>,
+        pub(crate) size: Cell<(i32, i32)>,
+        pub(crate) fading: RefCell<Option<adw::TimedAnimation>>,
         /// The composer's ground, which the stage shows where it stood.
-        pub base: Cell<Option<gdk::RGBA>>,
+        pub(crate) base: Cell<Option<gdk::RGBA>>,
         /// The composer without its editor card, and the editor card.
-        pub chrome_cut: RefCell<Option<Cut>>,
-        pub editor_cut: RefCell<Option<Cut>>,
+        pub(crate) chrome_cut: RefCell<Option<Cut>>,
+        pub(crate) editor_cut: RefCell<Option<Cut>>,
     }
 
     #[glib::object_subclass]
@@ -185,7 +186,7 @@ mod imp {
 }
 
 glib::wrapper! {
-    pub struct SendMorph(ObjectSubclass<imp::SendMorph>)
+    pub(crate) struct SendMorph(ObjectSubclass<imp::SendMorph>)
         @extends gtk::Widget;
 }
 
@@ -196,7 +197,7 @@ impl Default for SendMorph {
 }
 
 impl SendMorph {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let obj: Self = glib::Object::new();
         obj.set_visible(false);
         obj.set_can_target(false);
@@ -205,13 +206,13 @@ impl SendMorph {
     }
 
     /// Whether a morph is on screen.
-    pub fn running(&self) -> bool {
+    pub(crate) fn running(&self) -> bool {
         self.imp().before.borrow().is_some()
     }
 
     /// Take the pane as it looks now, the still the morph starts from. The
     /// stage goes up over it with [`Self::show`].
-    pub fn begin(&self, before: Before, scale: f32) {
+    pub(crate) fn begin(&self, before: Before, scale: f32) {
         let imp = self.imp();
         if let Some(a) = imp.fading.take() {
             a.skip();
@@ -253,7 +254,7 @@ impl SendMorph {
     /// Put the stage up, over a pane about to change underneath it. Until
     /// now the real composer has stayed on screen: the stills are complete
     /// only once the web views have answered.
-    pub fn show(&self) {
+    pub(crate) fn show(&self) {
         if !self.running() {
             return;
         }
@@ -267,14 +268,14 @@ impl SendMorph {
     }
 
     /// Where the conversation's cards were when Send was pressed.
-    pub fn set_before_cards(&self, cards: Vec<Card>) {
+    pub(crate) fn set_before_cards(&self, cards: Vec<Card>) {
         if let Some(b) = self.imp().before.borrow_mut().as_mut() {
             b.cards = cards;
         }
     }
 
     /// The pane is ready in its new state: move everything there.
-    pub fn land(&self, after: After) {
+    pub(crate) fn land(&self, after: After) {
         let imp = self.imp();
         let scene = match imp.before.borrow().as_ref() {
             Some(before) => self.scene_for(before, after),
@@ -311,7 +312,7 @@ impl SendMorph {
 
     /// Give up on the motion: the pane underneath is already in its new
     /// state, so the stage fades away over it.
-    pub fn abort(&self) {
+    pub(crate) fn abort(&self) {
         let imp = self.imp();
         if imp.before.borrow().is_none() || imp.fading.borrow().is_some() {
             return;
@@ -337,7 +338,7 @@ impl SendMorph {
     }
 
     /// Lift the stage and let go of the stills.
-    pub fn finish(&self) {
+    pub(crate) fn finish(&self) {
         let imp = self.imp();
         if let Some(id) = imp.tick.take() {
             id.remove();

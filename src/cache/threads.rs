@@ -97,7 +97,7 @@ impl Cache {
     /// headers whenever it was sent. [`THREAD_MEMBER_LIMIT`] caps what one
     /// conversation can drag in, which is the bound that matters: every member
     /// found is a body the reader will load and render.
-    pub fn messages_by_thread_ids(
+    pub(crate) fn messages_by_thread_ids(
         &self,
         account_id: u32,
         ids: &[String],
@@ -159,7 +159,7 @@ impl Cache {
     /// are left out, as they are for the reader; a draft is left out of the
     /// newest message too, since a reply you have not sent is not one the
     /// other side has heard.
-    pub fn thread_summaries(
+    pub(crate) fn thread_summaries(
         &self,
         account_id: u32,
         groups: &[(String, Vec<String>)],
@@ -324,7 +324,7 @@ impl Cache {
     /// References, hence the `next_uid` watermark: each pass walks strictly
     /// downwards, so a message with nothing to find is visited once and never
     /// again.
-    pub fn uids_needing_references(
+    pub(crate) fn uids_needing_references(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -349,7 +349,13 @@ impl Cache {
         run().unwrap_or_default()
     }
 
-    pub fn set_references(&self, account_id: u32, folder_path: &str, uid: u32, references: &str) {
+    pub(crate) fn set_references(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        uid: u32,
+        references: &str,
+    ) {
         let _ = self.conn.execute(
             "UPDATE messages SET references_ = ?1 \
              WHERE account_id = ?2 AND folder_path = ?3 AND uid = ?4",
@@ -360,11 +366,11 @@ impl Cache {
     /// How far down a folder's References repair has walked: the uid to look
     /// below next, and whether the pass has finished. A folder never touched
     /// starts at the top (`u32::MAX`), so the first chunk is its newest mail.
-    pub fn refs_repair_state(&self, account_id: u32, folder_path: &str) -> (u32, bool) {
+    pub(crate) fn refs_repair_state(&self, account_id: u32, folder_path: &str) -> (u32, bool) {
         self.walk_state("refs_repair", account_id, folder_path)
     }
 
-    pub fn set_refs_repair_state(
+    pub(crate) fn set_refs_repair_state(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -376,11 +382,11 @@ impl Cache {
 
     /// How far down a folder the one-time Gmail label fill (#374) has walked,
     /// as [`Cache::refs_repair_state`] does for References.
-    pub fn label_fill_state(&self, account_id: u32, folder_path: &str) -> (u32, bool) {
+    pub(crate) fn label_fill_state(&self, account_id: u32, folder_path: &str) -> (u32, bool) {
         self.walk_state("label_fill", account_id, folder_path)
     }
 
-    pub fn set_label_fill_state(
+    pub(crate) fn set_label_fill_state(
         &self,
         account_id: u32,
         folder_path: &str,

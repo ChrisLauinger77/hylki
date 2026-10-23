@@ -14,7 +14,7 @@ use std::rc::Rc;
 /// own photo, their Gravatar, then the icon their domain publishes (#30), with
 /// the UI's colored initials as the implicit last resort.
 #[derive(Debug)]
-pub enum FaceCmd {
+pub(super) enum FaceCmd {
     /// The avatar tiers (contact photo, Gravatar) answered. `logo` carries the
     /// logo tier's answer when it was consulted in the same trip: found bytes,
     /// or a definitive miss to remember.
@@ -36,7 +36,7 @@ pub enum FaceCmd {
 /// when they come up empty and `want_logo` says the switch is on. `generation`
 /// and `mode` come from [`crate::avatar::lookup`] and ride along so the result
 /// can be cached against the EDS state that was actually queried.
-pub async fn find_face(
+pub(super) async fn find_face(
     email: String,
     generation: u64,
     mode: crate::avatar::FetchMode,
@@ -61,7 +61,7 @@ pub async fn find_face(
 }
 
 /// Fetch just the domain icon, off the main thread.
-pub async fn find_logo(email: String) -> FaceCmd {
+pub(super) async fn find_logo(email: String) -> FaceCmd {
     let lookup_email = email.clone();
     let bytes = tokio::task::spawn_blocking(move || crate::logo::fetch(&lookup_email))
         .await
@@ -71,7 +71,7 @@ pub async fn find_logo(email: String) -> FaceCmd {
 }
 
 /// Display names from a raw To header: "Ann <a@x>, b@y" -> "Ann, b@y".
-pub fn recipient_names(to: &str) -> String {
+pub(crate) fn recipient_names(to: &str) -> String {
     let mut names: Vec<String> = Vec::new();
     for part in to.split(',') {
         let part = part.trim();
@@ -328,7 +328,7 @@ impl Row {
     }
 
     /// Slide the circle away (Focus Mode), before the list drops it.
-    pub fn slide_avatar_away(&self) {
+    pub(crate) fn slide_avatar_away(&self) {
         self.st.borrow_mut().avatar_shown = false;
         self.w.avatar_revealer.set_reveal_child(false);
         self.w
@@ -338,7 +338,7 @@ impl Row {
 
     /// Fold the circle and slide it in a moment later (Focus Mode has given
     /// the avatars back), once the row is on screen and the revealer mapped.
-    pub fn slide_avatar_in(self: &Rc<Self>) {
+    pub(crate) fn slide_avatar_in(self: &Rc<Self>) {
         self.st.borrow_mut().avatar_shown = false;
         self.w.avatar_revealer.set_transition_duration(0);
         self.w.avatar_revealer.set_reveal_child(false);

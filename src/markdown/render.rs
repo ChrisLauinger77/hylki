@@ -22,7 +22,7 @@ fn options() -> Options {
 }
 
 /// Markdown source to the HTML part of a message.
-pub fn to_html(src: &str) -> String {
+pub(crate) fn to_html(src: &str) -> String {
     let events: Vec<Event> = extend(Parser::new_ext(src, options()).collect());
     let mut html = String::with_capacity(src.len() * 3 / 2);
     pulldown_cmark::html::push_html(&mut html, events.into_iter());

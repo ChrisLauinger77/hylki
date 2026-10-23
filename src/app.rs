@@ -144,7 +144,7 @@ relm4::new_stateless_action!(FindAction, WindowActionGroup, "find");
 relm4::new_stateless_action!(UndoAction, WindowActionGroup, "undo");
 relm4::new_stateless_action!(RedoAction, WindowActionGroup, "redo");
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl SimpleComponent for AppModel {
     type Init = ();
     type Input = AppMsg;

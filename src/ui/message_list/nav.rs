@@ -10,7 +10,7 @@ use adw::prelude::*;
 use relm4::prelude::*;
 
 impl MessageList {
-    pub fn selection_probe(&self) -> SelectionProbe {
+    pub(crate) fn selection_probe(&self) -> SelectionProbe {
         SelectionProbe {
             selection: self.shared.selection.clone(),
             model: self.shared.model.clone(),

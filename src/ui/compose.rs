@@ -31,17 +31,17 @@ use cloud::not_signed_in;
 use format::{markdown_body, SHOWCASE_PLAIN_LOG, ZOOM};
 use host::{fold_on_first_map, set_toggle_icon, size_for_host, COMPOSE_MIN_WIDTH};
 pub(crate) use keys::composer_key;
-pub use messages::{ComposeInput, ComposeOutput};
-pub use model::Compose;
+pub(crate) use messages::{ComposeInput, ComposeOutput};
+pub(crate) use model::Compose;
 use send::{next_monday, pick_send_time, preset_time, start_autosave};
 use setup::{add_toolbar_end_buttons, connect_editor};
 use showcase::showcase_hooks;
 use signature::sig_html;
 use subject::wire_subject;
 use suggest::{load_suggestions, wire_recipient_rows};
-pub use types::{ComposeAccount, ComposeInit, ComposePrefill};
+pub(crate) use types::{ComposeAccount, ComposeInit, ComposePrefill};
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for Compose {
     type Init = ComposeInit;
     type Input = ComposeInput;

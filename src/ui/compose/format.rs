@@ -69,7 +69,7 @@ text:window.__hylkiBodyText?window.__hylkiBodyText():''})"#;
 
 impl Compose {
     /// Whether the body zooms in its present format; see [`ComposeInput::Zoom`].
-    pub fn zooms(&self) -> bool {
+    pub(crate) fn zooms(&self) -> bool {
         self.zoomable.get()
     }
 

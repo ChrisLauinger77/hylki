@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum CloudKind {
+pub(crate) enum CloudKind {
     /// Nextcloud, ownCloud or OpenCloud: WebDAV + OCS.
     #[default]
     Nextcloud,
@@ -17,12 +17,12 @@ pub enum CloudKind {
 
 impl CloudKind {
     /// Signed in through GNOME Online Accounts: no secret of ours.
-    pub fn via_goa(self) -> bool {
+    pub(crate) fn via_goa(self) -> bool {
         self == CloudKind::OneDrive
     }
 
     /// GOA's `ProviderType` for the kinds that go through it.
-    pub fn goa_provider(self) -> Option<&'static str> {
+    pub(crate) fn goa_provider(self) -> Option<&'static str> {
         match self {
             CloudKind::OneDrive => Some("ms_graph"),
             _ => None,
@@ -31,77 +31,77 @@ impl CloudKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct CloudAccount {
+pub(crate) struct CloudAccount {
     /// How the account is shown ("Work Nextcloud").
-    pub name: String,
+    pub(crate) name: String,
     #[serde(default)]
-    pub kind: CloudKind,
+    pub(crate) kind: CloudKind,
     /// Which product a `Nextcloud`-kind server is: "nextcloud", "owncloud"
     /// or "opencloud" (they speak the same WebDAV + OCS). Chosen in the
     /// Service picker; found from the server's status page for accounts
     /// made before the picker told them apart. Empty = not known yet.
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub product: String,
+    pub(crate) product: String,
     /// The server's base URL, e.g. `https://cloud.example.com` (not used
     /// by Dropbox).
     #[serde(default)]
-    pub url: String,
+    pub(crate) url: String,
     /// The login (for Dropbox, the account's e-mail, filled in by the
     /// sign-in).
     #[serde(default)]
-    pub user: String,
+    pub(crate) user: String,
     /// The folder uploads go to, under the user's files (for Seafile,
     /// inside the library).
     #[serde(default = "default_folder")]
-    pub folder: String,
+    pub(crate) folder: String,
     /// Seafile: the library uploads go to, made when missing.
     #[serde(default = "default_folder")]
-    pub library: String,
+    pub(crate) library: String,
     /// Dropbox: the app key of the Dropbox app the sign-in runs as; empty
     /// means the build's own (see `oauth::provider_credentials`).
     #[serde(default)]
-    pub client_id: String,
+    pub(crate) client_id: String,
     /// OneDrive: the GNOME Online Accounts account id.
     #[serde(default)]
-    pub goa_id: String,
+    pub(crate) goa_id: String,
     /// Links expire this many days after upload; 0 keeps them.
     #[serde(default)]
-    pub expire_days: u32,
+    pub(crate) expire_days: u32,
     /// Off, the account stays configured but is not offered in the
     /// composer, like a paused mail account.
     #[serde(default = "default_true")]
-    pub enabled: bool,
+    pub(crate) enabled: bool,
     /// Protect every link with a generated download password.
     #[serde(default)]
-    pub password: bool,
+    pub(crate) password: bool,
     /// What the service allows on a link, found out when the account was
     /// checked or saved (`probe_link_terms`); unknown means assume yes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub link_expiry: Option<bool>,
+    pub(crate) link_expiry: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub link_password: Option<bool>,
+    pub(crate) link_password: Option<bool>,
     /// Why, in a phrase for the greyed-out rows.
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub link_note: String,
+    pub(crate) link_note: String,
     /// A self-hosted server (Nextcloud-kind, Seafile) reached through
     /// Cloudflare, whose proxy refuses a request body over 100 MB: uploads
     /// go in `CLOUDFLARE_CHUNK` pieces the server reassembles.
     #[serde(default)]
-    pub cloudflare: bool,
+    pub(crate) cloudflare: bool,
 }
 
 /// One entry of the Service picker: a kind, and for the WebDAV kinds the
 /// product, with the name shown and the brand id of its mark.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Service {
-    pub kind: CloudKind,
-    pub product: &'static str,
-    pub name: &'static str,
+pub(crate) struct Service {
+    pub(crate) kind: CloudKind,
+    pub(crate) product: &'static str,
+    pub(crate) name: &'static str,
 }
 
 impl Service {
     /// The brand id of its mark (`brand::image`).
-    pub fn brand(&self) -> &'static str {
+    pub(crate) fn brand(&self) -> &'static str {
         match self.kind {
             CloudKind::Nextcloud => self.product,
             CloudKind::Dropbox => "dropbox",
@@ -113,7 +113,7 @@ impl Service {
 
 /// The services offered, in picker order. Names are the services' own
 /// and are not translated.
-pub const SERVICES: [Service; 6] = [
+pub(crate) const SERVICES: [Service; 6] = [
     Service {
         kind: CloudKind::Nextcloud,
         product: "nextcloud",
@@ -149,11 +149,11 @@ pub const SERVICES: [Service; 6] = [
 /// What a service lets a public link carry, as found by
 /// [`probe_link_terms`].
 #[derive(Clone, Debug, PartialEq)]
-pub struct LinkTerms {
-    pub expiry: bool,
-    pub password: bool,
+pub(crate) struct LinkTerms {
+    pub(crate) expiry: bool,
+    pub(crate) password: bool,
     /// Why something is off, for the rows that show it.
-    pub note: String,
+    pub(crate) note: String,
 }
 
 fn default_folder() -> String {
@@ -165,7 +165,7 @@ fn default_true() -> bool {
 }
 
 impl CloudAccount {
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         CloudAccount {
             name: String::new(),
             kind: CloudKind::Nextcloud,
@@ -189,7 +189,7 @@ impl CloudAccount {
     /// The brand id of the service this account is on (`brand::image`):
     /// the product for a Nextcloud-kind server, else the kind's own name.
     /// Empty while a pre-picker server's product is still unknown.
-    pub fn brand(&self) -> &str {
+    pub(crate) fn brand(&self) -> &str {
         match self.kind {
             CloudKind::Nextcloud => self.product.as_str(),
             CloudKind::Dropbox => "dropbox",
@@ -199,7 +199,7 @@ impl CloudAccount {
     }
 
     /// The Service picker entry this account matches, if any.
-    pub fn service_index(&self) -> Option<usize> {
+    pub(crate) fn service_index(&self) -> Option<usize> {
         SERVICES.iter().position(|s| {
             s.kind == self.kind && (self.kind != CloudKind::Nextcloud || s.product == self.product)
         })
@@ -207,17 +207,17 @@ impl CloudAccount {
 
     /// Whether the service lets this account's links expire (assumed
     /// until a probe said otherwise).
-    pub fn expiry_allowed(&self) -> bool {
+    pub(crate) fn expiry_allowed(&self) -> bool {
         self.link_expiry.unwrap_or(true)
     }
 
     /// Whether the service lets this account's links take a password.
-    pub fn password_allowed(&self) -> bool {
+    pub(crate) fn password_allowed(&self) -> bool {
         self.link_password.unwrap_or(true)
     }
 
     /// Record what a probe found.
-    pub fn set_link_terms(&mut self, terms: Option<&LinkTerms>) {
+    pub(crate) fn set_link_terms(&mut self, terms: Option<&LinkTerms>) {
         match terms {
             Some(t) => {
                 self.link_expiry = Some(t.expiry);
@@ -239,7 +239,7 @@ impl CloudAccount {
     }
 
     /// The base URL as the requests want it: a scheme, no trailing slash.
-    pub fn base(&self) -> String {
+    pub(crate) fn base(&self) -> String {
         match self.kind {
             CloudKind::Dropbox => return "https://www.dropbox.com".to_string(),
             CloudKind::OneDrive => return "https://onedrive.live.com".to_string(),
@@ -255,7 +255,7 @@ impl CloudAccount {
 
     /// The keyring key for this account's secret: the app password, the
     /// Seafile password or token, or the Dropbox refresh token.
-    pub fn key(&self) -> String {
+    pub(crate) fn key(&self) -> String {
         match self.kind {
             CloudKind::Dropbox => format!("cloud:dropbox|{}", self.user.trim()),
             CloudKind::OneDrive => format!("cloud:goa|{}", self.goa_id.trim()),
@@ -265,12 +265,12 @@ impl CloudAccount {
 
     /// Whether the keyring holds a secret for this account: not for one
     /// signed in through GOA, which keeps the sign-in itself.
-    pub fn has_secret(&self) -> bool {
+    pub(crate) fn has_secret(&self) -> bool {
         !self.kind.via_goa()
     }
 
     /// Where the account is, for a list row: the server, or the service.
-    pub fn where_shown(&self) -> String {
+    pub(crate) fn where_shown(&self) -> String {
         match self.kind {
             CloudKind::Dropbox => "Dropbox".to_string(),
             CloudKind::OneDrive => "OneDrive".to_string(),

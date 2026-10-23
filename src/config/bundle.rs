@@ -60,7 +60,7 @@ fn write_file_struct<T: serde::Serialize>(
 }
 
 /// The current configuration as a TOML bundle for Export Settings.
-pub fn export_bundle() -> Result<String, String> {
+pub(crate) fn export_bundle() -> Result<String, String> {
     let bundle = SettingsBundle {
         version: 1,
         privacy: load_privacy(),
@@ -79,7 +79,7 @@ pub fn export_bundle() -> Result<String, String> {
 /// Parse and persist an exported bundle: privacy.toml and accounts.toml are
 /// replaced (via the same writers the app uses; the keyring is untouched
 /// since imported accounts carry no secrets). Returns the account count.
-pub fn import_bundle(text: &str) -> Result<usize, String> {
+pub(crate) fn import_bundle(text: &str) -> Result<usize, String> {
     let bundle: SettingsBundle = toml::from_str(text).map_err(|e| e.to_string())?;
     if bundle.version != 1 {
         return Err(format!("unsupported bundle version {}", bundle.version));

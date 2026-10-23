@@ -8,58 +8,58 @@ use crate::ui::message_list::RowAction;
 
 /// Everything needed to open a popout reader for one message.
 #[derive(Debug)]
-pub struct MessageWindowInit {
-    pub message: Message,
+pub(crate) struct MessageWindowInit {
+    pub(crate) message: Message,
     /// The whole conversation (oldest first) when the popped-out message heads
     /// one; empty for a plain single message.
-    pub thread: Vec<Message>,
-    pub account_name: Option<String>,
-    pub account_color: Option<String>,
-    pub allow_remote: bool,
+    pub(crate) thread: Vec<Message>,
+    pub(crate) account_name: Option<String>,
+    pub(crate) account_color: Option<String>,
+    pub(crate) allow_remote: bool,
     /// The body is still being fetched — show a spinner.
-    pub loading: bool,
+    pub(crate) loading: bool,
     /// Each member's files, as far as they are in hand, by (account, id).
-    pub attachments: Vec<((u32, u32), Vec<Attachment>)>,
+    pub(crate) attachments: Vec<((u32, u32), Vec<Attachment>)>,
     /// The members whose files are on their way.
-    pub attachments_loading: Vec<(u32, u32)>,
+    pub(crate) attachments_loading: Vec<(u32, u32)>,
     /// The attachment drawer is on (Settings, #213); off, the files show on
     /// the message's card instead, when that is on.
-    pub drawer_enabled: bool,
-    pub card_attachments: bool,
+    pub(crate) drawer_enabled: bool,
+    pub(crate) card_attachments: bool,
     /// The reader toolbar's layout, as the main window has it.
-    pub toolbar: ReaderToolbar,
+    pub(crate) toolbar: ReaderToolbar,
     /// The message is in Junk (Spam reads Not Spam), or in Junk or Trash
     /// (Move to Inbox is offered).
-    pub in_junk: bool,
-    pub restorable: bool,
+    pub(crate) in_junk: bool,
+    pub(crate) restorable: bool,
     /// Message-content theme override (`None` follows the system).
-    pub content_dark: Option<bool>,
+    pub(crate) content_dark: Option<bool>,
     /// The reader's own fonts and colors over the senders' (#56).
-    pub reader_style: crate::config::ReaderStyle,
+    pub(crate) reader_style: crate::config::ReaderStyle,
     /// Reader View (the main window's header toggle), followed here too.
-    pub reader_mode: bool,
+    pub(crate) reader_mode: bool,
     /// Message zoom in percent (Ctrl+ / Ctrl-), followed here too.
-    pub zoom: u32,
+    pub(crate) zoom: u32,
     /// The zoom Settings starts at, for the chip.
-    pub zoom_default: u32,
+    pub(crate) zoom_default: u32,
     /// Whether the Reader View switch is shown at all.
-    pub reader_switch: bool,
+    pub(crate) reader_switch: bool,
     /// Whether the Light / Dark Mode switch is shown (PR #386).
-    pub theme_switch: bool,
+    pub(crate) theme_switch: bool,
     /// What Reader View does when a message is opened.
-    pub reader_default: crate::config::ReaderDefault,
+    pub(crate) reader_default: crate::config::ReaderDefault,
     /// The tags (#71), for the cards' chips.
-    pub tags: Vec<crate::config::Tag>,
+    pub(crate) tags: Vec<crate::config::Tag>,
     /// The OpenPGP chip says its verdict in words (#300).
-    pub pgp_labels: bool,
+    pub(crate) pgp_labels: bool,
     /// The main window's single-key and Gmail switches, shared so a change
     /// in Settings reaches an open window too (#392).
-    pub single_key: std::rc::Rc<std::cell::Cell<bool>>,
-    pub gmail_keys: std::rc::Rc<std::cell::Cell<bool>>,
+    pub(crate) single_key: std::rc::Rc<std::cell::Cell<bool>>,
+    pub(crate) gmail_keys: std::rc::Rc<std::cell::Cell<bool>>,
 }
 
 #[derive(Debug)]
-pub enum MessageWindowInput {
+pub(crate) enum MessageWindowInput {
     /// Print this message (Ctrl+P), the same as in the main window.
     Print,
     /// Preview it as it will print (Ctrl+Shift+P).
@@ -219,7 +219,7 @@ pub enum MessageWindowInput {
 }
 
 #[derive(Debug)]
-pub enum MessageWindowOutput {
+pub(crate) enum MessageWindowOutput {
     /// A card's Unsubscribe button: leave the list, by these handles.
     Unsubscribe {
         message: Box<Message>,

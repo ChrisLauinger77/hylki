@@ -14,43 +14,43 @@ use super::{config_file, is_false, read_toml, save_private_toml};
 /// (with the rest of the conditions ignored); `more` holds the others.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(from = "FilterRuleDisk", into = "FilterRuleDisk")]
-pub struct FilterRule {
+pub(crate) struct FilterRule {
     /// What to call the rule (#197). Optional: an unnamed rule is still
     /// listed by its conditions, the way every rule was before names
     /// existed. Kept first so it reads first in `filters.toml`.
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub name: String,
+    pub(crate) name: String,
     /// The account this rule (and its destination folder) belongs to.
-    pub account_email: String,
+    pub(crate) account_email: String,
     /// The first condition: what it inspects…
-    pub field: FilterField,
+    pub(crate) field: FilterField,
     /// …how…
-    pub matcher: FilterMatch,
+    pub(crate) matcher: FilterMatch,
     /// …and against what. Commas separate alternatives, any one of which
     /// matches (#192): "invoice, receipt".
-    pub value: String,
+    pub(crate) value: String,
     /// The conditions after the first (#192).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub more: Vec<FilterCondition>,
+    pub(crate) more: Vec<FilterCondition>,
     /// Whether one matching condition is enough (true) or every condition
     /// must match (false, the default).
     #[serde(default, skip_serializing_if = "is_false")]
-    pub any: bool,
+    pub(crate) any: bool,
     /// Destination folder path on the account. Empty leaves the mail where it
     /// is (a rule that only tags, #71).
     #[serde(default)]
-    pub dest_path: String,
+    pub(crate) dest_path: String,
     /// The keyword of a [`Tag`] to put on matching mail (#71); empty tags
     /// nothing. Tagging and filing combine: the tag goes on first, and the
     /// move carries it along.
     #[serde(default)]
-    pub tag: String,
+    pub(crate) tag: String,
     /// Whether the destination folder's unread mail counts toward the unread
     /// total (the All Inboxes chip, the tray icon and its menu, the
     /// Background Apps status), as inbox mail does (#116). Trash and Junk
     /// destinations never count, whatever this says.
     #[serde(default = "count_unread_default")]
-    pub count_unread: bool,
+    pub(crate) count_unread: bool,
 }
 
 fn count_unread_default() -> bool {
@@ -75,11 +75,11 @@ fn strip_reply_prefixes(subject: &str) -> &str {
 /// One condition of a [`FilterRule`]: what to look at, how, and for what.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(from = "FilterConditionDisk", into = "FilterConditionDisk")]
-pub struct FilterCondition {
-    pub field: FilterField,
-    pub matcher: FilterMatch,
+pub(crate) struct FilterCondition {
+    pub(crate) field: FilterField,
+    pub(crate) matcher: FilterMatch,
     /// Commas separate alternatives; any one of them matching is a match.
-    pub value: String,
+    pub(crate) value: String,
 }
 
 /// How `filters.toml` writes a sender-in-Contacts condition (PR #384). An
@@ -216,7 +216,7 @@ impl From<FilterRule> for FilterRuleDisk {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum FilterField {
+pub(crate) enum FilterField {
     FromAddress,
     FromName,
     Subject,
@@ -241,7 +241,7 @@ pub enum FilterField {
 
 impl FilterField {
     /// Whether the field needs no text and no matcher.
-    pub fn is_contact_check(self) -> bool {
+    pub(crate) fn is_contact_check(self) -> bool {
         matches!(
             self,
             FilterField::FromInContacts | FilterField::FromNotInContacts
@@ -249,7 +249,7 @@ impl FilterField {
     }
 
     /// Every field, in the order the editor lists them.
-    pub const ALL: [FilterField; 8] = [
+    pub(crate) const ALL: [FilterField; 8] = [
         FilterField::FromAddress,
         FilterField::FromName,
         FilterField::Subject,
@@ -263,7 +263,7 @@ impl FilterField {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum FilterMatch {
+pub(crate) enum FilterMatch {
     Contains,
     Equals,
     StartsWith,
@@ -272,7 +272,7 @@ pub enum FilterMatch {
 
 impl FilterMatch {
     /// Every matcher, in the order the editor lists them.
-    pub const ALL: [FilterMatch; 4] = [
+    pub(crate) const ALL: [FilterMatch; 4] = [
         FilterMatch::Contains,
         FilterMatch::Equals,
         FilterMatch::StartsWith,
@@ -282,30 +282,30 @@ impl FilterMatch {
 
 /// What a message offers the conditions to look at.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct FilterInput<'a> {
-    pub from_addr: &'a str,
-    pub from_name: &'a str,
-    pub subject: &'a str,
+pub(crate) struct FilterInput<'a> {
+    pub(crate) from_addr: &'a str,
+    pub(crate) from_name: &'a str,
+    pub(crate) subject: &'a str,
     /// To and Cc together.
-    pub recipients: &'a str,
+    pub(crate) recipients: &'a str,
     /// The Reply-To header; empty when absent.
-    pub reply_to: &'a str,
+    pub(crate) reply_to: &'a str,
     /// The message text on hand: the list preview, or the body when the
     /// list carries it.
-    pub body: &'a str,
+    pub(crate) body: &'a str,
     /// The body alternatives the server confirmed for this message (#191),
     /// lowercased as [`FilterCondition::alternatives`] hands them out.
-    pub body_hits: &'a [String],
+    pub(crate) body_hits: &'a [String],
     /// Lowercased addresses from the address books, or `None` when they are
     /// unknown (unread, empty, or no rule asked for them).
-    pub contacts: Option<&'a std::collections::HashSet<String>>,
+    pub(crate) contacts: Option<&'a std::collections::HashSet<String>>,
 }
 
 impl FilterCondition {
     /// The alternatives a value names (#192): its comma-separated pieces,
     /// trimmed and lowercased, empties dropped. A value without a comma is
     /// one alternative.
-    pub fn alternatives(value: &str) -> Vec<String> {
+    pub(crate) fn alternatives(value: &str) -> Vec<String> {
         value
             .split(',')
             .map(|s| s.trim().to_lowercase())
@@ -314,7 +314,7 @@ impl FilterCondition {
     }
 
     /// Case-insensitive match against one message.
-    pub fn matches(&self, input: &FilterInput) -> bool {
+    pub(crate) fn matches(&self, input: &FilterInput) -> bool {
         if self.field.is_contact_check() {
             let Some(contacts) = input.contacts else {
                 return false;
@@ -394,7 +394,11 @@ impl FilterRule {
     /// leading "Re:" / "Fwd:" so a whole thread matches. Both have to match;
     /// what the rule does is left for the user to pick. A blank subject
     /// leaves the sender as the only condition.
-    pub fn draft_from_message(account_email: &str, from_addr: &str, subject: &str) -> FilterRule {
+    pub(crate) fn draft_from_message(
+        account_email: &str,
+        from_addr: &str,
+        subject: &str,
+    ) -> FilterRule {
         let mut conditions = vec![FilterCondition {
             field: FilterField::FromAddress,
             matcher: FilterMatch::Equals,
@@ -425,7 +429,7 @@ impl FilterRule {
     }
 
     /// Every condition, the first included.
-    pub fn conditions(&self) -> Vec<FilterCondition> {
+    pub(crate) fn conditions(&self) -> Vec<FilterCondition> {
         let mut all = Vec::with_capacity(1 + self.more.len());
         all.push(FilterCondition {
             field: self.field,
@@ -438,7 +442,7 @@ impl FilterRule {
 
     /// Replace the conditions: the first goes to the top level, the rest to
     /// `more`. Returns false (and changes nothing) when `conds` is empty.
-    pub fn set_conditions(&mut self, mut conds: Vec<FilterCondition>) -> bool {
+    pub(crate) fn set_conditions(&mut self, mut conds: Vec<FilterCondition>) -> bool {
         if conds.is_empty() {
             return false;
         }
@@ -452,7 +456,7 @@ impl FilterRule {
 
     /// What to call the rule in a list or a log line (#197): its name, or
     /// its conditions when it has none.
-    pub fn label(&self) -> String {
+    pub(crate) fn label(&self) -> String {
         if !self.name.trim().is_empty() {
             return self.name.trim().to_string();
         }
@@ -464,12 +468,12 @@ impl FilterRule {
     }
 
     /// Whether any condition looks the sender up in the address books.
-    pub fn needs_contacts(&self) -> bool {
+    pub(crate) fn needs_contacts(&self) -> bool {
         self.conditions().iter().any(|c| c.field.is_contact_check())
     }
 
     /// The body alternatives this rule needs a server search for (#191).
-    pub fn body_needles(&self) -> Vec<String> {
+    pub(crate) fn body_needles(&self) -> Vec<String> {
         self.conditions()
             .iter()
             .filter(|c| c.field == FilterField::Body)
@@ -479,7 +483,7 @@ impl FilterRule {
 
     /// Case-insensitive match against a message: every condition must hold,
     /// or any one of them with `any` set.
-    pub fn matches(&self, input: &FilterInput) -> bool {
+    pub(crate) fn matches(&self, input: &FilterInput) -> bool {
         let conds = self.conditions();
         if self.any {
             conds.iter().any(|c| c.matches(input))
@@ -492,7 +496,7 @@ impl FilterRule {
 /// Every body alternative the rules of `email` search for (#191), lowercased
 /// and deduplicated, read fresh from disk: the worker asks at each inbox
 /// sync, so a rule added in Settings counts from the next sync on.
-pub fn filter_body_needles(email: &str) -> Vec<String> {
+pub(crate) fn filter_body_needles(email: &str) -> Vec<String> {
     let mut out: Vec<String> = load_filters()
         .iter()
         .filter(|r| r.account_email.eq_ignore_ascii_case(email))
@@ -513,13 +517,13 @@ fn filters_path() -> Option<PathBuf> {
     config_file("filters.toml")
 }
 
-pub fn load_filters() -> Vec<FilterRule> {
+pub(crate) fn load_filters() -> Vec<FilterRule> {
     read_toml::<FiltersFile>(filters_path())
         .map(|f| f.rules)
         .unwrap_or_default()
 }
 
-pub fn save_filters(rules: &[FilterRule]) {
+pub(crate) fn save_filters(rules: &[FilterRule]) {
     let file = FiltersFile {
         rules: rules.to_vec(),
     };

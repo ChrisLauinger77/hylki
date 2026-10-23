@@ -19,7 +19,7 @@ use super::{
 impl AttachmentsGallery {
     /// What the gallery holds in RAM, for the memory section of an export:
     /// items listed, of which carrying their file bytes, and those bytes.
-    pub fn memory_stats(&self) -> (usize, usize, u64) {
+    pub(crate) fn memory_stats(&self) -> (usize, usize, u64) {
         let with_data = self.all_items.iter().filter(|i| i.data.is_some()).count();
         let bytes = self
             .all_items

@@ -46,11 +46,11 @@ mod imp {
     use std::cell::{Cell, RefCell};
 
     #[derive(Default)]
-    pub struct ToolFlow {
-        pub end: RefCell<Option<gtk::Widget>>,
+    pub(crate) struct ToolFlow {
+        pub(crate) end: RefCell<Option<gtk::Widget>>,
         /// The tools hidden as one (a message written as source), the end
         /// widget staying.
-        pub hidden: Cell<bool>,
+        pub(crate) hidden: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -124,7 +124,7 @@ mod imp {
 }
 
 glib::wrapper! {
-    pub struct ToolFlow(ObjectSubclass<imp::ToolFlow>)
+    pub(crate) struct ToolFlow(ObjectSubclass<imp::ToolFlow>)
         @extends gtk::Widget,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
@@ -136,12 +136,12 @@ impl Default for ToolFlow {
 }
 
 impl ToolFlow {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         glib::Object::new()
     }
 
     /// Add a tool at the end of the flow.
-    pub fn append(&self, child: &impl IsA<gtk::Widget>) {
+    pub(crate) fn append(&self, child: &impl IsA<gtk::Widget>) {
         let child = child.as_ref();
         match self.imp().end.borrow().as_ref() {
             // Tools stay ahead of the end widget among the children, so
@@ -153,14 +153,14 @@ impl ToolFlow {
     }
 
     /// The widget that holds the top right corner (top left, right to left).
-    pub fn set_end(&self, end: &impl IsA<gtk::Widget>) {
+    pub(crate) fn set_end(&self, end: &impl IsA<gtk::Widget>) {
         let end = end.as_ref();
         end.set_parent(self);
         self.imp().end.replace(Some(end.clone()));
     }
 
     /// Show or hide every tool at once; the end widget stays.
-    pub fn set_tools_shown(&self, on: bool) {
+    pub(crate) fn set_tools_shown(&self, on: bool) {
         self.imp().hidden.set(!on);
         let end = self.imp().end.borrow().clone();
         let mut child = self.first_child();
@@ -174,7 +174,7 @@ impl ToolFlow {
     }
 
     /// The room left on `child`'s row after it, at the bar's current width.
-    pub fn room_after(&self, child: &gtk::Widget) -> Option<i32> {
+    pub(crate) fn room_after(&self, child: &gtk::Widget) -> Option<i32> {
         let width = self.width();
         let flow = self.flow(width);
         let p = flow.placed.iter().find(|p| &p.child == child)?;

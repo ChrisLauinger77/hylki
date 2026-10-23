@@ -10,22 +10,22 @@ use gtk::gio;
 use gtk::prelude::*;
 
 /// App action (bare name) that raises the main window. Used by error alerts.
-pub const PRESENT_ACTION: &str = "present-window";
+pub(crate) const PRESENT_ACTION: &str = "present-window";
 /// App action (bare name) that raises the window and opens a specific message.
 /// Its target is a `(account_id, folder_id, message_id)` `(uuu)` variant.
-pub const OPEN_MESSAGE_ACTION: &str = "open-message";
+pub(crate) const OPEN_MESSAGE_ACTION: &str = "open-message";
 /// Notification button actions (#38): act on the notified message without
 /// raising the window. Same `(uuu)` target as [`OPEN_MESSAGE_ACTION`].
-pub const MARK_READ_ACTION: &str = "notify-mark-read";
-pub const ARCHIVE_ACTION: &str = "notify-archive";
-pub const DELETE_ACTION: &str = "notify-delete";
+pub(crate) const MARK_READ_ACTION: &str = "notify-mark-read";
+pub(crate) const ARCHIVE_ACTION: &str = "notify-archive";
+pub(crate) const DELETE_ACTION: &str = "notify-delete";
 /// These two raise the window as well: a composer needs it.
-pub const REPLY_ACTION: &str = "notify-reply";
-pub const FORWARD_ACTION: &str = "notify-forward";
-pub const SPAM_ACTION: &str = "notify-spam";
+pub(crate) const REPLY_ACTION: &str = "notify-reply";
+pub(crate) const FORWARD_ACTION: &str = "notify-forward";
+pub(crate) const SPAM_ACTION: &str = "notify-spam";
 /// App action (bare name) that raises the window and the newest composer:
 /// the click on a "message ready" alert ([`compose_ready`]).
-pub const PRESENT_COMPOSE_ACTION: &str = "present-compose";
+pub(crate) const PRESENT_COMPOSE_ACTION: &str = "present-compose";
 
 const COMPOSE_READY_ID: &str = "vireo-compose-ready";
 /// Whether a [`compose_ready`] alert is (or may be) showing, so that
@@ -89,7 +89,7 @@ fn mail_id(account_id: u32) -> String {
 /// `in_place` says the anchor message still sits in `folder_id` (as opposed to
 /// having been filed elsewhere by a mail filter, where `folder_id` is only the
 /// folder to show); the action buttons need that to act on the right message.
-pub fn new_mail(
+pub(crate) fn new_mail(
     account_id: u32,
     folder_id: u32,
     message_id: u32,
@@ -142,7 +142,7 @@ pub fn new_mail(
 /// The sound for new mail, if Settings asks for one and the desktop does
 /// not ask for quiet. Part of [`new_mail`]; on its own while the window is
 /// in front, where no notification is posted (#337).
-pub fn sound_for_new_mail() {
+pub(crate) fn sound_for_new_mail() {
     match crate::config::new_mail_sound() {
         None => tracing::debug!("new-mail sound: switched off"),
         Some(_) if crate::desktop::quiet() => {
@@ -162,7 +162,7 @@ thread_local! {
 
 /// The (folder, message id) an account's new-mail notification points at,
 /// if one is up.
-pub fn posted_for(account_id: u32) -> Option<(u32, u32)> {
+pub(crate) fn posted_for(account_id: u32) -> Option<(u32, u32)> {
     POSTED.with(|p| p.borrow().get(&account_id).copied())
 }
 
@@ -189,7 +189,7 @@ const HOLD_OFF: std::time::Duration = std::time::Duration::from_secs(10);
 /// Every step is logged: the sound is the one thing a notification does that
 /// leaves no trace on screen, so an exported log is all there is to go on
 /// when someone hears nothing (#337).
-pub fn play_sound(sound: &crate::config::SoundSource, restart: bool) {
+pub(crate) fn play_sound(sound: &crate::config::SoundSource, restart: bool) {
     SOUND.with(|slot| {
         let mut slot = slot.borrow_mut();
         if !restart {
@@ -262,13 +262,13 @@ pub fn play_sound(sound: &crate::config::SoundSource, restart: bool) {
 }
 
 /// Withdraw an account's new-mail notification (once its mail has been read).
-pub fn withdraw_mail(account_id: u32) {
+pub(crate) fn withdraw_mail(account_id: u32) {
     relm4::main_application().withdraw_notification(&mail_id(account_id));
     POSTED.with(|p| p.borrow_mut().remove(&account_id));
 }
 
 /// Post a genuine error alert (e.g. send/auth failure).
-pub fn error(account_id: u32, title: &str, body: &str) {
+pub(crate) fn error(account_id: u32, title: &str, body: &str) {
     let n = gio::Notification::new(title);
     if !body.is_empty() {
         n.set_body(Some(body));
@@ -283,7 +283,7 @@ pub fn error(account_id: u32, title: &str, body: &str) {
 /// word that it is waiting, with the click that brings it up. Clicking a
 /// notification hands the app a fresh activation token, which is exactly
 /// what the hand-off lacked.
-pub fn compose_ready(attachments: u32) {
+pub(crate) fn compose_ready(attachments: u32) {
     let n = gio::Notification::new(&i18n("Message ready to send"));
     let body = if attachments == 0 {
         i18n("A new message is open in Hylki.")
@@ -304,7 +304,7 @@ pub fn compose_ready(attachments: u32) {
 
 /// Take down the "message ready" alert once a window of ours has the focus
 /// (the user got there by themselves).
-pub fn withdraw_compose_ready() {
+pub(crate) fn withdraw_compose_ready() {
     if COMPOSE_READY_POSTED.swap(false, std::sync::atomic::Ordering::Relaxed) {
         relm4::main_application().withdraw_notification(COMPOSE_READY_ID);
     }

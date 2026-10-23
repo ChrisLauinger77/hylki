@@ -8,7 +8,7 @@ use super::privacy::load_privacy;
 /// The app's own theme: follow the system, or force light/dark regardless.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum AppTheme {
+pub(crate) enum AppTheme {
     #[default]
     System,
     Light,
@@ -18,7 +18,7 @@ pub enum AppTheme {
 /// Which icon the tray item wears (issue #116).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum TrayIcon {
+pub(crate) enum TrayIcon {
     /// The app icon.
     Hylki,
     /// The app's symbolic icon, which the panel draws in its own color, as
@@ -32,7 +32,7 @@ pub enum TrayIcon {
 /// How email message content is themed, independent of the app UI theme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum MessageTheme {
+pub(crate) enum MessageTheme {
     /// Follow the system / app light-dark preference.
     #[default]
     System,
@@ -42,7 +42,7 @@ pub enum MessageTheme {
 
 impl MessageTheme {
     /// Forced dark flag for message content, or `None` to follow the system.
-    pub fn dark_override(self) -> Option<bool> {
+    pub(crate) fn dark_override(self) -> Option<bool> {
         match self {
             MessageTheme::System => None,
             MessageTheme::Light => Some(false),
@@ -59,27 +59,27 @@ impl MessageTheme {
 /// stored preferences, with the interface font filled in where none was
 /// chosen, so the reader never has to ask GTK.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub struct ReaderStyle {
+pub(crate) struct ReaderStyle {
     /// Pango description ("Cantarell 11") of the font every message is set
     /// in; `None` leaves the sender's fonts and sizes alone.
-    pub font: Option<String>,
+    pub(crate) font: Option<String>,
     /// Ignore the sender's text and background colors.
-    pub colors: bool,
+    pub(crate) colors: bool,
     /// Pango description of the font plain-text messages are set in
     /// (#181); `None` leaves them in the reader's default.
-    pub plain_font: Option<String>,
+    pub(crate) plain_font: Option<String>,
 }
 
 impl ReaderStyle {
     /// The sender's formatting stands entirely.
-    pub const NONE: ReaderStyle = ReaderStyle {
+    pub(crate) const NONE: ReaderStyle = ReaderStyle {
         font: None,
         colors: false,
         plain_font: None,
     };
 
     /// Whether anything of the sender's is overridden.
-    pub fn active(&self) -> bool {
+    pub(crate) fn active(&self) -> bool {
         self.font.is_some() || self.colors || self.plain_font.is_some()
     }
 }
@@ -88,7 +88,7 @@ impl ReaderStyle {
 /// regardless of it (#32).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum DateStyle {
+pub(crate) enum DateStyle {
     /// Follow the locale: its field order, month names and separators.
     #[default]
     System,
@@ -103,7 +103,7 @@ pub enum DateStyle {
 /// Whether the clock runs to 12 or 24, or follows the system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum ClockStyle {
+pub(crate) enum ClockStyle {
     #[default]
     System,
     /// 5:40 PM
@@ -113,7 +113,7 @@ pub enum ClockStyle {
 }
 
 /// How dates are written, and on what clock.
-pub fn load_date_format() -> (DateStyle, ClockStyle) {
+pub(crate) fn load_date_format() -> (DateStyle, ClockStyle) {
     let p = load_privacy();
     (p.date_style, p.clock_style)
 }
@@ -124,7 +124,7 @@ pub(super) fn default_text_scale() -> u32 {
 
 /// The app's text size in percent; anything Settings does not offer reads
 /// as the desktop's own size.
-pub fn load_text_scale() -> u32 {
+pub(crate) fn load_text_scale() -> u32 {
     let percent = load_privacy().text_scale;
     if crate::text_scale::STEPS.contains(&percent) {
         percent
@@ -134,7 +134,7 @@ pub fn load_text_scale() -> u32 {
 }
 
 /// The appearance theme's id; "system" (the stock look) when unset.
-pub fn load_theme() -> String {
+pub(crate) fn load_theme() -> String {
     let id = load_privacy().theme;
     if id.is_empty() {
         crate::theme::SYSTEM_ID.to_string()
@@ -146,7 +146,7 @@ pub fn load_theme() -> String {
 /// How the message list lays out a message (#334).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ListLayout {
+pub(crate) enum ListLayout {
     /// Sender, subject and preview on lines of their own.
     #[default]
     Cards,
@@ -156,13 +156,13 @@ pub enum ListLayout {
     Automatic,
 }
 
-pub fn load_list_layout() -> ListLayout {
+pub(crate) fn load_list_layout() -> ListLayout {
     load_privacy().list_layout
 }
 
 /// One column of the single-line message list (#334).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ListColumn {
+pub(crate) enum ListColumn {
     Star,
     /// Replied to, forwarded, or both (#454).
     Replied,
@@ -181,7 +181,7 @@ pub enum ListColumn {
 }
 
 impl ListColumn {
-    pub const ALL: [ListColumn; 12] = [
+    pub(crate) const ALL: [ListColumn; 12] = [
         ListColumn::Star,
         ListColumn::Replied,
         ListColumn::Sender,
@@ -198,7 +198,7 @@ impl ListColumn {
 
     /// The columns a single line shows until they are changed: the ones it
     /// had before they could be, and the replied arrows (#454).
-    pub const DEFAULT: [ListColumn; 7] = [
+    pub(crate) const DEFAULT: [ListColumn; 7] = [
         ListColumn::Star,
         ListColumn::Replied,
         ListColumn::Sender,
@@ -209,7 +209,7 @@ impl ListColumn {
     ];
 
     /// The stable name written to `privacy.toml`.
-    pub fn key(self) -> &'static str {
+    pub(crate) fn key(self) -> &'static str {
         match self {
             ListColumn::Star => "star",
             ListColumn::Replied => "replied",
@@ -226,12 +226,12 @@ impl ListColumn {
         }
     }
 
-    pub fn from_key(key: &str) -> Option<ListColumn> {
+    pub(crate) fn from_key(key: &str) -> Option<ListColumn> {
         ListColumn::ALL.iter().copied().find(|c| c.key() == key)
     }
 
     /// The icon on the column's chip in Settings.
-    pub fn icon(self) -> &'static str {
+    pub(crate) fn icon(self) -> &'static str {
         match self {
             ListColumn::Star => "starred-symbolic",
             ListColumn::Replied => "mail-reply-sender-symbolic",
@@ -249,7 +249,7 @@ impl ListColumn {
     }
 
     /// The untranslated label (callers pass it through `i18n`).
-    pub fn label(self) -> &'static str {
+    pub(crate) fn label(self) -> &'static str {
         match self {
             ListColumn::Star => crate::i18n::i18n_noop("Star"),
             ListColumn::Replied => crate::i18n::i18n_noop("Replied"),
@@ -269,7 +269,7 @@ impl ListColumn {
     /// The shown columns, in order, from their saved names. Names this
     /// version does not know are skipped, and the subject is always there:
     /// it is the column that takes the room the others leave.
-    pub fn from_keys(keys: &[String]) -> Vec<ListColumn> {
+    pub(crate) fn from_keys(keys: &[String]) -> Vec<ListColumn> {
         let mut out: Vec<ListColumn> = Vec::new();
         for c in keys.iter().filter_map(|k| ListColumn::from_key(k)) {
             if !out.contains(&c) {
@@ -287,7 +287,7 @@ impl ListColumn {
         out
     }
 
-    pub fn to_keys(columns: &[ListColumn]) -> Vec<String> {
+    pub(crate) fn to_keys(columns: &[ListColumn]) -> Vec<String> {
         columns.iter().map(|c| c.key().to_string()).collect()
     }
 }
@@ -297,11 +297,11 @@ pub(super) fn default_list_columns() -> Vec<String> {
 }
 
 /// The widths single-line columns were dragged to (#334), by column.
-pub fn load_list_column_widths() -> std::collections::HashMap<ListColumn, i32> {
+pub(crate) fn load_list_column_widths() -> std::collections::HashMap<ListColumn, i32> {
     list_column_widths_from(&load_privacy().list_column_widths)
 }
 
-pub fn list_column_widths_from(
+pub(crate) fn list_column_widths_from(
     saved: &std::collections::BTreeMap<String, i32>,
 ) -> std::collections::HashMap<ListColumn, i32> {
     saved
@@ -310,7 +310,7 @@ pub fn list_column_widths_from(
         .collect()
 }
 
-pub fn list_column_widths_to(
+pub(crate) fn list_column_widths_to(
     widths: &std::collections::HashMap<ListColumn, i32>,
 ) -> std::collections::BTreeMap<String, i32> {
     widths
@@ -320,12 +320,12 @@ pub fn list_column_widths_to(
 }
 
 /// The single-line list's columns, in order (#334).
-pub fn load_list_columns() -> Vec<ListColumn> {
+pub(crate) fn load_list_columns() -> Vec<ListColumn> {
     ListColumn::from_keys(&load_privacy().list_columns)
 }
 
 /// Lines of message text shown under the subject in the list; 0 means previews
 /// are off. Clamped in case the file was edited by hand.
-pub fn load_preview_lines() -> u32 {
+pub(crate) fn load_preview_lines() -> u32 {
     load_privacy().preview_lines.min(3)
 }

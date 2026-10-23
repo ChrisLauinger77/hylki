@@ -32,7 +32,7 @@ pub(super) fn seafile_err(what: &str, e: ureq::Error) -> String {
 /// the token that comes back is what the keyring keeps from then on, as
 /// the password alone would not get past the code at upload time.
 /// Answers with the token and the account's display name.
-pub fn seafile_login_with_code(
+pub(crate) fn seafile_login_with_code(
     account: &CloudAccount,
     password: &str,
     code: &str,

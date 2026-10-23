@@ -5,7 +5,7 @@ use super::base;
 
 /// Which language a message's text is in, when that can be told with
 /// confidence: one of this module's codes, or `None`. Runs offline.
-pub fn detect(html: &str) -> Option<String> {
+pub(crate) fn detect(html: &str) -> Option<String> {
     let text = visible_text(html);
     // A line or two is too little to go on, and a long newsletter is
     // decided well before its end.
@@ -62,7 +62,7 @@ pub fn detect(html: &str) -> Option<String> {
 
 /// Whether a message in `detected` is worth offering to translate into
 /// `target`: a different language, not a variety of the same one.
-pub fn differs(detected: &str, target: &str) -> bool {
+pub(crate) fn differs(detected: &str, target: &str) -> bool {
     base(detected) != base(target)
 }
 

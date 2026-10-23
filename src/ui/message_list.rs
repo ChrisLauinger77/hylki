@@ -11,7 +11,7 @@ use std::rc::Rc;
 use relm4::prelude::*;
 
 use crate::models::{Message, ThreadSummary};
-pub use crate::ui::message_row::{tag_menu_entries, RowAction};
+pub(crate) use crate::ui::message_row::{tag_menu_entries, RowAction};
 use crate::ui::message_row::{RowData, RowShared};
 
 mod component;
@@ -35,15 +35,15 @@ mod threading;
 mod types;
 mod views;
 
-pub use filters::{CheckFilter, QuickFilter, QuickFilters};
+pub(crate) use filters::{CheckFilter, QuickFilter, QuickFilters};
 pub(crate) use layout::after_next_paint;
 pub(crate) use search::search_text_of;
-pub use search::{PoolFolder, SearchScope};
-pub use sort::SortOrder;
-pub use types::{BulkAction, MessageListInput, MessageListOutput};
-pub use views::{KEEP_AT_MOST, KEPT_VIEWS};
+pub(crate) use search::{PoolFolder, SearchScope};
+pub(crate) use sort::SortOrder;
+pub(crate) use types::{BulkAction, MessageListInput, MessageListOutput};
+pub(crate) use views::{KEEP_AT_MOST, KEPT_VIEWS};
 
-pub struct MessageList {
+pub(crate) struct MessageList {
     /// The rows: a `ListView` builds only the ones on screen, so a folder
     /// of any size is one list (#323).
     list_view: gtk::ListView,

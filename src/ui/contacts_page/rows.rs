@@ -308,7 +308,7 @@ impl DragKeys {
 
 /// The contacts in a drag's text, by book and UID; `None` when it is not
 /// a drag of contacts (a message, a folder).
-pub fn dragged_contacts(payload: &str) -> Option<Vec<(String, String)>> {
+pub(crate) fn dragged_contacts(payload: &str) -> Option<Vec<(String, String)>> {
     let mut lines = payload.lines();
     (lines.next()? == DRAG_MARK).then(|| {
         lines

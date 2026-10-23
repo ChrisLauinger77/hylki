@@ -404,7 +404,7 @@ pub(super) const THREADS_OFF_MAIN: usize = 4000;
 
 /// [`compute_thread_keys`] over everything a list holds, with each
 /// conversation's members as positions in that same slice.
-pub struct SourceThreads {
+pub(crate) struct SourceThreads {
     /// Worked out from the search pool rather than the folder.
     pub(super) pool: bool,
     pub(super) keys: std::collections::HashMap<(u32, u32, u32), (u32, String)>,

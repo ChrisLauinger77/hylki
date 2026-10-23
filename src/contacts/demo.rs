@@ -6,7 +6,7 @@ use super::read::{local_book, Book};
 use crate::i18n::i18n;
 
 /// The books demo mode offers new contacts, the Hylki book among them.
-pub fn demo_books() -> Vec<Book> {
+pub(crate) fn demo_books() -> Vec<Book> {
     vec![
         Book {
             uid: "On This Computer".into(),
@@ -26,7 +26,7 @@ pub fn demo_books() -> Vec<Book> {
 /// mailbox, fleshed out so the contacts view has something to show off.
 /// No EDS identity: demo entries are display-only. The book's name stands
 /// in for its UID, so the book filter has something to tell apart.
-pub fn demo_contacts() -> Vec<ContactDetails> {
+pub(crate) fn demo_contacts() -> Vec<ContactDetails> {
     let l = |label: &str, value: &str| Labeled {
         label: label.into(),
         value: value.into(),

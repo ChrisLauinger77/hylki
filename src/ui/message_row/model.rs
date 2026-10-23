@@ -15,7 +15,7 @@ use std::rc::Rc;
 glib::wrapper! {
     /// The view's handle on one row of the list. Made only when the view
     /// asks for that position, and kept for as long as the view holds it.
-    pub struct RowItem(ObjectSubclass<item_imp::RowItem>);
+    pub(crate) struct RowItem(ObjectSubclass<item_imp::RowItem>);
 }
 
 glib::wrapper! {
@@ -24,7 +24,7 @@ glib::wrapper! {
     /// the same message keeps the same item (and the same bound row) across
     /// a rebuild. Its sections are the runs of rows under one date heading
     /// (#435).
-    pub struct MessageModel(ObjectSubclass<model_imp::MessageModel>)
+    pub(crate) struct MessageModel(ObjectSubclass<model_imp::MessageModel>)
         @implements gtk::gio::ListModel, gtk::SectionModel;
 }
 
@@ -36,10 +36,10 @@ pub(super) mod item_imp {
     use gtk::subclass::prelude::*;
 
     #[derive(Default)]
-    pub struct RowItem {
-        pub data: RefCell<Option<Rc<super::RowData>>>,
+    pub(crate) struct RowItem {
+        pub(crate) data: RefCell<Option<Rc<super::RowData>>>,
         /// The row widget showing this item, while it is bound.
-        pub row: RefCell<Weak<super::Row>>,
+        pub(crate) row: RefCell<Weak<super::Row>>,
     }
 
     #[glib::object_subclass]
@@ -58,7 +58,7 @@ impl RowItem {
         item
     }
 
-    pub fn data(&self) -> Rc<RowData> {
+    pub(crate) fn data(&self) -> Rc<RowData> {
         self.imp()
             .data
             .borrow()
@@ -106,9 +106,9 @@ pub(super) mod model_imp {
     use gtk::subclass::prelude::*;
 
     #[derive(Default)]
-    pub struct MessageModel {
-        pub rows: RefCell<Vec<Rc<super::RowData>>>,
-        pub items: RefCell<HashMap<super::Slot, glib::WeakRef<super::RowItem>>>,
+    pub(crate) struct MessageModel {
+        pub(crate) rows: RefCell<Vec<Rc<super::RowData>>>,
+        pub(crate) items: RefCell<HashMap<super::Slot, glib::WeakRef<super::RowItem>>>,
         /// Where each section starts, worked out again from `rows` the first
         /// time the view asks after they change: a handful of runs, so the
         /// view's question is a short search however long the list.
@@ -118,7 +118,7 @@ pub(super) mod model_imp {
 
     impl MessageModel {
         /// `rows` changed: the sections are worked out again when next asked.
-        pub fn touch(&self) {
+        pub(crate) fn touch(&self) {
             self.sections_stale.set(true);
         }
     }
@@ -187,7 +187,7 @@ pub(crate) fn section_starts(rows: &[Rc<RowData>]) -> Vec<u32> {
 
 /// One step of turning the rows on screen into a new list, in row order.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum RowEdit {
+pub(crate) enum RowEdit {
     /// The row stays, showing the next new row.
     Keep,
     /// New row `i` goes in here.
@@ -198,7 +198,10 @@ pub enum RowEdit {
 
 /// The edits that turn `old` into `new`, as far as `old` goes, and the
 /// first of `new` left to add after them.
-pub fn row_edits<K: std::hash::Hash + Eq + Copy>(old: &[K], new: &[K]) -> (Vec<RowEdit>, usize) {
+pub(crate) fn row_edits<K: std::hash::Hash + Eq + Copy>(
+    old: &[K],
+    new: &[K],
+) -> (Vec<RowEdit>, usize) {
     let at = |keys: &[K]| -> HashMap<K, usize> {
         keys.iter().enumerate().map(|(n, k)| (*k, n)).collect()
     };
@@ -241,7 +244,7 @@ const SWAP_RUNS: usize = 8;
 
 /// Whether the view is better told of one swap than of `edits`: nothing is
 /// kept, or what is kept is in scattered pieces.
-pub fn swap_wanted(edits: &[RowEdit], old_len: usize, tail: usize, new_len: usize) -> bool {
+pub(crate) fn swap_wanted(edits: &[RowEdit], old_len: usize, tail: usize, new_len: usize) -> bool {
     old_len > 0
         && new_len > 0
         && (!edits.contains(&RowEdit::Keep)
@@ -285,16 +288,16 @@ impl Default for MessageModel {
 }
 
 impl MessageModel {
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.imp().rows.borrow().len()
     }
 
     /// Every row, in order.
-    pub fn rows(&self) -> Vec<Rc<RowData>> {
+    pub(crate) fn rows(&self) -> Vec<Rc<RowData>> {
         self.imp().rows.borrow().clone()
     }
 
-    pub fn row(&self, pos: usize) -> Option<Rc<RowData>> {
+    pub(crate) fn row(&self, pos: usize) -> Option<Rc<RowData>> {
         self.imp().rows.borrow().get(pos).cloned()
     }
 
@@ -305,7 +308,7 @@ impl MessageModel {
     /// `stale`: the list's look changed since the rows on screen were
     /// filled, so a swap fills again the ones it keeps. Returns whether it
     /// was a swap, which leaves nothing on screen stale.
-    pub fn replace(&self, new: Vec<Rc<RowData>>, stale: bool) -> bool {
+    pub(crate) fn replace(&self, new: Vec<Rc<RowData>>, stale: bool) -> bool {
         let old: Vec<Slot> = self.imp().rows.borrow().iter().map(|r| r.slot()).collect();
         let keys: Vec<Slot> = new.iter().map(|r| r.slot()).collect();
         let (edits, tail) = row_edits(&old, &keys);
@@ -381,7 +384,7 @@ impl MessageModel {
     }
 
     /// New data for the row at `pos`, showing the same message.
-    pub fn set_row(&self, pos: usize, data: Rc<RowData>) {
+    pub(crate) fn set_row(&self, pos: usize, data: Rc<RowData>) {
         if self.put_row(pos, data) {
             self.resection();
         }
@@ -479,14 +482,14 @@ impl MessageModel {
     }
 
     /// Change the row at `pos` in place.
-    pub fn update_row(&self, pos: usize, f: impl FnOnce(&mut RowData)) {
+    pub(crate) fn update_row(&self, pos: usize, f: impl FnOnce(&mut RowData)) {
         let Some(row) = self.row(pos) else { return };
         let mut data = (*row).clone();
         f(&mut data);
         self.set_row(pos, Rc::new(data));
     }
 
-    pub fn splice(&self, pos: usize, removed: usize, added: Vec<Rc<RowData>>) {
+    pub(crate) fn splice(&self, pos: usize, removed: usize, added: Vec<Rc<RowData>>) {
         let n = added.len();
         self.imp()
             .rows

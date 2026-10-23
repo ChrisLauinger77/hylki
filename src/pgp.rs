@@ -25,26 +25,26 @@ mod status;
 #[cfg(test)]
 mod tests;
 
-pub use inbound::{detect, legacy_display_part, unwrap_message};
-pub use keys::{
+pub(crate) use inbound::{detect, legacy_display_part, unwrap_message};
+pub(crate) use keys::{
     delete_key, export_public, fetch_key, generate_key, import_keys, key_by_fingerprint,
     key_display, list_keys, public_key_for, secret_key_by_fingerprint, secret_key_for, trust_key,
     ImportSummary, KeyInfo,
 };
-pub use outbound::{encrypt, sign_detached};
+pub(crate) use outbound::{encrypt, sign_detached};
 
 /// A GnuPG to talk to: the system one by default, or one with its own home
 /// directory (tests build a throwaway keyring).
 #[derive(Debug, Clone, Default)]
-pub struct Gpg {
+pub(crate) struct Gpg {
     /// `GNUPGHOME` for the child process; `None` = the user's own.
-    pub home: Option<PathBuf>,
+    pub(crate) home: Option<PathBuf>,
 }
 
 impl Gpg {
     /// The user's GnuPG (honouring `HYLKI_GNUPGHOME`, for trying an
     /// alternative keyring without touching the real one).
-    pub fn system() -> Gpg {
+    pub(crate) fn system() -> Gpg {
         Gpg {
             home: std::env::var_os("HYLKI_GNUPGHOME").map(PathBuf::from),
         }
@@ -72,7 +72,7 @@ impl Gpg {
 }
 
 /// Whether a `gpg` answers at all. Checked once per process.
-pub fn available() -> bool {
+pub(crate) fn available() -> bool {
     static AVAILABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *AVAILABLE.get_or_init(|| {
         Command::new("gpg")

@@ -37,7 +37,7 @@ static LAST: Mutex<Option<u32>> = Mutex::new(None);
 /// going away: GNOME Shell disables extensions like Dash to Dock while the
 /// screen is locked and enables them afresh on unlock, and a restarted
 /// Plasma shell starts empty. Neither asks for the count again.
-pub fn resend() {
+pub(crate) fn resend() {
     *LAST.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
@@ -46,7 +46,7 @@ pub fn resend() {
 /// they keep badges, and start empty each time they take it: after an
 /// unlock (GNOME Shell disables them on the lock screen), after Do Not
 /// Disturb, after the shell restarts. Must be called on the GTK main thread.
-pub fn watch_dock<F: Fn() + Send + Sync + 'static>(on_back: F) {
+pub(crate) fn watch_dock<F: Fn() + Send + Sync + 'static>(on_back: F) {
     let id = gtk::gio::bus_watch_name(
         gtk::gio::BusType::Session,
         "com.canonical.Unity",
@@ -61,7 +61,7 @@ pub fn watch_dock<F: Fn() + Send + Sync + 'static>(on_back: F) {
 
 /// Show `count` on the launcher icon; 0 hides the badge. Repeats of the
 /// value last sent are skipped, since this runs on every unread change.
-pub fn set_count(count: u32) {
+pub(crate) fn set_count(count: u32) {
     {
         let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
         if *last == Some(count) {
@@ -87,7 +87,7 @@ pub fn set_count(count: u32) {
 /// a notification's buttons, or on another device) stops counting. Kept in
 /// memory only: a restart starts from none.
 #[derive(Debug, Default)]
-pub struct Arrivals {
+pub(crate) struct Arrivals {
     /// (account, folder, UID).
     mail: HashSet<(u32, u32, u32)>,
 }
@@ -97,7 +97,7 @@ impl Arrivals {
     /// UIDs, `None` on the folder's first load, which arrives with everything
     /// the inbox already holds and so counts nothing. `listing` is the new
     /// one, as (UID, unread).
-    pub fn note(
+    pub(crate) fn note(
         &mut self,
         account_id: u32,
         folder_id: u32,
@@ -114,13 +114,13 @@ impl Arrivals {
     }
 
     /// The window came forward: everything has been seen.
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.mail.clear();
     }
 
     /// How many of the arrivals are still unread, where `unread_uids` gives
     /// a folder's unread UIDs as the app now lists them.
-    pub fn count<I: IntoIterator<Item = u32>>(
+    pub(crate) fn count<I: IntoIterator<Item = u32>>(
         &self,
         mut unread_uids: impl FnMut(u32, u32) -> I,
     ) -> u32 {

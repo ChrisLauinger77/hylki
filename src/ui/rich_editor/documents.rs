@@ -234,7 +234,7 @@ pub(super) fn image_policy_meta(allowed: Option<&[String]>) -> String {
 }
 
 /// Every remote picture `html` shows, by its `src` address.
-pub fn remote_image_urls(html: &str) -> Vec<String> {
+pub(crate) fn remote_image_urls(html: &str) -> Vec<String> {
     let mut urls = Vec::new();
     let mut rest = html;
     while let Some(at) = find_src_attr(rest) {

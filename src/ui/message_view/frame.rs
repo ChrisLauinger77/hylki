@@ -17,7 +17,10 @@ use relm4::prelude::*;
 /// read from. When the caller asks for a scheme the app isn't currently in,
 /// the theme can't answer for that mode, so the stock GNOME values stand in.
 #[allow(deprecated)] // lookup_color: named theme colors have no successor yet
-pub fn theme_grounds_for(widget: &impl IsA<gtk::Widget>, dark: bool) -> (String, String, String) {
+pub(crate) fn theme_grounds_for(
+    widget: &impl IsA<gtk::Widget>,
+    dark: bool,
+) -> (String, String, String) {
     let style = widget.style_context();
     if dark == adw::StyleManager::default().is_dark() {
         if let Some(c) = style.lookup_color("view_bg_color") {

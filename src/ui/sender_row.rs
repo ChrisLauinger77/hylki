@@ -7,17 +7,17 @@ use relm4::prelude::*;
 use crate::i18n::i18n;
 
 /// An address on the allow list or the blocklist.
-pub struct SenderRow {
+pub(crate) struct SenderRow {
     addr: String,
 }
 
 #[derive(Debug)]
-pub enum SenderRowOutput {
+pub(crate) enum SenderRowOutput {
     /// The row's trash button: take this address off its list.
     Remove(String),
 }
 
-#[relm4::factory(pub)]
+#[relm4::factory(pub(crate))]
 impl FactoryComponent for SenderRow {
     type Init = String;
     type Input = ();

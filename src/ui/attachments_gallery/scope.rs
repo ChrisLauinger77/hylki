@@ -14,20 +14,20 @@ use super::{AttachmentsGallery, GalleryInput};
 
 /// One folder offered in the gallery's folder list.
 #[derive(Debug, Clone)]
-pub struct GalleryFolder {
-    pub path: String,
+pub(crate) struct GalleryFolder {
+    pub(crate) path: String,
     /// Display name, as the sidebar spells it.
-    pub name: String,
-    pub kind: FolderKind,
+    pub(crate) name: String,
+    pub(crate) kind: FolderKind,
 }
 
 /// One account's share of the folder list: the account's own label and the
 /// folders whose attachments the gallery could draw on.
 #[derive(Debug, Clone)]
-pub struct GalleryAccount {
-    pub id: u32,
-    pub label: String,
-    pub folders: Vec<GalleryFolder>,
+pub(crate) struct GalleryAccount {
+    pub(crate) id: u32,
+    pub(crate) label: String,
+    pub(crate) folders: Vec<GalleryFolder>,
 }
 
 /// Whether a folder of this kind feeds the gallery unless the user says

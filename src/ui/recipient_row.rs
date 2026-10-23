@@ -29,7 +29,7 @@ mod pill;
 mod selection;
 mod wire;
 
-pub use flow::PillFlow;
+pub(crate) use flow::PillFlow;
 
 /// Space between pills, and between lines of them.
 const SPACING: i32 = 4;
@@ -41,26 +41,26 @@ mod imp {
     use super::*;
 
     #[derive(Default)]
-    pub struct RecipientRow {
-        pub header: gtk::Box,
-        pub empty_title: gtk::Label,
-        pub title: gtk::Label,
-        pub flow: super::PillFlow,
-        pub text: gtk::Text,
-        pub edit_icon: gtk::Image,
-        pub suffixes: gtk::Box,
+    pub(crate) struct RecipientRow {
+        pub(crate) header: gtk::Box,
+        pub(crate) empty_title: gtk::Label,
+        pub(crate) title: gtk::Label,
+        pub(crate) flow: super::PillFlow,
+        pub(crate) text: gtk::Text,
+        pub(crate) edit_icon: gtk::Image,
+        pub(crate) suffixes: gtk::Box,
         /// The pills in order, each with the recipient it stands for as it
         /// goes into the field ("Name <address>").
-        pub pills: RefCell<Vec<(gtk::Widget, String)>>,
+        pub(crate) pills: RefCell<Vec<(gtk::Widget, String)>>,
         /// Set while the row rewrites its own text, so that is not taken
         /// for typing.
-        pub busy: Cell<bool>,
-        pub focused: Cell<bool>,
+        pub(crate) busy: Cell<bool>,
+        pub(crate) focused: Cell<bool>,
         /// Every recipient field of the composer, this one included, in
         /// order: a selection spans them, and a pill's menu moves to them.
-        pub fields: RefCell<Vec<glib::WeakRef<super::RecipientRow>>>,
+        pub(crate) fields: RefCell<Vec<glib::WeakRef<super::RecipientRow>>>,
         /// The pill a Shift+click or Shift+arrow selects from.
-        pub anchor: RefCell<Option<gtk::Widget>>,
+        pub(crate) anchor: RefCell<Option<gtk::Widget>>,
     }
 
     #[glib::object_subclass]
@@ -178,7 +178,7 @@ mod imp {
 }
 
 glib::wrapper! {
-    pub struct RecipientRow(ObjectSubclass<imp::RecipientRow>)
+    pub(crate) struct RecipientRow(ObjectSubclass<imp::RecipientRow>)
         @extends adw::PreferencesRow, gtk::ListBoxRow, gtk::Widget,
         @implements gtk::Accessible, gtk::Actionable, gtk::Buildable, gtk::ConstraintTarget;
 }
@@ -192,7 +192,7 @@ impl Default for RecipientRow {
 impl RecipientRow {
     /// The whole field as one recipient list: the pills, then whatever is
     /// still being typed, comma separated.
-    pub fn text(&self) -> String {
+    pub(crate) fn text(&self) -> String {
         let imp = self.imp();
         let mut all: Vec<String> = imp.pills.borrow().iter().map(|(_, r)| r.clone()).collect();
         let typed = self.typed();
@@ -203,7 +203,7 @@ impl RecipientRow {
     }
 
     /// Replace the field with these recipients, every one a pill.
-    pub fn set_text(&self, field: &str) {
+    pub(crate) fn set_text(&self, field: &str) {
         let imp = self.imp();
         for (pill, _) in imp.pills.take() {
             imp.flow.remove(&pill);
@@ -214,37 +214,37 @@ impl RecipientRow {
     }
 
     /// What is being typed after the pills, which suggestions are for.
-    pub fn typed(&self) -> String {
+    pub(crate) fn typed(&self) -> String {
         self.imp().text.text().trim().to_string()
     }
 
     /// Put a recipient in place of what is being typed (a suggestion
     /// picked from the list).
-    pub fn complete(&self, recipient: &str) {
+    pub(crate) fn complete(&self, recipient: &str) {
         self.set_typed("");
         self.push(recipient);
         self.emit_changed();
     }
 
     /// Add a recipient after the others, leaving what is being typed alone.
-    pub fn add_recipient(&self, recipient: &str) {
+    pub(crate) fn add_recipient(&self, recipient: &str) {
         self.push(recipient);
         self.emit_changed();
     }
 
-    pub fn add_suffix(&self, widget: &impl IsA<gtk::Widget>) {
+    pub(crate) fn add_suffix(&self, widget: &impl IsA<gtk::Widget>) {
         let imp = self.imp();
         imp.suffixes.append(widget);
         imp.suffixes.set_visible(true);
     }
 
-    pub fn set_input_purpose(&self, purpose: gtk::InputPurpose) {
+    pub(crate) fn set_input_purpose(&self, purpose: gtk::InputPurpose) {
         self.imp().text.set_input_purpose(purpose);
     }
 
     /// Called after every change to the field: typing, a pill made or
     /// taken away.
-    pub fn connect_changed<F: Fn(&Self) + 'static>(&self, f: F) -> glib::SignalHandlerId {
+    pub(crate) fn connect_changed<F: Fn(&Self) + 'static>(&self, f: F) -> glib::SignalHandlerId {
         self.connect_local("changed", false, move |values| {
             let row = values[0]
                 .get::<Self>()
@@ -261,7 +261,7 @@ impl RecipientRow {
 
     /// Every recipient field of the composer, this one among them, in
     /// order, for a selection to span and a pill's menu to move it to.
-    pub fn set_fields(&self, fields: &[&RecipientRow]) {
+    pub(crate) fn set_fields(&self, fields: &[&RecipientRow]) {
         *self.imp().fields.borrow_mut() = fields.iter().map(|f| f.downgrade()).collect();
     }
 
@@ -282,7 +282,10 @@ impl RecipientRow {
 
     /// Called as a pill of this field starts (true) and ends (false) a
     /// drag.
-    pub fn connect_pill_drag<F: Fn(&Self, bool) + 'static>(&self, f: F) -> glib::SignalHandlerId {
+    pub(crate) fn connect_pill_drag<F: Fn(&Self, bool) + 'static>(
+        &self,
+        f: F,
+    ) -> glib::SignalHandlerId {
         self.connect_local("pill-drag", false, move |values| {
             let row = values[0]
                 .get::<Self>()

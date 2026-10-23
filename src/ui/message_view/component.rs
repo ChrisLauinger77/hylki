@@ -9,7 +9,7 @@ use crate::i18n::{i18n, i18n_f};
 use adw::prelude::*;
 use relm4::prelude::*;
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for MessageView {
     type Init = ();
     type Input = MessageViewInput;

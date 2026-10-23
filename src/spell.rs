@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 mod dictionaries;
 
-pub use dictionaries::{
+pub(crate) use dictionaries::{
     installed_dictionaries, resolved_spell_languages, spell_language_names, system_spell_languages,
 };
 
@@ -30,7 +30,7 @@ type RequestDict = unsafe extern "C" fn(*mut c_void, *const c_char) -> *mut c_vo
 type DictCheck = unsafe extern "C" fn(*mut c_void, *const c_char, isize) -> c_int;
 type DictAdd = unsafe extern "C" fn(*mut c_void, *const c_char, isize);
 
-pub struct SpellChecker {
+pub(crate) struct SpellChecker {
     dict: *mut c_void,
     check: DictCheck,
     add: DictAdd,
@@ -130,7 +130,7 @@ fn misspelled_in_all<C>(checkers: &[C], word: &str, rejects: impl Fn(&C, &str) -
 /// The language codes a spelling setting lists, in order and each once.
 /// Commas are the separator the app writes; semicolons and spaces are read
 /// too, for a hand-edited file.
-pub fn parse_languages(setting: &str) -> Vec<String> {
+pub(crate) fn parse_languages(setting: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for code in setting
         .split([',', ';', ' '])
@@ -145,7 +145,7 @@ pub fn parse_languages(setting: &str) -> Vec<String> {
 }
 
 /// The setting as it is written back: "en_US, de_DE".
-pub fn join_languages(codes: &[String]) -> String {
+pub(crate) fn join_languages(codes: &[String]) -> String {
     codes.join(", ")
 }
 
@@ -155,7 +155,7 @@ pub fn join_languages(codes: &[String]) -> String {
 /// the list, and switching the last one off returns to it. Switching the
 /// system language off keeps checking in `system`, the dictionaries it was
 /// using, since checking in no language at all is not a choice.
-pub fn toggle_language(setting: &str, code: &str, on: bool, system: &[String]) -> String {
+pub(crate) fn toggle_language(setting: &str, code: &str, on: bool, system: &[String]) -> String {
     let mut codes = parse_languages(setting);
     if code.is_empty() {
         return match (on, codes.is_empty()) {
@@ -181,7 +181,11 @@ pub fn toggle_language(setting: &str, code: &str, on: bool, system: &[String]) -
 /// a missing dictionary checks nothing. When nothing is left, any
 /// dictionary beats none. With no dictionaries visible at all the codes are
 /// passed on as they are.
-pub fn resolve_languages(setting: &str, locale: Option<String>, dicts: &[String]) -> Vec<String> {
+pub(crate) fn resolve_languages(
+    setting: &str,
+    locale: Option<String>,
+    dicts: &[String],
+) -> Vec<String> {
     let mut wanted = parse_languages(setting);
     if wanted.is_empty() {
         wanted.push(locale.unwrap_or_else(|| "en_US".to_string()));
@@ -320,7 +324,7 @@ const LANGUAGE_FAMILY_NAMES: &[(&str, &str)] = &[
 /// ("Русский (Россия)" for ru_RU). Unknown regions fall back to the language
 /// name plus the raw region; unknown languages to the raw code — never
 /// nothing.
-pub fn language_display_name(code: &str) -> String {
+pub(crate) fn language_display_name(code: &str) -> String {
     if let Some((_, name)) = LANGUAGE_NAMES.iter().find(|(c, _)| *c == code) {
         return (*name).to_string();
     }
@@ -379,7 +383,7 @@ fn checkable_words(text: &str) -> Vec<(usize, usize, &str)> {
 
 /// Whether one word is misspelled under the current preference and
 /// languages. `false` whenever checking is off or unavailable.
-pub fn word_is_misspelled(word: &str) -> bool {
+pub(crate) fn word_is_misspelled(word: &str) -> bool {
     if !crate::config::load_privacy().spellcheck {
         return false;
     }
@@ -393,7 +397,7 @@ pub fn word_is_misspelled(word: &str) -> bool {
 /// while the cursor sits in a word it is still being typed, and flagging a
 /// half-word on every keystroke reads as nagging. Pass `None` (after a
 /// typing pause) to check the cursor's word too.
-pub fn error_attrs(text: &str, cursor: Option<usize>) -> Option<gtk::pango::AttrList> {
+pub(crate) fn error_attrs(text: &str, cursor: Option<usize>) -> Option<gtk::pango::AttrList> {
     if !crate::config::load_privacy().spellcheck {
         return None;
     }
@@ -446,7 +450,7 @@ fn personal_dict_paths() -> Vec<std::path::PathBuf> {
 
 /// The words the user has taught the spell checker, across the active
 /// languages, each once.
-pub fn personal_words() -> Vec<String> {
+pub(crate) fn personal_words() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for path in personal_dict_paths() {
         let text = std::fs::read_to_string(path).unwrap_or_default();
@@ -461,7 +465,7 @@ pub fn personal_words() -> Vec<String> {
 
 /// Every language's personal word list in the enchant config dir, for a
 /// settings backup: language → words.
-pub fn all_personal_words() -> std::collections::BTreeMap<String, Vec<String>> {
+pub(crate) fn all_personal_words() -> std::collections::BTreeMap<String, Vec<String>> {
     let mut out = std::collections::BTreeMap::new();
     let Ok(entries) = std::fs::read_dir(enchant_dir()) else {
         return out;
@@ -486,7 +490,7 @@ pub fn all_personal_words() -> std::collections::BTreeMap<String, Vec<String>> {
 /// Add a backup's words for `lang` to its personal list, keeping what is
 /// already there (nothing is removed). The file is enchant's own
 /// one-word-per-line list, created when absent.
-pub fn merge_personal_words(lang: &str, words: &[String]) {
+pub(crate) fn merge_personal_words(lang: &str, words: &[String]) {
     if words.is_empty() || lang.is_empty() || lang.contains('/') || lang.contains("..") {
         return;
     }
@@ -516,7 +520,7 @@ pub fn merge_personal_words(lang: &str, words: &[String]) {
 /// instance) picks it up at the next launch. With several languages the
 /// word joins the first one's list, which is enough: a word any one of the
 /// dictionaries accepts is not underlined.
-pub fn add_personal_word(word: &str) {
+pub(crate) fn add_personal_word(word: &str) {
     let word = word.trim();
     if word.is_empty() {
         return;
@@ -532,7 +536,7 @@ pub fn add_personal_word(word: &str) {
 /// without the word (the body's Learn Spelling may have put it in any of
 /// them) and the cached checkers are dropped to reload the trimmed lists.
 /// The message body applies the change at the next launch.
-pub fn remove_personal_word(word: &str) {
+pub(crate) fn remove_personal_word(word: &str) {
     for path in personal_dict_paths() {
         let Ok(content) = std::fs::read_to_string(&path) else {
             continue;

@@ -24,24 +24,24 @@ const TRANSIENT_SECS: u64 = 5;
 
 /// A single persisted notification (currently always an error).
 #[derive(Debug, Clone)]
-pub struct Notification {
-    pub id: u32,
-    pub text: String,
+pub(crate) struct Notification {
+    pub(crate) id: u32,
+    pub(crate) text: String,
     /// Connection/sync error — cleared automatically once connectivity returns.
-    pub connectivity: bool,
+    pub(crate) connectivity: bool,
 }
 
 /// One expandable card.
-pub struct NotificationCard {
+pub(crate) struct NotificationCard {
     note: Notification,
 }
 
 #[derive(Debug)]
-pub enum CardOutput {
+pub(crate) enum CardOutput {
     Dismiss(u32),
 }
 
-#[relm4::factory(pub)]
+#[relm4::factory(pub(crate))]
 impl FactoryComponent for NotificationCard {
     type Init = Notification;
     type Input = ();
@@ -87,7 +87,7 @@ impl FactoryComponent for NotificationCard {
     }
 }
 
-pub struct NotificationCenter {
+pub(crate) struct NotificationCenter {
     cards: FactoryVecDeque<NotificationCard>,
     /// Card ids, index-aligned with the factory (newest first).
     ids: Vec<u32>,
@@ -140,7 +140,7 @@ struct Layout {
 }
 
 #[derive(Debug)]
-pub enum NotifyInput {
+pub(crate) enum NotifyInput {
     /// Auto-shows the transient bar for a few seconds; errors also add a card.
     Push {
         text: String,
@@ -178,7 +178,7 @@ pub enum NotifyInput {
 }
 
 #[derive(Debug)]
-pub enum NotifyOutput {
+pub(crate) enum NotifyOutput {
     CountChanged(usize),
     /// The console's Export button: save the log to a file (#132).
     ExportLog,
@@ -187,7 +187,7 @@ pub enum NotifyOutput {
     Shown(bool),
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl SimpleComponent for NotificationCenter {
     type Init = ();
     type Input = NotifyInput;

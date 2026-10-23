@@ -14,7 +14,7 @@ use relm4::prelude::*;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::Attachment;
 
-pub struct Lightbox {
+pub(crate) struct Lightbox {
     items: Vec<Attachment>,
     pos: usize,
     texture: Option<gtk::gdk::Texture>,
@@ -33,7 +33,7 @@ pub struct Lightbox {
 }
 
 #[derive(Debug)]
-pub enum LightboxInput {
+pub(crate) enum LightboxInput {
     /// Show these previewable attachments, starting at `start`.
     Show {
         items: Vec<Attachment>,
@@ -59,7 +59,7 @@ pub enum LightboxInput {
     Rendered(u64),
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for Lightbox {
     type Init = ();
     type Input = LightboxInput;

@@ -307,7 +307,7 @@ fn our_uid() -> u32 {
 /// decrypted, readable, and long past the point the user considers them gone.
 /// Called once at startup, because the helper application the user opened a file
 /// with may still have it open while Hylki is running.
-pub fn purge_attachment_dir() {
+pub(crate) fn purge_attachment_dir() {
     let dir = std::env::temp_dir().join("vireo-attachments");
     if !dir.exists() {
         return;

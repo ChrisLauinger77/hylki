@@ -39,7 +39,7 @@ fn push_line(line: &str) {
 
 /// Every buffered line newer than `after`, plus the newest sequence number
 /// (pass it back next call). Cheap when nothing is new.
-pub fn lines_since(after: u64) -> (u64, Vec<String>) {
+pub(crate) fn lines_since(after: u64) -> (u64, Vec<String>) {
     let newest = SEQ.load(Ordering::Relaxed);
     if newest == after {
         return (newest, Vec::new());
@@ -56,7 +56,7 @@ pub fn lines_since(after: u64) -> (u64, Vec<String>) {
 /// `MakeWriter` for the console's fmt layer: collects the layer's output and
 /// buffers it line by line.
 #[derive(Clone, Default)]
-pub struct ConsoleWriter;
+pub(crate) struct ConsoleWriter;
 
 impl std::io::Write for ConsoleWriter {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
@@ -79,13 +79,13 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for ConsoleWriter {
 
 /// How many lines the console holds and what they weigh, for the memory
 /// section of an export.
-pub fn stats() -> (usize, usize) {
+pub(crate) fn stats() -> (usize, usize) {
     let buf = buffer();
     (buf.len(), buf.iter().map(|(_, l)| l.len()).sum())
 }
 
 /// Everything the console holds, oldest first.
-pub fn all_lines() -> Vec<String> {
+pub(crate) fn all_lines() -> Vec<String> {
     buffer().iter().map(|(_, l)| l.clone()).collect()
 }
 
@@ -94,7 +94,7 @@ pub fn all_lines() -> Vec<String> {
 /// app started, with email addresses shortened to their domain so the file
 /// can be attached to an issue as it is. `memory` is the app's memory
 /// section (see `memory_report`), placed between the header and the lines.
-pub fn export_text(memory: &str) -> String {
+pub(crate) fn export_text(memory: &str) -> String {
     let os = std::fs::read_to_string("/etc/os-release")
         .ok()
         .and_then(|t| {

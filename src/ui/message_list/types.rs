@@ -12,7 +12,7 @@ use relm4::prelude::*;
 
 /// A bulk action applied to every selected message at once.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BulkAction {
+pub(crate) enum BulkAction {
     MarkRead,
     MarkUnread,
     Flag,
@@ -31,7 +31,7 @@ pub enum BulkAction {
 }
 
 #[derive(Debug)]
-pub enum MessageListInput {
+pub(crate) enum MessageListInput {
     /// The header's quick filters (#97, #441), with your contacts'
     /// addresses when "From Contacts" is among them.
     SetQuickFilters {
@@ -415,7 +415,7 @@ pub enum MessageListInput {
 }
 
 #[derive(Debug)]
-pub enum MessageListOutput {
+pub(crate) enum MessageListOutput {
     /// The view the app asked to be shown as kept was not: send its
     /// messages.
     ViewMissed,
@@ -531,14 +531,14 @@ pub enum MessageListOutput {
 /// the row the arrow reached, even when the app has not heard of it yet
 /// (#416).
 #[derive(Clone)]
-pub struct SelectionProbe {
+pub(crate) struct SelectionProbe {
     pub(super) selection: gtk::MultiSelection,
     pub(super) model: crate::ui::message_row::MessageModel,
 }
 
 impl SelectionProbe {
     /// Where each selected row's message sits, in list order.
-    pub fn slots(&self) -> Vec<Slot> {
+    pub(crate) fn slots(&self) -> Vec<Slot> {
         let set = self.selection.selection();
         let Some((iter, first)) = gtk::BitsetIter::init_first(&set) else {
             return Vec::new();

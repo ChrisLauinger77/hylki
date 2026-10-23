@@ -12,24 +12,24 @@ use super::{config_file, read_toml, save_private_toml};
 /// stores them as categories; POP3 and servers that refuse custom keywords
 /// keep them in Hylki's own cache instead.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Tag {
+pub(crate) struct Tag {
     /// What the user sees.
-    pub name: String,
+    pub(crate) name: String,
     /// The keyword the tag is stored as: an IMAP atom (no spaces, quotes,
     /// parentheses, brackets, backslashes or non-ASCII), case-insensitive.
-    pub keyword: String,
+    pub(crate) keyword: String,
     /// `#rrggbb`.
-    pub color: String,
+    pub(crate) color: String,
 }
 
 /// The tag palette, GNOME's color set at its middle strength.
-pub const TAG_COLORS: &[&str] = &[
+pub(crate) const TAG_COLORS: &[&str] = &[
     "#1c71d8", "#2ec27e", "#f5c211", "#e66100", "#c01c28", "#813d9c", "#865e3c", "#77767b",
 ];
 
 impl Tag {
     /// The characters an IMAP keyword (an atom) may hold.
-    pub fn is_keyword_char(c: char) -> bool {
+    pub(crate) fn is_keyword_char(c: char) -> bool {
         c.is_ascii_graphic()
             && !matches!(
                 c,
@@ -38,14 +38,14 @@ impl Tag {
     }
 
     /// Whether `s` can be sent to a server as a keyword.
-    pub fn valid_keyword(s: &str) -> bool {
+    pub(crate) fn valid_keyword(s: &str) -> bool {
         !s.is_empty() && s.chars().all(Self::is_keyword_char)
     }
 
     /// The keyword a tag named `name` gets unless the user picks one: the
     /// name with spaces turned to underscores and anything an atom cannot
     /// carry dropped ("To Do" → `To_Do`, "Réunion" → `Runion`).
-    pub fn keyword_for(name: &str) -> String {
+    pub(crate) fn keyword_for(name: &str) -> String {
         name.trim()
             .chars()
             .map(|c| if c == ' ' { '_' } else { c })
@@ -55,7 +55,7 @@ impl Tag {
 
     /// The CSS class carrying this tag's color (see the app's tag stylesheet):
     /// the keyword reduced to what a class name may hold.
-    pub fn css_class(&self) -> String {
+    pub(crate) fn css_class(&self) -> String {
         tag_css_class(&self.keyword)
     }
 
@@ -63,7 +63,7 @@ impl Tag {
     /// Thunderbird's five built-ins get Thunderbird's names; anything else
     /// sheds a leading `$`, turns `_`/`-` into spaces and capitalises each
     /// word (`travel_plans` → "Travel Plans", `$Receipts` → "Receipts").
-    pub fn name_for_keyword(keyword: &str) -> String {
+    pub(crate) fn name_for_keyword(keyword: &str) -> String {
         match keyword.to_ascii_lowercase().as_str() {
             "$label1" => return "Important".to_string(),
             "$label2" => return "Work".to_string(),
@@ -95,7 +95,7 @@ impl Tag {
     /// The color to offer for a found keyword: Thunderbird's built-ins get
     /// their Thunderbird colors (as the palette has them); the rest take
     /// the first palette color not in `taken`, cycling once every color is.
-    pub fn color_for_keyword(keyword: &str, taken: &[String]) -> String {
+    pub(crate) fn color_for_keyword(keyword: &str, taken: &[String]) -> String {
         let fixed = match keyword.to_ascii_lowercase().as_str() {
             "$label1" => Some(TAG_COLORS[4]), // red
             "$label2" => Some(TAG_COLORS[3]), // orange
@@ -119,7 +119,7 @@ impl Tag {
 /// The CSS class for a keyword's color: `tag-` plus the keyword lowercased,
 /// with every character a class name can't carry turned into its code so two
 /// keywords never share a class.
-pub fn tag_css_class(keyword: &str) -> String {
+pub(crate) fn tag_css_class(keyword: &str) -> String {
     let mut out = String::from("tag-");
     for c in keyword.to_ascii_lowercase().chars() {
         if c.is_ascii_alphanumeric() {
@@ -141,13 +141,13 @@ fn tags_path() -> Option<PathBuf> {
     config_file("tags.toml")
 }
 
-pub fn load_tags() -> Vec<Tag> {
+pub(crate) fn load_tags() -> Vec<Tag> {
     read_toml::<TagsFile>(tags_path())
         .map(|f| f.tags)
         .unwrap_or_default()
 }
 
-pub fn save_tags(tags: &[Tag]) {
+pub(crate) fn save_tags(tags: &[Tag]) {
     let file = TagsFile {
         tags: tags.to_vec(),
     };

@@ -14,7 +14,7 @@ use super::ics::{escape, fold};
 /// the organizer's calendar knows which version of which occurrence is being
 /// answered. Without them a reply to an updated meeting is applied to the
 /// original, or to every occurrence of a series.
-pub fn reply_ics(invite: &Invite, name: &str, email: &str, status: &str) -> String {
+pub(crate) fn reply_ics(invite: &Invite, name: &str, email: &str, status: &str) -> String {
     let mut out = String::new();
     let mut line = |text: String| {
         out.push_str(&fold(&text));

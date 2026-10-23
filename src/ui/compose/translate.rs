@@ -14,7 +14,7 @@ use adw::prelude::*;
 /// Which editor a translation (#327) was taken from, and so how it goes
 /// back: as HTML into the rich document, or as text into the source field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TranslateHow {
+pub(crate) enum TranslateHow {
     Rich,
     Markdown,
     Html,

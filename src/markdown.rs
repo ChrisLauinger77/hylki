@@ -23,7 +23,7 @@ mod render;
 mod tests;
 mod writer;
 
-pub use dom::plain_text;
-pub use outgoing::{pretty_html, sanitize_outgoing};
-pub use render::to_html;
-pub use writer::{from_html, html_to_text};
+pub(crate) use dom::plain_text;
+pub(crate) use outgoing::{pretty_html, sanitize_outgoing};
+pub(crate) use render::to_html;
+pub(crate) use writer::{from_html, html_to_text};

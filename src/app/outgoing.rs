@@ -15,20 +15,20 @@ use crate::models::OutboxItem;
 use crate::worker::OutgoingMessage;
 
 pub(crate) struct Outgoing {
-    pub ticket: u64,
-    pub account_id: u32,
+    pub(crate) ticket: u64,
+    pub(crate) account_id: u32,
     /// The account as configured when Send was pressed: quitting builds the
     /// message from it, after the app's own state is gone.
-    pub account: AccountConfig,
-    pub message: Box<OutgoingMessage>,
-    pub sent_path: Option<String>,
-    pub queued_at: i64,
+    pub(crate) account: AccountConfig,
+    pub(crate) message: Box<OutgoingMessage>,
+    pub(crate) sent_path: Option<String>,
+    pub(crate) queued_at: i64,
     /// Where it was written, for Undo to reopen it there.
-    pub origin: Origin,
+    pub(crate) origin: Origin,
     /// Still waiting out the delay, so Undo can take it back. False once the
     /// worker has it.
-    pub held: bool,
-    pub toast: adw::Toast,
+    pub(crate) held: bool,
+    pub(crate) toast: adw::Toast,
 }
 
 /// The composer a message was sent from.
@@ -52,7 +52,7 @@ pub(crate) fn row_id(ticket: u64) -> u32 {
 
 impl Outgoing {
     /// What the toast says while the message waits out its delay.
-    pub fn sending_title(&self) -> String {
+    pub(super) fn sending_title(&self) -> String {
         match self.message.subject.trim() {
             "" => i18n("Sending message…"),
             subject => i18n_f("Sending “{subject}”…", &[("subject", subject)]),
@@ -60,7 +60,7 @@ impl Outgoing {
     }
 
     /// Its row in the Outbox.
-    pub fn as_outbox_item(&self) -> OutboxItem {
+    pub(super) fn as_outbox_item(&self) -> OutboxItem {
         let m = &self.message;
         let recipients = [&m.to, &m.cc]
             .iter()

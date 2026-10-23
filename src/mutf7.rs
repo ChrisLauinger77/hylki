@@ -17,7 +17,7 @@
 
 /// Decode a mailbox name for display. Input that isn't valid modified UTF-7 is
 /// returned as-is.
-pub fn decode(name: &str) -> String {
+pub(crate) fn decode(name: &str) -> String {
     // Nothing to do for a name with no escapes, which is the overwhelmingly
     // common case (and every ASCII name).
     if !name.contains('&') {
@@ -95,7 +95,7 @@ fn decode_run(run: &str) -> Option<String> {
 
 /// Encode a name the user typed into the form the server expects, so a folder
 /// can be created with a non-ASCII name.
-pub fn encode(name: &str) -> String {
+pub(crate) fn encode(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     let mut pending: Vec<u16> = Vec::new();
 

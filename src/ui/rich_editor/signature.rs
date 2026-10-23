@@ -2,7 +2,7 @@
 
 /// Convert a stored signature (which may be legacy plain text) to HTML suitable
 /// for the editor / for inserting into a message.
-pub fn signature_to_html(sig: &str) -> String {
+pub(crate) fn signature_to_html(sig: &str) -> String {
     if sig.contains('<') {
         sig.to_string()
     } else {
@@ -22,7 +22,7 @@ pub fn signature_to_html(sig: &str) -> String {
 /// path is read and embedded as a `data:` URI (a relative path resolves
 /// against `base`, the file's own directory), so the send path lifts it into
 /// a `cid:` part like any inline picture; a remote image stays a remote URL.
-pub fn signature_from_source(source: &str, base: Option<&std::path::Path>) -> String {
+pub(crate) fn signature_from_source(source: &str, base: Option<&std::path::Path>) -> String {
     if !source.contains('<') {
         return signature_to_html(source.trim_end());
     }

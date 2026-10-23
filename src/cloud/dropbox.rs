@@ -19,7 +19,7 @@ const DROPBOX_SINGLE_LIMIT: u64 = 150 * 1024 * 1024;
 const DROPBOX_CHUNK: usize = 32 * 1024 * 1024;
 
 /// The app key the sign-in runs as: the account's own, else the build's.
-pub fn dropbox_client_id(account: &CloudAccount) -> String {
+pub(crate) fn dropbox_client_id(account: &CloudAccount) -> String {
     let own = account.client_id.trim();
     if !own.is_empty() {
         return own.to_string();
@@ -41,7 +41,7 @@ fn dropbox_settings(account: &CloudAccount) -> crate::config::OAuthSettings {
 /// Sign in to Dropbox in the browser (blocking; call off the UI thread).
 /// Answers with the refresh token to keep, the account's e-mail (its
 /// login, for the keyring key) and its display name.
-pub fn dropbox_connect(account: &CloudAccount) -> Result<(String, String, String), String> {
+pub(crate) fn dropbox_connect(account: &CloudAccount) -> Result<(String, String, String), String> {
     let settings = dropbox_settings(account);
     if settings.client_id.is_empty() {
         return Err("Enter the app key of a Dropbox app first.".to_string());

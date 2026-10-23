@@ -20,7 +20,7 @@ use gtk::prelude::*;
 /// and the callback to run on activation. Use `.enabled(false)` to grey an
 /// item out rather than hiding it — HIG prefers a disabled item users can
 /// still find over one that vanishes and makes the menu shift under them.
-pub struct MenuEntry {
+pub(crate) struct MenuEntry {
     label: String,
     icon: Option<String>,
     /// A color swatch in the icon slot instead of an icon (a tag's color,
@@ -40,7 +40,7 @@ pub struct MenuEntry {
 }
 
 impl MenuEntry {
-    pub fn new(label: impl Into<String>, activate: impl Fn() + 'static) -> Self {
+    pub(crate) fn new(label: impl Into<String>, activate: impl Fn() + 'static) -> Self {
         Self {
             label: label.into(),
             icon: None,
@@ -55,7 +55,7 @@ impl MenuEntry {
 
     /// An entry that opens `sections` as a page of the same popover, headed
     /// by a back row carrying this entry's label. Disabled when empty.
-    pub fn submenu(label: impl Into<String>, sections: Vec<Vec<MenuEntry>>) -> Self {
+    pub(crate) fn submenu(label: impl Into<String>, sections: Vec<Vec<MenuEntry>>) -> Self {
         let empty = sections.iter().all(|s| s.is_empty());
         Self {
             label: label.into(),
@@ -71,33 +71,33 @@ impl MenuEntry {
 
     /// A colored disc in the icon slot — `on` fills it, off draws a ring —
     /// for entries that toggle something with a color of its own (tags).
-    pub fn swatch(mut self, color: impl Into<String>, on: bool) -> Self {
+    pub(crate) fn swatch(mut self, color: impl Into<String>, on: bool) -> Self {
         self.swatch = Some((color.into(), on));
         self
     }
 
     /// Leading symbolic icon — use the same icon as the toolbar button that
     /// performs this action, so the menu teaches the toolbar.
-    pub fn icon(mut self, name: impl Into<String>) -> Self {
+    pub(crate) fn icon(mut self, name: impl Into<String>) -> Self {
         self.icon = Some(name.into());
         self
     }
 
-    pub fn enabled(mut self, enabled: bool) -> Self {
+    pub(crate) fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     /// The keys that do the same, as a GTK accelerator (`<Control>c`),
     /// shown the way GTK's own menus show them.
-    pub fn accel(mut self, accel: &str) -> Self {
+    pub(crate) fn accel(mut self, accel: &str) -> Self {
         self.accel = gtk::accelerator_parse(accel)
             .map(|(key, mods)| gtk::accelerator_get_label(key, mods).to_string());
         self
     }
 
     /// Mark this entry as the one the menu is set to.
-    pub fn selected(mut self, selected: bool) -> Self {
+    pub(crate) fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
         self
     }
@@ -108,7 +108,7 @@ impl MenuEntry {
 /// right-click landed on, so no coordinate translation is needed). `sections`
 /// groups entries into visually separated clusters, e.g. `[[Reply, Reply All,
 /// Forward], [Star, Mark Read], [Spam, Archive, Delete]]`.
-pub fn show_context_menu(
+pub(crate) fn show_context_menu(
     parent: &impl IsA<gtk::Widget>,
     x: f64,
     y: f64,
@@ -119,7 +119,7 @@ pub fn show_context_menu(
 
 /// [`show_context_menu`] with an optional dim caption header above the first
 /// section (e.g. the bulk menu's "5 selected").
-pub fn show_context_menu_with_header(
+pub(crate) fn show_context_menu_with_header(
     parent: &impl IsA<gtk::Widget>,
     x: f64,
     y: f64,
@@ -131,7 +131,7 @@ pub fn show_context_menu_with_header(
 
 /// [`show_context_menu_with_header`], handing back the popover for a caller
 /// that needs to know when it closes.
-pub fn show_context_menu_popover(
+pub(crate) fn show_context_menu_popover(
     parent: &impl IsA<gtk::Widget>,
     x: f64,
     y: f64,
@@ -487,7 +487,7 @@ fn build_page(
 
 /// A 16px color swatch for a menu row: a filled disc when `on`, a ring when
 /// not, in `color` (`#rrggbb`; an unparsable color falls back to grey).
-pub fn swatch_widget(color: &str, on: bool) -> gtk::DrawingArea {
+pub(crate) fn swatch_widget(color: &str, on: bool) -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
     area.set_content_width(16);
     area.set_content_height(16);

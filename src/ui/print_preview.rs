@@ -53,7 +53,7 @@ thread_local! {
 }
 
 /// What the app's Settings say a printed page carries.
-pub fn set_options(options: PrintOptions) {
+pub(crate) fn set_options(options: PrintOptions) {
     OPTIONS.with(|o| o.set(options));
 }
 
@@ -67,7 +67,7 @@ fn options() -> PrintOptions {
 /// The settings come through `GtkPrintDialog`'s callback rather than WebKit's
 /// own `run_dialog`, which spins a nested main loop; polling a glib future
 /// inside one aborts the process.
-pub fn print_html(html: &str, job_name: &str, parent: Option<gtk::Window>) {
+pub(crate) fn print_html(html: &str, job_name: &str, parent: Option<gtk::Window>) {
     let dialog = gtk::PrintDialog::new();
     dialog.set_title(&i18n("Print Message"));
     let settings = gtk::PrintSettings::new();
@@ -422,7 +422,7 @@ fn file_printer() -> Option<String> {
 
 /// Show `html` as it will print, page by page, with a Print button that
 /// prints it and a button that saves it as a PDF.
-pub fn open(parent: &gtk::Window, html: &str, job_name: &str) {
+pub(crate) fn open(parent: &gtk::Window, html: &str, job_name: &str) {
     let win = adw::Window::builder()
         .transient_for(parent)
         .modal(false)

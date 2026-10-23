@@ -31,7 +31,7 @@ fn note_launcher_written() {
 /// How much longer to keep running before a restart, so the desktop has
 /// acted on the launcher written for the current choice. Zero when it has
 /// had the time, or nothing was written.
-pub fn launcher_settle_remaining() -> std::time::Duration {
+pub(crate) fn launcher_settle_remaining() -> std::time::Duration {
     let last = *LAST_LAUNCHER_WRITE
         .lock()
         .unwrap_or_else(|e| e.into_inner());
@@ -376,7 +376,7 @@ fn action_exec(exec: &str, args: &str) -> String {
 /// own format: every `.desktop` in the directory and, with a `<sub>-`
 /// prefix, its subdirectories, `Hidden=true` skipped, types and ids in
 /// byte order. Left alone when it is already right.
-pub fn sync_mime_cache(dir: &std::path::Path) {
+pub(crate) fn sync_mime_cache(dir: &std::path::Path) {
     if !dir.is_dir() {
         return;
     }

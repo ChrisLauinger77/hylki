@@ -52,7 +52,7 @@ mod site;
 use bimi::{bimi_logo, Bimi};
 use bundled::{bundled_bytes, bundled_entry};
 use decode::decode;
-pub use decode::{decode_and_cache, remember_missing};
+pub(crate) use decode::{decode_and_cache, remember_missing};
 pub(crate) use mailbox::is_mailbox_domain;
 use mailbox::is_mailbox_host;
 use site::candidate_urls;
@@ -81,7 +81,7 @@ thread_local! {
 
 /// The session's logo cache: domains with a texture, their pixel bytes, and
 /// domains remembered as having none. For the memory section of an export.
-pub fn cache_stats() -> (usize, u64, usize) {
+pub(crate) fn cache_stats() -> (usize, u64, usize) {
     let (n, bytes) = CACHE.with(|c| {
         let c = c.borrow();
         (
@@ -159,7 +159,7 @@ fn fresh(path: &PathBuf) -> bool {
 /// last two are a country-code pair like `co.uk`, which is a heuristic rather
 /// than the public suffix list — close enough to point a favicon request at, and
 /// wrong only for a handful of unusual suffixes.
-pub fn domain_of(email: &str) -> Option<String> {
+pub(crate) fn domain_of(email: &str) -> Option<String> {
     let host = email.rsplit('@').next()?.trim().trim_end_matches('.');
     let host = host.to_ascii_lowercase();
     if host.is_empty() || !host.contains('.') || host.parse::<std::net::IpAddr>().is_ok() {
@@ -181,7 +181,7 @@ pub fn domain_of(email: &str) -> Option<String> {
 /// A previously decoded logo for this sender's domain (main thread only).
 /// Falls back to the on-disk copy — however old — so a restart shows icons
 /// without a single network request; [`wants_refresh`] handles staleness.
-pub fn cached(email: &str) -> Option<gtk::gdk::Texture> {
+pub(crate) fn cached(email: &str) -> Option<gtk::gdk::Texture> {
     if is_mailbox_host(email) {
         return None;
     }
@@ -207,7 +207,7 @@ pub fn cached(email: &str) -> Option<gtk::gdk::Texture> {
 /// look again in the background while the old one keeps showing. Says yes at
 /// most once a session per domain, so a screenful of rows from one sender
 /// doesn't fan out into a fetch per row.
-pub fn wants_refresh(email: &str) -> bool {
+pub(crate) fn wants_refresh(email: &str) -> bool {
     // Spent offline, the session's one look would find nothing (#442).
     if is_mailbox_host(email) || !crate::power::fetches_ahead() {
         return false;
@@ -230,7 +230,7 @@ pub fn wants_refresh(email: &str) -> bool {
 /// Whether this domain has already been asked about and had nothing to give.
 /// A miss remembered on disk expires after a week, so a domain that gains an
 /// icon is eventually found.
-pub fn known_missing(email: &str) -> bool {
+pub(crate) fn known_missing(email: &str) -> bool {
     // Nothing will ever be looked up for a person's own mailbox.
     if is_mailbox_host(email) {
         return true;
@@ -261,13 +261,13 @@ pub fn known_missing(email: &str) -> bool {
 /// domain is asked and the answer stored — icon or miss. When the network
 /// fails with a stale copy in hand, the stale copy stands (and stays due for
 /// refresh, so it is retried later).
-pub fn fetch(email: &str) -> Option<Vec<u8>> {
+pub(crate) fn fetch(email: &str) -> Option<Vec<u8>> {
     fetch_from(email).map(|(bytes, _)| bytes)
 }
 
 /// What [`fetch`] would answer for an address and where from, in words —
 /// for the `HYLKI_LOGO_PROBE` hook.
-pub fn probe(email: &str) -> String {
+pub(crate) fn probe(email: &str) -> String {
     match fetch_from(email) {
         Some((bytes, source)) => format!("{source} ({} bytes)", bytes.len()),
         None => "nothing".to_string(),

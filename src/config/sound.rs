@@ -15,7 +15,7 @@ fn custom_sound_dir() -> Option<PathBuf> {
 }
 
 /// The custom new-mail sound file, if one has been chosen.
-pub fn custom_sound() -> Option<PathBuf> {
+pub(crate) fn custom_sound() -> Option<PathBuf> {
     std::fs::read_dir(custom_sound_dir()?)
         .ok()?
         .flatten()
@@ -29,7 +29,7 @@ pub fn custom_sound() -> Option<PathBuf> {
 }
 
 /// Make a copy of `src` the custom new-mail sound, in place of any earlier one.
-pub fn set_custom_sound(src: &Path) -> std::io::Result<PathBuf> {
+pub(crate) fn set_custom_sound(src: &Path) -> std::io::Result<PathBuf> {
     let dir = custom_sound_dir()
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no data directory"))?;
     let name = src
@@ -108,13 +108,13 @@ fn repair_custom_sound(path: &Path) {
 /// so there is something to hear without hunting for a file. The desktop's
 /// own sound theme is out of reach: the GNOME runtime ships none, and the
 /// Flatpak cannot see the host's /usr/share/sounds.
-pub const BUILTIN_SOUNDS: [&str; 4] = ["click", "hum", "string", "swing"];
+pub(crate) const BUILTIN_SOUNDS: [&str; 4] = ["click", "hum", "string", "swing"];
 
 /// The `sound` value naming the custom file.
-pub const CUSTOM_SOUND: &str = "custom";
+pub(crate) const CUSTOM_SOUND: &str = "custom";
 
 /// Something to play: a built-in sound's resource path, or the custom file.
-pub enum SoundSource {
+pub(crate) enum SoundSource {
     Resource(String),
     File(PathBuf),
 }
@@ -122,20 +122,20 @@ pub enum SoundSource {
 /// The new-mail sound settings (#292). Stored in sound.toml, like focus.toml,
 /// so privacy.toml's long save call stays as it is.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct NewMailSound {
-    pub enabled: bool,
+pub(crate) struct NewMailSound {
+    pub(crate) enabled: bool,
     /// One of `BUILTIN_SOUNDS`, or `CUSTOM_SOUND`.
-    pub sound: String,
+    pub(crate) sound: String,
     /// Play it while the window is in front too, where no notification is
     /// shown (#337). Off, the sound comes only with the notification.
     #[serde(default)]
-    pub when_focused: bool,
+    pub(crate) when_focused: bool,
 }
 
 impl NewMailSound {
     /// What `sound` names. An unknown name is the first built-in; a custom
     /// sound whose file has gone is nothing.
-    pub fn source(&self) -> Option<SoundSource> {
+    pub(crate) fn source(&self) -> Option<SoundSource> {
         if self.sound == CUSTOM_SOUND {
             let path = custom_sound()?;
             repair_custom_sound(&path);
@@ -157,7 +157,7 @@ fn sound_path() -> Option<PathBuf> {
 
 /// The saved new-mail sound settings. Without sound.toml the sound is off,
 /// unless a custom file was chosen before the switch existed: that stays on.
-pub fn load_new_mail_sound() -> NewMailSound {
+pub(crate) fn load_new_mail_sound() -> NewMailSound {
     if let Some(saved) = read_toml::<NewMailSound>(sound_path()) {
         return saved;
     }
@@ -174,12 +174,12 @@ pub fn load_new_mail_sound() -> NewMailSound {
     }
 }
 
-pub fn save_new_mail_sound(sound: &NewMailSound) {
+pub(crate) fn save_new_mail_sound(sound: &NewMailSound) {
     save_plain_toml(sound_path(), sound);
 }
 
 /// What to play for new mail, if anything.
-pub fn new_mail_sound() -> Option<SoundSource> {
+pub(crate) fn new_mail_sound() -> Option<SoundSource> {
     let sound = load_new_mail_sound();
     if sound.enabled {
         sound.source()
@@ -190,7 +190,7 @@ pub fn new_mail_sound() -> Option<SoundSource> {
 
 /// Whether the new-mail sound plays while the window is in front as well
 /// (#337).
-pub fn sound_when_focused() -> bool {
+pub(crate) fn sound_when_focused() -> bool {
     let sound = load_new_mail_sound();
     sound.enabled && sound.when_focused
 }

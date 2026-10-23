@@ -8,14 +8,14 @@
 //! follows too, on top of the reader's own zoom.
 
 /// The sizes Settings offers, in percent of the desktop's.
-pub const STEPS: &[u32] = &[90, 100, 110, 120, 135, 150];
+pub(crate) const STEPS: &[u32] = &[90, 100, 110, 120, 135, 150];
 
 /// GTK's value for "no DPI set": 96 dots per inch, in 1/1024ths.
 const DEFAULT_DPI: i32 = 96 * 1024;
 
 /// Put the app's text at `percent` of the desktop's size. 100 hands the
 /// setting back to the desktop, so a change there is followed again.
-pub fn apply(percent: u32) {
+pub(crate) fn apply(percent: u32) {
     let Some(settings) = gtk::Settings::default() else {
         return;
     };

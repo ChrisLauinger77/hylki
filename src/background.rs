@@ -32,7 +32,7 @@ const IFACE_BACKGROUND: &str = "org.freedesktop.portal.Background";
 /// the desktop *presents* a background app, not whether the process may run —
 /// and blocking a settings toggle on a dialog the user may leave sitting there
 /// would be worse than proceeding.
-pub fn request(autostart: bool) {
+pub(crate) fn request(autostart: bool) {
     let reason =
         i18n("Hylki checks for new mail and shows notifications while its window is closed.");
     if let Err(e) = call_request(&reason, autostart) {
@@ -68,7 +68,7 @@ fn call_request(reason: &str, autostart: bool) -> Result<(), String> {
 ///
 /// Truncated to the portal's 96-character limit — an over-long status is
 /// rejected outright, which would leave no message at all.
-pub fn set_status(message: &str) {
+pub(crate) fn set_status(message: &str) {
     let message: String = message.chars().take(96).collect();
     let run = || -> Result<(), String> {
         let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
@@ -92,7 +92,7 @@ pub fn set_status(message: &str) {
 }
 
 /// The status line: what Hylki is doing for you while it has no window.
-pub fn status_text(unread: u32) -> String {
+pub(crate) fn status_text(unread: u32) -> String {
     match unread {
         0 => i18n("Checking for new mail"),
         n => ni18n_f(

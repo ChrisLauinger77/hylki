@@ -10,11 +10,11 @@ use super::*;
 /// alias address, #34). Read off the main thread when the editor opens, so
 /// the Settings window never waits on the keyring.
 #[derive(Debug, Clone)]
-pub struct AccountSecrets {
-    pub email: String,
-    pub password: String,
-    pub smtp_password: String,
-    pub aliases: Vec<(String, String)>,
+pub(crate) struct AccountSecrets {
+    pub(crate) email: String,
+    pub(crate) password: String,
+    pub(crate) smtp_password: String,
+    pub(crate) aliases: Vec<(String, String)>,
 }
 
 impl AccountSecrets {

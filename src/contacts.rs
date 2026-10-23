@@ -19,12 +19,12 @@ mod read;
 mod registry;
 mod vcard;
 
-pub use demo::*;
-pub use details::*;
-pub use edit::*;
-pub use eds_write::*;
-pub use photos::*;
-pub use read::*;
+pub(crate) use demo::*;
+pub(crate) use details::*;
+pub(crate) use edit::*;
+pub(crate) use eds_write::*;
+pub(crate) use photos::*;
+pub(crate) use read::*;
 pub(crate) use registry::*;
 pub(crate) use vcard::*;
 
@@ -37,35 +37,35 @@ mod vcard_tests;
 
 /// A name + email pair from the address book.
 #[derive(Debug, Clone)]
-pub struct Contact {
-    pub name: String,
-    pub email: String,
+pub(crate) struct Contact {
+    pub(crate) name: String,
+    pub(crate) email: String,
 }
 
 /// A recipient autocomplete suggestion (from Contacts or mail history).
 /// `Default` is a person from mail history seen no times.
 #[derive(Debug, Clone, Default)]
-pub struct Suggestion {
-    pub name: String,
-    pub email: String,
+pub(crate) struct Suggestion {
+    pub(crate) name: String,
+    pub(crate) email: String,
     /// True when this came from the address book.
-    pub from_contacts: bool,
+    pub(crate) from_contacts: bool,
     /// Found in an LDAP or organisation directory: marked as such even when
     /// mail history knows the address too (#307).
-    pub from_directory: bool,
+    pub(crate) from_directory: bool,
     /// How often this address appears in mail history (0 for contacts-only).
-    pub score: u32,
+    pub(crate) score: u32,
     /// One of the user's own account addresses: offered, since people do
     /// mail themselves, but ranked after everyone else so it does not sit
     /// on top of every list (it is on nearly every message received).
-    pub own: bool,
+    pub(crate) own: bool,
     /// Set for a contact group: picking it puts in its members, and `email`
     /// is empty.
-    pub group: Option<Arc<SuggestedGroup>>,
+    pub(crate) group: Option<Arc<SuggestedGroup>>,
 }
 
 /// "3 people", and "in Bcc" for a group whose people go there.
-pub fn group_reach(people: usize, hide_addresses: bool) -> String {
+pub(crate) fn group_reach(people: usize, hide_addresses: bool) -> String {
     let n = people as u32;
     let count = n.to_string();
     if hide_addresses {
@@ -82,20 +82,20 @@ pub fn group_reach(people: usize, hide_addresses: bool) -> String {
 
 /// What a group suggestion stands for.
 #[derive(Debug, Clone)]
-pub struct SuggestedGroup {
-    pub members: Vec<Contact>,
+pub(crate) struct SuggestedGroup {
+    pub(crate) members: Vec<Contact>,
     /// The members go in Bcc whichever field the group was picked in.
-    pub hide_addresses: bool,
+    pub(crate) hide_addresses: bool,
 }
 
 impl Suggestion {
     /// "Name <email>" for inserting into a recipient field (email alone if no name).
-    pub fn display(&self) -> String {
+    pub(crate) fn display(&self) -> String {
         crate::worker::format_recipient(&self.name, &self.email)
     }
 
     /// Whether the suggestion matches a typed fragment (name or email).
-    pub fn matches(&self, q: &str) -> bool {
+    pub(crate) fn matches(&self, q: &str) -> bool {
         let q = q.to_lowercase();
         self.email.to_lowercase().contains(&q) || self.name.to_lowercase().contains(&q)
     }
@@ -104,7 +104,7 @@ impl Suggestion {
 /// Order the suggestions matching `typed` best first: one whose name or
 /// address starts with it, then the most used, then by name. The user's own
 /// addresses come after everyone else's, prefix match or not.
-pub fn rank(matches: &mut [Suggestion], typed: &str) {
+pub(crate) fn rank(matches: &mut [Suggestion], typed: &str) {
     let q = typed.to_lowercase();
     matches.sort_by(|a, b| {
         let pa = a.email.to_lowercase().starts_with(&q) || a.name.to_lowercase().starts_with(&q);
@@ -122,7 +122,7 @@ pub fn rank(matches: &mut [Suggestion], typed: &str) {
 /// suggestion's `score` so frequently used addresses — contact or not — can
 /// rank ahead. The user's `own` (name, email) account addresses are in the
 /// list too, flagged and with no score, so they come last.
-pub fn suggestions(own: &[(String, String)]) -> Vec<Suggestion> {
+pub(crate) fn suggestions(own: &[(String, String)]) -> Vec<Suggestion> {
     let own_keys: HashSet<String> = own.iter().map(|(_, e)| e.to_lowercase()).collect();
     let mut map: std::collections::HashMap<String, Suggestion> = std::collections::HashMap::new();
 

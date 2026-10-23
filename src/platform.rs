@@ -10,12 +10,12 @@ use std::fs;
 use std::path::PathBuf;
 
 /// Whether Hylki is running inside a Flatpak sandbox.
-pub fn is_flatpak() -> bool {
+pub(crate) fn is_flatpak() -> bool {
     std::path::Path::new("/.flatpak-info").exists()
 }
 
 /// The user's home: the host's, from inside the sandbox too.
-pub fn home() -> Option<PathBuf> {
+pub(crate) fn home() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
         .or_else(dirs::home_dir)
@@ -23,7 +23,7 @@ pub fn home() -> Option<PathBuf> {
 
 /// A key file (a `.desktop` entry, an EDS `.source`, a D-Bus `.service`,
 /// `/.flatpak-info`), or `None` if it does not parse.
-pub fn keyfile(data: &str) -> Option<gtk::glib::KeyFile> {
+pub(crate) fn keyfile(data: &str) -> Option<gtk::glib::KeyFile> {
     let kf = gtk::glib::KeyFile::new();
     kf.load_from_data(data, gtk::glib::KeyFileFlags::NONE)
         .ok()?;
@@ -31,7 +31,7 @@ pub fn keyfile(data: &str) -> Option<gtk::glib::KeyFile> {
 }
 
 /// One non-empty value from a key file's group.
-pub fn keyfile_value(data: &str, group: &str, key: &str) -> Option<String> {
+pub(crate) fn keyfile_value(data: &str, group: &str, key: &str) -> Option<String> {
     let v = keyfile(data)?.string(group, key).ok()?;
     let v = v.trim();
     (!v.is_empty()).then(|| v.to_string())
@@ -47,7 +47,7 @@ pub fn keyfile_value(data: &str, group: &str, key: &str) -> Option<String> {
 /// terminal, an editor, a launcher) inherits it and would take its parent's
 /// bundle for its own. The pair with `APPDIR` is what settles it — our own
 /// binary has to be running from inside that mount.
-pub fn appimage() -> Option<PathBuf> {
+pub(crate) fn appimage() -> Option<PathBuf> {
     let bundle = PathBuf::from(std::env::var_os("APPIMAGE")?);
     let mount = PathBuf::from(std::env::var_os("APPDIR")?);
     let exe = std::env::current_exe().ok()?;
@@ -55,7 +55,7 @@ pub fn appimage() -> Option<PathBuf> {
 }
 
 /// Whether Hylki runs from an AppImage.
-pub fn is_appimage() -> bool {
+pub(crate) fn is_appimage() -> bool {
     appimage().is_some()
 }
 
@@ -92,12 +92,12 @@ fn text_is_mint(text: &str) -> bool {
 }
 
 /// True on Linux Mint (matches `ID=linuxmint`, or Mint listed in `ID_LIKE`).
-pub fn is_linux_mint() -> bool {
+pub(crate) fn is_linux_mint() -> bool {
     text_is_mint(&os_release())
 }
 
 /// True when the current desktop session is Cinnamon (Mint's default).
-pub fn is_cinnamon() -> bool {
+pub(crate) fn is_cinnamon() -> bool {
     let has_cinnamon = |var: &str| {
         std::env::var(var)
             .map(|v| v.to_ascii_lowercase().contains("cinnamon"))
@@ -109,7 +109,7 @@ pub fn is_cinnamon() -> bool {
 }
 
 /// The combination we specifically tailor keyring guidance for.
-pub fn is_mint_cinnamon() -> bool {
+pub(crate) fn is_mint_cinnamon() -> bool {
     is_linux_mint() && is_cinnamon()
 }
 
@@ -117,7 +117,7 @@ pub fn is_mint_cinnamon() -> bool {
 /// loader GNOME Files needs for the Hylki extension, #188) on this machine,
 /// judged by the host's os-release. `None` for a distribution whose package
 /// manager and package name are not known here.
-pub fn nautilus_python_install_command() -> Option<&'static str> {
+pub(crate) fn nautilus_python_install_command() -> Option<&'static str> {
     install_command_for(&os_release())
 }
 

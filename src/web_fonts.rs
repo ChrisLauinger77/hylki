@@ -126,7 +126,7 @@ fn probe_html() -> String {
 /// At startup, before any web view loads: put a fallback settled under this
 /// runtime back in place. `widget` is any widget of the app, whose font map
 /// is loaded first so the interface keeps the host's fonts.
-pub fn startup(widget: &impl IsA<gtk::Widget>) {
+pub(crate) fn startup(widget: &impl IsA<gtk::Widget>) {
     let Some(conf) = fallback_conf() else {
         STATE.with(|s| s.set(State::Off));
         return;
@@ -158,7 +158,7 @@ pub fn startup(widget: &impl IsA<gtk::Widget>) {
 /// `view.load_html`, watched: a document that does not finish in time has
 /// the fonts checked, and is loaded again on a fresh web process if they
 /// were what held it up.
-pub fn load_html(view: &webkit6::WebView, html: &str, base: Option<&str>) {
+pub(crate) fn load_html(view: &webkit6::WebView, html: &str, base: Option<&str>) {
     if !simulated_hang() {
         view.load_html(html, base);
     }

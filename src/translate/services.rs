@@ -250,7 +250,7 @@ pub(super) fn libre(
 /// Try the settings with a greeting, for the Settings page's check
 /// (blocking): what was sent and what came back. The greeting is in a
 /// language other than the target, or nothing would change.
-pub fn check(settings: &Settings, key: &str) -> Result<(String, String), String> {
+pub(crate) fn check(settings: &Settings, key: &str) -> Result<(String, String), String> {
     let greeting = if base(&settings.target_language()) == "en" {
         "Guten Morgen"
     } else {

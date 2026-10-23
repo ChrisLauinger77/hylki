@@ -18,7 +18,7 @@ use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction};
 use crate::i18n::{i18n, i18n_f};
 
 /// The reserved `book_uid` of the local book.
-pub const LOCAL_BOOK_UID: &str = "hylki-local";
+pub(crate) const LOCAL_BOOK_UID: &str = "hylki-local";
 
 /// Largest `.vcf` file read in one go.
 const MAX_FILE_BYTES: u64 = 50 * 1024 * 1024;
@@ -48,14 +48,14 @@ CREATE INDEX IF NOT EXISTS contact_email_idx ON contact_email(email_lower);
 /// What an import did. Counts are per contact, except `failed_files`, which
 /// names the files that could not be read at all (with the reason).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ImportOutcome {
-    pub added: usize,
-    pub updated: usize,
+pub(crate) struct ImportOutcome {
+    pub(crate) added: usize,
+    pub(crate) updated: usize,
     /// Blocks with neither a name nor an email, or a group with no name.
-    pub skipped: usize,
+    pub(crate) skipped: usize,
     /// Truncated or oversized vCards.
-    pub errors: usize,
-    pub failed_files: Vec<String>,
+    pub(crate) errors: usize,
+    pub(crate) failed_files: Vec<String>,
 }
 
 impl ImportOutcome {
@@ -83,7 +83,7 @@ enum Upsert {
 }
 
 /// An open `local_contacts.db`.
-pub struct Store {
+pub(crate) struct Store {
     conn: Connection,
 }
 
@@ -394,7 +394,7 @@ fn insert_uid(vcard: &str, uid: &str) -> String {
 /// blocks, each kept verbatim (with CRLF line ends). Returns the blocks and
 /// how many were cut short (a `BEGIN` with no `END`). Text between blocks is
 /// ignored. Continuation lines (folding) stay inside their block.
-pub fn split_vcards(text: &str) -> (Vec<String>, usize) {
+pub(crate) fn split_vcards(text: &str) -> (Vec<String>, usize) {
     let mut blocks = Vec::new();
     let mut truncated = 0;
     let mut current: Option<String> = None;
@@ -424,7 +424,7 @@ pub fn split_vcards(text: &str) -> (Vec<String>, usize) {
 
 /// Decode the bytes of a `.vcf` file: UTF-8 (a BOM is dropped), else Latin-1,
 /// which older exporters use. UTF-16 and binary data are refused.
-pub fn decode_text(bytes: &[u8]) -> Result<String, String> {
+pub(crate) fn decode_text(bytes: &[u8]) -> Result<String, String> {
     if bytes.starts_with(&[0xFF, 0xFE]) || bytes.starts_with(&[0xFE, 0xFF]) {
         return Err(i18n("UTF-16 files are not supported"));
     }
@@ -443,7 +443,7 @@ pub fn decode_text(bytes: &[u8]) -> Result<String, String> {
 /// `FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:J=C3=BCrgen`, with `=` at a
 /// line's end continuing the value on the next line. Other lines are kept
 /// as they are.
-pub fn decode_quoted_printable(block: &str) -> String {
+pub(crate) fn decode_quoted_printable(block: &str) -> String {
     let mut out = String::with_capacity(block.len());
     let mut lines = block.split("\r\n").peekable();
     while let Some(line) = lines.next() {
@@ -550,7 +550,7 @@ fn import_text_into(store: &mut Store, text: &str) -> Result<ImportOutcome, Stri
 
 /// Import several `.vcf` files. A file that cannot be read or stored is
 /// listed in `failed_files`; the others are still imported.
-pub fn import_files(paths: &[PathBuf]) -> Result<ImportOutcome, String> {
+pub(crate) fn import_files(paths: &[PathBuf]) -> Result<ImportOutcome, String> {
     let mut store = Store::open()?;
     let mut total = ImportOutcome::default();
     for path in paths {
@@ -579,52 +579,52 @@ fn read_vcf_file(path: &Path) -> Result<String, String> {
 }
 
 /// The vCards of the local book's contact groups.
-pub fn group_vcards() -> Result<Vec<String>, String> {
+pub(crate) fn group_vcards() -> Result<Vec<String>, String> {
     Store::open_read()?.map_or(Ok(Vec::new()), |s| s.group_vcards())
 }
 
 /// Every stored vCard, sorted by display name.
-pub fn list_vcards() -> Result<Vec<String>, String> {
+pub(crate) fn list_vcards() -> Result<Vec<String>, String> {
     Store::open_read()?.map_or(Ok(Vec::new()), |s| s.vcards())
 }
 
 /// One stored vCard by UID.
-pub fn vcard_by_uid(uid: &str) -> Result<Option<String>, String> {
+pub(crate) fn vcard_by_uid(uid: &str) -> Result<Option<String>, String> {
     Store::open_read()?.map_or(Ok(None), |s| s.vcard(uid))
 }
 
 /// (display name, email) of every address in the local book.
-pub fn emails() -> Result<Vec<(String, String)>, String> {
+pub(crate) fn emails() -> Result<Vec<(String, String)>, String> {
     Store::open_read()?.map_or(Ok(Vec::new()), |s| s.emails())
 }
 
 /// (lower-cased email, uid) of the local contacts that have a photo.
-pub fn photo_entries() -> Result<Vec<(String, String)>, String> {
+pub(crate) fn photo_entries() -> Result<Vec<(String, String)>, String> {
     Store::open_read()?.map_or(Ok(Vec::new()), |s| s.photo_entries())
 }
 
 /// Add a contact from a full vCard (a missing UID is generated).
-pub fn create(vcard: &str) -> Result<(), String> {
+pub(crate) fn create(vcard: &str) -> Result<(), String> {
     Store::open()?.upsert_one(vcard)
 }
 
 /// Replace a stored contact with its edited vCard.
-pub fn modify(vcard: &str) -> Result<(), String> {
+pub(crate) fn modify(vcard: &str) -> Result<(), String> {
     Store::open()?.upsert_one(vcard)
 }
 
 /// Delete a contact by UID.
-pub fn delete(uid: &str) -> Result<(), String> {
+pub(crate) fn delete(uid: &str) -> Result<(), String> {
     Store::open()?.delete(uid)
 }
 
 /// How many contacts the book holds, its groups left out.
-pub fn count() -> usize {
+pub(crate) fn count() -> usize {
     Store::open_read().ok().flatten().map_or(0, |s| s.people())
 }
 
 /// Write every contact into one `.vcf` file at `path`, returning how many.
-pub fn export_to(path: &Path) -> Result<usize, String> {
+pub(crate) fn export_to(path: &Path) -> Result<usize, String> {
     let vcards = list_vcards()?;
     let mut text = String::new();
     for v in &vcards {
@@ -636,7 +636,7 @@ pub fn export_to(path: &Path) -> Result<usize, String> {
 }
 
 /// Delete every contact in the book, returning how many there were.
-pub fn delete_all() -> Result<usize, String> {
+pub(crate) fn delete_all() -> Result<usize, String> {
     if !exists() {
         return Ok(0);
     }
@@ -648,12 +648,12 @@ pub fn delete_all() -> Result<usize, String> {
 }
 
 /// Whether the database file exists yet (nothing to read before the first write).
-pub fn exists() -> bool {
+pub(crate) fn exists() -> bool {
     db_path().is_some_and(|p| p.is_file())
 }
 
 /// The file the fingerprint watcher should look at, with its journal files.
-pub fn db_paths() -> Vec<PathBuf> {
+pub(crate) fn db_paths() -> Vec<PathBuf> {
     let Some(db) = db_path() else {
         return Vec::new();
     };

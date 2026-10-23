@@ -31,7 +31,7 @@ impl Cache {
     /// the same schema and the same queries is the point — the gallery's
     /// paging, search and sort are SQL, so a demo that bypassed them would
     /// exercise nothing.
-    pub fn in_memory() -> rusqlite::Result<Cache> {
+    pub(crate) fn in_memory() -> rusqlite::Result<Cache> {
         let conn = Connection::open_in_memory()?;
         conn.execute_batch(SCHEMA)?;
         let _ = conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION};"));
@@ -47,7 +47,7 @@ impl Cache {
     /// before the workers start, in one transaction.
     ///
     /// A cache from before this knew no owners: it is taken as it stands.
-    pub fn claim_accounts(&self, accounts: &[(u32, String)]) -> rusqlite::Result<()> {
+    pub(crate) fn claim_accounts(&self, accounts: &[(u32, String)]) -> rusqlite::Result<()> {
         let tx = self.conn.unchecked_transaction()?;
         let owners: std::collections::HashMap<u32, String> = {
             let mut stmt = tx.prepare("SELECT account_id, email FROM account_owner")?;
@@ -117,7 +117,7 @@ impl Cache {
 
     /// A separate WAL reader over an already-initialized cache. Background
     /// lookups need another connection, not another migration and cleanup pass.
-    pub fn read_connection(&self) -> rusqlite::Result<Cache> {
+    pub(crate) fn read_connection(&self) -> rusqlite::Result<Cache> {
         let path = self.conn.path().ok_or_else(|| {
             rusqlite::Error::InvalidPath(std::path::PathBuf::from("cache has no database file"))
         })?;
@@ -127,7 +127,7 @@ impl Cache {
     }
 
     /// Open (creating if needed) the cache DB at `~/.local/share/hylki/cache.db`.
-    pub fn open() -> rusqlite::Result<Cache> {
+    pub(crate) fn open() -> rusqlite::Result<Cache> {
         // No `temp_dir` fallback: this database holds message bodies, attachment
         // bytes and the harvested address book, and a shared world-writable
         // directory is the wrong place for any of it. Without a data dir there

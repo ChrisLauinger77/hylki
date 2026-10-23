@@ -23,9 +23,9 @@ mod on_inputs;
 mod toolbar;
 mod types;
 
-pub use types::{MessageWindowInit, MessageWindowInput, MessageWindowOutput};
+pub(crate) use types::{MessageWindowInit, MessageWindowInput, MessageWindowOutput};
 
-pub struct MessageWindow {
+pub(crate) struct MessageWindow {
     msg: Message,
     /// What the reader renders: the whole conversation, or just `[msg]`.
     thread: Vec<Message>,

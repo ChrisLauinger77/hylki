@@ -11,7 +11,7 @@ use crate::i18n::i18n;
 /// Present the contacts browser as a modal of `parent`. `on_choose` runs with
 /// the chosen contact when a row is activated, `on_show_all` when the header
 /// button asks for Hylki's Contacts view (the window closes either way).
-pub fn present(
+pub(crate) fn present(
     parent: &impl IsA<gtk::Window>,
     on_choose: impl Fn(Contact) + 'static,
     on_show_all: impl Fn() + 'static,
@@ -122,7 +122,7 @@ pub fn present(
 /// Open GNOME Contacts showing one contact. Best effort: outside a sandbox
 /// `gnome-contacts -i <uid>` selects the individual; the Flatpak D-Bus path
 /// can only raise the app.
-pub fn launch_gnome_contacts_for(uid: &str) {
+pub(crate) fn launch_gnome_contacts_for(uid: &str) {
     if crate::platform::is_flatpak() || uid.is_empty() {
         launch_gnome_contacts();
         return;
@@ -141,7 +141,7 @@ pub fn launch_gnome_contacts_for(uid: &str) {
 }
 
 /// Launch the GNOME Contacts application via the desktop session.
-pub fn launch_gnome_contacts() {
+pub(crate) fn launch_gnome_contacts() {
     // Inside a Flatpak sandbox `gnome-contacts` isn't on the path, so a plain
     // exec fails. Reach the host app by D-Bus-activating it (it's a
     // DBusActivatable GApplication).

@@ -9,19 +9,19 @@
 
 /// Everything but the unreserved characters escaped: a query value or one
 /// path segment.
-pub fn encode(s: &str) -> String {
+pub(crate) fn encode(s: &str) -> String {
     gtk::glib::Uri::escape_string(s, None, false).into()
 }
 
 /// A whole path, keeping its slashes.
-pub fn encode_path(s: &str) -> String {
+pub(crate) fn encode_path(s: &str) -> String {
     gtk::glib::Uri::escape_string(s, Some("/"), false).into()
 }
 
 /// `%XX` back to bytes, read as UTF-8 (lossily). `plus_is_space` reads `+`
 /// as a space, as an HTML form writes it; a `mailto:` address keeps its `+`
 /// (plus-addressing), and a path or a `cid:` has no such convention.
-pub fn decode(s: &str, plus_is_space: bool) -> String {
+pub(crate) fn decode(s: &str, plus_is_space: bool) -> String {
     let bytes = s.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;

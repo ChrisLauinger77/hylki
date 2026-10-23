@@ -18,10 +18,10 @@ use serde::{Deserialize, Serialize};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// The ID of the Hylki book in the switches, and its book UID.
-pub const HYLKI: &str = crate::local_contacts::LOCAL_BOOK_UID;
+pub(crate) const HYLKI: &str = crate::local_contacts::LOCAL_BOOK_UID;
 /// The ID that stands for the EDS books on this computer, which no source
 /// of their own groups.
-pub const THIS_COMPUTER: &str = "eds-local";
+pub(crate) const THIS_COMPUTER: &str = "eds-local";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct SwitchFile {
@@ -51,14 +51,14 @@ fn write_file(file: &SwitchFile) -> Result<(), String> {
 }
 
 /// The names given to address books in Hylki, by book UID.
-pub fn names() -> HashMap<String, String> {
+pub(crate) fn names() -> HashMap<String, String> {
     read_file().names.into_iter().collect()
 }
 
 /// Give an address book a name of its own in Hylki, or (`None`, or a
 /// blank one) go back to the book's own name. GNOME and Evolution keep
 /// theirs.
-pub fn set_name(uid: &str, name: Option<&str>) -> Result<(), String> {
+pub(crate) fn set_name(uid: &str, name: Option<&str>) -> Result<(), String> {
     let mut file = read_file();
     match name.map(str::trim).filter(|n| !n.is_empty()) {
         Some(name) => file.names.insert(uid.to_string(), name.to_string()),
@@ -77,12 +77,12 @@ fn switch_path() -> Option<PathBuf> {
 
 /// The IDs switched off for Hylki: sources (an account, a directory, the
 /// Hylki book, [`THIS_COMPUTER`]) and single books.
-pub fn off() -> HashSet<String> {
+pub(crate) fn off() -> HashSet<String> {
     read_file().off.into_iter().collect()
 }
 
 /// Switch a source or a book on or off for Hylki.
-pub fn set_off(id: &str, is_off: bool) -> Result<(), String> {
+pub(crate) fn set_off(id: &str, is_off: bool) -> Result<(), String> {
     let mut ids = off();
     if is_off {
         ids.insert(id.to_string());
@@ -97,13 +97,13 @@ pub fn set_off(id: &str, is_off: bool) -> Result<(), String> {
 }
 
 /// Whether the Hylki book is used.
-pub fn hylki_used() -> bool {
+pub(crate) fn hylki_used() -> bool {
     !off().contains(HYLKI)
 }
 
 /// The source an EDS book is grouped under: the collection (account) it
 /// belongs to, [`THIS_COMPUTER`] for a local book, or the book itself.
-pub fn group_of(uid: &str, sources: &HashMap<String, String>) -> String {
+pub(crate) fn group_of(uid: &str, sources: &HashMap<String, String>) -> String {
     let mut current = uid.to_string();
     for _ in 0..4 {
         let Some(data) = sources.get(&current) else {
@@ -137,13 +137,17 @@ pub fn group_of(uid: &str, sources: &HashMap<String, String>) -> String {
 
 /// Whether an EDS book is used by Hylki: neither it nor its account is
 /// switched off. `sources` is the registry's UID → key file.
-pub fn book_used(uid: &str, sources: &HashMap<String, String>, off: &HashSet<String>) -> bool {
+pub(crate) fn book_used(
+    uid: &str,
+    sources: &HashMap<String, String>,
+    off: &HashSet<String>,
+) -> bool {
     !off.contains(uid) && !off.contains(&group_of(uid, sources))
 }
 
 /// What kind of source a row is.
 #[derive(Debug, Clone)]
-pub enum Kind {
+pub(crate) enum Kind {
     Hylki,
     ThisComputer,
     /// An account in GNOME Online Accounts: changed in GNOME Settings.
@@ -158,45 +162,45 @@ pub enum Kind {
 
 /// One address book of a source.
 #[derive(Debug, Clone)]
-pub struct Book {
-    pub uid: String,
+pub(crate) struct Book {
+    pub(crate) uid: String,
     /// The book's own name; [`Book::shown`] is the one Hylki uses.
-    pub name: String,
+    pub(crate) name: String,
     /// The name given to it in Hylki, if any.
-    pub given: Option<String>,
+    pub(crate) given: Option<String>,
     /// Switched on for Hylki (its own switch; the source's is apart).
-    pub on: bool,
+    pub(crate) on: bool,
 }
 
 /// One row of Settings → Contacts.
 #[derive(Debug, Clone)]
-pub struct Source {
+pub(crate) struct Source {
     /// The ID its switch is kept under.
-    pub id: String,
-    pub kind: Kind,
+    pub(crate) id: String,
+    pub(crate) kind: Kind,
     /// The name it is listed by: the one given to it in Hylki, else its own.
-    pub title: String,
+    pub(crate) title: String,
     /// Its own name, which the given one stands in for.
-    pub own_title: String,
+    pub(crate) own_title: String,
     /// The name given to it in Hylki, if any.
-    pub given: Option<String>,
+    pub(crate) given: Option<String>,
     /// The second line: what it is and holds.
-    pub detail: String,
+    pub(crate) detail: String,
     /// The brand mark, or an icon name when there is none.
-    pub mark: &'static str,
+    pub(crate) mark: &'static str,
     /// Where it is set up: "Hylki", "GOA" or "Evolution".
-    pub origin: Origin,
-    pub books: Vec<Book>,
+    pub(crate) origin: Origin,
+    pub(crate) books: Vec<Book>,
     /// The source's switch.
-    pub on: bool,
+    pub(crate) on: bool,
     /// Why the switch cannot be turned on here, when it cannot.
-    pub paused: Option<String>,
+    pub(crate) paused: Option<String>,
     /// A CardDAV account's sign-in, for its row.
-    pub status: Option<crate::carddav::Status>,
+    pub(crate) status: Option<crate::carddav::Status>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Origin {
+pub(crate) enum Origin {
     Hylki,
     Online,
     Evolution,
@@ -253,7 +257,7 @@ fn books_line(books: &[Book]) -> String {
 /// this computer's books, then the accounts by name, and whether Evolution
 /// Data Server answered. Blocking: it asks EDS, GNOME Online Accounts and
 /// the keyring. Without EDS, only the Hylki book.
-pub fn list_with_eds() -> (Vec<Source>, bool) {
+pub(crate) fn list_with_eds() -> (Vec<Source>, bool) {
     let sources = list();
     let eds = crate::contacts::registry_sources().is_some();
     (sources, eds)
@@ -261,7 +265,7 @@ pub fn list_with_eds() -> (Vec<Source>, bool) {
 
 impl Book {
     /// The name Hylki uses: the one given to it, else its own.
-    pub fn shown(&self) -> &str {
+    pub(crate) fn shown(&self) -> &str {
         self.given.as_deref().unwrap_or(if self.name.is_empty() {
             &self.uid
         } else {
@@ -272,7 +276,7 @@ impl Book {
 
 /// [`list_with_eds`] with the names given in Hylki to the accounts and
 /// books in place of their own.
-pub fn list() -> Vec<Source> {
+pub(crate) fn list() -> Vec<Source> {
     let names = names();
     let mut sources = list_own();
     for s in &mut sources {
@@ -630,7 +634,7 @@ fn is_hylki_made_ldap(dir: &crate::directory::Directory) -> bool {
 /// Switch a source on or off for Hylki. Turning on one EDS itself has off
 /// (a CardDAV account or directory switched off before this page kept its
 /// own switch) switches it on there too. Blocking.
-pub fn switch_source(source: &Source, on: bool) -> Result<(), String> {
+pub(crate) fn switch_source(source: &Source, on: bool) -> Result<(), String> {
     set_off(&source.id, !on)?;
     if on {
         match &source.kind {

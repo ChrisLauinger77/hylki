@@ -44,21 +44,21 @@ use self::chrome::ClassRules;
 use self::page_fade::{PageFade, PendingLoad};
 use crate::models::Message;
 
-pub use frame::theme_grounds_for;
-pub use menu::MenuHit;
+pub(crate) use frame::theme_grounds_for;
+pub(crate) use menu::MenuHit;
 pub(crate) use menu::{hit_menu_entries, strip_navigation_items};
 pub(crate) use page_fade::{on_next_page_fade, PAGE_FADE_MS};
-pub use types::{
+pub(crate) use types::{
     CardAttachment, InviteAction, MessageViewInput, MessageViewOutput, SelectMode, TrState,
     UnsubState,
 };
-pub use webview::{new_preview_webview, shared_web_context};
+pub(crate) use webview::{new_preview_webview, shared_web_context};
 
 /// Each card's detected language, with the body length it was worked out
 /// for.
 type DetectedLanguages = std::collections::HashMap<(u32, u32), (usize, Option<String>)>;
 
-pub struct MessageView {
+pub(crate) struct MessageView {
     /// Render a lone message as an inset card, same as a conversation's
     /// messages (#57, preference; off keeps the full-bleed view).
     single_message_card: bool,

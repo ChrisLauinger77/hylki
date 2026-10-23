@@ -42,7 +42,7 @@ mod reply;
 mod tz;
 
 use ics::{unfold, Line};
-pub use reply::reply_ics;
+pub(crate) use reply::reply_ics;
 use tz::{Observance, TimeZoneSpec};
 
 /// The largest calendar part that is read. An invitation is a few KB; a
@@ -52,13 +52,13 @@ use tz::{Observance, TimeZoneSpec};
 const MAX_ICS: usize = 256 * 1024;
 
 /// Read the invitation a raw message carries, if it carries one.
-pub fn detect_raw(raw: &[u8]) -> Option<Invite> {
+pub(crate) fn detect_raw(raw: &[u8]) -> Option<Invite> {
     let parsed = mail_parser::MessageParser::default().parse(raw)?;
     detect(&parsed)
 }
 
 /// Read the invitation a parsed message carries, if it carries one.
-pub fn detect(parsed: &mail_parser::Message) -> Option<Invite> {
+pub(crate) fn detect(parsed: &mail_parser::Message) -> Option<Invite> {
     use mail_parser::MimeHeaders;
     for part in parsed.parts.iter() {
         let calendar = part.content_type().is_some_and(|c| {
@@ -100,7 +100,7 @@ pub fn detect(parsed: &mail_parser::Message) -> Option<Invite> {
 /// A document with no `VEVENT` (a free/busy reply, a bare `VTODO`) is not an
 /// invitation and reads as nothing, so the reader shows the message as it
 /// always did rather than an empty card.
-pub fn parse(ics: &str) -> Option<Invite> {
+pub(crate) fn parse(ics: &str) -> Option<Invite> {
     let lines = unfold(ics);
     let mut method = String::new();
     let mut zones: Vec<TimeZoneSpec> = Vec::new();

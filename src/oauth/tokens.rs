@@ -18,24 +18,24 @@ struct TokenResponse {
 }
 
 /// What a refresh gives back.
-pub struct Refreshed {
-    pub access_token: String,
+pub(crate) struct Refreshed {
+    pub(crate) access_token: String,
     /// A replacement for the refresh token that was spent, when the provider
     /// rotates them (Microsoft does, on every refresh). Keeping the old one
     /// works only until it expires, about 90 days on, and then the account
     /// has to sign in again.
-    pub refresh_token: Option<String>,
+    pub(crate) refresh_token: Option<String>,
     /// Seconds the access token is good for, when the provider says.
-    pub expires_in: Option<u64>,
+    pub(crate) expires_in: Option<u64>,
 }
 
 /// Result of a completed sign-in (the refresh token to persist).
-pub struct FlowResult {
-    pub refresh_token: String,
+pub(crate) struct FlowResult {
+    pub(crate) refresh_token: String,
 }
 
 /// Redeem an authorization code for the refresh token (blocking).
-pub fn exchange_code(
+pub(crate) fn exchange_code(
     settings: &OAuthSettings,
     request: &Authorization,
     code: &str,
@@ -68,7 +68,7 @@ pub fn exchange_code(
 /// address Graph reports, and the refresh token to keep, rotated by the
 /// refresh this takes. Fills the account in after a sign-in, so it is named
 /// by the mailbox actually reached rather than by what was typed.
-pub fn microsoft_whoami(
+pub(crate) fn microsoft_whoami(
     settings: &OAuthSettings,
     refresh: &str,
     user: Option<&str>,
@@ -96,7 +96,7 @@ pub fn microsoft_whoami(
 }
 
 /// Mint a fresh access token from a stored refresh token (blocking).
-pub fn refresh_access_token(
+pub(crate) fn refresh_access_token(
     settings: &OAuthSettings,
     refresh_token: &str,
 ) -> Result<Refreshed, String> {
@@ -107,7 +107,7 @@ pub fn refresh_access_token(
 /// Conditional Access that wants a managed device, Entra checks every
 /// refresh again: the identity broker's device cookie goes with it, as a
 /// header of its own name (#329, see `ms_broker`).
-pub fn refresh_access_token_as(
+pub(crate) fn refresh_access_token_as(
     settings: &OAuthSettings,
     refresh_token: &str,
     user: Option<&str>,

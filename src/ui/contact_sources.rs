@@ -93,7 +93,7 @@ fn mark(id: &str, px: i32) -> gtk::Widget {
 /// `ContactSources::save_action`).
 type SaveAction = Rc<RefCell<Option<Rc<dyn Fn() -> bool>>>>;
 
-pub struct ContactSources {
+pub(crate) struct ContactSources {
     sources: Vec<Source>,
     /// The books new contacts can go to, the chosen default first.
     books: Vec<crate::contacts::Book>,
@@ -120,7 +120,7 @@ pub struct ContactSources {
 }
 
 #[derive(Debug)]
-pub enum ContactSourcesInput {
+pub(crate) enum ContactSourcesInput {
     /// Ask EDS, GNOME Online Accounts and the keyring again.
     Load,
     Loaded {
@@ -179,7 +179,7 @@ pub enum ContactSourcesInput {
 }
 
 #[derive(Debug)]
-pub enum ContactSourcesOutput {
+pub(crate) enum ContactSourcesOutput {
     /// A page is pushed over the list (or gone); `form` when it holds
     /// changes Save keeps, so leaving it asks first.
     PageOpen {
@@ -200,13 +200,13 @@ pub enum ContactSourcesOutput {
     SetPlacement(crate::config::SectionPlacement),
 }
 
-pub struct ContactSourcesInit {
+pub(crate) struct ContactSourcesInit {
     /// Whether the Contacts search field is kept open.
-    pub search_open: bool,
-    pub placement: crate::config::SectionPlacement,
+    pub(crate) search_open: bool,
+    pub(crate) placement: crate::config::SectionPlacement,
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl SimpleComponent for ContactSources {
     type Init = ContactSourcesInit;
     type Input = ContactSourcesInput;

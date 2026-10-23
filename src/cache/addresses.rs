@@ -10,7 +10,7 @@ impl Cache {
     /// the Sent folder syncs. Each send bumps the address's frequency. The app
     /// records at the moment of sending, whatever route the message then
     /// takes (straight out, the Outbox, Send Later).
-    pub fn record_addresses(&self, entries: &[(String, String)]) {
+    pub(crate) fn record_addresses(&self, entries: &[(String, String)]) {
         for (name, email) in entries {
             let email = email.trim().to_lowercase();
             if email.is_empty() || !email.contains('@') {
@@ -33,7 +33,7 @@ impl Cache {
 
     /// Aggregate every address seen in stored mail (senders received +
     /// recipients sent/recorded), as (name, email, frequency), most-frequent first.
-    pub fn address_history(&self) -> Vec<(String, String, u32)> {
+    pub(crate) fn address_history(&self) -> Vec<(String, String, u32)> {
         use std::collections::HashMap;
         let mut counts: HashMap<String, (String, u32)> = HashMap::new();
         fn bump(counts: &mut HashMap<String, (String, u32)>, name: &str, email: &str, n: u32) {
@@ -104,7 +104,7 @@ impl Cache {
 
     /// Every address in one account's mail, lower case: what the composer
     /// keeps of the history when that account suggests only its own (#410).
-    pub fn account_addresses(&self, account_id: u32) -> std::collections::HashSet<String> {
+    pub(crate) fn account_addresses(&self, account_id: u32) -> std::collections::HashSet<String> {
         let mut out = std::collections::HashSet::new();
         let Ok(mut stmt) = self
             .conn

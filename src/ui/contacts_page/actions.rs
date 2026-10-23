@@ -22,7 +22,7 @@ use super::ContactsPageWidgets;
 impl ContactsPage {
     /// The entries held, their bytes (the floor: strings, vCards and photos)
     /// and how much of that is photos, for the memory report.
-    pub fn memory_stats(&self) -> (usize, usize, usize) {
+    pub(crate) fn memory_stats(&self) -> (usize, usize, usize) {
         let entries = self
             .contacts
             .iter()

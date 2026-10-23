@@ -239,7 +239,7 @@ fn inline_mime(file: &gtk::gio::File) -> Option<String> {
 
 /// Whether the file is a picture the editor would place in the text rather
 /// than attach: what the composer's drop surfaces offer "Insert in Text" for.
-pub fn is_inline_image(path: &std::path::Path) -> bool {
+pub(crate) fn is_inline_image(path: &std::path::Path) -> bool {
     inline_mime(&gtk::gio::File::for_path(path)).is_some()
 }
 

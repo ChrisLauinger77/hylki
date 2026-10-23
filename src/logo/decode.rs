@@ -9,7 +9,7 @@ use super::{bimi_path, domain_of, img_path, miss_path, CACHE, LOGO_PX, MISSES};
 /// `GdkTexture` reads PNG and JPEG; an `.ico` needs GdkPixbuf, which the platform
 /// supplies loaders for. Failing to decode is remembered as a miss, so a domain
 /// serving something unreadable is not asked on every row.
-pub fn decode_and_cache(email: &str, bytes: &[u8]) -> Option<gtk::gdk::Texture> {
+pub(crate) fn decode_and_cache(email: &str, bytes: &[u8]) -> Option<gtk::gdk::Texture> {
     let domain = domain_of(email)?;
     let tex = decode(bytes);
     match tex {
@@ -41,7 +41,7 @@ pub fn decode_and_cache(email: &str, bytes: &[u8]) -> Option<gtk::gdk::Texture> 
 }
 
 /// Remember that a sender's domain has no usable icon.
-pub fn remember_missing(email: &str) {
+pub(crate) fn remember_missing(email: &str) {
     // Not looked up at all, offline or metered (#442).
     if !crate::power::fetches_ahead() {
         return;

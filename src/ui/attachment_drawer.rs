@@ -54,12 +54,12 @@ const MIN_HEIGHT: i32 = 96;
 
 /// What the drawer needs at launch: its remembered state plus the reader widget
 /// it docks beneath (which becomes the top pane of its internal `GtkPaned`).
-pub struct DrawerInit {
-    pub state: DrawerState,
-    pub reader: gtk::Widget,
+pub(crate) struct DrawerInit {
+    pub(crate) state: DrawerState,
+    pub(crate) reader: gtk::Widget,
 }
 
-pub struct AttachmentDrawer {
+pub(crate) struct AttachmentDrawer {
     items: Vec<Attachment>,
     /// Display position → index into `items`. Identity for the grid; the list
     /// view is sorted alphabetically (flipped by `sort_desc`).
@@ -133,7 +133,7 @@ pub struct AttachmentDrawer {
 
 /// What the drawer asks the app to do.
 #[derive(Debug)]
-pub enum DrawerOutput {
+pub(crate) enum DrawerOutput {
     /// Show the app's full-window lightbox over these previewable
     /// attachments, starting at `start`.
     ShowLightbox {
@@ -148,7 +148,7 @@ pub enum DrawerOutput {
 }
 
 #[derive(Debug)]
-pub enum AttachmentDrawerInput {
+pub(crate) enum AttachmentDrawerInput {
     /// Replace the shown attachments (empty hides the drawer).
     SetItems(Vec<Attachment>),
     /// New thumbnail edge from the size slider (thumbnails only, not height).
@@ -208,7 +208,7 @@ pub enum AttachmentDrawerInput {
     SettleEmpty(u64),
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl SimpleComponent for AttachmentDrawer {
     type Init = DrawerInit;
     type Input = AttachmentDrawerInput;

@@ -86,7 +86,7 @@ const SYSTEM_DARK: Mini = Mini {
 
 /// Build the gallery with `selected` highlighted. `on_pick` runs for every change
 /// the user makes, not for the initial selection.
-pub fn gallery(selected: &str, on_pick: Rc<dyn Fn(&str)>) -> gtk::FlowBox {
+pub(crate) fn gallery(selected: &str, on_pick: Rc<dyn Fn(&str)>) -> gtk::FlowBox {
     let grid = gtk::FlowBox::new();
     grid.add_css_class("icon-gallery");
     grid.add_css_class("theme-gallery");

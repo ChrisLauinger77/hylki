@@ -262,7 +262,7 @@ pub(super) fn matches_query(c: &ContactDetails, q: &str) -> bool {
 
 /// Ask for `.vcf` files to import into the Hylki book, and hand their paths
 /// to `done` (never called for a cancelled dialog or no files).
-pub fn choose_vcf_files(
+pub(crate) fn choose_vcf_files(
     parent: Option<&gtk::Window>,
     done: impl Fn(Vec<std::path::PathBuf>) + 'static,
 ) {

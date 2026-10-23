@@ -32,7 +32,7 @@ pub(crate) fn locale_env(with_language: bool) -> impl Iterator<Item = String> {
 
 /// Bind the text domain. Called once, first thing in `main`, before GTK
 /// (which would otherwise set the locale without our domain in place).
-pub fn init() {
+pub(crate) fn init() {
     // A language chosen in Settings (#179) goes to gettext through
     // LANGUAGE, which it consults on every lookup, ahead of the locale.
     // Under the C locale gettext ignores LANGUAGE, so a system without a
@@ -80,7 +80,7 @@ const LANGUAGE_ORIG: &str = "HYLKI_LANGUAGE_ORIG";
 
 /// Point gettext at `code` ("" = the system's): restore the LANGUAGE the
 /// session had, then set the choice over it.
-pub fn apply_language(code: &str) {
+pub(crate) fn apply_language(code: &str) {
     if let Some(orig) = std::env::var_os(LANGUAGE_ORIG) {
         if orig.is_empty() {
             std::env::remove_var("LANGUAGE");
@@ -141,29 +141,29 @@ fn has_catalogue(dir: &Path) -> bool {
 }
 
 /// The translation of `s`, or `s` itself.
-pub fn i18n(s: &str) -> String {
+pub(crate) fn i18n(s: &str) -> String {
     gettextrs::gettext(s)
 }
 
 /// The plural-aware translation: `singular` or `plural` in English, the
 /// language's own form for `n` elsewhere.
-pub fn ni18n(singular: &str, plural: &str, n: u32) -> String {
+pub(crate) fn ni18n(singular: &str, plural: &str, n: u32) -> String {
     gettextrs::ngettext(singular, plural, n)
 }
 
 /// Translate, then fill `{name}` placeholders from `args`.
-pub fn i18n_f(s: &str, args: &[(&str, &str)]) -> String {
+pub(crate) fn i18n_f(s: &str, args: &[(&str, &str)]) -> String {
     fill(gettextrs::gettext(s), args)
 }
 
 /// Plural-aware [`i18n_f`]; `{n}` is not filled in automatically, pass it.
-pub fn ni18n_f(singular: &str, plural: &str, n: u32, args: &[(&str, &str)]) -> String {
+pub(crate) fn ni18n_f(singular: &str, plural: &str, n: u32, args: &[(&str, &str)]) -> String {
     fill(gettextrs::ngettext(singular, plural, n), args)
 }
 
 /// Mark a string for extraction without translating it here — for
 /// tables of literals whose entries are translated where they are shown.
-pub const fn i18n_noop(s: &'static str) -> &'static str {
+pub(crate) const fn i18n_noop(s: &'static str) -> &'static str {
     s
 }
 
@@ -181,7 +181,7 @@ const RTL_LANGUAGES: &[&str] = &[
 
 /// Whether a locale or LANGUAGE value ("fa_IR.UTF-8", "he:en", "ar")
 /// names a right-to-left language first.
-pub fn is_rtl_locale(value: &str) -> bool {
+pub(crate) fn is_rtl_locale(value: &str) -> bool {
     let first = value
         .split(':')
         .map(str::trim)
@@ -196,18 +196,18 @@ static RTL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(f
 /// Record the window's direction once GTK has settled it, for the parts of
 /// the window drawn in HTML (the reader's message headers), which have no
 /// widget to ask.
-pub fn set_rtl(rtl: bool) {
+pub(crate) fn set_rtl(rtl: bool) {
     RTL.store(rtl, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// Whether the window is laid out right to left.
-pub fn is_rtl() -> bool {
+pub(crate) fn is_rtl() -> bool {
     RTL.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Whether the interface language is right to left: the language chosen
 /// in Settings, else the first one the session names.
-pub fn ui_is_rtl() -> bool {
+pub(crate) fn ui_is_rtl() -> bool {
     let chosen = crate::config::load_language();
     if !chosen.is_empty() {
         return is_rtl_locale(&chosen);

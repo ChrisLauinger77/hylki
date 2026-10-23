@@ -40,35 +40,35 @@ use crate::i18n::{i18n, i18n_f, ni18n_f};
 /// is drawn by the panel, so a row is an icon and text and can carry no
 /// buttons; the actions stay in the reader.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TrayMail {
-    pub account_id: u32,
-    pub folder_id: u32,
-    pub message_id: u32,
+pub(crate) struct TrayMail {
+    pub(crate) account_id: u32,
+    pub(crate) folder_id: u32,
+    pub(crate) message_id: u32,
     /// First line: sender, account when there are several, and the date.
-    pub heading: String,
-    pub subject: String,
+    pub(crate) heading: String,
+    pub(crate) subject: String,
     /// The list's preview text; empty when previews are off.
-    pub preview: String,
+    pub(crate) preview: String,
     /// PNG of the sender's picture or initials, sized for a menu.
-    pub icon: Vec<u8>,
+    pub(crate) icon: Vec<u8>,
 }
 
 /// How many unread messages the menu lists, newest first; past that, one
 /// row offers the rest in the window.
-pub const MAIL_LIMIT: usize = 5;
+pub(super) const MAIL_LIMIT: usize = 5;
 
 /// The menu's mail section: the cards shown, and how many unread inbox
 /// messages there are in all (more than the cards when the list was cut).
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct TrayMailList {
-    pub items: Vec<TrayMail>,
-    pub unread: u32,
+pub(crate) struct TrayMailList {
+    pub(crate) items: Vec<TrayMail>,
+    pub(crate) unread: u32,
 }
 
 /// The app icon the tray shows: the one the dock shows (see
 /// `app_icon::tray_image`), passed in as image bytes (PNG, SVG or any
 /// format the loader reads) so a change follows live.
-pub type AppIconPng<'a> = &'a [u8];
+pub(super) type AppIconPng<'a> = &'a [u8];
 /// The app's symbolic icon (the opened envelope, drawn in black); its
 /// fill is swapped for the chosen color.
 const ENVELOPE_SVG: &str =
@@ -88,7 +88,7 @@ const DOT_RGB: (f64, f64, f64) = (
 
 /// A running tray item. Dropping it does not remove the icon; call
 /// [`TrayHandle::stop`].
-pub struct TrayHandle {
+pub(crate) struct TrayHandle {
     handle: Handle<HylkiTray>,
     last_unread: std::cell::Cell<u32>,
 }
@@ -97,7 +97,7 @@ impl TrayHandle {
     /// Publish the item. `None` when the session bus can't be reached at
     /// all; a missing watcher is not that — the item then waits for one.
     /// `mail` is `None` when the menu is not to list messages at all.
-    pub fn start(
+    pub(crate) fn start(
         sender: relm4::Sender<AppMsg>,
         icon: TrayIcon,
         app_png: AppIconPng,
@@ -129,7 +129,7 @@ impl TrayHandle {
     }
 
     /// The unread total across inboxes: the dot is on while it is non-zero.
-    pub fn set_unread(&self, unread: u32) {
+    pub(crate) fn set_unread(&self, unread: u32) {
         if self.last_unread.replace(unread) == unread {
             return;
         }
@@ -137,7 +137,7 @@ impl TrayHandle {
     }
 
     /// Swap the icon set.
-    pub fn set_icon(&self, icon: TrayIcon, app_png: AppIconPng) {
+    pub(crate) fn set_icon(&self, icon: TrayIcon, app_png: AppIconPng) {
         let plain = render_set(icon, app_png, false);
         let dotted = render_set(icon, app_png, true);
         let symbolic = symbolic_theme(icon);
@@ -149,12 +149,12 @@ impl TrayHandle {
     }
 
     /// Replace the menu's message list; `None` drops the section.
-    pub fn set_mail(&self, mail: Option<TrayMailList>) {
+    pub(crate) fn set_mail(&self, mail: Option<TrayMailList>) {
         self.handle.update(move |t| t.mail = mail);
     }
 
     /// Take the item down.
-    pub fn stop(self) {
+    pub(crate) fn stop(self) {
         let _ = self.handle.shutdown();
     }
 }
@@ -447,7 +447,7 @@ fn menu_text(s: &str) -> String {
 }
 
 /// Cut a line of mail text down to menu width, on a character boundary.
-pub fn clip(s: &str, max: usize) -> String {
+pub(super) fn clip(s: &str, max: usize) -> String {
     let s: String = s.split_whitespace().collect::<Vec<_>>().join(" ");
     if s.chars().count() <= max {
         return s;
@@ -460,7 +460,7 @@ pub fn clip(s: &str, max: usize) -> String {
 /// The menu's picture for a sender: the contact or Gravatar picture when the
 /// avatar cache has one, else their initials on a color picked by name — the
 /// same fallback the message list shows.
-pub fn sender_icon(name: &str, email: &str, texture: Option<gtk::gdk::Texture>) -> Vec<u8> {
+pub(super) fn sender_icon(name: &str, email: &str, texture: Option<gtk::gdk::Texture>) -> Vec<u8> {
     const SIZE: i32 = 32;
     if let Some(png) = texture.and_then(|t| {
         let loader = PixbufLoader::with_type("png").ok()?;

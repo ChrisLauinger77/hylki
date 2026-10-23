@@ -15,7 +15,7 @@ use relm4::prelude::*;
 
 impl Row {
     /// Fill the widgets from the bound message and the list's look.
-    pub fn refresh(&self) {
+    pub(crate) fn refresh(&self) {
         let Some(shared) = self.shared() else { return };
         let Some(data) = self.data() else { return };
         let look = shared.look.borrow().clone();
@@ -599,7 +599,7 @@ impl Row {
         w.line.set_visible(columns.is_some());
     }
 
-    pub fn set_preview_lines(&self, lines: u32) {
+    pub(crate) fn set_preview_lines(&self, lines: u32) {
         let lines = lines.clamp(1, 3);
         self.w.preview.set_wrap(lines > 1);
         self.w.preview.set_lines(lines as i32);

@@ -19,14 +19,14 @@ mod imp {
     use super::*;
 
     #[derive(Default)]
-    pub struct FadeLabel {
-        pub label: RefCell<Option<gtk::Label>>,
+    pub(crate) struct FadeLabel {
+        pub(crate) label: RefCell<Option<gtk::Label>>,
         /// How far the text is slid to the left, in pixels.
-        pub offset: Cell<f64>,
+        pub(crate) offset: Cell<f64>,
         /// The natural width asked of the parent at most: past it the text
         /// fades rather than widening its row.
-        pub max_natural: Cell<i32>,
-        pub anim: RefCell<Option<adw::TimedAnimation>>,
+        pub(crate) max_natural: Cell<i32>,
+        pub(crate) anim: RefCell<Option<adw::TimedAnimation>>,
     }
 
     #[glib::object_subclass]
@@ -119,14 +119,14 @@ mod imp {
 }
 
 glib::wrapper! {
-    pub struct FadeLabel(ObjectSubclass<imp::FadeLabel>)
+    pub(crate) struct FadeLabel(ObjectSubclass<imp::FadeLabel>)
         @extends gtk::Widget;
 }
 
 impl FadeLabel {
     /// `max_natural` caps the width the label asks for; it takes any width
     /// it is given.
-    pub fn new(text: &str, max_natural: i32) -> Self {
+    pub(crate) fn new(text: &str, max_natural: i32) -> Self {
         let obj: Self = glib::Object::new();
         let label = gtk::Label::new(Some(text));
         label.set_xalign(0.0);
@@ -148,7 +148,7 @@ impl FadeLabel {
 
     /// Slide the text to show its end (`true`) or back to its start. Speed
     /// is steady, so a long name takes longer than one a few letters over.
-    pub fn reveal(&self, on: bool) {
+    pub(crate) fn reveal(&self, on: bool) {
         let imp = self.imp();
         if let Some(a) = imp.anim.take() {
             a.pause();

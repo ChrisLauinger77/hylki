@@ -12,14 +12,14 @@ mod flow_imp {
     /// Lays the pills out left to right, wrapping, with the text after the
     /// last one taking what is left of its line.
     #[derive(Default)]
-    pub struct PillFlow {
-        pub text: RefCell<Option<gtk::Widget>>,
+    pub(crate) struct PillFlow {
+        pub(crate) text: RefCell<Option<gtk::Widget>>,
         /// The line showing where a dragged pill would go, outside the
         /// layout.
-        pub marker: gtk::Box,
+        pub(crate) marker: gtk::Box,
         /// The pill the marker stands before; the number of pills puts it
         /// after the last.
-        pub marker_at: Cell<Option<usize>>,
+        pub(crate) marker_at: Cell<Option<usize>>,
     }
 
     #[glib::object_subclass]
@@ -121,7 +121,7 @@ mod flow_imp {
 }
 
 glib::wrapper! {
-    pub struct PillFlow(ObjectSubclass<flow_imp::PillFlow>)
+    pub(crate) struct PillFlow(ObjectSubclass<flow_imp::PillFlow>)
         @extends gtk::Widget,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }

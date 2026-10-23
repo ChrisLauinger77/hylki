@@ -828,6 +828,6 @@ impl PrivacyFile {
 }
 
 /// Persist all app settings together (so no field is clobbered).
-pub fn save_privacy(file: PrivacyFile) {
+pub(crate) fn save_privacy(file: PrivacyFile) {
     save_private_toml(privacy_path(), &file, "privacy settings", true);
 }

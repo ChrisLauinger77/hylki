@@ -5,200 +5,200 @@ use super::*;
 
 /// Initial data for the settings window.
 #[derive(Debug)]
-pub struct PrefInit {
-    pub auto_remote_content: bool,
-    pub show_remote_banner: bool,
-    pub show_spoof_banner: bool,
-    pub gravatar: bool,
-    pub avatars: bool,
+pub(crate) struct PrefInit {
+    pub(crate) auto_remote_content: bool,
+    pub(crate) show_remote_banner: bool,
+    pub(crate) show_spoof_banner: bool,
+    pub(crate) gravatar: bool,
+    pub(crate) avatars: bool,
     /// Your own mail wears its mailbox's face, not a sender's circle (#189).
-    pub own_mailbox_face: bool,
+    pub(crate) own_mailbox_face: bool,
     /// Tagged rows are washed with their tag's color (PR #383).
-    pub tag_row_tint: bool,
-    pub sender_logos: bool,
-    pub date_style: DateStyle,
-    pub clock_style: ClockStyle,
+    pub(crate) tag_row_tint: bool,
+    pub(crate) sender_logos: bool,
+    pub(crate) date_style: DateStyle,
+    pub(crate) clock_style: ClockStyle,
     /// The chosen interface language code; empty = the system's (#179).
-    pub language: String,
-    pub fetch_interval_secs: u64,
-    pub push: bool,
-    pub metered_save_data: bool,
-    pub palette_collapse_secs: u64,
+    pub(crate) language: String,
+    pub(crate) fetch_interval_secs: u64,
+    pub(crate) push: bool,
+    pub(crate) metered_save_data: bool,
+    pub(crate) palette_collapse_secs: u64,
     /// Seconds a message card's actions palette stays open — its own, not
     /// the message list's.
-    pub card_palette_collapse_secs: u64,
-    pub threading: bool,
-    pub threads_expanded: bool,
+    pub(crate) card_palette_collapse_secs: u64,
+    pub(crate) threading: bool,
+    pub(crate) threads_expanded: bool,
     /// Reading pane shows conversations newest-message-first.
-    pub thread_newest_first: bool,
+    pub(crate) thread_newest_first: bool,
     /// Which messages of a conversation open folded (#326).
-    pub fold_messages: crate::config::FoldMessages,
+    pub(crate) fold_messages: crate::config::FoldMessages,
     /// Reader always shows the recipients line under the sender.
-    pub always_show_recipients: bool,
+    pub(crate) always_show_recipients: bool,
     /// The OpenPGP chip says its verdict in words (#300).
-    pub pgp_labels: bool,
+    pub(crate) pgp_labels: bool,
     /// Lone messages render as inset cards, like conversation messages.
-    pub single_message_card: bool,
+    pub(crate) single_message_card: bool,
     /// The Light / Dark Mode switch is shown in the reader header (PR #386).
-    pub theme_switch: bool,
+    pub(crate) theme_switch: bool,
     /// Icons come from the desktop's icon theme, not Hylki's own.
-    pub desktop_icons: bool,
+    pub(crate) desktop_icons: bool,
     /// The Reader View switch is shown in the reader header.
-    pub reader_switch: bool,
+    pub(crate) reader_switch: bool,
     /// What Reader View does when a message is opened.
-    pub reader_default: crate::config::ReaderDefault,
+    pub(crate) reader_default: crate::config::ReaderDefault,
     /// The message zoom every launch starts at, in percent.
-    pub reader_zoom: u32,
+    pub(crate) reader_zoom: u32,
     /// Each conversation message lists its own attachments (#213).
-    pub card_attachments: bool,
+    pub(crate) card_attachments: bool,
     /// The attachment drawer beneath the reader is shown (#213).
-    pub attachment_drawer: bool,
+    pub(crate) attachment_drawer: bool,
     /// Conversation rows may expand into their members in the message list.
-    pub thread_expansion: bool,
+    pub(crate) thread_expansion: bool,
     /// A conversation's row speaks for the newest message anywhere in the
     /// account, the replies you sent included (#236).
-    pub thread_row_newest: bool,
+    pub(crate) thread_row_newest: bool,
     /// Deleting a whole selected conversation asks for confirmation.
-    pub confirm_thread_delete: bool,
+    pub(crate) confirm_thread_delete: bool,
     /// Conversation card actions hide until the card is hovered.
-    pub card_actions_hover: bool,
+    pub(crate) card_actions_hover: bool,
     /// With the ⋯ toggle off: card actions appear automatically on hover.
-    pub card_actions_auto: bool,
+    pub(crate) card_actions_auto: bool,
     /// The list rows carry an actions palette line at all.
-    pub list_palette: bool,
+    pub(crate) list_palette: bool,
     /// The list's actions palette opens on row hover (no ⋯ click).
-    pub list_palette_hover: bool,
+    pub(crate) list_palette_hover: bool,
     /// A message card's ⋯ opens the card menu instead of sliding its
     /// actions palette out.
-    pub card_palette_menu: bool,
+    pub(crate) card_palette_menu: bool,
     /// Message rows take a sideways swipe to archive / delete (#92).
-    pub swipe_enabled: bool,
+    pub(crate) swipe_enabled: bool,
     /// The message list's swipe-gesture sides are swapped (#swipe).
-    pub swipe_reversed: bool,
+    pub(crate) swipe_reversed: bool,
     /// How far a trackpad two-finger swipe has to travel to fire the action.
-    pub swipe_sensitivity: f64,
+    pub(crate) swipe_sensitivity: f64,
     /// "New message" composes inline over the reading pane (vs a window).
-    pub compose_inline: bool,
+    pub(crate) compose_inline: bool,
     /// Reply, Reply All and Forward open in the reading pane (vs a window).
-    pub reply_inline: bool,
-    pub reply_fields: bool,
+    pub(crate) reply_inline: bool,
+    pub(crate) reply_fields: bool,
     /// Settings → System → GNOME Files: what handed-in files open into.
-    pub files: crate::config::FilesPrefs,
+    pub(crate) files: crate::config::FilesPrefs,
     /// Settings → System → Links: the browser links open in (#232). Empty =
     /// the desktop's default, `ask` = its app chooser, otherwise a desktop
     /// entry id.
-    pub link_browser: String,
+    pub(crate) link_browser: String,
     /// The identity new messages are sent from (#157); empty = the open
     /// folder's account. One of `identities`' addresses.
-    pub compose_default_from: String,
-    pub paste_plain: bool,
-    pub return_paragraph: bool,
-    pub toolbar_expanded: bool,
+    pub(crate) compose_default_from: String,
+    pub(crate) paste_plain: bool,
+    pub(crate) return_paragraph: bool,
+    pub(crate) toolbar_expanded: bool,
     /// The font rich-text messages are written in, as a CSS family list,
     /// and its size in points; empty and 0 are the defaults.
-    pub compose_font: String,
-    pub compose_font_size: u32,
+    pub(crate) compose_font: String,
+    pub(crate) compose_font_size: u32,
     /// Settings → Reading → Printing (#359).
-    pub print_options: crate::config::PrintOptions,
-    pub spellcheck: bool,
-    pub spellcheck_langs: String,
-    pub message_theme: MessageTheme,
+    pub(crate) print_options: crate::config::PrintOptions,
+    pub(crate) spellcheck: bool,
+    pub(crate) spellcheck_langs: String,
+    pub(crate) message_theme: MessageTheme,
     /// Set every message in the reader's own font (#56).
-    pub override_fonts: bool,
+    pub(crate) override_fonts: bool,
     /// That font, as a Pango description; empty = the interface font.
-    pub reader_font: String,
+    pub(crate) reader_font: String,
     /// Ignore the senders' text and background colors (#56).
-    pub override_colors: bool,
+    pub(crate) override_colors: bool,
     /// Plain-text messages in monospace (#181), and the font ("" = the
     /// desktop's monospace font).
-    pub plain_monospace: bool,
-    pub plain_font: String,
+    pub(crate) plain_monospace: bool,
+    pub(crate) plain_font: String,
     /// New messages start as plain text (#180).
-    pub compose_format: crate::config::ComposeFormat,
+    pub(crate) compose_format: crate::config::ComposeFormat,
     /// Replies and forwards to plain-text mail are written in plain text (#436).
-    pub follow_plain: bool,
+    pub(crate) follow_plain: bool,
     /// Where the split reply opens in the reading pane (#212).
-    pub reply_position: crate::config::ReplyPosition,
+    pub(crate) reply_position: crate::config::ReplyPosition,
     /// Where the signature sits in a reply or forward (#237).
-    pub signature_position: crate::config::SignaturePosition,
-    pub signature_dashes: bool,
+    pub(crate) signature_position: crate::config::SignaturePosition,
+    pub(crate) signature_dashes: bool,
     /// Undo Send delay in seconds, 0 for off (#434).
-    pub undo_send_secs: u32,
-    pub app_theme: AppTheme,
-    pub text_scale: u32,
+    pub(crate) undo_send_secs: u32,
+    pub(crate) app_theme: AppTheme,
+    pub(crate) text_scale: u32,
     /// The appearance theme's id ("system" for the stock GNOME colors).
-    pub theme: String,
-    pub notifications: bool,
-    pub notification_content: bool,
-    pub notification_buttons: crate::config::NotificationButtons,
-    pub show_attachments: bool,
-    pub show_unified: bool,
-    pub unified_chips: crate::config::UnifiedChips,
-    pub unified_kinds: crate::config::UnifiedKinds,
-    pub show_accounts: bool,
-    pub section_style: crate::config::SectionStyle,
-    pub filtered_placement: crate::config::SectionPlacement,
-    pub tags_placement: crate::config::SectionPlacement,
-    pub favorites_placement: crate::config::SectionPlacement,
-    pub contacts_placement: crate::config::SectionPlacement,
-    pub chevrons_left: bool,
-    pub account_click_folds: bool,
-    pub start_view: crate::config::StartView,
-    pub folder_sort: crate::config::FolderSort,
-    pub console_mode: bool,
-    pub status_bar_top: bool,
-    pub read_mark: crate::config::ReadMark,
-    pub sidebar_hover_expand: bool,
-    pub remember_sidebar: bool,
-    pub remember_rail: bool,
-    pub rail_dots: bool,
-    pub seen_counts: bool,
-    pub rail_fold: crate::config::RailFold,
+    pub(crate) theme: String,
+    pub(crate) notifications: bool,
+    pub(crate) notification_content: bool,
+    pub(crate) notification_buttons: crate::config::NotificationButtons,
+    pub(crate) show_attachments: bool,
+    pub(crate) show_unified: bool,
+    pub(crate) unified_chips: crate::config::UnifiedChips,
+    pub(crate) unified_kinds: crate::config::UnifiedKinds,
+    pub(crate) show_accounts: bool,
+    pub(crate) section_style: crate::config::SectionStyle,
+    pub(crate) filtered_placement: crate::config::SectionPlacement,
+    pub(crate) tags_placement: crate::config::SectionPlacement,
+    pub(crate) favorites_placement: crate::config::SectionPlacement,
+    pub(crate) contacts_placement: crate::config::SectionPlacement,
+    pub(crate) chevrons_left: bool,
+    pub(crate) account_click_folds: bool,
+    pub(crate) start_view: crate::config::StartView,
+    pub(crate) folder_sort: crate::config::FolderSort,
+    pub(crate) console_mode: bool,
+    pub(crate) status_bar_top: bool,
+    pub(crate) read_mark: crate::config::ReadMark,
+    pub(crate) sidebar_hover_expand: bool,
+    pub(crate) remember_sidebar: bool,
+    pub(crate) remember_rail: bool,
+    pub(crate) rail_dots: bool,
+    pub(crate) seen_counts: bool,
+    pub(crate) rail_fold: crate::config::RailFold,
     /// The reader header's buttons, per side and in order.
-    pub reader_toolbar: ReaderToolbar,
+    pub(crate) reader_toolbar: ReaderToolbar,
     /// Focus Mode: the master switch and the parts it strips.
-    pub focus: crate::config::FocusMode,
-    pub preview_lines: u32,
-    pub list_layout: crate::config::ListLayout,
-    pub list_columns: Vec<crate::config::ListColumn>,
-    pub list_headings: bool,
-    pub list_column_scroll: bool,
-    pub list_group_by_date: bool,
-    pub list_pills_below: bool,
-    pub list_search_open: bool,
-    pub contacts_search_open: bool,
-    pub list_search_bottom: bool,
-    pub list_bulk_bar_bottom: bool,
-    pub single_key_shortcuts: bool,
-    pub gmail_keys: bool,
-    pub keep_downloads_days: u32,
-    pub run_in_background: bool,
-    pub autostart: bool,
-    pub tray: bool,
-    pub tray_icon: TrayIcon,
-    pub tray_mail: bool,
-    pub launcher_badge: LauncherBadge,
+    pub(crate) focus: crate::config::FocusMode,
+    pub(crate) preview_lines: u32,
+    pub(crate) list_layout: crate::config::ListLayout,
+    pub(crate) list_columns: Vec<crate::config::ListColumn>,
+    pub(crate) list_headings: bool,
+    pub(crate) list_column_scroll: bool,
+    pub(crate) list_group_by_date: bool,
+    pub(crate) list_pills_below: bool,
+    pub(crate) list_search_open: bool,
+    pub(crate) contacts_search_open: bool,
+    pub(crate) list_search_bottom: bool,
+    pub(crate) list_bulk_bar_bottom: bool,
+    pub(crate) single_key_shortcuts: bool,
+    pub(crate) gmail_keys: bool,
+    pub(crate) keep_downloads_days: u32,
+    pub(crate) run_in_background: bool,
+    pub(crate) autostart: bool,
+    pub(crate) tray: bool,
+    pub(crate) tray_icon: TrayIcon,
+    pub(crate) tray_mail: bool,
+    pub(crate) launcher_badge: LauncherBadge,
     /// The chosen app icon (an `app_icon::catalog` id).
-    pub app_icon: String,
+    pub(crate) app_icon: String,
     /// The accounts panel (built by the AccountsWindow component), shown
     /// behind the window's "Accounts" tab.
-    pub accounts_panel: gtk::Widget,
+    pub(crate) accounts_panel: gtk::Widget,
     /// Open showing the Accounts tab instead of Preferences.
-    pub start_on_accounts: bool,
+    pub(crate) start_on_accounts: bool,
     /// The category to open on, when the app remembers one from earlier
     /// this session; overrides `start_on_accounts`.
-    pub start_page: Option<String>,
+    pub(crate) start_page: Option<String>,
     /// The persisted "this window opens to" choice (true = Accounts).
-    pub settings_open_accounts: bool,
+    pub(crate) settings_open_accounts: bool,
     /// The accounts component's inbox, for the sidebar to pick its pages.
-    pub accounts_sender: relm4::Sender<crate::ui::accounts::AccountsInput>,
+    pub(crate) accounts_sender: relm4::Sender<crate::ui::accounts::AccountsInput>,
     /// (name, address) per account and alias, for the OpenPGP page's
     /// key generator.
-    pub identities: Vec<(String, String)>,
+    pub(crate) identities: Vec<(String, String)>,
 }
 
 #[derive(Debug)]
-pub enum PrefInput {
+pub(crate) enum PrefInput {
     /// The Contacts page: the books new contacts can go to, freshly read.
     SetContactBooks(Vec<crate::contacts::Book>),
     /// The Hylki book's size changed (an import, a deletion).
@@ -379,7 +379,7 @@ pub enum PrefInput {
 }
 
 #[derive(Debug)]
-pub enum PrefOutput {
+pub(crate) enum PrefOutput {
     /// The Contacts page's buttons: the app opens the file dialogs and the
     /// confirmation, and does the work off the main thread.
     ImportLocalContacts,

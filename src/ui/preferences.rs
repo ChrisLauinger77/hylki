@@ -34,7 +34,7 @@ mod spelling;
 mod system;
 
 use chips::{ColumnEditor, ToolbarEditor};
-pub use choices::language_choices;
+pub(crate) use choices::language_choices;
 pub(crate) use choices::{
     contacts_placement_from_index, contacts_placement_index, contacts_placement_model,
 };
@@ -43,21 +43,21 @@ use choices::{
     placement_index, sound_index, sound_labels, APP_THEMES, CLOCK_STYLES, DATE_STYLES,
     FETCH_INTERVALS, KEEP_DOWNLOADS_DAYS, LAUNCHER_BADGES, MESSAGE_THEMES, RENDERERS, TRAY_ICONS,
 };
-pub use messages::{PrefInit, PrefInput, PrefOutput};
+pub(crate) use messages::{PrefInit, PrefInput, PrefOutput};
 use navigation::{side_page, SIDE_PAGES};
 use pages::{
     AppearancePage, BackupPage, ComposingPage, ConversationsPage, DateTimePage, GeneralPage,
     ListPage, PrivacyPage, ReadingPage, SidebarPage, SystemPage,
 };
 use rows::{compose_font_setup, middle_ellipsize, widen_combo_value, widen_page};
-pub use search::NOT_SEARCHED;
+pub(crate) use search::NOT_SEARCHED;
 use search::{scroll_to, SettingsSearch};
 use spelling::{rebuild_personal_words, SpellLangRows};
 use system::hide_edit_icon;
 
 // ---- Preferences window -----------------------------------------------------
 
-pub struct Preferences {
+pub(crate) struct Preferences {
     /// Mirrors the notifications switch, so the "show sender and subject" row
     /// below it can grey out when nothing is being posted at all.
     notifications: bool,
@@ -210,7 +210,7 @@ impl ViewSender {
     }
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for Preferences {
     type Init = PrefInit;
     type Input = PrefInput;

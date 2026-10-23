@@ -33,15 +33,15 @@ mod types;
 mod unified;
 mod widgets;
 
-pub use messages::{CtxAction, SidebarInput, SidebarOutput};
-pub use tree::Hierarchy;
+pub(crate) use messages::{CtxAction, SidebarInput, SidebarOutput};
+pub(crate) use tree::Hierarchy;
 pub(crate) use tree::{folder_depth, order_folders, placed_run, TREE_EXPANDER_WIDTH};
 pub(crate) use types::kind_label;
 use types::{InboxRef, KindWidgets, SectionWidgets, UnifiedRow};
-pub use types::{SectionData, Sel, SidebarInit, Slot, StartTarget, UnifiedFolderRef};
+pub(crate) use types::{SectionData, Sel, SidebarInit, Slot, StartTarget, UnifiedFolderRef};
 pub(crate) use widgets::{account_initials, build_unified_sub_row, pin_icon_size};
 
-pub struct Sidebar {
+pub(crate) struct Sidebar {
     /// Last sections received, in display order.
     sections: Vec<SectionData>,
     /// Whether to show the unified "All Inboxes" row.
@@ -237,7 +237,7 @@ pub struct Sidebar {
     reveal_accounts_late: bool,
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for Sidebar {
     type Init = SidebarInit;
     type Input = SidebarInput;

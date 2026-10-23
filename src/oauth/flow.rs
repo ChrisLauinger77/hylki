@@ -98,7 +98,7 @@ fn success_page() -> String {
 /// sandbox as well as natively, and is safe to call from any thread (the OAuth
 /// flow opens the browser from a worker thread). Falls back to `xdg-open` if the
 /// portal isn't available.
-pub fn open_uri(uri: &str) {
+pub(crate) fn open_uri(uri: &str) {
     if open_uri_portal(uri).is_err() {
         let _ = std::process::Command::new("xdg-open").arg(uri).spawn();
     }
@@ -121,7 +121,7 @@ fn open_uri_portal(uri: &str) -> Result<(), Box<dyn std::error::Error>> {
 
 /// Run the interactive authorization-code + PKCE flow (blocking — call off the
 /// UI thread). Opens the browser and waits for the loopback redirect.
-pub fn run_flow(settings: &OAuthSettings) -> Result<FlowResult, String> {
+pub(crate) fn run_flow(settings: &OAuthSettings) -> Result<FlowResult, String> {
     run_flow_as(settings, None)
 }
 
@@ -131,7 +131,7 @@ pub fn run_flow(settings: &OAuthSettings) -> Result<FlowResult, String> {
 /// The picker, not a forced consent screen: in a tenant where users may not
 /// consent, `prompt=consent` asks an admin every time even after the app was
 /// approved.
-pub fn microsoft_prompt(login_hint: Option<&str>) -> String {
+pub(crate) fn microsoft_prompt(login_hint: Option<&str>) -> String {
     match login_hint.map(str::trim).filter(|h| !h.is_empty()) {
         Some(hint) => format!("&login_hint={}", crate::encoding::percent::encode(hint)),
         None => "&prompt=select_account".into(),
@@ -140,7 +140,7 @@ pub fn microsoft_prompt(login_hint: Option<&str>) -> String {
 
 /// [`run_flow`] for the account `login_hint` names, where the provider
 /// takes a hint (Microsoft).
-pub fn run_flow_as(
+pub(crate) fn run_flow_as(
     settings: &OAuthSettings,
     login_hint: Option<&str>,
 ) -> Result<FlowResult, String> {
@@ -199,16 +199,20 @@ pub fn run_flow_as(
 
 /// One authorization request: the address to open, and what checks and
 /// redeems its answer.
-pub struct Authorization {
-    pub url: String,
-    pub redirect: String,
-    pub state: String,
+pub(crate) struct Authorization {
+    pub(crate) url: String,
+    pub(crate) redirect: String,
+    pub(crate) state: String,
     pub(super) verifier: String,
 }
 
 impl Authorization {
     /// `extra` is appended to the query as it is ("&prompt=…").
-    pub fn new(settings: &OAuthSettings, redirect: &str, extra: &str) -> Result<Self, String> {
+    pub(crate) fn new(
+        settings: &OAuthSettings,
+        redirect: &str,
+        extra: &str,
+    ) -> Result<Self, String> {
         // PKCE S256 (RFC 7636 §4.2). With `plain` the challenge *is* the verifier, so
         // anyone who gets to read the authorization URL — browser history, an
         // extension, another local process — can redeem a stolen code, which is the
@@ -239,7 +243,11 @@ impl Authorization {
     /// For a sign-in in Hylki's own window (#329): the code a navigation
     /// to `uri` carries, `None` while it is not the redirect, or the
     /// provider's refusal.
-    pub fn answer(&self, uri: &str, settings: &OAuthSettings) -> Option<Result<String, String>> {
+    pub(crate) fn answer(
+        &self,
+        uri: &str,
+        settings: &OAuthSettings,
+    ) -> Option<Result<String, String>> {
         let rest = uri.strip_prefix(self.redirect.as_str())?;
         if !(rest.is_empty() || rest.starts_with('?') || rest.starts_with('#')) {
             return None;

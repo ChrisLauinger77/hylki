@@ -297,7 +297,7 @@ glib::wrapper! {
     /// ignoring the child's intrinsic size. This keeps every thumbnail uniformly
     /// sized (so images don't blow the cell out to their native pixel width) and
     /// lets the grid pack many per row, flowing left-to-right.
-    pub struct SquareBox(ObjectSubclass<imp::SquareBox>) @extends gtk::Widget;
+    pub(crate) struct SquareBox(ObjectSubclass<imp::SquareBox>) @extends gtk::Widget;
 }
 
 impl SquareBox {
@@ -318,8 +318,8 @@ mod imp {
     use gtk::subclass::prelude::*;
 
     #[derive(Default)]
-    pub struct SquareBox {
-        pub size: Cell<i32>,
+    pub(crate) struct SquareBox {
+        pub(crate) size: Cell<i32>,
     }
 
     #[glib::object_subclass]

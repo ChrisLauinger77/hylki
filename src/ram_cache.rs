@@ -16,7 +16,7 @@
 use std::collections::{HashMap, VecDeque};
 
 /// What an entry costs the budget.
-pub trait Weigh {
+pub(crate) trait Weigh {
     fn weight(&self) -> usize;
 }
 
@@ -34,7 +34,7 @@ impl Weigh for Vec<crate::models::Attachment> {
 
 /// A map that stays under a byte budget by dropping its oldest entries. The
 /// key says which message an entry belongs to; see its users for the shape.
-pub struct RamCache<K, V: Weigh> {
+pub(crate) struct RamCache<K, V: Weigh> {
     map: HashMap<K, V>,
     /// Insertion order, oldest first — the eviction queue.
     order: VecDeque<K>,
@@ -43,7 +43,7 @@ pub struct RamCache<K, V: Weigh> {
 }
 
 impl<K: std::hash::Hash + Eq + Clone, V: Weigh> RamCache<K, V> {
-    pub fn new(budget: usize) -> Self {
+    pub(crate) fn new(budget: usize) -> Self {
         RamCache {
             map: HashMap::new(),
             order: VecDeque::new(),
@@ -53,29 +53,29 @@ impl<K: std::hash::Hash + Eq + Clone, V: Weigh> RamCache<K, V> {
     }
 
     /// How many entries are held.
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.map.len()
     }
 
     /// What the entries weigh together, in bytes.
-    pub fn bytes(&self) -> usize {
+    pub(crate) fn bytes(&self) -> usize {
         self.bytes
     }
 
     /// The byte budget eviction keeps the cache under.
-    pub fn budget(&self) -> usize {
+    pub(crate) fn budget(&self) -> usize {
         self.budget
     }
 
-    pub fn get(&self, key: &K) -> Option<&V> {
+    pub(crate) fn get(&self, key: &K) -> Option<&V> {
         self.map.get(key)
     }
 
-    pub fn contains_key(&self, key: &K) -> bool {
+    pub(crate) fn contains_key(&self, key: &K) -> bool {
         self.map.contains_key(key)
     }
 
-    pub fn insert(&mut self, key: K, value: V) {
+    pub(crate) fn insert(&mut self, key: K, value: V) {
         self.bytes += value.weight();
         if let Some(old) = self.map.insert(key.clone(), value) {
             self.bytes -= old.weight();
@@ -95,14 +95,14 @@ impl<K: std::hash::Hash + Eq + Clone, V: Weigh> RamCache<K, V> {
         }
     }
 
-    pub fn remove(&mut self, key: &K) -> Option<V> {
+    pub(crate) fn remove(&mut self, key: &K) -> Option<V> {
         let v = self.map.remove(key)?;
         self.bytes -= v.weight();
         self.order.retain(|k| k != key);
         Some(v)
     }
 
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.map.clear();
         self.order.clear();
         self.bytes = 0;

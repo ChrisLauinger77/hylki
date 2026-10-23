@@ -11,14 +11,14 @@ use crate::i18n::i18n;
 use crate::models::Folder;
 
 /// One account's folders in the picker.
-pub struct PickerAccount {
-    pub account_id: u32,
+pub(crate) struct PickerAccount {
+    pub(crate) account_id: u32,
     /// Shown above the folders; `None` for the message's own account,
     /// which comes first without one.
-    pub heading: Option<String>,
-    pub folders: Vec<Folder>,
+    pub(crate) heading: Option<String>,
+    pub(crate) folders: Vec<Folder>,
     /// The folder the mail already sits in, left out.
-    pub exclude: Option<String>,
+    pub(crate) exclude: Option<String>,
 }
 
 /// Open the picker below the point (`x`, `y`) of `parent`, listing each of
@@ -27,7 +27,7 @@ pub struct PickerAccount {
 /// of a conversation of `conversation` messages (#171), a switch at the top
 /// offers moving them all, on by default — the reading pane is showing the
 /// conversation, and that is what a move from it most likely means.
-pub fn show_folder_picker(
+pub(crate) fn show_folder_picker(
     parent: &impl IsA<gtk::Widget>,
     x: f64,
     y: f64,

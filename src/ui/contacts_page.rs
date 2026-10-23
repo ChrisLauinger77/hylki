@@ -26,9 +26,9 @@ mod types;
 use menus::{book_label_factory, new_menu, FilterMenu};
 use rows::{row_factory, DragKeys};
 
-pub use menus::choose_vcf_files;
-pub use rows::dragged_contacts;
-pub use types::*;
+pub(crate) use menus::choose_vcf_files;
+pub(crate) use rows::dragged_contacts;
+pub(crate) use types::*;
 
 mod update_edit;
 mod update_groups;
@@ -42,7 +42,7 @@ mod tests;
 /// as the early returns of the original single `match` did.
 type Flow = std::ops::ControlFlow<()>;
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for ContactsPage {
     /// The app's compose revealer, mounted over the detail pane.
     type Init = gtk::Revealer;

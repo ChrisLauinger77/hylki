@@ -3,13 +3,13 @@
 
 /// The dictionaries checking actually runs with: the configured languages,
 /// else the session locale, mapped onto the installed dictionaries.
-pub fn resolved_spell_languages() -> Vec<String> {
+pub(crate) fn resolved_spell_languages() -> Vec<String> {
     let configured = crate::config::load_privacy().spellcheck_langs;
     super::resolve_languages(&configured, locale_language(), &installed_dictionaries())
 }
 
 /// The dictionaries "System language" stands for: the session locale's.
-pub fn system_spell_languages() -> Vec<String> {
+pub(crate) fn system_spell_languages() -> Vec<String> {
     super::resolve_languages("", locale_language(), &installed_dictionaries())
 }
 
@@ -24,7 +24,7 @@ fn locale_language() -> Option<String> {
 /// most of `/usr/share/hunspell` is dangling symlinks until the locale
 /// extension carries the language; `metadata()` follows symlinks, so a
 /// dangling one errs out and is rightly skipped.
-pub fn installed_dictionaries() -> Vec<String> {
+pub(crate) fn installed_dictionaries() -> Vec<String> {
     let mut codes: std::collections::BTreeSet<String> = Default::default();
     // Exactly the places enchant's hunspell provider reads (verified
     // empirically — a listed dictionary the checker can't use is the silent
@@ -70,7 +70,7 @@ pub fn installed_dictionaries() -> Vec<String> {
 
 /// Dictionary codes as the names people read, joined: "Deutsch
 /// (Deutschland), Français (France)".
-pub fn spell_language_names(codes: &[String]) -> String {
+pub(crate) fn spell_language_names(codes: &[String]) -> String {
     codes
         .iter()
         .map(|c| super::language_display_name(c))

@@ -9,24 +9,24 @@ use crate::models::Message;
 
 /// One process in the tree, as `/proc` reports it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Proc {
-    pub pid: u32,
-    pub name: String,
+pub(crate) struct Proc {
+    pub(crate) pid: u32,
+    pub(crate) name: String,
     /// Resident set, in bytes.
-    pub rss: u64,
+    pub(crate) rss: u64,
     /// Proportional set size (shared pages divided among their sharers), in
     /// bytes. `None` when the kernel would not say.
-    pub pss: Option<u64>,
+    pub(crate) pss: Option<u64>,
     /// The anonymous (heap) part of the resident set, in bytes.
-    pub heap: u64,
-    pub threads: u32,
+    pub(crate) heap: u64,
+    pub(crate) threads: u32,
 }
 
 /// This process and every descendant, parents first. Inside the Flatpak
 /// sandbox `/proc` shows only the sandbox, so the tree is exactly what a
 /// system monitor lists under "Hylki": the app, WebKit's web and network
 /// processes and their bwrap wrappers.
-pub fn process_tree() -> Vec<Proc> {
+pub(crate) fn process_tree() -> Vec<Proc> {
     let me = std::process::id();
     let Ok(dir) = std::fs::read_dir("/proc") else {
         return Vec::new();
@@ -106,7 +106,7 @@ fn describe(pid: u32) -> Option<Proc> {
 /// GTK, WebKit, SQLite, Mesa and the rest allocate through glibc directly,
 /// so the difference between [`allocator`] and [`rust_heap`] is theirs — the
 /// split that says whether a big heap is Hylki's own data or a library's.
-pub struct CountingAllocator;
+pub(crate) struct CountingAllocator;
 
 static RUST_LIVE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 static RUST_PEAK: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -159,14 +159,14 @@ unsafe impl std::alloc::GlobalAlloc for CountingAllocator {
 }
 
 /// Bytes Rust code holds right now, and the most it has held.
-pub fn rust_heap() -> (usize, usize) {
+pub(crate) fn rust_heap() -> (usize, usize) {
     use std::sync::atomic::Ordering::Relaxed;
     (RUST_LIVE.load(Relaxed), RUST_PEAK.load(Relaxed))
 }
 
 /// Bytes SQLite holds right now across every connection (page caches,
 /// prepared statements, the lot), and the most it has held.
-pub fn sqlite_heap() -> (u64, u64) {
+pub(crate) fn sqlite_heap() -> (u64, u64) {
     // SAFETY: both read a process-wide counter and take no pointers; the
     // highwater reset flag is 0, so nothing is changed.
     unsafe {
@@ -202,7 +202,7 @@ extern "C" {
 /// and bytes in large blocks it mapped directly. Rust's allocations are
 /// glibc's too, so this is the whole heap. The difference between "live" and
 /// the resident heap is what a `malloc_trim` could return.
-pub fn allocator() -> Allocator {
+pub(crate) fn allocator() -> Allocator {
     // SAFETY: mallinfo2 takes nothing and returns a plain struct by value; it
     // exists in every glibc since 2.33, which every build target has.
     let m = unsafe { mallinfo2() };
@@ -214,10 +214,10 @@ pub fn allocator() -> Allocator {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Allocator {
-    pub live: usize,
-    pub held_free: usize,
-    pub mapped: usize,
+pub(crate) struct Allocator {
+    pub(crate) live: usize,
+    pub(crate) held_free: usize,
+    pub(crate) mapped: usize,
 }
 
 /// The graphics driver libraries this process has loaded, by file name: what
@@ -226,7 +226,7 @@ pub struct Allocator {
 /// LLVM inside this process, which is hundreds of megabytes of heap that
 /// have nothing to do with mail — the first thing to rule out on a VM or a
 /// machine without a working GPU driver.
-pub fn graphics_libraries() -> Vec<String> {
+pub(crate) fn graphics_libraries() -> Vec<String> {
     let Ok(maps) = std::fs::read_to_string("/proc/self/maps") else {
         return Vec::new();
     };
@@ -276,7 +276,7 @@ const TRIM_WORTHWHILE: usize = 64 * 1024 * 1024;
 /// 2.17 GB with 270 MB live and 1.73 GB freed but held, twelve minutes in,
 /// after the gallery had decoded 62 thumbnails: the heap had grown around
 /// the attachment bytes and never let go.
-pub fn tune_allocator() {
+pub(crate) fn tune_allocator() {
     // SAFETY: mallopt takes two ints and touches only malloc's own tunables;
     // it is meant to be called before the first allocation, which main does.
     unsafe {
@@ -289,7 +289,7 @@ pub fn tune_allocator() {
 /// to matter, across every arena. Returns what was held before the trim, or
 /// `None` when it was not worth one. A few milliseconds on a big heap; called
 /// from an idle timer, never from a hot path.
-pub fn trim_if_worthwhile() -> Option<usize> {
+pub(crate) fn trim_if_worthwhile() -> Option<usize> {
     let held = allocator().held_free;
     if held < TRIM_WORTHWHILE {
         return None;
@@ -316,7 +316,7 @@ thread_local! {
 /// user's log at 563 MB while the system monitor said 1.5 GB was two such
 /// invisible web processes. Counting the views is the one measure of them
 /// this process has.
-pub fn register_web_view(view: &webkit6::WebView, role: &'static str) {
+pub(crate) fn register_web_view(view: &webkit6::WebView, role: &'static str) {
     use gtk::glib::prelude::ObjectExt;
     WEB_VIEWS.with(|v| v.borrow_mut().push((role, view.downgrade())));
 }
@@ -328,7 +328,7 @@ pub fn register_web_view(view: &webkit6::WebView, role: &'static str) {
 /// showed six of them under Hylki (#221). Every owner of a view that is
 /// finished with it calls this: closed composers, the released signature
 /// editor, closed pop-outs, finished prints.
-pub fn release_web_view(view: &webkit6::WebView) {
+pub(crate) fn release_web_view(view: &webkit6::WebView) {
     use webkit6::prelude::WebViewExt;
     view.terminate_web_process();
     WEB_VIEWS.with(|v| {
@@ -339,7 +339,7 @@ pub fn release_web_view(view: &webkit6::WebView) {
 }
 
 /// The views still alive, as (role, count) pairs in first-created order.
-pub fn live_web_views() -> Vec<(&'static str, usize)> {
+pub(crate) fn live_web_views() -> Vec<(&'static str, usize)> {
     WEB_VIEWS.with(|v| {
         let mut v = v.borrow_mut();
         v.retain(|(_, w)| w.upgrade().is_some());
@@ -356,7 +356,7 @@ pub fn live_web_views() -> Vec<(&'static str, usize)> {
 
 /// The report's lines about the web processes, which the process tree above
 /// cannot weigh from inside a Flatpak (see [`register_web_view`]).
-pub fn web_view_lines() -> Vec<String> {
+pub(crate) fn web_view_lines() -> Vec<String> {
     let views = live_web_views();
     let total: usize = views.iter().map(|(_, n)| n).sum();
     let roles: Vec<String> = views
@@ -388,7 +388,7 @@ pub fn web_view_lines() -> Vec<String> {
 }
 
 /// How long this process has been running, from the kernel's clock.
-pub fn uptime() -> Option<std::time::Duration> {
+pub(crate) fn uptime() -> Option<std::time::Duration> {
     let system: f64 = std::fs::read_to_string("/proc/uptime")
         .ok()?
         .split_whitespace()
@@ -409,7 +409,7 @@ pub fn uptime() -> Option<std::time::Duration> {
 
 /// What a message record costs in RAM: the struct plus every string and
 /// keyword it owns. Capacity may exceed length a little; this is the floor.
-pub fn message_bytes(m: &Message) -> usize {
+pub(crate) fn message_bytes(m: &Message) -> usize {
     std::mem::size_of::<Message>()
         + m.from_name.len()
         + m.from_addr.len()
@@ -434,19 +434,19 @@ pub fn message_bytes(m: &Message) -> usize {
 }
 
 /// The records and bytes of a batch of messages.
-pub fn messages_bytes<'a>(msgs: impl IntoIterator<Item = &'a Message>) -> (usize, usize) {
+pub(crate) fn messages_bytes<'a>(msgs: impl IntoIterator<Item = &'a Message>) -> (usize, usize) {
     msgs.into_iter()
         .fold((0, 0), |(n, b), m| (n + 1, b + message_bytes(m)))
 }
 
 /// A texture's pixel memory: GTK keeps decoded textures as 8-bit RGBA.
-pub fn texture_bytes(t: &gtk::gdk::Texture) -> u64 {
+pub(crate) fn texture_bytes(t: &gtk::gdk::Texture) -> u64 {
     use gtk::prelude::*;
     (t.width() as u64) * (t.height() as u64) * 4
 }
 
 /// `1234567` → `1.2 MB`; `12345` → `12.1 KB`; `123` → `123 B`.
-pub fn human_bytes(bytes: u64) -> String {
+pub(crate) fn human_bytes(bytes: u64) -> String {
     const KB: f64 = 1024.0;
     let b = bytes as f64;
     if b >= KB * KB * KB {
@@ -461,7 +461,7 @@ pub fn human_bytes(bytes: u64) -> String {
 }
 
 /// `1234567` → `1,234,567`.
-pub fn human_count(n: usize) -> String {
+pub(crate) fn human_count(n: usize) -> String {
     let s = n.to_string();
     let mut out = String::with_capacity(s.len() + s.len() / 3);
     for (i, c) in s.chars().enumerate() {
@@ -474,7 +474,7 @@ pub fn human_count(n: usize) -> String {
 }
 
 /// `3h 12m`, `47m`, `12s`.
-pub fn human_duration(d: std::time::Duration) -> String {
+pub(crate) fn human_duration(d: std::time::Duration) -> String {
     let s = d.as_secs();
     if s >= 3600 {
         format!("{}h {:02}m", s / 3600, (s % 3600) / 60)
@@ -486,7 +486,7 @@ pub fn human_duration(d: std::time::Duration) -> String {
 }
 
 /// The process lines of the report, with a total.
-pub fn process_lines() -> Vec<String> {
+pub(crate) fn process_lines() -> Vec<String> {
     let procs = process_tree();
     let mut lines = Vec::new();
     for p in &procs {

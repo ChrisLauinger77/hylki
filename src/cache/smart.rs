@@ -16,7 +16,7 @@ impl Cache {
     /// which `keep` says yes. Rows are read one at a time and only the kept
     /// ones become messages, so a folder over a large index stays cheap to
     /// hold; reading stops at `limit` kept.
-    pub fn smart_scan(
+    pub(crate) fn smart_scan(
         &self,
         account_id: u32,
         include: Option<&[String]>,
@@ -91,7 +91,7 @@ impl Cache {
     /// drops the copies Gmail keeps per label. `name` is the tag's name: on
     /// Gmail a label named like the tag (or like its keyword) counts as the
     /// tag too (#374).
-    pub fn messages_with_keyword(
+    pub(crate) fn messages_with_keyword(
         &self,
         account_id: u32,
         keyword: &str,

@@ -9,7 +9,7 @@ use gtk::prelude::*;
 
 /// The gallery as one row that scrolls sideways, its edges fading into the
 /// card wherever there is more to scroll to.
-pub fn strip(selected: &str, tile: i32, on_pick: Rc<dyn Fn(&str)>) -> gtk::Overlay {
+pub(crate) fn strip(selected: &str, tile: i32, on_pick: Rc<dyn Fn(&str)>) -> gtk::Overlay {
     let n = crate::app_icon::catalog().count() as u32;
     let row = build(selected, tile, n.max(1), on_pick);
     row.set_halign(gtk::Align::Start);
