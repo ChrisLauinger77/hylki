@@ -2303,29 +2303,45 @@ impl Component for Preferences {
             PrefInput::ToggleSoundFocused(on) => self.on_toggle_sound_focused(on),
             PrefInput::ChangeSound(index) => self.on_change_sound(index, sender),
             PrefInput::ToggleShowUnified(on) => self.on_toggle_show_unified(on, sender),
-            PrefInput::TogglePrintPageNumbers(on) => self.on_toggle_print_page_numbers(on, sender),
-            PrefInput::TogglePrintDate(on) => self.on_toggle_print_date(on, sender),
-            PrefInput::TogglePrintPunchMargin(on) => self.on_toggle_print_punch_margin(on, sender),
+            PrefInput::TogglePrintPageNumbers(on) => {
+                self.set_print_option(|s| &mut s.page_numbers, on, sender)
+            }
+            PrefInput::TogglePrintDate(on) => self.set_print_option(|s| &mut s.date, on, sender),
+            PrefInput::TogglePrintPunchMargin(on) => {
+                self.set_print_option(|s| &mut s.punch_margin, on, sender)
+            }
             PrefInput::ToggleUnifiedChipAllInboxes(on) => {
-                self.on_toggle_unified_chip_all_inboxes(on, sender)
+                self.set_unified_chip(|s| &mut s.all_inboxes, on, sender)
             }
             PrefInput::ToggleUnifiedChipStarred(on) => {
-                self.on_toggle_unified_chip_starred(on, sender)
+                self.set_unified_chip(|s| &mut s.starred, on, sender)
             }
             PrefInput::ToggleUnifiedChipDrafts(on) => {
-                self.on_toggle_unified_chip_drafts(on, sender)
+                self.set_unified_chip(|s| &mut s.drafts, on, sender)
             }
             PrefInput::ToggleUnifiedChipArchive(on) => {
-                self.on_toggle_unified_chip_archive(on, sender)
+                self.set_unified_chip(|s| &mut s.archive, on, sender)
             }
-            PrefInput::ToggleUnifiedChipJunk(on) => self.on_toggle_unified_chip_junk(on, sender),
-            PrefInput::ToggleUnifiedChipTrash(on) => self.on_toggle_unified_chip_trash(on, sender),
-            PrefInput::ToggleUnifiedStarred(on) => self.on_toggle_unified_starred(on, sender),
-            PrefInput::ToggleUnifiedSent(on) => self.on_toggle_unified_sent(on, sender),
-            PrefInput::ToggleUnifiedDrafts(on) => self.on_toggle_unified_drafts(on, sender),
-            PrefInput::ToggleUnifiedArchive(on) => self.on_toggle_unified_archive(on, sender),
-            PrefInput::ToggleUnifiedJunk(on) => self.on_toggle_unified_junk(on, sender),
-            PrefInput::ToggleUnifiedTrash(on) => self.on_toggle_unified_trash(on, sender),
+            PrefInput::ToggleUnifiedChipJunk(on) => {
+                self.set_unified_chip(|s| &mut s.junk, on, sender)
+            }
+            PrefInput::ToggleUnifiedChipTrash(on) => {
+                self.set_unified_chip(|s| &mut s.trash, on, sender)
+            }
+            PrefInput::ToggleUnifiedStarred(on) => {
+                self.set_unified_kind(|s| &mut s.starred, on, sender)
+            }
+            PrefInput::ToggleUnifiedSent(on) => self.set_unified_kind(|s| &mut s.sent, on, sender),
+            PrefInput::ToggleUnifiedDrafts(on) => {
+                self.set_unified_kind(|s| &mut s.drafts, on, sender)
+            }
+            PrefInput::ToggleUnifiedArchive(on) => {
+                self.set_unified_kind(|s| &mut s.archive, on, sender)
+            }
+            PrefInput::ToggleUnifiedJunk(on) => self.set_unified_kind(|s| &mut s.junk, on, sender),
+            PrefInput::ToggleUnifiedTrash(on) => {
+                self.set_unified_kind(|s| &mut s.trash, on, sender)
+            }
             PrefInput::MountPages => self.mount_pages(),
             PrefInput::Search(text) => self.on_search(text),
             PrefInput::SearchPick(i) => self.on_search_pick(i, sender),
@@ -2371,19 +2387,31 @@ impl Component for Preferences {
             }
             PrefInput::ColumnRestore => self.on_column_restore(sender),
             PrefInput::ToolbarRestore => self.on_toolbar_restore(sender),
-            PrefInput::ToggleRailFoldEnabled(on) => self.on_toggle_rail_fold_enabled(on, sender),
-            PrefInput::ToggleRailFoldAccounts(on) => self.on_toggle_rail_fold_accounts(on, sender),
-            PrefInput::ToggleRailFoldAllInboxes(on) => {
-                self.on_toggle_rail_fold_all_inboxes(on, sender)
+            PrefInput::ToggleRailFoldEnabled(on) => {
+                self.set_rail_fold(|s| &mut s.enabled, on, sender)
             }
-            PrefInput::ToggleRailFoldStarred(on) => self.on_toggle_rail_fold_starred(on, sender),
-            PrefInput::ToggleRailFoldSent(on) => self.on_toggle_rail_fold_sent(on, sender),
-            PrefInput::ToggleRailFoldDrafts(on) => self.on_toggle_rail_fold_drafts(on, sender),
-            PrefInput::ToggleRailFoldArchive(on) => self.on_toggle_rail_fold_archive(on, sender),
-            PrefInput::ToggleRailFoldJunk(on) => self.on_toggle_rail_fold_junk(on, sender),
-            PrefInput::ToggleRailFoldTrash(on) => self.on_toggle_rail_fold_trash(on, sender),
-            PrefInput::ToggleRailFoldFiltered(on) => self.on_toggle_rail_fold_filtered(on, sender),
-            PrefInput::ToggleRailFoldTags(on) => self.on_toggle_rail_fold_tags(on, sender),
+            PrefInput::ToggleRailFoldAccounts(on) => {
+                self.set_rail_fold(|s| &mut s.accounts, on, sender)
+            }
+            PrefInput::ToggleRailFoldAllInboxes(on) => {
+                self.set_rail_fold(|s| &mut s.all_inboxes, on, sender)
+            }
+            PrefInput::ToggleRailFoldStarred(on) => {
+                self.set_rail_fold(|s| &mut s.starred, on, sender)
+            }
+            PrefInput::ToggleRailFoldSent(on) => self.set_rail_fold(|s| &mut s.sent, on, sender),
+            PrefInput::ToggleRailFoldDrafts(on) => {
+                self.set_rail_fold(|s| &mut s.drafts, on, sender)
+            }
+            PrefInput::ToggleRailFoldArchive(on) => {
+                self.set_rail_fold(|s| &mut s.archive, on, sender)
+            }
+            PrefInput::ToggleRailFoldJunk(on) => self.set_rail_fold(|s| &mut s.junk, on, sender),
+            PrefInput::ToggleRailFoldTrash(on) => self.set_rail_fold(|s| &mut s.trash, on, sender),
+            PrefInput::ToggleRailFoldFiltered(on) => {
+                self.set_rail_fold(|s| &mut s.filtered, on, sender)
+            }
+            PrefInput::ToggleRailFoldTags(on) => self.set_rail_fold(|s| &mut s.tags, on, sender),
             PrefInput::ChangeReadMark(idx) => self.on_change_read_mark(idx, sender),
             PrefInput::ExportLog => {
                 let _ = sender.output(PrefOutput::ExportLog);

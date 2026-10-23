@@ -57,21 +57,6 @@ impl Preferences {
         let _ = sender.output(PrefOutput::SetSwipeEnabled(on));
     }
 
-    pub(super) fn on_toggle_print_page_numbers(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.print_options.page_numbers = on;
-        let _ = sender.output(PrefOutput::SetPrintOptions(self.print_options));
-    }
-
-    pub(super) fn on_toggle_print_date(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.print_options.date = on;
-        let _ = sender.output(PrefOutput::SetPrintOptions(self.print_options));
-    }
-
-    pub(super) fn on_toggle_print_punch_margin(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.print_options.punch_margin = on;
-        let _ = sender.output(PrefOutput::SetPrintOptions(self.print_options));
-    }
-
     pub(super) fn on_change_read_mark(&mut self, idx: u32, sender: ComponentSender<Self>) {
         let policy = read_mark_at(idx);
         let _ = sender.output(PrefOutput::SetReadMark(policy));
@@ -92,5 +77,18 @@ impl Preferences {
     pub(super) fn on_change_fold_messages(&mut self, idx: u32, sender: ComponentSender<Self>) {
         let fold = fold_messages_at(idx);
         let _ = sender.output(PrefOutput::SetFoldMessages(fold));
+    }
+}
+
+impl Preferences {
+    /// Flip one of the Printing switches and hand the app the whole set.
+    pub(super) fn set_print_option(
+        &mut self,
+        switch: fn(&mut crate::config::PrintOptions) -> &mut bool,
+        on: bool,
+        sender: ComponentSender<Self>,
+    ) {
+        *switch(&mut self.print_options) = on;
+        let _ = sender.output(PrefOutput::SetPrintOptions(self.print_options));
     }
 }

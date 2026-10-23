@@ -10,82 +10,6 @@ impl Preferences {
         let _ = sender.output(PrefOutput::SetShowUnified(on));
     }
 
-    pub(super) fn on_toggle_unified_chip_all_inboxes(
-        &mut self,
-        on: bool,
-        sender: ComponentSender<Self>,
-    ) {
-        self.unified_chips.all_inboxes = on;
-        let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
-    }
-
-    pub(super) fn on_toggle_unified_chip_starred(
-        &mut self,
-        on: bool,
-        sender: ComponentSender<Self>,
-    ) {
-        self.unified_chips.starred = on;
-        let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
-    }
-
-    pub(super) fn on_toggle_unified_chip_drafts(
-        &mut self,
-        on: bool,
-        sender: ComponentSender<Self>,
-    ) {
-        self.unified_chips.drafts = on;
-        let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
-    }
-
-    pub(super) fn on_toggle_unified_chip_archive(
-        &mut self,
-        on: bool,
-        sender: ComponentSender<Self>,
-    ) {
-        self.unified_chips.archive = on;
-        let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
-    }
-
-    pub(super) fn on_toggle_unified_chip_junk(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.unified_chips.junk = on;
-        let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
-    }
-
-    pub(super) fn on_toggle_unified_chip_trash(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.unified_chips.trash = on;
-        let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
-    }
-
-    pub(super) fn on_toggle_unified_starred(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.unified_kinds.starred = on;
-        let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-    }
-
-    pub(super) fn on_toggle_unified_sent(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.unified_kinds.sent = on;
-        let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-    }
-
-    pub(super) fn on_toggle_unified_drafts(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.unified_kinds.drafts = on;
-        let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-    }
-
-    pub(super) fn on_toggle_unified_archive(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.unified_kinds.archive = on;
-        let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-    }
-
-    pub(super) fn on_toggle_unified_junk(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.unified_kinds.junk = on;
-        let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-    }
-
-    pub(super) fn on_toggle_unified_trash(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.unified_kinds.trash = on;
-        let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
-    }
-
     pub(super) fn on_toggle_show_accounts(&mut self, on: bool, sender: ComponentSender<Self>) {
         if self.show_accounts != on {
             self.show_accounts = on;
@@ -130,63 +54,46 @@ impl Preferences {
             .unwrap_or_default();
         let _ = sender.output(PrefOutput::SetFolderSort(sort));
     }
+}
 
-    pub(super) fn on_toggle_rail_fold_enabled(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.enabled = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-    }
-
-    pub(super) fn on_toggle_rail_fold_accounts(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.accounts = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-    }
-
-    pub(super) fn on_toggle_rail_fold_all_inboxes(
+impl Preferences {
+    /// Flip one of the unified rows' unread-chip switches and hand the app the
+    /// whole set.
+    pub(super) fn set_unified_chip(
         &mut self,
+        switch: fn(&mut crate::config::UnifiedChips) -> &mut bool,
         on: bool,
         sender: ComponentSender<Self>,
     ) {
-        self.rail_fold.all_inboxes = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+        *switch(&mut self.unified_chips) = on;
+        let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
     }
+}
 
-    pub(super) fn on_toggle_rail_fold_starred(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.starred = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+impl Preferences {
+    /// Flip one of the unified Starred / Sent / Drafts / Archive / Junk / Trash
+    /// switches and hand the app the whole set.
+    pub(super) fn set_unified_kind(
+        &mut self,
+        switch: fn(&mut crate::config::UnifiedKinds) -> &mut bool,
+        on: bool,
+        sender: ComponentSender<Self>,
+    ) {
+        *switch(&mut self.unified_kinds) = on;
+        let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
     }
+}
 
-    pub(super) fn on_toggle_rail_fold_sent(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.sent = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-    }
-
-    pub(super) fn on_toggle_rail_fold_drafts(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.drafts = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-    }
-
-    pub(super) fn on_toggle_rail_fold_archive(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.archive = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-    }
-
-    pub(super) fn on_toggle_rail_fold_junk(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.junk = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-    }
-
-    pub(super) fn on_toggle_rail_fold_trash(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.trash = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-    }
-
-    pub(super) fn on_toggle_rail_fold_filtered(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.filtered = on;
-        let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
-    }
-
-    pub(super) fn on_toggle_rail_fold_tags(&mut self, on: bool, sender: ComponentSender<Self>) {
-        self.rail_fold.tags = on;
+impl Preferences {
+    /// Flip one of the icon rail's fold-up switches and hand the app the whole
+    /// set.
+    pub(super) fn set_rail_fold(
+        &mut self,
+        switch: fn(&mut crate::config::RailFold) -> &mut bool,
+        on: bool,
+        sender: ComponentSender<Self>,
+    ) {
+        *switch(&mut self.rail_fold) = on;
         let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
     }
 }
