@@ -100,7 +100,7 @@ pub(crate) fn detect(parsed: &mail_parser::Message) -> Option<Invite> {
 /// A document with no `VEVENT` (a free/busy reply, a bare `VTODO`) is not an
 /// invitation and reads as nothing, so the reader shows the message as it
 /// always did rather than an empty card.
-pub(crate) fn parse(ics: &str) -> Option<Invite> {
+fn parse(ics: &str) -> Option<Invite> {
     let lines = unfold(ics);
     let mut method = String::new();
     let mut zones: Vec<TimeZoneSpec> = Vec::new();

@@ -5,16 +5,16 @@ use super::*;
 /// The alias editor dialog (#34): a small modal for one send-as alias — its
 /// identity, and optionally its own SMTP transport.
 pub(super) struct AliasDialog {
-    pub(super) window: adw::Window,
-    pub(super) name_row: adw::EntryRow,
-    pub(super) addr_row: adw::EntryRow,
+    window: adw::Window,
+    name_row: adw::EntryRow,
+    addr_row: adw::EntryRow,
     smtp_switch: adw::SwitchRow,
-    pub(super) host_row: adw::EntryRow,
-    pub(super) port_row: adw::EntryRow,
-    pub(super) user_row: adw::EntryRow,
-    pub(super) pass_row: adw::PasswordEntryRow,
-    pub(super) test_btn: gtk::Button,
-    pub(super) test_result: gtk::Label,
+    host_row: adw::EntryRow,
+    port_row: adw::EntryRow,
+    user_row: adw::EntryRow,
+    pass_row: adw::PasswordEntryRow,
+    test_btn: gtk::Button,
+    test_result: gtk::Label,
 }
 
 impl AccountsWindow {

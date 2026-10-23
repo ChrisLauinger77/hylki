@@ -167,7 +167,7 @@ pub(crate) struct Book {
     /// The book's own name; [`Book::shown`] is the one Hylki uses.
     pub(crate) name: String,
     /// The name given to it in Hylki, if any.
-    pub(crate) given: Option<String>,
+    given: Option<String>,
     /// Switched on for Hylki (its own switch; the source's is apart).
     pub(crate) on: bool,
 }
@@ -183,7 +183,7 @@ pub(crate) struct Source {
     /// Its own name, which the given one stands in for.
     pub(crate) own_title: String,
     /// The name given to it in Hylki, if any.
-    pub(crate) given: Option<String>,
+    given: Option<String>,
     /// The second line: what it is and holds.
     pub(crate) detail: String,
     /// The brand mark, or an icon name when there is none.

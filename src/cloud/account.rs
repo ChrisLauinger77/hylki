@@ -150,10 +150,10 @@ pub(crate) const SERVICES: [Service; 6] = [
 /// [`probe_link_terms`].
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct LinkTerms {
-    pub(crate) expiry: bool,
-    pub(crate) password: bool,
+    pub(super) expiry: bool,
+    pub(super) password: bool,
     /// Why something is off, for the rows that show it.
-    pub(crate) note: String,
+    pub(super) note: String,
 }
 
 fn default_folder() -> String {

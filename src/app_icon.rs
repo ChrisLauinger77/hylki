@@ -30,7 +30,7 @@ pub(crate) use restart::{launch_restart_helper, run_restart_helper, RESTART_FLAG
 pub(crate) struct IconChoice {
     pub(crate) id: &'static str,
     pub(crate) label: &'static str,
-    pub(crate) png: &'static [u8],
+    png: &'static [u8],
 }
 
 /// The id meaning "whatever this build ships".
@@ -219,7 +219,7 @@ fn icon_is_ours(value: &str) -> bool {
 /// caches app icons by name for the life of the session and never re-reads
 /// a file it has already shown, so swapping the art under one name shows
 /// nothing until the next login.
-pub(crate) fn icon_name(id: &str) -> String {
+fn icon_name(id: &str) -> String {
     format!("{}-{id}", crate::APP_ID)
 }
 

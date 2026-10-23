@@ -108,7 +108,7 @@ pub(crate) fn catalog() -> &'static [Theme] {
 
 /// The theme with this id, or `None` for the stock look (and for an id from
 /// a newer version's catalogue, which falls back to it).
-pub(crate) fn find(id: &str) -> Option<&'static Theme> {
+fn find(id: &str) -> Option<&'static Theme> {
     if id.is_empty() || id == SYSTEM_ID {
         return None;
     }
@@ -169,12 +169,12 @@ pub(crate) fn set(id: &str) {
 }
 
 /// The active theme's id (`""` before `install`, [`SYSTEM_ID`] for stock).
-pub(crate) fn current() -> String {
+fn current() -> String {
     CURRENT.with(|c| c.borrow().clone())
 }
 
 /// The palette on screen for `dark`, or `None` under the stock look.
-pub(crate) fn palette(dark: bool) -> Option<&'static Palette> {
+fn palette(dark: bool) -> Option<&'static Palette> {
     find(&current()).map(|t| t.variant(dark))
 }
 

@@ -20,13 +20,13 @@ mod imp {
 
     #[derive(Default)]
     pub(crate) struct FadeLabel {
-        pub(crate) label: RefCell<Option<gtk::Label>>,
+        pub(super) label: RefCell<Option<gtk::Label>>,
         /// How far the text is slid to the left, in pixels.
-        pub(crate) offset: Cell<f64>,
+        pub(super) offset: Cell<f64>,
         /// The natural width asked of the parent at most: past it the text
         /// fades rather than widening its row.
         pub(super) max_natural: Cell<i32>,
-        pub(crate) anim: RefCell<Option<adw::TimedAnimation>>,
+        pub(super) anim: RefCell<Option<adw::TimedAnimation>>,
     }
 
     #[glib::object_subclass]

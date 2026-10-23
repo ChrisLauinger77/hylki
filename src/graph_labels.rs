@@ -43,7 +43,7 @@ struct TenantLabel {
 /// The accounts whose list is read: Microsoft 365 over Graph with the
 /// switch on, signed in within Hylki. A token from GNOME Online Accounts
 /// carries only the scopes GNOME asked for.
-pub(crate) fn usable(account: &AccountConfig) -> bool {
+fn usable(account: &AccountConfig) -> bool {
     account.enabled
         && account.protocol == Protocol::Graph
         && account.graph_label_names

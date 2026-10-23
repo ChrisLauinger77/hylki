@@ -319,7 +319,7 @@ mod imp {
 
     #[derive(Default)]
     pub(super) struct SquareBox {
-        pub(crate) size: Cell<i32>,
+        pub(super) size: Cell<i32>,
     }
 
     #[glib::object_subclass]

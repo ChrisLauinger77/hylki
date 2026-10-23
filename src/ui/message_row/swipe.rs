@@ -82,7 +82,7 @@ mod swipe_surface_imp {
         /// Trackpad sensitivity (see `super::SWIPE_MAX`). Never 0 — that
         /// would divide by zero in `distance`/`progress` — so this can't
         /// simply be `#[derive(Default)]`.
-        pub(crate) sensitivity: Cell<f64>,
+        pub(super) sensitivity: Cell<f64>,
     }
 
     impl Default for SwipeSurface {

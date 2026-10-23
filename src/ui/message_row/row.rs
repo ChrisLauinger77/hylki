@@ -15,8 +15,8 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 /// The row's widgets, built once.
-pub(crate) struct RowWidgets {
-    pub(crate) host: gtk::Box,
+pub(super) struct RowWidgets {
+    pub(super) host: gtk::Box,
     pub(super) revealer: gtk::Revealer,
     pub(super) surface: SwipeSurface,
     pub(super) swipe_bg: gtk::Box,
@@ -141,8 +141,8 @@ pub(super) struct RowState {
 
 pub(crate) struct Row {
     pub(super) me: Weak<Row>,
-    pub(super) shared: Weak<RowShared>,
-    pub(crate) w: RowWidgets,
+    shared: Weak<RowShared>,
+    pub(super) w: RowWidgets,
     pub(super) st: RefCell<RowState>,
     pub(super) list_item: RefCell<glib::WeakRef<gtk::ListItem>>,
     /// Kept alive for as long as the row: the tracker stops firing once

@@ -28,16 +28,16 @@ pub(super) struct ReaderToolbarWidgets {
     pub(super) buttons: Vec<(config::ToolbarItem, gtk::Widget)>,
     /// The Outbox's own buttons' revealers (Edit, Send, Send all).
     pub(super) outbox: Vec<gtk::Revealer>,
-    pub(super) spinner: gtk::Widget,
-    pub(super) bin: adw::BreakpointBin,
-    pub(super) breakpoint: adw::Breakpoint,
+    spinner: gtk::Widget,
+    bin: adw::BreakpointBin,
+    breakpoint: adw::Breakpoint,
     /// The row's cost with every action button gone (padding, spacing…).
-    pub(super) base: i32,
+    base: i32,
     /// One action button's natural width.
     button_w: i32,
     /// The window controls' width (re-measured when the decoration layout
     /// changes).
-    pub(super) controls: std::cell::Cell<i32>,
+    controls: std::cell::Cell<i32>,
 }
 
 /// A menu entry that sends `msg` to the app, built afresh on each click.

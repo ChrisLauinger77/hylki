@@ -42,25 +42,25 @@ mod imp {
 
     #[derive(Default)]
     pub(crate) struct RecipientRow {
-        pub(crate) header: gtk::Box,
-        pub(crate) empty_title: gtk::Label,
-        pub(crate) title: gtk::Label,
-        pub(crate) flow: super::PillFlow,
-        pub(crate) text: gtk::Text,
+        header: gtk::Box,
+        pub(super) empty_title: gtk::Label,
+        pub(super) title: gtk::Label,
+        pub(super) flow: super::PillFlow,
+        pub(super) text: gtk::Text,
         pub(super) edit_icon: gtk::Image,
         pub(super) suffixes: gtk::Box,
         /// The pills in order, each with the recipient it stands for as it
         /// goes into the field ("Name <address>").
-        pub(crate) pills: RefCell<Vec<(gtk::Widget, String)>>,
+        pub(super) pills: RefCell<Vec<(gtk::Widget, String)>>,
         /// Set while the row rewrites its own text, so that is not taken
         /// for typing.
-        pub(crate) busy: Cell<bool>,
+        pub(super) busy: Cell<bool>,
         pub(super) focused: Cell<bool>,
         /// Every recipient field of the composer, this one included, in
         /// order: a selection spans them, and a pill's menu moves to them.
-        pub(crate) fields: RefCell<Vec<glib::WeakRef<super::RecipientRow>>>,
+        pub(super) fields: RefCell<Vec<glib::WeakRef<super::RecipientRow>>>,
         /// The pill a Shift+click or Shift+arrow selects from.
-        pub(crate) anchor: RefCell<Option<gtk::Widget>>,
+        pub(super) anchor: RefCell<Option<gtk::Widget>>,
     }
 
     #[glib::object_subclass]

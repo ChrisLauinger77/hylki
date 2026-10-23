@@ -51,8 +51,8 @@ pub(crate) fn set_browser(choice: &str) {
 /// it, and the name to show.
 #[derive(Debug, Clone)]
 pub(super) struct Browser {
-    pub(crate) id: String,
-    pub(crate) name: String,
+    pub(super) id: String,
+    pub(super) name: String,
 }
 
 /// The browsers this process can actually launch — the desktop entries

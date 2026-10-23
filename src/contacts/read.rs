@@ -55,7 +55,7 @@ pub(super) struct EdsLayout {
     /// Where the books' directories are.
     root: fn() -> Option<PathBuf>,
     /// The database file in each book's directory.
-    pub(super) file: &'static str,
+    file: &'static str,
     /// The table of cards, with its vCard and UID columns.
     pub(super) cards: &'static str,
     pub(super) vcard: &'static str,

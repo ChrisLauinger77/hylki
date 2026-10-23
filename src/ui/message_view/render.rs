@@ -245,16 +245,16 @@ struct BodyStamps {
     /// The conversation has had its open scroll: keep the reader's place.
     noscroll: bool,
     /// The card and offset the reader was scrolled to, if saved.
-    pub(super) anchor: Option<(u32, u32, u32)>,
+    anchor: Option<(u32, u32, u32)>,
     /// The saved place was in the gutter between cards.
-    pub(super) anchor_gutter: bool,
-    pub(super) card_actions_hover: bool,
-    pub(super) card_actions_auto: bool,
-    pub(super) palette_collapse_secs: u64,
-    pub(super) card_palette_menu: bool,
-    pub(super) pgp_labels: bool,
+    anchor_gutter: bool,
+    card_actions_hover: bool,
+    card_actions_auto: bool,
+    palette_collapse_secs: u64,
+    card_palette_menu: bool,
+    pgp_labels: bool,
     /// The newest member of a conversation (none for a single message).
-    pub(super) newest: Option<(u32, u32)>,
+    newest: Option<(u32, u32)>,
     pub(super) read_mark: crate::config::ReadMark,
 }
 

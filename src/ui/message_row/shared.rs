@@ -111,7 +111,7 @@ pub(crate) struct RowShared {
     pub(crate) view: glib::WeakRef<gtk::ListView>,
     pub(crate) thread_drag: RefCell<ThreadDragKeys>,
     /// Every row widget the view has made, by its list item.
-    pub(super) rows: RefCell<HashMap<usize, Rc<Row>>>,
+    rows: RefCell<HashMap<usize, Rc<Row>>>,
     /// Rows the view let go of, kept for the next it asks for. A short list
     /// (an Inbox of ten) gives most of its rows back, and the next long one
     /// asked for them all again, at a few milliseconds each, inside the

@@ -11,10 +11,10 @@ use super::*;
 /// the Settings window never waits on the keyring.
 #[derive(Debug, Clone)]
 pub(crate) struct AccountSecrets {
-    pub(crate) email: String,
-    pub(crate) password: String,
-    pub(crate) smtp_password: String,
-    pub(crate) aliases: Vec<(String, String)>,
+    email: String,
+    password: String,
+    smtp_password: String,
+    aliases: Vec<(String, String)>,
 }
 
 impl AccountSecrets {

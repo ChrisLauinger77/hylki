@@ -48,12 +48,12 @@ pub(super) struct FilterRun {
     /// outside the Inbox. Cleared by [`FILTER_RUN_TIMEOUT`].
     pub(super) folders: std::collections::HashMap<(u32, u32), FolderTally>,
     /// The folders that have not been to the server and back yet.
-    pub(super) pending: std::collections::HashSet<(u32, u32)>,
+    pending: std::collections::HashSet<(u32, u32)>,
     /// Whether the run has already said what it did.
-    pub(super) reported: bool,
+    reported: bool,
     /// The progress dialog, while it is up. Gone once the run was sent to the
     /// background, in which case the report goes to the status bar instead.
-    pub(super) dialog: Option<FilterRunDialog>,
+    dialog: Option<FilterRunDialog>,
 }
 
 impl FilterRun {
@@ -79,10 +79,10 @@ impl FilterRun {
 /// The widgets of a manual run's progress dialog, kept so its live text can be
 /// rewritten as folders report and so the finish can turn it into the report.
 #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
-pub(super) struct FilterRunDialog {
-    pub(super) dialog: adw::MessageDialog,
-    pub(super) spinner: gtk::Spinner,
-    pub(super) body: gtk::Label,
+struct FilterRunDialog {
+    dialog: adw::MessageDialog,
+    spinner: gtk::Spinner,
+    body: gtk::Label,
 }
 
 impl AppModel {

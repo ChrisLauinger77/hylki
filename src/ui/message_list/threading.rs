@@ -244,12 +244,12 @@ impl ThreadFields for Rc<Message> {
 
 /// A message's threading fields, owned, to be worked on off the main loop.
 pub(super) struct ThreadInput {
-    pub(super) account_id: u32,
-    pub(super) folder_id: u32,
-    pub(super) id: u32,
-    pub(super) uid: u32,
-    pub(super) message_id: String,
-    pub(super) references: String,
+    account_id: u32,
+    folder_id: u32,
+    id: u32,
+    uid: u32,
+    message_id: String,
+    references: String,
 }
 
 impl ThreadFields for ThreadInput {

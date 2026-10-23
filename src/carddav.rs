@@ -127,10 +127,10 @@ impl Account {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ServerUrl {
     /// The whole address, with its scheme.
-    pub(crate) url: String,
+    url: String,
     pub(crate) host: String,
-    pub(crate) port: u16,
-    pub(crate) tls: bool,
+    port: u16,
+    tls: bool,
 }
 
 /// Read what was typed as the server. A bare name is taken as HTTPS, which

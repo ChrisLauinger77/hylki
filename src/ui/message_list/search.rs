@@ -93,7 +93,7 @@ impl SearchScope {
 /// an info button that tells what it searches.
 pub(super) struct ScopePicker {
     pub(super) button: gtk::MenuButton,
-    pub(super) label: gtk::Label,
+    label: gtk::Label,
     /// Follows the way the popover opens (#496).
     pub(super) arrow: gtk::Image,
     radios: Vec<(SearchScope, gtk::CheckButton)>,

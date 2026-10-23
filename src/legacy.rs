@@ -25,7 +25,7 @@ pub(crate) struct Predecessor {
     /// Its Flatpak / desktop ID.
     pub(crate) app_id: &'static str,
     /// The subdirectory it used under the XDG bases.
-    pub(crate) dir: &'static str,
+    dir: &'static str,
     /// Its Secret Service service name.
     pub(crate) keyring_service: &'static str,
     /// Its GNOME Files extension file, installed on the host.

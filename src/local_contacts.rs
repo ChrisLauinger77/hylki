@@ -424,7 +424,7 @@ fn split_vcards(text: &str) -> (Vec<String>, usize) {
 
 /// Decode the bytes of a `.vcf` file: UTF-8 (a BOM is dropped), else Latin-1,
 /// which older exporters use. UTF-16 and binary data are refused.
-pub(crate) fn decode_text(bytes: &[u8]) -> Result<String, String> {
+fn decode_text(bytes: &[u8]) -> Result<String, String> {
     if bytes.starts_with(&[0xFF, 0xFE]) || bytes.starts_with(&[0xFE, 0xFF]) {
         return Err(i18n("UTF-16 files are not supported"));
     }
@@ -443,7 +443,7 @@ pub(crate) fn decode_text(bytes: &[u8]) -> Result<String, String> {
 /// `FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:J=C3=BCrgen`, with `=` at a
 /// line's end continuing the value on the next line. Other lines are kept
 /// as they are.
-pub(crate) fn decode_quoted_printable(block: &str) -> String {
+fn decode_quoted_printable(block: &str) -> String {
     let mut out = String::with_capacity(block.len());
     let mut lines = block.split("\r\n").peekable();
     while let Some(line) = lines.next() {

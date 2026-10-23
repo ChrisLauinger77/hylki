@@ -174,7 +174,7 @@ fn raw_header_values(parsed: &mail_parser::Message, name: &str) -> Vec<String> {
 
 /// Build the handles from header values: every `List-Unsubscribe`-like
 /// value, the `List-Unsubscribe-Post` value and the `List-Id`.
-pub(crate) fn from_headers(
+fn from_headers(
     list_unsubscribe: &[String],
     post: Option<&str>,
     list_id: Option<&str>,

@@ -10,16 +10,16 @@ use crate::models::Message;
 /// One process in the tree, as `/proc` reports it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Proc {
-    pub(crate) pid: u32,
-    pub(crate) name: String,
+    pid: u32,
+    name: String,
     /// Resident set, in bytes.
     rss: u64,
     /// Proportional set size (shared pages divided among their sharers), in
     /// bytes. `None` when the kernel would not say.
     pss: Option<u64>,
     /// The anonymous (heap) part of the resident set, in bytes.
-    pub(crate) heap: u64,
-    pub(crate) threads: u32,
+    heap: u64,
+    threads: u32,
 }
 
 /// This process and every descendant, parents first. Inside the Flatpak
@@ -215,9 +215,9 @@ fn allocator() -> Allocator {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Allocator {
-    pub(crate) live: usize,
+    live: usize,
     held_free: usize,
-    pub(crate) mapped: usize,
+    mapped: usize,
 }
 
 /// The graphics driver libraries this process has loaded, by file name: what

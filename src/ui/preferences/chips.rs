@@ -7,12 +7,12 @@ use super::*;
 /// Settings → Message List → Columns): its zones are rows of one raised
 /// card, each a wrapping row of draggable chips that slide apart under a
 /// drag to show where the drop will land.
-pub(super) struct ChipZones {
+struct ChipZones {
     /// Each zone's chips, and the caption shown while it has none.
-    pub(super) zones: Vec<(ChipFlow, gtk::Label)>,
+    zones: Vec<(ChipFlow, gtk::Label)>,
     /// The size of the chip being dragged (zero when none), written by the
     /// chip's drag source and read by every zone for its gap.
-    pub(super) drag_size: Rc<std::cell::Cell<(i32, i32)>>,
+    drag_size: Rc<std::cell::Cell<(i32, i32)>>,
 }
 
 impl ChipZones {
@@ -205,7 +205,7 @@ impl ChipZones {
 /// The reader toolbar editor (Settings → Appearance → Toolbar): one drop
 /// zone per side plus a "not shown" pool.
 pub(super) struct ToolbarEditor {
-    pub(super) zones: ChipZones,
+    zones: ChipZones,
 }
 
 /// The toolbar editor's zones, in order.

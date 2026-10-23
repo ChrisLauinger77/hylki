@@ -38,18 +38,18 @@ mod imp {
     pub(crate) struct ChipFlow {
         /// Where each child currently sits (content coordinates), eased
         /// towards its slot.
-        pub(crate) pos: RefCell<HashMap<gtk::Widget, (f64, f64)>>,
+        pub(super) pos: RefCell<HashMap<gtk::Widget, (f64, f64)>>,
         /// The slot each child was last sent towards.
-        pub(crate) target: RefCell<HashMap<gtk::Widget, (i32, i32)>>,
+        pub(super) target: RefCell<HashMap<gtk::Widget, (i32, i32)>>,
         pub(super) anims: RefCell<HashMap<gtk::Widget, adw::TimedAnimation>>,
         /// The slot index a dragged chip would take (a gap opens there).
-        pub(crate) gap: Cell<Option<usize>>,
+        pub(super) gap: Cell<Option<usize>>,
         /// The largest chip seen by any zone (shared), to size an empty
         /// zone by.
-        pub(crate) chip_size: RefCell<Option<SharedSize>>,
+        pub(super) chip_size: RefCell<Option<SharedSize>>,
         /// The size of the chip being dragged right now (shared; zero when
         /// none): the gap opens at exactly that size.
-        pub(crate) drag_size: RefCell<Option<SharedSize>>,
+        pub(super) drag_size: RefCell<Option<SharedSize>>,
     }
 
     #[glib::object_subclass]

@@ -24,7 +24,7 @@ pub(crate) struct UnsubscribedList {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub(super) struct UnsubscribedFile {
     #[serde(default)]
-    pub(super) lists: Vec<UnsubscribedList>,
+    lists: Vec<UnsubscribedList>,
 }
 
 fn unsubscribed_path() -> Option<PathBuf> {
@@ -73,7 +73,7 @@ pub(crate) struct InviteAnswer {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub(super) struct InviteAnswerFile {
     #[serde(default)]
-    pub(super) answers: Vec<InviteAnswer>,
+    answers: Vec<InviteAnswer>,
 }
 
 fn invites_path() -> Option<PathBuf> {

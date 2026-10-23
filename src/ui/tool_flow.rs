@@ -47,10 +47,10 @@ mod imp {
 
     #[derive(Default)]
     pub(crate) struct ToolFlow {
-        pub(crate) end: RefCell<Option<gtk::Widget>>,
+        pub(super) end: RefCell<Option<gtk::Widget>>,
         /// The tools hidden as one (a message written as source), the end
         /// widget staying.
-        pub(crate) hidden: Cell<bool>,
+        pub(super) hidden: Cell<bool>,
     }
 
     #[glib::object_subclass]

@@ -98,10 +98,10 @@ pub(crate) fn save_sidebar_state(state: &SidebarState) {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(super) struct WindowFile {
-    pub(super) width: i32,
-    pub(super) height: i32,
+    width: i32,
+    height: i32,
     #[serde(default)]
-    pub(super) maximized: bool,
+    maximized: bool,
 }
 
 impl Default for WindowFile {

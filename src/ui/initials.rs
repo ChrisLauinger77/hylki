@@ -74,14 +74,14 @@ mod imp {
 
     #[derive(Default)]
     pub(crate) struct InitialsPaintable {
-        pub(crate) initials: RefCell<String>,
+        pub(super) initials: RefCell<String>,
         /// The ground: a gradient top and bottom, or nothing (the widget
         /// beneath paints its own).
-        pub(crate) ground: RefCell<Option<(gdk::RGBA, gdk::RGBA)>>,
-        pub(crate) fg: RefCell<Option<gdk::RGBA>>,
+        pub(super) ground: RefCell<Option<(gdk::RGBA, gdk::RGBA)>>,
+        pub(super) fg: RefCell<Option<gdk::RGBA>>,
         /// Text height as a share of the shorter side; 0 = by the count
         /// of letters, as the avatar sizes its label.
-        pub(crate) scale: Cell<f64>,
+        pub(super) scale: Cell<f64>,
     }
 
     #[glib::object_subclass]
@@ -360,7 +360,7 @@ pub(super) fn png_data_uri(text: &str, bg: gdk::RGBA, size: i32) -> Option<Strin
 
 /// `hsl()` as CSS means it (hue in degrees, the rest as fractions), for the
 /// reader's per-sender tints.
-pub(crate) fn hsl(h: f64, s: f64, l: f64) -> gdk::RGBA {
+pub(super) fn hsl(h: f64, s: f64, l: f64) -> gdk::RGBA {
     let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
     let hp = (h.rem_euclid(360.0)) / 60.0;
     let x = c * (1.0 - (hp % 2.0 - 1.0).abs());

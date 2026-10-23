@@ -13,11 +13,11 @@ use relm4::prelude::*;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct MenuHit {
     /// A link the reader would open on a click (web and mail links only).
-    pub(crate) link: Option<String>,
+    pub(super) link: Option<String>,
     /// The picture's URI: a `data:` one for mail's own pictures.
-    pub(crate) image: Option<String>,
+    pub(super) image: Option<String>,
     /// The selected text, when the click was on it.
-    pub(crate) selection: Option<String>,
+    pub(super) selection: Option<String>,
     /// The message's translation entry (#327), when a service is set up:
     /// what it says, and the reader to tell.
     pub(crate) translate: Option<TranslateEntry>,

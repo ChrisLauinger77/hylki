@@ -66,10 +66,10 @@ type MeasuredCard = (String, [f32; 5], Option<(f32, f32, f32)>);
 /// view's box there.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct Measured {
-    pub(crate) live: bool,
+    pub(super) live: bool,
     /// The document's scroll, which must hold still too.
-    pub(crate) scroll: f64,
-    pub(crate) cards: Vec<MeasuredCard>,
+    scroll: f64,
+    pub(super) cards: Vec<MeasuredCard>,
 }
 
 impl Measured {

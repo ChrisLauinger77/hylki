@@ -20,7 +20,7 @@ mod imp {
         /// The width asked for; 0 asks for no more than the minimum, for
         /// the column that takes whatever room the others leave, and a
         /// negative width asks for whatever the child does.
-        pub(crate) width: Cell<i32>,
+        pub(super) width: Cell<i32>,
     }
 
     #[glib::object_subclass]

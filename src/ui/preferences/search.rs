@@ -9,13 +9,13 @@ use super::*;
 /// app is in.
 #[derive(Clone)]
 struct SearchHit {
-    pub(super) page: &'static str,
+    page: &'static str,
     title: String,
     /// Where it sits: the page, and the group or expander row around it.
     place: String,
     /// Lowercased title, subtitle and place, to match against.
     haystack: String,
-    pub(super) widget: gtk::glib::WeakRef<gtk::Widget>,
+    widget: gtk::glib::WeakRef<gtk::Widget>,
 }
 
 /// The settings search (#260): a search button in the sidebar's header

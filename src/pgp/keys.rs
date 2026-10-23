@@ -85,15 +85,15 @@ pub(crate) struct KeyInfo {
     /// User ids, the primary first.
     pub(crate) uids: Vec<String>,
     /// Whether the secret half is in the keyring (one of the user's own).
-    pub(crate) secret: bool,
+    pub(super) secret: bool,
     /// Whether the key (some subkey) can encrypt.
     pub(crate) can_encrypt: bool,
     /// Whether the key can sign.
     pub(crate) can_sign: bool,
-    pub(crate) created: i64,
+    created: i64,
     pub(crate) expires: Option<i64>,
     pub(crate) validity: KeyValidity,
-    pub(crate) disabled: bool,
+    pub(super) disabled: bool,
 }
 
 impl KeyInfo {
@@ -241,7 +241,7 @@ pub(crate) fn key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ImportSummary {
     pub(crate) imported: u32,
-    pub(crate) unchanged: u32,
+    pub(super) unchanged: u32,
     /// The fingerprints the import touched.
     pub(crate) fingerprints: Vec<String>,
 }

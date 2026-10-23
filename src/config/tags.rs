@@ -134,7 +134,7 @@ pub(super) fn tag_css_class(keyword: &str) -> String {
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(super) struct TagsFile {
     #[serde(default)]
-    pub(super) tags: Vec<Tag>,
+    tags: Vec<Tag>,
 }
 
 fn tags_path() -> Option<PathBuf> {

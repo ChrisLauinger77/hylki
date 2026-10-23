@@ -282,7 +282,7 @@ pub(crate) struct Translated {
     /// The language the service found the message to be in.
     pub(crate) from: Option<String>,
     pub(crate) service: Service,
-    pub(crate) to: String,
+    to: String,
     /// The subject, translated with the body in the same request.
     pub(crate) subject: Option<String>,
 }

@@ -236,15 +236,15 @@ pub(crate) enum ComposeInput {
 /// from the fields.
 #[derive(Debug, Clone)]
 pub(crate) struct OutgoingFields {
-    pub(crate) html: String,
-    pub(crate) text: String,
-    pub(crate) to: String,
-    pub(crate) cc: String,
-    pub(crate) bcc: String,
-    pub(crate) reply_to: String,
-    pub(crate) subject: String,
-    pub(crate) from_account_id: u32,
-    pub(crate) from_alias: Option<String>,
+    pub(super) html: String,
+    pub(super) text: String,
+    pub(super) to: String,
+    pub(super) cc: String,
+    pub(super) bcc: String,
+    pub(super) reply_to: String,
+    pub(super) subject: String,
+    pub(super) from_account_id: u32,
+    pub(super) from_alias: Option<String>,
 }
 
 #[derive(Debug)]

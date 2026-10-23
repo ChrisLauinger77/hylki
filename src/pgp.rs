@@ -38,7 +38,7 @@ pub(crate) use outbound::{encrypt, sign_detached};
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Gpg {
     /// `GNUPGHOME` for the child process; `None` = the user's own.
-    pub(crate) home: Option<PathBuf>,
+    home: Option<PathBuf>,
 }
 
 impl Gpg {

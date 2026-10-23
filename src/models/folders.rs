@@ -221,7 +221,7 @@ pub(crate) fn is_templates_name(name: &str) -> bool {
 }
 
 /// The [`FolderKind`] behind a Special Folders role key (#82).
-pub(crate) fn role_kind(role: &str) -> Option<FolderKind> {
+fn role_kind(role: &str) -> Option<FolderKind> {
     match role {
         "sent" => Some(FolderKind::Sent),
         "drafts" => Some(FolderKind::Drafts),

@@ -12,7 +12,7 @@ use gtk::glib;
 use crate::i18n::{i18n, i18n_f};
 use crate::translate::{self, Service, Settings, LANGUAGES};
 
-pub(crate) fn build() -> adw::PreferencesPage {
+pub(super) fn build() -> adw::PreferencesPage {
     let settings = Rc::new(RefCell::new(translate::load()));
     let page = adw::PreferencesPage::new();
 

@@ -15,7 +15,7 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use gtk::prelude::{Cast, TextureExt};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum AvatarSource {
+enum AvatarSource {
     Contact,
     Gravatar,
 }
@@ -37,7 +37,7 @@ struct DecodedImage {
 #[derive(Debug)]
 pub(crate) struct FetchedAvatar {
     image: DecodedImage,
-    pub(crate) source: AvatarSource,
+    source: AvatarSource,
 }
 
 #[derive(Debug)]

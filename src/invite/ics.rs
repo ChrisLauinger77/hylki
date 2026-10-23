@@ -10,7 +10,7 @@ use crate::encoding::unescape_text_value as unescape;
 #[derive(Debug, Default)]
 pub(super) struct Line {
     pub(super) name: String,
-    pub(super) params: Vec<(String, String)>,
+    params: Vec<(String, String)>,
     /// The value with iCalendar's text escapes undone (`\n`, `\,`, `\;`).
     pub(super) value: String,
     /// The value exactly as written, for the fields that are not text

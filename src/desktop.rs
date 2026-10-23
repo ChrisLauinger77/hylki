@@ -29,7 +29,7 @@ pub(crate) fn setting(namespace: &str, key: &str) -> Option<String> {
 }
 
 /// The boolean value of `key` in `namespace`, if the desktop has one.
-pub(crate) fn flag(namespace: &str, key: &str) -> Option<bool> {
+fn flag(namespace: &str, key: &str) -> Option<bool> {
     fn from_value(v: zbus::zvariant::Value<'_>) -> Option<bool> {
         match v {
             zbus::zvariant::Value::Value(inner) => from_value(*inner),

@@ -218,13 +218,13 @@ pub(crate) fn await_arrival(
 
 struct Poll {
     stage: SendMorph,
-    pub(super) header: Option<gtk::Widget>,
-    pub(super) root: gtk::Widget,
-    pub(super) reader: gtk::Widget,
-    pub(super) view: webkit6::WebView,
-    pub(super) key: String,
+    header: Option<gtk::Widget>,
+    root: gtk::Widget,
+    reader: gtk::Widget,
+    view: webkit6::WebView,
+    key: String,
     started: std::time::Instant,
-    pub(super) last: RefCell<Option<Measured>>,
+    last: RefCell<Option<Measured>>,
     same: Cell<u32>,
 }
 

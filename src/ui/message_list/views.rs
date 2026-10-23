@@ -22,22 +22,22 @@ pub(super) struct Built {
 
 /// A list as a rebuild left it (see `MessageList::keep_view`).
 pub(super) struct ViewSnapshot {
-    pub(super) key: u64,
-    pub(super) fp: u64,
+    key: u64,
+    fp: u64,
     sig: u64,
-    pub(super) all: Vec<Rc<Message>>,
-    pub(super) threads: Option<std::rc::Rc<SourceThreads>>,
-    pub(super) rows: Vec<Rc<RowData>>,
-    pub(super) shown: Vec<Rc<Message>>,
-    pub(super) tail: Vec<Rc<RowData>>,
-    pub(super) groups: std::collections::HashMap<(u32, String), Vec<Rc<Message>>>,
-    pub(super) msg_thread: std::collections::HashMap<(u32, u32), (u32, String)>,
-    pub(super) thread_members: std::collections::HashMap<(u32, String), Vec<(u32, u32)>>,
-    pub(super) nested: std::collections::HashMap<(u32, u32), Rc<Message>>,
-    pub(super) listed_folders: std::collections::HashSet<(u32, u32)>,
-    pub(super) total_matches: usize,
-    pub(super) thread_drag: crate::ui::message_row::ThreadDragKeys,
-    pub(super) window: usize,
+    all: Vec<Rc<Message>>,
+    threads: Option<std::rc::Rc<SourceThreads>>,
+    rows: Vec<Rc<RowData>>,
+    shown: Vec<Rc<Message>>,
+    tail: Vec<Rc<RowData>>,
+    groups: std::collections::HashMap<(u32, String), Vec<Rc<Message>>>,
+    msg_thread: std::collections::HashMap<(u32, u32), (u32, String)>,
+    thread_members: std::collections::HashMap<(u32, String), Vec<(u32, u32)>>,
+    nested: std::collections::HashMap<(u32, u32), Rc<Message>>,
+    listed_folders: std::collections::HashSet<(u32, u32)>,
+    total_matches: usize,
+    thread_drag: crate::ui::message_row::ThreadDragKeys,
+    window: usize,
 }
 
 /// How many views the list keeps as built: the unified rows built ahead

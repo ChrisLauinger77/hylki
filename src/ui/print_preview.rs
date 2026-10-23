@@ -422,7 +422,7 @@ fn file_printer() -> Option<String> {
 
 /// Show `html` as it will print, page by page, with a Print button that
 /// prints it and a button that saves it as a PDF.
-pub(crate) fn open(parent: &gtk::Window, html: &str, job_name: &str) {
+pub(super) fn open(parent: &gtk::Window, html: &str, job_name: &str) {
     let win = adw::Window::builder()
         .transient_for(parent)
         .modal(false)

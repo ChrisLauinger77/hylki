@@ -45,48 +45,48 @@ const CARD_RADIUS: f32 = 12.0;
 /// One conversation card as the reader document lays it out, in stage
 /// coordinates.
 #[derive(Clone, Debug)]
-pub(crate) struct Card {
-    pub(crate) key: String,
-    pub(crate) rect: graphene::Rect,
+struct Card {
+    key: String,
+    rect: graphene::Rect,
     /// The height of its header line, where the sender and date sit.
-    pub(crate) head: f32,
+    head: f32,
     /// Where its first line of text begins, and the size it is set in.
-    pub(crate) text: Option<(graphene::Point, f32)>,
+    text: Option<(graphene::Point, f32)>,
 }
 
 /// The pane at the moment Send was pressed.
 pub(crate) struct Before {
-    pub(crate) still: gdk::Texture,
+    still: gdk::Texture,
     /// The split slot the composer fills.
-    pub(crate) composer: graphene::Rect,
+    composer: graphene::Rect,
     /// The editor card inside it.
-    pub(crate) editor: graphene::Rect,
+    editor: graphene::Rect,
     /// The reader's web view, beside the composer. (The reader's own box is
     /// only measured, for where the window's ground shows.)
-    pub(crate) view: graphene::Rect,
+    view: graphene::Rect,
 
     /// The reader's header bar, when it was showing (a split above the
     /// reader hides it).
-    pub(crate) header: Option<graphene::Rect>,
+    header: Option<graphene::Rect>,
     /// What the window paints behind the pane, where the stills are
     /// see-through: the pane's own widgets leave their background to it.
-    pub(crate) ground: Option<gdk::RGBA>,
+    ground: Option<gdk::RGBA>,
     /// The conversation's cards as the document had them, once measured.
-    pub(crate) cards: Vec<Card>,
+    cards: Vec<Card>,
     /// Where the first line written in the editor begins, and its size.
-    pub(crate) text: Option<(graphene::Point, f32)>,
+    text: Option<(graphene::Point, f32)>,
 }
 
 /// The pane with the composer gone and the reply in the conversation.
 pub(crate) struct After {
-    pub(crate) still: gdk::Texture,
-    pub(crate) reader: graphene::Rect,
-    pub(crate) view: graphene::Rect,
-    pub(crate) header: Option<graphene::Rect>,
+    still: gdk::Texture,
+    reader: graphene::Rect,
+    view: graphene::Rect,
+    header: Option<graphene::Rect>,
     /// Every card, in document order.
-    pub(crate) cards: Vec<Card>,
+    cards: Vec<Card>,
     /// The reply's own card among them.
-    pub(super) arrival: String,
+    arrival: String,
 }
 
 /// Everything the frames are drawn from, worked out once when the motion
@@ -121,7 +121,7 @@ struct Scene {
 /// A piece of a still in a texture of its own, and where it sits. Faded on
 /// its own, a piece costs the GPU only its own size; faded as a clip of the
 /// whole still, it costs the whole pane, every frame.
-pub(crate) struct Cut {
+struct Cut {
     tex: gdk::Texture,
     at: graphene::Rect,
 }
@@ -131,10 +131,10 @@ mod imp {
 
     #[derive(Default)]
     pub(crate) struct SendMorph {
-        pub(crate) before: RefCell<Option<Before>>,
+        pub(super) before: RefCell<Option<Before>>,
         pub(super) scene: RefCell<Option<Scene>>,
         /// The texture scale: device pixels per logical pixel.
-        pub(crate) scale: Cell<f32>,
+        pub(super) scale: Cell<f32>,
         /// Frame times (µs) the chrome fade and the motion started at; 0
         /// until the first frame after they were asked for.
         pub(super) chrome_start: Cell<i64>,
@@ -142,13 +142,13 @@ mod imp {
         /// Frames the landed scene has been drawn at rest, before the clock
         /// starts.
         pub(super) rest_frames: Cell<u32>,
-        pub(crate) now: Cell<i64>,
-        pub(crate) tick: RefCell<Option<gtk::TickCallbackId>>,
+        pub(super) now: Cell<i64>,
+        pub(super) tick: RefCell<Option<gtk::TickCallbackId>>,
         /// The stage's size when it went up: a resize mid-flight ends it.
-        pub(crate) size: Cell<(i32, i32)>,
-        pub(crate) fading: RefCell<Option<adw::TimedAnimation>>,
+        pub(super) size: Cell<(i32, i32)>,
+        pub(super) fading: RefCell<Option<adw::TimedAnimation>>,
         /// The composer's ground, which the stage shows where it stood.
-        pub(crate) base: Cell<Option<gdk::RGBA>>,
+        pub(super) base: Cell<Option<gdk::RGBA>>,
         /// The composer without its editor card, and the editor card.
         pub(super) chrome_cut: RefCell<Option<Cut>>,
         pub(super) editor_cut: RefCell<Option<Cut>>,

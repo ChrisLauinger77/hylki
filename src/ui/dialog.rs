@@ -44,7 +44,7 @@ pub(crate) fn confirm_destructive(
 
 /// A message with only an OK button, over `parent`.
 #[allow(deprecated)] // adw::MessageDialog, see the module comment
-pub(crate) fn alert(parent: Option<&gtk::Window>, heading: &str, body: &str) {
+pub(super) fn alert(parent: Option<&gtk::Window>, heading: &str, body: &str) {
     let dialog = adw::MessageDialog::new(parent, Some(heading), Some(body));
     dialog.add_response("ok", &i18n("OK"));
     dialog.present();

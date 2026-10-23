@@ -8,7 +8,7 @@ mod cloud_accounts;
 mod column_bin;
 pub(crate) mod command_palette;
 pub(crate) mod compose;
-pub(crate) mod contact_sources;
+mod contact_sources;
 mod contact_tree;
 pub(crate) mod contacts_browser;
 pub(crate) mod contacts_page;

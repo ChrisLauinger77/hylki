@@ -24,11 +24,11 @@ const TRANSIENT_SECS: u64 = 5;
 
 /// A single persisted notification (currently always an error).
 #[derive(Debug, Clone)]
-pub(crate) struct Notification {
-    pub(crate) id: u32,
-    pub(crate) text: String,
+struct Notification {
+    id: u32,
+    text: String,
     /// Connection/sync error — cleared automatically once connectivity returns.
-    pub(crate) connectivity: bool,
+    connectivity: bool,
 }
 
 /// One expandable card.

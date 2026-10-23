@@ -201,8 +201,8 @@ pub(crate) fn run_flow_as(
 /// redeems its answer.
 pub(crate) struct Authorization {
     pub(crate) url: String,
-    pub(crate) redirect: String,
-    pub(crate) state: String,
+    pub(super) redirect: String,
+    pub(super) state: String,
     pub(super) verifier: String,
 }
 

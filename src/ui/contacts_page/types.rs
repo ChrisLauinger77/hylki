@@ -42,7 +42,7 @@ pub(crate) enum ContactScope {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ContactTree {
     /// Every contact, groups left out.
-    pub(crate) total: usize,
+    pub(super) total: usize,
     pub(crate) books: Vec<TreeBook>,
     pub(crate) scope: ContactScope,
 }

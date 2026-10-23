@@ -27,7 +27,7 @@ pub(super) const ATTRS_ATTR: &str = "data-hylki-a";
 /// A message being translated where it stands (#327): its parsed document,
 /// the runs of text in it, and the pieces of HTML they are sent as.
 pub(super) struct InPlace {
-    pub(super) dom: markup5ever_rcdom::RcDom,
+    dom: markup5ever_rcdom::RcDom,
     /// Each run: its parent and the range of the parent's children.
     pub(super) runs: Vec<(markup5ever_rcdom::Handle, std::ops::Range<usize>)>,
     /// The inline elements' attributes, by the number they were sent with.

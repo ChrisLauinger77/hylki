@@ -15,35 +15,35 @@ use super::{config_file, default_on, read_toml, save_plain_toml};
 pub(super) struct StateFile {
     /// Set once the user dismisses the Linux Mint keyring setup tip.
     #[serde(default)]
-    pub(super) mint_keyring_help_dismissed: bool,
+    mint_keyring_help_dismissed: bool,
     /// In-message attachment drawer: collapsed (showing only its header).
     #[serde(default)]
-    pub(super) drawer_collapsed: bool,
+    drawer_collapsed: bool,
     /// The way of asking for message summaries that worked for an account
     /// whose server rejects the default (#226), by email: "headers",
     /// "no-previews" or "headers-no-previews". Absent = the default. Written
     /// only once a stepped-to mode has actually loaded a folder, so a
     /// launch starts there instead of failing its way down the ladder.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    pub(super) fetch_modes: std::collections::BTreeMap<String, String>,
+    fetch_modes: std::collections::BTreeMap<String, String>,
     /// Expanded attachment-drawer height in px (the dragged split).
     #[serde(default = "default_drawer_height")]
-    pub(super) drawer_height: i32,
+    drawer_height: i32,
     /// Attachment drawer shows an alphabetical list instead of the thumbnail grid.
     #[serde(default)]
-    pub(super) drawer_list_view: bool,
+    drawer_list_view: bool,
     /// The drawer's list view sorts Z→A instead of A→Z.
     #[serde(default)]
-    pub(super) drawer_sort_desc: bool,
+    drawer_sort_desc: bool,
     /// Attachments gallery shows a table instead of the thumbnail grid.
     #[serde(default)]
-    pub(super) gallery_table_view: bool,
+    gallery_table_view: bool,
     /// Attachments gallery thumbnail cell width in px.
     #[serde(default = "default_gallery_thumb_width")]
     pub(super) gallery_thumb_width: i32,
     /// Attachments gallery sort criterion (the sort dropdown's row index).
     #[serde(default)]
-    pub(super) gallery_sort: u32,
+    gallery_sort: u32,
     /// Attachments gallery: pull from Archive folders.
     #[serde(default = "default_on")]
     pub(super) gallery_archive: bool,
@@ -56,60 +56,60 @@ pub(super) struct StateFile {
     /// from their kind's default are stored, so a new folder on the server
     /// follows the default rather than an entry that predates it.
     #[serde(default)]
-    pub(super) gallery_folders: Vec<String>,
+    gallery_folders: Vec<String>,
     /// Message-list pane width in px (#28 — it reset every launch).
     #[serde(default = "default_list_pane_width")]
     pub(super) list_pane_width: i32,
     /// Contacts view: the contact-list pane's width in px.
     #[serde(default = "default_contacts_pane_width")]
-    pub(super) contacts_pane_width: i32,
+    contacts_pane_width: i32,
     /// The About window's height, remembering the user's vertical resize.
     /// (The settings window's is fixed since its two-pane layout, #141; an
     /// old `prefs_height` key in the file is ignored.)
     #[serde(default = "default_about_height")]
-    pub(super) about_height: i32,
+    about_height: i32,
     /// Split-reply panel height in px (the dragged divider). 0 = never
     /// dragged: the panel opens at its computed default.
     #[serde(default)]
-    pub(super) split_reply_height: i32,
+    split_reply_height: i32,
     /// The welcome wizard has been completed once (Start Reading pressed),
     /// so an install with no accounts is not greeted with it again — a
     /// restart right after the wizard, for the app icon, must not loop.
     #[serde(default)]
-    pub(super) wizard_completed: bool,
+    wizard_completed: bool,
     /// The Flatpak runtime commit under which WebKit hung on the host's
     /// fonts and was given the runtime's own instead (#296). Kept per
     /// commit, so a runtime update gets another try with every font.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) web_font_fallback: Option<String>,
+    web_font_fallback: Option<String>,
     /// The mail view open last (#256): an account's folder, or All Inboxes
     /// when `email` is empty. Accounts are named by address, which stays
     /// true across launches where an account's number may not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) last_view: Option<LastView>,
+    last_view: Option<LastView>,
     /// The account whose mail was open last, kept through a visit to All
     /// Inboxes so "the last account's inbox" still has an account to mean.
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub(super) last_account: String,
+    last_account: String,
     /// The icon generation whose default has been asserted over the stored
     /// choice (see `app_icon::ICON_GENERATION`): a release that brings a new
     /// authoritative icon bumps the constant, and the first start on it puts
     /// that icon on every install once, whatever was chosen before.
     #[serde(default)]
-    pub(super) app_icon_generation: u32,
+    app_icon_generation: u32,
     /// The chosen app icon (an id from `app_icon::catalog`). Absent until
     /// the first start of a build that offers the choice settles it — see
     /// `app_icon::init_on_startup`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) app_icon: Option<String>,
+    app_icon: Option<String>,
     /// Each folder's unread count as of the last time it was looked at
     /// (#343), keyed "address␟folder path".
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    pub(super) unread_seen: std::collections::BTreeMap<String, u32>,
+    unread_seen: std::collections::BTreeMap<String, u32>,
     /// The fonts last picked with the composer's Other Font… (#358), the
     /// newest first, for the font menu to offer again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(super) recent_fonts: Vec<RecentFont>,
+    recent_fonts: Vec<RecentFont>,
 }
 
 /// A font family picked in the composer (#358), and whether it is

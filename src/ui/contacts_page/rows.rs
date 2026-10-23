@@ -20,8 +20,8 @@ pub(super) struct Line {
     /// nobody and cannot be selected. Moves when a contact before it is
     /// deleted.
     pub(super) idx: Cell<Option<usize>>,
-    pub(super) title: String,
-    pub(super) subtitle: String,
+    title: String,
+    subtitle: String,
     pub(super) kind: LineKind,
 }
 

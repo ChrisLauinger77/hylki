@@ -37,7 +37,7 @@ mod item_imp {
 
     #[derive(Default)]
     pub(crate) struct RowItem {
-        pub(crate) data: RefCell<Option<Rc<super::RowData>>>,
+        pub(super) data: RefCell<Option<Rc<super::RowData>>>,
         /// The row widget showing this item, while it is bound.
         pub(crate) row: RefCell<Weak<super::Row>>,
     }
@@ -108,7 +108,7 @@ mod model_imp {
     #[derive(Default)]
     pub(crate) struct MessageModel {
         pub(crate) rows: RefCell<Vec<Rc<super::RowData>>>,
-        pub(crate) items: RefCell<HashMap<super::Slot, glib::WeakRef<super::RowItem>>>,
+        pub(super) items: RefCell<HashMap<super::Slot, glib::WeakRef<super::RowItem>>>,
         /// Where each section starts, worked out again from `rows` the first
         /// time the view asks after they change: a handful of runs, so the
         /// view's question is a short search however long the list.

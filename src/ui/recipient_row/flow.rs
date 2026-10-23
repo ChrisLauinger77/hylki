@@ -13,10 +13,10 @@ mod flow_imp {
     /// last one taking what is left of its line.
     #[derive(Default)]
     pub(crate) struct PillFlow {
-        pub(crate) text: RefCell<Option<gtk::Widget>>,
+        pub(super) text: RefCell<Option<gtk::Widget>>,
         /// The line showing where a dragged pill would go, outside the
         /// layout.
-        pub(crate) marker: gtk::Box,
+        pub(super) marker: gtk::Box,
         /// The pill the marker stands before; the number of pills puts it
         /// after the last.
         pub(super) marker_at: Cell<Option<usize>>,
@@ -134,7 +134,7 @@ impl Default for PillFlow {
 
 /// One line of the flow: each child with its x, width and height.
 struct Line {
-    pub(super) y: i32,
+    y: i32,
     h: i32,
     items: Vec<(gtk::Widget, i32, i32, i32)>,
 }

@@ -31,7 +31,7 @@ pub(crate) use spelling::apply_spellcheck;
 #[derive(Clone)]
 pub(super) struct RichEditor {
     /// The toolbar + editor, ready to be placed in a container.
-    pub(crate) widget: gtk::Box,
+    pub(super) widget: gtk::Box,
     webview: webkit6::WebView,
     /// The formatting commands, hidden while a message is composed as plain
     /// text (#180) or as source — the row they sit in stays either way.

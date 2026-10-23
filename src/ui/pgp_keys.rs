@@ -14,7 +14,7 @@ use crate::pgp::{self, Gpg, ImportSummary, KeyInfo};
 /// What the page needs at launch: the identities keys can be made for.
 pub(super) struct PgpKeysInit {
     /// (name, address) per account and alias.
-    pub(crate) identities: Vec<(String, String)>,
+    pub(super) identities: Vec<(String, String)>,
 }
 
 pub(super) struct PgpKeys {
@@ -32,7 +32,7 @@ pub(super) struct PgpKeys {
 }
 
 #[derive(Debug)]
-pub(crate) enum PgpKeysInput {
+pub(super) enum PgpKeysInput {
     /// Re-read the keyring and rebuild both lists.
     Refresh,
     Generate,
@@ -62,7 +62,7 @@ pub(crate) enum PgpKeysInput {
 }
 
 #[derive(Debug)]
-pub(crate) enum PgpKeysCmd {
+pub(super) enum PgpKeysCmd {
     Generated(Result<String, String>),
     Fetched(Result<ImportSummary, String>),
     /// What an import, delete or trust has to say, if anything.

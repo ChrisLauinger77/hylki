@@ -41,16 +41,16 @@ use crate::i18n::{i18n, i18n_f, ni18n_f};
 /// buttons; the actions stay in the reader.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TrayMail {
-    pub(crate) account_id: u32,
-    pub(crate) folder_id: u32,
-    pub(crate) message_id: u32,
+    pub(super) account_id: u32,
+    pub(super) folder_id: u32,
+    pub(super) message_id: u32,
     /// First line: sender, account when there are several, and the date.
-    pub(crate) heading: String,
-    pub(crate) subject: String,
+    pub(super) heading: String,
+    pub(super) subject: String,
     /// The list's preview text; empty when previews are off.
-    pub(crate) preview: String,
+    pub(super) preview: String,
     /// PNG of the sender's picture or initials, sized for a menu.
-    pub(crate) icon: Vec<u8>,
+    pub(super) icon: Vec<u8>,
 }
 
 /// How many unread messages the menu lists, newest first; past that, one
@@ -61,8 +61,8 @@ pub(super) const MAIL_LIMIT: usize = 5;
 /// messages there are in all (more than the cards when the list was cut).
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub(crate) struct TrayMailList {
-    pub(crate) items: Vec<TrayMail>,
-    pub(crate) unread: u32,
+    pub(super) items: Vec<TrayMail>,
+    pub(super) unread: u32,
 }
 
 /// The app icon the tray shows: the one the dock shows (see

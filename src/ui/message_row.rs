@@ -91,7 +91,7 @@ pub(super) const REPLIED_PX: i32 = 2 * LINE_ICON_PX + 2;
 
 /// The width a single-line column takes until it is dragged to another
 /// (#334): negative for a date, which is as wide as its text.
-pub(crate) fn default_width(column: ListColumn) -> i32 {
+pub(super) fn default_width(column: ListColumn) -> i32 {
     match column {
         ListColumn::Sender | ListColumn::Recipients => SENDER_COLUMN_PX,
         ListColumn::Correspondents => PEOPLE_COLUMN_PX,
@@ -153,7 +153,7 @@ pub(crate) type Slot = (u32, u32, u32);
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct RowMeta {
     /// Size of the conversation (thread heads only; 1 or 0 otherwise).
-    pub(crate) count: usize,
+    pub(super) count: usize,
     /// Whether the chip can open anything: the folder holds more of it.
     pub(super) expandable: bool,
     /// A reply nested under a thread head — indented on the rail.
@@ -161,45 +161,45 @@ pub(crate) struct RowMeta {
     /// The last reply of its thread: the dotted rail stops at its node.
     pub(super) is_last: bool,
     /// The head's conversation is opened out in the list.
-    pub(crate) expanded: bool,
+    pub(super) expanded: bool,
     /// The conversation key, on a head that can toggle.
-    pub(crate) key: Option<(u32, String)>,
+    pub(super) key: Option<(u32, String)>,
     /// The newest member's sender, preview and time (thread heads only):
     /// the row speaks for the conversation's latest message.
-    pub(crate) from: Option<(String, String)>,
-    pub(crate) preview: Option<String>,
-    pub(crate) latest: Option<String>,
+    pub(super) from: Option<(String, String)>,
+    pub(super) preview: Option<String>,
+    pub(super) latest: Option<String>,
     /// When that newest member arrived, and its date header, for a short
     /// date on a one-line row (#334).
     pub(super) latest_at: Option<(i64, String)>,
     /// Any message of the conversation is unread / starred (heads only).
-    pub(crate) unread: bool,
-    pub(crate) starred: bool,
+    pub(super) unread: bool,
+    pub(super) starred: bool,
     /// The newest member here was replied to / forwarded (heads only): the
     /// row speaks for it, and the arrow says whether it has been answered.
-    pub(crate) answered: bool,
-    pub(crate) forwarded: bool,
+    pub(super) answered: bool,
+    pub(super) forwarded: bool,
     /// Who took part in the conversation, for the Correspondents column
     /// (#334); worked out only while that column is shown.
-    pub(crate) people: Option<String>,
+    pub(super) people: Option<String>,
     /// The row's height is open. False only while a reply slides shut
     /// before it is taken out of the list.
     pub(super) revealed: bool,
     /// A reply just put in by opening its conversation: it slides open the
     /// first time it is shown instead of simply appearing.
-    pub(crate) appear: bool,
+    pub(super) appear: bool,
     /// The group the row heads, for asking the cache how big it is (#222).
-    pub(crate) group: Option<(u32, String)>,
+    pub(super) group: Option<(u32, String)>,
     /// A head row past the list's window, described only as far as the
     /// conversation maps need, by this key: the rest is worked out when it
     /// comes on screen (a large folder holds tens of thousands).
-    pub(crate) pending: Option<(u32, String)>,
+    pub(super) pending: Option<(u32, String)>,
 }
 
 /// The date heading a row sits under while the list is grouped by date
 /// (#435). `None` everywhere when it is not: one section, and no heading.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum DaySection {
+pub(super) enum DaySection {
     #[default]
     None,
     Today,
@@ -244,11 +244,11 @@ impl DaySection {
 /// One row's worth of the list: the message and what the row says about it.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RowData {
-    pub(crate) msg: Rc<Message>,
-    pub(crate) meta: RowMeta,
+    pub(super) msg: Rc<Message>,
+    pub(super) meta: RowMeta,
     /// The date heading it sits under (#435): a conversation's replies share
     /// their head's.
-    pub(crate) section: DaySection,
+    pub(super) section: DaySection,
 }
 
 impl RowData {
