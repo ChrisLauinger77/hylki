@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
+fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
     match event {
         WorkerEvent::AttachmentsScanned {
             folder_path,
@@ -264,7 +264,7 @@ impl AppModel {
     /// and it unsticks any worker parked inside an IDLE wait, since the
     /// request breaks its select loop. Then reload the visible folder so new
     /// mail appears without waiting for the next auto-fetch.
-    pub(super) fn reconnect_workers(&self, sender: &ComponentSender<Self>) {
+    fn reconnect_workers(&self, sender: &ComponentSender<Self>) {
         for w in self.workers.values() {
             let _ = w.send(MailRequest::Reconnect);
         }
@@ -275,7 +275,7 @@ impl AppModel {
     }
 
     /// The Refresh buttons and the status bar follow the network (#442).
-    pub(super) fn show_network_state(&self) {
+    fn show_network_state(&self) {
         let offline = !crate::power::online();
         crate::ui::show_refresh_offline(&self.sidebar_refresh, offline);
         if let Some(button) = self
@@ -376,7 +376,7 @@ impl AppModel {
     /// full the instant the window appears. The workers' own cache-first
     /// loads and syncs then replace each slice with whatever changed since
     /// the app last ran.
-    pub(super) fn prime_from_cache(&mut self) {
+    fn prime_from_cache(&mut self) {
         self.claim_cached_accounts();
         let Ok(cache) = crate::cache::Cache::open() else {
             return;
@@ -429,7 +429,7 @@ impl AppModel {
 
     /// Spawn one worker per configured account (or a single mock worker when no
     /// account is configured).
-    pub(super) fn spawn_workers(&mut self, sender: &ComponentSender<Self>) {
+    fn spawn_workers(&mut self, sender: &ComponentSender<Self>) {
         self.workers.clear();
         self.message_list
             .emit(MessageListInput::SetOwnAddresses(self.own_addresses()));
@@ -694,6 +694,70 @@ impl AppModel {
             );
         }
     }
+
+    pub(super) fn prime_and_connect(&mut self, sender: &ComponentSender<Self>) {
+        self.prime_from_cache();
+        self.refresh_tag_css();
+        if self.filters.iter().any(|r| r.needs_contacts()) {
+            self.saved_addresses.refresh();
+        }
+        self.message_list
+            .emit(MessageListInput::SetTags(self.tags.clone()));
+        self.message_view
+            .emit(MessageViewInput::SetTags(self.tags.clone()));
+        // What each mailbox of the user's own shows (#189), before the first
+        // cached message is painted: the sidebar refreshes this whenever the
+        // accounts change, but nothing has rebuilt it yet at this point.
+        self.refresh_own_faces();
+        self.warm_own_gravatars(sender);
+        self.spawn_workers(sender);
+    }
+}
+
+/// Watch GNOME Online Accounts so a change there (account removed, Mail
+/// toggled) is reflected in Hylki live, no restart needed. The watcher
+/// debounces signal bursts and snapshots GOA on its own thread;
+/// reconciliation happens on GoaChanged.
+pub(super) fn watch_system_events(sender: &ComponentSender<AppModel>) {
+    crate::goa::watch_changes({
+        let s = sender.input_sender().clone();
+        move |state| {
+            let _ = s.send(AppMsg::GoaChanged(state));
+        }
+    });
+    // Watch for resume-from-sleep: suspended IMAP sockets die silently, so
+    // on wake we reconnect every worker and refresh, otherwise no new mail
+    // arrives until the next auto-fetch (#322). logind is instant but out
+    // of the Flatpak's reach; the clock check covers it there.
+    crate::power::watch_resume({
+        let s = sender.input_sender().clone();
+        move || {
+            let _ = s.send(AppMsg::SystemResumed);
+        }
+    });
+    crate::power::watch_clock_gap({
+        let s = sender.input_sender().clone();
+        move || {
+            let _ = s.send(AppMsg::SystemResumed);
+        }
+    });
+    // A dock that has just (re)started holds no badge until we send it.
+    crate::launcher_badge::watch_dock({
+        let s = sender.input_sender().clone();
+        move || {
+            let _ = s.send(AppMsg::LauncherCountLost);
+        }
+    });
+    crate::power::watch_network({
+        let s = sender.input_sender().clone();
+        move |change| {
+            let _ = s.send(match change {
+                crate::power::NetworkChange::Back => AppMsg::NetworkBack,
+                crate::power::NetworkChange::Lost => AppMsg::NetworkLost,
+                crate::power::NetworkChange::Metered(_) => AppMsg::MeteredChanged,
+            });
+        }
+    });
 }
 
 #[cfg(test)]

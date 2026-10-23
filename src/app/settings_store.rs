@@ -139,4 +139,108 @@ impl AppModel {
             folder_sort: self.folder_sort,
         });
     }
+
+    pub(super) fn push_settings_to_children(&mut self) {
+        self.message_view
+            .emit(MessageViewInput::SetReadMark(self.read_mark));
+        self.message_list
+            .emit(MessageListInput::SetGravatar(self.gravatar));
+        self.message_list
+            .emit(MessageListInput::SetAvatars(self.list_avatars()));
+        // The formatter is a free function, so the preference has to be handed to
+        // it before anything draws a date.
+        self.message_list
+            .emit(MessageListInput::SetSenderLogos(self.sender_logos));
+        crate::datefmt::set_style(self.date_style, self.clock_style);
+        crate::ui::print_preview::set_options(self.print_options);
+        self.message_list.emit(MessageListInput::SetLook {
+            avatars: self.list_avatars(),
+            preview_lines: self.list_preview_lines(),
+            subject: self.list_show_subject(),
+            animate: false,
+        });
+        self.message_view.emit(MessageViewInput::SetFoldLook {
+            preview_lines: self.list_preview_lines(),
+        });
+        self.push_single_line();
+        self.message_list
+            .emit(MessageListInput::SetColumns(self.list_columns.clone()));
+        self.message_list
+            .emit(MessageListInput::SetHeadings(self.list_headings));
+        self.message_list
+            .emit(MessageListInput::SetColumnScroll(self.list_column_scroll));
+        self.message_list
+            .emit(MessageListInput::SetSearchPinned(self.list_search_open));
+        self.push_list_bars();
+        self.contacts_page.emit(ContactsPageInput::SetSearchPinned(
+            self.contacts_search_open,
+        ));
+        self.contacts_page.emit(ContactsPageInput::SetBookPicker(
+            !self.contacts_placement.shown(),
+        ));
+        self.message_list.emit(MessageListInput::SetColumnWidths(
+            self.list_column_widths.clone(),
+        ));
+        self.sidebars_emit(SidebarInput::SetFocus {
+            hide_accounts: self.focus.active(config::FocusPart::HideAccounts),
+            fold_unified: self.focus.active(config::FocusPart::FoldUnified),
+            animate: false,
+        });
+        self.message_list
+            .emit(MessageListInput::SetThreading(self.threading));
+        self.message_list
+            .emit(MessageListInput::SetThreadExpansion(self.thread_expansion));
+        self.message_list
+            .emit(MessageListInput::SetThreadRowNewest(self.thread_row_newest));
+        self.message_list
+            .emit(MessageListInput::SetListPalette(self.list_palette));
+        self.message_list
+            .emit(MessageListInput::SetThreadsExpanded(self.threads_expanded));
+        self.message_list.emit(MessageListInput::SetPaletteCollapse(
+            self.palette_collapse_secs,
+        ));
+        self.message_view.emit(MessageViewInput::SetContentTheme(
+            self.message_theme.dark_override(),
+        ));
+        self.message_view
+            .emit(MessageViewInput::SetReaderStyle(self.reader_style()));
+        self.message_view
+            .emit(MessageViewInput::SetAlwaysShowRecipients(
+                self.always_show_recipients,
+            ));
+        self.message_view
+            .emit(MessageViewInput::SetPgpLabels(self.pgp_labels));
+        self.message_view
+            .emit(MessageViewInput::SetSingleMessageCard(
+                self.single_message_card,
+            ));
+        self.message_view
+            .emit(MessageViewInput::SetFoldMessages(self.fold_messages));
+        self.message_view.emit(MessageViewInput::SetReaderMode(
+            self.effective_reader_mode(),
+        ));
+        self.message_view
+            .emit(MessageViewInput::SetZoomDefault(self.zoom_default));
+        self.message_view.emit(MessageViewInput::SetZoom(self.zoom));
+        self.message_view
+            .emit(MessageViewInput::SetReaderSwitchShown(self.reader_switch));
+        self.message_view
+            .emit(MessageViewInput::SetThemeSwitchShown(self.theme_switch));
+        self.message_view.emit(MessageViewInput::SetReaderDefault(
+            self.effective_reader_default(),
+        ));
+        self.message_view
+            .emit(MessageViewInput::SetCardAttachmentsShown(
+                self.card_attachments,
+            ));
+        self.message_view
+            .emit(MessageViewInput::SetAttachmentDrawer(self.drawer_enabled));
+        self.message_view
+            .emit(MessageViewInput::SetUnsubscribed(self.unsubscribed_map()));
+        self.message_view
+            .emit(MessageViewInput::SetIdentities(self.identities_map()));
+        self.message_view.emit(MessageViewInput::SetInviteAnswers(
+            self.invite_answers_map(),
+        ));
+    }
 }

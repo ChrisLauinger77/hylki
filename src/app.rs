@@ -40,6 +40,7 @@ mod accounts;
 mod actions;
 mod attachments;
 mod card_menu;
+mod children;
 mod compose_host;
 mod compose_init;
 mod compose_open;
@@ -118,10 +119,14 @@ mod workers;
 
 pub(crate) use accounts::finish_keyring_writes;
 use accounts::{forget_account_secrets, reconcile_goa, GoaReconcile};
-use attachments::{prune_downloads, AttachmentTarget};
+use attachments::{prune_downloads, schedule_download_prune, AttachmentTarget};
+use children::{
+    attachment_drawer_output_msg, contacts_page_output_msg, gallery_output_msg,
+    message_list_output_msg, message_view_output_msg, notifications_output_msg, sidebar_output_msg,
+};
 use compose_host::{ComposeHost, ReaderCompose};
 use consts::{ATTACHMENT_CACHE_BUDGET, BODY_CACHE_BUDGET, READER_MIN_WIDTH};
-use contacts::{reload_contacts, sync_contact_books};
+use contacts::{reload_contacts, start_contacts_sync, sync_contact_books};
 use conversation::{
     batch_bodies_by_folder, body_key, is_event_target, next_after_vanish, BodyKey, MissingBody,
     CARRIED_BODY_LIMIT, THREAD_BODY_WAIT,
@@ -156,7 +161,7 @@ use search::default_scope;
 use send_morph::{MorphPending, Provisional};
 pub(crate) use showcase::showcase_capture;
 use showcase::showcase_pgp;
-use sidebar::{set_sidebar_header_compact, sidebar_output_msg};
+use sidebar::set_sidebar_header_compact;
 use sidebar_peek::SIDEBAR_RAIL_WIDTH;
 use smart::SMART_VIEW_LIMIT;
 use split_reply::{set_split_shrink, split_reply_height};
@@ -175,6 +180,7 @@ pub(crate) use uri_queue::{
     is_message_file, queue_attach_files, queue_mailto, queue_message_file, queue_mid,
 };
 use window::install_window_actions;
+use workers::watch_system_events;
 
 relm4::new_stateless_action!(StatusBarAction, WindowActionGroup, "status-bar");
 relm4::new_stateless_action!(ConsoleAction, WindowActionGroup, "console");
@@ -1076,161 +1082,13 @@ impl SimpleComponent for AppModel {
             })
             .forward(sender.input_sender(), sidebar_output_msg);
 
-        let message_list =
-            MessageList::builder()
-                .launch(())
-                .forward(sender.input_sender(), |out| match out {
-                    MessageListOutput::Selected {
-                        message,
-                        thread,
-                        solo,
-                    } => AppMsg::MessageSelected {
-                        message,
-                        thread,
-                        solo,
-                    },
-                    MessageListOutput::SelectionKeys(keys) => AppMsg::SelectionKeys(keys),
-                    MessageListOutput::Checked(count) => AppMsg::ListChecked(count),
-                    MessageListOutput::ViewMissed => AppMsg::EmitUnifiedNow,
-                    MessageListOutput::MoveMessages {
-                        account_id,
-                        dest,
-                        messages,
-                    } => AppMsg::MoveMessagesTo {
-                        account_id,
-                        dest,
-                        messages,
-                    },
-                    MessageListOutput::DeleteThread { messages } => AppMsg::DeleteThread(messages),
-                    MessageListOutput::ThreadGrew { message, thread } => AppMsg::ThreadGrew {
-                        message: Box::new(message),
-                        thread,
-                    },
-                    MessageListOutput::ThreadsListed { groups } => AppMsg::ThreadsListed { groups },
-                    MessageListOutput::CountChanged(text) => AppMsg::ListCount(text),
-                    MessageListOutput::Activated { message, thread } => {
-                        AppMsg::OpenMessageWindow { message, thread }
-                    }
-                    MessageListOutput::Action {
-                        action,
-                        message,
-                        conversation,
-                    } => AppMsg::RowAction {
-                        action,
-                        message,
-                        conversation,
-                    },
-                    MessageListOutput::SetTag {
-                        message,
-                        keyword,
-                        add,
-                    } => AppMsg::SetTag {
-                        message,
-                        keyword,
-                        add,
-                    },
-                    MessageListOutput::SetTagMany {
-                        messages,
-                        keyword,
-                        add,
-                    } => AppMsg::SetTagMany {
-                        messages,
-                        keyword,
-                        add,
-                    },
-                    MessageListOutput::Bulk { action, messages } => {
-                        AppMsg::Bulk { action, messages }
-                    }
-                    MessageListOutput::MoveTo {
-                        messages,
-                        offer_whole,
-                        x,
-                        y,
-                    } => AppMsg::ListMoveTo {
-                        messages,
-                        offer_whole,
-                        x,
-                        y,
-                    },
-                    MessageListOutput::SelectionCleared => AppMsg::ClearReader,
-                    MessageListOutput::OpenedByKey { already_open } => {
-                        AppMsg::OpenedByKey { already_open }
-                    }
-                    MessageListOutput::SearchActive(active) => AppMsg::SearchActive(active),
-                    MessageListOutput::SortChanged(key) => AppMsg::ListSortChanged(key),
-                    MessageListOutput::ColumnWidths(widths) => AppMsg::ListColumnWidths(widths),
-                    MessageListOutput::CustomizeColumns => AppMsg::CustomizeColumns,
-                });
+        let message_list = MessageList::builder()
+            .launch(())
+            .forward(sender.input_sender(), message_list_output_msg);
 
-        let message_view =
-            MessageView::builder()
-                .launch(())
-                .forward(sender.input_sender(), |out| match out {
-                    MessageViewOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
-                    MessageViewOutput::SetRemote {
-                        account_id,
-                        id,
-                        show,
-                    } => AppMsg::SetRemoteContent {
-                        account_id,
-                        id,
-                        show,
-                    },
-                    MessageViewOutput::OpenWindow(m) => AppMsg::OpenMessageWindow {
-                        message: *m,
-                        thread: Vec::new(),
-                    },
-                    MessageViewOutput::CardAction { action, message } => {
-                        AppMsg::CardAction { action, message }
-                    }
-                    MessageViewOutput::ContactSender(m) => AppMsg::CardContact(m),
-                    MessageViewOutput::AttachmentAction {
-                        account_id,
-                        id,
-                        index,
-                        save,
-                    } => AppMsg::CardAttachment {
-                        account_id,
-                        id,
-                        index,
-                        save,
-                    },
-                    MessageViewOutput::CardMenu { message, x, y, hit } => AppMsg::CardMenu {
-                        message,
-                        x,
-                        y,
-                        hit,
-                        popout: None,
-                    },
-                    MessageViewOutput::CardMoveTo { message, x, y } => AppMsg::ListMoveTo {
-                        messages: vec![*message],
-                        offer_whole: false,
-                        x,
-                        y,
-                    },
-                    MessageViewOutput::MarkSeen { account_id, id } => {
-                        AppMsg::ThreadMessageSeen { account_id, id }
-                    }
-                    MessageViewOutput::SelectCards(keys) => AppMsg::SelectCards(keys),
-                    MessageViewOutput::ComposeTo(addr) => AppMsg::ComposeTo(addr),
-                    MessageViewOutput::AddContactAddr(addr) => AppMsg::AddContactAddr(addr),
-                    MessageViewOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
-                    MessageViewOutput::Notice(text) => AppMsg::Notice(text),
-                    MessageViewOutput::ReaderMode(on) => AppMsg::SetReaderMode(on),
-                    MessageViewOutput::Zoom(step) => AppMsg::ZoomMessage(step),
-                    MessageViewOutput::Unsubscribe { message, info } => {
-                        AppMsg::Unsubscribe { message, info }
-                    }
-                    MessageViewOutput::InviteAction {
-                        message,
-                        invite,
-                        action,
-                    } => AppMsg::InviteAction {
-                        message,
-                        invite,
-                        action,
-                    },
-                });
+        let message_view = MessageView::builder()
+            .launch(())
+            .forward(sender.input_sender(), message_view_output_msg);
 
         // The drawer owns a Paned whose top pane is the reader body, so hand it
         // the message-view widget to dock beneath.
@@ -1239,58 +1097,13 @@ impl SimpleComponent for AppModel {
                 state: config::load_drawer_state(),
                 reader: message_view.widget().clone().upcast(),
             })
-            .forward(sender.input_sender(), |out| match out {
-                crate::ui::attachment_drawer::DrawerOutput::ShowLightbox { items, start } => {
-                    AppMsg::ShowLightbox { items, start }
-                }
-                crate::ui::attachment_drawer::DrawerOutput::ShowInMessage(att) => {
-                    AppMsg::ShowAttachmentInMessage(att)
-                }
-                crate::ui::attachment_drawer::DrawerOutput::DeleteFromServer(att) => {
-                    AppMsg::DeleteDrawerAttachment(att)
-                }
-            });
+            .forward(sender.input_sender(), attachment_drawer_output_msg);
 
         let lightbox = crate::ui::lightbox::Lightbox::builder().launch(()).detach();
 
-        let gallery = AttachmentsGallery::builder().launch(()).forward(
-            sender.input_sender(),
-            |out| match out {
-                GalleryOutput::OpenMessage {
-                    account_id,
-                    folder_path,
-                    uid,
-                } => AppMsg::OpenAttachmentMessage {
-                    account_id,
-                    folder_path,
-                    uid,
-                },
-                GalleryOutput::Load(req) => AppMsg::GalleryLoad(Box::new(req)),
-                GalleryOutput::Fetch {
-                    account_id,
-                    folder_path,
-                    uid,
-                } => AppMsg::GalleryFetch {
-                    account_id,
-                    folder_path,
-                    uid,
-                },
-                GalleryOutput::DeleteFromServer {
-                    account_id,
-                    folder_path,
-                    uid,
-                    name,
-                    size,
-                } => AppMsg::AskDeleteAttachment(AttachmentTarget {
-                    account_id,
-                    message_id: uid,
-                    path: folder_path,
-                    uid,
-                    name,
-                    size,
-                }),
-            },
-        );
+        let gallery = AttachmentsGallery::builder()
+            .launch(())
+            .forward(sender.input_sender(), gallery_output_msg);
 
         // Built here (not in the model literal) because the contacts page
         // mounts it over its detail pane at launch.
@@ -1304,71 +1117,11 @@ impl SimpleComponent for AppModel {
         };
         let contacts_page = ContactsPage::builder()
             .launch(contacts_compose_revealer.clone())
-            .forward(sender.input_sender(), |out| match out {
-                ContactsPageOutput::Compose(email) => AppMsg::ComposeTo(email),
-                ContactsPageOutput::ComposeBcc(field) => AppMsg::ComposeBcc(field),
-                ContactsPageOutput::ToggleSidebar => AppMsg::ToggleSidebar,
-                ContactsPageOutput::SaveContact { book_uid, vcard } => {
-                    AppMsg::SaveContact { book_uid, vcard }
-                }
-                ContactsPageOutput::CreateContact { book_uid, vcard } => {
-                    AppMsg::CreateContact { book_uid, vcard }
-                }
-                ContactsPageOutput::SaveGroup {
-                    book_uid,
-                    format,
-                    original,
-                    edit,
-                } => AppMsg::SaveGroup {
-                    book_uid,
-                    format,
-                    original,
-                    edit,
-                },
-                ContactsPageOutput::DeleteContacts(keys) => AppMsg::DeleteContacts(keys),
-                ContactsPageOutput::MoveGroup {
-                    from,
-                    uid,
-                    to,
-                    format,
-                    edit,
-                } => AppMsg::MoveGroup {
-                    from,
-                    uid,
-                    to,
-                    format,
-                    edit,
-                },
-                ContactsPageOutput::MoveContacts { to, cards } => {
-                    AppMsg::MoveContacts { to, cards }
-                }
-                ContactsPageOutput::CopyContacts { to, cards } => {
-                    AppMsg::CopyContacts { to, cards }
-                }
-                ContactsPageOutput::RenameBook { uid, name } => AppMsg::RenameBook { uid, name },
-                ContactsPageOutput::Tree(tree) => AppMsg::ContactTree(tree),
-                ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
-                ContactsPageOutput::WantSuggestions => AppMsg::ContactSuggestions,
-                ContactsPageOutput::ShowPhoto { name, data } => {
-                    // The lightbox routes by extension — a bare contact
-                    // name sent the JPEG down the PDF path, where poppler
-                    // hung the UI trying to parse it. Name it by content.
-                    let name = format!("{name}.{}", crate::models::image_ext(&data));
-                    AppMsg::ShowLightbox {
-                        items: vec![crate::models::Attachment { name, data }],
-                        start: 0,
-                    }
-                }
-            });
+            .forward(sender.input_sender(), contacts_page_output_msg);
 
-        let notifications = NotificationCenter::builder().launch(()).forward(
-            sender.input_sender(),
-            |out| match out {
-                NotifyOutput::CountChanged(n) => AppMsg::NotifyCount(n),
-                NotifyOutput::ExportLog => AppMsg::Pref(PrefOutput::ExportLog),
-                NotifyOutput::Shown(shown) => AppMsg::StatusBarShown(shown),
-            },
-        );
+        let notifications = NotificationCenter::builder()
+            .launch(())
+            .forward(sender.input_sender(), notifications_output_msg);
 
         // Sectioned: settings / printing / window & help / quit.
         let menu = gtk::gio::Menu::new();
@@ -1892,257 +1645,16 @@ impl SimpleComponent for AppModel {
             gallery_total: 0,
             gallery_scan_left: HashMap::new(),
         };
-        model.prime_from_cache();
-        model.refresh_tag_css();
-        if model.filters.iter().any(|r| r.needs_contacts()) {
-            model.saved_addresses.refresh();
-        }
-        model
-            .message_list
-            .emit(MessageListInput::SetTags(model.tags.clone()));
-        model
-            .message_view
-            .emit(MessageViewInput::SetTags(model.tags.clone()));
-        // What each mailbox of the user's own shows (#189), before the first
-        // cached message is painted: the sidebar refreshes this whenever the
-        // accounts change, but nothing has rebuilt it yet at this point.
-        model.refresh_own_faces();
-        model.warm_own_gravatars(&sender);
-        model.spawn_workers(&sender);
-        // Downloaded mail past Settings → System → Keep downloaded mail goes
-        // a little after start, once the first syncs are under way, and
-        // every six hours after (#394).
-        gtk::glib::timeout_add_seconds_local_once(120, || {
-            prune_downloads(config::load_privacy().keep_downloads_days);
-            gtk::glib::timeout_add_seconds_local(6 * 3600, || {
-                prune_downloads(config::load_privacy().keep_downloads_days);
-                gtk::glib::ControlFlow::Continue
-            });
-        });
-        // GNOME keeps a notification after the app that posted it has quit,
-        // and a new instance knows nothing of what it pointed at, so it
-        // could only linger (#333). New mail since is notified afresh.
-        for a in &model.accounts {
-            crate::notify::withdraw_mail(a.id);
-        }
+        model.prime_and_connect(&sender);
+        schedule_download_prune();
+        model.withdraw_stale_notifications();
         if model.tray_enabled {
             model.start_tray(&sender);
         }
-        // Nothing keeps a CardDAV or Online Accounts address book in step
-        // unless an app holds it open, and off GNOME there may be no other
-        // (#408). A moment after the window, not in its way.
-        if !demo_mode() {
-            sync_contact_books(&sender, false, 5000);
-        }
-        // Contacts is read and listed in the background, so the first visit
-        // shows it at once (#477); a visit re-reads it to catch up.
-        reload_contacts(&sender, 4000);
-        // Refresh visible avatars when the GNOME Contacts photo index
-        // changes (first load finishing, or an EDS/CardDAV sync).
-        crate::contacts::watch_photo_changes({
-            let input = sender.input_sender().clone();
-            move || {
-                let _ = input.send(AppMsg::ContactPhotosChanged);
-            }
-        });
-        // Watch GNOME Online Accounts so a change there (account removed, Mail
-        // toggled) is reflected in Hylki live, no restart needed. The watcher
-        // debounces signal bursts and snapshots GOA on its own thread;
-        // reconciliation happens on GoaChanged.
-        crate::goa::watch_changes({
-            let s = sender.input_sender().clone();
-            move |state| {
-                let _ = s.send(AppMsg::GoaChanged(state));
-            }
-        });
-        // Watch for resume-from-sleep: suspended IMAP sockets die silently, so
-        // on wake we reconnect every worker and refresh, otherwise no new mail
-        // arrives until the next auto-fetch (#322). logind is instant but out
-        // of the Flatpak's reach; the clock check covers it there.
-        crate::power::watch_resume({
-            let s = sender.input_sender().clone();
-            move || {
-                let _ = s.send(AppMsg::SystemResumed);
-            }
-        });
-        crate::power::watch_clock_gap({
-            let s = sender.input_sender().clone();
-            move || {
-                let _ = s.send(AppMsg::SystemResumed);
-            }
-        });
-        // A dock that has just (re)started holds no badge until we send it.
-        crate::launcher_badge::watch_dock({
-            let s = sender.input_sender().clone();
-            move || {
-                let _ = s.send(AppMsg::LauncherCountLost);
-            }
-        });
-        crate::power::watch_network({
-            let s = sender.input_sender().clone();
-            move |change| {
-                let _ = s.send(match change {
-                    crate::power::NetworkChange::Back => AppMsg::NetworkBack,
-                    crate::power::NetworkChange::Lost => AppMsg::NetworkLost,
-                    crate::power::NetworkChange::Metered(_) => AppMsg::MeteredChanged,
-                });
-            }
-        });
-        // With no accounts, no worker events will populate the sidebar, so render
-        // its empty state (the "Add first account" prompt) up front — and greet
-        // a first run with the welcome wizard (src/ui/welcome.rs).
-        // A restart the wizard's language pick asked for: the wizard comes
-        // back once, whatever mode this is; the flag must not reach a
-        // later restart (the icon change's), so it is cleared here.
-        let wizard_again = std::env::var_os(crate::WIZARD_AGAIN_VAR).is_some();
-        if wizard_again {
-            std::env::remove_var(crate::WIZARD_AGAIN_VAR);
-        }
-        if model.config.is_empty() || std::env::var("HYLKI_WELCOME").is_ok() || wizard_again {
-            model.rebuild_sidebar();
-            // HYLKI_WELCOME=1 forces the wizard over an existing config, for
-            // design review and screenshots. A wizard already completed once
-            // (Start Reading pressed, even with no account added) doesn't
-            // come back on its own — a restart right after it must not loop.
-            if std::env::var("HYLKI_WELCOME").is_ok()
-                || wizard_again
-                || (!demo_mode() && !config::wizard_completed())
-            {
-                model.open_wizard(&sender);
-            }
-        }
-        model
-            .message_view
-            .emit(MessageViewInput::SetReadMark(model.read_mark));
-        model
-            .message_list
-            .emit(MessageListInput::SetGravatar(model.gravatar));
-        model
-            .message_list
-            .emit(MessageListInput::SetAvatars(model.list_avatars()));
-        // The formatter is a free function, so the preference has to be handed to
-        // it before anything draws a date.
-        model
-            .message_list
-            .emit(MessageListInput::SetSenderLogos(model.sender_logos));
-        crate::datefmt::set_style(model.date_style, model.clock_style);
-        crate::ui::print_preview::set_options(model.print_options);
-        model.message_list.emit(MessageListInput::SetLook {
-            avatars: model.list_avatars(),
-            preview_lines: model.list_preview_lines(),
-            subject: model.list_show_subject(),
-            animate: false,
-        });
-        model.message_view.emit(MessageViewInput::SetFoldLook {
-            preview_lines: model.list_preview_lines(),
-        });
-        model.push_single_line();
-        model
-            .message_list
-            .emit(MessageListInput::SetColumns(model.list_columns.clone()));
-        model
-            .message_list
-            .emit(MessageListInput::SetHeadings(model.list_headings));
-        model
-            .message_list
-            .emit(MessageListInput::SetColumnScroll(model.list_column_scroll));
-        model
-            .message_list
-            .emit(MessageListInput::SetSearchPinned(model.list_search_open));
-        model.push_list_bars();
-        model.contacts_page.emit(ContactsPageInput::SetSearchPinned(
-            model.contacts_search_open,
-        ));
-        model.contacts_page.emit(ContactsPageInput::SetBookPicker(
-            !model.contacts_placement.shown(),
-        ));
-        model.message_list.emit(MessageListInput::SetColumnWidths(
-            model.list_column_widths.clone(),
-        ));
-        model.sidebars_emit(SidebarInput::SetFocus {
-            hide_accounts: model.focus.active(config::FocusPart::HideAccounts),
-            fold_unified: model.focus.active(config::FocusPart::FoldUnified),
-            animate: false,
-        });
-        model
-            .message_list
-            .emit(MessageListInput::SetThreading(model.threading));
-        model
-            .message_list
-            .emit(MessageListInput::SetThreadExpansion(model.thread_expansion));
-        model
-            .message_list
-            .emit(MessageListInput::SetThreadRowNewest(
-                model.thread_row_newest,
-            ));
-        model
-            .message_list
-            .emit(MessageListInput::SetListPalette(model.list_palette));
-        model
-            .message_list
-            .emit(MessageListInput::SetThreadsExpanded(model.threads_expanded));
-        model
-            .message_list
-            .emit(MessageListInput::SetPaletteCollapse(
-                model.palette_collapse_secs,
-            ));
-        model.message_view.emit(MessageViewInput::SetContentTheme(
-            model.message_theme.dark_override(),
-        ));
-        model
-            .message_view
-            .emit(MessageViewInput::SetReaderStyle(model.reader_style()));
-        model
-            .message_view
-            .emit(MessageViewInput::SetAlwaysShowRecipients(
-                model.always_show_recipients,
-            ));
-        model
-            .message_view
-            .emit(MessageViewInput::SetPgpLabels(model.pgp_labels));
-        model
-            .message_view
-            .emit(MessageViewInput::SetSingleMessageCard(
-                model.single_message_card,
-            ));
-        model
-            .message_view
-            .emit(MessageViewInput::SetFoldMessages(model.fold_messages));
-        model.message_view.emit(MessageViewInput::SetReaderMode(
-            model.effective_reader_mode(),
-        ));
-        model
-            .message_view
-            .emit(MessageViewInput::SetZoomDefault(model.zoom_default));
-        model
-            .message_view
-            .emit(MessageViewInput::SetZoom(model.zoom));
-        model
-            .message_view
-            .emit(MessageViewInput::SetReaderSwitchShown(model.reader_switch));
-        model
-            .message_view
-            .emit(MessageViewInput::SetThemeSwitchShown(model.theme_switch));
-        model.message_view.emit(MessageViewInput::SetReaderDefault(
-            model.effective_reader_default(),
-        ));
-        model
-            .message_view
-            .emit(MessageViewInput::SetCardAttachmentsShown(
-                model.card_attachments,
-            ));
-        model
-            .message_view
-            .emit(MessageViewInput::SetAttachmentDrawer(model.drawer_enabled));
-        model
-            .message_view
-            .emit(MessageViewInput::SetUnsubscribed(model.unsubscribed_map()));
-        model
-            .message_view
-            .emit(MessageViewInput::SetIdentities(model.identities_map()));
-        model.message_view.emit(MessageViewInput::SetInviteAnswers(
-            model.invite_answers_map(),
-        ));
+        start_contacts_sync(&sender);
+        watch_system_events(&sender);
+        model.open_wizard_if_needed(&sender);
+        model.push_settings_to_children();
         model.arm_auto_fetch(&sender);
 
         // The app-wide theme choice must be in force before the first frame.

@@ -41,7 +41,7 @@ pub(super) fn reload_contacts(sender: &ComponentSender<AppModel>, delay_ms: u64)
 }
 
 /// The notification text for a finished contacts import, and whether it is an error.
-pub(super) fn import_summary(o: &crate::local_contacts::ImportOutcome) -> (String, bool) {
+fn import_summary(o: &crate::local_contacts::ImportOutcome) -> (String, bool) {
     if o.added + o.updated == 0 {
         return (
             i18n("No contacts were found in the selected files"),
@@ -96,7 +96,7 @@ impl AppModel {
         });
     }
 
-    pub(super) fn add_contact_dialog(
+    fn add_contact_dialog(
         &self,
         name: &str,
         email: &str,
@@ -166,7 +166,7 @@ impl AppModel {
     }
 
     /// Show Contacts in place of the mail panes, read afresh.
-    pub(super) fn show_contacts_view(&mut self, sender: &ComponentSender<Self>) {
+    fn show_contacts_view(&mut self, sender: &ComponentSender<Self>) {
         self.close_sidebar_peek();
         self.showing_outbox = false;
         self.leave_gallery();
@@ -499,6 +499,26 @@ impl AppModel {
             _ => unreachable!("not routed to on_contacts"),
         }
     }
+}
+
+/// Nothing keeps a CardDAV or Online Accounts address book in step
+/// unless an app holds it open, and off GNOME there may be no other
+/// (#408). A moment after the window, not in its way.
+pub(super) fn start_contacts_sync(sender: &ComponentSender<AppModel>) {
+    if !demo_mode() {
+        sync_contact_books(sender, false, 5000);
+    }
+    // Contacts is read and listed in the background, so the first visit
+    // shows it at once (#477); a visit re-reads it to catch up.
+    reload_contacts(sender, 4000);
+    // Refresh visible avatars when the GNOME Contacts photo index
+    // changes (first load finishing, or an EDS/CardDAV sync).
+    crate::contacts::watch_photo_changes({
+        let input = sender.input_sender().clone();
+        move || {
+            let _ = input.send(AppMsg::ContactPhotosChanged);
+        }
+    });
 }
 
 #[cfg(test)]

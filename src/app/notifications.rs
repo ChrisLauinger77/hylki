@@ -431,4 +431,13 @@ impl AppModel {
             app.add_action(&act);
         }
     }
+
+    /// GNOME keeps a notification after the app that posted it has quit,
+    /// and a new instance knows nothing of what it pointed at, so it
+    /// could only linger (#333). New mail since is notified afresh.
+    pub(super) fn withdraw_stale_notifications(&mut self) {
+        for a in &self.accounts {
+            crate::notify::withdraw_mail(a.id);
+        }
+    }
 }

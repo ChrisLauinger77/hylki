@@ -3,7 +3,7 @@
 use super::*;
 
 /// Save one attachment via a file chooser (a card chip's save button, #213).
-pub(super) fn save_attachment(att: Attachment, parent: Option<adw::ApplicationWindow>) {
+fn save_attachment(att: Attachment, parent: Option<adw::ApplicationWindow>) {
     let dialog = gtk::FileDialog::builder()
         .initial_name(&att.name)
         .title(&i18n("Save Attachment"))
@@ -63,7 +63,7 @@ pub(crate) struct AttachmentTarget {
 }
 
 impl AttachmentTarget {
-    pub(super) fn gallery_key(&self) -> crate::ui::attachments_gallery::FileKey {
+    fn gallery_key(&self) -> crate::ui::attachments_gallery::FileKey {
         (
             self.account_id,
             self.path.clone(),
@@ -88,7 +88,7 @@ impl AppModel {
     }
 
     /// The messages on screen: the open conversation, or the lone message.
-    pub(super) fn conversation_members(&self) -> Vec<(u32, u32)> {
+    fn conversation_members(&self) -> Vec<(u32, u32)> {
         if self.current_thread.is_empty() {
             self.current.iter().map(|c| (c.account_id, c.id)).collect()
         } else {
@@ -260,7 +260,7 @@ impl AppModel {
     }
 
     /// Forget a deletion the worker has answered, handing back what it was.
-    pub(super) fn take_deleting(
+    fn take_deleting(
         &mut self,
         account_id: u32,
         message_id: u32,
@@ -274,7 +274,7 @@ impl AppModel {
 
     /// Removing an attachment cannot be undone, and reaches every device
     /// that reads the account: ask (#289).
-    pub(super) fn confirm_delete_attachment(
+    fn confirm_delete_attachment(
         &self,
         target: AttachmentTarget,
         parent: &gtk::Window,
@@ -566,6 +566,19 @@ impl AppModel {
             _ => unreachable!("not routed to on_attachments"),
         }
     }
+}
+
+/// Downloaded mail past Settings → System → Keep downloaded mail goes
+/// a little after start, once the first syncs are under way, and
+/// every six hours after (#394).
+pub(super) fn schedule_download_prune() {
+    gtk::glib::timeout_add_seconds_local_once(120, || {
+        prune_downloads(config::load_privacy().keep_downloads_days);
+        gtk::glib::timeout_add_seconds_local(6 * 3600, || {
+            prune_downloads(config::load_privacy().keep_downloads_days);
+            gtk::glib::ControlFlow::Continue
+        });
+    });
 }
 
 #[cfg(test)]

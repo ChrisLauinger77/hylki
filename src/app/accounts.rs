@@ -629,6 +629,32 @@ impl AppModel {
             sender.input(AppMsg::ShowCarryOverNotice(&crate::legacy::PREDECESSORS[0]));
         }
     }
+
+    /// With no accounts, no worker events will populate the sidebar, so render
+    /// its empty state (the "Add first account" prompt) up front — and greet
+    /// a first run with the welcome wizard (src/ui/welcome.rs).
+    /// A restart the wizard's language pick asked for: the wizard comes
+    /// back once, whatever mode this is; the flag must not reach a
+    /// later restart (the icon change's), so it is cleared here.
+    pub(super) fn open_wizard_if_needed(&mut self, sender: &ComponentSender<Self>) {
+        let wizard_again = std::env::var_os(crate::WIZARD_AGAIN_VAR).is_some();
+        if wizard_again {
+            std::env::remove_var(crate::WIZARD_AGAIN_VAR);
+        }
+        if self.config.is_empty() || std::env::var("HYLKI_WELCOME").is_ok() || wizard_again {
+            self.rebuild_sidebar();
+            // HYLKI_WELCOME=1 forces the wizard over an existing config, for
+            // design review and screenshots. A wizard already completed once
+            // (Start Reading pressed, even with no account added) doesn't
+            // come back on its own — a restart right after it must not loop.
+            if std::env::var("HYLKI_WELCOME").is_ok()
+                || wizard_again
+                || (!demo_mode() && !config::wizard_completed())
+            {
+                self.open_wizard(sender);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
