@@ -111,12 +111,15 @@ fn local_image_data_uri(value: &str, base: Option<&std::path::Path>, max: u64) -
     let v = value.trim();
     let lower = v.to_ascii_lowercase();
     let path = if let Some(rest) = lower.strip_prefix("file://") {
-        std::path::PathBuf::from(crate::percent::decode(&v[v.len() - rest.len()..], false))
+        std::path::PathBuf::from(crate::encoding::percent::decode(
+            &v[v.len() - rest.len()..],
+            false,
+        ))
     } else if lower.contains(':') && !lower.starts_with('/') && !lower.starts_with('.') {
         // Some other scheme (http, https, data, cid, mailto…): not ours.
         return None;
     } else {
-        let p = std::path::PathBuf::from(crate::percent::decode(v, false));
+        let p = std::path::PathBuf::from(crate::encoding::percent::decode(v, false));
         if p.is_absolute() {
             p
         } else {
@@ -140,7 +143,7 @@ fn local_image_data_uri(value: &str, base: Option<&std::path::Path>, max: u64) -
     let data = std::fs::read(&path).ok()?;
     Some(format!(
         "data:{mime};base64,{}",
-        crate::oauth::base64_encode(&data)
+        crate::encoding::base64_encode(&data)
     ))
 }
 

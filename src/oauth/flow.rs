@@ -7,9 +7,9 @@ use std::time::{Duration, Instant};
 
 use crate::config::OAuthSettings;
 
-use super::encoding::base64_encode;
 use super::tokens::{exchange_code, FlowResult};
 use super::DROPBOX_REDIRECT_PORT;
+use crate::encoding::base64_encode;
 
 /// The Hylki app icon, embedded so the success page needs no external resources.
 const ICON_PNG: &[u8] =
@@ -133,7 +133,7 @@ pub fn run_flow(settings: &OAuthSettings) -> Result<FlowResult, String> {
 /// approved.
 pub fn microsoft_prompt(login_hint: Option<&str>) -> String {
     match login_hint.map(str::trim).filter(|h| !h.is_empty()) {
-        Some(hint) => format!("&login_hint={}", crate::percent::encode(hint)),
+        Some(hint) => format!("&login_hint={}", crate::encoding::percent::encode(hint)),
         None => "&prompt=select_account".into(),
     }
 }
@@ -222,11 +222,11 @@ impl Authorization {
             "{base}?response_type=code&client_id={cid}&redirect_uri={redir}&scope={scope}\
              &code_challenge={chal}&code_challenge_method=S256&state={st}{extra}",
             base = settings.auth_url,
-            cid = crate::percent::encode(&settings.client_id),
-            redir = crate::percent::encode(redirect),
-            scope = crate::percent::encode(&settings.scopes),
-            chal = crate::percent::encode(&challenge),
-            st = crate::percent::encode(&state),
+            cid = crate::encoding::percent::encode(&settings.client_id),
+            redir = crate::encoding::percent::encode(redirect),
+            scope = crate::encoding::percent::encode(&settings.scopes),
+            chal = crate::encoding::percent::encode(&challenge),
+            st = crate::encoding::percent::encode(&state),
         );
         Ok(Self {
             url,
@@ -379,8 +379,8 @@ fn redirect_error(request_line: &str) -> Option<(String, String)> {
     for pair in query.split('&') {
         if let Some((k, v)) = pair.split_once('=') {
             match k {
-                "error" => error = Some(crate::percent::decode(v, true)),
-                "error_description" => description = crate::percent::decode(v, true),
+                "error" => error = Some(crate::encoding::percent::decode(v, true)),
+                "error_description" => description = crate::encoding::percent::decode(v, true),
                 _ => {}
             }
         }
@@ -424,7 +424,7 @@ fn parse_redirect(request_line: &str) -> (Option<String>, Option<String>) {
     let mut state = None;
     for pair in query.split('&') {
         if let Some((k, v)) = pair.split_once('=') {
-            let value = crate::percent::decode(v, true);
+            let value = crate::encoding::percent::decode(v, true);
             match k {
                 "code" => code = Some(value),
                 "state" => state = Some(value),

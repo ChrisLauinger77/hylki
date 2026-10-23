@@ -162,7 +162,7 @@ pub fn unwrap_message(raw: &[u8], gpg: &Gpg) -> Option<Unwrapped> {
     let shape = detect(raw)?;
     let mut unwrapped = unwrap_shape(shape, raw, gpg);
     unwrapped.status.sender_addr = from_address(raw);
-    unwrapped.status.autocrypt = autocrypt_key(raw).map(|k| crate::oauth::base64_encode(&k));
+    unwrapped.status.autocrypt = autocrypt_key(raw).map(|k| crate::encoding::base64_encode(&k));
     Some(unwrapped)
 }
 
@@ -388,5 +388,5 @@ pub fn autocrypt_key(raw: &[u8]) -> Option<Vec<u8>> {
         }
     }
     let keydata = keydata?;
-    crate::oauth::base64_decode(&keydata).filter(|b| !b.is_empty())
+    crate::encoding::base64_decode(&keydata).filter(|b| !b.is_empty())
 }

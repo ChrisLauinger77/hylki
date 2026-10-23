@@ -1,4 +1,4 @@
-//! The crate's base64: standard encoding, and a lenient decoder that a mail
+//! Base64: standard encoding, and a lenient decoder that a mail
 //! body's wrapped lines and truncated fetches need.
 
 /// Standard base64, for inline `data:` URIs.

@@ -76,7 +76,9 @@ pub(crate) fn hit_menu_entries(
         let address = uri
             .split_once(':')
             .filter(|(scheme, _)| scheme.eq_ignore_ascii_case("mailto"))
-            .map(|(_, rest)| crate::percent::decode(rest.split('?').next().unwrap_or(""), false));
+            .map(|(_, rest)| {
+                crate::encoding::percent::decode(rest.split('?').next().unwrap_or(""), false)
+            });
         out.push(
             match address {
                 Some(a) => MenuEntry::new(i18n("Copy Email Address"), copy(a)),

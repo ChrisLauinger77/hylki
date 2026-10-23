@@ -305,7 +305,7 @@ fn import_status_is_summarised() {
 #[test]
 fn autocrypt_header_yields_the_key() {
     let key = b"\x98\x01\x02binarykey";
-    let b64 = crate::oauth::base64_encode(key);
+    let b64 = crate::encoding::base64_encode(key);
     let raw = format!(
         "From: a@b.c\r\nAutocrypt: addr=a@b.c; prefer-encrypt=mutual;\r\n keydata={}\r\nContent-Type: text/plain\r\n\r\nhi\r\n",
         b64

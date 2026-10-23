@@ -115,7 +115,7 @@ pub(super) fn onedrive_item(path: &str) -> String {
     } else {
         format!(
             "{GRAPH}/me/drive/root:/{}",
-            crate::percent::encode_path(path)
+            crate::encoding::percent::encode_path(path)
         )
     }
 }

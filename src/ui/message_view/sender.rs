@@ -57,7 +57,7 @@ pub(super) fn confirm_trust(
 pub(super) fn fetch_sender_key(pgp: &crate::models::PgpStatus) -> Result<String, String> {
     let gpg = crate::pgp::Gpg::system();
     if let Some(b64) = &pgp.autocrypt {
-        if let Some(bytes) = crate::oauth::base64_decode(b64) {
+        if let Some(bytes) = crate::encoding::base64_decode(b64) {
             if let Ok(s) = crate::pgp::import_keys(&gpg, &bytes) {
                 if !s.fingerprints.is_empty() {
                     return Ok(i18n("The sender's key was imported from the message."));

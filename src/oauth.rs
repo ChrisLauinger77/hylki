@@ -14,11 +14,11 @@ use serde::Deserialize;
 
 use crate::config::OAuthSettings;
 
-mod encoding;
 mod flow;
 mod tokens;
 
-pub use encoding::{base64_decode, base64_encode};
+// The worker reads base64 through this path (until the worker branch is merged).
+pub use crate::encoding::{base64_decode, base64_encode};
 pub use flow::{microsoft_prompt, open_uri, run_flow, run_flow_as, Authorization};
 pub use tokens::{exchange_code, microsoft_whoami, refresh_access_token, refresh_access_token_as};
 
