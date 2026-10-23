@@ -340,7 +340,7 @@ impl AttachmentsGallery {
         if let Ok(path) = std::env::var("HYLKI_SHOWCASE") {
             let content = widgets.folders_box.clone();
             glib::timeout_add_seconds_local_once(1, move || {
-                crate::app::showcase_capture(content.upcast_ref(), &path);
+                crate::ui::showcase::showcase_capture(content.upcast_ref(), &path);
             });
         }
     }

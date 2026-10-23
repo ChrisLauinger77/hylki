@@ -72,7 +72,7 @@ pub(super) fn showcase_hooks(
             let host = root.clone().upcast::<gtk::Widget>();
             gtk::glib::timeout_add_seconds_local_once(at, move || {
                 if host.is_mapped() {
-                    crate::app::showcase_capture(&host, &shot);
+                    crate::ui::showcase::showcase_capture(&host, &shot);
                 }
             });
         }

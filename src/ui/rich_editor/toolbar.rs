@@ -690,7 +690,7 @@ fn showcase_toolbar_toggle(more: &gtk::ToggleButton) {
                             std::time::Duration::from_millis(t),
                             move || {
                                 if let Some(r) = root {
-                                    crate::app::showcase_capture(
+                                    crate::ui::showcase::showcase_capture(
                                         r.upcast_ref::<gtk::Widget>(),
                                         &path,
                                     );

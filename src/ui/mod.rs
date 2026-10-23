@@ -33,6 +33,7 @@ pub mod recipient_row;
 pub mod rich_editor;
 pub mod send_morph;
 pub mod sender_row;
+pub mod showcase;
 pub mod sidebar;
 pub mod theme_picker;
 pub mod tool_flow;

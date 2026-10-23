@@ -139,7 +139,7 @@ impl AccountsWindow {
             if let Ok(path) = std::env::var("HYLKI_SHOWCASE") {
                 let d = dialog.clone();
                 gtk::glib::timeout_add_seconds_local_once(2, move || {
-                    crate::app::showcase_capture(d.upcast_ref(), &path);
+                    crate::ui::showcase::showcase_capture(d.upcast_ref(), &path);
                 });
             }
         }

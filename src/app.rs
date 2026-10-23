@@ -127,7 +127,6 @@ pub(crate) use model::AppModel;
 pub(crate) use msg::AppMsg;
 // The worker reads `crate::app::message_text` (until the worker branch is merged).
 pub(crate) use crate::quote::message_text;
-pub(crate) use showcase::showcase_capture;
 pub(crate) use theme::desktop_icon_theme;
 pub(crate) use uri_queue::{
     is_message_file, queue_attach_files, queue_mailto, queue_message_file, queue_mid,

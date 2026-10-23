@@ -18,7 +18,7 @@ use super::model::AppModel;
 use super::msg::AppMsg;
 use super::prefill::first_recipient;
 use super::send::machine_message;
-use super::showcase::showcase_capture;
+use crate::ui::showcase::showcase_capture;
 
 impl AppModel {
     /// The lists left, as the readers take them: key → when.

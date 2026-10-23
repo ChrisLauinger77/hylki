@@ -6,9 +6,9 @@ use relm4::prelude::*;
 
 use crate::app::model::AppModel;
 use crate::app::msg::AppMsg;
-use crate::app::showcase::showcase_capture;
 use crate::i18n::i18n;
 use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::showcase::showcase_capture;
 use crate::ui::sidebar::CtxAction;
 
 use super::capture::input_after;

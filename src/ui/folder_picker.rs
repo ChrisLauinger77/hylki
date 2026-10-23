@@ -219,7 +219,7 @@ pub fn show_folder_picker(
         if let Ok(path) = std::env::var("HYLKI_SHOWCASE") {
             let column = column.clone();
             gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1000), move || {
-                crate::app::showcase_capture(column.upcast_ref(), &path);
+                crate::ui::showcase::showcase_capture(column.upcast_ref(), &path);
             });
         }
     }

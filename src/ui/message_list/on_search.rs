@@ -127,7 +127,7 @@ impl MessageList {
             picker.button.popup();
             if let Some(popover) = picker.button.popover() {
                 gtk::glib::timeout_add_seconds_local_once(1, move || {
-                    crate::app::showcase_capture(popover.upcast_ref(), &path);
+                    crate::ui::showcase::showcase_capture(popover.upcast_ref(), &path);
                 });
             }
             // HYLKI_SHOWCASE_SCOPE_INFO=<png> opens the first scope's
@@ -141,7 +141,7 @@ impl MessageList {
                     info.popup();
                     if let Some(popover) = info.popover() {
                         gtk::glib::timeout_add_seconds_local_once(1, move || {
-                            crate::app::showcase_capture(popover.upcast_ref(), &path);
+                            crate::ui::showcase::showcase_capture(popover.upcast_ref(), &path);
                         });
                     }
                 });

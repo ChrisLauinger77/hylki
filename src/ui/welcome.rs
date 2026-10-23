@@ -412,7 +412,7 @@ impl Component for Welcome {
                 gtk::glib::timeout_add_local_once(
                     std::time::Duration::from_millis(2000 + 700 * n as u64),
                     move || {
-                        crate::app::showcase_capture(win.upcast_ref(), &path);
+                        crate::ui::showcase::showcase_capture(win.upcast_ref(), &path);
                     },
                 );
             });

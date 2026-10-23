@@ -6,12 +6,12 @@ use relm4::prelude::*;
 
 use crate::app::model::AppModel;
 use crate::app::msg::AppMsg;
-use crate::app::showcase::showcase_capture;
 use crate::app::AppModelWidgets;
 use crate::models::FolderKind;
 use crate::ui::attachments_gallery::GalleryInput;
 use crate::ui::message_list::MessageListInput;
 use crate::ui::message_view::MessageViewInput;
+use crate::ui::showcase::showcase_capture;
 use crate::ui::sidebar::SidebarInput;
 
 impl AppModel {
