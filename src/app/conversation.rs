@@ -469,15 +469,25 @@ impl AppModel {
                 }
             }
         }
-        let to_load: Vec<MissingBody> = self
-            .current_thread
+        let to_load = self.missing_thread_bodies(except);
+        self.request_bodies(to_load);
+    }
+
+    /// The conversation's members whose bodies are still missing, `except`
+    /// one, with the folder each lives in.
+    pub(super) fn missing_thread_bodies(&self, except: Option<(u32, u32)>) -> Vec<MissingBody> {
+        self.current_thread
             .iter()
             .filter(|tm| tm.body.is_empty() && except != Some((tm.account_id, tm.id)))
             .filter_map(|tm| {
                 self.resolve_folder_path(tm)
                     .map(|p| (tm.account_id, tm.id, tm.uid, p))
             })
-            .collect();
+            .collect()
+    }
+
+    /// Asks the workers for these bodies, one request per folder.
+    pub(super) fn request_bodies(&self, to_load: Vec<MissingBody>) {
         for ((aid, path), items) in batch_bodies_by_folder(to_load) {
             self.send_to(aid, MailRequest::LoadBodies { items, path });
         }

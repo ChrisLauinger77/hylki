@@ -470,10 +470,7 @@ impl AppModel {
                             .or_default();
                         continue;
                     }
-                    let messages = self.merge_local_tags(account_id, messages);
-                    let messages = self.apply_pending_seen(account_id, folder_id, messages);
-                    let messages = self.apply_pending_answers(account_id, folder_id, messages);
-                    let messages = self.apply_pending_tags(account_id, folder_id, messages);
+                    let messages = self.overlay_local_state(account_id, folder_id, messages);
                     if open && self.is_unified_target(account_id, folder_id) {
                         if self.unified_reads_through() {
                             self.unified_slices.remove(&(account_id, folder_id));

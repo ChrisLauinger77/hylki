@@ -369,7 +369,7 @@ impl AppModel {
                 }
                 CtxAction::AddFavorite { account_id, path } => {
                     if let Some(email) = self.email_of(account_id) {
-                        let key = format!("{email}\t{path}");
+                        let key = folder_key(&email, &path);
                         if !self.favorites.contains(&key) {
                             // The first favorite shows its list open.
                             if self.favorites.is_empty() {
@@ -383,7 +383,7 @@ impl AppModel {
                 }
                 CtxAction::RemoveFavorite { account_id, path } => {
                     if let Some(email) = self.email_of(account_id) {
-                        let key = format!("{email}\t{path}");
+                        let key = folder_key(&email, &path);
                         self.favorites.retain(|k| *k != key);
                         self.save_sidebar_state();
                         self.rebuild_sidebar();

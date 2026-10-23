@@ -235,18 +235,8 @@ impl AppModel {
                         // holds its spinner.
                         self.queue_thread_render(&sender);
                         // Fetch the bodies we don't have yet (primary first via order).
-                        let to_load: Vec<MissingBody> = self
-                            .current_thread
-                            .iter()
-                            .filter(|tm| tm.body.is_empty())
-                            .filter_map(|tm| {
-                                self.resolve_folder_path(tm)
-                                    .map(|p| (tm.account_id, tm.id, tm.uid, p))
-                            })
-                            .collect();
-                        for ((aid, path), items) in batch_bodies_by_folder(to_load) {
-                            self.send_to(aid, MailRequest::LoadBodies { items, path });
-                        }
+                        let to_load = self.missing_thread_bodies(None);
+                        self.request_bodies(to_load);
                         if let Some(req) = related.take() {
                             self.send_to(account_id, req);
                         }
@@ -393,21 +383,11 @@ impl AppModel {
                     self.message_view
                         .emit(MessageViewInput::HoldPlace { account_id, id });
                 }
-                let to_load: Vec<MissingBody> = self
-                    .current_thread
-                    .iter()
-                    .filter(|tm| tm.body.is_empty())
-                    .filter_map(|tm| {
-                        self.resolve_folder_path(tm)
-                            .map(|p| (tm.account_id, tm.id, tm.uid, p))
-                    })
-                    .collect();
+                let to_load = self.missing_thread_bodies(None);
                 if to_load.is_empty() {
                     self.show_thread();
                 } else {
-                    for ((aid, path), items) in batch_bodies_by_folder(to_load) {
-                        self.send_to(aid, MailRequest::LoadBodies { items, path });
-                    }
+                    self.request_bodies(to_load);
                 }
                 self.load_thread_attachments();
             }

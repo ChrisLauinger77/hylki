@@ -253,7 +253,7 @@ impl AppModel {
         }
         // A deleted folder leaves Favorites (#367), with what was inside it.
         if let Some(email) = self.email_of(account_id) {
-            let own = format!("{email}\t{path}");
+            let own = folder_key(&email, &path);
             let inside = format!("{own}{}", self.folder_delimiter(account_id));
             let before = self.favorites.len();
             self.favorites

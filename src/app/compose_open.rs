@@ -548,18 +548,7 @@ impl AppModel {
                 // None of the named files could be read (#339): asking where
                 // no files should go helps nobody, so the message opens with
                 // the error beside it.
-                self.leave_gallery();
-                let account = self
-                    .current
-                    .as_ref()
-                    .map(|m| m.account_id)
-                    .unwrap_or_else(|| self.active_account());
-                let (account, prefill) = self.new_message_from(account, prefill);
-                if self.compose_inline {
-                    self.open_inline_reply(account, prefill, None, &sender);
-                } else {
-                    self.open_compose(account, prefill, &sender);
-                }
+                self.compose_addressed(prefill, &sender);
                 self.after_hand_off(0, dropped);
             }
 

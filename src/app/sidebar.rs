@@ -44,6 +44,12 @@ pub(super) fn set_sidebar_header_compact(
     title.set_visible(!compact);
 }
 
+/// How the sidebar layout (sidebar.toml: folder order, favorites, folded
+/// tree nodes) names one account's folder: "email\tpath".
+pub(super) fn folder_key(email: &str, path: &str) -> String {
+    format!("{email}\t{path}")
+}
+
 impl AppModel {
     /// Persist the sidebar's per-account state (order, collapse, custom-folders
     /// expansion, and icon-only mode).
@@ -87,7 +93,7 @@ impl AppModel {
         let Some(email) = self.email_of(account_id) else {
             return;
         };
-        let keys: Vec<String> = paths.iter().map(|p| format!("{email}\t{p}")).collect();
+        let keys: Vec<String> = paths.iter().map(|p| folder_key(&email, p)).collect();
         self.folder_order.retain(|k| !keys.contains(k));
         self.folder_order.extend(keys);
     }
@@ -283,7 +289,7 @@ impl AppModel {
                     .find(|a| a.id == account_id)
                     .map(|a| a.email.clone())
                 {
-                    let key = format!("{email}\t{path}");
+                    let key = folder_key(&email, &path);
                     if collapsed {
                         if !self.tree_collapsed.contains(&key) {
                             self.tree_collapsed.push(key);

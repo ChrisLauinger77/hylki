@@ -173,10 +173,7 @@ impl AppModel {
                     .unwrap_or_default();
                 // Nothing newest is nothing at all.
                 if !newest.is_empty() {
-                    let newest = self.merge_local_tags(*account_id, newest);
-                    let newest = self.apply_pending_seen(*account_id, *folder_id, newest);
-                    let newest = self.apply_pending_answers(*account_id, *folder_id, newest);
-                    let newest = self.apply_pending_tags(*account_id, *folder_id, newest);
+                    let newest = self.overlay_local_state(*account_id, *folder_id, newest);
                     self.unified_slices
                         .insert((*account_id, *folder_id), newest);
                     unseen.push((*account_id, *folder_id, path.clone()));
@@ -358,10 +355,7 @@ impl AppModel {
                 if newest.is_empty() {
                     self.message_list.emit(MessageListInput::SetLoading);
                 } else {
-                    let newest = self.merge_local_tags(account_id, newest);
-                    let newest = self.apply_pending_seen(account_id, folder_id, newest);
-                    let newest = self.apply_pending_answers(account_id, folder_id, newest);
-                    let newest = self.apply_pending_tags(account_id, folder_id, newest);
+                    let newest = self.overlay_local_state(account_id, folder_id, newest);
                     self.message_list
                         .emit(MessageListInput::SetMessages { messages: newest });
                 }

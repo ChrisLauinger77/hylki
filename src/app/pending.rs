@@ -31,6 +31,21 @@ impl AppModel {
             .any(|((a, p, _), at)| *a == account_id && p == path && at.elapsed() < PENDING_MOVE_MAX)
     }
 
+    /// A list from the cache or a server with what this session changed
+    /// and the server may not reflect yet laid over it: local tags, then
+    /// the pending read marks, answered marks and tags.
+    pub(super) fn overlay_local_state(
+        &mut self,
+        account_id: u32,
+        folder_id: u32,
+        messages: Vec<Message>,
+    ) -> Vec<Message> {
+        let messages = self.merge_local_tags(account_id, messages);
+        let messages = self.apply_pending_seen(account_id, folder_id, messages);
+        let messages = self.apply_pending_answers(account_id, folder_id, messages);
+        self.apply_pending_tags(account_id, folder_id, messages)
+    }
+
     /// Take the mail whose move is still on its way off a folder list the
     /// worker fetched before running it.
     pub(super) fn drop_pending_moves(

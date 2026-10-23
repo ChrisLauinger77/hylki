@@ -127,8 +127,7 @@ use compose_host::{ComposeHost, ReaderCompose};
 use consts::{ATTACHMENT_CACHE_BUDGET, BODY_CACHE_BUDGET, READER_MIN_WIDTH};
 use contacts::{reload_contacts, start_contacts_sync, sync_contact_books};
 use conversation::{
-    batch_bodies_by_folder, body_key, is_event_target, next_after_vanish, BodyKey, MissingBody,
-    CARRIED_BODY_LIMIT, THREAD_BODY_WAIT,
+    body_key, is_event_target, next_after_vanish, BodyKey, CARRIED_BODY_LIMIT, THREAD_BODY_WAIT,
 };
 use demo::{demo_account_configs_saved, demo_filters, demo_mode, demo_tags};
 use diagnostics::start_heap_trim;
@@ -160,7 +159,7 @@ use search::default_scope;
 use send_morph::{MorphPending, Provisional};
 pub(crate) use showcase::showcase_capture;
 use showcase::showcase_pgp;
-use sidebar::set_sidebar_header_compact;
+use sidebar::{folder_key, set_sidebar_header_compact};
 use sidebar_peek::SIDEBAR_RAIL_WIDTH;
 use smart::SMART_VIEW_LIMIT;
 use split_reply::{set_split_shrink, split_reply_height};
