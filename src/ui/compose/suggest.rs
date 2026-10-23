@@ -262,11 +262,7 @@ impl Compose {
         widgets: &ComposeWidgets,
         sender: &ComponentSender<Self>,
     ) {
-        let row = match field {
-            Field::To => &widgets.to_row,
-            Field::Cc => &widgets.cc_row,
-            Field::Bcc => &widgets.bcc_row,
-        };
+        let row = field_row(widgets, field);
         self.directory_generation = self.directory_generation.wrapping_add(1);
         self.directory_matches.clear();
         let token = recipient_token(row);
@@ -384,11 +380,7 @@ impl Compose {
         matches: Vec<Suggestion>,
         widgets: &ComposeWidgets,
     ) {
-        let row = match field {
-            Field::To => &widgets.to_row,
-            Field::Cc => &widgets.cc_row,
-            Field::Bcc => &widgets.bcc_row,
-        };
+        let row = field_row(widgets, field);
         if generation == self.directory_generation
             && recipient_token(row) == token
             && !matches.is_empty()
@@ -565,4 +557,13 @@ pub(super) fn wire_recipient_rows(widgets: &ComposeWidgets, sender: &ComponentSe
     widgets
         .reply_to_row
         .connect_changed(|row| row.remove_css_class("error"));
+}
+
+/// The recipient row a field names.
+pub(super) fn field_row(widgets: &ComposeWidgets, field: Field) -> &RecipientRow {
+    match field {
+        Field::To => &widgets.to_row,
+        Field::Cc => &widgets.cc_row,
+        Field::Bcc => &widgets.bcc_row,
+    }
 }

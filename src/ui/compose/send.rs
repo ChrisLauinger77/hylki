@@ -1,6 +1,7 @@
 //! Sending and saving: the From, the outgoing message, OpenPGP checks before a
 //! send, and Send Later.
 
+use super::host::show_alert;
 use super::messages::ComposeOutput;
 use super::messages::{ComposeInput, OutgoingFields};
 use super::types::ComposeAccount;
@@ -165,13 +166,11 @@ pub(super) fn pick_send_time(
             _ => {
                 // An explicit time in the past is a slip, not a request to
                 // send at once.
-                let d = adw::MessageDialog::new(
+                show_alert(
                     dlg.transient_for().as_ref(),
-                    Some(i18n("That time has passed").as_str()),
-                    Some(i18n("Choose a time later than now.").as_str()),
+                    i18n("That time has passed").as_str(),
+                    i18n("Choose a time later than now.").as_str(),
                 );
-                d.add_response("ok", &i18n("OK"));
-                d.present();
             }
         }
     });
@@ -434,13 +433,7 @@ impl Compose {
             }
             Err(problem) => {
                 let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-                let dialog = adw::MessageDialog::new(
-                    parent.as_ref(),
-                    Some(&i18n("Cannot send with OpenPGP")),
-                    Some(&problem),
-                );
-                dialog.add_response("ok", &i18n("OK"));
-                dialog.present();
+                show_alert(parent.as_ref(), &i18n("Cannot send with OpenPGP"), &problem);
             }
         }
     }
@@ -479,16 +472,11 @@ impl Compose {
         {
             row.add_css_class("error");
             let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-            let dialog = adw::MessageDialog::new(
+            show_alert(
                 parent.as_ref(),
-                Some(&i18n("Check the address")),
-                Some(&i18n_f(
-                    "“{addr}” is not an email address.",
-                    &[("addr", &addr)],
-                )),
+                &i18n("Check the address"),
+                &i18n_f("“{addr}” is not an email address.", &[("addr", &addr)]),
             );
-            dialog.add_response("ok", &i18n("OK"));
-            dialog.present();
             return;
         }
         let to = widgets.to_row.text().trim().to_string();
@@ -508,16 +496,10 @@ impl Compose {
         if !missing.is_empty() {
             self.rebuild_attachments(&widgets.attach_box, sender);
             let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-            let dialog = adw::MessageDialog::new(
-            parent.as_ref(),
-            Some(&i18n("An attachment is missing")),
-            Some(&i18n_f(
+            show_alert(parent.as_ref(), &i18n("An attachment is missing"), &i18n_f(
                 "Hylki cannot read {names}. It was moved or deleted after it was attached. Remove it, or attach it again from where it is now.",
                 &[("names", &missing.join(", "))],
-            )),
-        );
-            dialog.add_response("ok", &i18n("OK"));
-            dialog.present();
+            ));
             return;
         }
         let cc = widgets.cc_row.text().trim().to_string();
@@ -564,13 +546,7 @@ impl Compose {
             Ok(from) => from,
             Err(why) => {
                 let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-                let dialog = adw::MessageDialog::new(
-                    parent.as_ref(),
-                    Some(&i18n("Check the From address")),
-                    Some(&why),
-                );
-                dialog.add_response("ok", &i18n("OK"));
-                dialog.present();
+                show_alert(parent.as_ref(), &i18n("Check the From address"), &why);
                 return;
             }
         };

@@ -1,6 +1,8 @@
 //! Cloud links: uploading a file too big to attach and putting its link in the
 //! body.
 
+use super::attachments::pick_files;
+use super::host::show_alert;
 use super::messages::ComposeInput;
 use super::types::CloudLink;
 use super::{Compose, ComposeWidgets};
@@ -153,19 +155,9 @@ impl Compose {
         sender: &ComponentSender<Self>,
         root: &adw::BreakpointBin,
     ) {
-        let dialog = gtk::FileDialog::new();
-        dialog.set_title(&i18n("Upload to Cloud Storage"));
-        let parent = root.root().and_downcast::<gtk::Window>();
         let s = sender.input_sender().clone();
-        dialog.open_multiple(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-            if let Ok(model) = res {
-                let paths: Vec<_> = (0..model.n_items())
-                    .filter_map(|i| model.item(i).and_downcast::<gtk::gio::File>()?.path())
-                    .collect();
-                if !paths.is_empty() {
-                    let _ = s.send(ComposeInput::CloudPicked(paths));
-                }
-            }
+        pick_files(root, &i18n("Upload to Cloud Storage"), move |paths| {
+            let _ = s.send(ComposeInput::CloudPicked(paths));
         });
     }
 
@@ -334,13 +326,11 @@ impl Compose {
             }
             Err(e) => {
                 let parent = root.root().and_downcast::<gtk::Window>();
-                let d = adw::MessageDialog::new(
+                show_alert(
                     parent.as_ref(),
-                    Some(i18n_f("Could not upload {name}", &[("name", &name)]).as_str()),
-                    Some(&e),
+                    i18n_f("Could not upload {name}", &[("name", &name)]).as_str(),
+                    &e,
                 );
-                d.add_response("ok", &i18n("OK"));
-                d.present();
             }
         }
         self.rebuild_attachments(&widgets.attach_box, sender);
@@ -394,11 +384,5 @@ impl Compose {
 /// The cloud account's sign-in is missing from the keyring.
 pub(super) fn not_signed_in(root: &adw::BreakpointBin, name: &str) {
     let parent = root.root().and_downcast::<gtk::Window>();
-    let d = adw::MessageDialog::new(
-    parent.as_ref(),
-    Some(i18n("Not signed in").as_str()),
-    Some(i18n_f("The sign-in for {name} is not in the keyring. Open Settings, Cloud Storage, and enter it again.", &[("name", name)]).as_str()),
-);
-    d.add_response("ok", &i18n("OK"));
-    d.present();
+    show_alert(parent.as_ref(), i18n("Not signed in").as_str(), i18n_f("The sign-in for {name} is not in the keyring. Open Settings, Cloud Storage, and enter it again.", &[("name", name)]).as_str());
 }

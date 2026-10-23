@@ -20,7 +20,12 @@ pub fn key_display(id: &str) -> String {
         .into_iter()
         .rev()
         .collect();
-    tail.as_bytes()
+    groups_of_four(&tail)
+}
+
+/// Hex digits in groups of four, the way keys are read out.
+fn groups_of_four(hex: &str) -> String {
+    hex.as_bytes()
         .chunks(4)
         .map(|c| String::from_utf8_lossy(c).into_owned())
         .collect::<Vec<_>>()
@@ -122,12 +127,7 @@ impl KeyInfo {
 
     /// The fingerprint in readable groups of four.
     pub fn fingerprint_display(&self) -> String {
-        self.fingerprint
-            .as_bytes()
-            .chunks(4)
-            .map(|c| String::from_utf8_lossy(c).into_owned())
-            .collect::<Vec<_>>()
-            .join(" ")
+        groups_of_four(&self.fingerprint)
     }
 }
 
@@ -246,6 +246,15 @@ pub struct ImportSummary {
     pub fingerprints: Vec<String>,
 }
 
+impl ImportSummary {
+    /// Count another import into this one.
+    fn add(&mut self, other: ImportSummary) {
+        self.imported += other.imported;
+        self.unchanged += other.unchanged;
+        self.fingerprints.extend(other.fingerprints);
+    }
+}
+
 pub(super) fn import_summary(out: &Run) -> ImportSummary {
     let mut s = ImportSummary::default();
     for line in &out.status_lines {
@@ -349,19 +358,13 @@ pub fn fetch_key(gpg: &Gpg, addr: &str, key_id: Option<&str>) -> Result<ImportSu
             b"",
             None,
         );
-        let s = import_summary(&out);
-        total.imported += s.imported;
-        total.unchanged += s.unchanged;
-        total.fingerprints.extend(s.fingerprints);
+        total.add(import_summary(&out));
         detail = out.detail;
     }
     if total.fingerprints.is_empty() {
         if let Some(id) = key_id.filter(|k| !k.is_empty()) {
             let out = run(gpg, &["--recv-keys", id], b"", None);
-            let s = import_summary(&out);
-            total.imported += s.imported;
-            total.unchanged += s.unchanged;
-            total.fingerprints.extend(s.fingerprints);
+            total.add(import_summary(&out));
             if out.detail.is_some() {
                 detail = out.detail;
             }

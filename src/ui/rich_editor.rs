@@ -228,12 +228,9 @@ impl RichEditor {
 
     /// Read the source text back, exactly as typed.
     pub fn extract_source(&self, cb: impl FnOnce(String) + 'static) {
-        self.webview.evaluate_javascript(
+        self.eval(
             "window.__hylkiSourceText ? window.__hylkiSourceText() : ''",
-            None,
-            None,
-            gtk::gio::Cancellable::NONE,
-            move |res| cb(res.map(|v| v.to_str().to_string()).unwrap_or_default()),
+            cb,
         );
     }
 
@@ -345,13 +342,7 @@ impl RichEditor {
     /// flag set on the first `input` event). Used to avoid saving a pristine,
     /// quote-only reply to Drafts when the reader navigates away.
     pub fn is_dirty(&self, cb: impl FnOnce(bool) + 'static) {
-        self.webview.evaluate_javascript(
-            "String(!!window.__hylkiDirty)",
-            None,
-            None,
-            gtk::gio::Cancellable::NONE,
-            move |res| cb(res.map(|v| v.to_str() == "true").unwrap_or(false)),
-        );
+        self.eval("String(!!window.__hylkiDirty)", move |v| cb(v == "true"));
     }
 
     /// Show or hide the formatting commands: hidden while the message is
@@ -388,13 +379,7 @@ impl RichEditor {
 
     /// Read the current body HTML asynchronously.
     pub fn extract_html(&self, cb: impl FnOnce(String) + 'static) {
-        self.webview.evaluate_javascript(
-            "window.__hylkiBodyHtml()",
-            None,
-            None,
-            gtk::gio::Cancellable::NONE,
-            move |res| cb(res.map(|v| v.to_str().to_string()).unwrap_or_default()),
-        );
+        self.eval("window.__hylkiBodyHtml()", cb);
     }
 
     /// Read the body for *sending*: any picture armed with "Recompress to

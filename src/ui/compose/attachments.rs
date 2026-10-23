@@ -332,14 +332,7 @@ impl Compose {
         }
         for (i, path) in self.attachments.iter().enumerate() {
             let chip = attachment_chip(path, &self.attach_thumbs, sender, i);
-            flow.append(&chip);
-            // GtkFlowBox wraps `chip` in a FlowBoxChild; it fills its column,
-            // but its own row interactivity goes, since the chip's click
-            // handlers are the only real targets.
-            if let Some(cell) = chip.parent().and_downcast::<gtk::FlowBoxChild>() {
-                cell.set_can_focus(false);
-                cell.set_focusable(false);
-            }
+            append_chip(flow, &chip);
         }
         // Cloud links (#144) sit with the attachments but read as links: a
         // cloud icon, the name, and a remove that also takes the paragraph
@@ -365,11 +358,7 @@ impl Compose {
                 let _ = s.send(ComposeInput::RemoveCloudLink(i));
             });
             chip.append(&rm);
-            flow.append(&chip);
-            if let Some(cell) = chip.parent().and_downcast::<gtk::FlowBoxChild>() {
-                cell.set_can_focus(false);
-                cell.set_focusable(false);
-            }
+            append_chip(flow, &chip);
         }
         for _ in 0..self.cloud_busy {
             let chip = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -394,24 +383,9 @@ impl Compose {
         sender: &ComponentSender<Self>,
         root: &adw::BreakpointBin,
     ) {
-        let dialog = gtk::FileDialog::new();
-        dialog.set_title(&i18n("Attach Files"));
-        let parent = root.root().and_downcast::<gtk::Window>();
         let s = sender.input_sender().clone();
-        dialog.open_multiple(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-            if let Ok(model) = res {
-                let mut paths = Vec::new();
-                for i in 0..model.n_items() {
-                    if let Some(file) = model.item(i).and_downcast::<gtk::gio::File>() {
-                        if let Some(p) = file.path() {
-                            paths.push(p);
-                        }
-                    }
-                }
-                if !paths.is_empty() {
-                    let _ = s.send(ComposeInput::AddAttachments(paths));
-                }
-            }
+        pick_files(root, &i18n("Attach Files"), move |paths| {
+            let _ = s.send(ComposeInput::AddAttachments(paths));
         });
     }
 
@@ -516,5 +490,38 @@ impl Compose {
             DropChoice::Inline => self.editor.insert_files(&paths),
             DropChoice::Cloud => sender.input_sender().emit(ComposeInput::CloudPicked(paths)),
         }
+    }
+}
+
+/// Ask for files with the file chooser over the composer's window; `chosen`
+/// gets the local paths picked, and is not called when there are none.
+pub(super) fn pick_files(
+    root: &adw::BreakpointBin,
+    title: &str,
+    chosen: impl FnOnce(Vec<std::path::PathBuf>) + 'static,
+) {
+    let dialog = gtk::FileDialog::new();
+    dialog.set_title(title);
+    let parent = root.root().and_downcast::<gtk::Window>();
+    dialog.open_multiple(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
+        if let Ok(model) = res {
+            let paths: Vec<_> = (0..model.n_items())
+                .filter_map(|i| model.item(i).and_downcast::<gtk::gio::File>()?.path())
+                .collect();
+            if !paths.is_empty() {
+                chosen(paths);
+            }
+        }
+    });
+}
+
+/// Put a chip in the attachment flow. GtkFlowBox wraps it in a
+/// FlowBoxChild, which fills its column but loses its own row
+/// interactivity: the chip's click handlers are the only real targets.
+fn append_chip(flow: &gtk::FlowBox, chip: &gtk::Box) {
+    flow.append(chip);
+    if let Some(cell) = chip.parent().and_downcast::<gtk::FlowBoxChild>() {
+        cell.set_can_focus(false);
+        cell.set_focusable(false);
     }
 }

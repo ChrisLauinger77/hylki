@@ -3,6 +3,7 @@
 
 use super::messages::ComposeInput;
 use super::messages::ComposeOutput;
+use super::suggest::field_row;
 use super::types::ComposePrefill;
 use super::types::Field;
 use super::Compose;
@@ -79,6 +80,13 @@ pub(super) fn set_toggle_icon(btn: &gtk::Button, windowed: bool) {
         btn.set_icon_name("view-fullscreen-symbolic");
         btn.set_tooltip_text(Some(i18n("Open in window").as_str()));
     }
+}
+
+/// A message with only an OK button, over `parent`.
+pub(super) fn show_alert(parent: Option<&gtk::Window>, heading: &str, body: &str) {
+    let dialog = adw::MessageDialog::new(parent, Some(heading), Some(body));
+    dialog.add_response("ok", &i18n("OK"));
+    dialog.present();
 }
 
 /// Save the edited message, discard it, or go back to it. Escape answers
@@ -199,11 +207,7 @@ impl Compose {
             widgets.fields_btn.set_active(true);
             widgets.fields_list.set_visible(true);
         }
-        let row = match field {
-            Field::To => &widgets.to_row,
-            Field::Cc => &widgets.cc_row,
-            Field::Bcc => &widgets.bcc_row,
-        };
+        let row = field_row(widgets, field);
         row.set_visible(true);
         row.grab_focus();
     }

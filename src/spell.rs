@@ -419,11 +419,22 @@ pub fn error_attrs(text: &str, cursor: Option<usize>) -> Option<gtk::pango::Attr
     Some(attrs)
 }
 
+/// Where enchant keeps the personal word lists, one `<lang>.dic` each.
+fn enchant_dir() -> std::path::PathBuf {
+    gtk::glib::user_config_dir().join("enchant")
+}
+
+/// The words of a personal word list: one a line, trimmed, blank lines
+/// skipped.
+fn list_words(text: &str) -> impl Iterator<Item = &str> {
+    text.lines().map(str::trim).filter(|l| !l.is_empty())
+}
+
 /// The personal word list of each active language: the plain
 /// one-word-per-line file enchant keeps in the user config dir, the same
 /// list the body's "Learn Spelling" menu item feeds.
 fn personal_dict_paths() -> Vec<std::path::PathBuf> {
-    let dir = gtk::glib::user_config_dir().join("enchant");
+    let dir = enchant_dir();
     crate::ui::rich_editor::resolved_spell_languages()
         .iter()
         .map(|lang| dir.join(format!("{lang}.dic")))
@@ -435,12 +446,9 @@ fn personal_dict_paths() -> Vec<std::path::PathBuf> {
 pub fn personal_words() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for path in personal_dict_paths() {
-        for word in std::fs::read_to_string(path)
-            .unwrap_or_default()
-            .lines()
-            .map(str::trim)
-        {
-            if !word.is_empty() && !out.iter().any(|w| w == word) {
+        let text = std::fs::read_to_string(path).unwrap_or_default();
+        for word in list_words(&text) {
+            if !out.iter().any(|w| w == word) {
                 out.push(word.to_string());
             }
         }
@@ -452,8 +460,7 @@ pub fn personal_words() -> Vec<String> {
 /// settings backup: language → words.
 pub fn all_personal_words() -> std::collections::BTreeMap<String, Vec<String>> {
     let mut out = std::collections::BTreeMap::new();
-    let dir = gtk::glib::user_config_dir().join("enchant");
-    let Ok(entries) = std::fs::read_dir(dir) else {
+    let Ok(entries) = std::fs::read_dir(enchant_dir()) else {
         return out;
     };
     for e in entries.flatten() {
@@ -464,13 +471,8 @@ pub fn all_personal_words() -> std::collections::BTreeMap<String, Vec<String>> {
         let Some(lang) = path.file_stem().and_then(|x| x.to_str()) else {
             continue;
         };
-        let words: Vec<String> = std::fs::read_to_string(&path)
-            .unwrap_or_default()
-            .lines()
-            .map(str::trim)
-            .filter(|l| !l.is_empty())
-            .map(String::from)
-            .collect();
+        let text = std::fs::read_to_string(&path).unwrap_or_default();
+        let words: Vec<String> = list_words(&text).map(String::from).collect();
         if !words.is_empty() {
             out.insert(lang.to_string(), words);
         }
@@ -485,16 +487,12 @@ pub fn merge_personal_words(lang: &str, words: &[String]) {
     if words.is_empty() || lang.is_empty() || lang.contains('/') || lang.contains("..") {
         return;
     }
-    let dir = gtk::glib::user_config_dir().join("enchant");
+    let dir = enchant_dir();
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join(format!("{lang}.dic"));
     let existing = std::fs::read_to_string(&path).unwrap_or_default();
-    let mut have: std::collections::BTreeSet<String> = existing
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .map(String::from)
-        .collect();
+    let mut have: std::collections::BTreeSet<String> =
+        list_words(&existing).map(String::from).collect();
     let mut out = existing;
     if !out.is_empty() && !out.ends_with('\n') {
         out.push('\n');

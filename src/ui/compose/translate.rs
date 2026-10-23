@@ -3,6 +3,7 @@
 
 use relm4::prelude::*;
 
+use super::host::show_alert;
 use super::messages::ComposeInput;
 use super::{Compose, ComposeWidgets};
 use crate::config::ComposeFormat;
@@ -200,15 +201,13 @@ impl Compose {
         // handed to a third party on the way.
         if self.encrypt {
             let parent = root.root().and_downcast::<gtk::Window>();
-            let d = adw::MessageDialog::new(
+            show_alert(
                 parent.as_ref(),
-                Some(&i18n("Not translated")),
-                Some(&i18n(
+                &i18n("Not translated"),
+                &i18n(
                     "This message is set to be encrypted, so its text is not sent for translation.",
-                )),
+                ),
             );
-            d.add_response("ok", &i18n("OK"));
-            d.present();
             return;
         }
         self.translating = true;
@@ -257,15 +256,11 @@ impl Compose {
             self.editor.run_js(TR_CANCEL);
             if v["empty"].as_bool() == Some(true) {
                 let parent = root.root().and_downcast::<gtk::Window>();
-                let d = adw::MessageDialog::new(
+                show_alert(
                     parent.as_ref(),
-                    Some(&i18n("Nothing to translate yet")),
-                    Some(&i18n(
-                        "Write something first, or select the text to translate.",
-                    )),
+                    &i18n("Nothing to translate yet"),
+                    &i18n("Write something first, or select the text to translate."),
                 );
-                d.add_response("ok", &i18n("OK"));
-                d.present();
             }
             return;
         }
@@ -355,13 +350,7 @@ impl Compose {
             Err(why) => {
                 self.editor.run_js(TR_CANCEL);
                 let parent = root.root().and_downcast::<gtk::Window>();
-                let d = adw::MessageDialog::new(
-                    parent.as_ref(),
-                    Some(&i18n("Could not translate")),
-                    Some(&why),
-                );
-                d.add_response("ok", &i18n("OK"));
-                d.present();
+                show_alert(parent.as_ref(), &i18n("Could not translate"), &why);
             }
         }
     }
