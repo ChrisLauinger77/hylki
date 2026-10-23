@@ -10,165 +10,7 @@ impl AppModel {
             AppMsg::SetFolders {
                 account_id,
                 folders,
-            } => {
-                self.notifications.emit(NotifyInput::ClearConnectivity);
-                // Defence in depth against a wedged session's empty LIST (the
-                // worker filters these too): never trade a real folder list
-                // for nothing.
-                if folders.is_empty()
-                    && self
-                        .folders
-                        .get(&account_id)
-                        .is_some_and(|old| !old.is_empty())
-                {
-                    return;
-                }
-                let mut folders = folders;
-                // The first listing of an account is looked over once for
-                // Exchange's non-mail folders (#239), which are hidden the
-                // way any folder is: the account editor lists them, and can
-                // bring any of them back. Noted as done either way, so a
-                // folder brought back stays back.
-                let seed = self
-                    .config
-                    .get(account_id as usize - 1)
-                    .filter(|cfg| !cfg.folders_seeded)
-                    .map(|_| crate::models::exchange_non_mail_folders(&folders));
-                if let Some(seed) = seed {
-                    if let Some(cfg) = self.config.get_mut(account_id as usize - 1) {
-                        cfg.folders_seeded = true;
-                        if let Err(e) = config::save(&self.config) {
-                            tracing::warn!("could not note the folder look-over: {e}");
-                        }
-                    }
-                    if !seed.is_empty() {
-                        tracing::info!(
-                            "account {account_id}: hiding Exchange's non-mail folders {seed:?}"
-                        );
-                        self.hide_folders(account_id, seed);
-                    }
-                }
-                // A listing from before a hide (the cache at startup, an
-                // answer already on its way) still carries what is hidden.
-                if let Some(cfg) = self.config.get(account_id as usize - 1) {
-                    if !cfg.hidden_folders.is_empty() {
-                        let hidden = cfg.hidden_folders.clone();
-                        folders
-                            .retain(|f| !crate::models::folder_is_hidden(&f.path, None, &hidden));
-                    }
-                }
-                // Manual special-folder assignments (#82) ride over whatever
-                // the worker detected.
-                if let Some(cfg) = self.config.get(account_id as usize - 1) {
-                    apply_folder_roles(&cfg.folder_roles.clone(), &mut folders);
-                }
-                // After the look-over above, which goes by the English names.
-                crate::models::localize_special_folder_names(&mut folders);
-                // Keep the settings editor's folder choices current while open.
-                if let Some(acc) = &self.accounts_win {
-                    acc.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
-                        self.folder_choice_map_with(account_id, &folders),
-                    ));
-                }
-                let unread = merged_unread(
-                    account_id,
-                    self.folders.get(&account_id).map(Vec::as_slice),
-                    &self.folder_unread,
-                    &folders,
-                );
-                self.folder_unread.retain(|(a, _), _| *a != account_id);
-                for (folder_id, n) in unread {
-                    self.folder_unread.insert((account_id, folder_id), n);
-                }
-                // An identical list — above all the refresh confirming an
-                // optimistic folder move, whose local reshape mirrors the
-                // worker exactly — changes nothing on screen: skip the rebuild
-                // so the sidebar's rows don't vanish and reappear for it.
-                let unchanged = self
-                    .folders
-                    .get(&account_id)
-                    .is_some_and(|old| same_folder_list(old, &folders));
-                // Ids are list positions, so a folder another client added,
-                // renamed or removed shifts them (a refresh re-lists the
-                // folders). The open folder and the cached lists follow their
-                // folder by path; a list whose folder is gone is dropped.
-                // The first listing has nothing to follow from.
-                if !unchanged
-                    && self
-                        .folders
-                        .get(&account_id)
-                        .is_some_and(|old| !old.is_empty())
-                {
-                    let old_paths: HashMap<u32, String> = self
-                        .folders
-                        .get(&account_id)
-                        .map(|old| old.iter().map(|f| (f.id, f.path.clone())).collect())
-                        .unwrap_or_default();
-                    let new_ids: HashMap<&str, u32> =
-                        folders.iter().map(|f| (f.path.as_str(), f.id)).collect();
-                    let cached = std::mem::take(&mut self.message_cache);
-                    for ((a, fid), mut list) in cached {
-                        if a != account_id {
-                            self.message_cache.insert((a, fid), list);
-                            continue;
-                        }
-                        let Some(&id) = old_paths.get(&fid).and_then(|p| new_ids.get(p.as_str()))
-                        else {
-                            continue;
-                        };
-                        for m in &mut list {
-                            m.folder_id = id;
-                        }
-                        self.message_cache.insert((a, id), list);
-                    }
-                    if let Some(sel) = self
-                        .selected
-                        .as_mut()
-                        .filter(|s| s.account_id == account_id)
-                    {
-                        if let Some(&id) = new_ids.get(sel.path.as_str()) {
-                            sel.folder_id = id;
-                        }
-                    }
-                }
-                self.folders.insert(account_id, folders);
-                self.push_template_folders();
-                if unchanged {
-                    self.push_unread_counts();
-                } else {
-                    self.rebuild_sidebar();
-                }
-                // Launch with "All Inboxes" already selected: UnifiedSelected
-                // fired before any folder list existed, so its inbox requests
-                // went nowhere and the list sat empty until the user visited a
-                // folder by hand. The first time an account's folders arrive
-                // while the unified view is up, ask for its inbox — the cache
-                // priming already painted its slice, and this is what brings
-                // in whatever changed since the app last ran.
-                if self.unified && self.unified_boot_requested.insert(account_id) {
-                    let mine: Vec<(u32, u32, String)> = self
-                        .unified_targets()
-                        .into_iter()
-                        .filter(|(a, _, _)| *a == account_id)
-                        .collect();
-                    for (_, folder_id, path) in mine {
-                        self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
-                    }
-                }
-                self.schedule_preload(&sender);
-                if self.flag_starred_accounts().contains(&account_id) {
-                    self.refresh_unified_starred(&sender);
-                }
-                self.index_sent_folders(account_id);
-                // A unified view merges one folder per account, and this
-                // account's folders may only now have arrived — so the set the
-                // completeness flag is measured over just changed. It is
-                // otherwise recomputed on `BackfillDone` alone, which meant an
-                // account joining after every other one had finished left the
-                // list claiming a complete index, or (once its own load
-                // landed) spinning with no event left to clear it (#218).
-                self.push_index_complete();
-            }
+            } => self.on_set_folders(account_id, folders, sender),
 
             AppMsg::FolderUnread {
                 account_id,
@@ -312,6 +154,191 @@ impl AppModel {
                 self.body_hits.insert((account_id, folder_id), hits);
             }
             _ => unreachable!("not routed to on_events_folders"),
+        }
+    }
+
+    /// An account's folder list, from the worker's cache or the server.
+    fn on_set_folders(
+        &mut self,
+        account_id: u32,
+        folders: Vec<Folder>,
+        sender: ComponentSender<Self>,
+    ) {
+        self.notifications.emit(NotifyInput::ClearConnectivity);
+        // Defence in depth against a wedged session's empty LIST (the
+        // worker filters these too): never trade a real folder list
+        // for nothing.
+        if folders.is_empty()
+            && self
+                .folders
+                .get(&account_id)
+                .is_some_and(|old| !old.is_empty())
+        {
+            return;
+        }
+        let mut folders = folders;
+        self.prepare_folder_list(account_id, &mut folders);
+        // Keep the settings editor's folder choices current while open.
+        if let Some(acc) = &self.accounts_win {
+            acc.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
+                self.folder_choice_map_with(account_id, &folders),
+            ));
+        }
+        self.merge_folder_unread(account_id, &folders);
+        // An identical list — above all the refresh confirming an
+        // optimistic folder move, whose local reshape mirrors the
+        // worker exactly — changes nothing on screen: skip the rebuild
+        // so the sidebar's rows don't vanish and reappear for it.
+        let unchanged = self
+            .folders
+            .get(&account_id)
+            .is_some_and(|old| same_folder_list(old, &folders));
+        // Ids are list positions, so a folder another client added,
+        // renamed or removed shifts them (a refresh re-lists the
+        // folders). The open folder and the cached lists follow their
+        // folder by path; a list whose folder is gone is dropped.
+        // The first listing has nothing to follow from.
+        if !unchanged
+            && self
+                .folders
+                .get(&account_id)
+                .is_some_and(|old| !old.is_empty())
+        {
+            self.follow_folder_ids(account_id, &folders);
+        }
+        self.folders.insert(account_id, folders);
+        self.push_template_folders();
+        if unchanged {
+            self.push_unread_counts();
+        } else {
+            self.rebuild_sidebar();
+        }
+        self.request_unified_boot(account_id);
+        self.schedule_preload(&sender);
+        if self.flag_starred_accounts().contains(&account_id) {
+            self.refresh_unified_starred(&sender);
+        }
+        self.index_sent_folders(account_id);
+        // A unified view merges one folder per account, and this
+        // account's folders may only now have arrived — so the set the
+        // completeness flag is measured over just changed. It is
+        // otherwise recomputed on `BackfillDone` alone, which meant an
+        // account joining after every other one had finished left the
+        // list claiming a complete index, or (once its own load
+        // landed) spinning with no event left to clear it (#218).
+        self.push_index_complete();
+    }
+
+    /// A new listing made ready to keep: Exchange's non-mail folders
+    /// hidden the first time, hidden folders left out, manual roles laid
+    /// over, special folders named in the app's language.
+    fn prepare_folder_list(&mut self, account_id: u32, folders: &mut Vec<Folder>) {
+        // The first listing of an account is looked over once for
+        // Exchange's non-mail folders (#239), which are hidden the
+        // way any folder is: the account editor lists them, and can
+        // bring any of them back. Noted as done either way, so a
+        // folder brought back stays back.
+        let seed = self
+            .config
+            .get(account_id as usize - 1)
+            .filter(|cfg| !cfg.folders_seeded)
+            .map(|_| crate::models::exchange_non_mail_folders(folders));
+        if let Some(seed) = seed {
+            if let Some(cfg) = self.config.get_mut(account_id as usize - 1) {
+                cfg.folders_seeded = true;
+                if let Err(e) = config::save(&self.config) {
+                    tracing::warn!("could not note the folder look-over: {e}");
+                }
+            }
+            if !seed.is_empty() {
+                tracing::info!("account {account_id}: hiding Exchange's non-mail folders {seed:?}");
+                self.hide_folders(account_id, seed);
+            }
+        }
+        // A listing from before a hide (the cache at startup, an
+        // answer already on its way) still carries what is hidden.
+        if let Some(cfg) = self.config.get(account_id as usize - 1) {
+            if !cfg.hidden_folders.is_empty() {
+                let hidden = cfg.hidden_folders.clone();
+                folders.retain(|f| !crate::models::folder_is_hidden(&f.path, None, &hidden));
+            }
+        }
+        // Manual special-folder assignments (#82) ride over whatever
+        // the worker detected.
+        if let Some(cfg) = self.config.get(account_id as usize - 1) {
+            apply_folder_roles(&cfg.folder_roles.clone(), folders);
+        }
+        // After the look-over above, which goes by the English names.
+        crate::models::localize_special_folder_names(folders);
+    }
+
+    /// The new list's unread counts, never trading a known count for a
+    /// zero the listing did not measure (see `merged_unread`).
+    fn merge_folder_unread(&mut self, account_id: u32, folders: &[Folder]) {
+        let unread = merged_unread(
+            account_id,
+            self.folders.get(&account_id).map(Vec::as_slice),
+            &self.folder_unread,
+            folders,
+        );
+        self.folder_unread.retain(|(a, _), _| *a != account_id);
+        for (folder_id, n) in unread {
+            self.folder_unread.insert((account_id, folder_id), n);
+        }
+    }
+
+    /// Ids are list positions: the open folder and the cached lists
+    /// follow their folder by path to its new id; a list whose folder is
+    /// gone is dropped.
+    fn follow_folder_ids(&mut self, account_id: u32, folders: &[Folder]) {
+        let old_paths: HashMap<u32, String> = self
+            .folders
+            .get(&account_id)
+            .map(|old| old.iter().map(|f| (f.id, f.path.clone())).collect())
+            .unwrap_or_default();
+        let new_ids: HashMap<&str, u32> = folders.iter().map(|f| (f.path.as_str(), f.id)).collect();
+        let cached = std::mem::take(&mut self.message_cache);
+        for ((a, fid), mut list) in cached {
+            if a != account_id {
+                self.message_cache.insert((a, fid), list);
+                continue;
+            }
+            let Some(&id) = old_paths.get(&fid).and_then(|p| new_ids.get(p.as_str())) else {
+                continue;
+            };
+            for m in &mut list {
+                m.folder_id = id;
+            }
+            self.message_cache.insert((a, id), list);
+        }
+        if let Some(sel) = self
+            .selected
+            .as_mut()
+            .filter(|s| s.account_id == account_id)
+        {
+            if let Some(&id) = new_ids.get(sel.path.as_str()) {
+                sel.folder_id = id;
+            }
+        }
+    }
+
+    /// Launch with "All Inboxes" already selected: UnifiedSelected
+    /// fired before any folder list existed, so its inbox requests
+    /// went nowhere and the list sat empty until the user visited a
+    /// folder by hand. The first time an account's folders arrive
+    /// while the unified view is up, ask for its inbox — the cache
+    /// priming already painted its slice, and this is what brings
+    /// in whatever changed since the app last ran.
+    fn request_unified_boot(&mut self, account_id: u32) {
+        if self.unified && self.unified_boot_requested.insert(account_id) {
+            let mine: Vec<(u32, u32, String)> = self
+                .unified_targets()
+                .into_iter()
+                .filter(|(a, _, _)| *a == account_id)
+                .collect();
+            for (_, folder_id, path) in mine {
+                self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
+            }
         }
     }
 }
