@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::i18n::{i18n, i18n_f};
-use crate::models::{Account, KeywordFinding};
+use crate::models::Account;
 
 mod api;
 mod auth;

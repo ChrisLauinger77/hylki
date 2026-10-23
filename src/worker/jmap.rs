@@ -19,37 +19,20 @@
 //! Proven against a local Stalwart container; Fastmail speaks the same
 //! standard but has not been tried by hand.
 
-use std::collections::BTreeMap;
-
 use super::*;
-use crate::worker::jmap::chores::{auto_empty_jmap, clean_lists_jmap, emit_jmap_body_hits};
-use crate::worker::jmap::folders::{
-    jmap_create_mailbox, jmap_refresh_unread, refresh_jmap_folders,
-};
+use crate::worker::jmap::folders::refresh_jmap_folders;
 use crate::worker::jmap::index::{
-    jmap_backfill_pause, jmap_backfill_step, jmap_load_folder, jmap_sync_folder, JmapState,
-    JMAP_BACKFILL_BACKOFF,
+    jmap_backfill_pause, jmap_backfill_step, JmapState, JMAP_BACKFILL_BACKOFF,
 };
-use crate::worker::jmap::messages::{jmap_get_messages, jmap_query_ids};
-use crate::worker::jmap::ops::{
-    jmap_all_ids_in, jmap_destroy_all, jmap_drop_draft_origin, jmap_fetch_raw, jmap_import,
-    jmap_import_draft, jmap_import_template, jmap_move_uids, jmap_patch_all, jmap_patch_message,
-    jmap_purge_uids, jmap_strip_attachment, jmap_undo_move,
-};
-use crate::worker::jmap::push::{
-    jmap_deliver_body, jmap_poll_inbox, serve_cached, spawn_jmap_push,
-};
-use crate::worker::jmap::send::{
-    emit_jmap_identities, jmap_flush_outbox, jmap_mark_answered, jmap_send_message,
-    SUBMISSION_REFUSED,
-};
-use crate::worker::jmap::wire::{
-    args, call, jmap_base_url, jmap_call, jmap_session, jmap_storage_quota, CAP_CORE, CAP_MAIL,
-    CAP_QUOTA,
-};
+use crate::worker::jmap::push::{jmap_poll_inbox, spawn_jmap_push};
+use crate::worker::jmap::send::emit_jmap_identities;
+use crate::worker::jmap::wire::{jmap_base_url, jmap_session};
 
 mod chores;
 mod folders;
+mod handle_read;
+mod handle_send;
+mod handle_write;
 mod index;
 mod messages;
 mod ops;
@@ -57,272 +40,189 @@ mod push;
 mod send;
 mod wire;
 
-use crate::worker::compose::build::{build_draft, draft_message_id, restore_msgid_case};
-use crate::worker::drafts::{draft_not_saved, saving_text};
-use crate::worker::ids::hash_uid;
-use crate::worker::outbox::{
-    delete_queued, drop_superseded_outbox, emit_outbox, schedule_send, send_failed,
-};
-use crate::worker::render::attachments::extract_attachments;
-use crate::worker::strip::{cache_rewritten, strip_refused};
+use crate::worker::outbox::{delete_queued, emit_outbox};
 pub(super) use wire::test_jmap;
 
+/// A JMAP account's worker: the session and index state, the push channel,
+/// and what it reports through.
+struct JmapWorker<E> {
+    account_id: u32,
+    account: AccountConfig,
+    rx: mpsc::UnboundedReceiver<MailRequest>,
+    emit: E,
+    cache: Option<Cache>,
+    state: JmapState,
+    last_auto_empty: Option<std::time::Instant>,
+    last_list_clean: Option<std::time::Instant>,
+    /// The push thread's wake-ups: one `()` per change the server announced.
+    push_tx: mpsc::UnboundedSender<()>,
+    push_rx: mpsc::UnboundedReceiver<()>,
+    push_enabled: bool,
+    push_started: bool,
+}
+
+/// Run a JMAP account until the UI drops its sender.
 pub(super) async fn run_jmap(
     account_id: u32,
-    mut account: AccountConfig,
-    mut rx: mpsc::UnboundedReceiver<MailRequest>,
+    account: AccountConfig,
+    rx: mpsc::UnboundedReceiver<MailRequest>,
     emit: impl Fn(WorkerEvent),
 ) {
-    // The password lives in the keyring, like an IMAP account's.
-    if account.password.is_empty() {
-        if let Some(pw) = crate::config::load_password(&account.email) {
-            account.password = pw;
+    JmapWorker::start(account_id, account, rx, emit)
+        .await
+        .run()
+        .await;
+}
+
+impl<E: Fn(WorkerEvent)> JmapWorker<E> {
+    /// Read the password, show the account and its cached folders, then open
+    /// the session, list the mailboxes and start push.
+    async fn start(
+        account_id: u32,
+        mut account: AccountConfig,
+        rx: mpsc::UnboundedReceiver<MailRequest>,
+        emit: E,
+    ) -> Self {
+        // The password lives in the keyring, like an IMAP account's.
+        if account.password.is_empty() {
+            if let Some(pw) = crate::config::load_password(&account.email) {
+                account.password = pw;
+            }
+        } else {
+            let _ = crate::config::store_password(&account.email, &account.password);
+            crate::config::strip_passwords_on_disk();
         }
-    } else {
-        let _ = crate::config::store_password(&account.email, &account.password);
-        crate::config::strip_passwords_on_disk();
-    }
 
-    let cache = Cache::open()
-        .map_err(|e| tracing::warn!("cache unavailable: {e}"))
-        .ok();
+        let cache = Cache::open()
+            .map_err(|e| tracing::warn!("cache unavailable: {e}"))
+            .ok();
 
-    emit(WorkerEvent::Account(Account {
-        id: account_id,
-        name: account.name.clone(),
-        email: account.email.clone(),
-        label: account.display_label(),
-        accent: accent_for(account_id).into(),
-    }));
+        emit(WorkerEvent::Account(Account {
+            id: account_id,
+            name: account.name.clone(),
+            email: account.email.clone(),
+            label: account.display_label(),
+            accent: accent_for(account_id).into(),
+        }));
 
-    let cached_folders = cache
-        .as_ref()
-        .map(|c| c.load_folders(account_id))
-        .unwrap_or_default();
-    if !cached_folders.is_empty() {
-        emit(WorkerEvent::Folders(cached_folders));
-    }
-
-    let mut last_auto_empty: Option<std::time::Instant> = None;
-    let mut last_list_clean: Option<std::time::Instant> = None;
-    let mut state = JmapState::new(&account);
-
-    let (push_tx, mut push_rx) = mpsc::unbounded_channel::<()>();
-    let push_enabled = account
-        .push
-        .unwrap_or_else(|| crate::config::load_privacy().push);
-    let mut push_started = false;
-
-    if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-        refresh_jmap_folders(&s, account_id, cache.as_ref(), &mut state, &emit).await;
-        emit_jmap_identities(&s, &emit);
-        if push_enabled {
-            spawn_jmap_push(s.clone(), push_tx.clone());
-            push_started = true;
+        let cached_folders = cache
+            .as_ref()
+            .map(|c| c.load_folders(account_id))
+            .unwrap_or_default();
+        if !cached_folders.is_empty() {
+            emit(WorkerEvent::Folders(cached_folders));
         }
+
+        let state = JmapState::new(&account);
+        let (push_tx, push_rx) = mpsc::unbounded_channel::<()>();
+        let push_enabled = account
+            .push
+            .unwrap_or_else(|| crate::config::load_privacy().push);
+        let mut worker = JmapWorker {
+            account_id,
+            account,
+            rx,
+            emit,
+            cache,
+            state,
+            last_auto_empty: None,
+            last_list_clean: None,
+            push_tx,
+            push_rx,
+            push_enabled,
+            push_started: false,
+        };
+
+        let w = &mut worker;
+        if let Some(s) = jmap_session(&w.account, &mut w.state, &w.emit).await {
+            refresh_jmap_folders(&s, account_id, w.cache.as_ref(), &mut w.state, &w.emit).await;
+            emit_jmap_identities(&s, &w.emit);
+            if w.push_enabled {
+                spawn_jmap_push(s.clone(), w.push_tx.clone());
+                w.push_started = true;
+            }
+        }
+        worker
     }
 
-    // The poll is the fallback for a server without push (or with it off):
-    // the auto-fetch cadence when set, otherwise a quiet couple of minutes.
-    let poll_secs = match crate::config::load_privacy().fetch_interval_secs {
-        0 => 120,
-        s => s.max(60),
-    };
-    let mut poll = tokio::time::interval(Duration::from_secs(poll_secs));
-    poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    poll.tick().await;
+    /// Serve requests until the UI hangs up; between them, follow push,
+    /// poll, and index the mailbox in the background.
+    async fn run(mut self) {
+        // The poll is the fallback for a server without push (or with it off):
+        // the auto-fetch cadence when set, otherwise a quiet couple of minutes.
+        let poll_secs = match crate::config::load_privacy().fetch_interval_secs {
+            0 => 120,
+            s => s.max(60),
+        };
+        let mut poll = tokio::time::interval(Duration::from_secs(poll_secs));
+        poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        poll.tick().await;
 
-    loop {
-        // The background index (#429) runs only while nothing else is
-        // asked, a single request a step.
-        // Offline or on a metered connection it waits; the request that
-        // follows the change wakes this loop to look again (#442).
-        let indexing = !state.backfill.is_empty()
-            && crate::power::reaches_url(&jmap_base_url(&account))
-            && !crate::power::saving_data();
-        let wait = state.backfill_wait;
-        let req = tokio::select! {
-            biased;
-            req = rx.recv() => match req {
-                Some(req) => req,
-                None => break,
-            },
-            _ = poll.tick() => {
-                if !crate::power::reaches_url(&jmap_base_url(&account)) {
+        loop {
+            let account_id = self.account_id;
+            let account = &self.account;
+            let cache = &self.cache;
+            let state = &mut self.state;
+            let emit = &self.emit;
+            // The background index (#429) runs only while nothing else is
+            // asked, a single request a step.
+            // Offline or on a metered connection it waits; the request that
+            // follows the change wakes this loop to look again (#442).
+            let indexing = !state.backfill.is_empty()
+                && crate::power::reaches_url(&jmap_base_url(account))
+                && !crate::power::saving_data();
+            let wait = state.backfill_wait;
+            let req = tokio::select! {
+                biased;
+                req = self.rx.recv() => match req {
+                    Some(req) => req,
+                    None => break,
+                },
+                _ = poll.tick() => {
+                    if !crate::power::reaches_url(&jmap_base_url(account)) {
+                        continue;
+                    }
+                    if let Some(s) = jmap_session(account, state, &|_| {}).await {
+                        jmap_poll_inbox(&s, account_id, account, cache.as_ref(), state, emit).await;
+                        if self.push_enabled && !self.push_started {
+                            spawn_jmap_push(s.clone(), self.push_tx.clone());
+                            self.push_started = true;
+                        }
+                    }
                     continue;
                 }
-                if let Some(s) = jmap_session(&account, &mut state, &|_| {}).await {
-                    jmap_poll_inbox(&s, account_id, &account, cache.as_ref(), &mut state, &emit).await;
-                    if push_enabled && !push_started {
-                        spawn_jmap_push(s.clone(), push_tx.clone());
-                        push_started = true;
+                Some(()) = self.push_rx.recv() => {
+                    // A burst of changes is one refresh.
+                    while self.push_rx.try_recv().is_ok() {}
+                    if let Some(s) = jmap_session(account, state, &|_| {}).await {
+                        jmap_poll_inbox(&s, account_id, account, cache.as_ref(), state, emit).await;
                     }
+                    continue;
                 }
-                continue;
-            }
-            Some(()) = push_rx.recv() => {
-                // A burst of changes is one refresh.
-                while push_rx.try_recv().is_ok() {}
-                if let Some(s) = jmap_session(&account, &mut state, &|_| {}).await {
-                    jmap_poll_inbox(&s, account_id, &account, cache.as_ref(), &mut state, &emit).await;
+                _ = jmap_backfill_pause(wait), if indexing => {
+                    match jmap_session(account, state, &|_| {}).await {
+                        Some(s) => jmap_backfill_step(&s, account_id, cache.as_ref(), state, emit).await,
+                        None => state.backfill_wait = Some(std::time::Instant::now() + JMAP_BACKFILL_BACKOFF),
+                    }
+                    continue;
                 }
-                continue;
-            }
-            _ = jmap_backfill_pause(wait), if indexing => {
-                match jmap_session(&account, &mut state, &|_| {}).await {
-                    Some(s) => jmap_backfill_step(&s, account_id, cache.as_ref(), &mut state, &emit).await,
-                    None => state.backfill_wait = Some(std::time::Instant::now() + JMAP_BACKFILL_BACKOFF),
-                }
-                continue;
-            }
-        };
+            };
+            self.handle(req).await;
+        }
+    }
+
+    /// The handler for each kind of request.
+    async fn handle(&mut self, req: MailRequest) {
         // A folder the user opened, rather than a background refresh.
         let user = matches!(req, MailRequest::LoadMessages { .. });
+        let account_id = self.account_id;
+        let cache = &self.cache;
+        let emit = &self.emit;
         match req {
-            MailRequest::Locate { message_id } => {
-                // The cache first, as on IMAP: every folder listing went
-                // through it. Then a header filter on the server, which finds
-                // the message wherever it is filed on a server that indexes
-                // Message-ID (Stalwart's full-text index does not).
-                let mut hit = cache
-                    .as_ref()
-                    .map(|c| c.locate_by_message_id(&message_id))
-                    .unwrap_or_default()
-                    .into_iter()
-                    .find(|(a, _, _)| *a == account_id)
-                    .map(|(_, path, uid)| (path, uid));
-                if hit.is_none() {
-                    if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                        let sess = s.clone();
-                        let mid = message_id.clone();
-                        let found = blocking(move || {
-                            let ids = jmap_query_ids(
-                                &sess,
-                                serde_json::json!({ "header": ["Message-ID", mid] }),
-                                5,
-                            )?;
-                            jmap_get_messages(&sess, &ids, 0, 0).map(|got| {
-                                got.into_iter()
-                                    .map(|(m, id, blob)| (m, id, blob))
-                                    .collect::<Vec<_>>()
-                            })
-                        })
-                        .await;
-                        if let Ok(got) = found {
-                            // The listing carries the mailbox ids in the raw
-                            // object, which the summary drops; ask again for
-                            // just those.
-                            let ids: Vec<String> =
-                                got.iter().map(|(_, id, _)| id.clone()).collect();
-                            let sess = s.clone();
-                            let boxes = blocking(move || {
-                            let r = jmap_call(
-                                &sess,
-                                &[CAP_CORE, CAP_MAIL],
-                                vec![call(0, "Email/get", serde_json::json!({
-                                    "accountId": sess.account, "ids": ids, "properties": ["id", "blobId", "mailboxIds"]
-                                }))],
-                            )?;
-                            Ok(args(&r, 0)["list"].as_array().cloned().unwrap_or_default())
-                        })
-                        .await
-                        .unwrap_or_default();
-                            'outer: for e in boxes {
-                                let Some(id) = e["id"].as_str() else { continue };
-                                let blob = e["blobId"].as_str().unwrap_or("").to_string();
-                                for (mbox, _) in e["mailboxIds"].as_object().into_iter().flatten() {
-                                    if let Some((_, path)) = state.path_of(mbox) {
-                                        let uid = hash_uid(id);
-                                        state.uids.insert(uid, (id.to_string(), blob.clone()));
-                                        hit = Some((path, uid));
-                                        break 'outer;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                emit(WorkerEvent::Located { message_id, hit });
-            }
-            MailRequest::Quota => {
-                let mut quota = None;
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    if s.quota {
-                        let sess = s.clone();
-                        let r = blocking(move || {
-                            jmap_call(
-                                &sess,
-                                &[CAP_CORE, CAP_QUOTA],
-                                vec![call(
-                                    0,
-                                    "Quota/get",
-                                    serde_json::json!({ "accountId": sess.account, "ids": null }),
-                                )],
-                            )
-                        })
-                        .await;
-                        match r {
-                            Ok(responses) => {
-                                quota = jmap_storage_quota(&args(&responses, 0)["list"])
-                            }
-                            Err(e) => tracing::warn!("[account {account_id}] quota: {e}"),
-                        }
-                    }
-                }
-                emit(WorkerEvent::Quota(quota));
-            }
-            MailRequest::FindKeywords => {
-                // JMAP has no keyword listing; the cached rows are the
-                // survey, as they are for the count on every path.
-                let mut seen: BTreeMap<String, usize> = BTreeMap::new();
-                if let Some(c) = cache.as_ref() {
-                    for f in c.load_folders(account_id) {
-                        for m in c.load_messages(account_id, &f.path, f.id) {
-                            for k in m.keywords {
-                                *seen.entry(k).or_default() += 1;
-                            }
-                        }
-                    }
-                }
-                let found = seen
-                    .into_iter()
-                    .map(|(keyword, count)| KeywordFinding {
-                        keyword,
-                        name: None,
-                        color: None,
-                        count,
-                        folders: Vec::new(),
-                    })
-                    .collect();
-                emit(WorkerEvent::KeywordsFound(found));
-            }
-            MailRequest::RefreshKeywords { .. } => {
-                let mut paths = Vec::new();
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    let folders: Vec<(String, u32)> = state
-                        .folders
-                        .iter()
-                        .map(|(p, (id, _))| (p.clone(), *id))
-                        .collect();
-                    for (path, folder_id) in folders {
-                        if jmap_load_folder(
-                            &s,
-                            account_id,
-                            folder_id,
-                            &path,
-                            cache.as_ref(),
-                            &mut state,
-                        )
-                        .await
-                        .is_ok()
-                        {
-                            paths.push(path);
-                        }
-                    }
-                }
-                emit(WorkerEvent::KeywordsSynced { paths });
-            }
-
+            MailRequest::Locate { message_id } => self.on_locate(message_id).await,
+            MailRequest::Quota => self.on_quota().await,
+            MailRequest::FindKeywords => self.on_find_keywords().await,
+            MailRequest::RefreshKeywords { .. } => self.on_refresh_keywords().await,
             // Cache-only, exactly like the other paths.
             MailRequest::ScanAttachments { folder_path } => {
                 emit(WorkerEvent::AttachmentsScanned {
@@ -348,606 +248,74 @@ pub(super) async fn run_jmap(
                     .unwrap_or_default();
                 emit(WorkerEvent::ThreadSummaries { summaries });
             }
-
             MailRequest::LoadMessages { folder_id, path }
             | MailRequest::SyncFolder { folder_id, path } => {
-                if let Some(c) = cache.as_ref() {
-                    let cached = c.load_messages(account_id, &path, folder_id);
-                    if !cached.is_empty() {
-                        emit(WorkerEvent::Messages {
-                            folder_id,
-                            messages: cached,
-                        });
-                    }
-                }
-                emit(WorkerEvent::Status(i18n("Syncing…")));
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    emit(WorkerEvent::BackfillDone { folder_id });
-                    emit(WorkerEvent::Status(String::new()));
-                    continue;
-                };
-                match jmap_sync_folder(&s, account_id, folder_id, &path, cache.as_ref(), &mut state)
-                    .await
-                {
-                    Ok((messages, complete)) => {
-                        let unread = state.chip_count(folder_id, &messages);
-                        emit_jmap_body_hits(
-                            &s, &account, folder_id, &path, &messages, &state, &emit,
-                        )
-                        .await;
-                        emit(WorkerEvent::Messages {
-                            folder_id,
-                            messages,
-                        });
-                        emit(WorkerEvent::FolderUnread { folder_id, unread });
-                        // Complete when the first page held the whole folder,
-                        // or once the background index has run (#429).
-                        if state.index_after_load(&path, complete, user) {
-                            emit(WorkerEvent::BackfillDone { folder_id });
-                        }
-                    }
-                    Err(e) => {
-                        emit(WorkerEvent::net_error(i18n_f(
-                            "Could not fetch mail: {e}",
-                            &[("e", &e)],
-                        )));
-                        emit(WorkerEvent::BackfillDone { folder_id });
-                    }
-                }
-                emit(WorkerEvent::Status(String::new()));
+                self.on_load_messages(folder_id, path, user).await
             }
-
             MailRequest::LoadBody {
                 message_id,
                 path,
                 uid,
-            } => {
-                if serve_cached(cache.as_ref(), account_id, &path, uid, message_id, &emit) {
-                    continue;
-                }
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                jmap_deliver_body(
-                    &s,
-                    account_id,
-                    message_id,
-                    &path,
-                    uid,
-                    cache.as_ref(),
-                    &mut state,
-                    &emit,
-                )
-                .await;
-            }
-
-            MailRequest::LoadBodies { items, path } => {
-                for (message_id, uid) in items {
-                    if serve_cached(cache.as_ref(), account_id, &path, uid, message_id, &emit) {
-                        continue;
-                    }
-                    let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                        break;
-                    };
-                    jmap_deliver_body(
-                        &s,
-                        account_id,
-                        message_id,
-                        &path,
-                        uid,
-                        cache.as_ref(),
-                        &mut state,
-                        &emit,
-                    )
-                    .await;
-                }
-            }
-
+            } => self.on_load_body(message_id, path, uid).await,
+            MailRequest::LoadBodies { items, path } => self.on_load_bodies(items, path).await,
             MailRequest::LoadSource {
                 message_id: _,
                 path,
                 uid,
-            } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                match jmap_fetch_raw(&s, &mut state, &path, uid).await {
-                    Ok(raw) => emit(WorkerEvent::Source {
-                        text: String::from_utf8_lossy(&raw).into_owned(),
-                    }),
-                    Err(e) => emit(WorkerEvent::net_error(i18n_f(
-                        "Could not load source: {e}",
-                        &[("e", &e)],
-                    ))),
-                }
-            }
-
+            } => self.on_load_source(path, uid).await,
             MailRequest::LoadAttachments {
                 message_id,
                 path,
                 uid,
                 download,
             } => {
-                if let Some(c) = cache.as_ref() {
-                    let items = c.load_attachments(account_id, &path, uid);
-                    if !items.is_empty() {
-                        emit(WorkerEvent::Attachments {
-                            path: path.to_string(),
-                            message_id,
-                            items,
-                        });
-                        continue;
-                    }
-                }
-                if !download {
-                    emit(WorkerEvent::AttachmentsPending {
-                        path: path.to_string(),
-                        message_id,
-                    });
-                    continue;
-                }
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                match jmap_fetch_raw(&s, &mut state, &path, uid).await {
-                    Ok(raw) => {
-                        let items = extract_attachments(&raw);
-                        if let Some(c) = cache.as_ref() {
-                            c.save_attachments(account_id, &path, uid, &items);
-                        }
-                        emit(WorkerEvent::Attachments {
-                            path: path.to_string(),
-                            message_id,
-                            items,
-                        });
-                    }
-                    Err(e) => emit(WorkerEvent::net_error(i18n_f(
-                        "Could not load attachments: {e}",
-                        &[("e", &e)],
-                    ))),
-                }
+                self.on_load_attachments(message_id, path, uid, download)
+                    .await
             }
-
-            MailRequest::SetSeen { path, uid, seen } => {
-                if let Some(c) = cache.as_ref() {
-                    c.set_unread(account_id, &path, uid, !seen);
-                }
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    let patch = serde_json::json!({ "keywords/$seen": if seen { serde_json::Value::Bool(true) } else { serde_json::Value::Null } });
-                    jmap_patch_message(&s, &mut state, &path, uid, patch).await;
-                }
-                emit(WorkerEvent::SeenSettled { path, uid });
-            }
-
+            MailRequest::SetSeen { path, uid, seen } => self.on_set_seen(path, uid, seen).await,
             MailRequest::SetFlagged { path, uid, flagged } => {
-                if let Some(c) = cache.as_ref() {
-                    c.set_starred(account_id, &path, uid, flagged);
-                }
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    let patch = serde_json::json!({ "keywords/$flagged": if flagged { serde_json::Value::Bool(true) } else { serde_json::Value::Null } });
-                    jmap_patch_message(&s, &mut state, &path, uid, patch).await;
-                }
+                self.on_set_flagged(path, uid, flagged).await
             }
-
             MailRequest::SetKeyword {
                 path,
                 uid,
                 keyword,
                 add,
                 ..
-            } => {
-                if let Some(c) = cache.as_ref() {
-                    c.set_keyword(account_id, &path, uid, &keyword, add);
-                }
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    let patch = serde_json::json!({ format!("keywords/{keyword}"): if add { serde_json::Value::Bool(true) } else { serde_json::Value::Null } });
-                    jmap_patch_message(&s, &mut state, &path, uid, patch).await;
-                }
-                emit(WorkerEvent::TagSettled { path, uid, keyword });
-            }
-
+            } => self.on_set_keyword(path, uid, keyword, add).await,
             MailRequest::MarkAllRead { folder_id, path } => {
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    if let Some((_, mailbox_id)) = state.folders.get(&path).cloned() {
-                        let sess = s.clone();
-                        let r = blocking(move || {
-                            let ids = jmap_all_ids_in(
-                                &sess,
-                                &mailbox_id,
-                                serde_json::json!({ "notKeyword": "$seen" }),
-                            )?;
-                            jmap_patch_all(
-                                &sess,
-                                &ids,
-                                &serde_json::json!({ "keywords/$seen": true }),
-                            )
-                        })
-                        .await;
-                        if let Err(e) = r {
-                            tracing::warn!("jmap: mark all read in {path} failed: {e}");
-                        }
-                    }
-                }
-                if let Some(c) = cache.as_ref() {
-                    c.mark_folder_read(account_id, &path);
-                }
-                emit(WorkerEvent::FolderUnread {
-                    folder_id,
-                    unread: 0,
-                });
+                self.on_mark_all_read(folder_id, path).await
             }
-
             MailRequest::MoveMessage { path, uid, dest } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                if let Err(e) = jmap_move_uids(
-                    &s,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &[uid],
-                    &dest,
-                    serde_json::json!({}),
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    emit(WorkerEvent::error(i18n_f(
-                        "Could not move message: {e}",
-                        &[("e", &e)],
-                    )));
-                }
+                self.on_move_message(path, uid, dest).await
             }
-
-            MailRequest::MarkSpam { path, uid, dest } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                let verdict =
-                    serde_json::json!({ "keywords/$junk": true, "keywords/$notjunk": null });
-                if let Err(e) = jmap_move_uids(
-                    &s,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &[uid],
-                    &dest,
-                    verdict,
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    emit(WorkerEvent::error(i18n_f(
-                        "Could not mark as spam: {e}",
-                        &[("e", &e)],
-                    )));
-                }
-            }
-
-            MailRequest::MarkHam { path, uid, dest } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                let verdict =
-                    serde_json::json!({ "keywords/$junk": null, "keywords/$notjunk": true });
-                if let Err(e) = jmap_move_uids(
-                    &s,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &[uid],
-                    &dest,
-                    verdict,
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    emit(WorkerEvent::error(i18n_f(
-                        "Could not mark as not spam: {e}",
-                        &[("e", &e)],
-                    )));
-                }
-            }
+            MailRequest::MarkSpam { path, uid, dest } => self.on_mark_spam(path, uid, dest).await,
+            MailRequest::MarkHam { path, uid, dest } => self.on_mark_ham(path, uid, dest).await,
             MailRequest::MarkHamMany { path, uids, dest } => {
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    let verdict =
-                        serde_json::json!({ "keywords/$junk": null, "keywords/$notjunk": true });
-                    if let Err(e) = jmap_move_uids(
-                        &s,
-                        account_id,
-                        &mut state,
-                        &path,
-                        &uids,
-                        &dest,
-                        verdict,
-                        cache.as_ref(),
-                    )
-                    .await
-                    {
-                        emit(WorkerEvent::error(i18n_f(
-                            "Could not mark {len} messages as not spam: {e}",
-                            &[("len", &uids.len().to_string()), ("e", &e)],
-                        )));
-                    }
-                }
-                emit(WorkerEvent::BulkComplete);
+                self.on_mark_ham_many(path, uids, dest).await
             }
-
             MailRequest::MoveMessages { path, uids, dest } => {
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    if let Err(e) = jmap_move_uids(
-                        &s,
-                        account_id,
-                        &mut state,
-                        &path,
-                        &uids,
-                        &dest,
-                        serde_json::json!({}),
-                        cache.as_ref(),
-                    )
-                    .await
-                    {
-                        emit(WorkerEvent::error(i18n_f(
-                            "Could not move messages: {e}",
-                            &[("e", &e)],
-                        )));
-                    }
-                }
-                emit(WorkerEvent::BulkComplete);
+                self.on_move_messages(path, uids, dest).await
             }
-
-            MailRequest::PurgeMessages { path, uids } => {
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    jmap_purge_uids(&s, account_id, &mut state, &path, uids, cache.as_ref()).await;
-                }
-                emit(WorkerEvent::BulkComplete);
-            }
-
+            MailRequest::PurgeMessages { path, uids } => self.on_purge_messages(path, uids).await,
             MailRequest::EmptyFolder { folder_id, path } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                let Some((_, mailbox_id)) = state.folders.get(&path).cloned() else {
-                    continue;
-                };
-                let sess = s.clone();
-                let r = blocking(move || {
-                    let ids = jmap_all_ids_in(&sess, &mailbox_id, serde_json::json!({}))?;
-                    jmap_destroy_all(&sess, &ids)?;
-                    Ok(ids)
-                })
-                .await;
-                match r {
-                    Ok(ids) => {
-                        for id in &ids {
-                            let uid = hash_uid(id);
-                            state.uids.remove(&uid);
-                            if let Some(c) = cache.as_ref() {
-                                c.delete_message(account_id, &path, uid);
-                            }
-                        }
-                        tracing::info!("emptied {path}: {} message(s) erased", ids.len());
-                        emit(WorkerEvent::Messages {
-                            folder_id,
-                            messages: Vec::new(),
-                        });
-                        emit(WorkerEvent::FolderUnread {
-                            folder_id,
-                            unread: 0,
-                        });
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f(
-                        "Could not empty the folder: {e}",
-                        &[("e", &e)],
-                    ))),
-                }
+                self.on_empty_folder(folder_id, path).await
             }
-
             MailRequest::UndoMove {
                 path,
                 dest,
                 dest_folder_id,
                 message_ids,
             } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    emit(WorkerEvent::BulkComplete);
-                    continue;
-                };
-                match jmap_undo_move(
-                    &s,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &dest,
-                    &message_ids,
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    Ok(0) => {
-                        tracing::info!("undo: the messages are no longer where that move put them")
-                    }
-                    Ok(_) => {
-                        if let Ok(messages) = jmap_load_folder(
-                            &s,
-                            account_id,
-                            dest_folder_id,
-                            &dest,
-                            cache.as_ref(),
-                            &mut state,
-                        )
-                        .await
-                        {
-                            let unread = state.chip_count(dest_folder_id, &messages);
-                            emit(WorkerEvent::Messages {
-                                folder_id: dest_folder_id,
-                                messages,
-                            });
-                            emit(WorkerEvent::FolderUnread {
-                                folder_id: dest_folder_id,
-                                unread,
-                            });
-                        }
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f("Undo failed: {e}", &[("e", &e)]))),
-                }
-                // The app spins its busy indicator until an undo answers.
-                emit(WorkerEvent::BulkComplete);
+                self.on_undo_move(path, dest, dest_folder_id, message_ids)
+                    .await
             }
-
-            MailRequest::CreateFolder { path } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                // "A/B" nests under A (resolved from the last listing);
-                // otherwise a top-level mailbox.
-                let (parent, name) = match path.rsplit_once('/') {
-                    Some((parent, leaf)) => match state.folders.get(parent) {
-                        Some((_, pid)) => (Some(pid.clone()), leaf.to_string()),
-                        None => (None, path.clone()),
-                    },
-                    None => (None, path.clone()),
-                };
-                let sess = s.clone();
-                let r =
-                    blocking(move || jmap_create_mailbox(&sess, &name, parent.as_deref())).await;
-                match r {
-                    Ok(_) => {
-                        refresh_jmap_folders(&s, account_id, cache.as_ref(), &mut state, &emit)
-                            .await
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f(
-                        "Could not create folder: {e}",
-                        &[("e", &e)],
-                    ))),
-                }
-            }
-
+            MailRequest::CreateFolder { path } => self.on_create_folder(path).await,
             MailRequest::RenameFolder { old_path, new_path } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                let Some((_, id)) = state.folders.get(&old_path).cloned() else {
-                    emit(WorkerEvent::error(i18n(
-                        "Could not rename folder: unknown folder",
-                    )));
-                    continue;
-                };
-                let leaf = new_path.rsplit('/').next().unwrap_or(&new_path).to_string();
-                let sess = s.clone();
-                let r = blocking(move || {
-                    let r = jmap_call(
-                        &sess,
-                        &[CAP_CORE, CAP_MAIL],
-                        vec![call(
-                            0,
-                            "Mailbox/set",
-                            serde_json::json!({
-                                "accountId": sess.account,
-                                "update": { id.clone(): { "name": leaf } },
-                            }),
-                        )],
-                    )?;
-                    let r = args(&r, 0);
-                    if r["updated"]
-                        .as_object()
-                        .is_some_and(|m| m.contains_key(&id))
-                    {
-                        Ok(())
-                    } else {
-                        Err(r["notUpdated"][&id]["description"]
-                            .as_str()
-                            .unwrap_or("the server refused")
-                            .to_string())
-                    }
-                })
-                .await;
-                match r {
-                    Ok(()) => {
-                        refresh_jmap_folders(&s, account_id, cache.as_ref(), &mut state, &emit)
-                            .await
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f(
-                        "Could not rename folder: {e}",
-                        &[("e", &e)],
-                    ))),
-                }
+                self.on_rename_folder(old_path, new_path).await
             }
-
-            MailRequest::SetHiddenFolders { paths } => {
-                state.hidden = paths;
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                refresh_jmap_folders(&s, account_id, cache.as_ref(), &mut state, &emit).await;
-            }
-
-            MailRequest::DeleteFolder { path, trash } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    continue;
-                };
-                let Some((_, id)) = state.folders.get(&path).cloned() else {
-                    emit(WorkerEvent::error(i18n(
-                        "Could not delete folder: unknown folder",
-                    )));
-                    continue;
-                };
-                // The contents go to Trash first when the app names one, as
-                // on IMAP; then the mailbox goes, with whatever is left.
-                let trash_id = trash
-                    .as_ref()
-                    .and_then(|t| state.folders.get(t))
-                    .map(|(_, id)| id.clone());
-                let sess = s.clone();
-                let r = blocking(move || {
-                    if let Some(trash_id) = trash_id {
-                        let ids = jmap_all_ids_in(&sess, &id, serde_json::json!({}))?;
-                        jmap_patch_all(
-                            &sess,
-                            &ids,
-                            &serde_json::json!({ "mailboxIds": { trash_id: true } }),
-                        )?;
-                    }
-                    let r = jmap_call(
-                        &sess,
-                        &[CAP_CORE, CAP_MAIL],
-                        vec![call(
-                            0,
-                            "Mailbox/set",
-                            serde_json::json!({
-                                "accountId": sess.account,
-                                "destroy": [id.clone()],
-                                "onDestroyRemoveEmails": true,
-                            }),
-                        )],
-                    )?;
-                    let r = args(&r, 0);
-                    if r["destroyed"]
-                        .as_array()
-                        .is_some_and(|a| a.iter().any(|v| v.as_str() == Some(&id)))
-                    {
-                        Ok(())
-                    } else {
-                        Err(r["notDestroyed"][&id]["description"]
-                            .as_str()
-                            .unwrap_or("the server refused")
-                            .to_string())
-                    }
-                })
-                .await;
-                match r {
-                    Ok(()) => {
-                        refresh_jmap_folders(&s, account_id, cache.as_ref(), &mut state, &emit)
-                            .await
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f(
-                        "Could not delete folder: {e}",
-                        &[("e", &e)],
-                    ))),
-                }
-            }
-
+            MailRequest::SetHiddenFolders { paths } => self.on_set_hidden_folders(paths).await,
+            MailRequest::DeleteFolder { path, trash } => self.on_delete_folder(path, trash).await,
             MailRequest::SaveDraft {
                 message,
                 folder_id,
@@ -955,312 +323,31 @@ pub(super) async fn run_jmap(
                 autosave,
                 template,
             } => {
-                if autosave.is_none() {
-                    emit(WorkerEvent::Status(saving_text(template)));
-                }
-                let mut message = OutgoingMessage {
-                    sign: false,
-                    encrypt: false,
-                    ..*message
-                };
-                restore_msgid_case(cache.as_ref(), &mut message);
-                let mut saved = None;
-                let mut why = String::new();
-                match build_draft(&account, &message) {
-                    Ok(email) => {
-                        let message_id = draft_message_id(&email);
-                        let raw = email.formatted();
-                        if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                            let mut mailbox_id = state.folders.get(&path).map(|(_, id)| id.clone());
-                            // The first template of an account with no
-                            // Templates folder makes one, as IMAP's APPEND does.
-                            if mailbox_id.is_none() && template {
-                                let (sess, name) = (s.clone(), path.clone());
-                                match blocking(move || jmap_create_mailbox(&sess, &name, None))
-                                    .await
-                                {
-                                    Ok(_) => {
-                                        refresh_jmap_folders(
-                                            &s,
-                                            account_id,
-                                            cache.as_ref(),
-                                            &mut state,
-                                            &emit,
-                                        )
-                                        .await;
-                                        mailbox_id =
-                                            state.folders.get(&path).map(|(_, id)| id.clone());
-                                    }
-                                    Err(e) => tracing::warn!("jmap: could not create {path}: {e}"),
-                                }
-                            }
-                            // The listing just made numbers the new folder.
-                            let folder_id = state
-                                .folders
-                                .get(&path)
-                                .map(|(id, _)| *id)
-                                .unwrap_or(folder_id);
-                            match mailbox_id {
-                                Some(mailbox_id) => {
-                                    let sess = s.clone();
-                                    let import = move || {
-                                        if template {
-                                            jmap_import_template(&sess, &raw, &mailbox_id)
-                                        } else {
-                                            jmap_import_draft(&sess, &raw, &mailbox_id)
-                                        }
-                                    };
-                                    match blocking(import).await {
-                                        Ok(_) => {
-                                            if let Some(o) = message.draft_origin.clone() {
-                                                jmap_drop_draft_origin(
-                                                    &s,
-                                                    account_id,
-                                                    &o,
-                                                    cache.as_ref(),
-                                                    &mut state,
-                                                )
-                                                .await;
-                                            }
-                                            if let Ok(messages) = jmap_load_folder(
-                                                &s,
-                                                account_id,
-                                                folder_id,
-                                                &path,
-                                                cache.as_ref(),
-                                                &mut state,
-                                            )
-                                            .await
-                                            {
-                                                emit(WorkerEvent::Messages {
-                                                    folder_id,
-                                                    messages,
-                                                });
-                                            }
-                                            saved = Some(message_id);
-                                        }
-                                        Err(e) => why = e,
-                                    }
-                                }
-                                None => why = i18n("unknown folder"),
-                            }
-                        } else {
-                            why = i18n("Could not reach the server");
-                        }
-                    }
-                    Err(e) => why = e.to_string(),
-                }
-                emit(WorkerEvent::Status(String::new()));
-                match saved {
-                    Some(id) => emit(WorkerEvent::DraftSaved {
-                        autosave,
-                        message_id: Some(id),
-                    }),
-                    None => draft_not_saved(autosave, template, why, message, &emit),
-                }
+                self.on_save_draft(message, folder_id, path, autosave, template)
+                    .await
             }
-
             // Send Later (#145): into the Outbox until its time.
             MailRequest::Send {
-                mut message,
+                message,
                 sent_path,
                 ticket,
             } if message.send_at.is_some_and(|t| t > crate::datefmt::now()) => {
-                let at = message.send_at.unwrap_or_default();
-                restore_msgid_case(cache.as_ref(), &mut message);
-                schedule_send(
-                    cache.as_ref(),
-                    account_id,
-                    &account,
-                    &message,
-                    sent_path.as_deref(),
-                    at,
-                    &emit,
-                );
-                emit(WorkerEvent::SendDone {
-                    ticket,
-                    sent: false,
-                });
-                if let Some(o) = message.draft_origin.clone() {
-                    if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                        jmap_drop_draft_origin(&s, account_id, &o, cache.as_ref(), &mut state)
-                            .await;
-                        if o.account_id == account_id {
-                            if let Ok(messages) = jmap_load_folder(
-                                &s,
-                                account_id,
-                                o.folder_id,
-                                &o.path,
-                                cache.as_ref(),
-                                &mut state,
-                            )
-                            .await
-                            {
-                                emit(WorkerEvent::Messages {
-                                    folder_id: o.folder_id,
-                                    messages,
-                                });
-                            }
-                        }
-                    }
-                }
+                self.on_send_later(message, sent_path, ticket).await
             }
-
             MailRequest::Send {
-                mut message,
+                message,
                 sent_path,
                 ticket,
-            } => {
-                emit(WorkerEvent::Status(i18n("Sending…")));
-                restore_msgid_case(cache.as_ref(), &mut message);
-                let reachable = crate::power::reaches_url(&jmap_base_url(&account));
-                let sent = match jmap_session(&account, &mut state, &emit).await {
-                    Some(s) if reachable => jmap_send_message(
-                        &s,
-                        account_id,
-                        &account,
-                        &message,
-                        sent_path.as_deref(),
-                        cache.as_ref(),
-                        &mut state,
-                        &emit,
-                    )
-                    .await
-                    .map(|()| s),
-                    _ if !reachable => Err(offline_text()),
-                    _ => Err("could not reach the server".to_string()),
-                };
-                emit(WorkerEvent::Status(String::new()));
-                match sent {
-                    Ok(s) => {
-                        jmap_mark_answered(
-                            &s,
-                            &mut state,
-                            cache.as_ref(),
-                            account_id,
-                            &message.in_reply_to,
-                            &message.forwards,
-                            &emit,
-                        )
-                        .await;
-                        if let Some(o) = message.draft_origin.clone() {
-                            if o.account_id == account_id {
-                                jmap_drop_draft_origin(
-                                    &s,
-                                    account_id,
-                                    &o,
-                                    cache.as_ref(),
-                                    &mut state,
-                                )
-                                .await;
-                                if let Ok(messages) = jmap_load_folder(
-                                    &s,
-                                    account_id,
-                                    o.folder_id,
-                                    &o.path,
-                                    cache.as_ref(),
-                                    &mut state,
-                                )
-                                .await
-                                {
-                                    emit(WorkerEvent::Messages {
-                                        folder_id: o.folder_id,
-                                        messages,
-                                    });
-                                }
-                            }
-                        }
-                        drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
-                        emit(WorkerEvent::Sent);
-                        emit(WorkerEvent::SendDone { ticket, sent: true });
-                    }
-                    Err(e) => {
-                        send_failed(
-                            cache.as_ref(),
-                            account_id,
-                            &account,
-                            &message,
-                            sent_path.as_deref(),
-                            &e,
-                            e.starts_with(SUBMISSION_REFUSED),
-                            &emit,
-                        );
-                        emit(WorkerEvent::SendDone {
-                            ticket,
-                            sent: false,
-                        });
-                    }
-                }
-            }
-
-            MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
-
-            MailRequest::DeleteOutbox { id } => {
-                delete_queued(cache.as_ref(), account_id, id, &emit)
-            }
-
-            MailRequest::FlushOutbox { id } => {
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    jmap_flush_outbox(
-                        &s,
-                        cache.as_ref(),
-                        account_id,
-                        &account,
-                        id,
-                        &mut state,
-                        &emit,
-                    )
-                    .await;
-                }
-            }
-
-            MailRequest::RefreshUnread => {
-                if let Some(s) = jmap_session(&account, &mut state, &|_| {}).await {
-                    jmap_refresh_unread(&s, account_id, cache.as_ref(), &mut state, &emit).await;
-                    auto_empty_jmap(
-                        &s,
-                        account_id,
-                        &account,
-                        cache.as_ref(),
-                        &mut state,
-                        &mut last_auto_empty,
-                        &emit,
-                    )
-                    .await;
-                    clean_lists_jmap(
-                        &s,
-                        account_id,
-                        &account,
-                        cache.as_ref(),
-                        &mut state,
-                        &mut last_list_clean,
-                        &emit,
-                    )
-                    .await;
-                }
-            }
-
-            MailRequest::Reconnect => {
-                // A fresh session resource: the server may have moved, or
-                // the credentials changed.
-                state.session = None;
-                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
-                    refresh_jmap_folders(&s, account_id, cache.as_ref(), &mut state, &emit).await;
-                }
-            }
-
+            } => self.on_send(message, sent_path, ticket).await,
+            MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, emit),
+            MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, emit),
+            MailRequest::FlushOutbox { id } => self.on_flush_outbox(id).await,
+            MailRequest::RefreshUnread => self.on_refresh_unread().await,
+            MailRequest::Reconnect => self.on_reconnect().await,
             MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
-
             MailRequest::ExportRaw {
                 token, path, uid, ..
-            } => {
-                let raw = match jmap_session(&account, &mut state, &emit).await {
-                    Some(s) => jmap_fetch_raw(&s, &mut state, &path, uid).await,
-                    None => Err(i18n("Could not reach the server")),
-                };
-                emit(WorkerEvent::RawExported { token, raw });
-            }
-
+            } => self.on_export_raw(token, path, uid).await,
             MailRequest::DeleteAttachment {
                 message_id,
                 path,
@@ -1268,94 +355,16 @@ pub(super) async fn run_jmap(
                 name,
                 size,
             } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    strip_refused(
-                        &emit,
-                        i18n("Could not reach the server"),
-                        message_id,
-                        name,
-                        size,
-                    );
-                    continue;
-                };
-                emit(WorkerEvent::Status(i18n("Removing the attachment…")));
-                let result = jmap_strip_attachment(&s, &mut state, &path, uid, &name, size).await;
-                emit(WorkerEvent::Status(String::new()));
-                match result {
-                    Ok((new_id, raw)) => {
-                        let new_uid = hash_uid(&new_id);
-                        state.uids.remove(&uid);
-                        if let Some(c) = cache.as_ref() {
-                            c.delete_message(account_id, &path, uid);
-                        }
-                        if let Some((folder_id, _)) = state.folders.get(&path).cloned() {
-                            if let Ok(messages) = jmap_load_folder(
-                                &s,
-                                account_id,
-                                folder_id,
-                                &path,
-                                cache.as_ref(),
-                                &mut state,
-                            )
-                            .await
-                            {
-                                emit(WorkerEvent::Messages {
-                                    folder_id,
-                                    messages,
-                                });
-                            }
-                        }
-                        if let Some(c) = cache.as_ref() {
-                            c.save_attachment_meta(account_id, &path, uid, &[]);
-                            cache_rewritten(c, account_id, &path, new_uid, &raw);
-                        }
-                        emit(WorkerEvent::AttachmentDeleted {
-                            message_id,
-                            path,
-                            uid,
-                            new_uid: Some(new_uid),
-                            name,
-                            size,
-                        });
-                    }
-                    Err(e) => strip_refused(
-                        &emit,
-                        i18n_f("Could not remove the attachment: {e}", &[("e", &e)]),
-                        message_id,
-                        name,
-                        size,
-                    ),
-                }
+                self.on_delete_attachment(message_id, path, uid, name, size)
+                    .await
             }
-
             MailRequest::ImportRaw {
                 token,
                 path,
                 raw,
                 seen,
                 flagged,
-            } => {
-                let mailbox = state.folders.get(&path).map(|(_, id)| id.clone());
-                let result = match (jmap_session(&account, &mut state, &emit).await, mailbox) {
-                    (Some(s), Some(mailbox)) => {
-                        let mut keywords = serde_json::Map::new();
-                        if seen {
-                            keywords.insert("$seen".into(), true.into());
-                        }
-                        if flagged {
-                            keywords.insert("$flagged".into(), true.into());
-                        }
-                        blocking(move || {
-                            jmap_import(&s, &raw, &mailbox, serde_json::Value::Object(keywords))
-                        })
-                        .await
-                        .map(|_| ())
-                    }
-                    (None, _) => Err(i18n("Could not reach the server")),
-                    (_, None) => Err(i18n("That folder is not on the server")),
-                };
-                emit(WorkerEvent::RawImported { token, result });
-            }
+            } => self.on_import_raw(token, path, raw, seen, flagged).await,
         }
     }
 }
@@ -1396,25 +405,42 @@ mod tests {
     use crate::models::MailboxQuota;
     use crate::models::Message;
     use crate::worker::compose::build::build_email;
+    use crate::worker::ids::hash_uid;
+    use crate::worker::jmap::folders::jmap_create_mailbox;
     use crate::worker::jmap::folders::jmap_list_folders;
     use crate::worker::jmap::index::jmap_backfill_with;
     use crate::worker::jmap::index::jmap_index_plan;
+    use crate::worker::jmap::index::jmap_sync_folder;
     use crate::worker::jmap::index::JmapBackfillPhase;
+    use crate::worker::jmap::messages::jmap_get_messages;
     use crate::worker::jmap::messages::jmap_list_messages;
     use crate::worker::jmap::messages::jmap_message;
+    use crate::worker::jmap::messages::jmap_query_ids;
     use crate::worker::jmap::ops::crlf_line_endings;
+    use crate::worker::jmap::ops::jmap_destroy_all;
+    use crate::worker::jmap::ops::jmap_import_draft;
     use crate::worker::jmap::ops::jmap_import_email;
+    use crate::worker::jmap::ops::jmap_import_template;
     use crate::worker::jmap::ops::jmap_set_emails;
+    use crate::worker::jmap::ops::jmap_strip_attachment;
     use crate::worker::jmap::send::jmap_identities;
     use crate::worker::jmap::send::jmap_identity_for;
     use crate::worker::jmap::send::jmap_submit;
     use crate::worker::jmap::send::pick_identity;
+    use crate::worker::jmap::wire::args;
+    use crate::worker::jmap::wire::call;
     use crate::worker::jmap::wire::fill_template;
     use crate::worker::jmap::wire::jmap_auth;
+    use crate::worker::jmap::wire::jmap_call;
     use crate::worker::jmap::wire::jmap_connect;
     use crate::worker::jmap::wire::jmap_download;
+    use crate::worker::jmap::wire::jmap_storage_quota;
     use crate::worker::jmap::wire::origin_of;
     use crate::worker::jmap::wire::JmapSession;
+    use crate::worker::jmap::wire::CAP_CORE;
+    use crate::worker::jmap::wire::CAP_MAIL;
+    use crate::worker::render::attachments::extract_attachments;
+    use std::collections::BTreeMap;
     use std::collections::HashMap;
 
     /// An email as `Email/get` answers it with [`EMAIL_PROPS`].
