@@ -1,13 +1,11 @@
 //! The pop-out reader as a relm4 component: its window, building it, and
 //! `update`.
 
-use super::content::{save_attachment, title_text};
+use super::content::title_text;
 use super::keys::key_controller;
 use super::toolbar::{build_toolbar, Toolbar};
 use super::types::{MessageWindowInit, MessageWindowInput, MessageWindowOutput};
 use super::MessageWindow;
-use crate::config::ToolbarItem;
-use crate::models::Attachment;
 use crate::ui::attachment_drawer::{AttachmentDrawer, DrawerInit, DrawerOutput};
 use crate::ui::lightbox::{Lightbox, LightboxInput};
 use crate::ui::message_list::RowAction;
@@ -210,13 +208,7 @@ impl Component for MessageWindow {
                 message,
                 invite,
                 action,
-            } => {
-                let _ = sender.output(MessageWindowOutput::InviteAction {
-                    message,
-                    invite,
-                    action,
-                });
-            }
+            } => self.on_invite_action(message, invite, action, &sender),
             MessageWindowInput::SetIdentities(identities) => {
                 self.view.emit(MessageViewInput::SetIdentities(identities));
             }
@@ -227,13 +219,7 @@ impl Component for MessageWindow {
                 account_id,
                 id,
                 state,
-            } => {
-                self.view.emit(MessageViewInput::UnsubscribeState {
-                    account_id,
-                    id,
-                    state,
-                });
-            }
+            } => self.on_unsubscribe_state(account_id, id, state),
             MessageWindowInput::FacesChanged => {
                 self.view.emit(MessageViewInput::FacesChanged);
             }
@@ -243,41 +229,12 @@ impl Component for MessageWindow {
             MessageWindowInput::SetPgpLabels(on) => {
                 self.view.emit(MessageViewInput::SetPgpLabels(on))
             }
-            MessageWindowInput::SetSenderCheck(check) => {
-                // Decrypted, the window is named by the subject inside (#493).
-                if let Some(subject) = check.pgp.as_ref().and_then(|p| p.subject.as_deref()) {
-                    root.set_title(Some(subject));
-                }
-                // Light the popout's header seal too (#88).
-                self.view.emit(MessageViewInput::SenderCheckFor {
-                    account_id: self.msg.account_id,
-                    id: self.msg.id,
-                    check: check.clone(),
-                });
-                self.view.emit(MessageViewInput::SetSenderCheck(check));
-            }
+            MessageWindowInput::SetSenderCheck(check) => self.on_set_sender_check(check, root),
             MessageWindowInput::SetBody {
                 account_id,
                 id,
                 body,
-            } => {
-                let mine = self.msg.account_id == account_id && self.msg.id == id;
-                let member = self
-                    .thread
-                    .iter_mut()
-                    .find(|t| t.account_id == account_id && t.id == id);
-                if !mine && member.is_none() {
-                    return;
-                }
-                if let Some(t) = member {
-                    t.body = body.clone();
-                }
-                if mine {
-                    self.msg.body = body;
-                    self.loading = false;
-                }
-                self.render_body();
-            }
+            } => self.on_set_body(account_id, id, body),
             MessageWindowInput::SetStarred(starred) => {
                 self.msg.starred = starred;
                 self.sync_toolbar();
@@ -287,20 +244,7 @@ impl Component for MessageWindow {
                 self.sync_toolbar();
             }
             MessageWindowInput::SetKeywords(keywords, labels) => {
-                self.msg.keywords = keywords.clone();
-                self.msg.labels = labels.clone();
-                for m in self.thread.iter_mut() {
-                    if m.account_id == self.msg.account_id && m.id == self.msg.id {
-                        m.keywords = keywords.clone();
-                        m.labels = labels.clone();
-                    }
-                }
-                self.view.emit(MessageViewInput::SetCardKeywords {
-                    account_id: self.msg.account_id,
-                    id: self.msg.id,
-                    keywords,
-                    labels,
-                });
+                self.on_set_keywords(keywords, labels)
             }
             MessageWindowInput::SetTags(tags) => {
                 self.tags = tags.clone();
@@ -311,23 +255,9 @@ impl Component for MessageWindow {
                 account_id,
                 id,
                 items,
-            } => {
-                let key = (account_id, id);
-                self.attachments.retain(|(k, _)| *k != key);
-                self.attachments.push((key, items));
-                self.attachments_loading.remove(&key);
-                self.sync_attachments();
-                self.sync_toolbar();
-            }
+            } => self.on_set_attachments(account_id, id, items),
             MessageWindowInput::AttachmentsPending { account_id, id } => {
-                // Opening the message was the request: fetch them, as the
-                // main reader does, rather than wait for a click.
-                let Some(m) = self.member(account_id, id).cloned() else {
-                    return;
-                };
-                self.attachments_loading.insert((account_id, id));
-                let _ = sender.output(MessageWindowOutput::LoadAttachments(Box::new(m)));
-                self.sync_toolbar();
+                self.on_attachments_pending(account_id, id, &sender)
             }
             MessageWindowInput::SetToolbar(layout) => {
                 if self.toolbar != layout {
@@ -358,50 +288,8 @@ impl Component for MessageWindow {
                 id,
                 index,
                 save,
-            } => {
-                let Some(files) = self
-                    .attachments
-                    .iter()
-                    .find(|(k, _)| *k == (account_id, id))
-                    .map(|(_, f)| f)
-                else {
-                    return;
-                };
-                let Some(att) = files.get(index).cloned() else {
-                    return;
-                };
-                if save {
-                    save_attachment(att, root);
-                } else if crate::ui::attachment_drawer::previewable(&att) {
-                    // The lightbox pages through this message's previewable
-                    // files, starting at the one clicked.
-                    let previewable =
-                        |a: &&Attachment| crate::ui::attachment_drawer::previewable(a);
-                    let items: Vec<Attachment> =
-                        files.iter().filter(previewable).cloned().collect();
-                    let start = files[..=index]
-                        .iter()
-                        .filter(previewable)
-                        .count()
-                        .saturating_sub(1);
-                    self.lightbox.emit(LightboxInput::Show { items, start });
-                } else {
-                    crate::ui::attachments_gallery::open_bytes(
-                        &att.name,
-                        &att.data,
-                        Some(root.upcast_ref()),
-                    );
-                }
-            }
-            MessageWindowInput::DeleteAttachment(att) => {
-                let Some(message) = self.owner(&att).cloned() else {
-                    return;
-                };
-                let _ = sender.output(MessageWindowOutput::DeleteAttachment {
-                    message: Box::new(message),
-                    attachment: Box::new(att),
-                });
-            }
+            } => self.on_card_attachment(account_id, id, index, save, root),
+            MessageWindowInput::DeleteAttachment(att) => self.on_delete_attachment(att, &sender),
             MessageWindowInput::ShowAttachment(att) => {
                 if let Some(m) = self.owner(&att) {
                     self.view.emit(MessageViewInput::ScrollToAttachments {
@@ -433,38 +321,12 @@ impl Component for MessageWindow {
                 self.emit_action(RowAction::Archive, &sender);
                 root.close();
             }
-            MessageWindowInput::Spam => {
-                let action = if self.in_junk {
-                    RowAction::NotSpam
-                } else {
-                    RowAction::Spam
-                };
-                self.emit_action(action, &sender);
-                root.close();
-            }
+            MessageWindowInput::Spam => self.on_spam(&sender, root),
             MessageWindowInput::MoveToInbox => {
                 self.emit_action(RowAction::MoveToInbox, &sender);
                 root.close();
             }
-            MessageWindowInput::MoveTo => {
-                // Under the Move To button, or under the ⋯ that stands in
-                // for it while the toolbar is folded.
-                let button = self
-                    .button(ToolbarItem::MoveTo)
-                    .filter(|b| b.is_mapped())
-                    .unwrap_or(&self.bar.overflow);
-                let Some(point) = button.compute_point(
-                    root,
-                    &gtk::graphene::Point::new(button.width() as f32 / 2.0, button.height() as f32),
-                ) else {
-                    return;
-                };
-                let _ = sender.output(MessageWindowOutput::MoveTo {
-                    message: Box::new(self.msg.clone()),
-                    x: point.x().into(),
-                    y: point.y().into(),
-                });
-            }
+            MessageWindowInput::MoveTo => self.on_move_to(&sender, root),
             MessageWindowInput::MoveToAt { message, x, y } => {
                 let _ = sender.output(MessageWindowOutput::MoveTo { message, x, y });
             }

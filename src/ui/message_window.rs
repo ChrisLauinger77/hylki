@@ -19,6 +19,7 @@ use crate::ui::message_view::MessageView;
 mod component;
 mod content;
 mod keys;
+mod on_inputs;
 mod toolbar;
 mod types;
 
