@@ -57,7 +57,7 @@ pub fn initials_of(text: &str) -> String {
         return String::new();
     };
     let mut out: String = first.chars().take(1).collect();
-    if let Some(last) = words.last() {
+    if let Some(last) = words.next_back() {
         out.extend(last.chars().take(1));
     }
     out

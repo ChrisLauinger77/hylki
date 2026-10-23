@@ -55,9 +55,7 @@ pub fn run(
     window.set_content(Some(&toolbar));
 
     // `done` runs once: on the redirect, or when the window closes first.
-    let done: std::rc::Rc<
-        std::cell::RefCell<Option<Box<dyn FnOnce(Result<(Authorization, String), String>)>>>,
-    > = std::rc::Rc::new(std::cell::RefCell::new(Some(Box::new(done))));
+    let done: DoneSlot = std::rc::Rc::new(std::cell::RefCell::new(Some(Box::new(done))));
     let request = std::rc::Rc::new(std::cell::RefCell::new(Some(request)));
     {
         let done = done.clone();
@@ -130,3 +128,9 @@ pub fn run(
         view.load_uri(&url);
     });
 }
+
+/// The sign-in's answer, taken once: by the redirect, or by the window
+/// closing first.
+type DoneSlot = std::rc::Rc<
+    std::cell::RefCell<Option<Box<dyn FnOnce(Result<(Authorization, String), String>)>>>,
+>;

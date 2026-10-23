@@ -83,6 +83,9 @@ pub fn show_folder_picker(
     let list = gtk::ListBox::new();
     list.set_selection_mode(gtk::SelectionMode::None);
     list.add_css_class("navigation-sidebar");
+    // What each row stands for, at the row's index: rows are only ever
+    // appended, in this order.
+    let mut table: Vec<PickerRow> = Vec::new();
     for account in &accounts {
         if let Some(heading) = &account.heading {
             let label = gtk::Label::new(Some(heading));
@@ -97,7 +100,7 @@ pub fn show_folder_picker(
             lbr.set_activatable(false);
             lbr.set_selectable(false);
             // The search keeps a heading while any of its folders match.
-            unsafe { lbr.set_data("heading", account.account_id) };
+            table.push(PickerRow::Heading);
             list.append(&lbr);
         }
         let refs: Vec<&Folder> = account.folders.iter().collect();
@@ -118,9 +121,11 @@ pub fn show_folder_picker(
             let lbr = gtk::ListBoxRow::new();
             lbr.set_child(Some(&row));
             // The search filter reads the name back from here.
-            unsafe { lbr.set_data("folder-name", f.name.to_lowercase()) };
-            unsafe { lbr.set_data("folder-path", f.path.clone()) };
-            unsafe { lbr.set_data("folder-account", account.account_id) };
+            table.push(PickerRow::Folder {
+                name: f.name.to_lowercase(),
+                path: f.path.clone(),
+                account: account.account_id,
+            });
             list.append(&lbr);
         }
     }
@@ -134,16 +139,15 @@ pub fn show_folder_picker(
     column.append(&scroller);
 
     let on_pick = std::rc::Rc::new(on_pick);
+    let table = std::rc::Rc::new(table);
     {
         let popover = popover.clone();
         let on_pick = on_pick.clone();
         let whole = whole.clone();
+        let table = table.clone();
         list.connect_row_activated(move |_, row| {
-            let path: Option<std::ptr::NonNull<String>> = unsafe { row.data("folder-path") };
-            let account: Option<std::ptr::NonNull<u32>> = unsafe { row.data("folder-account") };
-            if let (Some(path), Some(account)) = (path, account) {
-                let path = unsafe { path.as_ref() }.clone();
-                let account = unsafe { *account.as_ref() };
+            if let Some(PickerRow::Folder { path, account, .. }) = row_entry(&table, row.index()) {
+                let (path, account) = (path.clone(), *account);
                 let all = whole.as_ref().is_some_and(|w| w.is_active());
                 popover.popdown();
                 on_pick(account, path, all);
@@ -152,6 +156,7 @@ pub fn show_folder_picker(
     }
     {
         let list = list.clone();
+        let table = table.clone();
         search.connect_search_changed(move |e| {
             let query = e.text().to_lowercase();
             // Headings come before their folders: settled once the next
@@ -164,15 +169,16 @@ pub fn show_folder_picker(
             };
             let mut i = 0;
             while let Some(row) = list.row_at_index(i) {
-                let is_heading = unsafe { row.data::<u32>("heading") }.is_some();
-                if is_heading {
+                let entry = row_entry(&table, i);
+                if matches!(entry, Some(PickerRow::Heading)) {
                     settle(heading.take());
                     heading = Some((row.clone(), false));
                 } else {
-                    let name: Option<std::ptr::NonNull<String>> =
-                        unsafe { row.data("folder-name") };
-                    let hit = query.is_empty()
-                        || name.is_some_and(|n| unsafe { n.as_ref() }.contains(&query));
+                    let name = match entry {
+                        Some(PickerRow::Folder { name, .. }) => Some(name),
+                        _ => None,
+                    };
+                    let hit = query.is_empty() || name.is_some_and(|n| n.contains(&query));
                     row.set_visible(hit);
                     if hit {
                         if let Some((_, any)) = heading.as_mut() {
@@ -216,5 +222,46 @@ pub fn show_folder_picker(
                 crate::app::showcase_capture(column.upcast_ref(), &path);
             });
         }
+    }
+}
+
+/// A row of the folder list: an account's heading, or a folder with its
+/// lowercased name (for the search), its path and its account.
+enum PickerRow {
+    Heading,
+    Folder {
+        name: String,
+        path: String,
+        account: u32,
+    },
+}
+
+/// The entry for the row at `index` (a `ListBoxRow` index, never negative
+/// for a row in the list).
+fn row_entry(table: &[PickerRow], index: i32) -> Option<&PickerRow> {
+    usize::try_from(index).ok().and_then(|i| table.get(i))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{row_entry, PickerRow};
+
+    #[test]
+    fn rows_are_looked_up_by_their_index() {
+        let table = [
+            PickerRow::Heading,
+            PickerRow::Folder {
+                name: "inbox".into(),
+                path: "INBOX".into(),
+                account: 2,
+            },
+        ];
+        assert!(matches!(row_entry(&table, 0), Some(PickerRow::Heading)));
+        assert!(matches!(
+            row_entry(&table, 1),
+            Some(PickerRow::Folder { account: 2, .. })
+        ));
+        assert!(row_entry(&table, 2).is_none());
+        assert!(row_entry(&table, -1).is_none());
     }
 }

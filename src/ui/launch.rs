@@ -84,7 +84,7 @@ pub fn browsers() -> Vec<Browser> {
             name: info.display_name().to_string(),
         });
     }
-    found.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    found.sort_by_key(|b| b.name.to_lowercase());
     found
 }
 
@@ -200,7 +200,7 @@ fn portal_open_uri(uri: String, ask: bool, parent: Option<gtk::Window>) {
 /// Both roads failed: say so, and what still works.
 fn link_failed_dialog(parent: Option<&gtk::Window>, error: &str) {
     let dialog = gtk::AlertDialog::builder()
-        .message(&i18n("The link could not be opened"))
+        .message(i18n("The link could not be opened"))
         // No Flatseal toggle can help here: portal access is not a
         // permission, and the failure is inside the portal's own launcher.
         .detail(i18n_f(
