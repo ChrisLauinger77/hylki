@@ -32,8 +32,6 @@ impl Sidebar {
     ) -> KindWidgets {
         let is_inbox = row_kind == UnifiedRow::Kind(FolderKind::Inbox);
         let title = row_title(row_kind);
-        // Sent wears no unread chip anywhere: what you sent is not new mail.
-        let counted = row_kind != UnifiedRow::Kind(FolderKind::Sent);
         let unread = self.row_unread(row_kind);
         let expanded = self.row_shown_open(row_kind);
         let show_chip = unread > 0 && !expanded && self.chip_shown(row_kind);
@@ -276,391 +274,13 @@ impl Sidebar {
         let mut row_badges: HashMap<(u32, u32), gtk::Label> = HashMap::new();
         match row_kind {
             UnifiedRow::Kind(kind) => {
-                for section in sections {
-                    // Most accounts keep a star as a flag, with no Starred
-                    // folder (#482): theirs is a row with no path, which
-                    // opens the account's starred mail wherever it is filed.
-                    let flagged;
-                    let folder = match section.folders.iter().find(|f| f.kind == kind) {
-                        Some(f) => f,
-                        None if kind == FolderKind::Starred && !section.folders.is_empty() => {
-                            flagged = Folder {
-                                id: u32::MAX,
-                                account_id: section.account.id,
-                                name: kind_label(kind),
-                                path: String::new(),
-                                kind,
-                                unread: 0,
-                            };
-                            &flagged
-                        }
-                        None => continue,
-                    };
-                    let aid = section.account.id;
-                    let (row, badge) = build_unified_inbox_row(
-                        section,
-                        folder,
-                        self.collapsed,
-                        self.chevrons_left,
-                    );
-                    // A message dropped here moves to that account's folder
-                    // (the app declines mail from other accounts, #23).
-                    if !folder.path.is_empty() {
-                        row.add_controller(folder_drop_target(aid, folder.path.clone(), sender));
-                    }
-                    sub.append(&row);
-                    if counted && !folder.path.is_empty() {
-                        row_badges.insert((aid, folder.id), badge);
-                    } else {
-                        badge.set_visible(false);
-                        row.set_tooltip_text(None);
-                    }
-                    rows.push(InboxRef {
-                        account_id: aid,
-                        folder_id: folder.id,
-                        name: folder.name.clone(),
-                        path: folder.path.clone(),
-                    });
-                }
-                let ss = sender.input_sender().clone();
-                let quiet = self.quiet.clone();
-                sub.connect_row_selected(move |_, row| {
-                    if quiet.get() {
-                        return;
-                    }
-                    if let Some(row) = row {
-                        let _ = ss.send(if is_inbox {
-                            SidebarInput::UnifiedInboxRowSelected(row.index())
-                        } else {
-                            SidebarInput::KindSubRowSelected {
-                                kind,
-                                index: row.index(),
-                            }
-                        });
-                    }
-                });
-                // Right-click a row: act on that account's folder.
-                let click = gtk::GestureClick::new();
-                click.set_button(gtk::gdk::BUTTON_SECONDARY);
-                let cs = sender.clone();
-                let sub_w = sub.clone();
-                let refs = rows.clone();
-                click.connect_pressed(move |_, _, x, y| {
-                    if let Some(r) = sub_w
-                        .row_at_y(y as i32)
-                        .and_then(|row| refs.get(row.index() as usize))
-                    {
-                        if r.path.is_empty() {
-                            let items = vec![(
-                                i18n_noop("Account Settings…"),
-                                CtxAction::OpenAccountSettings(r.account_id),
-                            )];
-                            show_sidebar_menu(&sub_w, x, y, items, &cs);
-                            return;
-                        }
-                        let mut items = vec![
-                            (
-                                i18n_noop("Mark as Read"),
-                                CtxAction::MarkFolderRead {
-                                    account_id: r.account_id,
-                                    folder_id: r.folder_id,
-                                },
-                            ),
-                            (
-                                i18n_noop("Refresh"),
-                                CtxAction::RefreshFolder {
-                                    account_id: r.account_id,
-                                    folder_id: r.folder_id,
-                                },
-                            ),
-                        ];
-                        // Each account's Trash and Junk empties from here
-                        // too (#369), as from its own section.
-                        let empty_label = match kind {
-                            FolderKind::Trash => Some(i18n_noop("Empty Trash…")),
-                            FolderKind::Junk => Some(i18n_noop("Empty Junk…")),
-                            _ => None,
-                        };
-                        if let Some(label) = empty_label {
-                            items.push((
-                                label,
-                                CtxAction::EmptyFolder {
-                                    account_id: r.account_id,
-                                    folder_id: r.folder_id,
-                                    name: r.name.clone(),
-                                    path: r.path.clone(),
-                                },
-                            ));
-                        }
-                        items.push((
-                            i18n_noop("Account Settings…"),
-                            CtxAction::OpenAccountSettings(r.account_id),
-                        ));
-                        show_sidebar_menu(&sub_w, x, y, items, &cs);
-                    }
-                });
-                sub.add_controller(click);
+                self.fill_kind_list(kind, &sub, sections, &mut rows, &mut row_badges, sender)
             }
-            UnifiedRow::Favorites => {
-                // Every account's favorites, whether or not the account is
-                // in the unified section: picking one was choice enough.
-                let refs = self.favorite_folders.clone();
-                let all = self.sections.clone();
-                for r in &refs {
-                    let Some(section) = all.iter().find(|s| s.account.id == r.account_id) else {
-                        continue;
-                    };
-                    // The folder's own glyph, in the account's color.
-                    let icon = gtk::Image::from_icon_name(r.folder.kind.icon());
-                    icon.add_css_class(&format!("acct-tint-{}", section.account.id));
-                    pin_icon_size(&icon);
-                    let tip = format!("{} \u{2014} {}", r.folder.name, section.account.label);
-                    let counted = r.folder.kind != FolderKind::Sent;
-                    let (row, badge) = build_unified_sub_row(
-                        &tree_indent(&icon, self.collapsed),
-                        &r.folder.name,
-                        &tip,
-                        if counted { r.folder.unread } else { 0 },
-                        self.collapsed,
-                        self.chevrons_left,
-                        false,
-                    );
-                    row.add_controller(folder_drop_target(
-                        r.account_id,
-                        r.folder.path.clone(),
-                        sender,
-                    ));
-                    sub.append(&row);
-                    if counted {
-                        row_badges.insert((r.account_id, r.folder.id), badge);
-                    } else {
-                        badge.set_visible(false);
-                    }
-                }
-                let ss = sender.input_sender().clone();
-                let quiet = self.quiet.clone();
-                sub.connect_row_selected(move |_, row| {
-                    if quiet.get() {
-                        return;
-                    }
-                    if let Some(row) = row {
-                        let _ = ss.send(SidebarInput::FavoriteRowSelected(row.index()));
-                    }
-                });
-                // Right-click a favorite: the folder's own menu, which
-                // takes it out of Favorites too.
-                let click = gtk::GestureClick::new();
-                click.set_button(gtk::gdk::BUTTON_SECONDARY);
-                let cs = sender.clone();
-                let sub_w = sub.clone();
-                let filtered: Vec<(u32, String)> = self
-                    .unified_folders
-                    .iter()
-                    .map(|r| (r.account_id, r.folder.path.clone()))
-                    .collect();
-                click.connect_pressed(move |_, _, x, y| {
-                    if let Some(r) = sub_w
-                        .row_at_y(y as i32)
-                        .and_then(|row| refs.get(row.index() as usize))
-                    {
-                        let is_filtered = filtered
-                            .iter()
-                            .any(|(a, p)| *a == r.account_id && *p == r.folder.path);
-                        let items =
-                            folder_menu_items(r.account_id, &r.folder, is_filtered, true, true);
-                        show_sidebar_menu(&sub_w, x, y, items, &cs);
-                    }
-                });
-                sub.add_controller(click);
-            }
-            UnifiedRow::Smart => {
-                self.smart_badges.clear();
-                for (id, name) in &self.smart_folders {
-                    let icon = gtk::Image::from_icon_name("folder-saved-search-symbolic");
-                    pin_icon_size(&icon);
-                    let unread = self.smart_unread.get(id).copied().unwrap_or(0);
-                    let (row, badge) = build_unified_sub_row(
-                        &icon,
-                        name,
-                        name,
-                        unread,
-                        self.collapsed,
-                        self.chevrons_left,
-                        false,
-                    );
-                    sub.append(&row);
-                    self.smart_badges.insert(id.clone(), badge);
-                }
-                let ss = sender.input_sender().clone();
-                let quiet = self.quiet.clone();
-                sub.connect_row_selected(move |_, row| {
-                    if quiet.get() {
-                        return;
-                    }
-                    if let Some(row) = row {
-                        let _ = ss.send(SidebarInput::SmartRowSelected(row.index()));
-                    }
-                });
-                let click = gtk::GestureClick::new();
-                click.set_button(gtk::gdk::BUTTON_SECONDARY);
-                let cs = sender.clone();
-                let sub_w = sub.clone();
-                let ids: Vec<String> = self
-                    .smart_folders
-                    .iter()
-                    .map(|(id, _)| id.clone())
-                    .collect();
-                click.connect_pressed(move |_, _, x, y| {
-                    if let Some(id) = sub_w
-                        .row_at_y(y as i32)
-                        .and_then(|row| ids.get(row.index() as usize))
-                    {
-                        let items = vec![
-                            (
-                                i18n_noop("Edit Smart Folder…"),
-                                CtxAction::EditSmartFolder(id.clone()),
-                            ),
-                            (
-                                i18n_noop("Delete Smart Folder…"),
-                                CtxAction::DeleteSmartFolder(id.clone()),
-                            ),
-                            (i18n_noop("New Smart Folder…"), CtxAction::NewSmartFolder),
-                        ];
-                        show_sidebar_menu(&sub_w, x, y, items, &cs);
-                    }
-                });
-                sub.add_controller(click);
-            }
-            UnifiedRow::Contacts => {
-                // The tree the contact page handed over; filled again as it
-                // changes (see `fill_contact_tree`).
-                if let Some(tree) = &self.contact_tree {
-                    let filled = crate::ui::contact_tree::fill(
-                        &sub,
-                        tree,
-                        self.collapsed,
-                        self.chevrons_left,
-                        &self.contacts_folded,
-                        sender.input_sender(),
-                    );
-                    *self.tree_rows.borrow_mut() = filled.rows;
-                    self.contact_layout = filled.layout;
-                    self.contact_chevrons = filled.chevrons;
-                }
-                let ss = sender.input_sender().clone();
-                let quiet = self.quiet.clone();
-                let rows = self.tree_rows.clone();
-                sub.connect_row_selected(move |_, row| {
-                    if quiet.get() {
-                        return;
-                    }
-                    let Some(row) = row else { return };
-                    if let Some((scope, _)) = rows.borrow().iter().find(|(_, r)| r == row) {
-                        let _ = ss.send(SidebarInput::ContactTreeSelected(scope.clone()));
-                    }
-                });
-            }
-            UnifiedRow::Filtered => {
-                let refs = self.unified_folders.clone();
-                for r in &refs {
-                    let Some(section) = sections.iter().find(|s| s.account.id == r.account_id)
-                    else {
-                        continue;
-                    };
-                    // The glyph in the account's color says whose folder
-                    // this is; the tooltip names the account.
-                    let icon = filtered_folder_icon(&r.folder, section.account.id);
-                    pin_icon_size(&icon);
-                    let tip = format!("{} \u{2014} {}", r.folder.name, section.account.label);
-                    let (row, badge) = build_unified_sub_row(
-                        &tree_indent(&icon, self.collapsed),
-                        &r.folder.name,
-                        &tip,
-                        r.folder.unread,
-                        self.collapsed,
-                        self.chevrons_left,
-                        false,
-                    );
-                    // Filtered folders take drops like any folder of their account.
-                    row.add_controller(folder_drop_target(
-                        r.account_id,
-                        r.folder.path.clone(),
-                        sender,
-                    ));
-                    sub.append(&row);
-                    row_badges.insert((r.account_id, r.folder.id), badge);
-                }
-                self.filtered_badges
-                    .insert(Slot::Unified, row_badges.clone());
-                let ss = sender.input_sender().clone();
-                let quiet = self.quiet.clone();
-                sub.connect_row_selected(move |_, row| {
-                    if quiet.get() {
-                        return;
-                    }
-                    if let Some(row) = row {
-                        let _ = ss.send(SidebarInput::FilteredRowSelected {
-                            slot: Slot::Unified,
-                            index: row.index(),
-                        });
-                    }
-                });
-                // Right-click a filtered folder: act on that folder alone.
-                let click = gtk::GestureClick::new();
-                click.set_button(gtk::gdk::BUTTON_SECONDARY);
-                let cs = sender.clone();
-                let sub_w = sub.clone();
-                let favorites = self.favorite_keys();
-                click.connect_pressed(move |_, _, x, y| {
-                    if let Some(r) = sub_w
-                        .row_at_y(y as i32)
-                        .and_then(|row| refs.get(row.index() as usize))
-                    {
-                        // The same menu the folder has under its account.
-                        let favorite = favorites
-                            .iter()
-                            .any(|(a, p)| *a == r.account_id && *p == r.folder.path);
-                        let items =
-                            folder_menu_items(r.account_id, &r.folder, true, true, favorite);
-                        show_sidebar_menu(&sub_w, x, y, items, &cs);
-                    }
-                });
-                sub.add_controller(click);
-            }
-            UnifiedRow::Tags => {
-                for t in &self.tags {
-                    let disc = crate::ui::context_menu::swatch_widget(&t.color, true);
-                    let (row, badge) = build_unified_sub_row(
-                        &tree_indent(&disc, self.collapsed),
-                        &t.name,
-                        &t.name,
-                        0,
-                        self.collapsed,
-                        self.chevrons_left,
-                        false,
-                    );
-                    badge.set_visible(false);
-                    sub.append(&row);
-                }
-                let ss = sender.input_sender().clone();
-                let quiet = self.quiet.clone();
-                sub.connect_row_selected(move |_, row| {
-                    if quiet.get() {
-                        return;
-                    }
-                    if let Some(row) = row {
-                        let _ = ss.send(SidebarInput::TagRowSelected {
-                            slot: Slot::Unified,
-                            index: row.index(),
-                        });
-                    }
-                });
-                attach_tag_context_menu(
-                    &sub,
-                    self.tags.iter().map(|t| t.keyword.clone()).collect(),
-                    sender,
-                );
-            }
+            UnifiedRow::Favorites => self.fill_favorites(&sub, &mut row_badges, sender),
+            UnifiedRow::Smart => self.fill_smart(&sub, sender),
+            UnifiedRow::Contacts => self.fill_contacts(&sub, sender),
+            UnifiedRow::Filtered => self.fill_filtered(&sub, sections, &mut row_badges, sender),
+            UnifiedRow::Tags => self.fill_tags(&sub, sender),
         }
 
         let revealer = gtk::Revealer::new();
@@ -833,6 +453,422 @@ impl Sidebar {
                 chevron,
                 list,
             },
+        );
+    }
+}
+
+impl Sidebar {
+    /// Each account's folder of `kind` (a Starred row with no path for an
+    /// account that keeps stars as flags, #482).
+    fn fill_kind_list(
+        &mut self,
+        kind: FolderKind,
+        sub: &gtk::ListBox,
+        sections: &[SectionData],
+        rows: &mut Vec<InboxRef>,
+        row_badges: &mut HashMap<(u32, u32), gtk::Label>,
+        sender: &ComponentSender<Self>,
+    ) {
+        let is_inbox = kind == FolderKind::Inbox;
+        // Sent wears no unread chip anywhere: what you sent is not new mail.
+        let counted = kind != FolderKind::Sent;
+        for section in sections {
+            // Most accounts keep a star as a flag, with no Starred
+            // folder (#482): theirs is a row with no path, which
+            // opens the account's starred mail wherever it is filed.
+            let flagged;
+            let folder = match section.folders.iter().find(|f| f.kind == kind) {
+                Some(f) => f,
+                None if kind == FolderKind::Starred && !section.folders.is_empty() => {
+                    flagged = Folder {
+                        id: u32::MAX,
+                        account_id: section.account.id,
+                        name: kind_label(kind),
+                        path: String::new(),
+                        kind,
+                        unread: 0,
+                    };
+                    &flagged
+                }
+                None => continue,
+            };
+            let aid = section.account.id;
+            let (row, badge) =
+                build_unified_inbox_row(section, folder, self.collapsed, self.chevrons_left);
+            // A message dropped here moves to that account's folder
+            // (the app declines mail from other accounts, #23).
+            if !folder.path.is_empty() {
+                row.add_controller(folder_drop_target(aid, folder.path.clone(), sender));
+            }
+            sub.append(&row);
+            if counted && !folder.path.is_empty() {
+                row_badges.insert((aid, folder.id), badge);
+            } else {
+                badge.set_visible(false);
+                row.set_tooltip_text(None);
+            }
+            rows.push(InboxRef {
+                account_id: aid,
+                folder_id: folder.id,
+                name: folder.name.clone(),
+                path: folder.path.clone(),
+            });
+        }
+        let ss = sender.input_sender().clone();
+        let quiet = self.quiet.clone();
+        sub.connect_row_selected(move |_, row| {
+            if quiet.get() {
+                return;
+            }
+            if let Some(row) = row {
+                let _ = ss.send(if is_inbox {
+                    SidebarInput::UnifiedInboxRowSelected(row.index())
+                } else {
+                    SidebarInput::KindSubRowSelected {
+                        kind,
+                        index: row.index(),
+                    }
+                });
+            }
+        });
+        // Right-click a row: act on that account's folder.
+        let click = gtk::GestureClick::new();
+        click.set_button(gtk::gdk::BUTTON_SECONDARY);
+        let cs = sender.clone();
+        let sub_w = sub.clone();
+        let refs = rows.clone();
+        click.connect_pressed(move |_, _, x, y| {
+            if let Some(r) = sub_w
+                .row_at_y(y as i32)
+                .and_then(|row| refs.get(row.index() as usize))
+            {
+                if r.path.is_empty() {
+                    let items = vec![(
+                        i18n_noop("Account Settings…"),
+                        CtxAction::OpenAccountSettings(r.account_id),
+                    )];
+                    show_sidebar_menu(&sub_w, x, y, items, &cs);
+                    return;
+                }
+                let mut items = vec![
+                    (
+                        i18n_noop("Mark as Read"),
+                        CtxAction::MarkFolderRead {
+                            account_id: r.account_id,
+                            folder_id: r.folder_id,
+                        },
+                    ),
+                    (
+                        i18n_noop("Refresh"),
+                        CtxAction::RefreshFolder {
+                            account_id: r.account_id,
+                            folder_id: r.folder_id,
+                        },
+                    ),
+                ];
+                // Each account's Trash and Junk empties from here
+                // too (#369), as from its own section.
+                let empty_label = match kind {
+                    FolderKind::Trash => Some(i18n_noop("Empty Trash…")),
+                    FolderKind::Junk => Some(i18n_noop("Empty Junk…")),
+                    _ => None,
+                };
+                if let Some(label) = empty_label {
+                    items.push((
+                        label,
+                        CtxAction::EmptyFolder {
+                            account_id: r.account_id,
+                            folder_id: r.folder_id,
+                            name: r.name.clone(),
+                            path: r.path.clone(),
+                        },
+                    ));
+                }
+                items.push((
+                    i18n_noop("Account Settings…"),
+                    CtxAction::OpenAccountSettings(r.account_id),
+                ));
+                show_sidebar_menu(&sub_w, x, y, items, &cs);
+            }
+        });
+        sub.add_controller(click);
+    }
+
+    /// Every favorite folder (#367), from any account.
+    fn fill_favorites(
+        &mut self,
+        sub: &gtk::ListBox,
+        row_badges: &mut HashMap<(u32, u32), gtk::Label>,
+        sender: &ComponentSender<Self>,
+    ) {
+        // Every account's favorites, whether or not the account is
+        // in the unified section: picking one was choice enough.
+        let refs = self.favorite_folders.clone();
+        let all = self.sections.clone();
+        for r in &refs {
+            let Some(section) = all.iter().find(|s| s.account.id == r.account_id) else {
+                continue;
+            };
+            // The folder's own glyph, in the account's color.
+            let icon = gtk::Image::from_icon_name(r.folder.kind.icon());
+            icon.add_css_class(&format!("acct-tint-{}", section.account.id));
+            pin_icon_size(&icon);
+            let tip = format!("{} \u{2014} {}", r.folder.name, section.account.label);
+            let counted = r.folder.kind != FolderKind::Sent;
+            let (row, badge) = build_unified_sub_row(
+                &tree_indent(&icon, self.collapsed),
+                &r.folder.name,
+                &tip,
+                if counted { r.folder.unread } else { 0 },
+                self.collapsed,
+                self.chevrons_left,
+                false,
+            );
+            row.add_controller(folder_drop_target(
+                r.account_id,
+                r.folder.path.clone(),
+                sender,
+            ));
+            sub.append(&row);
+            if counted {
+                row_badges.insert((r.account_id, r.folder.id), badge);
+            } else {
+                badge.set_visible(false);
+            }
+        }
+        let ss = sender.input_sender().clone();
+        let quiet = self.quiet.clone();
+        sub.connect_row_selected(move |_, row| {
+            if quiet.get() {
+                return;
+            }
+            if let Some(row) = row {
+                let _ = ss.send(SidebarInput::FavoriteRowSelected(row.index()));
+            }
+        });
+        // Right-click a favorite: the folder's own menu, which
+        // takes it out of Favorites too.
+        let click = gtk::GestureClick::new();
+        click.set_button(gtk::gdk::BUTTON_SECONDARY);
+        let cs = sender.clone();
+        let sub_w = sub.clone();
+        let filtered: Vec<(u32, String)> = self
+            .unified_folders
+            .iter()
+            .map(|r| (r.account_id, r.folder.path.clone()))
+            .collect();
+        click.connect_pressed(move |_, _, x, y| {
+            if let Some(r) = sub_w
+                .row_at_y(y as i32)
+                .and_then(|row| refs.get(row.index() as usize))
+            {
+                let is_filtered = filtered
+                    .iter()
+                    .any(|(a, p)| *a == r.account_id && *p == r.folder.path);
+                let items = folder_menu_items(r.account_id, &r.folder, is_filtered, true, true);
+                show_sidebar_menu(&sub_w, x, y, items, &cs);
+            }
+        });
+        sub.add_controller(click);
+    }
+
+    /// Every smart folder (#417).
+    fn fill_smart(&mut self, sub: &gtk::ListBox, sender: &ComponentSender<Self>) {
+        self.smart_badges.clear();
+        for (id, name) in &self.smart_folders {
+            let icon = gtk::Image::from_icon_name("folder-saved-search-symbolic");
+            pin_icon_size(&icon);
+            let unread = self.smart_unread.get(id).copied().unwrap_or(0);
+            let (row, badge) = build_unified_sub_row(
+                &icon,
+                name,
+                name,
+                unread,
+                self.collapsed,
+                self.chevrons_left,
+                false,
+            );
+            sub.append(&row);
+            self.smart_badges.insert(id.clone(), badge);
+        }
+        let ss = sender.input_sender().clone();
+        let quiet = self.quiet.clone();
+        sub.connect_row_selected(move |_, row| {
+            if quiet.get() {
+                return;
+            }
+            if let Some(row) = row {
+                let _ = ss.send(SidebarInput::SmartRowSelected(row.index()));
+            }
+        });
+        let click = gtk::GestureClick::new();
+        click.set_button(gtk::gdk::BUTTON_SECONDARY);
+        let cs = sender.clone();
+        let sub_w = sub.clone();
+        let ids: Vec<String> = self
+            .smart_folders
+            .iter()
+            .map(|(id, _)| id.clone())
+            .collect();
+        click.connect_pressed(move |_, _, x, y| {
+            if let Some(id) = sub_w
+                .row_at_y(y as i32)
+                .and_then(|row| ids.get(row.index() as usize))
+            {
+                let items = vec![
+                    (
+                        i18n_noop("Edit Smart Folder…"),
+                        CtxAction::EditSmartFolder(id.clone()),
+                    ),
+                    (
+                        i18n_noop("Delete Smart Folder…"),
+                        CtxAction::DeleteSmartFolder(id.clone()),
+                    ),
+                    (i18n_noop("New Smart Folder…"), CtxAction::NewSmartFolder),
+                ];
+                show_sidebar_menu(&sub_w, x, y, items, &cs);
+            }
+        });
+        sub.add_controller(click);
+    }
+
+    /// The address books and groups under Contacts.
+    fn fill_contacts(&mut self, sub: &gtk::ListBox, sender: &ComponentSender<Self>) {
+        // The tree the contact page handed over; filled again as it
+        // changes (see `fill_contact_tree`).
+        if let Some(tree) = &self.contact_tree {
+            let filled = crate::ui::contact_tree::fill(
+                sub,
+                tree,
+                self.collapsed,
+                self.chevrons_left,
+                &self.contacts_folded,
+                sender.input_sender(),
+            );
+            *self.tree_rows.borrow_mut() = filled.rows;
+            self.contact_layout = filled.layout;
+            self.contact_chevrons = filled.chevrons;
+        }
+        let ss = sender.input_sender().clone();
+        let quiet = self.quiet.clone();
+        let rows = self.tree_rows.clone();
+        sub.connect_row_selected(move |_, row| {
+            if quiet.get() {
+                return;
+            }
+            let Some(row) = row else { return };
+            if let Some((scope, _)) = rows.borrow().iter().find(|(_, r)| r == row) {
+                let _ = ss.send(SidebarInput::ContactTreeSelected(scope.clone()));
+            }
+        });
+    }
+
+    /// Every folder a filter rule files into.
+    fn fill_filtered(
+        &mut self,
+        sub: &gtk::ListBox,
+        sections: &[SectionData],
+        row_badges: &mut HashMap<(u32, u32), gtk::Label>,
+        sender: &ComponentSender<Self>,
+    ) {
+        let refs = self.unified_folders.clone();
+        for r in &refs {
+            let Some(section) = sections.iter().find(|s| s.account.id == r.account_id) else {
+                continue;
+            };
+            // The glyph in the account's color says whose folder
+            // this is; the tooltip names the account.
+            let icon = filtered_folder_icon(&r.folder, section.account.id);
+            pin_icon_size(&icon);
+            let tip = format!("{} \u{2014} {}", r.folder.name, section.account.label);
+            let (row, badge) = build_unified_sub_row(
+                &tree_indent(&icon, self.collapsed),
+                &r.folder.name,
+                &tip,
+                r.folder.unread,
+                self.collapsed,
+                self.chevrons_left,
+                false,
+            );
+            // Filtered folders take drops like any folder of their account.
+            row.add_controller(folder_drop_target(
+                r.account_id,
+                r.folder.path.clone(),
+                sender,
+            ));
+            sub.append(&row);
+            row_badges.insert((r.account_id, r.folder.id), badge);
+        }
+        self.filtered_badges
+            .insert(Slot::Unified, row_badges.clone());
+        let ss = sender.input_sender().clone();
+        let quiet = self.quiet.clone();
+        sub.connect_row_selected(move |_, row| {
+            if quiet.get() {
+                return;
+            }
+            if let Some(row) = row {
+                let _ = ss.send(SidebarInput::FilteredRowSelected {
+                    slot: Slot::Unified,
+                    index: row.index(),
+                });
+            }
+        });
+        // Right-click a filtered folder: act on that folder alone.
+        let click = gtk::GestureClick::new();
+        click.set_button(gtk::gdk::BUTTON_SECONDARY);
+        let cs = sender.clone();
+        let sub_w = sub.clone();
+        let favorites = self.favorite_keys();
+        click.connect_pressed(move |_, _, x, y| {
+            if let Some(r) = sub_w
+                .row_at_y(y as i32)
+                .and_then(|row| refs.get(row.index() as usize))
+            {
+                // The same menu the folder has under its account.
+                let favorite = favorites
+                    .iter()
+                    .any(|(a, p)| *a == r.account_id && *p == r.folder.path);
+                let items = folder_menu_items(r.account_id, &r.folder, true, true, favorite);
+                show_sidebar_menu(&sub_w, x, y, items, &cs);
+            }
+        });
+        sub.add_controller(click);
+    }
+
+    /// Every tag (#71).
+    fn fill_tags(&mut self, sub: &gtk::ListBox, sender: &ComponentSender<Self>) {
+        for t in &self.tags {
+            let disc = crate::ui::context_menu::swatch_widget(&t.color, true);
+            let (row, badge) = build_unified_sub_row(
+                &tree_indent(&disc, self.collapsed),
+                &t.name,
+                &t.name,
+                0,
+                self.collapsed,
+                self.chevrons_left,
+                false,
+            );
+            badge.set_visible(false);
+            sub.append(&row);
+        }
+        let ss = sender.input_sender().clone();
+        let quiet = self.quiet.clone();
+        sub.connect_row_selected(move |_, row| {
+            if quiet.get() {
+                return;
+            }
+            if let Some(row) = row {
+                let _ = ss.send(SidebarInput::TagRowSelected {
+                    slot: Slot::Unified,
+                    index: row.index(),
+                });
+            }
+        });
+        attach_tag_context_menu(
+            sub,
+            self.tags.iter().map(|t| t.keyword.clone()).collect(),
+            sender,
         );
     }
 }
