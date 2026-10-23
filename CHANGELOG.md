@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Fixed: a click on a message's text did not select its card.** In a
+  conversation, only a click on a card's header or its edges selected it.
+  The text sits in a frame that runs no scripts, so the page never heard
+  the click, and a fallback caught it only when the reader already had the
+  keyboard. The reader now catches the click itself and asks the page which
+  card's frame it landed on. A click on a link, or one that ends a text
+  selection, still leaves the selection alone.
+
 - **Added: the find bar can open under the message** (#392, requested by
   3v1n0). **Settings → Reading → Find bar position** puts it at the top of
   the message, as before, or at the bottom, where opening it leaves the

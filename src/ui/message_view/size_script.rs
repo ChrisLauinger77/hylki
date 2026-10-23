@@ -357,6 +357,19 @@ var sel='';try{sel=String(window.getSelection()||'');\
 if(!sel){var fs=all();for(var j=0;j<fs.length&&!sel;j++){\
 try{sel=String(fs[j].contentDocument.getSelection()||'');}catch(_){}}}}catch(_){}\
 return JSON.stringify({key:(m&&m.dataset&&m.dataset.key)||'',sel:sel});};\
+/* A left click at widget point (x, y) that landed on a message's body\
+   frame, which never reports its own clicks, picks that card as a click\
+   on the rest of the card does. A link or a text selection in the body\
+   keeps the click to itself. mo is p (plain), t (Ctrl) or r (Shift). */\
+window.__hylkiPickAt=function(x,y,w,mo){var r=window.innerWidth/w;x*=r;y*=r;\
+var f=document.elementFromPoint(x,y);\
+if(!f||f.tagName!=='IFRAME'||!f.classList.contains('hylki-frame'))return;\
+var m=f.closest('.hylki-msg');var k=(m&&m.dataset.key)||f.dataset.key;if(!k)return;\
+try{var d=f.contentDocument,b=f.getBoundingClientRect();\
+var t=d.elementFromPoint(x-b.left,y-b.top);if(t&&t.closest&&t.closest('a'))return;\
+var g=d.getSelection();if(g){if(mo!=='p')g.removeAllRanges();else if(String(g).length)return;}}catch(_){}\
+reportPos();\
+try{window.webkit.messageHandlers.hylki.postMessage('sel:'+k+':'+mo);}catch(_){}};\
 window.addEventListener('keydown',function(e){if(e.key!=='Escape'||!window.__hylkiMailMenu)return;\
 e.preventDefault();e.stopPropagation();hideMailMenu();},true);\
 document.addEventListener('click',function(e){var m=window.__hylkiMailMenu;\
@@ -430,6 +443,4 @@ window.addEventListener(ev,function(){follow=null;hold=null;},{passive:true,capt
 window.addEventListener('blur',function(){setTimeout(function(){\
 var a=document.activeElement;\
 if(a&&a.tagName==='IFRAME'&&a.classList&&a.classList.contains('hylki-frame')&&a.dataset.key){\
-reportPos();\
-try{window.webkit.messageHandlers.hylki.postMessage('sel:'+a.dataset.key+':p');}catch(_){}\
 try{a.blur();window.focus();}catch(_){}}},0);});";

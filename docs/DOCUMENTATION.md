@@ -1439,7 +1439,9 @@ inbox for sent or received, a paperclip when it has files, and the day.
 Under it comes the start of the message, in as many lines as **Settings →
 Message List → Preview lines** asks for; the subject is the conversation's,
 in the heading above. A click on the card opens it again; a double-click on
-the header still opens the message in a window of its own.
+the header still opens the message in a window of its own. A click anywhere
+else on a message, its text included, selects it, and the action keys act
+on it.
 
 **Settings → Conversations → Fold earlier messages** decides how a
 conversation opens: **Never** shows every message, **Messages already read**
