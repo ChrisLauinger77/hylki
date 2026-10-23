@@ -65,71 +65,7 @@ impl AppModel {
         let order = self.ordered_emails();
         let sections: Vec<SectionData> = order
             .iter()
-            .filter_map(|email| {
-                let account = self.accounts.iter().find(|a| &a.email == email)?.clone();
-                // Use the server-side unread count (accurate beyond the loaded
-                // window) for each folder's badge.
-                let folders = self
-                    .folders
-                    .get(&account.id)
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|mut f| {
-                        if let Some(n) = self.folder_unread.get(&(account.id, f.id)) {
-                            f.unread = *n;
-                        }
-                        f
-                    })
-                    .collect();
-                let color = self.account_color(account.id);
-                let emoji = self.account_emoji(account.id);
-                let avatar = self.account_avatar(account.id);
-                // This account's collapsed tree nodes, keyed "email\tpath".
-                let prefix = format!("{email}\t");
-                let tree_collapsed = self
-                    .tree_collapsed
-                    .iter()
-                    .filter_map(|k| k.strip_prefix(&prefix).map(String::from))
-                    .collect();
-                let folder_order = self
-                    .folder_order
-                    .iter()
-                    .filter_map(|k| k.strip_prefix(&prefix).map(String::from))
-                    .collect();
-                let folder_sort = self.folder_sort_of(account.id);
-                let own_folder_sort = self.own_folder_sort(account.id);
-                let hierarchy = crate::ui::sidebar::Hierarchy {
-                    delimiter: self.folder_delimiter(account.id),
-                    namespace: self.folder_namespace(account.id),
-                };
-                let filtered = self.account_filtered_folders(account.id);
-                let has_filters = self
-                    .filters
-                    .iter()
-                    .any(|r| r.account_email.eq_ignore_ascii_case(&account.email));
-                let gmail = self.gmail_labels(account.id);
-                Some(SectionData {
-                    gmail,
-                    in_unified: self.in_unified(account.id),
-                    has_filters,
-                    collapsed: self.collapsed.contains(email),
-                    custom_expanded: self.folders_expanded.contains(email),
-                    tags_expanded: self.tags_expanded_accounts.contains(email),
-                    color,
-                    emoji,
-                    avatar,
-                    account,
-                    folders,
-                    filtered,
-                    tree_collapsed,
-                    folder_order,
-                    hierarchy,
-                    folder_sort,
-                    own_folder_sort,
-                    default_folder_sort: self.folder_sort,
-                })
-            })
+            .filter_map(|email| self.section_data(email))
             .collect();
         // Count enabled accounts from config, not just the workers that have
         // reported in: at startup the accounts stream in one by one, and
@@ -174,8 +110,81 @@ impl AppModel {
                 .collect(),
         });
 
-        // Keep the list's per-account tint colors in sync, and what its
-        // Account and Due columns need to know (#334).
+        self.sync_list_accounts();
+    }
+
+    /// What the sidebar draws for the account `email`: its folders with
+    /// the server's unread counts, its look, its tree's folded nodes and
+    /// order, and its place in the unified section.
+    fn section_data(&self, email: &str) -> Option<SectionData> {
+        let account = self.accounts.iter().find(|a| a.email == email)?.clone();
+        // Use the server-side unread count (accurate beyond the loaded
+        // window) for each folder's badge.
+        let folders = self
+            .folders
+            .get(&account.id)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|mut f| {
+                if let Some(n) = self.folder_unread.get(&(account.id, f.id)) {
+                    f.unread = *n;
+                }
+                f
+            })
+            .collect();
+        let color = self.account_color(account.id);
+        let emoji = self.account_emoji(account.id);
+        let avatar = self.account_avatar(account.id);
+        // This account's collapsed tree nodes, keyed "email\tpath".
+        let prefix = format!("{email}\t");
+        let tree_collapsed = self
+            .tree_collapsed
+            .iter()
+            .filter_map(|k| k.strip_prefix(&prefix).map(String::from))
+            .collect();
+        let folder_order = self
+            .folder_order
+            .iter()
+            .filter_map(|k| k.strip_prefix(&prefix).map(String::from))
+            .collect();
+        let folder_sort = self.folder_sort_of(account.id);
+        let own_folder_sort = self.own_folder_sort(account.id);
+        let hierarchy = crate::ui::sidebar::Hierarchy {
+            delimiter: self.folder_delimiter(account.id),
+            namespace: self.folder_namespace(account.id),
+        };
+        let filtered = self.account_filtered_folders(account.id);
+        let has_filters = self
+            .filters
+            .iter()
+            .any(|r| r.account_email.eq_ignore_ascii_case(&account.email));
+        let gmail = self.gmail_labels(account.id);
+        Some(SectionData {
+            gmail,
+            in_unified: self.in_unified(account.id),
+            has_filters,
+            collapsed: self.collapsed.iter().any(|e| e == email),
+            custom_expanded: self.folders_expanded.iter().any(|e| e == email),
+            tags_expanded: self.tags_expanded_accounts.iter().any(|e| e == email),
+            color,
+            emoji,
+            avatar,
+            account,
+            folders,
+            filtered,
+            tree_collapsed,
+            folder_order,
+            hierarchy,
+            folder_sort,
+            own_folder_sort,
+            default_folder_sort: self.folder_sort,
+        })
+    }
+
+    /// Keep the list's per-account tint colors in sync, and what its
+    /// Account and Due columns need to know (#334).
+    fn sync_list_accounts(&self) {
         let colors: std::collections::HashMap<u32, String> = self
             .accounts
             .iter()

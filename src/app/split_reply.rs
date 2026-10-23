@@ -4,7 +4,7 @@ use adw::prelude::*;
 use relm4::prelude::*;
 
 use crate::config;
-use crate::ui::compose::{ComposeInput, ComposePrefill};
+use crate::ui::compose::{Compose, ComposeInput, ComposePrefill};
 use crate::ui::message_view::MessageViewInput;
 
 use super::compose_host::ReaderCompose;
@@ -215,116 +215,9 @@ impl AppModel {
         widget.set_hexpand(true);
         widget.add_css_class("inline-compose-surface");
         if contextual && !self.showing_contacts {
-            // A reply/forward splits the pane instead of covering it (#86):
-            // the composer slides down from the top and the message(s) stay
-            // below, visible and interactive to refer to while writing. The
-            // composer fills whatever the Paned divider grants it, and the
-            // height it sets is final: pasting a novel into the body cannot
-            // push the panel down.
-            //
-            // The grab handle is a floating pill at the panel's bottom edge
-            // (the iOS home-indicator look) — the wrapper Overlay floats it
-            // over the composer, and dragging it moves the Paned divider,
-            // whose own separator is painted invisible.
-            // A still-running close animation would fight the new panel for
-            // the divider: jump it to its end (its teardown sees the slot's
-            // new occupant and stands down).
-            self.settle_split_anim();
-            // Above the reader, the reader's own header would show a second
-            // set of window decorations mid-window (the composer header at
-            // the pane's top already carries them) and spend vertical space
-            // the split needs: gone while the split hosts, back when it
-            // goes. What remains of the reader starts at the remote-content
-            // banner, or the subject block when there is none. Beneath the
-            // reader the header is nowhere near the panel and stays.
-            self.show_reader_header(bottom);
-            let (slot, split) = if bottom {
-                (&self.reader_split_bottom, self.reader_split_lower.clone())
-            } else {
-                (&self.reader_split_top, self.reader_split.clone())
-            };
-            widget.set_vexpand(true);
-            let wrap = gtk::Overlay::new();
-            wrap.set_child(Some(widget));
-            wrap.add_overlay(&self.build_split_grab_pill(bottom));
-            slot.set_child(Some(&wrap));
-            slot.set_visible(true);
-            slot.set_reveal_child(true);
-            let pane_h = split.height();
-            let pane_h = if pane_h > 0 { pane_h } else { 900 };
-            let saved = config::load_split_reply_height();
-            let h = if saved > 0 {
-                saved
-            } else {
-                ((pane_h as f64 * 0.45) as i32).clamp(300, 560)
-            };
-            // Keep a usable slice of reader on screen whatever was saved —
-            // and slide the panel in the way it slides out: the divider IS
-            // the animation, driven from zero to the opening height (the
-            // revealer's own transition can't run — it starts unmapped, and
-            // adw skips animations on unmapped widgets — so the divider
-            // does all the moving). Beneath the reader the divider position
-            // is the reader's height, so the same slide runs from the pane's
-            // full height down to what is left once the panel has its share.
-            let target = h.clamp(220, (pane_h - 200).max(220));
-            let (from, to) = if bottom {
-                (pane_h as f64, (pane_h - target) as f64)
-            } else {
-                (0.0, target as f64)
-            };
-            set_split_shrink(&split, bottom, true);
-            split.set_position(from as i32);
-            let anim = adw::TimedAnimation::new(
-                &split,
-                from,
-                to,
-                300,
-                adw::CallbackAnimationTarget::new({
-                    let split = split.clone();
-                    move |v| split.set_position(v as i32)
-                }),
-            );
-            anim.set_easing(adw::Easing::EaseOutCubic);
-            let cell = self.split_close_anim.clone();
-            // Focus waits for the slide: the pane opens from nothing, and a
-            // Paned child with no height is hidden, so focus given to it at
-            // once fell to the Paned and the reply opened with no cursor in
-            // it (#266).
-            let compose = controller.sender().clone();
-            anim.connect_done({
-                let cell = cell.clone();
-                move |_| {
-                    cell.borrow_mut().take();
-                    set_split_shrink(&split, bottom, false);
-                    compose.emit(ComposeInput::FocusInitial);
-                }
-            });
-            *cell.borrow_mut() = Some(anim.clone());
-            anim.play();
-            if let Some((fa, fid)) = focus {
-                // Put the card being answered at the top of the shortened
-                // reader, wearing the selection outline.
-                self.message_view.emit(MessageViewInput::FocusCard {
-                    account_id: fa,
-                    id: fid,
-                });
-            }
+            self.open_split_panel(&controller, bottom, focus);
         } else {
-            // Composing clears the reader toolbar too (decorations excepted);
-            // the ⋯ overflow is managed by hand, so hide it by hand.
-            self.reader_overflow_btn.set_visible(false);
-            // Fill the pane and paint an opaque surface: the composer covers
-            // the pane completely, not a partial panel.
-            widget.set_vexpand(true);
-            let slot = self.compose_slot();
-            slot.set_child(Some(widget));
-            slot.set_can_target(true);
-            // Revealed a frame later: starting the transition in the same
-            // cycle the child was set finds it unmapped, and the slide is
-            // skipped — the composer pops in instead of sliding down.
-            let s = slot.clone();
-            gtk::glib::idle_add_local_once(move || s.set_reveal_child(true));
-            controller.emit(ComposeInput::FocusInitial);
+            self.open_covering_composer(&controller);
         }
         self.reader_compose = Some(ReaderCompose {
             id,
@@ -336,5 +229,143 @@ impl AppModel {
         // labels must not carry over into its menu.
         self.compose_history = (None, None);
         self.refresh_undo_menu();
+    }
+
+    /// The split reply (#86): the composer slides into the reader's Paned,
+    /// above the reader or beneath it (`bottom`), and the card being
+    /// answered (`focus`) goes to the top of what is left of the reader.
+    fn open_split_panel(
+        &mut self,
+        controller: &Controller<Compose>,
+        bottom: bool,
+        focus: Option<(u32, u32)>,
+    ) {
+        // A reply/forward splits the pane instead of covering it (#86):
+        // the composer slides down from the top and the message(s) stay
+        // below, visible and interactive to refer to while writing. The
+        // composer fills whatever the Paned divider grants it, and the
+        // height it sets is final: pasting a novel into the body cannot
+        // push the panel down.
+        //
+        // The grab handle is a floating pill at the panel's bottom edge
+        // (the iOS home-indicator look) — the wrapper Overlay floats it
+        // over the composer, and dragging it moves the Paned divider,
+        // whose own separator is painted invisible.
+        // A still-running close animation would fight the new panel for
+        // the divider: jump it to its end (its teardown sees the slot's
+        // new occupant and stands down).
+        self.settle_split_anim();
+        // Above the reader, the reader's own header would show a second
+        // set of window decorations mid-window (the composer header at
+        // the pane's top already carries them) and spend vertical space
+        // the split needs: gone while the split hosts, back when it
+        // goes. What remains of the reader starts at the remote-content
+        // banner, or the subject block when there is none. Beneath the
+        // reader the header is nowhere near the panel and stays.
+        self.show_reader_header(bottom);
+        let (slot, split) = if bottom {
+            (&self.reader_split_bottom, self.reader_split_lower.clone())
+        } else {
+            (&self.reader_split_top, self.reader_split.clone())
+        };
+        let widget = controller.widget();
+        widget.set_vexpand(true);
+        let wrap = gtk::Overlay::new();
+        wrap.set_child(Some(widget));
+        wrap.add_overlay(&self.build_split_grab_pill(bottom));
+        slot.set_child(Some(&wrap));
+        slot.set_visible(true);
+        slot.set_reveal_child(true);
+        self.slide_split_open(&split, bottom, controller.sender().clone());
+        if let Some((fa, fid)) = focus {
+            // Put the card being answered at the top of the shortened
+            // reader, wearing the selection outline.
+            self.message_view.emit(MessageViewInput::FocusCard {
+                account_id: fa,
+                id: fid,
+            });
+        }
+    }
+
+    /// Slide the split's divider from nothing to the panel's opening height
+    /// (the saved one, kept clear of the reader), then give the composer
+    /// its focus.
+    fn slide_split_open(
+        &self,
+        split: &gtk::Paned,
+        bottom: bool,
+        compose: relm4::Sender<ComposeInput>,
+    ) {
+        let split = split.clone();
+        let pane_h = split.height();
+        let pane_h = if pane_h > 0 { pane_h } else { 900 };
+        let saved = config::load_split_reply_height();
+        let h = if saved > 0 {
+            saved
+        } else {
+            ((pane_h as f64 * 0.45) as i32).clamp(300, 560)
+        };
+        // Keep a usable slice of reader on screen whatever was saved —
+        // and slide the panel in the way it slides out: the divider IS
+        // the animation, driven from zero to the opening height (the
+        // revealer's own transition can't run — it starts unmapped, and
+        // adw skips animations on unmapped widgets — so the divider
+        // does all the moving). Beneath the reader the divider position
+        // is the reader's height, so the same slide runs from the pane's
+        // full height down to what is left once the panel has its share.
+        let target = h.clamp(220, (pane_h - 200).max(220));
+        let (from, to) = if bottom {
+            (pane_h as f64, (pane_h - target) as f64)
+        } else {
+            (0.0, target as f64)
+        };
+        set_split_shrink(&split, bottom, true);
+        split.set_position(from as i32);
+        let anim = adw::TimedAnimation::new(
+            &split,
+            from,
+            to,
+            300,
+            adw::CallbackAnimationTarget::new({
+                let split = split.clone();
+                move |v| split.set_position(v as i32)
+            }),
+        );
+        anim.set_easing(adw::Easing::EaseOutCubic);
+        let cell = self.split_close_anim.clone();
+        // Focus waits for the slide: the pane opens from nothing, and a
+        // Paned child with no height is hidden, so focus given to it at
+        // once fell to the Paned and the reply opened with no cursor in
+        // it (#266).
+        anim.connect_done({
+            let cell = cell.clone();
+            move |_| {
+                cell.borrow_mut().take();
+                set_split_shrink(&split, bottom, false);
+                compose.emit(ComposeInput::FocusInitial);
+            }
+        });
+        *cell.borrow_mut() = Some(anim.clone());
+        anim.play();
+    }
+
+    /// A composer that covers the whole reader pane, sliding down over it.
+    fn open_covering_composer(&self, controller: &Controller<Compose>) {
+        // Composing clears the reader toolbar too (decorations excepted);
+        // the ⋯ overflow is managed by hand, so hide it by hand.
+        self.reader_overflow_btn.set_visible(false);
+        // Fill the pane and paint an opaque surface: the composer covers
+        // the pane completely, not a partial panel.
+        let widget = controller.widget();
+        widget.set_vexpand(true);
+        let slot = self.compose_slot();
+        slot.set_child(Some(widget));
+        slot.set_can_target(true);
+        // Revealed a frame later: starting the transition in the same
+        // cycle the child was set finds it unmapped, and the slide is
+        // skipped — the composer pops in instead of sliding down.
+        let s = slot.clone();
+        gtk::glib::idle_add_local_once(move || s.set_reveal_child(true));
+        controller.emit(ComposeInput::FocusInitial);
     }
 }

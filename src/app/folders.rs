@@ -398,76 +398,9 @@ impl AppModel {
             self.blank_for_folder_change();
         }
 
-        // Optimistic: reshape the local tree NOW so the sidebar shows the move
-        // instantly; the server rename confirms in the background. The reshape
-        // mirrors the worker exactly — same subtree rewrite the server does,
-        // same sort, same index-assigned ids — so the confirming refresh is an
-        // identical list and SetFolders repaints nothing.
-        let old_prefix = format!("{path}{delim}");
-        let new_prefix = format!("{new_path}{delim}");
-        if let Some(folders) = self.folders.get_mut(&account_id) {
-            for f in folders.iter_mut() {
-                if f.path == path {
-                    f.path = new_path.clone();
-                    let leaf = f.path.rsplit(delim).next().unwrap_or(&f.path);
-                    f.name = crate::mutf7::decode(leaf);
-                } else if let Some(rest) = f.path.strip_prefix(&old_prefix) {
-                    f.path = format!("{new_prefix}{rest}");
-                }
-            }
-        }
-        self.normalize_folders(account_id);
-        // Collapsed tree nodes follow the moved subtree to its new home.
-        if let Some(email) = self
-            .accounts
-            .iter()
-            .find(|a| a.id == account_id)
-            .map(|a| a.email.clone())
-        {
-            let key_prefix = format!("{email}\t");
-            for k in self.tree_collapsed.iter_mut() {
-                rekey_folder_key(k, &key_prefix, &path, &new_path, delim);
-            }
-            // So do favorites (#367), keeping their place in the list.
-            for k in self.favorites.iter_mut() {
-                rekey_folder_key(k, &key_prefix, &path, &new_path, delim);
-            }
-            // So does the folder order. A renamed folder keeps its place; one
-            // moved under another parent has left the siblings it was placed
-            // among, and joins its new ones at the end.
-            let parent = |p: &str| p.rsplit_once(delim).map(|(head, _)| head.to_string());
-            let moved = parent(&path) != parent(&new_path);
-            let own_key = format!("{key_prefix}{path}");
-            if moved {
-                self.folder_order.retain(|k| *k != own_key);
-            }
-            for k in self.folder_order.iter_mut() {
-                rekey_folder_key(k, &key_prefix, &path, &new_path, delim);
-            }
-            self.save_sidebar_state();
-        }
-        // The open folder follows its rename (or its parent's): the
-        // selection used to keep the old path, and every auto-fetch asked
-        // the server for a mailbox that no longer existed.
-        let followed = self.selected.as_ref().and_then(|s| {
-            if s.account_id != account_id {
-                return None;
-            }
-            if s.path == path {
-                Some(new_path.clone())
-            } else {
-                s.path
-                    .strip_prefix(&old_prefix)
-                    .map(|rest| format!("{new_prefix}{rest}"))
-            }
-        });
-        if let Some(moved) = followed {
-            let id = self.folder_by_path(account_id, &moved).map(|f| f.id);
-            if let (Some(sel), Some(id)) = (self.selected.as_mut(), id) {
-                sel.path = moved.clone();
-                sel.folder_id = id;
-            }
-        }
+        self.reshape_renamed_tree(account_id, &path, &new_path, delim);
+        self.rekey_sidebar_state(account_id, &path, &new_path, delim);
+        self.follow_renamed_selection(account_id, &path, &new_path, delim);
         self.rebuild_sidebar();
         if let Some(sel) = self.selected.clone().filter(|s| s.account_id == account_id) {
             self.sidebars_emit(SidebarInput::SelectFolderRow {
@@ -492,6 +425,94 @@ impl AppModel {
                     path: sel.path,
                 },
             );
+        }
+    }
+
+    /// Optimistic: reshape the local tree NOW so the sidebar shows the move
+    /// instantly; the server rename confirms in the background. The reshape
+    /// mirrors the worker exactly — same subtree rewrite the server does,
+    /// same sort, same index-assigned ids — so the confirming refresh is an
+    /// identical list and SetFolders repaints nothing.
+    fn reshape_renamed_tree(&mut self, account_id: u32, path: &str, new_path: &str, delim: char) {
+        let old_prefix = format!("{path}{delim}");
+        let new_prefix = format!("{new_path}{delim}");
+        if let Some(folders) = self.folders.get_mut(&account_id) {
+            for f in folders.iter_mut() {
+                if f.path == path {
+                    f.path = new_path.to_string();
+                    let leaf = f.path.rsplit(delim).next().unwrap_or(&f.path);
+                    f.name = crate::mutf7::decode(leaf);
+                } else if let Some(rest) = f.path.strip_prefix(&old_prefix) {
+                    f.path = format!("{new_prefix}{rest}");
+                }
+            }
+        }
+        self.normalize_folders(account_id);
+    }
+
+    /// Collapsed tree nodes, favorites and the folder order follow the
+    /// moved subtree to its new home.
+    fn rekey_sidebar_state(&mut self, account_id: u32, path: &str, new_path: &str, delim: char) {
+        if let Some(email) = self
+            .accounts
+            .iter()
+            .find(|a| a.id == account_id)
+            .map(|a| a.email.clone())
+        {
+            let key_prefix = format!("{email}\t");
+            for k in self.tree_collapsed.iter_mut() {
+                rekey_folder_key(k, &key_prefix, path, new_path, delim);
+            }
+            // So do favorites (#367), keeping their place in the list.
+            for k in self.favorites.iter_mut() {
+                rekey_folder_key(k, &key_prefix, path, new_path, delim);
+            }
+            // So does the folder order. A renamed folder keeps its place; one
+            // moved under another parent has left the siblings it was placed
+            // among, and joins its new ones at the end.
+            let parent = |p: &str| p.rsplit_once(delim).map(|(head, _)| head.to_string());
+            let moved = parent(path) != parent(new_path);
+            let own_key = format!("{key_prefix}{path}");
+            if moved {
+                self.folder_order.retain(|k| *k != own_key);
+            }
+            for k in self.folder_order.iter_mut() {
+                rekey_folder_key(k, &key_prefix, path, new_path, delim);
+            }
+            self.save_sidebar_state();
+        }
+    }
+
+    /// The open folder follows its rename (or its parent's): the
+    /// selection used to keep the old path, and every auto-fetch asked
+    /// the server for a mailbox that no longer existed.
+    fn follow_renamed_selection(
+        &mut self,
+        account_id: u32,
+        path: &str,
+        new_path: &str,
+        delim: char,
+    ) {
+        let old_prefix = format!("{path}{delim}");
+        let new_prefix = format!("{new_path}{delim}");
+        let followed = self.selected.as_ref().and_then(|s| {
+            if s.account_id != account_id {
+                return None;
+            }
+            if s.path == path {
+                Some(new_path.to_string())
+            } else {
+                s.path
+                    .strip_prefix(&old_prefix)
+                    .map(|rest| format!("{new_prefix}{rest}"))
+            }
+        });
+        if let Some(moved) = followed {
+            let id = self.folder_by_path(account_id, &moved).map(|f| f.id);
+            if let (Some(sel), Some(id)) = (self.selected.as_mut(), id) {
+                sel.path = moved.clone();
+                sel.folder_id = id;
+            }
         }
     }
 

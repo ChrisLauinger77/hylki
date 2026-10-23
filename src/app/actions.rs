@@ -356,51 +356,60 @@ impl AppModel {
             RowAction::Archive => self.move_to(m, FolderKind::Archive),
             RowAction::MoveToInbox => self.move_to(m, FolderKind::Inbox),
             RowAction::Delete => self.delete_messages(vec![m], &sender),
-            RowAction::ViewSource => {
-                if let Some(path) = self.resolve_folder_path(&m) {
-                    self.send_to(
-                        m.account_id,
-                        MailRequest::LoadSource {
-                            message_id: m.id,
-                            path,
-                            uid: m.uid,
-                        },
-                    );
-                }
-            }
-            RowAction::SaveAsFile => {
-                // The whole message as the server keeps it, asked
-                // for first: the save dialog opens once it is here.
-                if let Some(path) = self.resolve_folder_path(&m) {
-                    let token = self.next_transfer;
-                    self.next_transfer += 1;
-                    self.pending_saves.insert(token, eml_file_name(&m.subject));
-                    self.send_to(
-                        m.account_id,
-                        MailRequest::ExportRaw {
-                            token,
-                            path,
-                            uid: m.uid,
-                            for_reader: true,
-                        },
-                    );
-                }
-            }
+            RowAction::ViewSource => self.request_source(&m),
+            RowAction::SaveAsFile => self.save_as_file(&m),
             RowAction::AddContact => {
                 self.show_add_contact_dialog(&m.from_name, &m.from_addr, &sender);
             }
-            RowAction::CreateFilter => {
-                let Some(email) = self.email_of(m.account_id) else {
-                    return;
-                };
-                let rule = config::FilterRule::draft_from_message(&email, &m.from_addr, &m.subject);
-                self.open_settings_at(
-                    &sender,
-                    "filters",
-                    crate::ui::accounts::AccountsInput::AddFilterFrom(rule),
-                );
-            }
+            RowAction::CreateFilter => self.create_filter_from(&m, &sender),
         }
+    }
+
+    /// View Source: ask the server for the message as it keeps it.
+    fn request_source(&self, m: &Message) {
+        if let Some(path) = self.resolve_folder_path(m) {
+            self.send_to(
+                m.account_id,
+                MailRequest::LoadSource {
+                    message_id: m.id,
+                    path,
+                    uid: m.uid,
+                },
+            );
+        }
+    }
+
+    /// Save as File: the whole message as the server keeps it, asked for
+    /// first; the save dialog opens once it is here.
+    fn save_as_file(&mut self, m: &Message) {
+        if let Some(path) = self.resolve_folder_path(m) {
+            let token = self.next_transfer;
+            self.next_transfer += 1;
+            self.pending_saves.insert(token, eml_file_name(&m.subject));
+            self.send_to(
+                m.account_id,
+                MailRequest::ExportRaw {
+                    token,
+                    path,
+                    uid: m.uid,
+                    for_reader: true,
+                },
+            );
+        }
+    }
+
+    /// Create Filter: the filter editor, opened on a rule drafted from the
+    /// message's sender and subject.
+    fn create_filter_from(&mut self, m: &Message, sender: &ComponentSender<Self>) {
+        let Some(email) = self.email_of(m.account_id) else {
+            return;
+        };
+        let rule = config::FilterRule::draft_from_message(&email, &m.from_addr, &m.subject);
+        self.open_settings_at(
+            sender,
+            "filters",
+            crate::ui::accounts::AccountsInput::AddFilterFrom(rule),
+        );
     }
 
     /// A bulk action applied to every selected message.

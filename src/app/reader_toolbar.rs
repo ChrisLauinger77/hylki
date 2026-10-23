@@ -472,84 +472,18 @@ impl AppModel {
         widgets: &AppModelWidgets,
         sender: &ComponentSender<Self>,
     ) {
-        // The controls' width comes from the headerbar's own live
-        // GtkWindowControls children (a detached WindowControls never
-        // populates its buttons and measures 0).
-        fn measure_controls(w: &gtk::Widget, sum: &mut i32) {
-            if let Some(c) = w.downcast_ref::<gtk::WindowControls>() {
-                *sum += c.measure(gtk::Orientation::Horizontal, -1).1;
-                return;
-            }
-            let mut child = w.first_child();
-            while let Some(c) = child {
-                measure_controls(&c, sum);
-                child = c.next_sibling();
-            }
-        }
         let header: gtk::Widget = widgets.reader_header.clone().upcast();
         let full = header.measure(gtk::Orientation::Horizontal, -1).1;
         let mut controls = 0;
         measure_controls(&header, &mut controls);
-        use config::ToolbarItem as T;
-        let buttons: Vec<(T, gtk::Widget)> = vec![
-            (T::Reply, widgets.tb_reply.clone().upcast()),
-            (T::ReplyAll, widgets.tb_reply_all.clone().upcast()),
-            (T::Forward, widgets.tb_forward.clone().upcast()),
-            (T::Star, widgets.tb_star.clone().upcast()),
-            (T::Archive, widgets.tb_archive.clone().upcast()),
-            (T::Delete, widgets.tb_delete.clone().upcast()),
-            (T::Spam, widgets.tb_spam.clone().upcast()),
-            (T::ReadUnread, widgets.tb_read.clone().upcast()),
-            (T::Tags, widgets.tb_tags.clone().upcast()),
-            (T::MoveTo, widgets.tb_move.clone().upcast()),
-            (T::Find, widgets.tb_find.clone().upcast()),
-            (T::Print, widgets.tb_print.clone().upcast()),
-        ];
-        // One button's cost, from the buttons themselves (a hidden one —
-        // Tags before any tag exists — measures 0 and is skipped); what
-        // is left of the row after them and the controls is the base.
-        //
-        // Two different widths, and the difference is load-bearing. Each
-        // button sits in a Focus Mode revealer, and a revealer that has
-        // not been revealed yet measures 0 however wide its child is —
-        // which is exactly the state this runs in, before
-        // `sync_focus_chrome` opens them. So a button's own cost comes
-        // from the button inside the revealer, while what is taken off
-        // `full` is what the row counted for it *just now*: the revealer.
-        // Subtracting the buttons from a row that never included them is
-        // how the base went negative (and the fold stopped happening) the
-        // moment Focus Mode wrapped the row in revealers.
-        let mut packed_sum = 0;
-        let mut button_w = 0;
-        for (_, w) in &buttons {
-            packed_sum += w.measure(gtk::Orientation::Horizontal, -1).1;
-            let inner = w
-                .downcast_ref::<gtk::Revealer>()
-                .and_then(|r| r.child())
-                .unwrap_or_else(|| w.clone());
-            let nat = inner.measure(gtk::Orientation::Horizontal, -1).1;
-            if nat > 0 {
-                button_w = button_w.max(nat);
-            }
-        }
+        let buttons = toolbar_buttons(widgets);
+        let (packed_sum, button_w) = button_widths(&buttons);
         let base = if full <= 0 {
             0
         } else {
             (full - controls - packed_sum).max(0)
         };
-        let bp = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
-            adw::BreakpointConditionLengthType::MaxWidth,
-            READER_ACTIONS_BREAKPOINT,
-            adw::LengthUnit::Px,
-        ));
-        let s = sender.input_sender().clone();
-        bp.connect_apply(move |_| {
-            let _ = s.send(AppMsg::SetReaderActionsCollapsed(true));
-        });
-        let s = sender.input_sender().clone();
-        bp.connect_unapply(move |_| {
-            let _ = s.send(AppMsg::SetReaderActionsCollapsed(false));
-        });
+        let bp = reader_actions_breakpoint(sender);
         widgets.reader_bin.add_breakpoint(bp.clone());
         let _ = self.reader_toolbar_widgets.set(ReaderToolbarWidgets {
             buttons,
@@ -567,20 +501,12 @@ impl AppModel {
         });
         // Packs the saved order and sets the real threshold.
         self.relayout_reader_toolbar();
-        if let Some(settings) = gtk::Settings::default() {
-            let s = sender.input_sender().clone();
-            settings.connect_notify_local(Some("gtk-decoration-layout"), move |_, _| {
-                // Re-measure in an idle: the headerbar's own controls
-                // rebuild on this same notify, in unspecified order.
-                let header = header.clone();
-                let s = s.clone();
-                gtk::glib::idle_add_local_once(move || {
-                    let mut controls = 0;
-                    measure_controls(&header, &mut controls);
-                    let _ = s.send(AppMsg::ReaderControlsChanged(controls));
-                });
-            });
-        }
+        watch_decoration_layout(header, sender);
+        self.connect_toolbar_menus(sender);
+    }
+
+    /// The overflow, Tags and Move To buttons open their menus.
+    fn connect_toolbar_menus(&self, sender: &ComponentSender<Self>) {
         let s = sender.input_sender().clone();
         self.reader_overflow_btn.connect_clicked(move |_| {
             let _ = s.send(AppMsg::ReaderOverflowMenu);
@@ -592,6 +518,109 @@ impl AppModel {
         let s = sender.input_sender().clone();
         self.reader_move_btn.connect_clicked(move |_| {
             let _ = s.send(AppMsg::MoveToMenu);
+        });
+    }
+}
+
+/// The controls' width comes from the headerbar's own live
+/// GtkWindowControls children (a detached WindowControls never
+/// populates its buttons and measures 0).
+fn measure_controls(w: &gtk::Widget, sum: &mut i32) {
+    if let Some(c) = w.downcast_ref::<gtk::WindowControls>() {
+        *sum += c.measure(gtk::Orientation::Horizontal, -1).1;
+        return;
+    }
+    let mut child = w.first_child();
+    while let Some(c) = child {
+        measure_controls(&c, sum);
+        child = c.next_sibling();
+    }
+}
+
+/// The reader toolbar's buttons, each with the item it stands for.
+fn toolbar_buttons(widgets: &AppModelWidgets) -> Vec<(config::ToolbarItem, gtk::Widget)> {
+    use config::ToolbarItem as T;
+    vec![
+        (T::Reply, widgets.tb_reply.clone().upcast()),
+        (T::ReplyAll, widgets.tb_reply_all.clone().upcast()),
+        (T::Forward, widgets.tb_forward.clone().upcast()),
+        (T::Star, widgets.tb_star.clone().upcast()),
+        (T::Archive, widgets.tb_archive.clone().upcast()),
+        (T::Delete, widgets.tb_delete.clone().upcast()),
+        (T::Spam, widgets.tb_spam.clone().upcast()),
+        (T::ReadUnread, widgets.tb_read.clone().upcast()),
+        (T::Tags, widgets.tb_tags.clone().upcast()),
+        (T::MoveTo, widgets.tb_move.clone().upcast()),
+        (T::Find, widgets.tb_find.clone().upcast()),
+        (T::Print, widgets.tb_print.clone().upcast()),
+    ]
+}
+
+/// What the row counts for the buttons now, and one button's cost, from
+/// the buttons themselves (a hidden one — Tags before any tag exists —
+/// measures 0 and is skipped); what is left of the row after them and the
+/// controls is the base.
+///
+/// Two different widths, and the difference is load-bearing. Each
+/// button sits in a Focus Mode revealer, and a revealer that has
+/// not been revealed yet measures 0 however wide its child is —
+/// which is exactly the state this runs in, before
+/// `sync_focus_chrome` opens them. So a button's own cost comes
+/// from the button inside the revealer, while what is taken off
+/// `full` is what the row counted for it *just now*: the revealer.
+/// Subtracting the buttons from a row that never included them is
+/// how the base went negative (and the fold stopped happening) the
+/// moment Focus Mode wrapped the row in revealers.
+fn button_widths(buttons: &[(config::ToolbarItem, gtk::Widget)]) -> (i32, i32) {
+    let mut packed_sum = 0;
+    let mut button_w = 0;
+    for (_, w) in buttons {
+        packed_sum += w.measure(gtk::Orientation::Horizontal, -1).1;
+        let inner = w
+            .downcast_ref::<gtk::Revealer>()
+            .and_then(|r| r.child())
+            .unwrap_or_else(|| w.clone());
+        let nat = inner.measure(gtk::Orientation::Horizontal, -1).1;
+        if nat > 0 {
+            button_w = button_w.max(nat);
+        }
+    }
+    (packed_sum, button_w)
+}
+
+/// The breakpoint that folds the reader's actions away, saying so to the
+/// app as it applies and unapplies.
+fn reader_actions_breakpoint(sender: &ComponentSender<AppModel>) -> adw::Breakpoint {
+    let bp = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+        adw::BreakpointConditionLengthType::MaxWidth,
+        READER_ACTIONS_BREAKPOINT,
+        adw::LengthUnit::Px,
+    ));
+    let s = sender.input_sender().clone();
+    bp.connect_apply(move |_| {
+        let _ = s.send(AppMsg::SetReaderActionsCollapsed(true));
+    });
+    let s = sender.input_sender().clone();
+    bp.connect_unapply(move |_| {
+        let _ = s.send(AppMsg::SetReaderActionsCollapsed(false));
+    });
+    bp
+}
+
+/// Measure the window controls again when the desktop moves them.
+fn watch_decoration_layout(header: gtk::Widget, sender: &ComponentSender<AppModel>) {
+    if let Some(settings) = gtk::Settings::default() {
+        let s = sender.input_sender().clone();
+        settings.connect_notify_local(Some("gtk-decoration-layout"), move |_, _| {
+            // Re-measure in an idle: the headerbar's own controls
+            // rebuild on this same notify, in unspecified order.
+            let header = header.clone();
+            let s = s.clone();
+            gtk::glib::idle_add_local_once(move || {
+                let mut controls = 0;
+                measure_controls(&header, &mut controls);
+                let _ = s.send(AppMsg::ReaderControlsChanged(controls));
+            });
         });
     }
 }
