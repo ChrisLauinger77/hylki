@@ -1,7 +1,7 @@
 //! Sending and saving: the From, the outgoing message, OpenPGP checks before a
 //! send, and Send Later.
 
-use super::messages::ComposeInput;
+use super::messages::{ComposeInput, OutgoingFields};
 use super::types::ComposeAccount;
 use super::Compose;
 use super::ComposeWidgets;
@@ -258,21 +258,49 @@ impl Compose {
         }
     }
 
-    /// Assemble an [`OutgoingMessage`] from the composed fields + attachments,
-    /// carrying the draft origin so a saved/sent draft replaces its predecessor.
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn build_outgoing(
-        &self,
-        from_account_id: u32,
-        from_alias: Option<String>,
-        to: String,
-        cc: String,
-        bcc: String,
-        reply_to: String,
-        subject: String,
-        text: String,
-        html: String,
-    ) -> OutgoingMessage {
+    /// The fields as a draft or the automatic save takes them, before the
+    /// body is read. A draft can be saved without recipients, and keeps even
+    /// a From still being typed: it is checked when the message is sent.
+    pub(super) fn draft_fields(&self, widgets: &ComposeWidgets) -> OutgoingFields {
+        let to = widgets.to_row.text().trim().to_string();
+        let cc = widgets.cc_row.text().trim().to_string();
+        let bcc = widgets.bcc_row.text().trim().to_string();
+        let reply_to = widgets.reply_to_row.text().trim().to_string();
+        let subject = widgets.subject_row.text().to_string();
+        let idx = widgets.from_row.selected() as usize;
+        let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
+        let from_alias = self
+            .chosen_from(widgets)
+            .unwrap_or_else(|_| self.accounts.get(idx).and_then(|a| a.alias_from.clone()));
+        OutgoingFields {
+            html: String::new(),
+            text: String::new(),
+            to,
+            cc,
+            bcc,
+            reply_to,
+            subject,
+            from_account_id,
+            from_alias,
+        }
+    }
+
+    /// The message to hand over: the body converted out of its composing
+    /// format, the fields and the attachments, with the draft origin so a
+    /// saved or sent draft replaces its predecessor.
+    pub(super) fn outgoing_message(&self, fields: OutgoingFields) -> OutgoingMessage {
+        let OutgoingFields {
+            html,
+            text,
+            to,
+            cc,
+            bcc,
+            reply_to,
+            subject,
+            from_account_id,
+            from_alias,
+        } = fields;
+        let (html, text) = self.outgoing_body(html, text);
         OutgoingMessage {
             from_account_id,
             from_alias,

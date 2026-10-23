@@ -36,6 +36,7 @@ use host::{
 };
 pub(crate) use keys::composer_key;
 use keys::{focus_is_entry, zoom_key};
+use messages::OutgoingFields;
 pub use messages::{ComposeInput, ComposeOutput};
 use send::{
     identity_display, next_monday, pgp_send_check, pick_send_time, preset_time, same_from,
@@ -3023,43 +3024,23 @@ impl Component for Compose {
                     // `outgoing_body` converts.
                     let s = sender.clone();
                     self.read_body_as(self.format, true, move |html, text| {
-                        s.input_sender().emit(ComposeInput::SendBody {
-                            html,
-                            text,
-                            to: to.clone(),
-                            cc: cc.clone(),
-                            bcc: bcc.clone(),
-                            reply_to: reply_to.clone(),
-                            subject: subject.clone(),
-                            from_account_id,
-                            from_alias: from_alias.clone(),
-                        });
+                        s.input_sender()
+                            .emit(ComposeInput::SendBody(OutgoingFields {
+                                html,
+                                text,
+                                to: to.clone(),
+                                cc: cc.clone(),
+                                bcc: bcc.clone(),
+                                reply_to: reply_to.clone(),
+                                subject: subject.clone(),
+                                from_account_id,
+                                from_alias: from_alias.clone(),
+                            }));
                     });
                 }
 
-                ComposeInput::SendBody {
-                    html,
-                    text,
-                    to,
-                    cc,
-                    bcc,
-                    reply_to,
-                    subject,
-                    from_account_id,
-                    from_alias,
-                } => {
-                    let (html, text) = self.outgoing_body(html, text);
-                    let mut out = self.build_outgoing(
-                        from_account_id,
-                        from_alias,
-                        to,
-                        cc,
-                        bcc,
-                        reply_to,
-                        subject,
-                        text,
-                        html,
-                    );
+                ComposeInput::SendBody(fields) => {
+                    let mut out = self.outgoing_message(fields);
                     // A draft goes once it is sent; a template stays to be used
                     // again.
                     if self.template {
@@ -3075,59 +3056,25 @@ impl Component for Compose {
                 msg @ (ComposeInput::SaveDraft | ComposeInput::SaveAsTemplate) => {
                     let as_template = matches!(msg, ComposeInput::SaveAsTemplate);
                     // A draft can be saved without recipients; just capture the fields.
-                    let to = widgets.to_row.text().trim().to_string();
-                    let cc = widgets.cc_row.text().trim().to_string();
-                    let bcc = widgets.bcc_row.text().trim().to_string();
-                    let reply_to = widgets.reply_to_row.text().trim().to_string();
-                    let subject = widgets.subject_row.text().to_string();
-                    let idx = widgets.from_row.selected() as usize;
-                    let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
-                    // A draft keeps even a From still being typed: it is checked
-                    // when the message is sent.
-                    let from_alias = self.chosen_from(widgets).unwrap_or_else(|_| {
-                        self.accounts.get(idx).and_then(|a| a.alias_from.clone())
-                    });
+                    let fields = self.draft_fields(widgets);
                     let s = sender.clone();
                     self.read_body_as(self.format, false, move |html, text| {
                         s.input_sender().emit(ComposeInput::SaveDraftBody {
-                            html,
-                            text,
-                            to: to.clone(),
-                            cc: cc.clone(),
-                            bcc: bcc.clone(),
-                            reply_to: reply_to.clone(),
-                            subject: subject.clone(),
-                            from_account_id,
-                            from_alias: from_alias.clone(),
+                            fields: OutgoingFields {
+                                html,
+                                text,
+                                ..fields.clone()
+                            },
                             as_template,
                         });
                     });
                 }
 
                 ComposeInput::SaveDraftBody {
-                    html,
-                    text,
-                    to,
-                    cc,
-                    bcc,
-                    reply_to,
-                    subject,
-                    from_account_id,
-                    from_alias,
+                    fields,
                     as_template,
                 } => {
-                    let (html, text) = self.outgoing_body(html, text);
-                    let mut out = self.build_outgoing(
-                        from_account_id,
-                        from_alias,
-                        to,
-                        cc,
-                        bcc,
-                        reply_to,
-                        subject,
-                        text,
-                        html,
-                    );
+                    let mut out = self.outgoing_message(fields);
                     if as_template {
                         // A copy, cut loose from wherever this message came
                         // from: saving it replaces no draft and no queued
@@ -3176,43 +3123,30 @@ impl Component for Compose {
                     if self.autosaving {
                         break 'handle;
                     }
-                    let to = widgets.to_row.text().trim().to_string();
-                    let cc = widgets.cc_row.text().trim().to_string();
-                    let bcc = widgets.bcc_row.text().trim().to_string();
-                    let reply_to = widgets.reply_to_row.text().trim().to_string();
-                    let subject = widgets.subject_row.text().to_string();
-                    let idx = widgets.from_row.selected() as usize;
-                    let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
-                    let from_alias = self.chosen_from(widgets).unwrap_or_else(|_| {
-                        self.accounts.get(idx).and_then(|a| a.alias_from.clone())
-                    });
+                    let fields = self.draft_fields(widgets);
                     let s = sender.clone();
                     self.read_body_as(self.format, false, move |html, text| {
-                        s.input_sender().emit(ComposeInput::AutoSaveBody {
-                            html,
-                            text,
-                            to: to.clone(),
-                            cc: cc.clone(),
-                            bcc: bcc.clone(),
-                            reply_to: reply_to.clone(),
-                            subject: subject.clone(),
-                            from_account_id,
-                            from_alias: from_alias.clone(),
-                        });
+                        s.input_sender()
+                            .emit(ComposeInput::AutoSaveBody(OutgoingFields {
+                                html,
+                                text,
+                                ..fields.clone()
+                            }));
                     });
                 }
 
-                ComposeInput::AutoSaveBody {
-                    html,
-                    text,
-                    to,
-                    cc,
-                    bcc,
-                    reply_to,
-                    subject,
-                    from_account_id,
-                    from_alias,
-                } => {
+                ComposeInput::AutoSaveBody(fields) => {
+                    let OutgoingFields {
+                        html,
+                        text,
+                        to,
+                        cc,
+                        bcc,
+                        reply_to,
+                        subject,
+                        from_account_id,
+                        from_alias,
+                    } = fields;
                     use std::hash::{Hash, Hasher};
                     let mut h = std::collections::hash_map::DefaultHasher::new();
                     (
@@ -3238,18 +3172,17 @@ impl Component for Compose {
                     if self.autosaved == Some(hash) || empty || self.autosaving {
                         break 'handle;
                     }
-                    let (html, text) = self.outgoing_body(html, text);
-                    let out = self.build_outgoing(
-                        from_account_id,
-                        from_alias,
+                    let out = self.outgoing_message(OutgoingFields {
+                        html,
+                        text,
                         to,
                         cc,
                         bcc,
                         reply_to,
                         subject,
-                        text,
-                        html,
-                    );
+                        from_account_id,
+                        from_alias,
+                    });
                     self.autosaving = true;
                     self.autosave_pending = Some(hash);
                     let _ = sender.output(ComposeOutput::AutoSave {

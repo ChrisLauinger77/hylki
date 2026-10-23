@@ -111,17 +111,7 @@ pub enum ComposeInput {
     /// The OpenPGP Encrypt toggle; encrypting turns signing on too.
     ToggleEncrypt(bool),
     /// The editor's HTML + plain text came back asynchronously — finish sending.
-    SendBody {
-        html: String,
-        text: String,
-        to: String,
-        cc: String,
-        bcc: String,
-        reply_to: String,
-        subject: String,
-        from_account_id: u32,
-        from_alias: Option<String>,
-    },
+    SendBody(OutgoingFields),
     /// Save the current message to Drafts.
     SaveDraft,
     /// Save a copy of the message as a template (#360), and go on writing.
@@ -140,32 +130,14 @@ pub enum ComposeInput {
     /// The editor content came back — finish saving the draft, or the copy
     /// kept as a template.
     SaveDraftBody {
-        html: String,
-        text: String,
-        to: String,
-        cc: String,
-        bcc: String,
-        reply_to: String,
-        subject: String,
-        from_account_id: u32,
-        from_alias: Option<String>,
+        fields: OutgoingFields,
         as_template: bool,
     },
     /// The automatic save's tick (#340), then, once anything was edited,
     /// the fields and body read for it.
     AutoSave,
     AutoSaveRead,
-    AutoSaveBody {
-        html: String,
-        text: String,
-        to: String,
-        cc: String,
-        bcc: String,
-        reply_to: String,
-        subject: String,
-        from_account_id: u32,
-        from_alias: Option<String>,
-    },
+    AutoSaveBody(OutgoingFields),
     /// An automatic save came back: whether it went through, and where the
     /// copy is now, to be replaced by the next save.
     Autosaved {
@@ -257,6 +229,22 @@ pub enum ComposeInput {
     /// Showcase only (HYLKI_SHOWCASE_COMPOSE_FROM): pick the From row's
     /// entry `n`, as a click would, so the signature swap can be captured.
     ShowcaseFrom(u32),
+}
+
+/// A message as it stood when Send, Save or the automatic save read it:
+/// the body from the editor (source text in Markdown and HTML), the rest
+/// from the fields.
+#[derive(Debug, Clone)]
+pub struct OutgoingFields {
+    pub html: String,
+    pub text: String,
+    pub to: String,
+    pub cc: String,
+    pub bcc: String,
+    pub reply_to: String,
+    pub subject: String,
+    pub from_account_id: u32,
+    pub from_alias: Option<String>,
 }
 
 #[derive(Debug)]
