@@ -22,6 +22,15 @@ pub(super) fn compose_identities(
     config: &[AccountConfig],
     server_identities: &HashMap<u32, Vec<(String, String)>>,
 ) -> Vec<ComposeAccount> {
+    accounts_in_order(account_order, config)
+        .iter()
+        .flat_map(|email| account_identities(email, config, server_identities))
+        .collect()
+}
+
+/// The enabled accounts' addresses, in sidebar order, then any the order
+/// does not list.
+fn accounts_in_order(account_order: &[String], config: &[AccountConfig]) -> Vec<String> {
     let mut emails: Vec<String> = Vec::new();
     for email in account_order {
         if config.iter().any(|c| c.enabled && &c.email == email) && !emails.contains(email) {
@@ -34,90 +43,95 @@ pub(super) fn compose_identities(
         }
     }
     emails
-        .iter()
-        .flat_map(|email| {
-            let Some((idx, cfg)) = config.iter().enumerate().find(|(_, c)| &c.email == email)
-            else {
-                return Vec::new();
-            };
-            let id = idx as u32 + 1;
-            let label = if cfg.name.trim().is_empty() {
-                cfg.email.clone()
-            } else {
-                format!("{} <{}>", cfg.name, cfg.email)
-            };
-            let cfg = Some(cfg);
-            let (signatures, default) = cfg.map(|c| c.signature_set()).unwrap_or_default();
-            let signature = default
-                .map(|i| signatures[i].html.clone())
-                .unwrap_or_default();
-            let pgp_key = cfg.and_then(|c| c.pgp_key.clone());
-            let sign_default = cfg.is_some_and(|c| c.sign_by_default);
-            let mut identities = vec![ComposeAccount {
-                id,
-                label,
-                signature: signature.clone(),
-                signatures: signatures.clone(),
-                email: email.clone(),
-                pgp_key: pgp_key.clone(),
-                sign_default,
-                alias_from: None,
-            }];
-            for alias in cfg.map(|c| c.aliases.as_slice()).unwrap_or_default() {
-                let (name, addr) = split_identity(&alias.identity);
-                if addr.is_empty() {
-                    continue;
-                }
-                let display = if name.is_empty() {
-                    addr.clone()
-                } else {
-                    format!("{name} <{addr}>")
-                };
-                identities.push(ComposeAccount {
-                    id,
-                    label: display.clone(),
-                    signature: signature.clone(),
-                    signatures: signatures.clone(),
-                    email: addr,
-                    pgp_key: pgp_key.clone(),
-                    sign_default,
-                    alias_from: Some(display),
-                });
-            }
-            // A JMAP server's own identities (#346), unless the account
-            // already lists the address. A catch-all (`*@domain`) is no
-            // address to send from; typing one into From uses it.
-            for (name, addr) in server_identities
-                .get(&id)
-                .map(Vec::as_slice)
-                .unwrap_or_default()
-            {
-                if addr.starts_with("*@")
-                    || identities
-                        .iter()
-                        .any(|i| i.email.eq_ignore_ascii_case(addr))
-                {
-                    continue;
-                }
-                let display = if name.is_empty() || name.eq_ignore_ascii_case(addr) {
-                    addr.clone()
-                } else {
-                    format!("{name} <{addr}>")
-                };
-                identities.push(ComposeAccount {
-                    id,
-                    label: display.clone(),
-                    signature: signature.clone(),
-                    signatures: signatures.clone(),
-                    email: addr.clone(),
-                    pgp_key: pgp_key.clone(),
-                    sign_default,
-                    alias_from: Some(display),
-                });
-            }
-            identities
-        })
-        .collect()
+}
+
+/// One account's identities in the From list: its own address, its
+/// aliases, then its server's own identities. None for an address no
+/// account has.
+fn account_identities(
+    email: &str,
+    config: &[AccountConfig],
+    server_identities: &HashMap<u32, Vec<(String, String)>>,
+) -> Vec<ComposeAccount> {
+    let Some((idx, cfg)) = config.iter().enumerate().find(|(_, c)| c.email == email) else {
+        return Vec::new();
+    };
+    let id = idx as u32 + 1;
+    let label = if cfg.name.trim().is_empty() {
+        cfg.email.clone()
+    } else {
+        format!("{} <{}>", cfg.name, cfg.email)
+    };
+    let cfg = Some(cfg);
+    let (signatures, default) = cfg.map(|c| c.signature_set()).unwrap_or_default();
+    let signature = default
+        .map(|i| signatures[i].html.clone())
+        .unwrap_or_default();
+    let pgp_key = cfg.and_then(|c| c.pgp_key.clone());
+    let sign_default = cfg.is_some_and(|c| c.sign_by_default);
+    let mut identities = vec![ComposeAccount {
+        id,
+        label,
+        signature: signature.clone(),
+        signatures: signatures.clone(),
+        email: email.to_string(),
+        pgp_key: pgp_key.clone(),
+        sign_default,
+        alias_from: None,
+    }];
+    for alias in cfg.map(|c| c.aliases.as_slice()).unwrap_or_default() {
+        let (name, addr) = split_identity(&alias.identity);
+        if addr.is_empty() {
+            continue;
+        }
+        let display = if name.is_empty() {
+            addr.clone()
+        } else {
+            format!("{name} <{addr}>")
+        };
+        identities.push(ComposeAccount {
+            id,
+            label: display.clone(),
+            signature: signature.clone(),
+            signatures: signatures.clone(),
+            email: addr,
+            pgp_key: pgp_key.clone(),
+            sign_default,
+            alias_from: Some(display),
+        });
+    }
+    // A JMAP server's own identities (#346), unless the account
+    // already lists the address. A catch-all (`*@domain`) is no
+    // address to send from; typing one into From uses it.
+    for (name, addr) in server_identities
+        .get(&id)
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+    {
+        if addr.starts_with("*@")
+            || identities
+                .iter()
+                .any(|i| i.email.eq_ignore_ascii_case(addr))
+        {
+            continue;
+        }
+        let display = if name.is_empty() || name.eq_ignore_ascii_case(addr) {
+            addr.clone()
+        } else {
+            format!("{name} <{addr}>")
+        };
+        identities.push(ComposeAccount {
+            id,
+            label: display.clone(),
+            signature: signature.clone(),
+            signatures: signatures.clone(),
+            email: addr.clone(),
+            pgp_key: pgp_key.clone(),
+            sign_default,
+            alias_from: Some(display),
+        });
+    }
+    identities
 }
 
 /// Default identity: for a reply, whichever of the account's addresses
@@ -317,7 +331,7 @@ impl AppModel {
             // action icons, Send) before it folds into its ⋯ menu.
             .default_width(720)
             .default_height(760)
-            .title(&i18n("New Message"))
+            .title(i18n("New Message"))
             .transient_for(&self.window)
             .build();
         win.set_content(Some(content));
