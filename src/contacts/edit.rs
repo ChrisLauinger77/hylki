@@ -9,7 +9,7 @@ use super::eds_write::{
 };
 use super::photos::local_changed;
 use super::read::is_local_book;
-use super::vcard::{escape_vcard_value, insert_after_version};
+use super::vcard::{escape_vcard_value, insert_after_version, property_name};
 use crate::i18n::i18n;
 
 // ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ pub fn patched_vcard(original: &str, e: &ContactEdit) -> String {
 
 /// A brand-new contact's vCard from the editor's values.
 pub fn new_vcard(e: &ContactEdit) -> String {
-    patched_vcard("BEGIN:VCARD\r\nVERSION:3.0\r\nEND:VCARD\r\n", e)
+    patched_vcard(EMPTY_VCARD, e)
 }
 
 /// The lines of a stored vCard up to its END, less the properties in
@@ -185,14 +185,7 @@ fn kept_lines_by(original: &str, drop: impl Fn(&str) -> bool) -> Vec<String> {
         if line.eq_ignore_ascii_case("END:VCARD") {
             break;
         }
-        let prop = line
-            .split([':', ';'])
-            .next()
-            .unwrap_or("")
-            .rsplit('.')
-            .next()
-            .unwrap_or("")
-            .to_ascii_uppercase();
+        let prop = property_name(line.split(':').next().unwrap_or("")).to_ascii_uppercase();
         skipping = drop(&prop);
         if !skipping {
             out.push(line.to_string());

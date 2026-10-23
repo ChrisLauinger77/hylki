@@ -16,6 +16,18 @@ pub(crate) fn unfold_vcard(vcard: &str) -> String {
         .replace("\n\t", "")
 }
 
+/// The name in a content line's property part, without its parameters
+/// or group prefix: `item1.EMAIL;TYPE=WORK` gives `EMAIL`.
+pub(crate) fn property_name(property: &str) -> &str {
+    property
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+}
+
 /// Split a (unfolded) vCard content line into property (name + params) and
 /// value at the first colon *outside* double quotes. A naive colon split
 /// breaks on quoted parameter values — iCloud's photo lines carry
@@ -70,14 +82,7 @@ pub(crate) fn vcard_photo_with(vcard: &str, allow_files: bool) -> Option<Vec<u8>
         let Some((property, raw_value)) = split_vcard_line(line) else {
             continue;
         };
-        let name = property
-            .split(';')
-            .next()
-            .unwrap_or("")
-            .rsplit('.')
-            .next()
-            .unwrap_or("")
-            .trim();
+        let name = property_name(property).trim();
         if !name.eq_ignore_ascii_case("PHOTO") {
             continue;
         }
@@ -204,14 +209,7 @@ pub(super) fn is_group_vcard(vcard: &str) -> bool {
         let Some((prop, value)) = line.split_once(':') else {
             return false;
         };
-        let name = prop
-            .split(';')
-            .next()
-            .unwrap_or("")
-            .rsplit('.')
-            .next()
-            .unwrap_or("")
-            .trim();
+        let name = property_name(prop).trim();
         let value = value.trim();
         (name.eq_ignore_ascii_case("X-EVOLUTION-LIST") && value.eq_ignore_ascii_case("true"))
             || ((name.eq_ignore_ascii_case("KIND")

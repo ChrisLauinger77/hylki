@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use super::read::{cache_dir, data_dir, local_details, open_book_db};
 use super::registry::{book_uid_active, book_uid_name, registry_books};
 use super::vcard::{
-    escape_vcard_value, split_unescaped, split_vcard_line, unescape_vcard_text, unfold_vcard,
-    vcard_photo, vcard_photo_with,
+    escape_vcard_value, property_name, split_unescaped, split_vcard_line, unescape_vcard_text,
+    unfold_vcard, vcard_photo, vcard_photo_with,
 };
 
 // ---------------------------------------------------------------------------
@@ -497,16 +497,8 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
         let Some((prop, raw_value)) = split_vcard_line(line) else {
             continue;
         };
-        let mut parts = prop.split(';');
-        // Group prefixes (`item1.EMAIL`) hide the property name; strip them.
-        let name = parts
-            .next()
-            .unwrap_or("")
-            .rsplit('.')
-            .next()
-            .unwrap_or("")
-            .to_ascii_uppercase();
-        let params: Vec<&str> = parts.collect();
+        let name = property_name(prop).to_ascii_uppercase();
+        let params: Vec<&str> = prop.split(';').skip(1).collect();
         let value = unescape_vcard_text(raw_value.trim());
         if value.is_empty() {
             continue;
