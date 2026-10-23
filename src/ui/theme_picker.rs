@@ -15,8 +15,8 @@ use std::rc::Rc;
 
 use gtk::prelude::*;
 
+use crate::desktop::theme::{self, Palette};
 use crate::i18n::i18n;
-use crate::theme::{self, Palette};
 
 /// The thumbnail window's size, in points.
 const THUMB_W: f64 = 70.0;

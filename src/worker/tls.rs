@@ -39,7 +39,7 @@ pub(super) fn tls_connector(
 /// Whether a connection error is the certificate's name not matching the
 /// host (#246), which the account's "Accept a certificate for another
 /// name" switch is for. The wording is OpenSSL's, via native-tls.
-pub fn is_hostname_mismatch(error: &str) -> bool {
+pub(crate) fn is_hostname_mismatch(error: &str) -> bool {
     let e = error.to_ascii_lowercase();
     e.contains("hostname mismatch")
         || e.contains("host name mismatch")

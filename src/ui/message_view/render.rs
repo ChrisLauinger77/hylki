@@ -108,7 +108,7 @@ impl MessageView {
         self.reader_mode.hash(&mut h);
         // Translations (#327): which cards show one, and whether cards
         // offer Translate at all.
-        crate::translate::generation().hash(&mut h);
+        crate::services::translate::generation().hash(&mut h);
         self.fold_messages.hash(&mut h);
         self.fold_preview_lines.hash(&mut h);
         let mut shown: Vec<(u32, u32, usize)> = self
@@ -130,7 +130,7 @@ impl MessageView {
         self.chips_shown().hash(&mut h);
         // The picture a mailbox of your own shows can change while a
         // conversation is open (#189) — the cards must be built again.
-        crate::avatar::own_faces_generation().hash(&mut h);
+        crate::services::avatar::own_faces_generation().hash(&mut h);
         self.thread.len().hash(&mut h);
         for m in &self.thread {
             let key = (m.account_id, m.id);
@@ -202,7 +202,7 @@ impl MessageView {
                 Default::default()
             }
         });
-        let translation = crate::translate::load();
+        let translation = crate::services::translate::load();
         LIVE_TRANSLATE_ON.with(|on| on.set(translation.enabled()));
         LIVE_TRANSLATE.with(|t| {
             *t.borrow_mut() = self

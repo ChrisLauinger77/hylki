@@ -208,7 +208,8 @@ impl ContactsPage {
             _ => false,
         };
         if directory_picked && !groups && no_people && lines.is_empty() {
-            let text = if self.query.trim().chars().count() < crate::directory::MIN_QUERY {
+            let text = if self.query.trim().chars().count() < crate::contacts::directory::MIN_QUERY
+            {
                 i18n("Type three letters or more to search the directory.")
             } else {
                 i18n("Nobody in the directory matches.")
@@ -237,7 +238,8 @@ impl ContactsPage {
                 _ => None,
             })
             .filter(|key| {
-                !self.decoding.contains(key) && crate::avatar::photo_thumbnail(*key).is_none()
+                !self.decoding.contains(key)
+                    && crate::services::avatar::photo_thumbnail(*key).is_none()
             })
             .collect();
         // Unselected first: the selection would otherwise follow the old
@@ -336,7 +338,7 @@ impl ContactsPage {
                     .iter()
                     .filter_map(|c| Some((c.photo_key, c.photo_bytes()?))),
             );
-            crate::avatar::decode_photo_thumbnails(photos, || {
+            crate::services::avatar::decode_photo_thumbnails(photos, || {
                 let _ = s.send(ContactsPageInput::PhotosDecoded);
             });
         });

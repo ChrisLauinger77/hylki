@@ -24,8 +24,8 @@ pub(super) fn registry_books() -> Option<HashMap<String, String>> {
         .map(|(_, uid, data)| (uid, data))
         .collect();
     let mut books = HashMap::new();
-    let off = crate::contact_sources::off();
-    let names = crate::contact_sources::names();
+    let off = crate::contacts::contact_sources::off();
+    let names = crate::contacts::contact_sources::names();
     for (uid, data) in &sources {
         // An address book, and not switched off (GOA sets the book source's
         // [Data Source] Enabled=false when Contacts is toggled off for the
@@ -34,10 +34,10 @@ pub(super) fn registry_books() -> Option<HashMap<String, String>> {
         // for Hylki in Settings → Contacts, it or its account.
         if data.contains("[Address Book]")
             && !data_source_disabled(data)
-            && crate::contact_sources::book_used(uid, &sources, &off)
+            && crate::contacts::contact_sources::book_used(uid, &sources, &off)
         {
             let name = book_display_name(data, &sources);
-            let account = names.get(&crate::contact_sources::group_of(uid, &sources));
+            let account = names.get(&crate::contacts::contact_sources::group_of(uid, &sources));
             books.insert(
                 uid.clone(),
                 with_given_name(&with_account_name(&name, account), names.get(uid)),
@@ -127,7 +127,7 @@ pub(super) fn with_given_name(name: &str, given: Option<&String>) -> String {
 }
 
 pub(super) fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> String {
-    let own = crate::platform::keyfile_value(book_data, "Data Source", "DisplayName");
+    let own = crate::desktop::platform::keyfile_value(book_data, "Data Source", "DisplayName");
     let (backend, identity, top_display) = book_account(book_data, sources);
     let account = identity.or(top_display.or(own.clone()));
     let label = match (backend.as_deref(), account.as_deref()) {
@@ -159,24 +159,32 @@ fn book_account(
     book_data: &str,
     sources: &HashMap<String, String>,
 ) -> (Option<String>, Option<String>, Option<String>) {
-    let mut backend = crate::platform::keyfile_value(book_data, "Address Book", "BackendName");
+    let mut backend =
+        crate::desktop::platform::keyfile_value(book_data, "Address Book", "BackendName");
     let mut identity: Option<String> = None;
     let mut top_display = None;
     let mut current = book_data.to_string();
     for _ in 0..4 {
-        let Some(parent) = crate::platform::keyfile_value(&current, "Data Source", "Parent") else {
+        let Some(parent) =
+            crate::desktop::platform::keyfile_value(&current, "Data Source", "Parent")
+        else {
             break;
         };
         let Some(parent_data) = sources.get(&parent) else {
             break;
         };
-        if let Some(b) = crate::platform::keyfile_value(parent_data, "Collection", "BackendName") {
+        if let Some(b) =
+            crate::desktop::platform::keyfile_value(parent_data, "Collection", "BackendName")
+        {
             backend = Some(b);
         }
         if identity.is_none() {
-            identity = crate::platform::keyfile_value(parent_data, "Collection", "Identity");
+            identity =
+                crate::desktop::platform::keyfile_value(parent_data, "Collection", "Identity");
         }
-        if let Some(d) = crate::platform::keyfile_value(parent_data, "Data Source", "DisplayName") {
+        if let Some(d) =
+            crate::desktop::platform::keyfile_value(parent_data, "Data Source", "DisplayName")
+        {
             top_display = Some(d);
         }
         current = parent_data.clone();
@@ -219,7 +227,7 @@ pub(super) fn group_format_for(backend: Option<&str>) -> Option<GroupFormat> {
 
 /// Whether a source keyfile's `[Data Source]` group says `Enabled=false`.
 pub(super) fn data_source_disabled(data: &str) -> bool {
-    crate::platform::keyfile(data).and_then(|kf| kf.boolean("Data Source", "Enabled").ok())
+    crate::desktop::platform::keyfile(data).and_then(|kf| kf.boolean("Data Source", "Enabled").ok())
         == Some(false)
 }
 
@@ -241,7 +249,7 @@ fn sources_dest_from_files() -> Option<String> {
 /// but for a book switched off for Hylki by its own UID).
 pub(super) fn book_uid_active(uid: &str, books: &Option<HashMap<String, String>>) -> bool {
     books.as_ref().map_or_else(
-        || !crate::contact_sources::off().contains(uid),
+        || !crate::contacts::contact_sources::off().contains(uid),
         |map| map.contains_key(uid),
     )
 }

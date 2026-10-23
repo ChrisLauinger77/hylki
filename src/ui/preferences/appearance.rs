@@ -24,7 +24,7 @@ impl Preferences {
     }
 
     pub(super) fn on_change_text_scale(&mut self, index: u32, sender: ComponentSender<Self>) {
-        let percent = crate::text_scale::STEPS
+        let percent = crate::desktop::text_scale::STEPS
             .get(index as usize)
             .copied()
             .unwrap_or(100);

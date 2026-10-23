@@ -60,7 +60,7 @@ fn build_webview(role: &'static str) -> webkit6::WebView {
         .web_context(&shared_web_context())
         .user_content_manager(&ucm)
         .build();
-    crate::memory_report::register_web_view(&webview, role);
+    crate::desktop::memory_report::register_web_view(&webview, role);
 
     let settings = webkit6::Settings::new();
     // JavaScript runs only in our own (trusted) wrapper document — it sizes each

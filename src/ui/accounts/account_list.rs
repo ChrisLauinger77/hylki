@@ -12,15 +12,15 @@ use super::*;
 /// neither serve IMAP nor Graph mail for can never connect and aren't listed.
 pub(super) fn importable_goa_accounts(
     configured: &[AccountConfig],
-) -> Vec<crate::goa::GoaMailAccount> {
-    importable_of(crate::goa::list_mail_accounts(), configured)
+) -> Vec<crate::services::goa::GoaMailAccount> {
+    importable_of(crate::services::goa::list_mail_accounts(), configured)
 }
 
 /// The importable ones among `listed` (see [`importable_goa_accounts`]).
 fn importable_of(
-    listed: Vec<crate::goa::GoaMailAccount>,
+    listed: Vec<crate::services::goa::GoaMailAccount>,
     configured: &[AccountConfig],
-) -> Vec<crate::goa::GoaMailAccount> {
+) -> Vec<crate::services::goa::GoaMailAccount> {
     listed
         .into_iter()
         .filter(|g| {
@@ -68,7 +68,7 @@ impl AccountsWindow {
             // The provider's mark, right of the name and address, named on
             // hover.
             let brand = brand_for_account(acc);
-            let mark = crate::brand::mark(brand, 24, crate::brand::GENERIC_MAIL);
+            let mark = crate::desktop::brand::mark(brand, 24, crate::desktop::brand::GENERIC_MAIL);
             mark.set_tooltip_text(Some(&provider_name(brand, acc)));
             hbox.append(&size_slot(mark.upcast_ref(), &mark_widths));
 
@@ -120,10 +120,10 @@ impl AccountsWindow {
         for (pos, g) in self.goa.iter().enumerate() {
             let row = adw::ActionRow::new();
             row.set_title(&g.email);
-            row.add_prefix(&crate::brand::mark(
+            row.add_prefix(&crate::desktop::brand::mark(
                 brand_for_goa(&g.provider),
                 24,
-                crate::brand::GENERIC_MAIL,
+                crate::desktop::brand::GENERIC_MAIL,
             ));
             let mut subtitle = if g.provider.is_empty() {
                 i18n("Mail")
@@ -165,7 +165,7 @@ impl AccountsWindow {
         // goa-daemon is slow to.
         widgets.accounts.goa_refresh_btn.set_sensitive(false);
         sender.oneshot_command(async move {
-            let listed = tokio::task::spawn_blocking(crate::goa::list_mail_accounts)
+            let listed = tokio::task::spawn_blocking(crate::services::goa::list_mail_accounts)
                 .await
                 .unwrap_or_default();
             AccountsCmd::GoaListed(listed)
@@ -227,7 +227,9 @@ impl AccountsWindow {
             // account still works if this read comes back empty.
             let (password, oauth) = if g.password_based {
                 (
-                    crate::goa::mail_passwords(&g.id).0.unwrap_or_default(),
+                    crate::services::goa::mail_passwords(&g.id)
+                        .0
+                        .unwrap_or_default(),
                     false,
                 )
             } else {
@@ -245,7 +247,7 @@ impl AccountsWindow {
 
     pub(super) fn on_goa_listed(
         &mut self,
-        listed: Vec<crate::goa::GoaMailAccount>,
+        listed: Vec<crate::services::goa::GoaMailAccount>,
         widgets: &AccountsWindowWidgets,
         sender: ComponentSender<Self>,
     ) {
@@ -308,7 +310,7 @@ fn account_circle(acc: &AccountConfig, account_id: u32, css: &mut String) -> gtk
     // as in the sidebar circle and the editor preview.
     let gravatar = acc
         .gravatar
-        .then(|| crate::avatar::own_gravatar(&acc.email))
+        .then(|| crate::services::avatar::own_gravatar(&acc.email))
         .flatten();
     let glyph: gtk::Widget = match (&gravatar, &picture, acc.emoji.as_deref()) {
         (Some(texture), ..) => {
@@ -446,8 +448,8 @@ mod tests {
         imap_host: &str,
         oauth2: bool,
         provider_type: &str,
-    ) -> crate::goa::GoaMailAccount {
-        crate::goa::GoaMailAccount {
+    ) -> crate::services::goa::GoaMailAccount {
+        crate::services::goa::GoaMailAccount {
             id: format!("account_{email}"),
             email: email.into(),
             name: String::new(),

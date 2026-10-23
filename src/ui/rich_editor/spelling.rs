@@ -21,7 +21,7 @@ pub(crate) fn apply_spellcheck() {
     if !on {
         return;
     }
-    let langs = crate::spell::resolved_spell_languages();
+    let langs = crate::desktop::spell::resolved_spell_languages();
     let langs: Vec<&str> = langs.iter().map(String::as_str).collect();
     ctx.set_spell_checking_languages(&langs);
 }
@@ -35,22 +35,25 @@ pub(super) fn append_spelling_menu(menu: &webkit6::ContextMenu, cb: &SpellLangsC
     if !crate::config::load_privacy().spellcheck {
         return;
     }
-    let dicts = crate::spell::installed_dictionaries();
+    let dicts = crate::desktop::spell::installed_dictionaries();
     if dicts.is_empty() {
         return;
     }
     let setting = crate::config::load_privacy().spellcheck_langs;
-    let chosen = crate::spell::parse_languages(&setting);
-    let system = crate::spell::system_spell_languages();
+    let chosen = crate::desktop::spell::parse_languages(&setting);
+    let system = crate::desktop::spell::system_spell_languages();
     let system_label = i18n_f(
         "System language — {language}",
-        &[("language", &crate::spell::spell_language_names(&system))],
+        &[(
+            "language",
+            &crate::desktop::spell::spell_language_names(&system),
+        )],
     );
     let entries = std::iter::once((String::new(), system_label, chosen.is_empty())).chain(
         dicts.iter().map(|d| {
             (
                 d.clone(),
-                crate::spell::language_display_name(d),
+                crate::desktop::spell::language_display_name(d),
                 chosen.contains(d),
             )
         }),
@@ -65,7 +68,7 @@ pub(super) fn append_spelling_menu(menu: &webkit6::ContextMenu, cb: &SpellLangsC
         );
         let (cb, setting, system) = (cb.clone(), setting.clone(), system.clone());
         action.connect_activate(move |_, _| {
-            let next = crate::spell::toggle_language(&setting, &code, !on, &system);
+            let next = crate::desktop::spell::toggle_language(&setting, &code, !on, &system);
             if let Some(f) = cb.borrow().as_ref() {
                 f(next);
             }

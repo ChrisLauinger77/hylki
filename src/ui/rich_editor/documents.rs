@@ -161,7 +161,7 @@ pub(super) fn source_document(text: &str, webview: &webkit6::WebView) -> String 
 fn monospace_family() -> String {
     static FAMILY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     FAMILY
-        .get_or_init(|| css_monospace_family(&crate::desktop::monospace_font()))
+        .get_or_init(|| css_monospace_family(&crate::desktop::session::monospace_font()))
         .clone()
 }
 

@@ -21,7 +21,7 @@ pub(super) fn sync_contact_books(sender: &ComponentSender<AppModel>, force: bool
     let s = sender.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(delay_ms));
-        if crate::carddav::sync_books(force) {
+        if crate::contacts::carddav::sync_books(force) {
             s.input(AppMsg::ContactBooksSynced);
         }
     });
@@ -56,17 +56,19 @@ pub(super) fn reload_contacts(sender: &ComponentSender<AppModel>, delay_ms: u64)
             return;
         }
         let contacts = crate::contacts::read_contact_details();
-        crate::avatar::retain_photo_thumbnails(&contacts.iter().map(|c| c.photo_key).collect());
+        crate::services::avatar::retain_photo_thumbnails(
+            &contacts.iter().map(|c| c.photo_key).collect(),
+        );
         s.input(AppMsg::ContactsLoaded(contacts));
         s.input(AppMsg::ContactBooksLoaded {
             books: crate::contacts::writable_books(),
-            local_count: crate::local_contacts::count(),
+            local_count: crate::contacts::local::count(),
         });
     });
 }
 
 /// The notification text for a finished contacts import, and whether it is an error.
-fn import_summary(o: &crate::local_contacts::ImportOutcome) -> (String, bool) {
+fn import_summary(o: &crate::contacts::local::ImportOutcome) -> (String, bool) {
     if o.added + o.updated == 0 {
         return (
             i18n("No contacts were found in the selected files"),
@@ -249,7 +251,7 @@ impl AppModel {
             }
 
             AppMsg::ShowContactsPage => {
-                crate::desktop::present_window(&self.window);
+                crate::desktop::session::present_window(&self.window);
                 sender.input(AppMsg::OpenContacts);
             }
 
@@ -404,7 +406,7 @@ impl AppModel {
             }
 
             AppMsg::RenameBook { uid, name } => {
-                if let Err(e) = crate::contact_sources::set_name(&uid, name.as_deref()) {
+                if let Err(e) = crate::contacts::contact_sources::set_name(&uid, name.as_deref()) {
                     self.notice_error(i18n_f(
                         "Could not rename the address book: {e}",
                         &[("e", &e)],
@@ -533,7 +535,7 @@ mod tests {
 
     #[test]
     fn contact_import_summary_counts() {
-        use crate::local_contacts::ImportOutcome;
+        use crate::contacts::local::ImportOutcome;
         let none = ImportOutcome {
             errors: 1,
             ..Default::default()

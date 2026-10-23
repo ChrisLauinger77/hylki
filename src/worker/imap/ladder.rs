@@ -37,8 +37,8 @@ impl<E: Emit> ImapWorker<E> {
         // Offline, the queues keep for when the network is back; on
         // a metered connection the work done ahead of the user waits
         // for an unmetered one (#442).
-        let net = crate::power::reaches(&self.account.imap_host);
-        let ahead = net && !crate::power::saving_data();
+        let net = crate::desktop::power::reaches(&self.account.imap_host);
+        let ahead = net && !crate::desktop::power::saving_data();
         if !self.body_prefetch.is_empty() && ahead {
             self.prefetch_one_body().await
         } else if self.folder_refresh_due && self.session.is_some() && net {

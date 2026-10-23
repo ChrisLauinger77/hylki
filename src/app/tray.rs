@@ -101,7 +101,9 @@ impl AppModel {
         // The counted total is what GNOME shows beside Hylki in Background
         // Apps, so a process with no window still says what it is there for.
         if self.run_in_background.get() {
-            crate::background::set_status(&crate::background::status_text(unified));
+            crate::desktop::background::set_status(&crate::desktop::background::status_text(
+                unified,
+            ));
         }
         // And what the tray icon's dot answers to: the inboxes alone, as
         // its menu says.
@@ -128,13 +130,13 @@ impl AppModel {
                     .map(|m| m.uid)
             }),
         };
-        crate::launcher_badge::set_count(count);
+        crate::desktop::launcher_badge::set_count(count);
     }
 
     /// Send the launcher badge again even though the count is unchanged, for
     /// when the dock may have dropped it (a lock, a wake).
     pub(super) fn resend_launcher_count(&self) {
-        crate::launcher_badge::resend();
+        crate::desktop::launcher_badge::resend();
         self.push_launcher_count();
     }
 
@@ -146,7 +148,7 @@ impl AppModel {
         self.tray = indicator::TrayHandle::start(
             sender.input_sender().clone(),
             self.tray_icon,
-            &crate::app_icon::tray_image(&self.app_icon),
+            &crate::desktop::app_icon::tray_image(&self.app_icon),
             unified,
             mail,
         );
@@ -272,8 +274,8 @@ impl AppModel {
                     heading.push_str(" · ");
                     heading.push_str(&m.date);
                 }
-                let texture = match crate::avatar::lookup(&m.from_addr, self.gravatar) {
-                    crate::avatar::CacheLookup::Texture(t) => Some(t),
+                let texture = match crate::services::avatar::lookup(&m.from_addr, self.gravatar) {
+                    crate::services::avatar::CacheLookup::Texture(t) => Some(t),
                     _ => None,
                 };
                 indicator::TrayMail {
@@ -309,7 +311,7 @@ impl AppModel {
                 // purpose, so a one-shot flag of its own goes along (init
                 // takes it and clears it, so it never outlives that start).
                 std::env::set_var(crate::WIZARD_AGAIN_VAR, "1");
-                match crate::app_icon::launch_restart_helper() {
+                match crate::desktop::app_icon::launch_restart_helper() {
                     Ok(()) => {
                         // The quit action's own teardown, inline: nothing to
                         // look up, nothing to wait for.
@@ -339,7 +341,7 @@ impl AppModel {
                 // seconds after the launcher changed; quitting before that
                 // brings the new window up under the old one, old icon and
                 // all. Wait it out with the window still up.
-                let wait = crate::app_icon::launcher_settle_remaining();
+                let wait = crate::desktop::app_icon::launcher_settle_remaining();
                 self.show_restarting_dialog();
                 if wait.is_zero() {
                     sender.input(AppMsg::RestartNow);
@@ -349,7 +351,7 @@ impl AppModel {
                 }
             }
 
-            AppMsg::RestartNow => match crate::app_icon::launch_restart_helper() {
+            AppMsg::RestartNow => match crate::desktop::app_icon::launch_restart_helper() {
                 Ok(()) => relm4::main_application().activate_action("quit", None),
                 Err(e) => {
                     tracing::warn!("restart helper failed: {e}");
@@ -388,7 +390,7 @@ impl AppModel {
             }
 
             AppMsg::PresentWindow => {
-                crate::desktop::present_window(&self.window);
+                crate::desktop::session::present_window(&self.window);
             }
             _ => unreachable!("not routed to on_tray"),
         }

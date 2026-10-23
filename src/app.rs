@@ -836,7 +836,7 @@ impl SimpleComponent for AppModel {
 
         // The app-wide theme choice must be in force before the first frame.
         apply_app_theme(model.app_theme);
-        crate::text_scale::apply(model.text_scale);
+        crate::desktop::text_scale::apply(model.text_scale);
         follow_motion_setting();
         let reader_tag_btn = model.reader_tag_btn.clone();
         let reader_move_btn = model.reader_move_btn.clone();

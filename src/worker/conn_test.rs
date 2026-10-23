@@ -12,10 +12,10 @@ use crate::worker::smtp::{smtp_host, smtp_tls_parameters, SmtpTls};
 
 /// Outcome of a credential/connection test for the Accounts window.
 #[derive(Debug)]
-pub struct ConnTest {
+pub(crate) struct ConnTest {
     /// Incoming server (IMAP or POP3, per the account's protocol).
-    pub incoming: Result<(), String>,
-    pub smtp: Result<(), String>,
+    pub(crate) incoming: Result<(), String>,
+    pub(crate) smtp: Result<(), String>,
 }
 
 /// Test that the account's servers accept the given credentials (no mail sent).
@@ -46,7 +46,7 @@ async fn test_pop3(account: &AccountConfig) -> Result<(), String> {
 /// Blocking wrapper around [`test_connection`] that spins up its own Tokio
 /// runtime — call it from `spawn_blocking` so the IMAP/SMTP sockets have an I/O
 /// reactor regardless of the caller's runtime.
-pub fn test_connection_blocking(account: AccountConfig) -> ConnTest {
+pub(crate) fn test_connection_blocking(account: AccountConfig) -> ConnTest {
     match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -155,7 +155,7 @@ fn account_accepts_hostname_mismatch(account_email: &str) -> bool {
 
 /// Blocking wrapper around [`test_alias_smtp`] — call from `spawn_blocking`,
 /// like [`test_connection_blocking`].
-pub fn test_alias_smtp_blocking(
+pub(crate) fn test_alias_smtp_blocking(
     account_email: String,
     alias: crate::config::AliasConfig,
 ) -> Result<(), String> {

@@ -304,7 +304,7 @@ fn a_sender_check_row_as_stored() {
             cancelled: false,
             ics: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n".into(),
         })),
-        label: Some(crate::sensitivity::SensitivityLabel {
+        label: Some(crate::mail::sensitivity::SensitivityLabel {
             name: "Confidential".into(),
             id: "id-1".into(),
             color: String::new(),

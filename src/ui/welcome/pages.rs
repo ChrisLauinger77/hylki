@@ -381,11 +381,11 @@ pub(super) fn build_personalize_page(carousel: &adw::Carousel) -> PersonalizePag
     // With an icon set outside Hylki on the launcher (#252), nothing is
     // preselected, and only an actual pick replaces it.
     let icon_choice = std::rc::Rc::new(std::cell::RefCell::new(
-        if crate::app_icon::custom_icon().is_some() {
+        if crate::desktop::app_icon::custom_icon().is_some() {
             String::new()
         } else {
             crate::config::load_app_icon()
-                .unwrap_or_else(|| crate::app_icon::DEFAULT_ID.to_string())
+                .unwrap_or_else(|| crate::desktop::app_icon::DEFAULT_ID.to_string())
         },
     ));
     let icon_card = card();

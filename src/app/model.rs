@@ -463,7 +463,7 @@ pub(crate) struct AppModel {
     /// What the launcher icon's badge counts (#271, #431).
     pub(super) launcher_badge: config::LauncherBadge,
     /// Inbox mail that arrived while the window was not in front (#431).
-    pub(super) arrivals: crate::launcher_badge::Arrivals,
+    pub(super) arrivals: crate::desktop::launcher_badge::Arrivals,
     /// The chosen app icon (an `app_icon::catalog` id); the tray draws it.
     pub(super) app_icon: String,
     /// A restart is on its way (Restart Now clicked, settle timer running).
@@ -645,7 +645,7 @@ pub(crate) struct AppModel {
     /// Settings → Reading: the zoom every launch starts at, in percent.
     pub(super) zoom_default: u32,
     /// Reader View: every message in the reader shown as its content alone,
-    /// in the reader's own sheet (see `crate::reader`). The toggle sits in
+    /// in the reader's own sheet (see `crate::mail::reader`). The toggle sits in
     /// the reader's subject block; the choice is remembered across runs.
     pub(super) reader_mode: bool,
     /// The Reader View switch is shown in the reader header.

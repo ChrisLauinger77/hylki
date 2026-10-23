@@ -171,7 +171,8 @@ fn system_ampm() -> bool {
 /// The desktop's clock format (GNOME's Time Format): `None` where the
 /// desktop has no such setting.
 fn desktop_ampm() -> Option<bool> {
-    match crate::desktop::setting("org.gnome.desktop.interface", "clock-format")?.as_str() {
+    match crate::desktop::session::setting("org.gnome.desktop.interface", "clock-format")?.as_str()
+    {
         "12h" => Some(true),
         "24h" => Some(false),
         _ => None,

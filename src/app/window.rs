@@ -113,7 +113,7 @@ impl AppModel {
             // Same teardown as closing the last window: save the geometry,
             // then exit rather than unwinding through GTK and WebKit.
             save_window_geometry(&window);
-            crate::background::set_status("");
+            crate::desktop::background::set_status("");
             exit_now(&outgoing)
         });
         app.add_action(&quit);
@@ -187,7 +187,7 @@ impl AppModel {
             if pending_hidden_start.replace(false) {
                 return;
             }
-            crate::desktop::present_window(&window);
+            crate::desktop::session::present_window(&window);
         });
     }
 }

@@ -4,11 +4,11 @@
 use std::time::Duration;
 
 use crate::config::AccountConfig;
-use crate::graph_api::bearer;
+use crate::services::graph_api::bearer;
 use crate::worker::auth::fetch_oauth_token;
 use crate::worker::WorkerEvent;
 
-pub(super) use crate::graph_api::GRAPH_BASE;
+pub(super) use crate::services::graph_api::GRAPH_BASE;
 
 /// How many times a throttled request waits and tries again.
 const GRAPH_THROTTLE_TRIES: u32 = 4;
@@ -209,7 +209,7 @@ pub(super) async fn graph_token(
 ) -> Option<String> {
     // Offline, no token is no fault of the sign-in; the Refresh button
     // already says the network is down (#442).
-    if !crate::power::reaches_internet() {
+    if !crate::desktop::power::reaches_internet() {
         return None;
     }
     match fetch_oauth_token(account).await {

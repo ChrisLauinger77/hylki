@@ -174,7 +174,7 @@ impl ContactDetails {
         }
         vcard_photo_with(
             &self.raw_vcard,
-            self.book_uid != crate::local_contacts::LOCAL_BOOK_UID,
+            self.book_uid != crate::contacts::local::LOCAL_BOOK_UID,
         )
     }
 

@@ -45,7 +45,7 @@ impl MessageView {
         let Some(m) = m.cloned() else { return };
         let mut hit = hit;
         let key = (m.account_id, m.id);
-        if crate::translate::load().enabled() && !self.encrypted(key) {
+        if crate::services::translate::load().enabled() && !self.encrypted(key) {
             let label = match self.translations.get(&key) {
                 Some(TrState::Shown(_)) => i18n("Show Original"),
                 Some(TrState::Original(_)) => i18n("Show Translation"),

@@ -56,7 +56,10 @@ impl Preferences {
     pub(super) fn on_sound_chosen(&mut self, path: std::path::PathBuf) {
         match crate::config::set_custom_sound(&path) {
             Ok(copy) => {
-                crate::notify::play_sound(&crate::config::SoundSource::File(copy.clone()), true);
+                crate::desktop::notify::play_sound(
+                    &crate::config::SoundSource::File(copy.clone()),
+                    true,
+                );
                 self.custom_sound = Some(copy);
             }
             Err(e) => tracing::warn!(
@@ -68,7 +71,7 @@ impl Preferences {
 
     pub(super) fn on_play_sound(&mut self) {
         if let Some(source) = self.sound.source() {
-            crate::notify::play_sound(&source, true);
+            crate::desktop::notify::play_sound(&source, true);
         }
     }
 
@@ -99,7 +102,7 @@ impl Preferences {
         // Picking a sound plays it; Custom File with no file yet
         // goes straight to the file chooser.
         match self.sound.source() {
-            Some(source) => crate::notify::play_sound(&source, true),
+            Some(source) => crate::desktop::notify::play_sound(&source, true),
             None => sender.input(PrefInput::ChooseSound),
         }
     }

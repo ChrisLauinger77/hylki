@@ -68,7 +68,7 @@ pub(super) fn add_toolbar_end_buttons(
     translate_btn.set_tooltip_text(Some(i18n("Translate what you wrote").as_str()));
     translate_btn.add_css_class("flat");
     translate_btn.set_can_focus(false);
-    translate_btn.set_visible(crate::translate::load().enabled());
+    translate_btn.set_visible(crate::services::translate::load().enabled());
     {
         let s = sender.input_sender().clone();
         translate_btn.connect_clicked(move |_| {

@@ -102,7 +102,7 @@ impl Drop for RichEditor {
             .collect();
         gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
             for v in &views {
-                crate::memory_report::release_web_view(v);
+                crate::desktop::memory_report::release_web_view(v);
             }
         });
     }
@@ -191,7 +191,7 @@ impl RichEditor {
     pub(super) fn set_html(&self, content: &str) {
         self.source.set(None);
         self.show_preview(None);
-        crate::web_fonts::load_html(
+        crate::desktop::web_fonts::load_html(
             &self.webview,
             &document(content, &self.webview, &self.image_policy, self.plain.get()),
             Some("https://hylki.localhost/editor"),
@@ -204,7 +204,7 @@ impl RichEditor {
     pub(super) fn set_source(&self, kind: SourceKind, text: &str) {
         self.source.set(Some(kind));
         self.show_preview(None);
-        crate::web_fonts::load_html(
+        crate::desktop::web_fonts::load_html(
             &self.webview,
             &source_document(text, &self.webview),
             Some("https://hylki.localhost/editor"),
@@ -252,7 +252,7 @@ impl RichEditor {
                     .web_context(&super::message_view::shared_web_context())
                     .settings(&settings)
                     .build();
-                crate::memory_report::register_web_view(&v, "editor preview");
+                crate::desktop::memory_report::register_web_view(&v, "editor preview");
                 v.set_zoom_level(self.zoom.get());
                 v.set_background_color(&gtk::gdk::RGBA::new(0.0, 0.0, 0.0, 0.0));
                 self.stack.add_named(&v, Some("preview"));
@@ -260,7 +260,7 @@ impl RichEditor {
                 v
             }
         };
-        crate::web_fonts::load_html(
+        crate::desktop::web_fonts::load_html(
             &view,
             &preview_document(html, &view, &self.image_policy),
             Some("https://hylki.localhost/preview"),

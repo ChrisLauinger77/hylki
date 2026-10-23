@@ -24,7 +24,7 @@ pub(super) enum ProviderKind {
 /// One entry in the Provider dropdown. It selects both the sign-in method and,
 /// for `Preset`, the IMAP/SMTP servers to auto-fill. `hint` is shown as the row's
 /// subtitle. Server fields are empty for non-`Preset` kinds (OAuth providers get
-/// their servers from `crate::oauth::preset`; Manual/Custom are user-entered).
+/// their servers from `crate::services::oauth::preset`; Manual/Custom are user-entered).
 pub(crate) struct Provider {
     pub(super) label: &'static str,
     /// The brand id of its mark (`brand::mark`): "mail", the IMAP tile, for
@@ -67,8 +67,8 @@ impl Provider {
         let name = self
             .oauth_name()
             .filter(|_| self.kind == ProviderKind::Microsoft)?;
-        let p = crate::oauth::preset(name)?;
-        let (client_id, client_secret) = crate::oauth::provider_credentials(name);
+        let p = crate::services::oauth::preset(name)?;
+        let (client_id, client_secret) = crate::services::oauth::provider_credentials(name);
         Some(crate::config::OAuthSettings {
             auth_url: p.auth_url.to_string(),
             token_url: p.token_url.to_string(),
@@ -227,10 +227,10 @@ pub(crate) fn provider_factory() -> gtk::SignalListItemFactory {
         let Some(old) = bx.first_child() else { return };
         let label = old.next_sibling().and_downcast::<gtk::Label>();
         bx.remove(&old);
-        bx.prepend(&crate::brand::mark(
+        bx.prepend(&crate::desktop::brand::mark(
             provider.brand,
             20,
-            crate::brand::GENERIC_MAIL,
+            crate::desktop::brand::GENERIC_MAIL,
         ));
         if let Some(label) = label {
             label.set_label(&name);

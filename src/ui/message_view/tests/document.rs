@@ -77,9 +77,9 @@ fn a_card_from_your_own_mailbox_wears_that_mailboxs_face() {
         )
     };
 
-    crate::avatar::set_own_faces([(
+    crate::services::avatar::set_own_faces([(
         "Me@Example.com".to_string(),
-        crate::avatar::OwnFace {
+        crate::services::avatar::OwnFace {
             gravatar: false,
             picture: None,
             emoji: Some("\u{1F98A}".to_string()),
@@ -111,9 +111,9 @@ fn a_card_from_your_own_mailbox_wears_that_mailboxs_face() {
         .expect("a pixbuf");
     pixbuf.fill(0xe661_00ff);
     pixbuf.savev(&path, "png", &[]).expect("a picture on disk");
-    crate::avatar::set_own_faces([(
+    crate::services::avatar::set_own_faces([(
         "me@example.com".to_string(),
-        crate::avatar::OwnFace {
+        crate::services::avatar::OwnFace {
             gravatar: false,
             picture: Some(path.clone()),
             emoji: Some("\u{1F98A}".to_string()),
@@ -134,7 +134,7 @@ fn a_card_from_your_own_mailbox_wears_that_mailboxs_face() {
         "the file is never linked: {doc}"
     );
 
-    crate::avatar::set_own_faces(std::iter::empty());
+    crate::services::avatar::set_own_faces(std::iter::empty());
     let _ = std::fs::remove_file(&path);
 }
 

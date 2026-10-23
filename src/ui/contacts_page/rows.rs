@@ -201,7 +201,7 @@ impl ListRow {
         if key == 0 {
             return;
         }
-        if let Some(texture) = crate::avatar::photo_thumbnail(key) {
+        if let Some(texture) = crate::services::avatar::photo_thumbnail(key) {
             if let Some(texture) = texture {
                 self.face.set_paintable(Some(&texture));
                 self.face.set_visible(true);
@@ -471,7 +471,7 @@ pub(super) fn same_contacts(shown: &[ContactDetails], read: &[ContactDetails]) -
 pub(super) fn avatar_for(c: &ContactDetails, size: i32) -> adw::Avatar {
     // The list's thumbnail does for a small face, without reading the photo.
     if size <= 48 {
-        if let Some(Some(texture)) = crate::avatar::photo_thumbnail(line_photo_key(c)) {
+        if let Some(Some(texture)) = crate::services::avatar::photo_thumbnail(line_photo_key(c)) {
             let avatar = avatar_with(c, size, None);
             avatar.set_custom_image(Some(&texture));
             return avatar;

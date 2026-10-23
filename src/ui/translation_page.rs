@@ -10,7 +10,7 @@ use adw::prelude::*;
 use gtk::glib;
 
 use crate::i18n::{i18n, i18n_f};
-use crate::translate::{self, Service, Settings, LANGUAGES};
+use crate::services::translate::{self, Service, Settings, LANGUAGES};
 
 pub(super) fn build() -> adw::PreferencesPage {
     let settings = Rc::new(RefCell::new(translate::load()));

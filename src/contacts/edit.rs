@@ -394,7 +394,7 @@ impl BookCards {
         };
         match self {
             Self::Local => {
-                let found = crate::local_contacts::list_vcards()?
+                let found = crate::contacts::local::list_vcards()?
                     .into_iter()
                     .find_map(|v| {
                         let c = parse_vcard_fields(&v).filter(|c| !c.is_group())?;
@@ -413,7 +413,7 @@ impl BookCards {
                     crate::rng::token(24).map_err(|e| e.to_string())?
                 );
                 let card = insert_after_version(&card, &format!("UID:{uid}"));
-                write_local(crate::local_contacts::create(&card))?;
+                write_local(crate::contacts::local::create(&card))?;
                 Ok(uid)
             }
             Self::Eds { conn, bus, path } => {
@@ -451,8 +451,8 @@ fn write_local(result: Result<(), String>) -> Result<(), String> {
 /// background thread).
 pub(crate) fn import_vcf_files(
     paths: &[PathBuf],
-) -> Result<crate::local_contacts::ImportOutcome, String> {
-    let outcome = crate::local_contacts::import_files(paths)?;
+) -> Result<crate::contacts::local::ImportOutcome, String> {
+    let outcome = crate::contacts::local::import_files(paths)?;
     if outcome.added + outcome.updated > 0 {
         local_changed();
     }
@@ -462,7 +462,7 @@ pub(crate) fn import_vcf_files(
 /// Write a modified vCard back to its book through EDS.
 pub(crate) fn modify_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
     if is_local_book(book_uid) {
-        return write_local(crate::local_contacts::modify(vcard));
+        return write_local(crate::contacts::local::modify(vcard));
     }
     let dest = factory_dest().ok_or("Evolution Data Server is not available")?;
     let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
@@ -480,7 +480,7 @@ pub(crate) fn modify_contact(book_uid: &str, vcard: &str) -> Result<(), String> 
 /// Create a contact from a full vCard through EDS.
 pub(crate) fn create_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
     if is_local_book(book_uid) {
-        return write_local(crate::local_contacts::create(vcard));
+        return write_local(crate::contacts::local::create(vcard));
     }
     let dest = factory_dest().ok_or("Evolution Data Server is not available")?;
     let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
@@ -499,7 +499,7 @@ pub(crate) fn create_contact(book_uid: &str, vcard: &str) -> Result<(), String> 
 pub(crate) fn delete_contacts(book_uid: &str, uids: &[String]) -> Result<(), String> {
     if is_local_book(book_uid) {
         for uid in uids {
-            crate::local_contacts::delete(uid)?;
+            crate::contacts::local::delete(uid)?;
         }
         return write_local(Ok(()));
     }
@@ -555,7 +555,7 @@ pub(crate) fn move_contact(
 /// Delete a contact (by its EDS UID) from its book.
 pub(super) fn delete_contact(book_uid: &str, uid: &str) -> Result<(), String> {
     if is_local_book(book_uid) {
-        return write_local(crate::local_contacts::delete(uid));
+        return write_local(crate::contacts::local::delete(uid));
     }
     let dest = factory_dest().ok_or("Evolution Data Server is not available")?;
     let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;

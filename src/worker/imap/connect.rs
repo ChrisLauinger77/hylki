@@ -26,7 +26,7 @@ pub(super) async fn connect_and_list(
 ) -> Option<ImapSession> {
     // The Refresh button already says the network is down; an error per
     // account and per attempt would only repeat it (#442).
-    if !crate::power::reaches(&account.imap_host) {
+    if !crate::desktop::power::reaches(&account.imap_host) {
         return None;
     }
     emit(WorkerEvent::Status(i18n_f(
@@ -130,7 +130,7 @@ const IMAP_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs
 pub(in crate::worker) async fn connect(
     account: &AccountConfig,
 ) -> Result<ImapSession, Box<dyn std::error::Error>> {
-    if !crate::power::reaches(&account.imap_host) {
+    if !crate::desktop::power::reaches(&account.imap_host) {
         return Err(offline_text().into());
     }
     // Read before the connect timeout starts: the keyring's own wait is not

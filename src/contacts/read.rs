@@ -32,7 +32,7 @@ pub(crate) struct Book {
 // visible by the `--filesystem=xdg-{data,cache,config}/evolution:ro` grants). So
 // under Flatpak resolve them from the real home instead of the redirected XDG env.
 fn host_xdg(sandbox: fn() -> Option<PathBuf>, subdir: &str) -> Option<PathBuf> {
-    if crate::platform::is_flatpak() {
+    if crate::desktop::platform::is_flatpak() {
         dirs::home_dir().map(|h| h.join(subdir))
     } else {
         sandbox()
@@ -315,8 +315,8 @@ pub(super) fn read_groups_in(active: &Option<HashMap<String, String>>) -> Vec<Co
             read(&db, layout.cards, layout.vcard, layout.uid);
         }
     }
-    if crate::local_contacts::exists() && crate::contact_sources::hylki_used() {
-        match crate::local_contacts::group_vcards() {
+    if crate::contacts::local::exists() && crate::contacts::contact_sources::hylki_used() {
+        match crate::contacts::local::group_vcards() {
             Ok(vcards) => {
                 for vcard in vcards {
                     let Some(mut c) = parse_vcard_fields(&vcard).filter(ContactDetails::is_group)
@@ -324,13 +324,13 @@ pub(super) fn read_groups_in(active: &Option<HashMap<String, String>>) -> Vec<Co
                         continue;
                     };
                     resolve_members(&mut c, |uid| {
-                        crate::local_contacts::vcard_by_uid(uid)
+                        crate::contacts::local::vcard_by_uid(uid)
                             .ok()
                             .flatten()
                             .as_deref()
                             .and_then(person_address)
                     });
-                    c.book_uid = crate::local_contacts::LOCAL_BOOK_UID.to_string();
+                    c.book_uid = crate::contacts::local::LOCAL_BOOK_UID.to_string();
                     c.raw_vcard = vcard;
                     out.push(c);
                 }
@@ -344,10 +344,10 @@ pub(super) fn read_groups_in(active: &Option<HashMap<String, String>>) -> Vec<Co
 /// Append the local book's addresses, skipping the ones already in `seen`.
 /// False when the book is there but could not be read.
 fn add_local_contacts(out: &mut Vec<Contact>, seen: &mut HashSet<String>) -> bool {
-    if !crate::local_contacts::exists() || !crate::contact_sources::hylki_used() {
+    if !crate::contacts::local::exists() || !crate::contacts::contact_sources::hylki_used() {
         return true;
     }
-    let rows = match crate::local_contacts::emails() {
+    let rows = match crate::contacts::local::emails() {
         Ok(rows) => rows,
         Err(e) => {
             tracing::warn!("contacts: cannot read the local address book: {e}");
@@ -371,15 +371,15 @@ fn add_local_contacts(out: &mut Vec<Contact>, seen: &mut HashSet<String>) -> boo
 
 /// Whether `book_uid` is the local Hylki book rather than an EDS one.
 pub(crate) fn is_local_book(book_uid: &str) -> bool {
-    book_uid == crate::local_contacts::LOCAL_BOOK_UID
+    book_uid == crate::contacts::local::LOCAL_BOOK_UID
 }
 
 /// The local Hylki book as a [`Book`].
 pub(crate) fn local_book() -> Book {
     Book {
-        uid: crate::local_contacts::LOCAL_BOOK_UID.to_string(),
-        name: crate::contact_sources::names()
-            .remove(crate::local_contacts::LOCAL_BOOK_UID)
+        uid: crate::contacts::local::LOCAL_BOOK_UID.to_string(),
+        name: crate::contacts::contact_sources::names()
+            .remove(crate::contacts::local::LOCAL_BOOK_UID)
             .unwrap_or_else(|| i18n("Hylki Address Book")),
         groups: Some(GroupFormat::Evolution),
     }
@@ -396,7 +396,7 @@ pub(super) fn details_from_local_vcards(
         .into_iter()
         .filter_map(|vcard| {
             let mut c = parse_vcard_fields(&vcard)?;
-            c.book_uid = crate::local_contacts::LOCAL_BOOK_UID.to_string();
+            c.book_uid = crate::contacts::local::LOCAL_BOOK_UID.to_string();
             c.book_name = book_name.to_string();
             c.photo = vcard_photo_with(&vcard, false);
             c.raw_vcard = vcard;
@@ -407,10 +407,10 @@ pub(super) fn details_from_local_vcards(
 
 /// The local book's contacts, parsed (empty when it was never written).
 pub(super) fn local_details() -> Vec<ContactDetails> {
-    if !crate::local_contacts::exists() || !crate::contact_sources::hylki_used() {
+    if !crate::contacts::local::exists() || !crate::contacts::contact_sources::hylki_used() {
         return Vec::new();
     }
-    match crate::local_contacts::list_vcards() {
+    match crate::contacts::local::list_vcards() {
         Ok(vcards) => {
             let mut book = details_from_local_vcards(vcards, &local_book().name);
             resolve_book_members(&mut book);
@@ -455,7 +455,7 @@ pub(super) fn open_book_db(path: &std::path::Path) -> rusqlite::Result<rusqlite:
     // Under Flatpak the book DB lives on a read-only host mount; a WAL database
     // can't be opened read-only there (it needs to touch the -shm/-wal files), so
     // open it `immutable=1` to read the committed snapshot without any locking.
-    if crate::platform::is_flatpak() {
+    if crate::desktop::platform::is_flatpak() {
         rusqlite::Connection::open_with_flags(
             format!("file:{}?immutable=1", path.to_string_lossy()),
             flags,
@@ -543,7 +543,7 @@ pub(crate) fn writable_books() -> Vec<Book> {
     }
     // Last: unless chosen in Settings, EDS books keep priority as the
     // default destination.
-    if crate::contact_sources::hylki_used() {
+    if crate::contacts::contact_sources::hylki_used() {
         books.push(local_book());
     }
     prefer_book(&mut books, &crate::config::load_contact_book());
@@ -582,7 +582,7 @@ fn book_read_only(conn: &zbus::blocking::Connection, dest: &str, uid: &str) -> b
 /// Best-effort display name from the EDS source file for a book UID.
 pub(super) fn source_display_name(uid: &str) -> Option<String> {
     let path = config_dir()?.join(format!("sources/{uid}.source"));
-    crate::platform::keyfile_value(
+    crate::desktop::platform::keyfile_value(
         &std::fs::read_to_string(path).ok()?,
         "Data Source",
         "DisplayName",

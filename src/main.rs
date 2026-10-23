@@ -1,70 +1,32 @@
 //! Hylki — a clean, fast, GNOME-native email client built with Rust + relm4.
 
+// A binary crate exports nothing, so a bare `pub` only hides how far an item
+// really reaches; `pub(crate)` or narrower says it.
+#![warn(unreachable_pub)]
+
 mod app;
-mod app_icon;
-mod avatar;
 mod backend;
-mod background;
-mod brand;
 mod cache;
-mod carddav;
-mod cloud;
 mod color;
 mod config;
-mod console_log;
-mod contact_sources;
 mod contacts;
 mod datefmt;
 mod desktop;
-mod directory;
 mod encoding;
-mod goa;
-mod graph_api;
-mod graph_directory;
-mod graph_labels;
 mod i18n;
-mod icon_theme;
-mod invite;
-mod launcher_badge;
-mod legacy;
-mod local_contacts;
-mod logo;
-mod mail_header;
-mod markdown;
-mod memory_report;
+mod mail;
 mod models;
-mod ms_broker;
-mod mutf7;
-mod nautilus_ext;
-mod notify;
-mod oauth;
-mod outlook_msg;
-mod pgp;
-mod platform;
-mod power;
-mod quote;
 mod ram_cache;
-mod reader;
 mod rng;
-mod sensitivity;
-mod single_instance;
-mod spell;
-mod startup;
-mod text_scale;
-mod theme;
-mod theme_palettes;
-mod translate;
+mod services;
 mod ui;
-mod unsubscribe;
-mod verify;
-mod web_fonts;
 mod worker;
 
 use relm4::RelmApp;
 
 use crate::app::AppModel;
-pub(crate) use crate::single_instance::primary_instance_running;
-use crate::single_instance::{relay_to_primary, UriKind};
+pub(crate) use crate::desktop::single_instance::primary_instance_running;
+use crate::desktop::single_instance::{relay_to_primary, UriKind};
 
 const APP_ID: &str = if cfg!(feature = "beta") {
     "co.hyprlab.Hylki.Beta"
@@ -86,7 +48,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Counts what Rust code holds, for the memory section of an exported log.
 #[global_allocator]
-static ALLOCATOR: memory_report::CountingAllocator = memory_report::CountingAllocator;
+static ALLOCATOR: desktop::memory_report::CountingAllocator =
+    desktop::memory_report::CountingAllocator;
 
 /// Command-line flag for starting without a window (used by the autostart entry
 /// the background portal writes).
@@ -126,7 +89,7 @@ fn apply_renderer() {
 fn main() {
     // The allocator's tunables before the first allocation that matters (see
     // memory_report::tune_allocator).
-    memory_report::tune_allocator();
+    desktop::memory_report::tune_allocator();
 
     // Translations first: the text domain must be bound before any string
     // is shown, and the locale set before GTK sets its own.
@@ -135,15 +98,15 @@ fn main() {
 
     // The restart helper (see app_icon.rs) never builds a UI: it waits for
     // the running instance to leave, then becomes the new one.
-    if std::env::args().any(|a| a == app_icon::RESTART_FLAG) {
-        app_icon::run_restart_helper();
+    if std::env::args().any(|a| a == desktop::app_icon::RESTART_FLAG) {
+        desktop::app_icon::run_restart_helper();
     }
 
-    legacy::migrate_dirs();
-    legacy::tidy_host();
+    desktop::legacy::migrate_dirs();
+    desktop::legacy::tidy_host();
     // An AppImage has no fixed path for the GNOME Files extension to launch,
     // so it leaves one behind (#235).
-    nautilus_ext::record_launcher();
+    desktop::nautilus_ext::record_launcher();
     // Attachments the user opened in a previous session were decrypted to a temp
     // directory and left there. Clear it before anything else runs.
     ui::attachment_io::purge_attachment_dir();
@@ -195,7 +158,7 @@ fn init_tracing() {
             .unwrap_or_else(|_| "hylki=info".into()),
     );
     let console = tracing_subscriber::fmt::layer()
-        .with_writer(console_log::ConsoleWriter)
+        .with_writer(desktop::console_log::ConsoleWriter)
         .with_ansi(false)
         .with_target(false)
         .compact()
@@ -212,7 +175,7 @@ fn start_logo_probe() {
     if let Ok(list) = std::env::var("HYLKI_LOGO_PROBE") {
         std::thread::spawn(move || {
             for email in list.split(',').map(str::trim).filter(|e| !e.is_empty()) {
-                tracing::info!("logo probe {email}: {}", logo::probe(email));
+                tracing::info!("logo probe {email}: {}", services::logo::probe(email));
             }
         });
     }
@@ -348,7 +311,7 @@ fn register_resources() {
         Ok(resource) => gio::resources_register(&resource),
         Err(e) => tracing::error!("failed to register bundled icon resources: {e}"),
     }
-    // The bundled sender logos (see src/logo.rs), under
+    // The bundled sender logos (see src/services/logo.rs), under
     // /co/hyprlab/Hylki/logos/<source>/<file>.
     let logos =
         glib::Bytes::from_static(include_bytes!(concat!(env!("OUT_DIR"), "/logos.gresource")));

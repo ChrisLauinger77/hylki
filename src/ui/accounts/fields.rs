@@ -67,14 +67,14 @@ impl AccountsWindow {
         // Look it up as soon as it is asked for, so the preview can
         // answer rather than waiting for the account to be saved.
         let address = trimmed(&widgets.form.email_row);
-        if on && !address.is_empty() && crate::avatar::wants_own_gravatar(&address) {
+        if on && !address.is_empty() && crate::services::avatar::wants_own_gravatar(&address) {
             sender.oneshot_command(async move {
                 let outcome = tokio::task::spawn_blocking({
                     let address = address.clone();
-                    move || crate::avatar::fetch_own_gravatar(&address)
+                    move || crate::services::avatar::fetch_own_gravatar(&address)
                 })
                 .await
-                .unwrap_or(crate::avatar::FetchOutcome::Retry);
+                .unwrap_or(crate::services::avatar::FetchOutcome::Retry);
                 AccountsCmd::OwnGravatar {
                     email: address,
                     outcome,
@@ -206,7 +206,7 @@ impl AccountsWindow {
     pub(super) fn on_own_gravatar_fetched(
         &mut self,
         email: String,
-        outcome: crate::avatar::FetchOutcome,
+        outcome: crate::services::avatar::FetchOutcome,
         widgets: &AccountsWindowWidgets,
         sender: ComponentSender<Self>,
     ) {
@@ -214,7 +214,7 @@ impl AccountsWindow {
         // preview only redraws while that address is still in the
         // editor, and the accounts list redraws its circles so one
         // that landed after the list was built shows there too.
-        let found = crate::avatar::cache_own_gravatar(&email, outcome);
+        let found = crate::services::avatar::cache_own_gravatar(&email, outcome);
         if found && trimmed(&widgets.form.email_row).eq_ignore_ascii_case(&email) {
             self.refresh_preview(widgets);
         }

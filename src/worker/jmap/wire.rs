@@ -110,7 +110,7 @@ pub(super) fn jmap_wired<T>(what: &str, r: &Result<T, String>) {
     }
 }
 
-pub(super) fn agent() -> ureq::Agent {
+fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(20))
         .timeout_read(Duration::from_secs(60))
@@ -435,7 +435,7 @@ pub(super) async fn jmap_session(
         return Some(s.clone());
     }
     // The Refresh button already says the network is down (#442).
-    if !crate::power::reaches_url(&jmap_base_url(account)) {
+    if !crate::desktop::power::reaches_url(&jmap_base_url(account)) {
         return None;
     }
     let a = account.clone();

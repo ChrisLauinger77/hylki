@@ -194,7 +194,7 @@ pub(super) async fn send_raw_smtp(
     let host = alias
         .map(|a| a.smtp_host.trim().to_string())
         .unwrap_or_else(|| smtp_host(account));
-    if !crate::power::reaches(&host) {
+    if !crate::desktop::power::reaches(&host) {
         return Err(offline_text().into());
     }
     let mailer = smtp_transport(account, alias).await?;

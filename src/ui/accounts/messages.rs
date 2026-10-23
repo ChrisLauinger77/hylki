@@ -289,13 +289,13 @@ pub(crate) enum AccountsCmd {
     AliasTested(Result<(), String>),
     /// GNOME Online Accounts read again: its mail accounts, for the import
     /// list.
-    GoaListed(Vec<crate::goa::GoaMailAccount>),
+    GoaListed(Vec<crate::services::goa::GoaMailAccount>),
     /// An account's secrets, read from the keyring for its editor.
     Secrets(u64, AccountSecrets),
     /// The Gravatar looked up for the address in the editor (#189).
     OwnGravatar {
         email: String,
-        outcome: crate::avatar::FetchOutcome,
+        outcome: crate::services::avatar::FetchOutcome,
     },
 }
 

@@ -362,7 +362,7 @@ impl AppModel {
             tray_mail: prefs.tray_mail,
             launcher_badge,
             arrivals: Default::default(),
-            app_icon: crate::app_icon::init_on_startup(),
+            app_icon: crate::desktop::app_icon::init_on_startup(),
             restart_pending: false,
             tray: None,
             tray_mail_key: std::cell::RefCell::new(None),

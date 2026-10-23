@@ -567,7 +567,7 @@ async fn pop3_sync(
         let msg = summary_from_raw(account_id, inbox_id, uid, &raw);
         // OpenPGP mail (#133) is neither rendered nor cached here: it is
         // decrypted or verified, in the reader only, when opened.
-        if let Some(c) = cache.filter(|_| crate::pgp::detect(&raw).is_none()) {
+        if let Some(c) = cache.filter(|_| crate::mail::pgp::detect(&raw).is_none()) {
             let (body, check, _) = render_raw(&raw);
             c.save_body(account_id, INBOX, uid, &body);
             c.save_sender_check(account_id, INBOX, uid, &check);

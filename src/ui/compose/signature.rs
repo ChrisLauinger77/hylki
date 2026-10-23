@@ -32,7 +32,7 @@ pub(super) fn sig_source(kind: SourceKind, sig: &str, dashes: bool) -> String {
         SourceKind::Markdown => format!(
             "\n\n{}{}\n",
             if dashes { "-- \n" } else { "" },
-            crate::markdown::from_html(&rich_editor::signature_to_html(sig))
+            crate::mail::markdown::from_html(&rich_editor::signature_to_html(sig))
         ),
     }
 }
@@ -229,7 +229,7 @@ window.__hylkiDirty=true;})()"#
     /// user has set it by hand. While encrypting it stays on: encrypted
     /// mail is always signed.
     pub(super) fn follow_account_signing(&mut self, widgets: &ComposeWidgets) {
-        if self.sign_touched || self.encrypt || !crate::pgp::available() {
+        if self.sign_touched || self.encrypt || !crate::mail::pgp::available() {
             return;
         }
         let idx = widgets.from_row.selected() as usize;

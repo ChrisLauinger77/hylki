@@ -218,10 +218,10 @@ impl MessageView {
                     if fade {
                         let view = view.clone();
                         page_fade.hold(&view.clone(), move || {
-                            crate::web_fonts::load_html(&view, &html, Some(&uri))
+                            crate::desktop::web_fonts::load_html(&view, &html, Some(&uri))
                         });
                     } else {
-                        crate::web_fonts::load_html(&view, &html, Some(&uri));
+                        crate::desktop::web_fonts::load_html(&view, &html, Some(&uri));
                     }
                 }
             }

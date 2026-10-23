@@ -4,6 +4,10 @@
 //! both the local address book and CardDAV books, which EDS mirrors locally).
 //! Writing goes through the EDS D-Bus API so changes are tracked by EDS and
 //! synced back to CardDAV servers.
+//!
+//! It is also the parent of the other places contacts come from: Hylki's own
+//! address book, LDAP directories, CardDAV accounts, the Microsoft 365
+//! directory, and the list of sources the settings show.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -18,6 +22,12 @@ mod photos;
 mod read;
 mod registry;
 mod vcard;
+
+pub(crate) mod carddav;
+pub(crate) mod contact_sources;
+pub(crate) mod directory;
+pub(crate) mod graph_directory;
+pub(crate) mod local;
 
 pub(crate) use demo::*;
 pub(crate) use details::*;

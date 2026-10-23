@@ -46,7 +46,7 @@ pub(super) async fn fetch_oauth_token(account: &AccountConfig) -> Option<String>
 /// tokens, so it seldom costs a refresh of its own.
 pub(crate) fn oauth_token_blocking(account: &AccountConfig) -> Option<String> {
     if let Some(goa_id) = account.goa_id.as_deref() {
-        return crate::goa::oauth_token(goa_id);
+        return crate::services::goa::oauth_token(goa_id);
     }
     // Natively-added OAuth account: refresh with the keyring-stored refresh token.
     // The client credentials saved with the account MUST be used — a refresh token
@@ -68,7 +68,7 @@ fn refreshed_access_token(
 ) -> Option<String> {
     let email = &account.email;
     let user = oauth_user(account);
-    let fresh = crate::oauth::refresh_access_token_as(settings, &refresh, Some(&user))
+    let fresh = crate::services::oauth::refresh_access_token_as(settings, &refresh, Some(&user))
         .map_err(|e| tracing::warn!("OAuth token refresh for {email} failed: {e}"))
         .ok()?;
     // The provider spent the old refresh token and handed out another:

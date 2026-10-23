@@ -187,7 +187,7 @@ fn load_for_print(html: &str, ready: impl FnOnce(&webkit6::WebView, Box<dyn FnOn
             Box::new(move || {
                 PENDING.with(|p| p.borrow_mut().retain(|v| v != &done));
                 // Its web process must not outlive it (#221).
-                crate::memory_report::release_web_view(&done);
+                crate::desktop::memory_report::release_web_view(&done);
             }),
         );
     });

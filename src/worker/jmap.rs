@@ -163,8 +163,8 @@ impl<E: Fn(WorkerEvent)> JmapWorker<E> {
             // Offline or on a metered connection it waits; the request that
             // follows the change wakes this loop to look again (#442).
             let indexing = !state.backfill.is_empty()
-                && crate::power::reaches_url(&jmap_base_url(account))
-                && !crate::power::saving_data();
+                && crate::desktop::power::reaches_url(&jmap_base_url(account))
+                && !crate::desktop::power::saving_data();
             let wait = state.backfill_wait;
             let req = tokio::select! {
                 biased;
@@ -173,7 +173,7 @@ impl<E: Fn(WorkerEvent)> JmapWorker<E> {
                     None => break,
                 },
                 _ = poll.tick() => {
-                    if !crate::power::reaches_url(&jmap_base_url(account)) {
+                    if !crate::desktop::power::reaches_url(&jmap_base_url(account)) {
                         continue;
                     }
                     if let Some(s) = jmap_session(account, state, &|_| {}).await {

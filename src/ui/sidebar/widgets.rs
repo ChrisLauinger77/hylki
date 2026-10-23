@@ -59,9 +59,9 @@ pub(super) fn section_heading(
 /// `None` when it asked for none, when the address has none, or before the
 /// answer is back — in every case the picture, emoji or initials stand.
 pub(super) fn account_gravatar(email: &str) -> Option<gtk::gdk::Texture> {
-    crate::avatar::account_face(email)
+    crate::services::avatar::account_face(email)
         .filter(|face| face.gravatar)
-        .and_then(|_| crate::avatar::own_gravatar(email))
+        .and_then(|_| crate::services::avatar::own_gravatar(email))
 }
 
 pub(crate) fn account_initials(name: &str, email: &str) -> String {
@@ -336,7 +336,7 @@ pub(super) fn build_folder_row(
         let pretty = folder
             .path
             .split(['/', '.', '\\'])
-            .map(crate::mutf7::decode)
+            .map(crate::mail::mutf7::decode)
             .collect::<Vec<_>>()
             .join(" › ");
         row.set_tooltip_text(Some(&pretty));

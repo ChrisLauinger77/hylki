@@ -193,7 +193,7 @@ impl AttachmentDrawer {
             let window = self.window();
             gtk::glib::spawn_future_local(async move {
                 let r = gtk::gio::spawn_blocking(move || {
-                    crate::pgp::import_keys(&crate::pgp::Gpg::system(), &data)
+                    crate::mail::pgp::import_keys(&crate::mail::pgp::Gpg::system(), &data)
                 })
                 .await
                 .unwrap_or_else(|_| Err("task failed".into()));

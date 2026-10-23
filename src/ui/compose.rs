@@ -241,7 +241,7 @@ impl Component for Compose {
                             set_icon_name: "channel-secure-symbolic",
                             set_tooltip_text: Some(i18n("Encrypt with OpenPGP to every recipient's key").as_str()),
                             #[watch]
-                            set_visible: crate::pgp::available() && !model.narrow,
+                            set_visible: crate::mail::pgp::available() && !model.narrow,
                             connect_toggled[sender] => move |b| {
                                 sender.input_sender().emit(ComposeInput::ToggleEncrypt(b.is_active()));
                             },
@@ -251,7 +251,7 @@ impl Component for Compose {
                             set_icon_name: "security-high-symbolic",
                             set_tooltip_text: Some(i18n("Sign with your OpenPGP key").as_str()),
                             #[watch]
-                            set_visible: crate::pgp::available() && !model.narrow,
+                            set_visible: crate::mail::pgp::available() && !model.narrow,
                             connect_toggled[sender] => move |b| {
                                 sender.input_sender().emit(ComposeInput::ToggleSign(b.is_active()));
                             },
@@ -544,9 +544,10 @@ impl Component for Compose {
             ComposeFormat::Markdown => {
                 editor.set_source(SourceKind::Markdown, &markdown_body(&content))
             }
-            ComposeFormat::Html => {
-                editor.set_source(SourceKind::Html, &crate::markdown::pretty_html(&content))
-            }
+            ComposeFormat::Html => editor.set_source(
+                SourceKind::Html,
+                &crate::mail::markdown::pretty_html(&content),
+            ),
             ComposeFormat::Rich | ComposeFormat::Plain => {}
         }
         // HYLKI_SHOWCASE_PLAIN_LOG also logs the body a composer opens with
@@ -637,7 +638,7 @@ impl Component for Compose {
             pgp_checking: false,
             pgp_cleared: None,
             send_at,
-            cloud_accounts: crate::cloud::load_enabled_accounts(),
+            cloud_accounts: crate::services::cloud::load_enabled_accounts(),
             drop_zones: None,
             cloud_links: Vec::new(),
             cloud_busy: 0,
@@ -651,10 +652,10 @@ impl Component for Compose {
             .map(|a| a.id)
             .unwrap_or_default();
         let widgets = view_output!();
-        if prefill_encrypt && crate::pgp::available() {
+        if prefill_encrypt && crate::mail::pgp::available() {
             // Through the buttons, so the toggles and the model agree.
             widgets.encrypt_btn.set_active(true);
-        } else if sign_default && crate::pgp::available() {
+        } else if sign_default && crate::mail::pgp::available() {
             // A draft does not record whether it was signed, so a reopened
             // one starts as its account says, like any new message.
             model.sign_expected = Some(true);
@@ -938,7 +939,7 @@ impl Component for Compose {
 
                 ComposeInput::ShowPreview(body) => {
                     let html = match self.format {
-                        ComposeFormat::Markdown => crate::markdown::to_html(&body),
+                        ComposeFormat::Markdown => crate::mail::markdown::to_html(&body),
                         _ => body,
                     };
                     self.editor.show_preview(Some(&html));

@@ -161,7 +161,7 @@ impl PgpStatus {
     /// One line for the chip's tooltip and the popover heading.
     pub(crate) fn summary(&self) -> String {
         use PgpSignature as S;
-        let key = |k: &str| crate::pgp::key_display(k);
+        let key = |k: &str| crate::mail::pgp::key_display(k);
         if self.encrypted && !self.decrypted {
             return i18n("Encrypted with OpenPGP; could not be decrypted");
         }
@@ -270,7 +270,7 @@ impl PgpStatus {
 
 /// How a mailing list lets its readers leave (RFC 2369, RFC 8058): read out
 /// of the message's headers with the sender check, kept in the cache beside
-/// it, and drawn as the card's Unsubscribe banner. See [`crate::unsubscribe`].
+/// it, and drawn as the card's Unsubscribe banner. See [`crate::mail::unsubscribe`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Unsubscribe {
     /// The https handle that takes a one-click POST (RFC 8058), when the
@@ -330,7 +330,7 @@ impl Unsubscribe {
 
 /// A meeting invitation read out of a message's `text/calendar` part
 /// (#223), kept beside the sender check and drawn as the card's invitation
-/// banner. See [`crate::invite`].
+/// banner. See [`crate::mail::invite`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Invite {
     /// The iTIP method, upper-cased: REQUEST (an invitation), REPLY
@@ -505,7 +505,7 @@ pub(crate) struct SenderCheck {
     pub(crate) invite: Option<Box<Invite>>,
     /// The sensitivity label the sender's organization set (#411), read in
     /// the same pass.
-    pub(crate) label: Option<crate::sensitivity::SensitivityLabel>,
+    pub(crate) label: Option<crate::mail::sensitivity::SensitivityLabel>,
 }
 
 impl Default for SenderCheck {

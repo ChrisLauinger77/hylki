@@ -68,7 +68,7 @@ pub(super) async fn run_one_prefetch(
                 // OpenPGP mail is left for an explicit open (#133): nothing
                 // of it is cached, and decrypting here would raise the
                 // passphrase prompt out of nowhere.
-                if crate::pgp::detect(&raw).is_some() {
+                if crate::mail::pgp::detect(&raw).is_some() {
                     emit(WorkerEvent::Status(prefetch_status(prefetch.len())));
                     return;
                 }
@@ -236,7 +236,7 @@ pub(super) async fn run_one_body_prefetch(
         // OpenPGP mail (#133) is left for an explicit open: nothing of it is
         // cached or pushed ahead, and rendering it here would decrypt in the
         // background — a passphrase prompt out of nowhere.
-        if crate::pgp::detect(&raw).is_some() {
+        if crate::mail::pgp::detect(&raw).is_some() {
             emitted.insert((path, uid));
             return;
         }

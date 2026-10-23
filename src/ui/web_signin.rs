@@ -12,7 +12,7 @@ use webkit6::prelude::*;
 
 use crate::config::OAuthSettings;
 use crate::i18n::i18n;
-use crate::oauth::Authorization;
+use crate::services::oauth::Authorization;
 
 /// Open the sign-in for `settings` and hand `done` the request and the
 /// authorization code once the provider redirects, or why there is none
@@ -27,7 +27,7 @@ pub(crate) fn run(
     done: impl FnOnce(Result<(Authorization, String), String>) + 'static,
 ) {
     let extra = if settings.token_url.contains("microsoftonline") {
-        crate::oauth::microsoft_prompt(user.as_deref().filter(|_| hint))
+        crate::services::oauth::microsoft_prompt(user.as_deref().filter(|_| hint))
     } else {
         String::new()
     };
@@ -111,7 +111,7 @@ pub(crate) fn run(
     let settings = settings.clone();
     gtk::glib::spawn_future_local(async move {
         let cookie = gtk::gio::spawn_blocking(move || {
-            crate::ms_broker::sso_cookie(&settings, user.as_deref())
+            crate::services::ms_broker::sso_cookie(&settings, user.as_deref())
         })
         .await
         .ok()

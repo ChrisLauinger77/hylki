@@ -36,7 +36,7 @@ pub(crate) struct Compose {
     /// The Microsoft 365 accounts whose organization directory is searched
     /// too (#410), found once the composer opens. The LDAP directories are
     /// not: one switched on in Evolution while the composer is open counts
-    /// as well (#307), and [`crate::directory::search`] keeps the list.
+    /// as well (#307), and [`crate::contacts::directory::search`] keeps the list.
     pub(super) graph_directories: std::sync::Arc<Vec<crate::config::AccountConfig>>,
     /// The accounts that suggest only from their directory and their own
     /// mail (#410), with the addresses in that mail.
@@ -150,7 +150,7 @@ pub(crate) struct Compose {
     pub(super) send_at: Option<i64>,
     /// Cloud attachments (#144): the accounts files can be uploaded to, the
     /// links already placed in the body, and how many uploads are running.
-    pub(super) cloud_accounts: Vec<crate::cloud::CloudAccount>,
+    pub(super) cloud_accounts: Vec<crate::services::cloud::CloudAccount>,
     pub(super) cloud_links: Vec<CloudLink>,
     pub(super) cloud_busy: u32,
     /// Download passwords made for this message's links, to pass on

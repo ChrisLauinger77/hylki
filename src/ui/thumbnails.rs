@@ -56,11 +56,11 @@ impl TextureCache {
 
     fn insert(&mut self, key: u64, tex: Option<gdk::Texture>) {
         if let Some(Some(old)) = self.map.insert(key, tex.clone()) {
-            self.bytes -= crate::memory_report::texture_bytes(&old);
+            self.bytes -= crate::desktop::memory_report::texture_bytes(&old);
             self.order.retain(|k| *k != key);
         }
         if let Some(tex) = tex {
-            self.bytes += crate::memory_report::texture_bytes(&tex);
+            self.bytes += crate::desktop::memory_report::texture_bytes(&tex);
             self.order.push_back(key);
         }
         // Keep at least the newest entry even when it alone busts the budget.
@@ -69,7 +69,7 @@ impl TextureCache {
                 break;
             };
             if let Some(Some(old)) = self.map.remove(&oldest) {
-                self.bytes -= crate::memory_report::texture_bytes(&old);
+                self.bytes -= crate::desktop::memory_report::texture_bytes(&old);
             }
         }
     }

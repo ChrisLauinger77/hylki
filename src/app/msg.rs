@@ -664,7 +664,7 @@ pub(crate) enum AppMsg {
     /// `.vcf` files chosen in the Contacts page, to import into the Hylki book.
     ImportContacts(Vec<std::path::PathBuf>),
     /// The import finished.
-    ContactsImported(Result<crate::local_contacts::ImportOutcome, String>),
+    ContactsImported(Result<crate::contacts::local::ImportOutcome, String>),
 
     // ---- on_about (about.rs) ----
     /// Open the About window.
@@ -737,7 +737,7 @@ pub(crate) enum AppMsg {
     /// A Gravatar one of the accounts asked for came back (#189).
     OwnGravatarFetched {
         email: String,
-        outcome: crate::avatar::FetchOutcome,
+        outcome: crate::services::avatar::FetchOutcome,
     },
 
     // ---- on_reader_toolbar (reader_toolbar.rs) ----
@@ -1079,7 +1079,7 @@ pub(crate) enum AppMsg {
     /// keyring said after the save.
     ReconnectAccounts,
     /// The one-time notice that an earlier install's data was carried over.
-    ShowCarryOverNotice(&'static crate::legacy::Predecessor),
+    ShowCarryOverNotice(&'static crate::desktop::legacy::Predecessor),
     /// An account was switched on or off in Settings.
     AccountEnabledChanged { email: String, enabled: bool },
     /// The welcome wizard's privacy/personalize choices: fan out through the
@@ -1092,7 +1092,7 @@ pub(crate) enum AppMsg {
     /// GNOME Online Accounts changed on the session bus. Carries the fresh live
     /// state, already fetched (debounced) on the watcher thread so the GTK main
     /// thread never does D-Bus I/O — re-reconcile against it.
-    GoaChanged(crate::goa::GoaLiveState),
+    GoaChanged(crate::services::goa::GoaLiveState),
     /// A worker reported its account: add it, or update the one listed.
     SetAccount(Account),
 

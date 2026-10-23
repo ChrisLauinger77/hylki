@@ -27,7 +27,7 @@ impl ContactsPage {
         let s = sender.input_sender().clone();
         std::thread::spawn(move || {
             let _ = s.send(ContactsPageInput::DirectoriesKnown(
-                crate::directory::enabled_names(),
+                crate::contacts::directory::enabled_names(),
             ));
         });
         Flow::Continue(())
@@ -122,7 +122,7 @@ impl ContactsPage {
         self.query = q.to_lowercase();
         self.directory_generation = self.directory_generation.wrapping_add(1);
         let typed = q.trim().to_string();
-        if typed.chars().count() < crate::directory::MIN_QUERY {
+        if typed.chars().count() < crate::contacts::directory::MIN_QUERY {
             self.directory_hits.clear();
             self.directory_failures.clear();
         } else {
@@ -306,7 +306,8 @@ impl ContactsPage {
         }
         let s = sender.input_sender().clone();
         std::thread::spawn(move || {
-            let (hits, failed) = crate::directory::search_contacts(&query, DIRECTORY_LIMIT);
+            let (hits, failed) =
+                crate::contacts::directory::search_contacts(&query, DIRECTORY_LIMIT);
             let _ = s.send(ContactsPageInput::DirectoryResults {
                 generation,
                 hits,
@@ -322,7 +323,7 @@ impl ContactsPage {
         sender: ComponentSender<Self>,
         generation: u64,
         hits: Vec<ContactDetails>,
-        failed: Vec<crate::directory::DirectoryFailure>,
+        failed: Vec<crate::contacts::directory::DirectoryFailure>,
     ) -> Flow {
         if generation != self.directory_generation {
             return Flow::Break(());
@@ -436,7 +437,7 @@ impl ContactsPage {
             row.show_photo();
         }
         self.decoding
-            .retain(|key| crate::avatar::photo_thumbnail(*key).is_none());
+            .retain(|key| crate::services::avatar::photo_thumbnail(*key).is_none());
         Flow::Continue(())
     }
 }

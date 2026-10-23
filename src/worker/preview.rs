@@ -146,7 +146,7 @@ fn decode_base64_prefix(body: &[u8]) -> Vec<u8> {
 pub(super) fn finish_preview(decoded: String) -> String {
     // An HTML part becomes readable text; a plain part passes through.
     let plain = if decoded.contains('<') && decoded.contains('>') {
-        crate::quote::message_text(&decoded)
+        crate::mail::quote::message_text(&decoded)
     } else {
         decoded
     };

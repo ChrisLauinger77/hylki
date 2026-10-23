@@ -182,7 +182,7 @@ fn photo_db_fingerprint() -> DbFingerprint {
             files.push(PathBuf::from(format!("{}{suffix}", db.to_string_lossy())));
         }
     }
-    files.extend(crate::local_contacts::db_paths());
+    files.extend(crate::contacts::local::db_paths());
     files.sort();
     files
         .into_iter()
@@ -229,10 +229,10 @@ fn load_contact_photo_index() -> HashMap<String, Vec<PhotoLocation>> {
 
 /// Index the local Hylki book's contacts that carry a photo.
 fn add_local_photo_locations(photos: &mut HashMap<String, Vec<PhotoLocation>>) {
-    if !crate::local_contacts::exists() || !crate::contact_sources::hylki_used() {
+    if !crate::contacts::local::exists() || !crate::contacts::contact_sources::hylki_used() {
         return;
     }
-    let entries = match crate::local_contacts::photo_entries() {
+    let entries = match crate::contacts::local::photo_entries() {
         Ok(entries) => entries,
         Err(e) => {
             tracing::warn!("contacts: cannot index local photos: {e}");
@@ -314,7 +314,7 @@ fn read_photo_locations(
 
 fn read_photo_at(location: &PhotoLocation) -> Option<Vec<u8>> {
     if location.local {
-        let vcard = crate::local_contacts::vcard_by_uid(&location.uid).ok()??;
+        let vcard = crate::contacts::local::vcard_by_uid(&location.uid).ok()??;
         return vcard_photo_with(&vcard, false);
     }
     let conn = open_book_db(&location.db).ok()?;

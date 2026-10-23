@@ -9,7 +9,7 @@ use crate::models::{Folder, FolderKind};
 
 /// How often an account's Junk / Trash auto-empty (#140) may run: it rides
 /// the unread sweep, but a server needs asking only a few times a day.
-pub(super) const AUTO_EMPTY_MIN: Duration = Duration::from_secs(6 * 60 * 60);
+const AUTO_EMPTY_MIN: Duration = Duration::from_secs(6 * 60 * 60);
 
 /// Auto-empty (#140): the roles the account wants emptied, with their ages.
 pub(super) fn auto_empty_roles(account: &AccountConfig) -> Vec<(FolderKind, &'static str, u32)> {

@@ -9,7 +9,7 @@ use crate::models::Message;
 /// scope are all SQL, and a demo that answered from a Vec would prove none of
 /// them work. Only ever called with the in-memory cache demo mode opens, so
 /// none of this can reach a real `cache.db`.
-pub fn seed_demo_cache(cache: &crate::cache::Cache) {
+pub(crate) fn seed_demo_cache(cache: &crate::cache::Cache) {
     let mock = MockBackend::new();
     seed_sample_mail(cache, &mock);
     seed_sample_attachments(cache, &mock);

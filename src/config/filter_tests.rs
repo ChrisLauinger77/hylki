@@ -655,7 +655,7 @@ fn settings_bundle_roundtrip_parses() {
         sidebar: None,
         window: None,
         state: None,
-        cloud: Some(vec![crate::cloud::CloudAccount::empty()]),
+        cloud: Some(vec![crate::services::cloud::CloudAccount::empty()]),
         spell_words: Some(std::collections::BTreeMap::from([(
             "en_US".to_string(),
             vec!["Hylki".to_string()],

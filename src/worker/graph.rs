@@ -45,7 +45,7 @@ use crate::worker::outbox::{delete_queued, emit_outbox};
 fn name_labels(account: &AccountConfig, emit: &impl Fn(WorkerEvent), mut ev: WorkerEvent) {
     if let WorkerEvent::SenderChecked { check, .. } = &mut ev {
         if let Some(label) = check.label.as_mut() {
-            crate::graph_labels::fill(account, label);
+            crate::services::graph_labels::fill(account, label);
         }
     }
     emit(ev)
@@ -144,8 +144,8 @@ impl<E: Fn(WorkerEvent)> GraphWorker<E> {
             // Offline or on a metered connection it waits; the request that
             // follows the change wakes this loop to look again (#442).
             let indexing = !self.state.backfill.is_empty()
-                && crate::power::reaches_internet()
-                && !crate::power::saving_data();
+                && crate::desktop::power::reaches_internet()
+                && !crate::desktop::power::saving_data();
             let wait = self.state.backfill_wait;
             let account_id = self.account_id;
             let emit = &|ev| name_labels(&self.account, &self.emit, ev);
@@ -156,7 +156,7 @@ impl<E: Fn(WorkerEvent)> GraphWorker<E> {
                     None => break,
                 },
                 _ = poll.tick() => {
-                    if !crate::power::reaches_internet() {
+                    if !crate::desktop::power::reaches_internet() {
                         continue;
                     }
                     graph_poll_inbox(account_id, &self.account, self.cache.as_ref(), &mut self.state, emit).await;

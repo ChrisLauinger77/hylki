@@ -9,8 +9,8 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::cloud::{self, CloudAccount, CloudKind};
 use crate::i18n::{i18n, i18n_f};
+use crate::services::cloud::{self, CloudAccount, CloudKind};
 
 mod editor;
 
@@ -210,7 +210,7 @@ impl SimpleComponent for CloudAccounts {
     fn init(_init: (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let widgets = view_output!();
         for service in cloud::SERVICES.iter() {
-            let mark = crate::brand::image(service.brand(), 22);
+            let mark = crate::desktop::brand::image(service.brand(), 22);
             mark.set_tooltip_text(Some(service.name));
             widgets.brands.append(&mark);
         }
@@ -468,7 +468,7 @@ impl CloudAccounts {
             row.set_activatable(true);
             let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
             hbox.add_css_class("account-list-row");
-            hbox.append(&crate::brand::image(a.brand(), 28));
+            hbox.append(&crate::desktop::brand::image(a.brand(), 28));
             let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
             vbox.set_hexpand(true);
             vbox.set_valign(gtk::Align::Center);

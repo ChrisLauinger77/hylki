@@ -65,7 +65,7 @@ impl MessageList {
     /// pool (empty unless a search is open), each as (messages, bytes). The
     /// rows share their messages with the index.
     pub(crate) fn memory_stats(&self) -> [(usize, usize); 3] {
-        use crate::memory_report::messages_bytes;
+        use crate::desktop::memory_report::messages_bytes;
         [
             messages_bytes(self.all.iter().map(|m| &**m)),
             (
@@ -80,7 +80,7 @@ impl MessageList {
     /// not shared with the view on show), and what their conversation maps
     /// add on top.
     pub(crate) fn kept_view_stats(&self) -> (usize, (usize, usize), usize) {
-        use crate::memory_report::message_bytes;
+        use crate::desktop::memory_report::message_bytes;
         let mut seen = std::collections::HashSet::new();
         for m in &self.all {
             seen.insert(Rc::as_ptr(m));

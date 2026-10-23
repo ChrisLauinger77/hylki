@@ -8,7 +8,7 @@ use crate::worker::accent_for;
 
 /// A request from the UI to the worker.
 #[derive(Debug)]
-pub enum MailRequest {
+pub(crate) enum MailRequest {
     /// Load the message summaries for a folder.
     LoadMessages { folder_id: u32, path: String },
     /// Resync a folder's message list in the background: the same fetch as
@@ -244,68 +244,68 @@ pub enum MailRequest {
 
 /// A message composed by the user, ready to send.
 #[derive(Debug, Clone)]
-pub struct OutgoingMessage {
+pub(crate) struct OutgoingMessage {
     /// The account to send from.
-    pub from_account_id: u32,
+    pub(crate) from_account_id: u32,
     /// Send-as alias (#34): the full From for the wire ("Name <alias@host>"),
     /// or `None` to send as the account itself. The mail leaves through the
     /// account's SMTP, unless the alias is configured with its own transport.
-    pub from_alias: Option<String>,
+    pub(crate) from_alias: Option<String>,
     /// Comma-separated recipient addresses.
-    pub to: String,
-    pub cc: String,
-    pub bcc: String,
+    pub(crate) to: String,
+    pub(crate) cc: String,
+    pub(crate) bcc: String,
     /// Reply-To addresses (comma-separated); empty for none (#58).
-    pub reply_to: String,
-    pub subject: String,
+    pub(crate) reply_to: String,
+    pub(crate) subject: String,
     /// Plain-text body (always present; the `text/plain` alternative).
-    pub body: String,
+    pub(crate) body: String,
     /// HTML body. When non-empty the mail is sent multipart/alternative with this
     /// as the `text/html` part and `body` as the plain fallback.
-    pub html: String,
+    pub(crate) html: String,
     /// File paths to attach.
-    pub attachments: Vec<String>,
+    pub(crate) attachments: Vec<String>,
     /// The Message-ID this is a reply to, and the thread's id chain — both
     /// normalized (no angle brackets), as [`crate::models::Message`] stores
     /// them. Empty for a message that starts a conversation. Without these
     /// headers a reply is a new thread to every client that receives it,
     /// including Hylki.
-    pub in_reply_to: String,
-    pub references: String,
+    pub(crate) in_reply_to: String,
+    pub(crate) references: String,
     /// The Message-ID of the message this forwards, normalized; empty for
     /// anything else. Marked forwarded once this has gone (#454).
-    pub forwards: String,
+    pub(crate) forwards: String,
     /// When editing an existing draft, the draft being replaced (removed from the
     /// Drafts folder after this message is saved or sent).
-    pub draft_origin: Option<crate::models::DraftOrigin>,
+    pub(crate) draft_origin: Option<crate::models::DraftOrigin>,
     /// When this came out of the Outbox for editing, the queued row it replaces.
     /// Dropped once this version is sent or re-queued, so the queue never holds
     /// the message twice.
-    pub outbox_origin: Option<u32>,
+    pub(crate) outbox_origin: Option<u32>,
     /// Sign with the account's OpenPGP key (#133): PGP/MIME multipart/signed.
-    pub sign: bool,
+    pub(crate) sign: bool,
     /// Encrypt to every recipient's key (and the sender's): multipart/encrypted,
     /// signed inside when `sign` is set too.
-    pub encrypt: bool,
+    pub(crate) encrypt: bool,
     /// Send Later (#145): unix seconds to send at. `None` sends now. A time
     /// already past sends now too.
-    pub send_at: Option<i64>,
+    pub(crate) send_at: Option<i64>,
     /// An answer to a meeting invitation (#223): the iCalendar document and
     /// its iTIP method, sent as a `text/calendar` alternative beside the
     /// plain text so a calendar reads the answer and a person reads the
     /// sentence.
-    pub calendar: Option<CalendarPart>,
+    pub(crate) calendar: Option<CalendarPart>,
 }
 
 /// The calendar half of an outgoing message (#223).
 #[derive(Debug, Clone)]
-pub struct CalendarPart {
+pub(crate) struct CalendarPart {
     /// The iCalendar document.
-    pub ics: String,
+    pub(crate) ics: String,
     /// The iTIP method, which belongs on the part's own Content-Type as
     /// well as in the document: a recipient's calendar reads it there
     /// first, and Exchange ignores a part that does not carry it.
-    pub method: String,
+    pub(crate) method: String,
 }
 
 /// An event pushed from the worker back to the UI.
@@ -313,7 +313,7 @@ pub struct CalendarPart {
 // boxing the large variant would change every place that builds or reads it.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
-pub enum WorkerEvent {
+pub(crate) enum WorkerEvent {
     /// A batch of a folder's attachments was described (not downloaded).
     /// `remaining` is how many of its messages are still unscanned.
     AttachmentsScanned {
@@ -563,7 +563,7 @@ pub enum WorkerEvent {
 
 impl WorkerEvent {
     /// A failure the user has to see, which stays until dismissed.
-    pub fn error(text: impl Into<String>) -> Self {
+    pub(super) fn error(text: impl Into<String>) -> Self {
         WorkerEvent::Error {
             text: text.into(),
             connectivity: false,

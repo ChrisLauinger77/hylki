@@ -2,14 +2,14 @@
 //! user's own keys and everyone else's, with the actions that otherwise
 //! need a terminal — generate, import, export, fetch by address, trust,
 //! remove. Every action is the user's own gpg on the user's own keyring
-//! (see `crate::pgp`); passphrases for a new key travel down a pipe to
+//! (see `crate::mail::pgp`); passphrases for a new key travel down a pipe to
 //! gpg and are not kept.
 
 use adw::prelude::*;
 use relm4::prelude::*;
 
 use crate::i18n::{i18n, i18n_f, ni18n_f};
-use crate::pgp::{self, Gpg, ImportSummary, KeyInfo};
+use crate::mail::pgp::{self, Gpg, ImportSummary, KeyInfo};
 
 /// What the page needs at launch: the identities keys can be made for.
 pub(super) struct PgpKeysInit {

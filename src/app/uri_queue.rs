@@ -291,8 +291,8 @@ impl AppModel {
             let outlook = path
                 .extension()
                 .is_some_and(|e| e.eq_ignore_ascii_case("msg"));
-            if crate::outlook_msg::is_msg(&bytes) {
-                crate::outlook_msg::to_eml(&bytes).map_err(std::io::Error::other)
+            if crate::mail::outlook_msg::is_msg(&bytes) {
+                crate::mail::outlook_msg::to_eml(&bytes).map_err(std::io::Error::other)
             } else if outlook {
                 // Other programs name files .msg too (Tcl's catalogues).
                 Err(std::io::Error::other(i18n("it is not an Outlook message")))

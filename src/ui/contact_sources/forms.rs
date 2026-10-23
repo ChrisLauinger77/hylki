@@ -6,9 +6,9 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::carddav::{self, Account};
-use crate::contact_sources::{Kind, Source};
-use crate::directory::{self, Directory, Security};
+use crate::contacts::carddav::{self, Account};
+use crate::contacts::contact_sources::{Kind, Source};
+use crate::contacts::directory::{self, Directory, Security};
 use crate::i18n::{i18n, i18n_f};
 
 use super::{mark, AddWhat, ContactSourcesInput, ADD_KINDS};

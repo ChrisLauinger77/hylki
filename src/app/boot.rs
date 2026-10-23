@@ -16,7 +16,7 @@ use super::demo::demo_mode;
 use super::palette::keyed_item;
 use super::theme::install_scheme_css;
 use super::{AppModel, AppMsg};
-use crate::icon_theme::register_icons;
+use crate::desktop::icon_theme::register_icons;
 
 /// What the steps before the model read from disk and the environment.
 pub(super) struct Boot {
@@ -61,18 +61,18 @@ fn install_globals(root: &adw::ApplicationWindow) -> config::PrivacyFile {
     let prefs = config::load_privacy();
     // Before the workers start, so their first connection already knows
     // whether there is a network to make it on (#442).
-    crate::power::read_network(prefs.metered_save_data);
+    crate::desktop::power::read_network(prefs.metered_save_data);
     relm4::set_global_css(include_str!("../styles.css"));
     register_icons(prefs.desktop_icons);
     // Before install_scheme_css and before the reader exists: both read
     // the theme's colors back, and both listen for the light/dark flip
     // that swaps a theme's two palettes — GTK runs those handlers in
     // connection order, so the palette has to be in place first.
-    crate::theme::install(&config::load_theme());
+    crate::desktop::theme::install(&config::load_theme());
     install_scheme_css(root);
     // Before any web view loads: a font fallback WebKit needed under
     // this runtime has to be in place for its first web process (#296).
-    crate::web_fonts::startup(root);
+    crate::desktop::web_fonts::startup(root);
     prefs
 }
 
@@ -122,7 +122,7 @@ fn load_accounts(sidebar_state: &mut config::SidebarState) -> Vec<AccountConfig>
     // Snapshot before reconciling: a removed account's alias-password
     // keyring entries are keyed by addresses only its config knows.
     let config_before_goa = config.clone();
-    let goa_outcome = match crate::goa::live_state() {
+    let goa_outcome = match crate::services::goa::live_state() {
         Some(live) => reconcile_goa(&mut config, &live),
         None => GoaReconcile::default(),
     };

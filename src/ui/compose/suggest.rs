@@ -266,7 +266,7 @@ impl Compose {
         self.directory_generation = self.directory_generation.wrapping_add(1);
         self.directory_matches.clear();
         let token = recipient_token(row);
-        if token.chars().count() >= crate::directory::MIN_QUERY {
+        if token.chars().count() >= crate::contacts::directory::MIN_QUERY {
             // A directory is asked once the typing pauses, not per key.
             let generation = self.directory_generation;
             let s = sender.input_sender().clone();
@@ -333,12 +333,13 @@ impl Compose {
                 // Both at once: the slower decides when the list
                 // grows, not the two one after the other.
                 let (matches, failed) = std::thread::scope(|scope| {
-                    let org = (!graph.is_empty())
-                        .then(|| scope.spawn(|| crate::graph_directory::search(&token, &graph)));
+                    let org = (!graph.is_empty()).then(|| {
+                        scope.spawn(|| crate::contacts::graph_directory::search(&token, &graph))
+                    });
                     let (mut matches, failed) = if narrowed {
                         Default::default()
                     } else {
-                        crate::directory::search(&token)
+                        crate::contacts::directory::search(&token)
                     };
                     if let Some(found) = org.and_then(|h| h.join().ok()) {
                         matches.extend(found);
@@ -360,7 +361,7 @@ impl Compose {
     /// typing meanwhile.
     pub(super) fn report_directory_failures(
         &mut self,
-        failed: Vec<crate::directory::DirectoryFailure>,
+        failed: Vec<crate::contacts::directory::DirectoryFailure>,
         sender: &ComponentSender<Self>,
     ) {
         for f in failed {
@@ -463,13 +464,15 @@ pub(super) fn load_suggestions(
     {
         let s = sender.input_sender().clone();
         std::thread::spawn(move || {
-            let graph = crate::graph_directory::accounts();
+            let graph = crate::contacts::graph_directory::accounts();
             // An account's id is its place in the file, from 1.
             let narrowed: Vec<(u32, crate::config::AccountConfig)> = crate::config::load()
                 .unwrap_or_default()
                 .into_iter()
                 .enumerate()
-                .filter(|(_, a)| a.graph_directory_only && crate::graph_directory::usable(a))
+                .filter(|(_, a)| {
+                    a.graph_directory_only && crate::contacts::graph_directory::usable(a)
+                })
                 .map(|(i, a)| (i as u32 + 1, a))
                 .collect();
             let own_mail = match crate::cache::Cache::open() {

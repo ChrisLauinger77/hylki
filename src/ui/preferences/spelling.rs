@@ -32,7 +32,7 @@ impl SpellLangRows {
     /// Show `setting` on the switches and in the row's subtitle.
     pub(super) fn show(&self, setting: &str) {
         *self.setting.borrow_mut() = setting.to_string();
-        let chosen = crate::spell::parse_languages(setting);
+        let chosen = crate::desktop::spell::parse_languages(setting);
         self.syncing.set(true);
         if let Some(row) = self.system.borrow().as_ref() {
             row.set_active(chosen.is_empty());
@@ -46,11 +46,13 @@ impl SpellLangRows {
                 "System language — {language}",
                 &[(
                     "language",
-                    &crate::spell::spell_language_names(&crate::spell::system_spell_languages()),
+                    &crate::desktop::spell::spell_language_names(
+                        &crate::desktop::spell::system_spell_languages(),
+                    ),
                 )],
             )
         } else {
-            crate::spell::spell_language_names(&chosen)
+            crate::desktop::spell::spell_language_names(&chosen)
         };
         self.expander
             .set_subtitle(&gtk::glib::markup_escape_text(&subtitle));
@@ -63,11 +65,11 @@ impl SpellLangRows {
             return None;
         }
         let current = self.setting.borrow().clone();
-        let next = crate::spell::toggle_language(
+        let next = crate::desktop::spell::toggle_language(
             &current,
             code,
             on,
-            &crate::spell::system_spell_languages(),
+            &crate::desktop::spell::system_spell_languages(),
         );
         self.show(&next);
         (next != current).then_some(next)
@@ -92,7 +94,7 @@ pub(super) fn rebuild_personal_words(exp: &adw::ExpanderRow) {
         // wants the row it was handed in add_row.
         exp.remove(row);
     }
-    let words = crate::spell::personal_words();
+    let words = crate::desktop::spell::personal_words();
     exp.set_enable_expansion(true);
     for w in words {
         let row = adw::ActionRow::builder().title(&w).build();
@@ -105,7 +107,7 @@ pub(super) fn rebuild_personal_words(exp: &adw::ExpanderRow) {
             let word = w.clone();
             let exp = exp.clone();
             del.connect_clicked(move |_| {
-                crate::spell::remove_personal_word(&word);
+                crate::desktop::spell::remove_personal_word(&word);
                 rebuild_personal_words(&exp);
             });
         }

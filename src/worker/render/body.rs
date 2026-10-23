@@ -21,7 +21,7 @@ use crate::encoding::escape_html;
 /// Render a raw message to the HTML the reader displays. Public so the Outbox
 /// can show a queued message without a round trip to the server — the bytes are
 /// already on disk.
-pub fn extract_body(raw: &[u8]) -> String {
+pub(crate) fn extract_body(raw: &[u8]) -> String {
     use mail_parser::{MessageParser, MimeHeaders, PartType};
 
     /// Total decoded bytes of inline images embedded into one message body.
@@ -32,7 +32,7 @@ pub fn extract_body(raw: &[u8]) -> String {
     };
 
     // The protected-headers stand-in that only repeats the Subject (#493).
-    let legacy = crate::pgp::legacy_display_part(&parsed);
+    let legacy = crate::mail::pgp::legacy_display_part(&parsed);
     let bodies: Vec<_> = parsed
         .html_body
         .iter()

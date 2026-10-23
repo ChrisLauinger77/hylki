@@ -281,13 +281,13 @@ fn card_avatar(m: &Message, dark: bool) -> String {
     // or its emoji on the account color — so your own
     // replies in a conversation wear the face you gave
     // that mailbox rather than plain initials.
-    let own = crate::avatar::own_face(&m.from_addr).and_then(|face| {
+    let own = crate::services::avatar::own_face(&m.from_addr).and_then(|face| {
         // The account's own Gravatar leads when it asked
         // for one and the address has one; the picture and
         // the emoji are what it falls back to.
         let gravatar = face
             .gravatar
-            .then(|| crate::avatar::own_gravatar_data_uri(&m.from_addr, 26))
+            .then(|| crate::services::avatar::own_gravatar_data_uri(&m.from_addr, 26))
             .flatten();
         if let Some(uri) = gravatar {
             return Some(format!("<img class=\"hylki-ava\" src=\"{uri}\" alt=\"\">"));

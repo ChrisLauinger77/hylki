@@ -219,9 +219,9 @@ pub(super) fn tag_labels(keyword: &str, add: bool) -> Vec<String> {
         .map(|t| t.name)
         .filter(|n| !n.trim().is_empty())
         .unwrap_or_else(|| keyword.to_string());
-    let mut out = vec![crate::mutf7::encode(&name)];
+    let mut out = vec![crate::mail::mutf7::encode(&name)];
     if !add && !name.eq_ignore_ascii_case(keyword) {
-        out.push(crate::mutf7::encode(keyword));
+        out.push(crate::mail::mutf7::encode(keyword));
     }
     out
 }

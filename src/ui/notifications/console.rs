@@ -188,7 +188,7 @@ impl NotificationCenter {
         if !self.console_open {
             return;
         }
-        let (seq, lines) = crate::console_log::lines_since(self.console_seq);
+        let (seq, lines) = crate::desktop::console_log::lines_since(self.console_seq);
         self.console_seq = seq;
         if !lines.is_empty() {
             // The adjustment's changed handler keeps a following

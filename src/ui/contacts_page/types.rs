@@ -300,7 +300,7 @@ pub(crate) struct ContactsPage {
     pub(super) directories: Vec<(String, String)>,
     /// The directories that did not answer the search, listed under the
     /// people found, so a search that finds nobody says why (#307).
-    pub(super) directory_failures: Vec<crate::directory::DirectoryFailure>,
+    pub(super) directory_failures: Vec<crate::contacts::directory::DirectoryFailure>,
     /// The composer's recipient suggestions (Contacts and mail history),
     /// shared with an open group form, which offers them as people to add.
     /// Read again each time a group form opens; until the first read lands
@@ -426,7 +426,7 @@ pub(crate) enum ContactsPageInput {
     DirectoryResults {
         generation: u64,
         hits: Vec<ContactDetails>,
-        failed: Vec<crate::directory::DirectoryFailure>,
+        failed: Vec<crate::contacts::directory::DirectoryFailure>,
     },
     /// Copy a directory entry into the default address book.
     AddDirectoryHit(usize),

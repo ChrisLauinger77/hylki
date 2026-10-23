@@ -481,7 +481,7 @@ mod tests {
     /// Skipped where gpg is missing.
     #[test]
     fn build_email_signs_and_encrypts_with_pgp_mime() {
-        if !crate::pgp::available() {
+        if !crate::mail::pgp::available() {
             eprintln!("gpg not installed; skipping");
             return;
         }
@@ -495,12 +495,13 @@ mod tests {
         }
         // `Gpg::system()` (what build_email uses) honours this override.
         std::env::set_var("HYLKI_GNUPGHOME", &home);
-        let gpg = crate::pgp::Gpg::system();
+        let gpg = crate::mail::pgp::Gpg::system();
         let mut account = sample_account();
         account.email = "sender@hylki.invalid".into();
-        let fpr = crate::pgp::generate_key(&gpg, "Sender", "sender@hylki.invalid", "never", "")
-            .expect("own key");
-        crate::pgp::generate_key(&gpg, "Peer", "peer@hylki.invalid", "never", "")
+        let fpr =
+            crate::mail::pgp::generate_key(&gpg, "Sender", "sender@hylki.invalid", "never", "")
+                .expect("own key");
+        crate::mail::pgp::generate_key(&gpg, "Peer", "peer@hylki.invalid", "never", "")
             .expect("peer key");
 
         let mut msg = sample_outgoing();
@@ -512,7 +513,7 @@ mod tests {
         assert!(text.contains("multipart/signed"), "{text}");
         assert!(text.contains("micalg=\"pgp-sha"), "{text}");
         assert!(!has_bare_lf(&raw), "{text}");
-        let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
+        let u = crate::mail::pgp::unwrap_message(&raw, &gpg).expect("recognised");
         assert!(
             matches!(u.status.signature, crate::models::PgpSignature::Good { .. }),
             "{:?}",
@@ -527,7 +528,7 @@ mod tests {
         std::fs::write(&path, b"attached").unwrap();
         msg.attachments = vec![path.to_string_lossy().to_string()];
         let raw = build_email(&account, &msg).expect("builds").formatted();
-        let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
+        let u = crate::mail::pgp::unwrap_message(&raw, &gpg).expect("recognised");
         assert!(
             matches!(u.status.signature, crate::models::PgpSignature::Good { .. }),
             "{:?}",
@@ -555,7 +556,7 @@ mod tests {
         );
         assert!(text.contains("Subject: ...\r\n"), "{text}");
         assert!(!has_bare_lf(&raw), "{text}");
-        let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
+        let u = crate::mail::pgp::unwrap_message(&raw, &gpg).expect("recognised");
         assert!(u.status.encrypted && u.status.decrypted, "{:?}", u.status);
         assert!(
             matches!(u.status.signature, crate::models::PgpSignature::Good { .. }),
@@ -590,7 +591,7 @@ mod tests {
             !text.contains("secret body text"),
             "plaintext must not appear: {text}"
         );
-        let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
+        let u = crate::mail::pgp::unwrap_message(&raw, &gpg).expect("recognised");
         assert!(
             u.status.decrypted && u.status.subject.is_none(),
             "{:?}",

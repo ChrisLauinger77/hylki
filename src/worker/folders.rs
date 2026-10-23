@@ -10,7 +10,7 @@ use crate::models::{Folder, FolderKind, Message};
 /// Whether a folder's sidebar chip counts every message rather than unread
 /// ones. Drafts: a draft is never unread, and the chip is there to say how
 /// many are waiting to be finished.
-pub fn chip_counts_all(kind: FolderKind) -> bool {
+pub(crate) fn chip_counts_all(kind: FolderKind) -> bool {
     kind == FolderKind::Drafts
 }
 
@@ -107,7 +107,7 @@ pub(super) fn display_name(path: &str, delimiter: Option<&str>) -> String {
     // Split first, decode second: the delimiter is ASCII and modified UTF-7
     // never produces one inside an escaped run (that is why `,` stands in for
     // `/`), so the leaf is always a whole name (issue #1).
-    crate::mutf7::decode(leaf)
+    crate::mail::mutf7::decode(leaf)
 }
 
 /// Put a folder listing in the order Hylki keeps and number it 1..n:

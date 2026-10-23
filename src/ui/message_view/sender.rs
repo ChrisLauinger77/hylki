@@ -13,7 +13,7 @@ use relm4::prelude::*;
 pub(super) fn confirm_trust(
     parent: Option<&gtk::Window>,
     signer: &str,
-    key: &crate::pgp::KeyInfo,
+    key: &crate::mail::pgp::KeyInfo,
     sender: ComponentSender<MessageView>,
     account_id: u32,
     id: u32,
@@ -56,17 +56,17 @@ pub(super) fn confirm_trust(
 /// message carried first, then WKD and the keyservers by address and by the
 /// key id the signature named. Runs off the main thread (network).
 pub(super) fn fetch_sender_key(pgp: &crate::models::PgpStatus) -> Result<String, String> {
-    let gpg = crate::pgp::Gpg::system();
+    let gpg = crate::mail::pgp::Gpg::system();
     if let Some(b64) = &pgp.autocrypt {
         if let Some(bytes) = crate::encoding::base64_decode(b64) {
-            if let Ok(s) = crate::pgp::import_keys(&gpg, &bytes) {
+            if let Ok(s) = crate::mail::pgp::import_keys(&gpg, &bytes) {
                 if !s.fingerprints.is_empty() {
                     return Ok(i18n("The sender's key was imported from the message."));
                 }
             }
         }
     }
-    let summary = crate::pgp::fetch_key(&gpg, &pgp.sender_addr, pgp.signing_key_id())?;
+    let summary = crate::mail::pgp::fetch_key(&gpg, &pgp.sender_addr, pgp.signing_key_id())?;
     Ok(if summary.imported > 0 {
         i18n("The sender's key was fetched and imported.")
     } else {

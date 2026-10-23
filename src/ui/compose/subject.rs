@@ -36,7 +36,7 @@ pub(super) fn wire_subject(widgets: &ComposeWidgets, sender: &ComponentSender<Co
                 .nth(row.position().max(0) as usize)
                 .map(|(b, _)| b)
                 .unwrap_or(content.len());
-            t.set_attributes(crate::spell::error_attrs(&content, Some(cursor)).as_ref());
+            t.set_attributes(crate::desktop::spell::error_attrs(&content, Some(cursor)).as_ref());
             let t = t.clone();
             let row = row.clone();
             let slot = pending.clone();
@@ -44,13 +44,17 @@ pub(super) fn wire_subject(widgets: &ComposeWidgets, sender: &ComponentSender<Co
                 std::time::Duration::from_millis(400),
                 move || {
                     slot.borrow_mut().take();
-                    t.set_attributes(crate::spell::error_attrs(&row.text(), None).as_ref());
+                    t.set_attributes(
+                        crate::desktop::spell::error_attrs(&row.text(), None).as_ref(),
+                    );
                 },
             );
             *pending.borrow_mut() = Some(id);
         });
         // Prefilled subjects (replies, drafts) get checked on open too.
-        text.set_attributes(crate::spell::error_attrs(&widgets.subject_row.text(), None).as_ref());
+        text.set_attributes(
+            crate::desktop::spell::error_attrs(&widgets.subject_row.text(), None).as_ref(),
+        );
     }
 }
 

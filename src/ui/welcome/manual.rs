@@ -111,10 +111,10 @@ impl Welcome {
             .set_text(&i18n("Opening browser… complete sign-in there."));
         sender.oneshot_command(async move {
             let result = tokio::task::spawn_blocking(move || {
-                let refresh = crate::oauth::run_flow(&settings)?.refresh_token;
+                let refresh = crate::services::oauth::run_flow(&settings)?.refresh_token;
                 if settings.token_url.contains("microsoftonline") {
                     let (name, address, refresh) =
-                        crate::oauth::microsoft_whoami(&settings, &refresh, None)?;
+                        crate::services::oauth::microsoft_whoami(&settings, &refresh, None)?;
                     return Ok((refresh, Some((name, address))));
                 }
                 Ok((refresh, None))

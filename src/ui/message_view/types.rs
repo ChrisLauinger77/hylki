@@ -197,7 +197,7 @@ pub(crate) enum MessageViewInput {
     Translated {
         account_id: u32,
         id: u32,
-        result: Result<crate::translate::Translated, String>,
+        result: Result<crate::services::translate::Translated, String>,
     },
     /// The app reports where a card's unsubscribe request stands: under way,
     /// failed, or over (`None` — the banner goes back to its resting state,
@@ -520,9 +520,9 @@ pub(crate) enum TrState {
     /// The service has been asked.
     Working,
     /// The card shows the translation.
-    Shown(crate::translate::Translated),
+    Shown(crate::services::translate::Translated),
     /// Translated, but the card is back on the original.
-    Original(crate::translate::Translated),
+    Original(crate::services::translate::Translated),
     /// It failed, and this is why.
     Failed(String),
 }

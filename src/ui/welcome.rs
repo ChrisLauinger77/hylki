@@ -38,7 +38,7 @@ pub(crate) use wordmark::{
 };
 
 pub(crate) struct Welcome {
-    goa: Vec<crate::goa::GoaMailAccount>,
+    goa: Vec<crate::services::goa::GoaMailAccount>,
     /// Emails added so far (either path), shown on the account page and used
     /// to relabel the final button.
     added: Vec<String>,
@@ -126,7 +126,7 @@ impl Component for Welcome {
             .into_iter()
             .map(|a| a.email.to_ascii_lowercase())
             .collect();
-        let mut goa = crate::goa::list_mail_accounts();
+        let mut goa = crate::services::goa::list_mail_accounts();
         goa.retain(|g| g.can_connect() && !existing.contains(&g.email.to_ascii_lowercase()));
         let model = Welcome {
             goa,

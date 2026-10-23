@@ -93,7 +93,7 @@ impl AppModel {
             Some(at) => &path[..=at],
             None => "",
         };
-        let new_path = format!("{parent}{}", crate::mutf7::encode(new_name));
+        let new_path = format!("{parent}{}", crate::mail::mutf7::encode(new_name));
         if new_path == path {
             return;
         }
@@ -252,7 +252,7 @@ impl AppModel {
                     let path = format!(
                         "{}{}",
                         self.folder_namespace(account_id),
-                        crate::mutf7::encode(name)
+                        crate::mail::mutf7::encode(name)
                     );
                     self.create_folder(account_id, path.clone());
                     self.push_undo(

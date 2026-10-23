@@ -29,23 +29,23 @@ pub(in crate::worker) fn addr_list(header: Option<&mail_parser::Address>) -> Str
 
 /// A queued message taken apart for editing: the fields a composer needs, plus
 /// its attachments as bytes.
-pub struct EditableMessage {
+pub(crate) struct EditableMessage {
     /// The From as written: "Name <address>", or the bare address.
-    pub from: String,
-    pub to: String,
-    pub cc: String,
-    pub bcc: String,
-    pub subject: String,
+    pub(crate) from: String,
+    pub(crate) to: String,
+    pub(crate) cc: String,
+    pub(crate) bcc: String,
+    pub(crate) subject: String,
     /// Threading headers, stored the way an outgoing message carries them:
     /// without angle brackets, References space-separated.
-    pub in_reply_to: String,
-    pub references: String,
+    pub(crate) in_reply_to: String,
+    pub(crate) references: String,
     /// The best body to edit: the HTML alternative when there is one, otherwise
     /// the plain text escaped into HTML (the composer edits HTML). Pictures
     /// pasted into the text come back as the `data:` URIs they were written as.
-    pub body_html: String,
+    pub(crate) body_html: String,
     /// The files, without the pictures already back in the text.
-    pub attachments: Vec<crate::models::Attachment>,
+    pub(crate) attachments: Vec<crate::models::Attachment>,
 }
 
 /// Whoever the envelope names that none of the `headers` (address lists)
@@ -156,7 +156,7 @@ fn editable_body(parsed: Option<&mail_parser::Message>, embedded: &mut Vec<Strin
 /// message's Bcc recipients survive only in the stored envelope. Anything in
 /// the envelope that isn't in To or Cc is therefore a Bcc recipient, and is
 /// restored as one. A draft keeps its `Bcc` header and has no envelope.
-pub fn editable_from_raw(raw: &[u8], envelope_rcpts: &[String]) -> EditableMessage {
+pub(crate) fn editable_from_raw(raw: &[u8], envelope_rcpts: &[String]) -> EditableMessage {
     use mail_parser::{MessageParser, MimeHeaders};
 
     let parsed = MessageParser::default().parse(raw);

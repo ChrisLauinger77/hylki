@@ -55,7 +55,7 @@ finish-args:
   - --filesystem=xdg-config/evolution:ro
   # Read the earlier names' sandbox data so accounts, settings and cached
   # mail carry over on first start (Veem through 1.5.1, Vireo through
-  # 1.34.0); nothing there is written to. See src/legacy.rs.
+  # 1.34.0); nothing there is written to. See src/desktop/legacy.rs.
   - --filesystem=~/.var/app/co.hyprlab.Vireo:ro
   - --filesystem=~/.var/app/com.getveem.Veem:ro
   # The chosen app icon (Settings → App icon) is written over the app's icon

@@ -305,7 +305,9 @@ pub(crate) fn cache_stats() -> (usize, u64, usize, usize) {
         let c = c.borrow();
         (
             c.len(),
-            c.values().map(crate::memory_report::texture_bytes).sum(),
+            c.values()
+                .map(crate::desktop::memory_report::texture_bytes)
+                .sum(),
         )
     });
     let (uris, uri_bytes) = PICTURE_URIS.with(|c| {

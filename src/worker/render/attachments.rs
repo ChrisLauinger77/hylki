@@ -17,17 +17,17 @@ pub(in crate::worker) const INLINE_ATTACHMENT_MIN: usize = 64 * 1024;
 
 /// The attachments of a raw message. Public so the Outbox can list a queued
 /// message's files without a fetch.
-pub fn extract_attachments_of(raw: &[u8]) -> Vec<crate::models::Attachment> {
+pub(crate) fn extract_attachments_of(raw: &[u8]) -> Vec<crate::models::Attachment> {
     extract_attachments(raw)
 }
 
 /// The attachments of a raw message, through any OpenPGP wrapping, and
 /// whether they may be cached (never for OpenPGP mail, like its body).
 pub(in crate::worker) fn attachments_of(raw: &[u8]) -> (Vec<crate::models::Attachment>, bool) {
-    match crate::pgp::detect(raw) {
+    match crate::mail::pgp::detect(raw) {
         None => (extract_attachments(raw), true),
         Some(_) => {
-            let items = crate::pgp::unwrap_message(raw, &crate::pgp::Gpg::system())
+            let items = crate::mail::pgp::unwrap_message(raw, &crate::mail::pgp::Gpg::system())
                 .and_then(|u| u.inner)
                 .map(|inner| extract_attachments(&inner))
                 .unwrap_or_default();
@@ -55,7 +55,7 @@ pub(in crate::worker) fn attachment_parts(
 ) -> Vec<(usize, crate::models::Attachment)> {
     use mail_parser::MimeHeaders;
     let mut out = Vec::new();
-    let legacy = crate::pgp::legacy_display_part(parsed);
+    let legacy = crate::mail::pgp::legacy_display_part(parsed);
     for (i, &id) in parsed.attachments.iter().enumerate() {
         if Some(id) == legacy {
             continue;

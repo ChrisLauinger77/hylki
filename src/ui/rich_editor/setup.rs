@@ -30,7 +30,7 @@ impl RichEditor {
         let image_policy: std::rc::Rc<str> = image_policy_meta(remote_images).into();
         let (webview, ucm) = editor_view();
         let spinner = loading_spinner(&webview);
-        crate::web_fonts::load_html(
+        crate::desktop::web_fonts::load_html(
             &webview,
             &document(initial_html, &webview, &image_policy, plain.get()),
             Some("https://hylki.localhost/editor"),
@@ -155,7 +155,7 @@ fn editor_view() -> (webkit6::WebView, webkit6::UserContentManager) {
         .web_context(&crate::ui::message_view::shared_web_context())
         .user_content_manager(&ucm)
         .build();
-    crate::memory_report::register_web_view(&webview, "editor");
+    crate::desktop::memory_report::register_web_view(&webview, "editor");
     // Everything the view itself owns (its content manager's handlers,
     // its event controllers, its toolbar's buttons via the format-state
     // handler) holds the view WEAKLY. A strong clone in any of those
@@ -167,7 +167,7 @@ fn editor_view() -> (webkit6::WebView, webkit6::UserContentManager) {
         ucm.connect_script_message_received(Some("hylkiSpell"), move |_, value| {
             let Some(v) = weak.upgrade() else { return };
             let word = value.to_str().to_string();
-            let bad = crate::spell::word_is_misspelled(&word);
+            let bad = crate::desktop::spell::word_is_misspelled(&word);
             exec(&v, &format!("window.__hylkiSpellMark({bad})"));
         });
     }
@@ -266,7 +266,7 @@ fn follow_theme(webview: &webkit6::WebView) -> gtk::glib::SignalHandlerId {
     // once its view is gone.
     {
         let weak = webview.downgrade();
-        crate::theme::connect_changed(move || {
+        crate::desktop::theme::connect_changed(move || {
             reground(&weak, adw::StyleManager::default().is_dark())
         });
     }

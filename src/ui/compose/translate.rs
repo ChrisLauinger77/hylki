@@ -140,31 +140,40 @@ impl Compose {
         // First what the conversation suggests: the language of the
         // message being answered, then the one last used.
         let mut first = Vec::new();
-        let quoted = crate::translate::detect(&quoted);
+        let quoted = crate::services::translate::detect(&quoted);
         if let Some(lang) = &quoted {
             first.push(
                 entry(
                     lang.clone(),
                     i18n_f(
                         "{language} (the quoted message)",
-                        &[("language", &crate::translate::language_name(lang))],
+                        &[("language", &crate::services::translate::language_name(lang))],
                     ),
                 )
                 .icon("mail-reply-sender-symbolic"),
             );
         }
-        if let Some(last) = crate::translate::last_compose_target() {
-            if quoted.as_deref().map(crate::translate::base) != Some(crate::translate::base(&last))
+        if let Some(last) = crate::services::translate::last_compose_target() {
+            if quoted.as_deref().map(crate::services::translate::base)
+                != Some(crate::services::translate::base(&last))
             {
                 first.push(
-                    entry(last.clone(), crate::translate::language_name(&last))
-                        .icon("translate-symbolic"),
+                    entry(
+                        last.clone(),
+                        crate::services::translate::language_name(&last),
+                    )
+                    .icon("translate-symbolic"),
                 );
             }
         }
-        let all: Vec<MenuEntry> = crate::translate::LANGUAGES
+        let all: Vec<MenuEntry> = crate::services::translate::LANGUAGES
             .iter()
-            .map(|code| entry(code.to_string(), crate::translate::language_name(code)))
+            .map(|code| {
+                entry(
+                    code.to_string(),
+                    crate::services::translate::language_name(code),
+                )
+            })
             .collect();
         let mut sections = if first.is_empty() {
             vec![all]
@@ -240,7 +249,7 @@ impl Compose {
         };
         let parts: Vec<String> = match (&how, v["text"].as_str()) {
             (TranslateHow::Html, Some(text)) => vec![text.to_string()],
-            (TranslateHow::Markdown, Some(text)) => crate::translate::text_to_parts(text),
+            (TranslateHow::Markdown, Some(text)) => crate::services::translate::text_to_parts(text),
             _ => v["parts"]
                 .as_array()
                 .map(|a| {
@@ -279,9 +288,10 @@ impl Compose {
         }
         let s = sender.input_sender().clone();
         std::thread::spawn(move || {
-            let settings = crate::translate::load();
-            let key = crate::translate::load_key(settings.service).unwrap_or_default();
-            let result = crate::translate::translate_parts(&settings, &key, &parts, &target);
+            let settings = crate::services::translate::load();
+            let key = crate::services::translate::load_key(settings.service).unwrap_or_default();
+            let result =
+                crate::services::translate::translate_parts(&settings, &key, &parts, &target);
             let _ = s.send(ComposeInput::Translated {
                 result,
                 how,
@@ -327,7 +337,7 @@ impl Compose {
                 self.tr_subject = None;
                 if let Some(original) = subject {
                     let translated = parts.pop().map(|t| {
-                        crate::markdown::plain_text(&t)
+                        crate::mail::markdown::plain_text(&t)
                             .split_whitespace()
                             .collect::<Vec<_>>()
                             .join(" ")
@@ -340,9 +350,10 @@ impl Compose {
                 let (end, text) = match how {
                     TranslateHow::Rich => (TR_RICH_END, parts.concat()),
                     TranslateHow::Html => (TR_SOURCE_END, parts.concat()),
-                    TranslateHow::Markdown => {
-                        (TR_SOURCE_END, crate::translate::parts_to_text(&parts))
-                    }
+                    TranslateHow::Markdown => (
+                        TR_SOURCE_END,
+                        crate::services::translate::parts_to_text(&parts),
+                    ),
                 };
                 let arg = serde_json::to_string(&text).unwrap_or_else(|_| "''".into());
                 self.editor.run_js(&end.replace("ARG", &arg));

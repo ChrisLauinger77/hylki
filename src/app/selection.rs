@@ -192,7 +192,7 @@ impl AppModel {
             );
         }
         // Reading new mail clears that account's new-mail notification.
-        crate::notify::withdraw_mail(account_id);
+        crate::desktop::notify::withdraw_mail(account_id);
         self.message_list
             .emit(MessageListInput::MarkRead((account_id, m.folder_id, m.id)));
         self.mark_cached_read(account_id, m.folder_id, m.id);

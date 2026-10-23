@@ -60,7 +60,7 @@ pub(super) fn fill(
     let mut books: Vec<&TreeBook> = tree.books.iter().collect();
     books.sort_by_key(|b| {
         (
-            b.uid != crate::local_contacts::LOCAL_BOOK_UID,
+            b.uid != crate::contacts::local::LOCAL_BOOK_UID,
             !b.account.is_empty(),
         )
     });
@@ -186,7 +186,7 @@ impl Ctx<'_> {
             String::new()
         } else if !book.account.is_empty() {
             book.account.clone()
-        } else if book.uid == crate::local_contacts::LOCAL_BOOK_UID {
+        } else if book.uid == crate::contacts::local::LOCAL_BOOK_UID {
             i18n("Hylki, on this computer")
         } else {
             String::new()

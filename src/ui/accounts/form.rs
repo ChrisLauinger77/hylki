@@ -316,10 +316,10 @@ fn fill_pgp_key_row(widgets: &AccountsWindowWidgets, chosen: Option<&str>) {
     });
     gtk::glib::spawn_future_local(async move {
         let keys = gtk::gio::spawn_blocking(|| {
-            if !crate::pgp::available() {
+            if !crate::mail::pgp::available() {
                 return Vec::new();
             }
-            crate::pgp::list_keys(&crate::pgp::Gpg::system(), true)
+            crate::mail::pgp::list_keys(&crate::mail::pgp::Gpg::system(), true)
                 .into_iter()
                 .filter(|k| k.usable() && k.can_sign)
                 .collect::<Vec<_>>()
@@ -335,7 +335,7 @@ fn fill_pgp_key_row(widgets: &AccountsWindowWidgets, chosen: Option<&str>) {
             labels.push(format!(
                 "{} ({})",
                 k.primary_uid(),
-                crate::pgp::key_display(&k.key_id)
+                crate::mail::pgp::key_display(&k.key_id)
             ));
             fingerprints.push(k.fingerprint.clone());
         }
@@ -343,7 +343,7 @@ fn fill_pgp_key_row(widgets: &AccountsWindowWidgets, chosen: Option<&str>) {
         // a row of its own, so saving the editor does not drop it.
         if let Some(f) = chosen.as_deref() {
             if !fingerprints.iter().any(|k| k.eq_ignore_ascii_case(f)) {
-                labels.push(crate::pgp::key_display(f));
+                labels.push(crate::mail::pgp::key_display(f));
                 fingerprints.push(f.to_string());
             }
         }
@@ -554,7 +554,7 @@ pub(super) fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) 
         .set_text(s.map(|s| s.scopes.as_str()).unwrap_or(""));
     // What a Microsoft account was set up with beyond Hylki's own app (#329).
     let adv = s
-        .map(crate::oauth::microsoft_advanced_of)
+        .map(crate::services::oauth::microsoft_advanced_of)
         .unwrap_or_default();
     widgets.form.ms_client_row.set_text(&adv.0);
     widgets.form.ms_tenant_row.set_text(&adv.1);

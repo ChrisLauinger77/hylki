@@ -85,7 +85,7 @@ const DEMO_HEADERS: &[(u32, &str, &str)] = &[
 /// A demo message as raw RFC 822: its header block (see [`DEMO_HEADERS`])
 /// followed by its body, so the real sender check and the real unsubscribe
 /// scan can be run over it exactly as they are over fetched mail.
-pub fn demo_raw(id: u32) -> Option<String> {
+pub(crate) fn demo_raw(id: u32) -> Option<String> {
     let (headers, tail) = DEMO_HEADERS
         .iter()
         .find(|(i, _, _)| *i == id)

@@ -116,15 +116,15 @@ fn graph_fetch_run(
 /// step, then its runs of missing mail a run a step.
 pub(super) struct GraphBackfill {
     pub(super) path: String,
-    pub(super) phase: GraphBackfillPhase,
+    phase: GraphBackfillPhase,
     /// Whether the list has already been told the folder's index is done:
     /// a pass that re-checks a finished folder, or one that kept failing.
-    pub(super) told: bool,
+    told: bool,
     /// Steps that failed in a row.
-    pub(super) failures: u32,
+    failures: u32,
 }
 
-pub(super) enum GraphBackfillPhase {
+enum GraphBackfillPhase {
     /// Paging through the ids: the next page's link (`None` for the first)
     /// and what came so far, from a listing begun at `since`.
     Listing {
@@ -197,7 +197,7 @@ pub(super) struct GraphState {
     /// Message uid (hashed Graph id) → Graph message id.
     pub(super) uids: std::collections::HashMap<u32, String>,
     /// The Drafts folder's (folder id, path), for draft reloads after a send.
-    pub(super) drafts: Option<(u32, String)>,
+    drafts: Option<(u32, String)>,
     /// The Inbox's (folder id, path), for the new-mail poll.
     pub(super) inbox: Option<(u32, String)>,
     /// The account's manual Special Folders assignments (#82), applied to

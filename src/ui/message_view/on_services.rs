@@ -86,7 +86,7 @@ impl MessageView {
                 else {
                     return;
                 };
-                let settings = crate::translate::load();
+                let settings = crate::services::translate::load();
                 let refused = if self.encrypted(key) {
                     Some(i18n("Encrypted messages are not sent for translation."))
                 } else if !settings.enabled() {
@@ -103,7 +103,7 @@ impl MessageView {
                     self.patch_translate(account_id, id);
                     return;
                 }
-                let cache = crate::translate::cache_key(
+                let cache = crate::services::translate::cache_key(
                     account_id,
                     if m.message_id.is_empty() {
                         &m.body
@@ -113,7 +113,7 @@ impl MessageView {
                     &settings,
                 );
                 // Already translated this session: no second request.
-                if let Some(t) = crate::translate::cached(&cache) {
+                if let Some(t) = crate::services::translate::cached(&cache) {
                     self.translations.insert(key, TrState::Shown(t));
                     self.render();
                     return;
@@ -122,8 +122,9 @@ impl MessageView {
                 self.patch_translate(account_id, id);
                 let input = sender.input_sender().clone();
                 std::thread::spawn(move || {
-                    let api_key = crate::translate::load_key(settings.service).unwrap_or_default();
-                    let result = crate::translate::translate(
+                    let api_key =
+                        crate::services::translate::load_key(settings.service).unwrap_or_default();
+                    let result = crate::services::translate::translate(
                         &settings, &api_key, &m.body, &m.subject, &cache,
                     );
                     input.emit(MessageViewInput::Translated {
@@ -140,7 +141,7 @@ impl MessageView {
         &mut self,
         account_id: u32,
         id: u32,
-        result: Result<crate::translate::Translated, String>,
+        result: Result<crate::services::translate::Translated, String>,
     ) {
         let key = (account_id, id);
         // The reader moved on to another message meanwhile.
@@ -286,7 +287,7 @@ impl MessageView {
         let s = sender.clone();
         gtk::glib::spawn_future_local(async move {
             let key = gtk::gio::spawn_blocking(move || {
-                crate::pgp::key_by_fingerprint(&crate::pgp::Gpg::system(), &key_id)
+                crate::mail::pgp::key_by_fingerprint(&crate::mail::pgp::Gpg::system(), &key_id)
             })
             .await
             .ok()
@@ -310,7 +311,7 @@ impl MessageView {
     ) {
         let input = sender.input_sender().clone();
         sender.oneshot_command(async move {
-            let result = tokio::task::spawn_blocking(move || crate::pgp::trust_key(&crate::pgp::Gpg::system(), &fingerprint, None))
+            let result = tokio::task::spawn_blocking(move || crate::mail::pgp::trust_key(&crate::mail::pgp::Gpg::system(), &fingerprint, None))
                 .await
                 .unwrap_or_else(|_| Err("task failed".into()))
                 .map(|()| i18n("Key trusted."))

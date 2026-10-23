@@ -346,7 +346,7 @@ impl Component for Sidebar {
             sync_stack: None,
             sync_spinner: None,
             busy: false,
-            offline: !crate::power::online(),
+            offline: !crate::desktop::power::online(),
             sync_button: None,
             outbox_list: None,
             color_provider,

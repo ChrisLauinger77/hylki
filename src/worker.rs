@@ -47,32 +47,32 @@ mod summary;
 mod test_support;
 mod tls;
 
-pub use api::{CalendarPart, MailRequest, OutgoingMessage, WorkerEvent};
+pub(crate) use api::{CalendarPart, MailRequest, OutgoingMessage, WorkerEvent};
 pub(crate) use auth::{forget_access_token, oauth_token_blocking};
 pub(crate) use compose::build::sent_body_preview;
-pub use compose::editable::editable_from_raw;
-pub use compose::recipients::{
+pub(crate) use compose::editable::editable_from_raw;
+pub(crate) use compose::recipients::{
     clean_recipient_field, format_recipient, invalid_recipient, parse_recipients,
 };
-pub use conn_test::{test_alias_smtp_blocking, test_connection_blocking, ConnTest};
-pub use folders::chip_counts_all;
+pub(crate) use conn_test::{test_alias_smtp_blocking, test_connection_blocking, ConnTest};
+pub(crate) use folders::chip_counts_all;
 pub(crate) use folders::folder_order;
 use graph::run_graph;
 pub(crate) use headers::{clean_display_name, decode_header, unescape_quoted_str};
-pub use imap::fetch_mode::readable_error;
+pub(crate) use imap::fetch_mode::readable_error;
 pub(crate) use imap::gmail::has_gmail_labels;
-pub use imap::keywords::is_system_keyword;
+pub(crate) use imap::keywords::is_system_keyword;
 use imap::run_imap;
 use lane::cache_lane;
 use mock::run_mock;
 pub(crate) use outbox::{answered_copies, park_for_next_launch, reply_copy_path};
 use pop3::run_pop3;
-pub use render::attachments::extract_attachments_of;
-pub use render::body::extract_body;
+pub(crate) use render::attachments::extract_attachments_of;
+pub(crate) use render::body::extract_body;
 pub(crate) use render::body::wrap_plain;
 pub(crate) use render::render_raw;
 pub(crate) use summary::summary_from_raw;
-pub use tls::is_hostname_mismatch;
+pub(crate) use tls::is_hostname_mismatch;
 
 /// What a connection that was never tried, because the network is down,
 /// reports (#442).
@@ -101,7 +101,7 @@ pub(crate) fn accent_for(account_id: u32) -> &'static str {
 /// Start a worker thread for one account (`Some`) or the offline sample data
 /// (`None`). Returns the sender used to issue requests. `account_id` stamps all
 /// emitted folders/messages and keys the cache.
-pub fn spawn(
+pub(crate) fn spawn(
     account_id: u32,
     account: Option<AccountConfig>,
     emit: impl Fn(WorkerEvent) + Clone + Send + 'static,
