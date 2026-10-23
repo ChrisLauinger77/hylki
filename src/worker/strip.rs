@@ -8,6 +8,8 @@
 
 use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 
+use crate::worker::render::attachments::attachment_parts;
+
 /// Whether a part is the note left where an attachment was removed.
 pub(super) fn is_placeholder(part: &MessagePart<'_>) -> bool {
     part.content_type().is_some_and(|c| {
@@ -62,7 +64,7 @@ pub(super) fn without_attachment(
     let parsed = MessageParser::default()
         .parse(raw)
         .ok_or(StripError::NotFound)?;
-    let (id, _) = super::attachment_parts(&parsed, raw)
+    let (id, _) = attachment_parts(&parsed, raw)
         .into_iter()
         .filter(|(_, a)| a.name == name)
         .min_by_key(|(_, a)| (a.data.len() as u64).abs_diff(size))
@@ -207,9 +209,10 @@ a,b\r\n\
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::worker::render::attachments::extract_attachments;
 
     fn names(raw: &[u8]) -> Vec<String> {
-        super::super::extract_attachments(raw)
+        extract_attachments(raw)
             .into_iter()
             .map(|a| a.name)
             .collect()

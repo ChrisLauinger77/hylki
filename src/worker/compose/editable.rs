@@ -2,9 +2,9 @@
 //! back the Bcc a sent copy or a retry needs.
 
 use crate::worker::compose::recipients::mailbox;
-use crate::worker::{
-    attachment_parts, escape_html, format_recipient, inline_cid_images, parse_recipients,
-};
+use crate::worker::render::attachments::attachment_parts;
+use crate::worker::render::body::{escape_html, inline_cid_images};
+use crate::worker::{format_recipient, parse_recipients};
 
 /// Render an address header back into the form the composer's fields use —
 /// `Ada Lovelace <ada@example.com>, bob@example.com` — keeping display names so
