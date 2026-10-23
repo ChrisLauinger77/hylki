@@ -133,7 +133,7 @@ fn a_label_named_like_a_tag_is_the_tag() {
     );
     m.keywords = vec!["$Label2".into()];
     assert_eq!(
-        m.tag_keywords(&[work.clone()]),
+        m.tag_keywords(std::slice::from_ref(&work)),
         ["$Label2"],
         "no second copy of a keyword it has"
     );

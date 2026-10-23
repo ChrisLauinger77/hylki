@@ -172,11 +172,11 @@ impl AccountsWindow {
              mail sent to it answer from it.",
         ));
         let name_row = adw::EntryRow::builder()
-            .title(&i18n("Display name (optional)"))
+            .title(i18n("Display name (optional)"))
             .build();
         name_row.set_text(&name);
         let addr_row = adw::EntryRow::builder()
-            .title(&i18n("Email address"))
+            .title(i18n("Email address"))
             .build();
         addr_row.set_text(&addr);
         identity_group.add(&name_row);
@@ -185,7 +185,7 @@ impl AccountsWindow {
         let smtp_group = adw::PreferencesGroup::new();
         smtp_group.set_title(&i18n("Sending"));
         let smtp_switch = adw::SwitchRow::builder()
-            .title(&i18n("Own SMTP server"))
+            .title(i18n("Own SMTP server"))
             .subtitle(
                 "Send through the alias's own mail provider, with its own \
                  sign-in — instead of this account's server. Needed when the \
@@ -193,16 +193,16 @@ impl AccountsWindow {
             )
             .build();
         smtp_switch.set_active(alias.has_own_smtp());
-        let host_row = adw::EntryRow::builder().title(&i18n("SMTP server")).build();
+        let host_row = adw::EntryRow::builder().title(i18n("SMTP server")).build();
         host_row.set_text(&alias.smtp_host);
-        let port_row = adw::EntryRow::builder().title(&i18n("SMTP port")).build();
+        let port_row = adw::EntryRow::builder().title(i18n("SMTP port")).build();
         port_row.set_text(&alias.smtp_port.to_string());
         let user_row = adw::EntryRow::builder()
-            .title(&i18n("SMTP username"))
+            .title(i18n("SMTP username"))
             .build();
         user_row.set_text(&alias.smtp_username);
         let pass_row = adw::PasswordEntryRow::builder()
-            .title(&i18n("SMTP password"))
+            .title(i18n("SMTP password"))
             .build();
         pass_row.set_text(&alias.smtp_password);
         smtp_group.add(&smtp_switch);

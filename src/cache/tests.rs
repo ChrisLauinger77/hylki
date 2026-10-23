@@ -588,7 +588,7 @@ fn a_sent_copys_bcc_round_trips_through_the_cache() {
         labels: Vec::new(),
     };
     c.save_messages(1, "Sent", std::slice::from_ref(&m));
-    assert_eq!(c.load_messages(1, "Sent", 4), [m.clone()]);
+    assert_eq!(c.load_messages(1, "Sent", 4), std::slice::from_ref(&m));
     let (_, tagged) = c.messages_with_keyword(1, "Work", "Work").pop().unwrap();
     assert_eq!(tagged.bcc, m.bcc);
     c.upsert_messages(

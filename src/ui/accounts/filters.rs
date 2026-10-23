@@ -191,7 +191,8 @@ impl AccountsWindow {
         // Save stays dimmed until the rule has something to match and
         // something to do; every row that bears on that calls `changed`.
         // The check needs the Save button, so it is filled in last.
-        let revalidate: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>> = Default::default();
+        type Check = std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>;
+        let revalidate: Check = Default::default();
         let changed = {
             let revalidate = revalidate.clone();
             move || {

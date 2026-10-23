@@ -599,7 +599,7 @@ pub(super) fn build_editor(
                     }
                     let _ = sender.send(CloudAccountsInput::Save {
                         index,
-                        account: a,
+                        account: Box::new(a),
                         password: String::new(),
                     });
                 });
@@ -631,7 +631,7 @@ pub(super) fn build_editor(
                         let _ = sender.send(match cloud::seafile_login_with_code(&a, &pw, &otp) {
                             Ok((token, _)) => CloudAccountsInput::Save {
                                 index,
-                                account: a,
+                                account: Box::new(a),
                                 password: token,
                             },
                             Err(e) => CloudAccountsInput::Failed(e),
@@ -644,7 +644,7 @@ pub(super) fn build_editor(
         };
         let _ = sender.send(CloudAccountsInput::Save {
             index,
-            account: a,
+            account: Box::new(a),
             password: secret,
         });
         true

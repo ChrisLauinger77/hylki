@@ -57,6 +57,11 @@ pub fn parse_text(json: &str, view: &graphene::Rect) -> Option<(graphene::Point,
     ))
 }
 
+/// One card as [`CARDS_JS`] reports it, in stage coordinates: its key, its
+/// box and header height `[x, y, width, height, head]`, and where its first
+/// line of text begins `(x, y, size)` when it has one.
+pub type MeasuredCard = (String, [f32; 5], Option<(f32, f32, f32)>);
+
 /// What [`CARDS_JS`] reported, placed in stage coordinates given the web
 /// view's box there.
 #[derive(Clone, Debug, PartialEq)]
@@ -64,7 +69,7 @@ pub struct Measured {
     pub live: bool,
     /// The document's scroll, which must hold still too.
     pub scroll: f64,
-    pub cards: Vec<(String, [f32; 5], Option<(f32, f32, f32)>)>,
+    pub cards: Vec<MeasuredCard>,
 }
 
 impl Measured {

@@ -361,6 +361,9 @@ fn rounded(cr: &gtk::cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
 /// the shape, `blur` fades its edge out over that many points. Cairo has
 /// no blur, so the fade is stacked rings, each carrying a share of `alpha`
 /// so the solid middle adds up to it exactly.
+// The CSS shadow's own numbers, in its order, after the rounded rectangle
+// `rounded` takes.
+#[allow(clippy::too_many_arguments)]
 fn shadow(
     cr: &gtk::cairo::Context,
     x: f64,

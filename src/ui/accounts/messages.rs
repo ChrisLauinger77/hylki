@@ -268,6 +268,10 @@ pub enum AccountsOutput {
     LeaveNeedsPrompt(String),
 }
 
+/// How a sign-in ended: the refresh token and, when the provider says
+/// (Microsoft), the name and address that signed in; or why it failed.
+pub(super) type SignInResult = Result<(String, Option<(String, String)>), String>;
+
 /// Background command results for the editor.
 #[derive(Debug)]
 pub enum AccountsCmd {
@@ -276,12 +280,12 @@ pub enum AccountsCmd {
     /// OAuth sign-in result: the refresh token, or an error message.
     /// A browser sign-in finished: the refresh token, and who signed in
     /// when the provider says (Microsoft).
-    OAuth(Result<(String, Option<(String, String)>), String>),
+    OAuth(SignInResult),
     /// The sign-in that asked for the directory's scopes (#410) finished,
     /// as [`AccountsCmd::OAuth`].
-    DirectoryConsent(Result<(String, Option<(String, String)>), String>),
+    DirectoryConsent(SignInResult),
     /// The one that asked for the label scope (#411).
-    LabelsConsent(Result<(String, Option<(String, String)>), String>),
+    LabelsConsent(SignInResult),
     /// Alias SMTP test result (#34).
     AliasTested(Result<(), String>),
     /// GNOME Online Accounts read again: its mail accounts, for the import

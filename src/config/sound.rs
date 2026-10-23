@@ -204,7 +204,7 @@ mod sound_tests {
         let audio = [0xFFu8, 0xFB, 0x90, 0x64];
         // An ID3v2.4 tag of 1024 bytes (syncsafe 0x00 0x00 0x08 0x00), as in #397.
         let mut tagged = b"ID3\x04\x00\x00\x00\x00\x08\x00".to_vec();
-        tagged.extend(std::iter::repeat(0).take(1024));
+        tagged.extend(std::iter::repeat_n(0, 1024));
         tagged.extend(audio);
         assert_eq!(without_id3v2(&tagged), audio);
         // With a footer, and two tags in a row.

@@ -51,6 +51,9 @@ impl MessageView {
     /// Takes the thread rather than `&self` so it can be exercised without a GTK
     /// display: what it emits is a security boundary, and one that needs
     /// regression cover.
+    // Positional, as the reader and the characterization tests call it; the
+    // settings become one `Cards` inside.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn conversation_document(
         thread: &[Message],
         folder_labels: &std::collections::HashMap<(u32, u32), String>,
@@ -339,6 +342,29 @@ fn card_html(cards: &Cards<'_>, m: &Message, ava_html: &str, body: String) -> St
         folder_labels,
         ..
     } = *cards;
+    // The sender-authentication seal (#88): hidden until a
+    // verdict arrives (SenderCheckFor patches it live), then
+    // tinted by trust — Bazaar's fixed blue for a pass.
+    let verify = format!(
+        "<button type=\"button\" class=\"hylki-verify\" data-key=\"{aid}:{id}\" \
+             title=\"\">{svg}</button>\
+             <button type=\"button\" class=\"hylki-pgp\" data-key=\"{aid}:{id}\" \
+             title=\"\">{lock}{sig}<span class=\"hylki-pgp-text\"></span></button>\
+             <span class=\"hylki-sens\" data-key=\"{aid}:{id}\" title=\"\">{sens}\
+             <span class=\"hylki-sens-text\"></span></span>",
+        aid = m.account_id,
+        id = m.id,
+        svg = inline_icon_svg("verified-checkmark-symbolic"),
+        // The OpenPGP chip (#133): a lock for an encrypted
+        // message, a shield for a signed one, then the
+        // verdict in words (#300); hidden until the verdict
+        // is patched in.
+        lock = inline_icon_svg("channel-secure-symbolic"),
+        sig = inline_icon_svg("security-high-symbolic"),
+        // The sensitivity label (#411), hidden until a
+        // label is patched in.
+        sens = inline_icon_svg("tag-outline-symbolic"),
+    );
     format!(
         "<section class=\"hylki-msg{sel}{unread_cls}{folded_cls}\" data-key=\"{aid}:{id}\">{fbar}\
                <header class=\"hylki-msg-hdr\" data-key=\"{aid}:{id}\" \
@@ -458,29 +484,6 @@ fn card_html(cards: &Cards<'_>, m: &Message, ava_html: &str, body: String) -> St
         // so any byte sequence can be delivered), and this document
         // is the trusted wrapper — not a sandboxed message frame.
         from = escape_html(&m.from_name),
-        // The sender-authentication seal (#88): hidden until a
-        // verdict arrives (SenderCheckFor patches it live), then
-        // tinted by trust — Bazaar's fixed blue for a pass.
-        verify = format!(
-            "<button type=\"button\" class=\"hylki-verify\" data-key=\"{aid}:{id}\" \
-                 title=\"\">{svg}</button>\
-                 <button type=\"button\" class=\"hylki-pgp\" data-key=\"{aid}:{id}\" \
-                 title=\"\">{lock}{sig}<span class=\"hylki-pgp-text\"></span></button>\
-                 <span class=\"hylki-sens\" data-key=\"{aid}:{id}\" title=\"\">{sens}\
-                 <span class=\"hylki-sens-text\"></span></span>",
-            aid = m.account_id,
-            id = m.id,
-            svg = inline_icon_svg("verified-checkmark-symbolic"),
-            // The OpenPGP chip (#133): a lock for an encrypted
-            // message, a shield for a signed one, then the
-            // verdict in words (#300); hidden until the verdict
-            // is patched in.
-            lock = inline_icon_svg("channel-secure-symbolic"),
-            sig = inline_icon_svg("security-high-symbolic"),
-            // The sensitivity label (#411), hidden until a
-            // label is patched in.
-            sens = inline_icon_svg("tag-outline-symbolic"),
-        ),
         // An initials circle, tinted per sender address, so who
         // wrote each card — and which cards are your own replies —
         // reads at a glance (#22). Nothing is linked: a picture
@@ -560,6 +563,47 @@ fn card_actions(cards: &Cards<'_>, m: &Message) -> String {
         ..
     } = *cards;
     let key = (m.account_id, m.id);
+    // Action-showing icon (read envelope = "mark as
+    // read"), like the menus and toolbar. Both icons
+    // are baked in; the section's `unread` class picks
+    // one, so marking read/unread flips in place.
+    let toggle_read = format!(
+        "<button type=\"button\" class=\"hylki-act\" data-act=\"toggleread\" \
+             data-key=\"{aid}:{id}\" title=\"{title}\">\
+             <span class=\"tr-when-unread\">{read_svg}</span>\
+             <span class=\"tr-when-read\">{unread_svg}</span></button>",
+        aid = key.0,
+        id = key.1,
+        title = gtk::glib::markup_escape_text(&i18n("Mark as read or unread")),
+        read_svg = inline_icon_svg("hylki-mail-read-symbolic"),
+        unread_svg = inline_icon_svg("mail-unread-symbolic"),
+    );
+    // The star keeps one glyph; the starred state is
+    // color alone (`.on`, toggled optimistically on
+    // click too).
+    let star = format!(
+        "<button type=\"button\" class=\"hylki-act{on}\" data-act=\"star\" \
+             data-key=\"{aid}:{id}\" title=\"{title}\">{svg}</button>",
+        on = if m.starred { " on" } else { "" },
+        title = gtk::glib::markup_escape_text(&i18n("Star this message")),
+        aid = key.0,
+        id = key.1,
+        svg = inline_icon_svg("hylki-non-starred-symbolic"),
+    );
+    let source_and_translate = format!(
+        "{}{}",
+        card_action_button(key, "viewsource", "code-symbolic", &i18n("View source")),
+        if LIVE_TRANSLATE_ON.with(|on| on.get()) {
+            card_action_button(
+                key,
+                "translate",
+                "translate-symbolic",
+                &i18n("Translate this message"),
+            )
+        } else {
+            String::new()
+        },
+    );
     format!(
         "<span class=\"hylki-acts\">{}{}{}{}{}{}{}{}{}{}{}{}{}</span>",
         // Same order as the reader toolbar and the list's
@@ -582,33 +626,8 @@ fn card_actions(cards: &Cards<'_>, m: &Message) -> String {
             "mail-forward-symbolic",
             &i18n("Forward this message")
         ),
-        // Action-showing icon (read envelope = "mark as
-        // read"), like the menus and toolbar. Both icons
-        // are baked in; the section's `unread` class picks
-        // one, so marking read/unread flips in place.
-        format!(
-            "<button type=\"button\" class=\"hylki-act\" data-act=\"toggleread\" \
-                 data-key=\"{aid}:{id}\" title=\"{title}\">\
-                 <span class=\"tr-when-unread\">{read_svg}</span>\
-                 <span class=\"tr-when-read\">{unread_svg}</span></button>",
-            aid = key.0,
-            id = key.1,
-            title = gtk::glib::markup_escape_text(&i18n("Mark as read or unread")),
-            read_svg = inline_icon_svg("hylki-mail-read-symbolic"),
-            unread_svg = inline_icon_svg("mail-unread-symbolic"),
-        ),
-        // The star keeps one glyph; the starred state is
-        // color alone (`.on`, toggled optimistically on
-        // click too).
-        format!(
-            "<button type=\"button\" class=\"hylki-act{on}\" data-act=\"star\" \
-                 data-key=\"{aid}:{id}\" title=\"{title}\">{svg}</button>",
-            on = if m.starred { " on" } else { "" },
-            title = gtk::glib::markup_escape_text(&i18n("Star this message")),
-            aid = key.0,
-            id = key.1,
-            svg = inline_icon_svg("hylki-non-starred-symbolic"),
-        ),
+        toggle_read,
+        star,
         card_action_button(
             key,
             "moveto",
@@ -639,20 +658,7 @@ fn card_actions(cards: &Cards<'_>, m: &Message) -> String {
             "contact-new-symbolic",
             &i18n("Add sender to Contacts")
         ),
-        format!(
-            "{}{}",
-            card_action_button(key, "viewsource", "code-symbolic", &i18n("View source")),
-            if LIVE_TRANSLATE_ON.with(|on| on.get()) {
-                card_action_button(
-                    key,
-                    "translate",
-                    "translate-symbolic",
-                    &i18n("Translate this message"),
-                )
-            } else {
-                String::new()
-            },
-        ),
+        source_and_translate,
         // The escape from the reader's own fonts and
         // colors (#56): only offered while an override
         // is on, lit while this card shows the sender's.

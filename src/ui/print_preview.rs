@@ -528,7 +528,7 @@ pub fn open(parent: &gtk::Window, html: &str, job_name: &str) {
     // On the paper last printed on, or the locale's own.
     let paper = LAST
         .with(|l| l.borrow().as_ref().map(|(_, page)| page.clone()))
-        .unwrap_or_else(gtk::PageSetup::new);
+        .unwrap_or_default();
     let scale = f64::from(win.scale_factor().max(1));
     render_pdf(html, &paper, job_name, move |result| {
         if closed.get() {

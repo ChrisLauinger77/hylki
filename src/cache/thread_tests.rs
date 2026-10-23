@@ -29,6 +29,8 @@ fn counts(c: &Cache, groups: &[(String, Vec<String>)]) -> Vec<(String, usize)> {
 }
 
 /// As [`add_threaded`], with the sender and preview a row would show.
+// One argument per column the INSERT fills.
+#[allow(clippy::too_many_arguments)]
 fn add_shown(
     c: &Cache,
     folder: &str,

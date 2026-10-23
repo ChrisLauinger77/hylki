@@ -150,8 +150,8 @@ impl RecipientRow {
         sweep.set_propagation_phase(gtk::PropagationPhase::Capture);
         // From where among all the pills it started, the selection Ctrl
         // kept, and whether it has moved enough to be a sweep.
-        let swept: std::rc::Rc<RefCell<Option<(usize, Vec<gtk::Widget>, bool)>>> =
-            Default::default();
+        type Sweep = (usize, Vec<gtk::Widget>, bool);
+        let swept: std::rc::Rc<RefCell<Option<Sweep>>> = Default::default();
         let weak = self.downgrade();
         let s = swept.clone();
         sweep.connect_drag_begin(move |gesture, x, y| {

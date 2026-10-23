@@ -41,6 +41,9 @@ const LAYER_SPACING: i32 = 14;
 /// A card's side padding (`.drop-zone`) plus its border.
 const CARD_PADDING: i32 = 18;
 
+/// What [`DropZones`] runs before the cards come up.
+type Refresh = Box<dyn Fn(&DropZones)>;
+
 pub struct DropZones {
     context: DropContext,
     layer: gtk::Box,
@@ -64,7 +67,7 @@ pub struct DropZones {
     gate: RefCell<Option<Box<dyn Fn() -> bool>>>,
     /// Run before the cards come up, to bring what they depend on (the
     /// format a new message starts in, the cloud accounts) up to date.
-    refresh: RefCell<Option<Box<dyn Fn(&DropZones)>>>,
+    refresh: RefCell<Option<Refresh>>,
 }
 
 struct Zone {

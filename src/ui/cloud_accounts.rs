@@ -64,10 +64,11 @@ pub enum CloudAccountsInput {
     /// the user moves on).
     CloseEditor,
     /// The editor's Save: `index` is the row being replaced, or none for a
-    /// new account. The password is stored only when given.
+    /// new account. The password is stored only when given. Boxed: an
+    /// account is far larger than any other message.
     Save {
         index: Option<usize>,
-        account: CloudAccount,
+        account: Box<CloudAccount>,
         password: String,
     },
     /// A sign-in the editor finished after closing went wrong.
@@ -362,6 +363,7 @@ impl SimpleComponent for CloudAccounts {
                 account,
                 password,
             } => {
+                let account = *account;
                 // On the keyring thread, in order: the new entry, then the
                 // old one dropped.
                 if !password.is_empty() && account.has_secret() {

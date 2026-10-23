@@ -115,6 +115,9 @@ pub(super) fn ground_rgba(hex: &str) -> gtk::gdk::RGBA {
 /// One message body as a sandboxed iframe: its own document (so CSS can't leak to
 /// other messages) with no `allow-scripts` (so the email can't run JavaScript).
 /// `allow-same-origin` lets the wrapper script measure its height.
+// Positional, as `conversation_document` and the tests call it: each
+// argument is one independent setting of the render.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn message_frame(
     body: &str,
     restrict: bool,

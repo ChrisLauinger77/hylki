@@ -19,6 +19,9 @@ use gtk::{glib, subclass::prelude::*};
 const SPACING: i32 = 6;
 const ANIM_MS: u32 = 180;
 
+/// A chip size (width, height) that several zones read and write.
+type SharedSize = Rc<Cell<(i32, i32)>>;
+
 /// One slot of the row: a child or the gap.
 struct Slot {
     child: Option<gtk::Widget>,
@@ -43,10 +46,10 @@ mod imp {
         pub gap: Cell<Option<usize>>,
         /// The largest chip seen by any zone (shared), to size an empty
         /// zone by.
-        pub chip_size: RefCell<Option<Rc<Cell<(i32, i32)>>>>,
+        pub chip_size: RefCell<Option<SharedSize>>,
         /// The size of the chip being dragged right now (shared; zero when
         /// none): the gap opens at exactly that size.
-        pub drag_size: RefCell<Option<Rc<Cell<(i32, i32)>>>>,
+        pub drag_size: RefCell<Option<SharedSize>>,
     }
 
     #[glib::object_subclass]
@@ -103,7 +106,9 @@ mod imp {
             let slots = obj.slots(width, &chips);
             // Work out every move first, then start the animations with no
             // borrow held (their first tick may land before this returns).
-            let mut moves: Vec<(gtk::Widget, (f64, f64), (i32, i32))> = Vec::new();
+            // A child, where it is now and the slot it moves to.
+            type Move = (gtk::Widget, (f64, f64), (i32, i32));
+            let mut moves: Vec<Move> = Vec::new();
             {
                 let mut pos = self.pos.borrow_mut();
                 let mut target = self.target.borrow_mut();
@@ -156,7 +161,7 @@ impl Default for ChipFlow {
 }
 
 impl ChipFlow {
-    pub fn new(chip_size: Rc<Cell<(i32, i32)>>, drag_size: Rc<Cell<(i32, i32)>>) -> Self {
+    pub fn new(chip_size: SharedSize, drag_size: SharedSize) -> Self {
         let this = Self::default();
         *this.imp().chip_size.borrow_mut() = Some(chip_size);
         *this.imp().drag_size.borrow_mut() = Some(drag_size);

@@ -93,7 +93,7 @@ impl AccountsWindow {
 
     pub(super) fn on_pick_avatar(&mut self, sender: ComponentSender<Self>, root: &adw::Bin) {
         let dialog = gtk::FileDialog::builder()
-            .title(&i18n("Choose a Picture"))
+            .title(i18n("Choose a Picture"))
             .build();
         let filter = gtk::FileFilter::new();
         filter.set_name(Some(&i18n("Images")));
