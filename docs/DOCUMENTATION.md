@@ -1443,7 +1443,7 @@ the header still opens the message in a window of its own. A click anywhere
 else on a message, its text included, selects it, and the action keys act
 on it. <kbd>Ctrl</kbd> and a click add a message to the selection or take it
 out, and <kbd>Shift</kbd> and a click select every message from the first
-selected to that one. Archive, Delete, Spam and Move act on the selected
+selected to that one, without folding or opening it. Archive, Delete, Spam and Move act on the selected
 messages alone, and the rest of the conversation stays open.
 
 A message's header, or its folded card, drags it to a folder in the sidebar,

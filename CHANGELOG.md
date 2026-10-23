@@ -11,7 +11,8 @@
 - **Fixed: Ctrl or Shift and a click on a card selected only that card.**
   Several cards of a conversation are all its one row in the list, which
   counted that row once per card, took the mismatch for a selection of its
-  own and handed the reader back a single card.
+  own and handed the reader back a single card. Ctrl or Shift and a click on
+  a folded card no longer opens it either.
 
 - **Fixed: deleting several selected cards deleted the whole conversation.**
   Archive, Delete, Delete Permanently, Spam and Move to Inbox went to the

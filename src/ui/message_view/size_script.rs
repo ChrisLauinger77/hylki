@@ -197,7 +197,8 @@ if(e.target.closest&&e.target.closest('button,a,.hylki-addr,.hylki-acts,.hylki-t
 if(tm){clearTimeout(tm);tm=null;return;}\
 tm=setTimeout(function(){tm=null;foldCard(h.closest('.hylki-msg'));},260);});})(hs[j]);}\
 var fb=document.querySelectorAll('.hylki-fbar');\
-for(var j=0;j<fb.length;j++){fb[j].addEventListener('click',function(){foldCard(this.closest('.hylki-msg'));});}}\
+for(var j=0;j<fb.length;j++){fb[j].addEventListener('click',function(e){\
+if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;foldCard(this.closest('.hylki-msg'));});}}\
 var rbd=document.body.dataset;\
 if(rbd.hylkiReadmark&&document.body.classList.contains('hylki-conv')){\
 var rdel=parseInt(rbd.hylkiReadmark,10)||250;var rt={};\
