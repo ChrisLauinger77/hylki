@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.45.2 — 2026-10-23
+
+A folder the server will not open no longer keeps the CPU busy.
 
 - **Fixed: a folder the server would not open kept the CPU busy** (#512,
   reported by valqk). The background index put the folder back in its queue
