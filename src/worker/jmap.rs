@@ -1392,6 +1392,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::models::FolderKind;
     use crate::models::MailboxQuota;
     use crate::models::Message;
     use crate::worker::compose::build::build_email;
@@ -2299,7 +2300,7 @@ mod tests {
 /// Pins of current behaviour for JMAP helpers (Area B, step B0).
 #[cfg(test)]
 mod characterization_tests {
-    use super::*;
+    use crate::models::FolderKind;
     use crate::worker::jmap::folders::role_kind;
     use crate::worker::jmap::wire::jmap_err;
 

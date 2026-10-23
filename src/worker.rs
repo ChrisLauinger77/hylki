@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::i18n::{i18n, i18n_f};
-use crate::models::{Account, FolderKind, KeywordFinding};
+use crate::models::{Account, KeywordFinding};
 
 mod api;
 mod auth;
@@ -226,6 +226,7 @@ pub(super) fn sample_account() -> AccountConfig {
 mod tests {
     use super::*;
     use crate::models::Folder;
+    use crate::models::FolderKind;
     use crate::models::MailboxQuota;
     use crate::models::Message;
     use crate::worker::auth::sign_in_password_blocking;
@@ -4106,6 +4107,7 @@ mod reader_preemption_tests {
 #[cfg(test)]
 mod characterization_tests {
     use super::*;
+    use crate::models::FolderKind;
     use crate::worker::folders::classify_with_source;
     use crate::worker::folders::display_name;
     use crate::worker::headers::format_date;

@@ -101,7 +101,7 @@ impl<E: Emit> ImapWorker<E> {
                     });
                 }
                 // Pre-download recent bodies so opening them is instant.
-                queue_body_prefetch(body_prefetch, &path, &messages, &body_emitted);
+                queue_body_prefetch(body_prefetch, &path, &messages, body_emitted);
                 // Queue background attachment pre-downloads for recent
                 // messages that have them — older ones download on demand.
                 queue_attachment_prefetch(prefetch, &path, &messages, cache.as_ref(), account_id);

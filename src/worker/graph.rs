@@ -12,129 +12,169 @@
 //! available from list queries.
 
 use super::*;
-use crate::worker::graph::chores::{auto_empty_graph, emit_graph_body_hits, graph_preset_color};
-use crate::worker::graph::folders::{
-    graph_poll_inbox, graph_refresh_unread, refresh_graph_folders,
-};
-use crate::worker::graph::http::{
-    graph_delete_req, graph_get_json, graph_post_mime, graph_send_json, graph_token, GRAPH_BASE,
-};
-use crate::worker::graph::index::{
-    backfill_pause, graph_backfill_step, graph_load_folder, graph_sync_folder, GraphState,
-};
-use crate::worker::graph::messages::graph_list_ids;
-use crate::worker::graph::ops::{
-    graph_delete_attachment, graph_drop_draft_origin, graph_fetch_raw, graph_move_uids,
-    graph_patch_message, graph_purge_uids, graph_undo_move,
-};
-use crate::worker::graph::send::{graph_flush_outbox, graph_mark_answered, graph_send_message};
+use crate::worker::graph::folders::{graph_poll_inbox, refresh_graph_folders};
+use crate::worker::graph::http::graph_token;
+use crate::worker::graph::index::{backfill_pause, graph_backfill_step, GraphState};
+use crate::worker::graph::ops::graph_fetch_raw;
+use crate::worker::graph::send::graph_flush_outbox;
 
 mod chores;
 mod folders;
+mod handle_read;
+mod handle_send;
+mod handle_write;
 mod http;
 mod index;
 mod messages;
 mod ops;
 mod send;
-use crate::worker::compose::build::{build_draft, draft_message_id, restore_msgid_case};
-use crate::worker::drafts::{draft_not_saved, saving_text};
-use crate::worker::ids::hash_uid;
-use crate::worker::outbox::{
-    delete_queued, drop_superseded_outbox, emit_outbox, schedule_send, send_failed,
-};
-use crate::worker::render::attachments::extract_attachments;
-use crate::worker::render::body_cacheable;
-use crate::worker::strip::{cache_rewritten, strip_refused};
+use crate::worker::outbox::{delete_queued, emit_outbox};
 
+/// A label whose name the message leaves out is named from the
+/// organization's list (#411) on its way to the reader, whether the
+/// check was just made or comes from the cache, which keeps the header's.
+fn name_labels(account: &AccountConfig, emit: &impl Fn(WorkerEvent), mut ev: WorkerEvent) {
+    if let WorkerEvent::SenderChecked { check, .. } = &mut ev {
+        if let Some(label) = check.label.as_mut() {
+            crate::graph_labels::fill(account, label);
+        }
+    }
+    emit(ev)
+}
+
+/// A Microsoft account's worker: the Graph state (folders, uid map, the
+/// background index) and what it reports through.
+struct GraphWorker<E> {
+    account_id: u32,
+    account: AccountConfig,
+    rx: mpsc::UnboundedReceiver<MailRequest>,
+    /// The UI's callback; events go out through [`name_labels`].
+    emit: E,
+    cache: Option<Cache>,
+    state: GraphState,
+    /// When the Junk / Trash auto-empty (#140) last ran for this worker.
+    last_auto_empty: Option<std::time::Instant>,
+}
+
+/// Run a Microsoft account until the UI drops its sender.
 pub(super) async fn run_graph(
     account_id: u32,
     account: AccountConfig,
-    mut rx: mpsc::UnboundedReceiver<MailRequest>,
+    rx: mpsc::UnboundedReceiver<MailRequest>,
     emit: impl Fn(WorkerEvent),
 ) {
-    // A label whose name the message leaves out is named from the
-    // organization's list (#411) on its way to the reader, whether the
-    // check was just made or comes from the cache, which keeps the header's.
-    let emit = |mut ev: WorkerEvent| {
-        if let WorkerEvent::SenderChecked { check, .. } = &mut ev {
-            if let Some(label) = check.label.as_mut() {
-                crate::graph_labels::fill(&account, label);
-            }
+    GraphWorker::start(account_id, account, rx, emit)
+        .await
+        .run()
+        .await;
+}
+
+impl<E: Fn(WorkerEvent)> GraphWorker<E> {
+    /// Show the account and its cached folders, then fetch a token and the
+    /// live folder list.
+    async fn start(
+        account_id: u32,
+        account: AccountConfig,
+        rx: mpsc::UnboundedReceiver<MailRequest>,
+        emit: E,
+    ) -> Self {
+        let cache = Cache::open()
+            .map_err(|e| tracing::warn!("cache unavailable: {e}"))
+            .ok();
+        let mut worker = GraphWorker {
+            account_id,
+            state: GraphState::new(&account),
+            account,
+            rx,
+            emit,
+            cache,
+            last_auto_empty: None,
+        };
+        let account_id = worker.account_id;
+        let account = &worker.account;
+        let cache = &worker.cache;
+        let emit = &|ev| name_labels(&worker.account, &worker.emit, ev);
+        emit(WorkerEvent::Account(Account {
+            id: account_id,
+            name: account.name.clone(),
+            email: account.email.clone(),
+            label: account.display_label(),
+            accent: accent_for(account_id).into(),
+        }));
+
+        // Cached folders immediately, then the live list.
+        let cached_folders = cache
+            .as_ref()
+            .map(|c| c.load_folders(account_id))
+            .unwrap_or_default();
+        if !cached_folders.is_empty() {
+            emit(WorkerEvent::Folders(cached_folders));
         }
-        emit(ev)
-    };
-    let cache = Cache::open()
-        .map_err(|e| tracing::warn!("cache unavailable: {e}"))
-        .ok();
 
-    emit(WorkerEvent::Account(Account {
-        id: account_id,
-        name: account.name.clone(),
-        email: account.email.clone(),
-        label: account.display_label(),
-        accent: accent_for(account_id).into(),
-    }));
-
-    // Cached folders immediately, then the live list.
-    let cached_folders = cache
-        .as_ref()
-        .map(|c| c.load_folders(account_id))
-        .unwrap_or_default();
-    if !cached_folders.is_empty() {
-        emit(WorkerEvent::Folders(cached_folders));
+        // Fetch a token and the folder list. A GOA token failure here is the one
+        // users actually hit (signed out in GNOME Settings), so say that.
+        if let Some(token) = graph_token(account, emit).await {
+            refresh_graph_folders(&token, account_id, cache.as_ref(), &mut worker.state, emit)
+                .await;
+        }
+        worker
     }
 
-    // When the Junk / Trash auto-empty (#140) last ran for this worker.
-    let mut last_auto_empty: Option<std::time::Instant> = None;
-    let mut state = GraphState::new(&account);
+    /// Serve requests until the UI hangs up; between them, poll the Inbox
+    /// and index the mailbox in the background.
+    async fn run(mut self) {
+        // Graph has no push channel (nothing like IMAP IDLE is available to this
+        // token), so new mail arrives on a poll. The auto-fetch preference sets the
+        // cadence when it's on; otherwise a quiet couple of minutes.
+        let poll_secs = match crate::config::load_privacy().fetch_interval_secs {
+            0 => 120,
+            s => s.max(60),
+        };
+        let mut poll = tokio::time::interval(Duration::from_secs(poll_secs));
+        poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        poll.tick().await; // consume the interval's immediate first tick
 
-    // Fetch a token and the folder list. A GOA token failure here is the one
-    // users actually hit (signed out in GNOME Settings), so say that.
-    if let Some(token) = graph_token(&account, &emit).await {
-        refresh_graph_folders(&token, account_id, cache.as_ref(), &mut state, &emit).await;
-    }
-
-    // Graph has no push channel (nothing like IMAP IDLE is available to this
-    // token), so new mail arrives on a poll. The auto-fetch preference sets the
-    // cadence when it's on; otherwise a quiet couple of minutes.
-    let poll_secs = match crate::config::load_privacy().fetch_interval_secs {
-        0 => 120,
-        s => s.max(60),
-    };
-    let mut poll = tokio::time::interval(Duration::from_secs(poll_secs));
-    poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    poll.tick().await; // consume the interval's immediate first tick
-
-    loop {
-        // The background index (#429) only runs while nothing else is
-        // asked: a request, then the poll, come first, and each step is a
-        // single request so neither waits long behind one.
-        // Offline or on a metered connection it waits; the request that
-        // follows the change wakes this loop to look again (#442).
-        let indexing = !state.backfill.is_empty()
-            && crate::power::reaches_internet()
-            && !crate::power::saving_data();
-        let wait = state.backfill_wait;
-        let req = tokio::select! {
-            biased;
-            req = rx.recv() => match req {
-                Some(req) => req,
-                None => break,
-            },
-            _ = poll.tick() => {
-                if !crate::power::reaches_internet() {
+        loop {
+            // The background index (#429) only runs while nothing else is
+            // asked: a request, then the poll, come first, and each step is a
+            // single request so neither waits long behind one.
+            // Offline or on a metered connection it waits; the request that
+            // follows the change wakes this loop to look again (#442).
+            let indexing = !self.state.backfill.is_empty()
+                && crate::power::reaches_internet()
+                && !crate::power::saving_data();
+            let wait = self.state.backfill_wait;
+            let account_id = self.account_id;
+            let emit = &|ev| name_labels(&self.account, &self.emit, ev);
+            let req = tokio::select! {
+                biased;
+                req = self.rx.recv() => match req {
+                    Some(req) => req,
+                    None => break,
+                },
+                _ = poll.tick() => {
+                    if !crate::power::reaches_internet() {
+                        continue;
+                    }
+                    graph_poll_inbox(account_id, &self.account, self.cache.as_ref(), &mut self.state, emit).await;
                     continue;
                 }
-                graph_poll_inbox(account_id, &account, cache.as_ref(), &mut state, &emit).await;
-                continue;
-            }
-            _ = backfill_pause(wait), if indexing => {
-                graph_backfill_step(&account, account_id, cache.as_ref(), &mut state, &emit).await;
-                continue;
-            }
-        };
+                _ = backfill_pause(wait), if indexing => {
+                    graph_backfill_step(&self.account, account_id, self.cache.as_ref(), &mut self.state, emit).await;
+                    continue;
+                }
+            };
+            self.handle(req).await;
+        }
+    }
+
+    /// The handler for each kind of request.
+    async fn handle(&mut self, req: MailRequest) {
         // A folder the user opened, rather than a background refresh.
         let user = matches!(req, MailRequest::LoadMessages { .. });
+        let account_id = self.account_id;
+        let cache = &self.cache;
+        let emit = &|ev| name_labels(&self.account, &self.emit, ev);
         match req {
             MailRequest::Locate { message_id } => {
                 // No folders to search here beyond what the cache already
@@ -146,75 +186,8 @@ pub(super) async fn run_graph(
             }
             // Graph reports no mailbox size or limit to the user it signs in.
             MailRequest::Quota => emit(WorkerEvent::Quota(None)),
-            MailRequest::FindKeywords => {
-                // Categories are defined once per mailbox, with a name and a
-                // color: the master list is the whole answer. Counts come
-                // from the cache, the only place Hylki has them.
-                let mut found: Vec<KeywordFinding> = Vec::new();
-                if let Some(token) = graph_token(&account, &emit).await {
-                    let t = token.clone();
-                    let cats = blocking(move || {
-                        graph_get_json(&t, &format!("{GRAPH_BASE}/me/outlook/masterCategories"))
-                    })
-                    .await;
-                    match cats {
-                        Ok(v) => {
-                            for c in v["value"].as_array().into_iter().flatten() {
-                                let Some(name) = c["displayName"].as_str() else {
-                                    continue;
-                                };
-                                let count = cache
-                                    .as_ref()
-                                    .map(|c| c.count_with_keyword(account_id, name))
-                                    .unwrap_or(0);
-                                found.push(KeywordFinding {
-                                    keyword: name.to_string(),
-                                    name: Some(name.to_string()),
-                                    color: graph_preset_color(c["color"].as_str().unwrap_or("")),
-                                    count,
-                                    folders: Vec::new(),
-                                });
-                            }
-                        }
-                        Err(e) => tracing::warn!(
-                            "[account {account_id}] find tags: categories failed: {e}"
-                        ),
-                    }
-                }
-                emit(WorkerEvent::KeywordsFound(found));
-            }
-            MailRequest::RefreshKeywords { .. } => {
-                // Categories arrive with each folder's listing, so the
-                // listing is the sync: every folder is re-read, which
-                // rewrites its cached keywords (#166).
-                let mut paths = Vec::new();
-                if let Some(token) = graph_token(&account, &emit).await {
-                    let folders: Vec<(String, u32)> = state
-                        .folders
-                        .iter()
-                        .map(|(p, (id, _))| (p.clone(), *id))
-                        .collect();
-                    for (path, folder_id) in folders {
-                        if graph_load_folder(
-                            &token,
-                            account_id,
-                            folder_id,
-                            &path,
-                            cache.as_ref(),
-                            &mut state,
-                        )
-                        .await
-                        .is_ok()
-                        {
-                            paths.push(path);
-                        }
-                    }
-                }
-                emit(WorkerEvent::KeywordsSynced { paths });
-            }
-
-            // Cache-only, exactly like the IMAP path: assemble the conversation
-            // from every folder's cached summaries.
+            MailRequest::FindKeywords => self.on_find_keywords().await,
+            MailRequest::RefreshKeywords { .. } => self.on_refresh_keywords().await,
             // Graph has no equivalent of BODYSTRUCTURE in the shape this path
             // uses: attachments come out of the raw MIME it downloads, so
             // describing one costs the same as fetching it. Listing them
@@ -229,6 +202,8 @@ pub(super) async fn run_graph(
                     remaining: 0,
                 });
             }
+            // Cache-only, exactly like the IMAP path: assemble the conversation
+            // from every folder's cached summaries.
             MailRequest::LoadRelated { message_id, ids } => {
                 let messages = cache
                     .as_ref()
@@ -246,175 +221,21 @@ pub(super) async fn run_graph(
                     .unwrap_or_default();
                 emit(WorkerEvent::ThreadSummaries { summaries });
             }
-
             MailRequest::LoadMessages { folder_id, path }
             | MailRequest::SyncFolder { folder_id, path } => {
-                if let Some(c) = cache.as_ref() {
-                    let cached = c.load_messages(account_id, &path, folder_id);
-                    if !cached.is_empty() {
-                        emit(WorkerEvent::Messages {
-                            folder_id,
-                            messages: cached,
-                        });
-                    }
-                }
-                emit(WorkerEvent::Status(i18n("Syncing…")));
-                let Some(token) = graph_token(&account, &emit).await else {
-                    // No token, so no mail is coming: end the folder's index
-                    // (#218) rather than leave the list spinning.
-                    emit(WorkerEvent::BackfillDone { folder_id });
-                    emit(WorkerEvent::Status(String::new()));
-                    continue;
-                };
-                match graph_sync_folder(
-                    &token,
-                    account_id,
-                    folder_id,
-                    &path,
-                    cache.as_ref(),
-                    &mut state,
-                )
-                .await
-                {
-                    Ok((messages, complete)) => {
-                        let unread = state.chip_count(folder_id, &messages);
-                        emit_graph_body_hits(
-                            &token, &account, folder_id, &path, &messages, &state, &emit,
-                        )
-                        .await;
-                        emit(WorkerEvent::Messages {
-                            folder_id,
-                            messages,
-                        });
-                        emit(WorkerEvent::FolderUnread { folder_id, unread });
-                        // The index is complete when the first page held the
-                        // whole folder, or once the background index has run
-                        // (#429). Said at once when it is, so the list's
-                        // "Loading more…" tail never waits on nothing (#218).
-                        if state.index_after_load(&path, complete, user) {
-                            emit(WorkerEvent::BackfillDone { folder_id });
-                        }
-                    }
-                    Err(e) => {
-                        emit(WorkerEvent::net_error(i18n_f(
-                            "Could not fetch mail: {e}",
-                            &[("e", &(e).to_string())],
-                        )));
-                        emit(WorkerEvent::BackfillDone { folder_id });
-                    }
-                }
-                emit(WorkerEvent::Status(String::new()));
+                self.on_load_messages(folder_id, path, user).await
             }
-
             MailRequest::LoadBody {
                 message_id,
                 path,
                 uid,
-            } => {
-                if let Some(body) = cache
-                    .as_ref()
-                    .and_then(|c| c.load_body(account_id, &path, uid))
-                {
-                    let check = cache
-                        .as_ref()
-                        .and_then(|c| c.load_sender_check(account_id, &path, uid));
-                    emit(WorkerEvent::Body {
-                        message_id,
-                        path: path.clone(),
-                        body,
-                    });
-                    if let Some(check) = check {
-                        emit(WorkerEvent::SenderChecked {
-                            path: path.to_string(),
-                            message_id,
-                            check,
-                        });
-                    }
-                    continue;
-                }
-                match graph_fetch_raw(&account, &mut state, &path, uid, &emit).await {
-                    Ok(raw) => {
-                        let (body, check, _) = render_raw(&raw);
-                        if let Some(c) = cache.as_ref() {
-                            if body_cacheable(&check) {
-                                c.save_body(account_id, &path, uid, &body);
-                            }
-                            c.save_sender_check(account_id, &path, uid, &check);
-                        }
-                        emit(WorkerEvent::Body {
-                            message_id,
-                            path: path.clone(),
-                            body,
-                        });
-                        emit(WorkerEvent::SenderChecked {
-                            path: path.to_string(),
-                            message_id,
-                            check,
-                        });
-                    }
-                    Err(e) => emit(WorkerEvent::net_error(i18n_f(
-                        "Could not load message: {e}",
-                        &[("e", &(e).to_string())],
-                    ))),
-                }
-            }
-
-            MailRequest::LoadBodies { items, path } => {
-                for (message_id, uid) in items {
-                    if let Some(body) = cache
-                        .as_ref()
-                        .and_then(|c| c.load_body(account_id, &path, uid))
-                    {
-                        emit(WorkerEvent::Body {
-                            message_id,
-                            path: path.clone(),
-                            body,
-                        });
-                        if let Some(check) = cache
-                            .as_ref()
-                            .and_then(|c| c.load_sender_check(account_id, &path, uid))
-                        {
-                            emit(WorkerEvent::SenderChecked {
-                                path: path.to_string(),
-                                message_id,
-                                check,
-                            });
-                        }
-                        continue;
-                    }
-                    match graph_fetch_raw(&account, &mut state, &path, uid, &emit).await {
-                        Ok(raw) => {
-                            let (body, check, _) = render_raw(&raw);
-                            if let Some(c) = cache.as_ref() {
-                                if body_cacheable(&check) {
-                                    c.save_body(account_id, &path, uid, &body);
-                                }
-                                c.save_sender_check(account_id, &path, uid, &check);
-                            }
-                            emit(WorkerEvent::Body {
-                                message_id,
-                                path: path.clone(),
-                                body,
-                            });
-                            emit(WorkerEvent::SenderChecked {
-                                path: path.to_string(),
-                                message_id,
-                                check,
-                            });
-                        }
-                        Err(e) => emit(WorkerEvent::net_error(i18n_f(
-                            "Could not load message: {e}",
-                            &[("e", &(e).to_string())],
-                        ))),
-                    }
-                }
-            }
-
+            } => self.on_load_body(message_id, path, uid).await,
+            MailRequest::LoadBodies { items, path } => self.on_load_bodies(items, path).await,
             MailRequest::LoadSource {
                 message_id: _,
                 path,
                 uid,
-            } => match graph_fetch_raw(&account, &mut state, &path, uid, &emit).await {
+            } => match graph_fetch_raw(&self.account, &mut self.state, &path, uid, emit).await {
                 Ok(raw) => emit(WorkerEvent::Source {
                     text: String::from_utf8_lossy(&raw).into_owned(),
                 }),
@@ -423,475 +244,59 @@ pub(super) async fn run_graph(
                     &[("e", &(e).to_string())],
                 ))),
             },
-
             MailRequest::LoadAttachments {
                 message_id,
                 path,
                 uid,
                 download,
             } => {
-                if let Some(c) = cache.as_ref() {
-                    let items = c.load_attachments(account_id, &path, uid);
-                    if !items.is_empty() {
-                        emit(WorkerEvent::Attachments {
-                            path: path.to_string(),
-                            message_id,
-                            items,
-                        });
-                        continue;
-                    }
-                }
-                if !download {
-                    emit(WorkerEvent::AttachmentsPending {
-                        path: path.to_string(),
-                        message_id,
-                    });
-                    continue;
-                }
-                match graph_fetch_raw(&account, &mut state, &path, uid, &emit).await {
-                    Ok(raw) => {
-                        let items = extract_attachments(&raw);
-                        if let Some(c) = cache.as_ref() {
-                            c.save_attachments(account_id, &path, uid, &items);
-                        }
-                        emit(WorkerEvent::Attachments {
-                            path: path.to_string(),
-                            message_id,
-                            items,
-                        });
-                    }
-                    Err(e) => emit(WorkerEvent::net_error(i18n_f(
-                        "Could not load attachments: {e}",
-                        &[("e", &(e).to_string())],
-                    ))),
-                }
+                self.on_load_attachments(message_id, path, uid, download)
+                    .await
             }
-
-            MailRequest::SetSeen { path, uid, seen } => {
-                if let Some(c) = cache.as_ref() {
-                    c.set_unread(account_id, &path, uid, !seen);
-                }
-                graph_patch_message(
-                    &account,
-                    &mut state,
-                    &path,
-                    uid,
-                    serde_json::json!({ "isRead": seen }),
-                    &emit,
-                )
-                .await;
-                emit(WorkerEvent::SeenSettled { path, uid });
-            }
-
+            MailRequest::SetSeen { path, uid, seen } => self.on_set_seen(path, uid, seen).await,
             MailRequest::SetFlagged { path, uid, flagged } => {
-                if let Some(c) = cache.as_ref() {
-                    c.set_starred(account_id, &path, uid, flagged);
-                }
-                let status = if flagged { "flagged" } else { "notFlagged" };
-                graph_patch_message(
-                    &account,
-                    &mut state,
-                    &path,
-                    uid,
-                    serde_json::json!({ "flag": { "flagStatus": status } }),
-                    &emit,
-                )
-                .await;
+                self.on_set_flagged(path, uid, flagged).await
             }
-
             MailRequest::SetKeyword {
                 path,
                 uid,
                 keyword,
                 add,
                 ..
-            } => {
-                // Categories travel as the whole list, so the cached row is
-                // the base: patched first, then sent as it now stands.
-                let categories = match cache.as_ref() {
-                    Some(c) => {
-                        c.set_keyword(account_id, &path, uid, &keyword, add);
-                        c.keywords_of(account_id, &path, uid)
-                    }
-                    None if add => vec![keyword.clone()],
-                    None => Vec::new(),
-                };
-                graph_patch_message(
-                    &account,
-                    &mut state,
-                    &path,
-                    uid,
-                    serde_json::json!({ "categories": categories }),
-                    &emit,
-                )
-                .await;
-                emit(WorkerEvent::TagSettled { path, uid, keyword });
-            }
-
+            } => self.on_set_keyword(path, uid, keyword, add).await,
             MailRequest::MarkAllRead { folder_id, path } => {
-                // The server side is one PATCH per message; run it over the
-                // cached unread rows (the listing window), then settle the cache.
-                let unread_uids: Vec<u32> = cache
-                    .as_ref()
-                    .map(|c| {
-                        c.load_messages(account_id, &path, folder_id)
-                            .into_iter()
-                            .filter(|m| m.unread)
-                            .map(|m| m.uid)
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                for uid in unread_uids {
-                    graph_patch_message(
-                        &account,
-                        &mut state,
-                        &path,
-                        uid,
-                        serde_json::json!({ "isRead": true }),
-                        &emit,
-                    )
-                    .await;
-                }
-                if let Some(c) = cache.as_ref() {
-                    c.mark_folder_read(account_id, &path);
-                }
-                emit(WorkerEvent::FolderUnread {
-                    folder_id,
-                    unread: 0,
-                });
+                self.on_mark_all_read(folder_id, path).await
             }
-
             MailRequest::MoveMessage { path, uid, dest } => {
-                if let Err(e) = graph_move_uids(
-                    &account,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &[uid],
-                    &dest,
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    emit(WorkerEvent::error(i18n_f(
-                        "Could not move message: {e}",
-                        &[("e", &(e).to_string())],
-                    )));
-                }
+                self.on_move_message(path, uid, dest).await
             }
-
-            MailRequest::MarkSpam { path, uid, dest } => {
-                if let Err(e) = graph_move_uids(
-                    &account,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &[uid],
-                    &dest,
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    emit(WorkerEvent::error(i18n_f(
-                        "Could not mark as spam: {e}",
-                        &[("e", &(e).to_string())],
-                    )));
-                }
-            }
-
-            // Microsoft 365 learns from the move itself: back to the Inbox.
-            MailRequest::MarkHam { path, uid, dest } => {
-                if let Err(e) = graph_move_uids(
-                    &account,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &[uid],
-                    &dest,
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    emit(WorkerEvent::error(i18n_f(
-                        "Could not mark as not spam: {e}",
-                        &[("e", &(e).to_string())],
-                    )));
-                }
-            }
+            MailRequest::MarkSpam { path, uid, dest } => self.on_mark_spam(path, uid, dest).await,
+            MailRequest::MarkHam { path, uid, dest } => self.on_mark_ham(path, uid, dest).await,
             MailRequest::MarkHamMany { path, uids, dest } => {
-                if let Err(e) = graph_move_uids(
-                    &account,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &uids,
-                    &dest,
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    emit(WorkerEvent::error(i18n_f(
-                        "Could not mark {len} messages as not spam: {e}",
-                        &[("len", &(uids.len()).to_string()), ("e", &(e).to_string())],
-                    )));
-                }
-                emit(WorkerEvent::BulkComplete);
+                self.on_mark_ham_many(path, uids, dest).await
             }
-
             MailRequest::MoveMessages { path, uids, dest } => {
-                if let Err(e) = graph_move_uids(
-                    &account,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &uids,
-                    &dest,
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    emit(WorkerEvent::error(i18n_f(
-                        "Could not move messages: {e}",
-                        &[("e", &(e).to_string())],
-                    )));
-                }
-                emit(WorkerEvent::BulkComplete);
+                self.on_move_messages(path, uids, dest).await
             }
-
-            MailRequest::PurgeMessages { path, uids } => {
-                graph_purge_uids(
-                    &account,
-                    account_id,
-                    &mut state,
-                    &path,
-                    uids,
-                    cache.as_ref(),
-                    &emit,
-                )
-                .await;
-                emit(WorkerEvent::BulkComplete);
-            }
-
+            MailRequest::PurgeMessages { path, uids } => self.on_purge_messages(path, uids).await,
             MailRequest::EmptyFolder { folder_id, path } => {
-                // No bulk endpoint for an arbitrary folder: list it, then
-                // delete each message the way a purge does.
-                let Some(token) = graph_token(&account, &emit).await else {
-                    continue;
-                };
-                // Every message in it, not just the newest page or what the
-                // cache has indexed so far (#429).
-                let listed = match state.folders.get(&path).cloned() {
-                    Some((_, gid)) => {
-                        let (t, base) = (token.clone(), state.base.clone());
-                        blocking(move || graph_list_ids(&t, &base, &gid)).await
-                    }
-                    None => Err(format!("unknown folder {path}")),
-                };
-                match listed {
-                    Ok(ids) => {
-                        let uids: Vec<u32> = ids
-                            .into_iter()
-                            .map(|(id, _)| {
-                                let uid = hash_uid(&id);
-                                state.uids.insert(uid, id);
-                                uid
-                            })
-                            .collect();
-                        let n = uids.len();
-                        graph_purge_uids(
-                            &account,
-                            account_id,
-                            &mut state,
-                            &path,
-                            uids,
-                            cache.as_ref(),
-                            &emit,
-                        )
-                        .await;
-                        tracing::info!("emptied {path}: {n} message(s) erased");
-                        emit(WorkerEvent::Messages {
-                            folder_id,
-                            messages: Vec::new(),
-                        });
-                        emit(WorkerEvent::FolderUnread {
-                            folder_id,
-                            unread: 0,
-                        });
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f(
-                        "Could not empty the folder: {e}",
-                        &[("e", &e.to_string())],
-                    ))),
-                }
+                self.on_empty_folder(folder_id, path).await
             }
-
             MailRequest::UndoMove {
                 path,
                 dest,
                 dest_folder_id,
                 message_ids,
             } => {
-                match graph_undo_move(
-                    &account,
-                    account_id,
-                    &mut state,
-                    &path,
-                    &dest,
-                    &message_ids,
-                    cache.as_ref(),
-                )
-                .await
-                {
-                    Ok(0) => {
-                        tracing::info!("undo: the messages are no longer where that move put them");
-                    }
-                    Ok(_) => {
-                        // Reload the restored folder so the messages reappear.
-                        if let Some(token) = graph_token(&account, &emit).await {
-                            if let Ok(messages) = graph_load_folder(
-                                &token,
-                                account_id,
-                                dest_folder_id,
-                                &dest,
-                                cache.as_ref(),
-                                &mut state,
-                            )
-                            .await
-                            {
-                                let unread = state.chip_count(dest_folder_id, &messages);
-                                emit(WorkerEvent::Messages {
-                                    folder_id: dest_folder_id,
-                                    messages,
-                                });
-                                emit(WorkerEvent::FolderUnread {
-                                    folder_id: dest_folder_id,
-                                    unread,
-                                });
-                            }
-                        }
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f(
-                        "Undo failed: {e}",
-                        &[("e", &(e).to_string())],
-                    ))),
-                }
-                // The app spins its busy indicator until an undo answers.
-                emit(WorkerEvent::BulkComplete);
+                self.on_undo_move(path, dest, dest_folder_id, message_ids)
+                    .await
             }
-
-            MailRequest::CreateFolder { path } => {
-                let Some(token) = graph_token(&account, &emit).await else {
-                    continue;
-                };
-                // "A/B" nests under A (resolved from the last listing);
-                // otherwise a top-level folder.
-                let (url, name) = match path.rsplit_once('/') {
-                    Some((parent, leaf)) => match state.folders.get(parent) {
-                        Some((_, pgid)) => (
-                            format!("{GRAPH_BASE}/me/mailFolders/{pgid}/childFolders"),
-                            leaf.to_string(),
-                        ),
-                        None => (format!("{GRAPH_BASE}/me/mailFolders"), path.clone()),
-                    },
-                    None => (format!("{GRAPH_BASE}/me/mailFolders"), path.clone()),
-                };
-                let t = token.clone();
-                let body = serde_json::json!({ "displayName": name });
-                let r = blocking(move || graph_send_json(&t, "POST", &url, &body)).await;
-                match r {
-                    Ok(_) => {
-                        refresh_graph_folders(
-                            &token,
-                            account_id,
-                            cache.as_ref(),
-                            &mut state,
-                            &emit,
-                        )
-                        .await;
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f(
-                        "Could not create folder: {e}",
-                        &[("e", &(e).to_string())],
-                    ))),
-                }
-            }
-
+            MailRequest::CreateFolder { path } => self.on_create_folder(path).await,
             MailRequest::RenameFolder { old_path, new_path } => {
-                let Some(token) = graph_token(&account, &emit).await else {
-                    continue;
-                };
-                let Some((_, gid)) = state.folders.get(&old_path).cloned() else {
-                    emit(WorkerEvent::error(i18n(
-                        "Could not rename folder: unknown folder",
-                    )));
-                    continue;
-                };
-                // Graph renames by displayName; moving between parents would be
-                // a different call — the sidebar only renames leaves here.
-                let leaf = new_path.rsplit('/').next().unwrap_or(&new_path).to_string();
-                let t = token.clone();
-                let url = format!("{GRAPH_BASE}/me/mailFolders/{gid}");
-                let body = serde_json::json!({ "displayName": leaf });
-                let r = blocking(move || graph_send_json(&t, "PATCH", &url, &body)).await;
-                match r {
-                    Ok(_) => {
-                        refresh_graph_folders(
-                            &token,
-                            account_id,
-                            cache.as_ref(),
-                            &mut state,
-                            &emit,
-                        )
-                        .await;
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f(
-                        "Could not rename folder: {e}",
-                        &[("e", &(e).to_string())],
-                    ))),
-                }
+                self.on_rename_folder(old_path, new_path).await
             }
-
-            MailRequest::SetHiddenFolders { paths } => {
-                state.hidden = paths;
-                let Some(token) = graph_token(&account, &emit).await else {
-                    continue;
-                };
-                refresh_graph_folders(&token, account_id, cache.as_ref(), &mut state, &emit).await;
-            }
-
-            MailRequest::DeleteFolder { path, trash: _ } => {
-                // Graph's folder delete moves the folder (contents included) to
-                // Deleted Items itself; no separate content move needed.
-                let Some(token) = graph_token(&account, &emit).await else {
-                    continue;
-                };
-                let Some((_, gid)) = state.folders.get(&path).cloned() else {
-                    emit(WorkerEvent::error(i18n(
-                        "Could not delete folder: unknown folder",
-                    )));
-                    continue;
-                };
-                let t = token.clone();
-                let url = format!("{GRAPH_BASE}/me/mailFolders/{gid}");
-                let r = blocking(move || graph_delete_req(&t, &url)).await;
-                match r {
-                    Ok(()) => {
-                        refresh_graph_folders(
-                            &token,
-                            account_id,
-                            cache.as_ref(),
-                            &mut state,
-                            &emit,
-                        )
-                        .await;
-                    }
-                    Err(e) => emit(WorkerEvent::error(i18n_f(
-                        "Could not delete folder: {e}",
-                        &[("e", &(e).to_string())],
-                    ))),
-                }
-            }
-
+            MailRequest::SetHiddenFolders { paths } => self.on_set_hidden_folders(paths).await,
+            MailRequest::DeleteFolder { path, trash: _ } => self.on_delete_folder(path).await,
             MailRequest::SaveDraft {
                 message,
                 folder_id,
@@ -899,315 +304,56 @@ pub(super) async fn run_graph(
                 autosave,
                 template,
             } => {
-                if autosave.is_none() {
-                    emit(WorkerEvent::Status(saving_text(template)));
-                }
-                // A template (#360) is made where every new message is, in
-                // Drafts, and moved on: so its folder is first made if the
-                // account has none, and found by its Graph id.
-                let mut folder_id = folder_id;
-                let mut template_gid = None;
-                if template {
-                    if !state.folders.contains_key(&path) {
-                        if let Some(token) = graph_token(&account, &emit).await {
-                            let (t, url) = (token.clone(), format!("{GRAPH_BASE}/me/mailFolders"));
-                            let body = serde_json::json!({ "displayName": path });
-                            match blocking(move || graph_send_json(&t, "POST", &url, &body)).await {
-                                Ok(_) => {
-                                    refresh_graph_folders(
-                                        &token,
-                                        account_id,
-                                        cache.as_ref(),
-                                        &mut state,
-                                        &emit,
-                                    )
-                                    .await
-                                }
-                                Err(e) => tracing::warn!("graph: could not create {path}: {e}"),
-                            }
-                        }
-                    }
-                    if let Some((id, gid)) = state.folders.get(&path) {
-                        folder_id = *id;
-                        template_gid = Some(gid.clone());
-                    }
-                }
-                let mut message = OutgoingMessage {
-                    sign: false,
-                    encrypt: false,
-                    ..*message
-                };
-                restore_msgid_case(cache.as_ref(), &mut message);
-                let mut why = String::new();
-                let saved = match build_draft(&account, &message) {
-                    Ok(email) => {
-                        let message_id = draft_message_id(&email);
-                        let raw = email.formatted();
-                        match graph_token(&account, &emit).await {
-                            Some(token) => {
-                                let t = token.clone();
-                                let url = format!("{GRAPH_BASE}/me/messages");
-                                let r = blocking(move || graph_post_mime(&t, &url, &raw)).await;
-                                let r = match (r, &template_gid) {
-                                    (Ok(created), Some(dest)) => match created["id"].as_str() {
-                                        Some(gid) => {
-                                            let (t, url) = (
-                                                token.clone(),
-                                                format!("{GRAPH_BASE}/me/messages/{gid}/move"),
-                                            );
-                                            let body = serde_json::json!({ "destinationId": dest });
-                                            blocking(move || {
-                                                graph_send_json(&t, "POST", &url, &body)
-                                            })
-                                            .await
-                                        }
-                                        None => Err("the new message has no id".to_string()),
-                                    },
-                                    (Ok(_), None) if template => Err(i18n("unknown folder")),
-                                    (r, _) => r,
-                                };
-                                match r {
-                                    Ok(_) => {
-                                        // Replace the previous version of this draft.
-                                        if let Some(o) = &message.draft_origin {
-                                            graph_drop_draft_origin(
-                                                &account,
-                                                &mut state,
-                                                account_id,
-                                                o,
-                                                cache.as_ref(),
-                                                &emit,
-                                            )
-                                            .await;
-                                        }
-                                        if let Ok(messages) = graph_load_folder(
-                                            &token,
-                                            account_id,
-                                            folder_id,
-                                            &path,
-                                            cache.as_ref(),
-                                            &mut state,
-                                        )
-                                        .await
-                                        {
-                                            emit(WorkerEvent::Messages {
-                                                folder_id,
-                                                messages,
-                                            });
-                                        }
-                                        Some(message_id)
-                                    }
-                                    Err(e) => {
-                                        why = e.to_string();
-                                        None
-                                    }
-                                }
-                            }
-                            None => {
-                                why = i18n("Could not reach the server");
-                                None
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        why = e.to_string();
-                        None
-                    }
-                };
-                emit(WorkerEvent::Status(String::new()));
-                match saved {
-                    Some(id) => emit(WorkerEvent::DraftSaved {
-                        autosave,
-                        message_id: Some(id),
-                    }),
-                    None => draft_not_saved(autosave, template, why, message, &emit),
-                }
+                self.on_save_draft(message, folder_id, path, autosave, template)
+                    .await
             }
-
             // `sent_path` is unused: Graph's sendMail files the Sent copy itself.
             // Send Later (#145): into the Outbox until its time.
             MailRequest::Send {
-                mut message,
+                message,
                 sent_path: _,
                 ticket,
             } if message.send_at.is_some_and(|t| t > crate::datefmt::now()) => {
-                let at = message.send_at.unwrap_or_default();
-                restore_msgid_case(cache.as_ref(), &mut message);
-                schedule_send(
-                    cache.as_ref(),
-                    account_id,
-                    &account,
-                    &message,
-                    None,
-                    at,
-                    &emit,
-                );
-                emit(WorkerEvent::SendDone {
-                    ticket,
-                    sent: false,
-                });
-                if let Some(o) = &message.draft_origin {
-                    graph_drop_draft_origin(
-                        &account,
-                        &mut state,
-                        account_id,
-                        o,
-                        cache.as_ref(),
-                        &emit,
-                    )
-                    .await;
-                }
+                self.on_send_later(message, ticket).await
             }
-
             MailRequest::Send {
-                mut message,
+                message,
                 sent_path: _,
                 ticket,
-            } => {
-                emit(WorkerEvent::Status(i18n("Sending…")));
-                restore_msgid_case(cache.as_ref(), &mut message);
-                match graph_send_message(&account, &message, &emit).await {
-                    Ok(()) => {
-                        emit(WorkerEvent::Status(String::new()));
-                        graph_mark_answered(
-                            &account,
-                            &mut state,
-                            cache.as_ref(),
-                            account_id,
-                            &message.in_reply_to,
-                            &message.forwards,
-                            &emit,
-                        )
-                        .await;
-                        // If sending an edited draft, remove the obsolete draft.
-                        if let Some(o) = message.draft_origin.clone() {
-                            if o.account_id == account_id {
-                                graph_drop_draft_origin(
-                                    &account,
-                                    &mut state,
-                                    account_id,
-                                    &o,
-                                    cache.as_ref(),
-                                    &emit,
-                                )
-                                .await;
-                                if let Some(token) = graph_token(&account, &emit).await {
-                                    if let Ok(messages) = graph_load_folder(
-                                        &token,
-                                        account_id,
-                                        o.folder_id,
-                                        &o.path,
-                                        cache.as_ref(),
-                                        &mut state,
-                                    )
-                                    .await
-                                    {
-                                        emit(WorkerEvent::Messages {
-                                            folder_id: o.folder_id,
-                                            messages,
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                        drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
-                        // The server files the copy in Sent Items itself; list
-                        // that folder now so the copy is in the cache and can
-                        // join the conversation it answers (#199).
-                        let sent = cache.as_ref().and_then(|c| {
-                            c.load_folders(account_id)
-                                .into_iter()
-                                .find(|f| f.kind == FolderKind::Sent)
-                        });
-                        if let (Some(c), Some(sent)) = (cache.as_ref(), sent) {
-                            if let Some(token) = graph_token(&account, &emit).await {
-                                if let Ok(messages) = graph_load_folder(
-                                    &token,
-                                    account_id,
-                                    sent.id,
-                                    &sent.path,
-                                    Some(c),
-                                    &mut state,
-                                )
-                                .await
-                                {
-                                    emit(WorkerEvent::Messages {
-                                        folder_id: sent.id,
-                                        messages,
-                                    });
-                                }
-                            }
-                        }
-                        emit(WorkerEvent::Sent);
-                        emit(WorkerEvent::SendDone { ticket, sent: true });
-                    }
-                    Err(e) => {
-                        emit(WorkerEvent::Status(String::new()));
-                        send_failed(
-                            cache.as_ref(),
-                            account_id,
-                            &account,
-                            &message,
-                            None,
-                            &e,
-                            false,
-                            &emit,
-                        );
-                        emit(WorkerEvent::SendDone {
-                            ticket,
-                            sent: false,
-                        });
-                    }
-                }
-            }
-
-            MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
-
-            MailRequest::DeleteOutbox { id } => {
-                delete_queued(cache.as_ref(), account_id, id, &emit)
-            }
-
+            } => self.on_send(message, ticket).await,
+            MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, emit),
+            MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, emit),
             MailRequest::FlushOutbox { id } => {
-                graph_flush_outbox(cache.as_ref(), account_id, &account, id, &mut state, &emit)
-                    .await;
+                graph_flush_outbox(
+                    cache.as_ref(),
+                    account_id,
+                    &self.account,
+                    id,
+                    &mut self.state,
+                    emit,
+                )
+                .await;
             }
-
-            MailRequest::RefreshUnread => {
-                // Quiet token fetch: this rides the auto-fetch tick, and a
-                // signed-out account already errors on interactive actions.
-                let quiet = |_: WorkerEvent| {};
-                if let Some(token) = graph_token(&account, &quiet).await {
-                    graph_refresh_unread(&token, account_id, cache.as_ref(), &mut state, &emit)
-                        .await;
-                    auto_empty_graph(
+            MailRequest::RefreshUnread => self.on_refresh_unread().await,
+            MailRequest::Reconnect => {
+                if let Some(token) = graph_token(&self.account, emit).await {
+                    refresh_graph_folders(
                         &token,
                         account_id,
-                        &account,
                         cache.as_ref(),
-                        &mut state,
-                        &mut last_auto_empty,
-                        &emit,
+                        &mut self.state,
+                        emit,
                     )
                     .await;
                 }
             }
-
-            MailRequest::Reconnect => {
-                if let Some(token) = graph_token(&account, &emit).await {
-                    refresh_graph_folders(&token, account_id, cache.as_ref(), &mut state, &emit)
-                        .await;
-                }
-            }
-
             MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
-
             MailRequest::ExportRaw {
                 token, path, uid, ..
             } => {
-                let raw = graph_fetch_raw(&account, &mut state, &path, uid, &emit).await;
+                let raw = graph_fetch_raw(&self.account, &mut self.state, &path, uid, emit).await;
                 emit(WorkerEvent::RawExported { token, raw });
             }
-
             // Graph files a message posted to a folder as a draft; it is never
             // offered as a destination.
             MailRequest::ImportRaw { token, .. } => emit(WorkerEvent::RawImported {
@@ -1216,9 +362,6 @@ pub(super) async fn run_graph(
                     "A Microsoft account can't receive mail from another account",
                 )),
             }),
-
-            // Microsoft 365 deletes an attachment in place: the message
-            // keeps its id, and only what the cache holds of it changes.
             MailRequest::DeleteAttachment {
                 message_id,
                 path,
@@ -1226,41 +369,8 @@ pub(super) async fn run_graph(
                 name,
                 size,
             } => {
-                emit(WorkerEvent::Status(i18n("Removing the attachment…")));
-                let result =
-                    graph_delete_attachment(&account, &mut state, &path, uid, &name, size, &emit)
-                        .await;
-                emit(WorkerEvent::Status(String::new()));
-                match result {
-                    Ok(()) => {
-                        if let Some(c) = cache.as_ref() {
-                            c.delete_body(account_id, &path, uid);
-                            match graph_fetch_raw(&account, &mut state, &path, uid, &emit).await {
-                                Ok(raw) => cache_rewritten(c, account_id, &path, uid, &raw),
-                                // Fetched again at the next open.
-                                Err(_) => {
-                                    c.save_attachments(account_id, &path, uid, &[]);
-                                    c.save_attachment_meta(account_id, &path, uid, &[]);
-                                }
-                            }
-                        }
-                        emit(WorkerEvent::AttachmentDeleted {
-                            message_id,
-                            path,
-                            uid,
-                            new_uid: Some(uid),
-                            name,
-                            size,
-                        });
-                    }
-                    Err(e) => strip_refused(
-                        &emit,
-                        i18n_f("Could not remove the attachment: {e}", &[("e", &e)]),
-                        message_id,
-                        name,
-                        size,
-                    ),
-                }
+                self.on_delete_attachment(message_id, path, uid, name, size)
+                    .await
             }
         }
     }
@@ -1271,6 +381,7 @@ mod tests {
     use crate::models::Message;
     use crate::worker::graph::index::graph_backfill_with;
     use crate::worker::graph::index::graph_index_plan;
+    use crate::worker::graph::index::graph_sync_folder;
     use crate::worker::graph::index::GraphRun;
     use crate::worker::graph::index::GRAPH_BACKFILL_CHUNK;
     use crate::worker::graph::messages::graph_due;
@@ -1279,6 +390,7 @@ mod tests {
     use crate::worker::graph::messages::graph_ids_url;
     use crate::worker::graph::messages::graph_message;
     use crate::worker::graph::messages::GRAPH_FIRST_PAGE;
+    use crate::worker::ids::hash_uid;
     use crate::worker::reconcile::window_gone;
 
     use super::*;
