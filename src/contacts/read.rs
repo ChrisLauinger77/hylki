@@ -305,7 +305,7 @@ pub(super) fn read_groups_in(active: &Option<HashMap<String, String>>) -> Vec<Co
             let Some(mut c) = parse_vcard_fields(&vcard).filter(ContactDetails::is_group) else {
                 continue;
             };
-            resolve_members(&mut c, &lookup);
+            resolve_members(&mut c, lookup);
             c.raw_vcard = vcard;
             out.push(c);
         }

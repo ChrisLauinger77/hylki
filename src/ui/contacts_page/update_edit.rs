@@ -198,7 +198,7 @@ impl ContactsPage {
                 let format = to.groups.unwrap_or(GroupFormat::Evolution);
                 edit.members = self.members_for(edit.members, Some(&g.book_uid), &to.uid, format);
                 let key = (g.book_uid.clone(), g.eds_uid.clone());
-                self.forget(&[key.clone()]);
+                self.forget(std::slice::from_ref(&key));
                 let _ = sender.output(ContactsPageOutput::MoveGroup {
                     from: key.0,
                     uid: key.1,

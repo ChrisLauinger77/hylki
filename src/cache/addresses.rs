@@ -98,7 +98,7 @@ impl Cache {
             .into_iter()
             .map(|(email, (name, n))| (name, email, n))
             .collect();
-        out.sort_by(|a, b| b.2.cmp(&a.2));
+        out.sort_by_key(|entry| std::cmp::Reverse(entry.2));
         out
     }
 

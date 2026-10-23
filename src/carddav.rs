@@ -99,7 +99,7 @@ impl Account {
 
     /// The source key file for this account, over what EDS had.
     fn to_source(&self, url: &ServerUrl) -> String {
-        let kf = crate::platform::keyfile(&self.data).unwrap_or_else(gtk::glib::KeyFile::new);
+        let kf = crate::platform::keyfile(&self.data).unwrap_or_default();
         kf.set_string("Data Source", "DisplayName", &self.title());
         kf.set_boolean("Data Source", "Enabled", self.enabled);
         if self.data.is_empty() {

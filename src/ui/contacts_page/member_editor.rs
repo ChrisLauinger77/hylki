@@ -338,7 +338,7 @@ pub(super) fn collect_edit(e: &ContactForm) -> ContactEdit {
                     .as_ref()
                     .and_then(|d| rows.labels.get(d.selected() as usize))
                     .map_or(String::new(), |l| l.to_string());
-                (!value.is_empty()).then(|| Labeled { label, value })
+                (!value.is_empty()).then_some(Labeled { label, value })
             })
             .collect()
     };

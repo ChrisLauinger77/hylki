@@ -394,7 +394,7 @@ impl ContactsPage {
                         card: crate::contacts::moved_vcard(p),
                         ..base
                     }),
-                    None => (!base.email.is_empty() || !m.card.is_empty()).then(|| Member {
+                    None => (!base.email.is_empty() || !m.card.is_empty()).then_some(Member {
                         card: m.card,
                         ..base
                     }),

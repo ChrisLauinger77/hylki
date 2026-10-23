@@ -89,6 +89,10 @@ fn mark(id: &str, px: i32) -> gtk::Widget {
     crate::brand::mark(id, px, id)
 }
 
+/// The editor page's Save, shared with the page's widgets (see
+/// `ContactSources::save_action`).
+type SaveAction = Rc<RefCell<Option<Rc<dyn Fn() -> bool>>>>;
+
 pub struct ContactSources {
     sources: Vec<Source>,
     /// The books new contacts can go to, the chosen default first.
@@ -112,7 +116,7 @@ pub struct ContactSources {
     /// What the editor's Save does: reads the form and sends the save;
     /// answers whether it accepted the form. `None` on a page with nothing
     /// to save.
-    save_action: Rc<RefCell<Option<Rc<dyn Fn() -> bool>>>>,
+    save_action: SaveAction,
 }
 
 #[derive(Debug)]

@@ -357,7 +357,7 @@ pub(super) fn photo_editor(
     }
     change.connect_clicked(move |b| {
         let dialog = gtk::FileDialog::builder()
-            .title(&i18n("Choose a Photo"))
+            .title(i18n("Choose a Photo"))
             .build();
         let filter = gtk::FileFilter::new();
         filter.set_name(Some(&i18n("Images")));

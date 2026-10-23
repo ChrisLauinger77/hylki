@@ -59,24 +59,6 @@ impl Postal {
         .all(|p| p.trim().is_empty())
     }
 
-    /// The parts on one line, as the card shows the address.
-    pub fn one_line(&self) -> String {
-        [
-            &self.pobox,
-            &self.extended,
-            &self.street,
-            &self.locality,
-            &self.region,
-            &self.code,
-            &self.country,
-        ]
-        .iter()
-        .map(|p| p.trim())
-        .filter(|p| !p.is_empty())
-        .collect::<Vec<_>>()
-        .join(", ")
-    }
-
     pub(super) fn adr_value(&self) -> String {
         [
             &self.pobox,

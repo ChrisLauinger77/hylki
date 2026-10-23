@@ -266,7 +266,7 @@ pub fn choose_vcf_files(
     done: impl Fn(Vec<std::path::PathBuf>) + 'static,
 ) {
     let dialog = gtk::FileDialog::builder()
-        .title(&i18n("Import Contacts"))
+        .title(i18n("Import Contacts"))
         .build();
     let filter = gtk::FileFilter::new();
     filter.set_name(Some(&i18n("vCard files")));
