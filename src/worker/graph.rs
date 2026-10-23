@@ -3378,3 +3378,43 @@ mod tests {
         );
     }
 }
+
+/// Pins of current behaviour for the Graph error helpers (Area B, step B0).
+#[cfg(test)]
+mod characterization_tests {
+    use super::*;
+
+    fn status(code: u16, body: &str) -> ureq::Error {
+        ureq::Error::Status(code, ureq::Response::new(code, "x", body).unwrap())
+    }
+
+    #[test]
+    fn graph_errors_surface_the_nested_message_or_the_body() {
+        assert_eq!(
+            graph_err(status(
+                403,
+                r#"{"error":{"code":"ErrorAccessDenied","message":"Access is denied."}}"#
+            )),
+            "Microsoft Graph returned 403: Access is denied."
+        );
+        let long = "x".repeat(300);
+        assert_eq!(
+            graph_err(status(500, &long)),
+            format!("Microsoft Graph returned 500: {}", "x".repeat(200))
+        );
+    }
+
+    #[test]
+    fn only_429_and_503_are_waited_on_five_seconds_by_default() {
+        assert_eq!(
+            graph_throttle_wait(&status(429, "")),
+            Some(Duration::from_secs(5))
+        );
+        assert_eq!(
+            graph_throttle_wait(&status(503, "")),
+            Some(Duration::from_secs(5))
+        );
+        assert_eq!(graph_throttle_wait(&status(500, "")), None);
+        assert_eq!(graph_throttle_wait(&status(404, "")), None);
+    }
+}

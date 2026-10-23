@@ -4961,3 +4961,50 @@ mod tests {
         assert_eq!(names[tag.parse::<usize>().unwrap()], "Email/query");
     }
 }
+
+/// Pins of current behaviour for JMAP helpers (Area B, step B0).
+#[cfg(test)]
+mod characterization_tests {
+    use super::*;
+
+    fn status(code: u16, body: &str) -> ureq::Error {
+        ureq::Error::Status(code, ureq::Response::new(code, "x", body).unwrap())
+    }
+
+    #[test]
+    fn jmap_errors_name_a_refused_sign_in_and_surface_problem_details() {
+        assert_eq!(
+            jmap_err(status(401, "whatever")),
+            "the server refused the sign-in (401): check the username and password, or the API token"
+        );
+        assert_eq!(
+            jmap_err(status(400, r#"{"title":"Bad","detail":"No such method"}"#)),
+            "the server returned 400: No such method"
+        );
+        assert_eq!(
+            jmap_err(status(400, r#"{"title":"Bad"}"#)),
+            "the server returned 400: Bad"
+        );
+        assert_eq!(
+            jmap_err(status(502, "gateway")),
+            "the server returned 502: gateway"
+        );
+    }
+
+    #[test]
+    fn jmap_roles_map_to_folder_kinds() {
+        for (role, kind) in [
+            ("inbox", FolderKind::Inbox),
+            ("sent", FolderKind::Sent),
+            ("drafts", FolderKind::Drafts),
+            ("trash", FolderKind::Trash),
+            ("junk", FolderKind::Junk),
+            ("archive", FolderKind::Archive),
+            ("flagged", FolderKind::Custom),
+            ("templates", FolderKind::Custom),
+            ("Inbox", FolderKind::Custom),
+        ] {
+            assert_eq!(role_kind(role), kind, "{role}");
+        }
+    }
+}

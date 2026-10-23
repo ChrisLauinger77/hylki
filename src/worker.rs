@@ -17741,3 +17741,257 @@ mod gmail_label_tests {
             .expect("skipped");
     }
 }
+
+/// Pins of current behaviour for the pure helpers the restructure moves
+/// (Area B, step B0): quirks included, so a move that changes one fails.
+#[cfg(test)]
+mod characterization_tests {
+    use super::*;
+    use async_imap::types::{Flag, NameAttribute};
+    use std::borrow::Cow;
+
+    #[test]
+    fn special_use_attributes_win_over_names_and_placement() {
+        let cases = [
+            (NameAttribute::Sent, FolderKind::Sent),
+            (NameAttribute::Drafts, FolderKind::Drafts),
+            (NameAttribute::Trash, FolderKind::Trash),
+            (NameAttribute::Junk, FolderKind::Junk),
+            (NameAttribute::Archive, FolderKind::Archive),
+            (NameAttribute::Flagged, FolderKind::Starred),
+        ];
+        for (attr, kind) in cases {
+            // Even deep in a hierarchy and under a name that says otherwise.
+            assert_eq!(
+                classify_with_source("a/b/c/Inbox", Some("/"), &[attr]),
+                (kind, true)
+            );
+        }
+        // `\All` and the other attributes are not mapped: the name decides.
+        assert_eq!(
+            classify_with_source("[Gmail]/All Mail", Some("/"), &[NameAttribute::All]),
+            (FolderKind::Archive, false)
+        );
+        assert_eq!(
+            classify_with_source("Lists", Some("/"), &[NameAttribute::All]),
+            (FolderKind::Custom, false)
+        );
+        // The first mapped attribute decides.
+        assert_eq!(
+            classify_with_source(
+                "X",
+                Some("/"),
+                &[
+                    NameAttribute::Marked,
+                    NameAttribute::Junk,
+                    NameAttribute::Sent
+                ]
+            ),
+            (FolderKind::Junk, true)
+        );
+    }
+
+    #[test]
+    fn folder_names_map_to_roles_where_servers_keep_them() {
+        let kind = |p: &str, d: Option<&str>| classify_with_source(p, d, &[]).0;
+        for (name, want) in [
+            ("Sent Items", FolderKind::Sent),
+            ("sent mail", FolderKind::Sent),
+            ("Deleted", FolderKind::Trash),
+            ("Deleted Items", FolderKind::Trash),
+            ("Bin", FolderKind::Trash),
+            ("Spam", FolderKind::Junk),
+            ("All Mail", FolderKind::Archive),
+            ("Archive", FolderKind::Archive),
+            ("Flagged", FolderKind::Starred),
+            ("Starred", FolderKind::Starred),
+            ("Outbox", FolderKind::Custom),
+        ] {
+            assert_eq!(kind(name, Some("/")), want, "{name}");
+        }
+        // No delimiter (or an empty one): both `/` and `.` split levels.
+        assert_eq!(kind("INBOX.Sent", None), FolderKind::Sent);
+        assert_eq!(kind("INBOX/Sent", Some("")), FolderKind::Sent);
+        assert_eq!(kind("a.b.Sent", None), FolderKind::Custom);
+        // A bracketed container, not only Gmail's, places a role.
+        assert_eq!(kind("[Mail]/Trash", Some("/")), FolderKind::Trash);
+        assert_eq!(kind("Mail/Trash", Some("/")), FolderKind::Custom);
+    }
+
+    #[test]
+    fn folder_order_is_the_persisted_numbering_order() {
+        let order = [
+            FolderKind::Inbox,
+            FolderKind::Starred,
+            FolderKind::Drafts,
+            FolderKind::Templates,
+            FolderKind::Sent,
+            FolderKind::Archive,
+            FolderKind::Junk,
+            FolderKind::Trash,
+            FolderKind::Custom,
+        ];
+        for (i, kind) in order.into_iter().enumerate() {
+            assert_eq!(folder_order(kind), i as u8);
+        }
+    }
+
+    #[test]
+    fn display_name_without_a_delimiter_splits_on_slash_and_dot() {
+        assert_eq!(display_name("inbox", None), "Inbox");
+        assert_eq!(display_name("a.b/c", None), "c");
+        assert_eq!(display_name("a.b", Some("/")), "a.b");
+        assert_eq!(display_name("a/b.c", Some("")), "c");
+    }
+
+    #[test]
+    fn thread_ids_list_in_reply_to_before_references() {
+        let raw = b"Message-ID: <ABC@Example.COM>\r\n\
+In-Reply-To: <Parent@x>\r\n\
+References: <Root@x> <PARENT@x>\r\n\
+Subject: t\r\n\r\nbody\r\n";
+        let parsed = mail_parser::MessageParser::default().parse(&raw[..]);
+        assert_eq!(
+            mp_thread_ids(parsed.as_ref()),
+            ("abc@example.com".to_string(), "parent@x root@x".to_string())
+        );
+        assert_eq!(mp_thread_ids(None), (String::new(), String::new()));
+    }
+
+    #[test]
+    fn a_pop3_summary_comes_from_the_raw_message() {
+        let raw = b"From: Ann <ann@x.example>\r\n\
+To: b@y.example, c@z.example\r\n\
+Cc: d@w.example\r\n\
+Reply-To: ANN@x.example\r\n\
+Subject: Hello\r\n\
+Date: Tue, 1 Jul 2003 10:52:37 +0200\r\n\
+Message-ID: <M1@x>\r\n\
+X-Priority: 1\r\n\r\nbody\r\n";
+        let m = summary_from_raw(3, 1, 42, raw);
+        assert_eq!((m.id, m.account_id, m.folder_id, m.uid), (42, 3, 1, 42));
+        assert_eq!(m.from_name, "Ann");
+        assert_eq!(m.from_addr, "ann@x.example");
+        assert_eq!(m.to, "b@y.example, c@z.example");
+        assert_eq!(m.cc, "d@w.example");
+        // A Reply-To that only repeats From is dropped.
+        assert_eq!(m.reply_to, "");
+        assert_eq!(m.subject, "Hello");
+        assert_eq!(m.timestamp, 1057049557);
+        assert_eq!(m.date, label_from_timestamp(1057049557));
+        assert_eq!(m.message_id, "m1@x");
+        assert!(m.unread);
+        assert!(!m.starred && !m.answered && !m.has_attachment);
+        assert!(m.preview.is_empty() && m.body.is_empty());
+
+        let bare = summary_from_raw(3, 1, 7, b"\r\nno headers\r\n");
+        assert_eq!(bare.from_name, "Unknown");
+        assert_eq!(bare.from_addr, "");
+        assert_eq!(bare.subject, "(no subject)");
+        assert_eq!(bare.timestamp, 0);
+
+        let nameless = summary_from_raw(3, 1, 7, b"From: a@x\r\n\r\n");
+        assert_eq!(nameless.from_name, "a@x");
+    }
+
+    #[test]
+    fn first_msgid_is_lowercased_without_brackets() {
+        assert_eq!(first_msgid("<A@X> <b@y>").as_deref(), Some("a@x"));
+        assert_eq!(first_msgid("  plain@id  ").as_deref(), Some("plain@id"));
+        assert_eq!(first_msgid("<>"), None);
+        assert_eq!(first_msgid(""), None);
+    }
+
+    #[test]
+    fn gmail_labels_shown_skip_system_labels_the_folder_and_repeats() {
+        let labels = ["\\Inbox", "Work", "", "INBOX", "work", "Work", "Travel"];
+        assert_eq!(
+            shown_gmail_labels(labels.into_iter(), "inbox"),
+            ["Work", "work", "Travel"]
+        );
+    }
+
+    #[test]
+    fn kept_flags_keep_the_ones_an_append_can_set() {
+        let flags = vec![
+            Flag::Seen,
+            Flag::Deleted,
+            Flag::Recent,
+            Flag::Custom(Cow::Borrowed("$Label")),
+            Flag::Custom(Cow::Borrowed("\\Weird")),
+            Flag::Draft,
+            Flag::Answered,
+            Flag::Flagged,
+            Flag::MayCreate,
+        ];
+        assert_eq!(
+            kept_flags(flags.into_iter()),
+            ["\\Seen", "$Label", "\\Draft", "\\Answered", "\\Flagged"]
+        );
+    }
+
+    #[test]
+    fn xoauth2_sends_the_bearer_once_then_an_empty_answer() {
+        use async_imap::Authenticator;
+        let mut auth = XOAuth2 {
+            user: "me@x".into(),
+            token: "tok".into(),
+            step: 0,
+        };
+        assert_eq!(
+            auth.process(b""),
+            b"user=me@x\x01auth=Bearer tok\x01\x01".to_vec()
+        );
+        assert_eq!(auth.process(b"{\"status\":\"400\"}"), Vec::<u8>::new());
+        assert_eq!(auth.process(b""), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn strip_crlf_drops_every_trailing_line_end() {
+        assert_eq!(strip_crlf(b"+OK\r\n"), b"+OK");
+        assert_eq!(strip_crlf(b"a\n\r\n"), b"a");
+        assert_eq!(strip_crlf(b"\r\n"), b"");
+        assert_eq!(strip_crlf(b"a\rb"), b"a\rb");
+    }
+
+    #[test]
+    fn dates_parse_or_fall_back_to_the_text() {
+        assert_eq!(
+            format_date(b" Tue, 1 Jul 2003 10:52:37 +0200 ").1,
+            1057049557
+        );
+        assert_eq!(format_date(b" not a date "), ("not a date".to_string(), 0));
+        assert_eq!(format_timestamp(0), "");
+        assert_eq!(format_timestamp(-5), "");
+        assert_eq!(
+            format_timestamp(1057049557),
+            label_from_timestamp(1057049557)
+        );
+    }
+
+    #[test]
+    fn system_keywords_are_told_from_tags() {
+        for k in [
+            "\\Seen",
+            "$Junk",
+            "NonJunk",
+            "$Forwarded",
+            "$MDNSent",
+            "$MailFlagBit0",
+            "$X-ME-Annot-2",
+            "$IsNotification",
+        ] {
+            assert!(is_system_keyword(k), "{k}");
+        }
+        for k in ["$label1", "Work", "$Important", "important"] {
+            assert!(!is_system_keyword(k), "{k}");
+        }
+    }
+
+    #[test]
+    fn the_wire_log_shows_three_words_of_a_command() {
+        assert_eq!(cmd_head("UID FETCH 1:5 (FLAGS)"), "UID FETCH 1:5");
+        assert_eq!(cmd_head("  NOOP "), "NOOP");
+        assert_eq!(cmd_head(""), "");
+    }
+}
