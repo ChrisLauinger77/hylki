@@ -1,7 +1,7 @@
 //! What a composer opens with when it answers, forwards or resumes a message:
 //! recipients, subject, threading headers and the quoted original.
 
-use super::quote::{body_is_plain_text, quoted_original};
+use super::quote::{body_is_plain_text, escaped_lines, quoted_original};
 use crate::models::Message;
 use crate::ui::compose::ComposePrefill;
 
@@ -180,12 +180,7 @@ pub(super) fn unsent_prefill(m: crate::worker::OutgoingMessage) -> ComposePrefil
     let body_html = if m.html.trim().is_empty() {
         m.body
             .split("\n\n")
-            .map(|p| {
-                format!(
-                    "<p>{}</p>",
-                    gtk::glib::markup_escape_text(p).replace('\n', "<br>")
-                )
-            })
+            .map(|p| format!("<p>{}</p>", escaped_lines(p)))
             .collect()
     } else {
         m.html

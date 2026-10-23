@@ -11,14 +11,25 @@ pub(super) fn quoted_original(attribution: &str, body: &str) -> String {
     if !body.contains('<') {
         return quote_block(attribution, &message_text(body));
     }
-    let quoted = sanitize_forward_html(&hard_wrap_plain_regions(body));
+    let quoted = sanitized_body(body);
     quote_block_html(attribution, trim_empty_blocks(&quoted))
+}
+
+/// An HTML body made safe for the editor: its plain-text regions hard
+/// wrapped, then sanitized as a forward is (#52).
+fn sanitized_body(body: &str) -> String {
+    sanitize_forward_html(&hard_wrap_plain_regions(body))
+}
+
+/// Text escaped for HTML, its line ends as `<br>`.
+pub(super) fn escaped_lines(text: &str) -> String {
+    gtk::glib::markup_escape_text(text).replace('\n', "<br>")
 }
 
 /// Build the HTML quoted block (attribution line + blockquote) for a reply or
 /// forward, from plain text so no scripts/remote content leak into the editor.
 fn quote_block(attribution: &str, text: &str) -> String {
-    let esc = |s: &str| gtk::glib::markup_escape_text(s).replace('\n', "<br>");
+    let esc = escaped_lines;
     // Under `pre-wrap`, as a plain-text part from the server is quoted
     // (#436): its spaces are part of the text, and a plain-text reply
     // sends them back as they were.
@@ -35,7 +46,7 @@ fn quote_block(attribution: &str, text: &str) -> String {
 /// lays it on the light ground it was designed for, where a dark composer
 /// would leave its dark text unreadable.
 fn quote_block_html(attribution: &str, inner_html: &str) -> String {
-    let esc = |s: &str| gtk::glib::markup_escape_text(s).replace('\n', "<br>");
+    let esc = escaped_lines;
     let colored = ["color:", "color=\"", "background:"]
         .iter()
         .any(|c| inner_html.contains(c));
@@ -56,13 +67,10 @@ fn quote_block_html(attribution: &str, inner_html: &str) -> String {
 /// or the plain text escaped into it.
 pub(super) fn editable_copy_html(body: &str) -> String {
     if body.contains('<') {
-        sanitize_forward_html(&hard_wrap_plain_regions(body))
+        sanitized_body(body)
     } else {
         let text = message_text(body);
-        format!(
-            "<p>{}</p>",
-            gtk::glib::markup_escape_text(&text).replace('\n', "<br>")
-        )
+        format!("<p>{}</p>", escaped_lines(&text))
     }
 }
 

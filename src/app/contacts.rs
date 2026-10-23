@@ -15,6 +15,19 @@ pub(super) fn sync_contact_books(sender: &ComponentSender<AppModel>, force: bool
     });
 }
 
+/// Runs a contact write off the main thread (EDS is talked to over
+/// blocking D-Bus) and reports its error, if any, as ContactWriteDone.
+fn spawn_contact_write(
+    sender: &ComponentSender<AppModel>,
+    write: impl FnOnce() -> Option<String> + Send + 'static,
+) {
+    let s = sender.clone();
+    std::thread::spawn(move || {
+        let err = write();
+        s.input(AppMsg::ContactWriteDone(err));
+    });
+}
+
 /// Read the contacts, the books new ones can go to and the Hylki book's
 /// size off the main thread, after `delay_ms` (EDS takes a moment to flush
 /// a write to the cache the read goes through).
@@ -294,16 +307,14 @@ impl AppModel {
             AppMsg::LaunchGnomeContacts => crate::ui::contacts_browser::launch_gnome_contacts(),
 
             AppMsg::SaveContact { book_uid, vcard } => {
-                let s = sender.clone();
-                std::thread::spawn(move || {
+                spawn_contact_write(&sender, move || {
                     let result = crate::contacts::modify_contact(&book_uid, &vcard);
-                    s.input(AppMsg::ContactWriteDone(result.err()));
+                    result.err()
                 });
             }
 
             AppMsg::CreateContact { book_uid, vcard } => {
-                let s = sender.clone();
-                std::thread::spawn(move || {
+                spawn_contact_write(&sender, move || {
                     // No book picked (none was listed yet): the default one.
                     let book_uid = match book_uid {
                         Some(uid) => Some(uid),
@@ -315,7 +326,7 @@ impl AppModel {
                         Some(uid) => crate::contacts::create_contact(&uid, &vcard),
                         None => Err(i18n("No address book available")),
                     };
-                    s.input(AppMsg::ContactWriteDone(result.err()));
+                    result.err()
                 });
             }
 
@@ -325,17 +336,15 @@ impl AppModel {
                 original,
                 edit,
             } => {
-                let s = sender.clone();
-                std::thread::spawn(move || {
+                spawn_contact_write(&sender, move || {
                     let result =
                         crate::contacts::save_group(&book_uid, format, original.as_deref(), edit);
-                    s.input(AppMsg::ContactWriteDone(result.err()));
+                    result.err()
                 });
             }
 
             AppMsg::DeleteContacts(keys) => {
-                let s = sender.clone();
-                std::thread::spawn(move || {
+                spawn_contact_write(&sender, move || {
                     // One call per book.
                     let mut by_book: Vec<(String, Vec<String>)> = Vec::new();
                     for (book, uid) in keys {
@@ -344,13 +353,12 @@ impl AppModel {
                             None => by_book.push((book, vec![uid])),
                         }
                     }
-                    let err = by_book
+                    by_book
                         .iter()
                         .filter_map(|(book, uids)| {
                             crate::contacts::delete_contacts(book, uids).err()
                         })
-                        .next();
-                    s.input(AppMsg::ContactWriteDone(err));
+                        .next()
                 });
             }
 
@@ -361,10 +369,9 @@ impl AppModel {
                 format,
                 edit,
             } => {
-                let s = sender.clone();
-                std::thread::spawn(move || {
+                spawn_contact_write(&sender, move || {
                     let result = crate::contacts::move_group(&from, &uid, &to, format, edit);
-                    s.input(AppMsg::ContactWriteDone(result.err()));
+                    result.err()
                 });
             }
 
@@ -395,13 +402,12 @@ impl AppModel {
             }
 
             AppMsg::CopyContacts { to, cards } => {
-                let s = sender.clone();
-                std::thread::spawn(move || {
+                spawn_contact_write(&sender, move || {
                     let failed: Vec<String> = cards
                         .iter()
                         .filter_map(|card| crate::contacts::create_contact(&to, card).err())
                         .collect();
-                    let err = failed.first().map(|e| {
+                    failed.first().map(|e| {
                         let n = failed.len() as u32;
                         ni18n_f(
                             "{n} contact was not copied: {e}",
@@ -409,21 +415,19 @@ impl AppModel {
                             n,
                             &[("n", &n.to_string()), ("e", e)],
                         )
-                    });
-                    s.input(AppMsg::ContactWriteDone(err));
+                    })
                 });
             }
 
             AppMsg::MoveContacts { to, cards } => {
-                let s = sender.clone();
-                std::thread::spawn(move || {
+                spawn_contact_write(&sender, move || {
                     let failed: Vec<String> = cards
                         .iter()
                         .filter_map(|(book, uid, vcard)| {
                             crate::contacts::move_contact(book, uid, vcard, &to).err()
                         })
                         .collect();
-                    let err = failed.first().map(|e| {
+                    failed.first().map(|e| {
                         let n = failed.len() as u32;
                         ni18n_f(
                             "{n} contact was not moved: {e}",
@@ -431,8 +435,7 @@ impl AppModel {
                             n,
                             &[("n", &n.to_string()), ("e", e)],
                         )
-                    });
-                    s.input(AppMsg::ContactWriteDone(err));
+                    })
                 });
             }
 

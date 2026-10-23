@@ -6,14 +6,20 @@ use super::*;
 
 use super::AppMsg;
 
-/// Route a `mailto:` URI to the app (from main's `connect_open`).
-pub(crate) fn queue_mailto(uri: String) {
+/// Hands `item` to the running component as `msg(item)`, or parks it in
+/// `pending` until init drains it (see `MAILTO_PENDING`).
+fn send_or_park<T>(pending: &std::sync::Mutex<Vec<T>>, item: T, msg: fn(T) -> AppMsg) {
     match MAILTO_SENDER.get() {
         Some(s) => {
-            let _ = s.send(AppMsg::OpenMailto(uri));
+            let _ = s.send(msg(item));
         }
-        None => MAILTO_PENDING.lock().unwrap().push(uri),
+        None => pending.lock().unwrap().push(item),
     }
+}
+
+/// Route a `mailto:` URI to the app (from main's `connect_open`).
+pub(crate) fn queue_mailto(uri: String) {
+    send_or_park(&MAILTO_PENDING, uri, AppMsg::OpenMailto);
 }
 
 /// A `mailto:` handed to the app before its component was up. `queue_mailto`
@@ -126,12 +132,7 @@ pub(super) fn parse_mailto(uri: &str) -> Option<crate::ui::compose::ComposePrefi
 
 /// Route a `mid:` URI to the app (from main's `connect_open`).
 pub(crate) fn queue_mid(uri: String) {
-    match MAILTO_SENDER.get() {
-        Some(s) => {
-            let _ = s.send(AppMsg::OpenMid(uri));
-        }
-        None => MID_PENDING.lock().unwrap().push(uri),
-    }
+    send_or_park(&MID_PENDING, uri, AppMsg::OpenMid);
 }
 
 /// `mid:` links that arrived before the component was up (see `MAILTO_PENDING`).
@@ -167,12 +168,7 @@ pub(super) fn parse_mid(uri: &str) -> Option<String> {
 
 /// Route a message file (.eml) to the app (from main's `connect_open`, #398).
 pub(crate) fn queue_message_file(path: std::path::PathBuf) {
-    match MAILTO_SENDER.get() {
-        Some(s) => {
-            let _ = s.send(AppMsg::OpenMessageFile(path));
-        }
-        None => FILE_PENDING.lock().unwrap().push(path),
-    }
+    send_or_park(&FILE_PENDING, path, AppMsg::OpenMessageFile);
 }
 
 /// Message files that arrived before the component was up (see `MAILTO_PENDING`).
@@ -215,12 +211,7 @@ pub(super) const FILE_FOLDER: u32 = u32::MAX;
 
 /// Route files to attach to a fresh composer (from main's `connect_open`).
 pub(crate) fn queue_attach_files(paths: Vec<std::path::PathBuf>) {
-    match MAILTO_SENDER.get() {
-        Some(s) => {
-            let _ = s.send(AppMsg::OpenWithFiles(paths));
-        }
-        None => ATTACH_PENDING.lock().unwrap().push(paths),
-    }
+    send_or_park(&ATTACH_PENDING, paths, AppMsg::OpenWithFiles);
 }
 
 /// Files handed in (via `connect_open`) before the app's component was up —

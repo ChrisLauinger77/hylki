@@ -8,14 +8,7 @@ impl AppModel {
     pub(super) fn show_template_picker(&self, sender: &ComponentSender<Self>) {
         let mut templates = Vec::new();
         for (account_id, folder) in self.templates_folders() {
-            let list = match self.message_cache.get(&(account_id, folder.id)) {
-                Some(l) => l.to_vec(),
-                None => self
-                    .cache
-                    .as_ref()
-                    .map(|c| c.load_messages(account_id, &folder.path, folder.id))
-                    .unwrap_or_default(),
-            };
+            let list = self.listed_or_cached(account_id, &folder);
             let name = self.account_name(account_id);
             templates.extend(list.into_iter().map(|m| (m, name.clone())));
         }
@@ -35,11 +28,29 @@ impl AppModel {
 
     /// Each account's Templates folder (#360), in account order.
     pub(super) fn templates_folders(&self) -> Vec<(u32, Folder)> {
+        self.folders_of_kind(FolderKind::Templates)
+    }
+
+    /// Each account's folder of one kind, in account order.
+    fn folders_of_kind(&self, kind: FolderKind) -> Vec<(u32, Folder)> {
         let mut ids: Vec<u32> = self.folders.keys().copied().collect();
         ids.sort_unstable();
         ids.into_iter()
-            .filter_map(|id| Some((id, self.folder_of_kind(id, FolderKind::Templates)?.clone())))
+            .filter_map(|id| Some((id, self.folder_of_kind(id, kind)?.clone())))
             .collect()
+    }
+
+    /// A folder's messages: the ones listed this session, else what the
+    /// cache on disk holds.
+    fn listed_or_cached(&self, account_id: u32, folder: &Folder) -> Vec<Message> {
+        match self.message_cache.get(&(account_id, folder.id)) {
+            Some(l) => l.to_vec(),
+            None => self
+                .cache
+                .as_ref()
+                .map(|c| c.load_messages(account_id, &folder.path, folder.id))
+                .unwrap_or_default(),
+        }
     }
 
     /// The "Continue a Draft" picker over every draft the app knows.
@@ -76,18 +87,7 @@ impl AppModel {
 
     /// Each account's Drafts folder, in account order.
     pub(super) fn drafts_folders(&self) -> Vec<(u32, Folder)> {
-        let mut ids: Vec<u32> = self.folders.keys().copied().collect();
-        ids.sort_unstable();
-        ids.into_iter()
-            .filter_map(|id| {
-                let f = self
-                    .folders
-                    .get(&id)?
-                    .iter()
-                    .find(|f| f.kind == FolderKind::Drafts)?;
-                Some((id, f.clone()))
-            })
-            .collect()
+        self.folders_of_kind(FolderKind::Drafts)
     }
 
     /// Every account's saved drafts, newest first, each with its account's
@@ -95,14 +95,7 @@ impl AppModel {
     fn drafts_for_pick(&self) -> Vec<(Message, String)> {
         let mut out = Vec::new();
         for (account_id, drafts) in self.drafts_folders() {
-            let list = match self.message_cache.get(&(account_id, drafts.id)) {
-                Some(l) => l.to_vec(),
-                None => self
-                    .cache
-                    .as_ref()
-                    .map(|c| c.load_messages(account_id, &drafts.path, drafts.id))
-                    .unwrap_or_default(),
-            };
+            let list = self.listed_or_cached(account_id, &drafts);
             let name = self.account_name(account_id);
             out.extend(list.into_iter().map(|m| (m, name.clone())));
         }
