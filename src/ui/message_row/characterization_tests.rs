@@ -1,6 +1,8 @@
 //! Characterization tests for the row's pure helpers, quirks included.
 
-use super::{default_width, due_label, first_recipient_addr, recipient_names, resizable};
+use super::faces::{first_recipient_addr, recipient_names};
+use super::headings::due_label;
+use super::{default_width, resizable};
 use crate::config::ListColumn;
 
 #[test]
