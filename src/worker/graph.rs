@@ -15,6 +15,10 @@ use super::*;
 use crate::worker::chores::{
     auto_empty_due, auto_empty_roles, graph_before_date, role_folder_path,
 };
+use crate::worker::compose::build::{
+    build_draft, build_email, draft_message_id, restore_msgid_case,
+};
+use crate::worker::compose::editable::{queued_with_bcc, with_bcc};
 use crate::worker::folders::chip_count_of;
 use crate::worker::headers::label_from_timestamp;
 use crate::worker::ids::{hash_uid, normalize_msgid};
