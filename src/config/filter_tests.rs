@@ -115,7 +115,7 @@ fn smart_folders_file_round_trips() {
     assert!(short.folders[0].folder.is_none() && !short.folders[0].any);
 }
 
-fn rule(field: FilterField, matcher: FilterMatch, value: &str) -> FilterRule {
+pub(super) fn rule(field: FilterField, matcher: FilterMatch, value: &str) -> FilterRule {
     FilterRule {
         name: String::new(),
         account_email: "a@b.c".into(),

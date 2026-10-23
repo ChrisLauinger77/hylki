@@ -112,7 +112,3 @@ pub fn import_bundle(text: &str) -> Result<usize, String> {
     }
     Ok(bundle.accounts.len())
 }
-
-pub(super) fn default_on() -> bool {
-    true
-}
