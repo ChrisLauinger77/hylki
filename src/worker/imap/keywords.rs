@@ -123,7 +123,7 @@ pub(super) async fn refresh_keywords(
 
 /// The keyword RFC 5550 gives a forwarded message; servers and clients
 /// differ in its case.
-pub const FORWARDED_KEYWORD: &str = "$Forwarded";
+pub(super) const FORWARDED_KEYWORD: &str = "$Forwarded";
 
 /// The user-defined keywords among a message's flags, verbatim.
 pub(super) fn custom_flags(flags: &[Flag]) -> Vec<String> {

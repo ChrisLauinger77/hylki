@@ -366,7 +366,7 @@ fn pick_reply_folder(
 
 /// The In-Reply-To of a message queued as raw bytes, for
 /// [`reply_copy_path`].
-pub(crate) fn raw_in_reply_to(raw: &[u8]) -> String {
+pub(in crate::worker) fn raw_in_reply_to(raw: &[u8]) -> String {
     let parsed = mail_parser::MessageParser::default().parse_headers(raw);
     match parsed.as_ref().map(|p| p.in_reply_to()) {
         Some(mail_parser::HeaderValue::Text(t)) => t.to_string(),

@@ -53,7 +53,7 @@ pub(super) fn seed_fetch_mode(account_id: u32, email: &str) -> bool {
 /// A parser error with its byte-array dump cut out: the same reply follows
 /// as text, which is the readable half, and the numbers were most of a
 /// 160 KB log for one user (#226).
-pub fn compact_parse_error(text: &str) -> String {
+pub(super) fn compact_parse_error(text: &str) -> String {
     let Some(start) = text.find("input: [") else {
         return text.to_string();
     };

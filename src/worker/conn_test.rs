@@ -19,7 +19,7 @@ pub struct ConnTest {
 }
 
 /// Test that the account's servers accept the given credentials (no mail sent).
-pub async fn test_connection(account: &AccountConfig) -> ConnTest {
+async fn test_connection(account: &AccountConfig) -> ConnTest {
     let incoming = match account.protocol {
         crate::config::Protocol::Pop3 => test_pop3(account).await,
         crate::config::Protocol::Jmap => jmap::test_jmap(account).await,
@@ -118,7 +118,7 @@ async fn test_smtp(account: &AccountConfig) -> Result<(), String> {
 /// Test a send-as alias's own SMTP server and credentials (#34): connect,
 /// authenticate, quit. Used by the alias editor's Test button; an alias without
 /// its own transport has nothing of its own to test.
-pub async fn test_alias_smtp(
+async fn test_alias_smtp(
     account_email: &str,
     alias: &crate::config::AliasConfig,
 ) -> Result<(), String> {

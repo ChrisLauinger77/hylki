@@ -7,7 +7,7 @@ use futures::TryStreamExt;
 use super::{ensured, After, Emit, ImapWorker};
 use crate::cache::Cache;
 use crate::i18n::{i18n, i18n_f};
-use crate::models::{KeywordFinding, SenderCheck};
+use crate::models::{KeywordFinding, Message, SenderCheck};
 use crate::worker::imap::backfill::Backfill;
 use crate::worker::imap::bodies::settle_missing_bodies;
 use crate::worker::imap::connect::connect;
@@ -39,23 +39,8 @@ impl<E: Emit> ImapWorker<E> {
         path: String,
         background: bool,
     ) -> After {
-        let account_id = self.account_id;
-        let account = &self.account;
-        let cache = &self.cache;
-        let session = &mut self.session;
-        let emit = &self.emit;
-        let use_envelope = &mut self.use_envelope;
-        let rx = &mut self.rx;
-        let backlog = &mut self.backlog;
-        let backfill_seen = &mut self.backfill_seen;
-        let backfill = &mut self.backfill;
-        let body_prefetch = &mut self.body_prefetch;
-        let body_emitted = &mut self.body_emitted;
-        let prefetch = &mut self.prefetch;
-        let watchers = &mut self.watchers;
-        let idle_folder = &mut self.idle_folder;
         if !background {
-            emit(WorkerEvent::Status(i18n("Syncing…")));
+            (self.emit)(WorkerEvent::Status(i18n("Syncing…")));
         }
         // Fast first page (or a recent-window refresh over the cached
         // index); the background backfill indexes the rest of the folder.
@@ -63,21 +48,21 @@ impl<E: Emit> ImapWorker<E> {
         // recovers transparently instead of surfacing an EOF.
         let result = interrupt_read_for_reader(
             load_messages_retry(
-                account_id,
-                session,
-                account,
+                self.account_id,
+                &mut self.session,
+                &self.account,
                 folder_id,
                 &path,
-                use_envelope,
-                cache.as_ref(),
+                &mut self.use_envelope,
+                self.cache.as_ref(),
             ),
-            rx,
-            backlog,
+            &mut self.rx,
+            &mut self.backlog,
         )
         .await;
         let Some(result) = result else {
             tracing::debug!("folder sync yielded to the reader: {path}");
-            backlog.push_back(if background {
+            self.backlog.push_back(if background {
                 MailRequest::SyncFolder { folder_id, path }
             } else {
                 MailRequest::LoadMessages { folder_id, path }
@@ -85,101 +70,136 @@ impl<E: Emit> ImapWorker<E> {
             return After::Skip;
         };
         match result {
-            Ok(messages) => {
-                if let Some(c) = cache.as_ref() {
-                    // Upsert (not replace) so the background-indexed tail
-                    // isn't wiped by a fast first-page load.
-                    c.upsert_messages(account_id, &path, &messages);
-                }
-                // Ensure this folder gets fully indexed (if not already
-                // queued this session).
-                if backfill_seen.insert(path.clone()) {
-                    backfill.push_back(Backfill {
-                        folder_id,
-                        gallery: folder_is_gallery(cache.as_ref(), account_id, &path),
-                        path: path.clone(),
-                        remaining: None,
-                    });
-                }
-                // Pre-download recent bodies so opening them is instant.
-                queue_body_prefetch(body_prefetch, &path, &messages, body_emitted);
-                // Queue background attachment pre-downloads for recent
-                // messages that have them — older ones download on demand.
-                queue_attachment_prefetch(prefetch, &path, &messages, cache.as_ref(), account_id);
-                if !background {
-                    *idle_folder = Some((folder_id, path.clone()));
-                    // Opening a folder is "use": keep it push-watched
-                    // for the next lease hour, so changes still land
-                    // instantly after the user moves on to another
-                    // folder.
-                    let kind = cache.as_ref().and_then(|c| {
-                        c.load_folders(account_id)
-                            .into_iter()
-                            .find(|f| f.path == path)
-                            .map(|f| f.kind)
-                    });
-                    if kind.is_some_and(watchable) {
-                        watch_active_folder(watchers, account, &path, 0, emit);
-                    }
-                }
-                emit_body_hits(
-                    session,
-                    account,
-                    account_id,
-                    folder_id,
-                    &path,
-                    &messages,
-                    cache.as_ref(),
-                    emit,
-                )
-                .await;
-                // A load that came back with less than a full first
-                // page *is* the whole folder — an uncached folder asks
-                // for the newest FIRST_PAGE of however many the server
-                // holds, and a cached one is reconciled against the
-                // server's complete UID set — so its index is already
-                // complete and the background backfill has nothing to
-                // add. Saying so now (#218) instead of waiting for that
-                // job's turn matters because the job sits behind every
-                // other folder in the mailbox, and behind the body
-                // prefetch, unread sweep and attachment prefetch ahead
-                // of it in the idle ladder: a small inbox could wait
-                // hours for a "Loading more…" spinner that had nothing
-                // left to load. Larger folders are unaffected — the
-                // list stops showing the spinner once it holds a full
-                // page anyway.
-                let complete = messages.len() < FIRST_PAGE as usize;
-                emit(WorkerEvent::Messages {
-                    folder_id,
-                    messages,
-                });
-                if complete {
-                    emit(WorkerEvent::BackfillDone { folder_id });
-                }
-                // Refresh the true unread count (catches new mail and
-                // reads from other clients beyond the loaded window).
-                if let Some(sess) = session.as_mut() {
-                    let kind = cached_folder_kind(cache.as_ref(), account_id, &path);
-                    if let Some(unread) = selected_chip_count(sess, kind).await {
-                        emit(WorkerEvent::FolderUnread { folder_id, unread });
-                    }
-                }
-            }
+            Ok(messages) => self.on_listed(folder_id, &path, messages, background).await,
             Err(e) => {
-                emit(WorkerEvent::net_error(i18n_f(
+                (self.emit)(WorkerEvent::net_error(i18n_f(
                     "Could not load {path}: {e}",
                     &[("path", &(path).to_string()), ("e", &(e).to_string())],
                 )));
                 // The load failed, so nothing more is on its way for
                 // this folder: end its index (#218) rather than leave
                 // the list spinning on a backfill that will not run.
-                emit(WorkerEvent::BackfillDone { folder_id });
+                (self.emit)(WorkerEvent::BackfillDone { folder_id });
             }
         }
         // However it went, this folder has been to the server (#198).
-        emit(WorkerEvent::FolderSynced { folder_id });
-        emit(WorkerEvent::Status(prefetch_status(prefetch.len())));
+        (self.emit)(WorkerEvent::FolderSynced { folder_id });
+        (self.emit)(WorkerEvent::Status(prefetch_status(self.prefetch.len())));
         After::Done
+    }
+
+    /// A folder's list as loaded: the work it queues, the push watch on a
+    /// folder the user opened, the body-rule hits, then the list itself,
+    /// the end of its index when it is the whole folder, and its unread
+    /// chip.
+    async fn on_listed(
+        &mut self,
+        folder_id: u32,
+        path: &str,
+        messages: Vec<Message>,
+        background: bool,
+    ) {
+        self.queue_folder_work(folder_id, path, &messages);
+        if !background {
+            self.adopt_open_folder(folder_id, path);
+        }
+        let account_id = self.account_id;
+        let account = &self.account;
+        let cache = &self.cache;
+        let session = &mut self.session;
+        let emit = &self.emit;
+        emit_body_hits(
+            session,
+            account,
+            account_id,
+            folder_id,
+            path,
+            &messages,
+            cache.as_ref(),
+            emit,
+        )
+        .await;
+        // A load that came back with less than a full first
+        // page *is* the whole folder — an uncached folder asks
+        // for the newest FIRST_PAGE of however many the server
+        // holds, and a cached one is reconciled against the
+        // server's complete UID set — so its index is already
+        // complete and the background backfill has nothing to
+        // add. Saying so now (#218) instead of waiting for that
+        // job's turn matters because the job sits behind every
+        // other folder in the mailbox, and behind the body
+        // prefetch, unread sweep and attachment prefetch ahead
+        // of it in the idle ladder: a small inbox could wait
+        // hours for a "Loading more…" spinner that had nothing
+        // left to load. Larger folders are unaffected — the
+        // list stops showing the spinner once it holds a full
+        // page anyway.
+        let complete = messages.len() < FIRST_PAGE as usize;
+        emit(WorkerEvent::Messages {
+            folder_id,
+            messages,
+        });
+        if complete {
+            emit(WorkerEvent::BackfillDone { folder_id });
+        }
+        // Refresh the true unread count (catches new mail and
+        // reads from other clients beyond the loaded window).
+        if let Some(sess) = session.as_mut() {
+            let kind = cached_folder_kind(cache.as_ref(), account_id, path);
+            if let Some(unread) = selected_chip_count(sess, kind).await {
+                emit(WorkerEvent::FolderUnread { folder_id, unread });
+            }
+        }
+    }
+
+    /// The cache and the background queues after a folder's list: the
+    /// list upserted, the folder's full index queued once a session, and
+    /// its recent bodies and attachments queued for download.
+    fn queue_folder_work(&mut self, folder_id: u32, path: &str, messages: &[Message]) {
+        let account_id = self.account_id;
+        let cache = &self.cache;
+        if let Some(c) = cache.as_ref() {
+            // Upsert (not replace) so the background-indexed tail
+            // isn't wiped by a fast first-page load.
+            c.upsert_messages(account_id, path, messages);
+        }
+        // Ensure this folder gets fully indexed (if not already
+        // queued this session).
+        if self.backfill_seen.insert(path.to_string()) {
+            self.backfill.push_back(Backfill {
+                folder_id,
+                gallery: folder_is_gallery(cache.as_ref(), account_id, path),
+                path: path.to_string(),
+                remaining: None,
+            });
+        }
+        // Pre-download recent bodies so opening them is instant.
+        queue_body_prefetch(&mut self.body_prefetch, path, messages, &self.body_emitted);
+        // Queue background attachment pre-downloads for recent
+        // messages that have them — older ones download on demand.
+        queue_attachment_prefetch(
+            &mut self.prefetch,
+            path,
+            messages,
+            cache.as_ref(),
+            account_id,
+        );
+    }
+
+    /// A folder the user opened is the one IDLE sits on, and opening it is
+    /// "use": keep it push-watched for the next lease hour, so changes
+    /// still land instantly after the user moves on to another folder.
+    fn adopt_open_folder(&mut self, folder_id: u32, path: &str) {
+        self.idle_folder = Some((folder_id, path.to_string()));
+        let kind = self.cache.as_ref().and_then(|c| {
+            c.load_folders(self.account_id)
+                .into_iter()
+                .find(|f| f.path == path)
+                .map(|f| f.kind)
+        });
+        if kind.is_some_and(watchable) {
+            watch_active_folder(&mut self.watchers, &self.account, path, 0, &self.emit);
+        }
     }
 
     /// One message's body, with its sender check and attachment flag.

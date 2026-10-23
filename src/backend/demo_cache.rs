@@ -11,8 +11,23 @@ use crate::models::Message;
 /// none of this can reach a real `cache.db`.
 pub fn seed_demo_cache(cache: &crate::cache::Cache) {
     let mock = MockBackend::new();
+    seed_sample_mail(cache, &mock);
+    seed_sample_attachments(cache, &mock);
+    // HYLKI_DEMO_ATTACHMENTS=N adds N more attachments per account, spread back
+    // over twenty years — the shape of a real archive, for exercising the
+    // gallery's paging and its scroll.
+    if let Some(n) = std::env::var("HYLKI_DEMO_ATTACHMENTS")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+    {
+        seed_archive_attachments(cache, &mock, n);
+    }
+}
+
+/// Every sample folder and its messages.
+fn seed_sample_mail(cache: &crate::cache::Cache, mock: &MockBackend) {
     for account in mock.accounts() {
-        let folders = MailBackend::folders(&mock, account.id);
+        let folders = MailBackend::folders(mock, account.id);
         cache.save_folders(account.id, &folders);
         for folder in &folders {
             let messages: Vec<Message> = mock
@@ -28,123 +43,120 @@ pub fn seed_demo_cache(cache: &crate::cache::Cache) {
             }
         }
     }
-    // The sample attachments hang off messages of their own, invented here so
-    // the gallery has rows going back further than the sample inbox does.
+}
+
+/// The sample attachments hang off messages of their own, invented here so
+/// the gallery has rows going back further than the sample inbox does.
+fn seed_sample_attachments(cache: &crate::cache::Cache, mock: &MockBackend) {
     for account in mock.accounts() {
         for &(uid, folder, name, from, subject, kb, ago) in demo_attachments(account.id) {
             let ts = crate::datefmt::now() - ago * 86_400;
-            let message = Message {
-                id: uid,
-                account_id: account.id,
-                folder_id: 0,
-                uid,
-                from_name: from.to_string(),
-                from_addr: format!("{}@example.com", from.to_lowercase().replace(' ', ".")),
-                reply_to: String::new(),
-                to: String::new(),
-                cc: String::new(),
-                bcc: String::new(),
-                subject: subject.to_string(),
-                preview: String::new(),
-                body: String::new(),
-                date: crate::datefmt::day_month_year(ts),
-                timestamp: ts,
-                unread: false,
-                starred: false,
-                answered: false,
-                forwarded: false,
-                keywords: Vec::new(),
-                has_attachment: true,
-                message_id: String::new(),
-                references: String::new(),
-                importance: Default::default(),
-                due: 0,
-                labels: Vec::new(),
-            };
-            // Insert-or-replace, not save: `save_messages` clears the folder
-            // first, so seeding one message at a time would leave only the last.
-            cache.upsert_messages(account.id, folder, std::slice::from_ref(&message));
-            cache.save_attachment_meta(
+            let message = attachment_message(
                 account.id,
-                folder,
                 uid,
-                &[crate::models::AttachmentMeta {
-                    idx: 0,
-                    name: name.to_string(),
-                    mime: String::new(),
-                    size: kb * 1024,
-                    section: String::new(),
-                }],
+                from.to_string(),
+                format!("{}@example.com", from.to_lowercase().replace(' ', ".")),
+                subject.to_string(),
+                ts,
             );
+            seed_attachment(cache, folder, &message, name.to_string(), kb);
         }
     }
+}
 
-    // HYLKI_DEMO_ATTACHMENTS=N adds N more attachments per account, spread back
-    // over twenty years — the shape of a real archive, for exercising the
-    // gallery's paging and its scroll.
-    if let Some(n) = std::env::var("HYLKI_DEMO_ATTACHMENTS")
-        .ok()
-        .and_then(|v| v.parse::<u32>().ok())
-    {
-        let kinds = [
-            ("invoice", "pdf", 90u64),
-            ("photo", "jpg", 2200),
-            ("notes", "txt", 8),
-            ("sheet", "xlsx", 140),
-            ("archive", "zip", 5400),
-        ];
-        let folders = ["Inbox", "Archive", "Newsletters"];
-        for account in mock.accounts() {
-            for i in 0..n {
-                let uid = 20_000 + i;
-                let (stem, ext, kb) = kinds[(i as usize) % kinds.len()];
-                // Oldest at the far end, so the newest page is the first one.
-                let ts = crate::datefmt::now() - (i as i64 + 1) * 430;
-                let folder = folders[(i as usize) % folders.len()];
-                let message = Message {
-                    id: uid,
-                    account_id: account.id,
-                    folder_id: 0,
-                    uid,
-                    from_name: format!("Sender {}", i % 40),
-                    from_addr: format!("sender{}@example.com", i % 40),
-                    reply_to: String::new(),
-                    to: String::new(),
-                    cc: String::new(),
-                    bcc: String::new(),
-                    subject: format!("Message {i}"),
-                    preview: String::new(),
-                    body: String::new(),
-                    date: crate::datefmt::day_month_year(ts),
-                    timestamp: ts,
-                    unread: false,
-                    starred: false,
-                    answered: false,
-                    forwarded: false,
-                    keywords: Vec::new(),
-                    has_attachment: true,
-                    message_id: String::new(),
-                    references: String::new(),
-                    importance: Default::default(),
-                    due: 0,
-                    labels: Vec::new(),
-                };
-                cache.upsert_messages(account.id, folder, std::slice::from_ref(&message));
-                cache.save_attachment_meta(
-                    account.id,
-                    folder,
-                    uid,
-                    &[crate::models::AttachmentMeta {
-                        idx: 0,
-                        name: format!("{stem}-{i}.{ext}"),
-                        mime: String::new(),
-                        size: kb * 1024,
-                        section: String::new(),
-                    }],
-                );
-            }
+/// `n` more attachments per account, one every 430 seconds back from now
+/// over three folders and five kinds of file.
+fn seed_archive_attachments(cache: &crate::cache::Cache, mock: &MockBackend, n: u32) {
+    let kinds = [
+        ("invoice", "pdf", 90u64),
+        ("photo", "jpg", 2200),
+        ("notes", "txt", 8),
+        ("sheet", "xlsx", 140),
+        ("archive", "zip", 5400),
+    ];
+    let folders = ["Inbox", "Archive", "Newsletters"];
+    for account in mock.accounts() {
+        for i in 0..n {
+            let uid = 20_000 + i;
+            let (stem, ext, kb) = kinds[(i as usize) % kinds.len()];
+            // Oldest at the far end, so the newest page is the first one.
+            let ts = crate::datefmt::now() - (i as i64 + 1) * 430;
+            let folder = folders[(i as usize) % folders.len()];
+            let message = attachment_message(
+                account.id,
+                uid,
+                format!("Sender {}", i % 40),
+                format!("sender{}@example.com", i % 40),
+                format!("Message {i}"),
+                ts,
+            );
+            seed_attachment(cache, folder, &message, format!("{stem}-{i}.{ext}"), kb);
         }
     }
+}
+
+/// A read message dated `ts` that carries one attachment and nothing else.
+fn attachment_message(
+    account_id: u32,
+    uid: u32,
+    from_name: String,
+    from_addr: String,
+    subject: String,
+    ts: i64,
+) -> Message {
+    Message {
+        id: uid,
+        account_id,
+        folder_id: 0,
+        uid,
+        from_name,
+        from_addr,
+        reply_to: String::new(),
+        to: String::new(),
+        cc: String::new(),
+        bcc: String::new(),
+        subject,
+        preview: String::new(),
+        body: String::new(),
+        date: crate::datefmt::day_month_year(ts),
+        timestamp: ts,
+        unread: false,
+        starred: false,
+        answered: false,
+        forwarded: false,
+        keywords: Vec::new(),
+        has_attachment: true,
+        message_id: String::new(),
+        references: String::new(),
+        importance: Default::default(),
+        due: 0,
+        labels: Vec::new(),
+    }
+}
+
+/// `message` into `folder`, described as holding one file of `kb` KB.
+fn seed_attachment(
+    cache: &crate::cache::Cache,
+    folder: &str,
+    message: &Message,
+    name: String,
+    kb: u64,
+) {
+    // Insert-or-replace, not save: `save_messages` clears the folder
+    // first, so seeding one message at a time would leave only the last.
+    cache.upsert_messages(message.account_id, folder, std::slice::from_ref(message));
+    cache.save_attachment_meta(
+        message.account_id,
+        folder,
+        message.uid,
+        &[crate::models::AttachmentMeta {
+            idx: 0,
+            name,
+            mime: String::new(),
+            size: kb * 1024,
+            section: String::new(),
+        }],
+    );
 }
 
 /// (uid, folder, filename, sender, subject, KB, days ago) for the demo gallery,

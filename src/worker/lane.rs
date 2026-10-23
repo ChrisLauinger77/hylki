@@ -40,15 +40,43 @@ pub(super) fn cache_lane(
             .map_err(|e| tracing::warn!("cache lane unavailable: {e}"))
             .ok()
     });
+    let summaries = spawn_badge_thread(account_id, protocol, cache.as_ref(), &emit);
+    while let Some(req) = rx.blocking_recv() {
+        let Some(c) = cache.as_ref() else {
+            if tx.send(req).is_err() {
+                break;
+            }
+            continue;
+        };
+        let forward = answer_from_cache(c, account_id, protocol, req, summaries.as_ref(), &emit);
+        if let Some(req) = forward {
+            if tx.send(req).is_err() {
+                break;
+            }
+        }
+    }
+}
+
+/// The conversation groups the badge thread is asked to count.
+type BadgeQueue = mpsc::UnboundedSender<Vec<(String, Vec<String>)>>;
+
+/// The thread that fills the list's conversation badges, and the sender
+/// that feeds it; `None` for POP3 or when its cache connection did not
+/// open.
+fn spawn_badge_thread(
+    account_id: u32,
+    protocol: Option<crate::config::Protocol>,
+    cache: Option<&Cache>,
+    emit: &(impl Fn(WorkerEvent) + Clone + Send + 'static),
+) -> Option<BadgeQueue> {
     // Filling the list's conversation badges may scan the account once per
     // thread. It must not hold cached bodies, or even cache misses, behind it.
     // Give that work its own WAL reader; forwarded network requests keep their
     // original ordering in this lane.
     let summary_cache = cache
-        .as_ref()
         .filter(|_| protocol != Some(crate::config::Protocol::Pop3))
         .and_then(|c| c.read_connection().ok());
-    let summaries = if let Some(cache) = summary_cache {
+    if let Some(cache) = summary_cache {
         let (tx, mut rx) = mpsc::unbounded_channel::<Vec<(String, Vec<String>)>>();
         let emit = emit.clone();
         std::thread::Builder::new()
@@ -66,104 +94,103 @@ pub(super) fn cache_lane(
         Some(tx)
     } else {
         None
-    };
-    while let Some(req) = rx.blocking_recv() {
-        let Some(c) = cache.as_ref() else {
-            if tx.send(req).is_err() {
-                break;
-            }
-            continue;
-        };
-        let forward = match req {
-            MailRequest::LoadBody {
-                message_id,
-                path,
-                uid,
-            } => {
-                if serve_cached_body(c, account_id, &path, uid, message_id, &emit) {
-                    None
-                } else {
-                    Some(MailRequest::LoadBody {
-                        message_id,
-                        path,
-                        uid,
-                    })
-                }
-            }
-            MailRequest::LoadBodies { items, path } => {
-                let items: Vec<(u32, u32)> = items
-                    .into_iter()
-                    .filter(|(message_id, uid)| {
-                        !serve_cached_body(c, account_id, &path, *uid, *message_id, &emit)
-                    })
-                    .collect();
-                if items.is_empty() {
-                    None
-                } else {
-                    Some(MailRequest::LoadBodies { items, path })
-                }
-            }
-            MailRequest::LoadAttachments {
-                message_id,
-                path,
-                uid,
-                download,
-            } => {
-                let items = c.load_attachments(account_id, &path, uid);
-                if !items.is_empty() {
-                    emit(WorkerEvent::Attachments {
-                        path: path.to_string(),
-                        message_id,
-                        items,
-                    });
-                    None
-                } else if !download {
-                    emit(WorkerEvent::AttachmentsPending {
-                        path: path.to_string(),
-                        message_id,
-                    });
-                    None
-                } else {
-                    Some(MailRequest::LoadAttachments {
-                        message_id,
-                        path,
-                        uid,
-                        download,
-                    })
-                }
-            }
-            MailRequest::LoadRelated { message_id, ids }
-                if protocol != Some(crate::config::Protocol::Pop3) =>
-            {
-                emit(WorkerEvent::Related {
+    }
+}
+
+/// One request the lane can answer from the cache, answered; what is left
+/// of it for the worker comes back.
+fn answer_from_cache(
+    c: &Cache,
+    account_id: u32,
+    protocol: Option<crate::config::Protocol>,
+    req: MailRequest,
+    summaries: Option<&BadgeQueue>,
+    emit: &impl Fn(WorkerEvent),
+) -> Option<MailRequest> {
+    match req {
+        MailRequest::LoadBody {
+            message_id,
+            path,
+            uid,
+        } => {
+            if serve_cached_body(c, account_id, &path, uid, message_id, emit) {
+                None
+            } else {
+                Some(MailRequest::LoadBody {
                     message_id,
-                    messages: related_from_cache(c, account_id, &ids),
-                });
-                None
-            }
-            MailRequest::LoadThreadSummaries { groups }
-                if protocol != Some(crate::config::Protocol::Pop3) =>
-            {
-                // Fall back to the existing lane if the extra cache connection
-                // could not open. Do not lose the list's response.
-                let fallback = match summaries.as_ref() {
-                    Some(tx) => tx.send(groups).err().map(|e| e.0),
-                    None => Some(groups),
-                };
-                if let Some(groups) = fallback {
-                    emit(WorkerEvent::ThreadSummaries {
-                        summaries: thread_summaries_with_members(c, account_id, &groups),
-                    });
-                }
-                None
-            }
-            other => Some(other),
-        };
-        if let Some(req) = forward {
-            if tx.send(req).is_err() {
-                break;
+                    path,
+                    uid,
+                })
             }
         }
+        MailRequest::LoadBodies { items, path } => {
+            let items: Vec<(u32, u32)> = items
+                .into_iter()
+                .filter(|(message_id, uid)| {
+                    !serve_cached_body(c, account_id, &path, *uid, *message_id, emit)
+                })
+                .collect();
+            if items.is_empty() {
+                None
+            } else {
+                Some(MailRequest::LoadBodies { items, path })
+            }
+        }
+        MailRequest::LoadAttachments {
+            message_id,
+            path,
+            uid,
+            download,
+        } => {
+            let items = c.load_attachments(account_id, &path, uid);
+            if !items.is_empty() {
+                emit(WorkerEvent::Attachments {
+                    path: path.to_string(),
+                    message_id,
+                    items,
+                });
+                None
+            } else if !download {
+                emit(WorkerEvent::AttachmentsPending {
+                    path: path.to_string(),
+                    message_id,
+                });
+                None
+            } else {
+                Some(MailRequest::LoadAttachments {
+                    message_id,
+                    path,
+                    uid,
+                    download,
+                })
+            }
+        }
+        MailRequest::LoadRelated { message_id, ids }
+            if protocol != Some(crate::config::Protocol::Pop3) =>
+        {
+            emit(WorkerEvent::Related {
+                message_id,
+                messages: related_from_cache(c, account_id, &ids),
+            });
+            None
+        }
+        MailRequest::LoadThreadSummaries { groups }
+            if protocol != Some(crate::config::Protocol::Pop3) =>
+        {
+            // Fall back to the existing lane if the extra cache connection
+            // could not open. Do not lose the list's response.
+            let fallback = match summaries {
+                Some(tx) => tx.send(groups).err().map(|e| e.0),
+                None => Some(groups),
+            };
+            if let Some(groups) = fallback {
+                emit(WorkerEvent::ThreadSummaries {
+                    summaries: thread_summaries_with_members(c, account_id, &groups),
+                });
+            }
+            None
+        }
+        other => Some(other),
     }
 }
 

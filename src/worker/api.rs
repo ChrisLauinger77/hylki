@@ -571,7 +571,7 @@ impl WorkerEvent {
     }
 
     /// A connection or sync failure, which the next success clears.
-    pub fn net_error(text: impl Into<String>) -> Self {
+    pub(in crate::worker) fn net_error(text: impl Into<String>) -> Self {
         WorkerEvent::Error {
             text: text.into(),
             connectivity: true,

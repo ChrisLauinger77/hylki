@@ -76,7 +76,7 @@ pub use tls::is_hostname_mismatch;
 
 /// What a connection that was never tried, because the network is down,
 /// reports (#442).
-pub(crate) fn offline_text() -> String {
+fn offline_text() -> String {
     i18n("no network connection")
 }
 

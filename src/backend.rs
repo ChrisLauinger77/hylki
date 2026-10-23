@@ -9,13 +9,14 @@ mod demo_cache;
 mod demo_mail;
 
 pub use demo_cache::seed_demo_cache;
+pub(crate) use demo_mail::demo_arrival;
+pub use demo_mail::demo_raw;
 use demo_mail::sample_messages;
-pub use demo_mail::{demo_arrival, demo_raw};
 
 use crate::models::{Account, Folder, FolderKind, Message, ThreadLatest, ThreadSummary};
 
 /// Read access to mail data.
-pub trait MailBackend {
+pub(crate) trait MailBackend {
     fn accounts(&self) -> Vec<Account>;
     fn folders(&self, account_id: u32) -> Vec<Folder>;
     fn messages(&self, folder_id: u32) -> Vec<Message>;

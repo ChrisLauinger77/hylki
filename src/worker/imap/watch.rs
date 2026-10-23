@@ -12,7 +12,7 @@ use crate::worker::imap::idle::idle_done;
 use crate::worker::imap::sweep::selected_unseen;
 use crate::worker::imap::wire::exam;
 use crate::worker::imap::{
-    IDLE_START_TIMEOUT, NETWORK_WAIT, WATCHER_LIMIT, WATCH_LEASE, WATCH_VERIFY,
+    ImapSession, IDLE_START_TIMEOUT, NETWORK_WAIT, WATCHER_LIMIT, WATCH_LEASE, WATCH_VERIFY,
 };
 use crate::worker::WorkerEvent;
 
@@ -148,15 +148,10 @@ pub(in crate::worker) async fn watch_folder(
     lease: Option<Rc<Cell<std::time::Instant>>>,
     emit: impl Fn(WorkerEvent),
 ) {
-    let lapsed = |lease: &Option<Rc<Cell<std::time::Instant>>>| {
-        lease
-            .as_ref()
-            .is_some_and(|l| l.get().elapsed() >= WATCH_LEASE)
-    };
     let mut backoff = start_delay;
     loop {
         tokio::time::sleep(backoff).await;
-        if lapsed(&lease) {
+        if lapsed(lease.as_ref()) {
             // The lease ran out while offline or backing off; don't reconnect
             // just to watch a folder nothing has touched for an hour.
             return;
@@ -165,7 +160,7 @@ pub(in crate::worker) async fn watch_folder(
         // backoff, so the watcher is back within moments of it (#442).
         while !crate::power::reaches(&account.imap_host) {
             tokio::time::sleep(NETWORK_WAIT).await;
-            if lapsed(&lease) {
+            if lapsed(lease.as_ref()) {
                 return;
             }
         }
@@ -195,7 +190,7 @@ pub(in crate::worker) async fn watch_folder(
         }
         // Catch up on whatever happened while unwatched (startup, or the gap a
         // dropped connection left), then settle into the IDLE/verify cycle.
-        let mut last_count = selected_unseen(&mut sess).await;
+        let last_count = selected_unseen(&mut sess).await;
         match last_count {
             Some(unread) => emit(WorkerEvent::FolderUnreadByPath {
                 path: path.clone(),
@@ -203,70 +198,102 @@ pub(in crate::worker) async fn watch_folder(
             }),
             None => continue, // wedged straight out of the gate; reconnect
         }
-        loop {
-            if lapsed(&lease) {
-                tracing::info!("unwatching {path}: quiet for the whole lease");
-                let _ = sess.logout().await;
-                return;
-            }
-            if lease.is_some() && crate::power::saving_data() {
-                tracing::info!("unwatching {path}: the connection is metered");
-                let _ = sess.logout().await;
-                return;
-            }
-            if !crate::power::reaches(&account.imap_host) {
-                break; // the socket went with the network
-            }
-            // A short IDLE round: woken instantly where the server announces
-            // changes, and capped at [`WATCH_VERIFY`] so the recount below
-            // covers the servers that stay silent — never past the lease's
-            // own deadline, so a lapsed watcher frees its connection promptly.
-            let timeout = lease.as_ref().map_or(WATCH_VERIFY.as_secs(), |l| {
-                WATCH_LEASE
-                    .saturating_sub(l.get().elapsed())
-                    .as_secs()
-                    .clamp(1, WATCH_VERIFY.as_secs())
-            });
-            tracing::debug!(target: "hylki::imap", "> IDLE");
-            let mut handle = sess.idle();
-            match tokio::time::timeout(IDLE_START_TIMEOUT, handle.init()).await {
-                Ok(Ok(())) => {}
-                _ => break, // error or wedged; drop the connection and redial
-            }
-            let woke = {
-                handle.as_mut().set_idle(true);
-                let (idle_fut, _stop) = handle.wait_with_timeout(Duration::from_secs(timeout));
-                matches!(
-                    idle_fut.await,
-                    Ok(async_imap::extensions::idle::IdleResponse::NewData(_))
-                )
-            };
-            match idle_done(handle).await {
-                Some(s) => sess = s,
-                None => break,
-            }
-            // Recount whether pushed awake or on the verify tick; a changed
-            // number (or any pushed wake) is activity that renews the lease,
-            // and only a changed number is worth an event.
-            match selected_unseen(&mut sess).await {
-                Some(unread) => {
-                    let moved = last_count != Some(unread);
-                    if woke || moved {
-                        if let Some(l) = &lease {
-                            l.set(std::time::Instant::now());
-                        }
-                    }
-                    if moved {
-                        tracing::debug!("watcher for {path}: unseen now {unread}");
-                        last_count = Some(unread);
-                        emit(WorkerEvent::FolderUnreadByPath {
-                            path: path.clone(),
-                            unread,
-                        });
+        if watch_session(sess, &account, &path, lease.as_ref(), last_count, &emit).await
+            == Watch::Retire
+        {
+            return;
+        }
+    }
+}
+
+/// How a watcher's session ended.
+#[derive(PartialEq, Eq)]
+enum Watch {
+    /// The watcher is done: its lease lapsed or the connection is metered.
+    Retire,
+    /// The session is gone or wedged: connect again.
+    Redial,
+}
+
+/// Whether a watcher's lease has run out; one without a lease never does.
+fn lapsed(lease: Option<&Rc<Cell<std::time::Instant>>>) -> bool {
+    lease.is_some_and(|l| l.get().elapsed() >= WATCH_LEASE)
+}
+
+/// The IDLE/verify cycle on one examined session: short IDLE rounds, a
+/// recount after each, the lease renewed on activity, until the lease
+/// lapses or the session is lost.
+async fn watch_session(
+    mut sess: ImapSession,
+    account: &AccountConfig,
+    path: &str,
+    lease: Option<&Rc<Cell<std::time::Instant>>>,
+    mut last_count: Option<u32>,
+    emit: &impl Fn(WorkerEvent),
+) -> Watch {
+    loop {
+        if lapsed(lease) {
+            tracing::info!("unwatching {path}: quiet for the whole lease");
+            let _ = sess.logout().await;
+            return Watch::Retire;
+        }
+        if lease.is_some() && crate::power::saving_data() {
+            tracing::info!("unwatching {path}: the connection is metered");
+            let _ = sess.logout().await;
+            return Watch::Retire;
+        }
+        if !crate::power::reaches(&account.imap_host) {
+            return Watch::Redial; // the socket went with the network
+        }
+        // A short IDLE round: woken instantly where the server announces
+        // changes, and capped at [`WATCH_VERIFY`] so the recount below
+        // covers the servers that stay silent — never past the lease's
+        // own deadline, so a lapsed watcher frees its connection promptly.
+        let timeout = lease.map_or(WATCH_VERIFY.as_secs(), |l| {
+            WATCH_LEASE
+                .saturating_sub(l.get().elapsed())
+                .as_secs()
+                .clamp(1, WATCH_VERIFY.as_secs())
+        });
+        tracing::debug!(target: "hylki::imap", "> IDLE");
+        let mut handle = sess.idle();
+        match tokio::time::timeout(IDLE_START_TIMEOUT, handle.init()).await {
+            Ok(Ok(())) => {}
+            _ => return Watch::Redial, // error or wedged; drop the connection and redial
+        }
+        let woke = {
+            handle.as_mut().set_idle(true);
+            let (idle_fut, _stop) = handle.wait_with_timeout(Duration::from_secs(timeout));
+            matches!(
+                idle_fut.await,
+                Ok(async_imap::extensions::idle::IdleResponse::NewData(_))
+            )
+        };
+        match idle_done(handle).await {
+            Some(s) => sess = s,
+            None => return Watch::Redial,
+        }
+        // Recount whether pushed awake or on the verify tick; a changed
+        // number (or any pushed wake) is activity that renews the lease,
+        // and only a changed number is worth an event.
+        match selected_unseen(&mut sess).await {
+            Some(unread) => {
+                let moved = last_count != Some(unread);
+                if woke || moved {
+                    if let Some(l) = lease {
+                        l.set(std::time::Instant::now());
                     }
                 }
-                None => break, // count unavailable = session gone; reconnect
+                if moved {
+                    tracing::debug!("watcher for {path}: unseen now {unread}");
+                    last_count = Some(unread);
+                    emit(WorkerEvent::FolderUnreadByPath {
+                        path: path.to_string(),
+                        unread,
+                    });
+                }
             }
+            None => return Watch::Redial, // count unavailable = session gone; reconnect
         }
     }
 }

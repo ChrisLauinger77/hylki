@@ -1,13 +1,15 @@
 //! The Graph handlers for sending and drafts.
 
 use super::{name_labels, GraphWorker};
+use crate::cache::Cache;
+use crate::config::AccountConfig;
 use crate::i18n::i18n;
 use crate::models::FolderKind;
 use crate::worker::compose::build::{build_draft, draft_message_id, restore_msgid_case};
 use crate::worker::drafts::{draft_not_saved, saving_text};
 use crate::worker::graph::folders::refresh_graph_folders;
 use crate::worker::graph::http::{graph_post_mime, graph_send_json, graph_token, GRAPH_BASE};
-use crate::worker::graph::index::graph_load_folder;
+use crate::worker::graph::index::{graph_load_folder, GraphState};
 use crate::worker::graph::ops::graph_drop_draft_origin;
 use crate::worker::graph::send::{graph_mark_answered, graph_send_message};
 use crate::worker::outbox::{drop_superseded_outbox, schedule_send, send_failed};
@@ -37,22 +39,11 @@ impl<E: Fn(WorkerEvent)> GraphWorker<E> {
         let mut folder_id = folder_id;
         let mut template_gid = None;
         if template {
-            if !state.folders.contains_key(&path) {
-                if let Some(token) = graph_token(account, emit).await {
-                    let (t, url) = (token.clone(), format!("{GRAPH_BASE}/me/mailFolders"));
-                    let body = serde_json::json!({ "displayName": path });
-                    match blocking(move || graph_send_json(&t, "POST", &url, &body)).await {
-                        Ok(_) => {
-                            refresh_graph_folders(&token, account_id, cache.as_ref(), state, emit)
-                                .await
-                        }
-                        Err(e) => tracing::warn!("graph: could not create {path}: {e}"),
-                    }
-                }
-            }
-            if let Some((id, gid)) = state.folders.get(&path) {
-                folder_id = *id;
-                template_gid = Some(gid.clone());
+            if let Some((id, gid)) =
+                template_folder(account, account_id, cache.as_ref(), state, &path, emit).await
+            {
+                folder_id = id;
+                template_gid = Some(gid);
             }
         }
         let mut message = OutgoingMessage {
@@ -68,24 +59,7 @@ impl<E: Fn(WorkerEvent)> GraphWorker<E> {
                 let raw = email.formatted();
                 match graph_token(account, emit).await {
                     Some(token) => {
-                        let t = token.clone();
-                        let url = format!("{GRAPH_BASE}/me/messages");
-                        let r = blocking(move || graph_post_mime(&t, &url, &raw)).await;
-                        let r = match (r, &template_gid) {
-                            (Ok(created), Some(dest)) => match created["id"].as_str() {
-                                Some(gid) => {
-                                    let (t, url) = (
-                                        token.clone(),
-                                        format!("{GRAPH_BASE}/me/messages/{gid}/move"),
-                                    );
-                                    let body = serde_json::json!({ "destinationId": dest });
-                                    blocking(move || graph_send_json(&t, "POST", &url, &body)).await
-                                }
-                                None => Err("the new message has no id".to_string()),
-                            },
-                            (Ok(_), None) if template => Err(i18n("unknown folder")),
-                            (r, _) => r,
-                        };
+                        let r = post_draft(&token, raw, template_gid.as_deref(), template).await;
                         match r {
                             Ok(_) => {
                                 // Replace the previous version of this draft.
@@ -273,5 +247,56 @@ impl<E: Fn(WorkerEvent)> GraphWorker<E> {
                 });
             }
         }
+    }
+}
+
+/// The folder a template is kept in (#360), as (folder id, Graph id): made
+/// first if the account has none, then found by name.
+async fn template_folder(
+    account: &AccountConfig,
+    account_id: u32,
+    cache: Option<&Cache>,
+    state: &mut GraphState,
+    path: &str,
+    emit: &impl Fn(WorkerEvent),
+) -> Option<(u32, String)> {
+    if !state.folders.contains_key(path) {
+        if let Some(token) = graph_token(account, emit).await {
+            let (t, url) = (token.clone(), format!("{GRAPH_BASE}/me/mailFolders"));
+            let body = serde_json::json!({ "displayName": path });
+            match blocking(move || graph_send_json(&t, "POST", &url, &body)).await {
+                Ok(_) => refresh_graph_folders(&token, account_id, cache, state, emit).await,
+                Err(e) => tracing::warn!("graph: could not create {path}: {e}"),
+            }
+        }
+    }
+    state.folders.get(path).map(|(id, gid)| (*id, gid.clone()))
+}
+
+/// Post a draft's MIME, which Graph files in Drafts, and move it on to
+/// `dest` for a template; the message Graph answers with.
+async fn post_draft(
+    token: &str,
+    raw: Vec<u8>,
+    dest: Option<&str>,
+    template: bool,
+) -> Result<serde_json::Value, String> {
+    let t = token.to_string();
+    let url = format!("{GRAPH_BASE}/me/messages");
+    let r = blocking(move || graph_post_mime(&t, &url, &raw)).await;
+    match (r, dest) {
+        (Ok(created), Some(dest)) => match created["id"].as_str() {
+            Some(gid) => {
+                let (t, url) = (
+                    token.to_string(),
+                    format!("{GRAPH_BASE}/me/messages/{gid}/move"),
+                );
+                let body = serde_json::json!({ "destinationId": dest });
+                blocking(move || graph_send_json(&t, "POST", &url, &body)).await
+            }
+            None => Err("the new message has no id".to_string()),
+        },
+        (Ok(_), None) if template => Err(i18n("unknown folder")),
+        (r, _) => r,
     }
 }
