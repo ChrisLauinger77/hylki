@@ -108,6 +108,7 @@ impl AppModel {
             keep_downloads_days: self.keep_downloads_days,
             run_in_background: self.run_in_background.get(),
             autostart: self.autostart,
+            start_fullscreen: self.start_fullscreen,
             tray: self.tray_enabled,
             tray_icon: self.tray_icon,
             tray_mail: self.tray_mail,

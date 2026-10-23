@@ -154,6 +154,7 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
                 i18n_noop("Show or hide the accounts in the sidebar"),
             ),
             ("Ctrl+Shift+F", i18n_noop("Focus Mode on or off")),
+            ("F11", i18n_noop("Fullscreen on or off")),
             ("Ctrl++  /  Ctrl+-", i18n_noop("Message zoom in or out")),
             ("Ctrl+0", i18n_noop("Message zoom back to the default")),
             ("Ctrl+,", i18n_noop("Settings")),

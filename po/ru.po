@@ -107,6 +107,9 @@ msgstr "Показывать учётные записи"
 msgid "Focus Mode"
 msgstr "Режим фокусировки"
 
+msgid "Fullscreen"
+msgstr ""
+
 msgid "Print Preview…"
 msgstr "Предпросмотр печати…"
 
@@ -869,6 +872,10 @@ msgid "Show or hide the accounts in the sidebar"
 msgstr "Показывать или скрывать учётные записи на боковой панели"
 
 msgid "Focus Mode on or off"
+msgstr "Включить или выключить режим концентрации"
+
+#, fuzzy
+msgid "Fullscreen on or off"
 msgstr "Включить или выключить режим концентрации"
 
 msgid "Message zoom in or out"
@@ -7443,6 +7450,12 @@ msgid "Start at login"
 msgstr "Запускать при входе в систему"
 
 msgid "Starts hidden."
+msgstr ""
+
+msgid "Start fullscreen"
+msgstr ""
+
+msgid "F11 switches fullscreen on and off."
 msgstr ""
 
 msgid "Show a tray icon"

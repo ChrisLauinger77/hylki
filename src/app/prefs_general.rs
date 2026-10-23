@@ -246,6 +246,10 @@ impl AppModel {
                 }
             }
 
+            PrefOutput::SetStartFullscreen(on) => {
+                pref!(self.start_fullscreen = on);
+            }
+
             PrefOutput::SetKeepDownloads(days) => {
                 if self.keep_downloads_days != days {
                     self.keep_downloads_days = days;

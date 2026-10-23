@@ -109,6 +109,9 @@ msgstr "Wyświetlanie kont"
 msgid "Focus Mode"
 msgstr "Tryb skupienia"
 
+msgid "Fullscreen"
+msgstr ""
+
 msgid "Print Preview…"
 msgstr "Podgląd wydruku…"
 
@@ -873,6 +876,10 @@ msgid "Show or hide the accounts in the sidebar"
 msgstr "Wyświetl lub ukryj konta w panelu bocznym"
 
 msgid "Focus Mode on or off"
+msgstr "Włącz lub wyłącz tryb skupienia"
+
+#, fuzzy
+msgid "Fullscreen on or off"
 msgstr "Włącz lub wyłącz tryb skupienia"
 
 msgid "Message zoom in or out"
@@ -7525,6 +7532,12 @@ msgid "Start at login"
 msgstr "Uruchamianie po zalogowaniu"
 
 msgid "Starts hidden."
+msgstr ""
+
+msgid "Start fullscreen"
+msgstr ""
+
+msgid "F11 switches fullscreen on and off."
 msgstr ""
 
 msgid "Show a tray icon"

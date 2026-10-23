@@ -98,6 +98,9 @@ msgstr ""
 msgid "Focus Mode"
 msgstr ""
 
+msgid "Fullscreen"
+msgstr ""
+
 msgid "Print Preview…"
 msgstr ""
 
@@ -775,6 +778,9 @@ msgid "Show or hide the accounts in the sidebar"
 msgstr ""
 
 msgid "Focus Mode on or off"
+msgstr ""
+
+msgid "Fullscreen on or off"
 msgstr ""
 
 msgid "Message zoom in or out"
@@ -6667,6 +6673,12 @@ msgid "Start at login"
 msgstr ""
 
 msgid "Starts hidden."
+msgstr ""
+
+msgid "Start fullscreen"
+msgstr ""
+
+msgid "F11 switches fullscreen on and off."
 msgstr ""
 
 msgid "Show a tray icon"

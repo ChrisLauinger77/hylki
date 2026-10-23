@@ -432,6 +432,9 @@ pub(crate) struct PrivacyFile {
     /// Start at login (only meaningful with `run_in_background`).
     #[serde(default)]
     pub(crate) autostart: bool,
+    /// The main window opens fullscreen (#511).
+    #[serde(default)]
+    pub(crate) start_fullscreen: bool,
     /// Publish a tray icon (StatusNotifierItem) for desktops that draw one
     /// (issue #116). Off by default: GNOME has no tray without an extension.
     #[serde(default)]
@@ -720,6 +723,7 @@ impl Default for PrivacyFile {
             keep_downloads_days: 0,
             run_in_background: false,
             autostart: false,
+            start_fullscreen: false,
             tray: false,
             tray_icon: TrayIcon::default(),
             tray_mail: true,

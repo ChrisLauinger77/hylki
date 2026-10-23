@@ -357,6 +357,7 @@ impl AppModel {
             shortcuts_win: None,
             run_in_background: std::rc::Rc::new(std::cell::Cell::new(prefs.run_in_background)),
             autostart: config::load_autostart(),
+            start_fullscreen: prefs.start_fullscreen,
             tray_enabled: prefs.tray,
             tray_icon: prefs.tray_icon,
             tray_mail: prefs.tray_mail,

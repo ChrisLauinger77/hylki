@@ -111,6 +111,9 @@ msgstr "Mostrar contas"
 msgid "Focus Mode"
 msgstr "Modo de foco"
 
+msgid "Fullscreen"
+msgstr ""
+
 msgid "Print Preview…"
 msgstr "Visualizar impressão…"
 
@@ -853,6 +856,10 @@ msgid "Show or hide the accounts in the sidebar"
 msgstr "Mostrar ou ocultar as contas na barra lateral"
 
 msgid "Focus Mode on or off"
+msgstr "Ativar ou desativar o modo de foco"
+
+#, fuzzy
+msgid "Fullscreen on or off"
 msgstr "Ativar ou desativar o modo de foco"
 
 msgid "Message zoom in or out"
@@ -7403,6 +7410,12 @@ msgid "Start at login"
 msgstr "Iniciar ao entrar na sessão"
 
 msgid "Starts hidden."
+msgstr ""
+
+msgid "Start fullscreen"
+msgstr ""
+
+msgid "F11 switches fullscreen on and off."
 msgstr ""
 
 msgid "Show a tray icon"

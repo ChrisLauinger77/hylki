@@ -455,6 +455,8 @@ pub(crate) struct AppModel {
     pub(super) run_in_background: std::rc::Rc<std::cell::Cell<bool>>,
     /// Whether Hylki starts at login (background running only).
     pub(super) autostart: bool,
+    /// The window opens fullscreen (#511).
+    pub(super) start_fullscreen: bool,
     /// Tray icon (issue #116): the setting, the icon choice, and the running
     /// item while the setting is on.
     pub(super) tray_enabled: bool,

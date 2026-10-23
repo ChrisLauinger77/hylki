@@ -110,6 +110,9 @@ msgstr "Fiókok megjelenítése"
 msgid "Focus Mode"
 msgstr "Fókusz mód"
 
+msgid "Fullscreen"
+msgstr ""
+
 msgid "Print Preview…"
 msgstr "Nyomtatási előnézet…"
 
@@ -853,6 +856,10 @@ msgid "Show or hide the accounts in the sidebar"
 msgstr "Fiókok megjelenítése vagy elrejtése az oldalsávban"
 
 msgid "Focus Mode on or off"
+msgstr "Fókuszmód be- vagy kikapcsolása"
+
+#, fuzzy
+msgid "Fullscreen on or off"
 msgstr "Fókuszmód be- vagy kikapcsolása"
 
 msgid "Message zoom in or out"
@@ -7466,6 +7473,12 @@ msgid "Start at login"
 msgstr "Indítás bejelentkezéskor"
 
 msgid "Starts hidden."
+msgstr ""
+
+msgid "Start fullscreen"
+msgstr ""
+
+msgid "F11 switches fullscreen on and off."
 msgstr ""
 
 msgid "Show a tray icon"

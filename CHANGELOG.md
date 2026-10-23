@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Added: fullscreen** (#511). F11, or Fullscreen in the main menu, puts
+  the main window fullscreen and back. Settings → System → Start fullscreen
+  opens it that way at every start. Leaving fullscreen keeps the size and
+  maximized state the window had before.
+
 - **Added: filters can forward, mark as read and delete** (#521, by Fabio
   Rotondo). The "Then" part of a filter is a list of actions built row by
   row: Forward to, Mark as Read, Move to and Delete. A forward is the

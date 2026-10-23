@@ -430,6 +430,7 @@ impl AppModel {
             | PrefOutput::SetTrayMail(..)
             | PrefOutput::SetLauncherBadge(..)
             | PrefOutput::SetSingleKey(..)
+            | PrefOutput::SetStartFullscreen(..)
             | PrefOutput::SetKeepDownloads(..)
             | PrefOutput::SetGmailKeys(..)
             | PrefOutput::SetDesktopIcons(..)

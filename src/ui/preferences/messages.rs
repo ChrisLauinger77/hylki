@@ -176,6 +176,7 @@ pub(crate) struct PrefInit {
     pub(crate) keep_downloads_days: u32,
     pub(crate) run_in_background: bool,
     pub(crate) autostart: bool,
+    pub(crate) start_fullscreen: bool,
     pub(crate) tray: bool,
     pub(crate) tray_icon: TrayIcon,
     pub(crate) tray_mail: bool,
@@ -516,6 +517,7 @@ pub(crate) enum PrefOutput {
     /// Every column back to its own width (#334).
     ResetColumnWidths,
     SetSingleKey(bool),
+    SetStartFullscreen(bool),
     SetGmailKeys(bool),
     /// How many days downloaded mail is kept; 0 keeps it (#394).
     SetKeepDownloads(u32),

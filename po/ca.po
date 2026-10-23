@@ -108,6 +108,9 @@ msgstr "Mostra els comptes"
 msgid "Focus Mode"
 msgstr "Mode d'enfocament"
 
+msgid "Fullscreen"
+msgstr ""
+
 msgid "Print Preview…"
 msgstr "Previsualització d'impressió…"
 
@@ -821,6 +824,10 @@ msgid "Show or hide the accounts in the sidebar"
 msgstr "Mostra o amaga els comptes a la barra lateral"
 
 msgid "Focus Mode on or off"
+msgstr "Activa o desactiva el mode d'enfocament"
+
+#, fuzzy
+msgid "Fullscreen on or off"
 msgstr "Activa o desactiva el mode d'enfocament"
 
 msgid "Message zoom in or out"
@@ -7143,6 +7150,12 @@ msgstr "Inicia en iniciar sessió"
 
 msgid "Starts hidden."
 msgstr "S'inicia amagat."
+
+msgid "Start fullscreen"
+msgstr ""
+
+msgid "F11 switches fullscreen on and off."
+msgstr ""
 
 msgid "Show a tray icon"
 msgstr "Mostra una icona a la safata"
