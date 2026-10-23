@@ -181,9 +181,7 @@ impl AppModel {
             body_html: e.body_html,
             in_reply_to: e.in_reply_to,
             references: e.references,
-            from_address: crate::worker::parse_recipients(&e.from)
-                .into_iter()
-                .next()
+            from_address: first_recipient(&e.from)
                 .map(|(_, addr)| addr)
                 .unwrap_or_default(),
             // Saved from an address that is no identity (#347): it opens

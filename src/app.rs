@@ -150,8 +150,8 @@ use pending::{PENDING_MOVE_MAX, PENDING_SEEN_MAX, PENDING_TAG_MAX, PENDING_TAG_S
 use picker::show_message_picker;
 use popout::PopOut;
 use prefill::{
-    forward_prefill, reply_all_prefill, reply_prefill, reply_subject, stage_attachments,
-    unsent_prefill,
+    first_recipient, forward_prefill, reply_all_prefill, reply_prefill, reply_subject,
+    stage_attachments, unsent_prefill,
 };
 use quote::editable_copy_html;
 pub(crate) use quote::{body_is_pre_wrap, message_text};

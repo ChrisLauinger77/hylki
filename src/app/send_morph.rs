@@ -84,7 +84,7 @@ impl AppModel {
         let (from_name, from_addr) = out
             .from_alias
             .as_deref()
-            .and_then(|a| worker::parse_recipients(a).into_iter().next())
+            .and_then(first_recipient)
             .unwrap_or_else(|| (account.name.clone(), account.email.clone()));
         let folder_id =
             worker::reply_copy_path(account, account_id, self.cache.as_ref(), &out.in_reply_to)

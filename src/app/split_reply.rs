@@ -25,6 +25,17 @@ pub(super) fn set_split_shrink(split: &gtk::Paned, bottom: bool, shrink: bool) {
 }
 
 impl AppModel {
+    /// Jumps a running slide of the split reply panel to its end.
+    pub(super) fn settle_split_anim(&self) {
+        // Taken out of the cell before it is skipped: `if let` holds the
+        // temporary `borrow_mut` guard alive for its whole body, and
+        // skipping emits `done`, whose handler reaches for this same cell.
+        let prev_anim = self.split_close_anim.borrow_mut().take();
+        if let Some(prev) = prev_anim {
+            prev.skip();
+        }
+    }
+
     /// Put the reader's header bar back without its slide: the send morph's
     /// stage is drawing the pane meanwhile, and needs the header where it
     /// ends up, now.
@@ -210,10 +221,7 @@ impl AppModel {
             // A still-running close animation would fight the new panel for
             // the divider: jump it to its end (its teardown sees the slot's
             // new occupant and stands down).
-            let prev_anim = self.split_close_anim.borrow_mut().take();
-            if let Some(prev) = prev_anim {
-                prev.skip();
-            }
+            self.settle_split_anim();
             // Above the reader, the reader's own header would show a second
             // set of window decorations mid-window (the composer header at
             // the pane's top already carries them) and spend vertical space

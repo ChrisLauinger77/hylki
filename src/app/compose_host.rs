@@ -96,13 +96,7 @@ impl AppModel {
         // In-flow (not overlay) slot: no click-swallowing to disarm. Settle
         // any running slide, then remember the height the user dragged the
         // panel to before it goes.
-        // Taken out of the cell before it is skipped: `if let` holds the
-        // temporary `borrow_mut` guard alive for its whole body, and
-        // skipping emits `done`, whose handler reaches for this same cell.
-        let prev_anim = self.split_close_anim.borrow_mut().take();
-        if let Some(prev) = prev_anim {
-            prev.skip();
-        }
+        self.settle_split_anim();
         if let Some((slot, split, bottom)) = self.live_split() {
             if slot.is_visible() {
                 config::save_split_reply_height(split_reply_height(&split, bottom));
@@ -168,13 +162,7 @@ impl AppModel {
         let Some(wrap) = slot.child() else { return };
         // Settle any running slide first, so the height saved below is the
         // real one and not a mid-animation reading.
-        // Taken out of the cell before it is skipped: `if let` holds the
-        // temporary `borrow_mut` guard alive for its whole body, and
-        // skipping emits `done`, whose handler reaches for this same cell.
-        let prev_anim = self.split_close_anim.borrow_mut().take();
-        if let Some(prev) = prev_anim {
-            prev.skip();
-        }
+        self.settle_split_anim();
         if slot.is_visible() {
             config::save_split_reply_height(split_reply_height(&split, bottom));
         }

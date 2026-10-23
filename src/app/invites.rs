@@ -12,10 +12,7 @@ impl AppModel {
         for (i, cfg) in self.effective_config().iter().enumerate() {
             let mut addresses = vec![cfg.email.trim().to_lowercase()];
             for alias in &cfg.aliases {
-                if let Some((_, addr)) = crate::worker::parse_recipients(&alias.identity)
-                    .into_iter()
-                    .next()
-                {
+                if let Some((_, addr)) = first_recipient(&alias.identity) {
                     addresses.push(addr.to_lowercase());
                 }
             }
@@ -164,10 +161,7 @@ impl AppModel {
             .map(|a| a.email.to_lowercase())
             .collect();
         for alias in &cfg.aliases {
-            if let Some((name, addr)) = crate::worker::parse_recipients(&alias.identity)
-                .into_iter()
-                .next()
-            {
+            if let Some((name, addr)) = first_recipient(&alias.identity) {
                 if invited.iter().any(|i| *i == addr.to_lowercase()) {
                     return (Some(alias.identity.clone()), name, addr);
                 }
@@ -181,11 +175,7 @@ impl AppModel {
         // best guess there is.
         match self.unsubscribe_from(message) {
             (Some(alias), addr) => {
-                let name = crate::worker::parse_recipients(&alias)
-                    .into_iter()
-                    .next()
-                    .map(|(n, _)| n)
-                    .unwrap_or_default();
+                let name = first_recipient(&alias).map(|(n, _)| n).unwrap_or_default();
                 (Some(alias), name, addr)
             }
             (None, addr) => (None, cfg.name.clone(), addr),

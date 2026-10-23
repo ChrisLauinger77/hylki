@@ -223,6 +223,12 @@ pub(super) fn unsent_prefill(m: crate::worker::OutgoingMessage) -> ComposePrefil
     }
 }
 
+/// The first `(name, address)` of a recipient list or identity, as the
+/// worker parses them.
+pub(super) fn first_recipient(list: &str) -> Option<(String, String)> {
+    crate::worker::parse_recipients(list).into_iter().next()
+}
+
 /// Write attachments out to a private temp directory: the composer attaches
 /// files by path, and these exist only as bytes — in a queued message's
 /// stored MIME, or in a cached message being copied.

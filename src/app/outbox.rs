@@ -168,9 +168,7 @@ impl AppModel {
             encrypt: false,
             outbox_origin: Some(id),
             reply_addressed_to: String::new(),
-            from_address: crate::worker::parse_recipients(&editable.from)
-                .into_iter()
-                .next()
+            from_address: first_recipient(&editable.from)
                 .map(|(_, addr)| addr)
                 .unwrap_or_default(),
             custom_from: editable.from,

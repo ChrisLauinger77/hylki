@@ -201,6 +201,23 @@ impl AppModel {
         });
     }
 
+    /// Newest first, and one row per message filed in several folders
+    /// (Gmail's labels): the Inbox copy where there is one. Messages with
+    /// no Message-ID are all kept.
+    pub(super) fn newest_once(&self, out: &mut Vec<Message>) {
+        let inbox_first =
+            |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
+        out.sort_by(|a, b| {
+            b.timestamp
+                .cmp(&a.timestamp)
+                .then_with(|| inbox_first(a).cmp(&inbox_first(b)))
+        });
+        let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
+        out.retain(|m| {
+            m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone()))
+        });
+    }
+
     /// A smart folder from its rows: newest first, Gmail's per-label copies
     /// of one message as one row, the inbox copy where there is one.
     pub(super) fn assemble_smart_view(
@@ -231,17 +248,7 @@ impl AppModel {
                 }
             }
         }
-        let inbox_first =
-            |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
-        out.sort_by(|a, b| {
-            b.timestamp
-                .cmp(&a.timestamp)
-                .then_with(|| inbox_first(a).cmp(&inbox_first(b)))
-        });
-        let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
-        out.retain(|m| {
-            m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone()))
-        });
+        self.newest_once(&mut out);
         out
     }
 

@@ -65,10 +65,7 @@ impl AppModel {
             .map(|(_, e)| e.to_lowercase())
             .collect();
         for alias in &cfg.aliases {
-            if let Some((_, addr)) = crate::worker::parse_recipients(&alias.identity)
-                .into_iter()
-                .next()
-            {
+            if let Some((_, addr)) = first_recipient(&alias.identity) {
                 if recipients.iter().any(|r| *r == addr.to_lowercase()) {
                     return (Some(alias.identity.clone()), addr);
                 }

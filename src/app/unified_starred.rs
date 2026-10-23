@@ -138,17 +138,7 @@ impl AppModel {
             }
         }
         // One row for a message filed twice, the inbox copy where there is one.
-        let inbox_first =
-            |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
-        found.sort_by(|a, b| {
-            b.timestamp
-                .cmp(&a.timestamp)
-                .then_with(|| inbox_first(a).cmp(&inbox_first(b)))
-        });
-        let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
-        found.retain(|m| {
-            m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone()))
-        });
+        self.newest_once(&mut found);
         let mut slices: HashMap<(u32, u32), Vec<Message>> = HashMap::new();
         for m in found {
             slices
