@@ -24,7 +24,7 @@ use super::msg::AppMsg;
 fn save_attachment(att: Attachment, parent: Option<adw::ApplicationWindow>) {
     let dialog = gtk::FileDialog::builder()
         .initial_name(&att.name)
-        .title(&i18n("Save Attachment"))
+        .title(i18n("Save Attachment"))
         .build();
     dialog.save(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
         if let Ok(file) = res {

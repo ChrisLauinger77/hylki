@@ -20,6 +20,10 @@ use super::folders::kind_label;
 use super::model::AppModel;
 use super::msg::AppMsg;
 
+/// A bulk move per (account, source path): the destination path, the
+/// UIDs and the rows kept for undo.
+type MoveGroups = HashMap<(u32, String), (String, Vec<u32>, Vec<Message>)>;
+
 impl AppModel {
     /// Whether a message already lives in its account's Trash — where "delete"
     /// can't mean "move to Trash" any more, so it has to mean erase for good.
@@ -304,7 +308,7 @@ impl AppModel {
         };
         // (account, source path) → (dest path, uids, the rows for undo).
         // dest is per-account.
-        let mut groups: HashMap<(u32, String), (String, Vec<u32>, Vec<Message>)> = HashMap::new();
+        let mut groups: MoveGroups = HashMap::new();
         let mut removed_ids = Vec::with_capacity(messages.len());
         let mut missing_dest = false;
         for m in &messages {

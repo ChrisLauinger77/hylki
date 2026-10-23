@@ -22,7 +22,7 @@ impl AppModel {
         if std::env::var("HYLKI_SHOWCASE_HEIGHTS").is_ok() {
             let sidebar = self.sidebar.widget().clone().upcast::<gtk::Widget>();
             gtk::glib::timeout_add_seconds_local_once(delay.saturating_sub(1).max(1), move || {
-                fn walk(w: &gtk::Widget, depth: usize, root: &gtk::Widget) {
+                fn walk(w: &gtk::Widget, root: &gtk::Widget) {
                     let classes = w.css_classes();
                     let heading = classes.iter().any(|c| c == "unified-folders-toggle");
                     let child_row = w.is::<gtk::ListBoxRow>()
@@ -42,11 +42,11 @@ impl AppModel {
                     }
                     let mut c = w.first_child();
                     while let Some(ch) = c {
-                        walk(&ch, depth + 1, root);
+                        walk(&ch, root);
                         c = ch.next_sibling();
                     }
                 }
-                walk(&sidebar, 0, &sidebar);
+                walk(&sidebar, &sidebar);
             });
         }
     }

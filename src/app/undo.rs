@@ -463,13 +463,12 @@ impl AppModel {
         if !added {
             return;
         }
-        for key in [(account_id, folder_id)] {
-            if let Some(ms) = self.message_cache.get_mut(&key) {
-                ms.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-            }
-            if let Some(ms) = self.unified_slices.get_mut(&key) {
-                ms.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-            }
+        let key = (account_id, folder_id);
+        if let Some(ms) = self.message_cache.get_mut(&key) {
+            ms.sort_by_key(|m| std::cmp::Reverse(m.timestamp));
+        }
+        if let Some(ms) = self.unified_slices.get_mut(&key) {
+            ms.sort_by_key(|m| std::cmp::Reverse(m.timestamp));
         }
         self.forget_threads(account_id);
         self.refresh_list_display();

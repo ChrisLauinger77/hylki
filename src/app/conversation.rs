@@ -461,9 +461,10 @@ impl AppModel {
             return;
         }
         conv.extend(added);
-        conv.sort_by(|a, b| a.timestamp.cmp(&b.timestamp)); // oldest first, as the list threads
-                                                            // Late arrivals bring bodies of their own; give them the same grace
-                                                            // period so they join the first paint instead of causing a second.
+        // Oldest first, as the list threads.
+        conv.sort_by_key(|m| m.timestamp);
+        // Late arrivals bring bodies of their own; give them the same grace
+        // period so they join the first paint instead of causing a second.
         self.thread_opened_at = Some(std::time::Instant::now());
         self.current_thread = conv;
         self.load_missing_thread_bodies(None);

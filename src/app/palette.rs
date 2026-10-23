@@ -441,7 +441,7 @@ impl AppModel {
         let win = adw::Window::builder()
             .transient_for(&self.window)
             .modal(true)
-            .title(&i18n("Keyboard Shortcuts"))
+            .title(i18n("Keyboard Shortcuts"))
             .default_width(600)
             .default_height(640)
             .build();

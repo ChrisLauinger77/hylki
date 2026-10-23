@@ -85,7 +85,7 @@ impl AppModel {
             }
             PrefOutput::ExportLocalContacts => {
                 let dialog = gtk::FileDialog::builder()
-                    .title(&i18n("Export Contacts"))
+                    .title(i18n("Export Contacts"))
                     .initial_name("hylki-contacts.vcf")
                     .build();
                 let notif = self.notifications.sender().clone();
@@ -180,7 +180,7 @@ impl AppModel {
 
             PrefOutput::ImportSettings => {
                 let dialog = gtk::FileDialog::builder()
-                    .title(&i18n("Import Settings"))
+                    .title(i18n("Import Settings"))
                     .build();
                 let win = self.window.clone();
                 let s = sender.clone();

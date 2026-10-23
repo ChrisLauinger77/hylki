@@ -34,11 +34,10 @@ pub(super) fn look_only_change(old: &AccountConfig, new: &AccountConfig) -> bool
     probe.label = old.label.clone();
     probe.in_unified = old.in_unified;
     // Compared as values: a map's order on the way out is no change.
-    let same = match (toml::Value::try_from(&probe), toml::Value::try_from(old)) {
+    match (toml::Value::try_from(&probe), toml::Value::try_from(old)) {
         (Ok(a), Ok(b)) => a == b,
         _ => false,
-    };
-    same
+    }
 }
 
 /// Whether `new` keeps the secrets of `old`. The editor hands every secret

@@ -127,7 +127,7 @@ impl AppModel {
                 continue;
             }
             let mut messages: Vec<Message> = content().cloned().collect();
-            messages.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+            messages.sort_by_key(|m| std::cmp::Reverse(m.timestamp));
             tracing::debug!(
                 "prebuild: {view:?}, {} messages ({})",
                 messages.len(),
@@ -364,7 +364,7 @@ impl AppModel {
         self.message_list.emit(MessageListInput::SetViewFp(fp));
         self.unified_emitted_at.set(t);
         let mut merged: Vec<Message> = self.unified_content().cloned().collect();
-        merged.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        merged.sort_by_key(|m| std::cmp::Reverse(m.timestamp));
         tracing::debug!(
             "unified: merged {} messages in {:?}",
             merged.len(),

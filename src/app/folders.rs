@@ -24,7 +24,7 @@ use super::undo::UndoStep;
 /// between a Settings save and the reconnect's fresh LIST.
 pub(super) fn apply_folder_roles(
     roles: &std::collections::BTreeMap<String, String>,
-    folders: &mut Vec<Folder>,
+    folders: &mut [Folder],
 ) {
     if roles.is_empty() {
         return;

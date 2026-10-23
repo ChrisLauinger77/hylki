@@ -60,6 +60,11 @@ pub(super) struct TransferTally {
     pub(super) landed: Vec<Landed>,
 }
 
+/// One side of a cross-account move each, with its Trash: (source
+/// account, source path, its Trash, receiving account, destination path,
+/// its Trash).
+type TrashPair = (u32, String, String, u32, String, String);
+
 impl AppModel {
     /// Whether mail from another account can be moved into this one (#265):
     /// IMAP and JMAP accounts take a message whole. A Microsoft account
@@ -295,8 +300,7 @@ impl AppModel {
     /// Mail that was erased at the source, or that went to an account with
     /// no Trash, is left out: undoing it would leave a copy behind.
     fn record_transfer_undo(&mut self, landed: Vec<Landed>) {
-        let mut groups: Vec<((u32, String, String, u32, String, String), Vec<Message>)> =
-            Vec::new();
+        let mut groups: Vec<(TrashPair, Vec<Message>)> = Vec::new();
         for l in landed {
             let Some(src_trash) = l.src_trash else {
                 continue;

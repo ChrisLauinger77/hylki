@@ -60,6 +60,10 @@ impl SmartContext {
     }
 }
 
+/// Where a smart folder looks: per account, the folders it is held to
+/// (`None` for all) and the ones it leaves out.
+type SmartScope = Vec<(u32, Option<Vec<String>>, Vec<String>)>;
+
 impl AppModel {
     pub(super) fn open_smart_folder(&self) -> Option<&config::SmartFolder> {
         let id = self.smart_view.as_ref()?;
@@ -109,7 +113,7 @@ impl AppModel {
     /// held to (`None` for all) and the ones it leaves out. One account
     /// when it names one, else every account in the unified section; one
     /// kind of folder when it names one, else all but Trash and Junk.
-    fn smart_scope(&self, f: &config::SmartFolder) -> Vec<(u32, Option<Vec<String>>, Vec<String>)> {
+    fn smart_scope(&self, f: &config::SmartFolder) -> SmartScope {
         self.accounts
             .iter()
             .filter(|a| {
@@ -287,11 +291,7 @@ impl AppModel {
             return;
         }
         let demo = demo_mode() && self.config.is_empty();
-        let jobs: Vec<(
-            config::SmartFolder,
-            Vec<(u32, Option<Vec<String>>, Vec<String>)>,
-            SmartContext,
-        )> = self
+        let jobs: Vec<(config::SmartFolder, SmartScope, SmartContext)> = self
             .smart_folders
             .iter()
             .map(|f| (f.clone(), self.smart_scope(f), self.smart_context(f)))

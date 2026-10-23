@@ -51,7 +51,7 @@ impl AppModel {
         sender: &ComponentSender<Self>,
     ) {
         if demo_mode() {
-            if let Some(shot) = std::env::var("HYLKI_SHOWCASE").ok() {
+            if let Ok(shot) = std::env::var("HYLKI_SHOWCASE") {
                 // HYLKI_SHOWCASE_STAGE=0 skips the staging (capture-only, for
                 // testing arbitrary states); HYLKI_SHOWCASE_DELAY overrides the
                 // capture time (seconds, default 9).

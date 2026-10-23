@@ -67,7 +67,7 @@ impl AppModel {
             return true;
         }
         let addr = m.from_addr.to_lowercase();
-        self.allowed_senders.iter().any(|s| *s == addr)
+        self.allowed_senders.contains(&addr)
     }
 
     /// The tag entries of the reader's menus (#71): one per tag, its swatch

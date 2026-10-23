@@ -217,9 +217,8 @@ pub(super) fn capture_window(
         (0..tops.n_items())
             .filter_map(|i| tops.item(i))
             .filter_map(|o| o.downcast::<gtk::Window>().ok())
-            .filter(|w| *w != main && w.is_visible())
             // The newest: a dialog over Settings, when one is up.
-            .last()
+            .rfind(|w| *w != main && w.is_visible())
     };
     // With HYLKI_SHOWCASE_SCROLL set, the Settings window is
     // made tall a beat after opening and every scroller in it

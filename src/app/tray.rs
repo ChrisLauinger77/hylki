@@ -247,7 +247,7 @@ impl AppModel {
                     .map(move |m| (a, m))
             })
             .collect();
-        unread.sort_by(|x, y| y.1.timestamp.cmp(&x.1.timestamp));
+        unread.sort_by_key(|x| std::cmp::Reverse(x.1.timestamp));
         unread
             .into_iter()
             .take(crate::tray::MAIL_LIMIT)

@@ -36,6 +36,16 @@ use super::types::{FolderMessages, SelectedFolder, UnifiedView};
 use super::undo::UndoEntry;
 use super::{RedoAction, UndoAction};
 
+/// A pending tag change: (account, folder path, uid, lower-cased keyword).
+pub(super) type PendingTagKey = (u32, String, u32, String);
+
+/// One row of the tray's mail section: (account, message id, sender,
+/// subject).
+pub(super) type TrayMailRow = (u32, u32, String, String);
+
+/// The root component's state: the accounts and their workers, what the
+/// list and the reader show, the session caches, every setting the app
+/// applies, and the child components.
 pub(crate) struct AppModel {
     /// One mail worker per account (account_id → request sender).
     pub(super) workers: HashMap<u32, UnboundedSender<MailRequest>>,
@@ -229,8 +239,7 @@ pub(crate) struct AppModel {
     /// (account, folder path, uid, lower-cased keyword) → (on, held until,
     /// keyword): the same for tags. A folder list fetched ahead of the STORE took a
     /// tag just set off the row until the next sync put it back.
-    pub(super) pending_tags:
-        HashMap<(u32, String, u32, String), (bool, std::time::Instant, String)>,
+    pub(super) pending_tags: HashMap<PendingTagKey, (bool, std::time::Instant, String)>,
     /// The messages a reply or forward on its way out marked as answered
     /// ahead of time (#454), by send ticket: (account, folder id, uid,
     /// forwarded). Undone or failed, the marks come off again.
@@ -463,7 +472,7 @@ pub(crate) struct AppModel {
     /// What the tray menu last listed (account, id, sender, subject; `None`
     /// for no section), so an unchanged list isn't re-sent over D-Bus on
     /// every unread-count push.
-    pub(super) tray_mail_key: std::cell::RefCell<Option<Vec<(u32, u32, String, String)>>>,
+    pub(super) tray_mail_key: std::cell::RefCell<Option<Vec<TrayMailRow>>>,
     /// Whether single-key (modifier-free) shortcuts are enabled. The window's key
     /// controller needs to read this without the model, so it is shared: with the
     /// feature off, keystrokes must pass straight through rather than be consumed
