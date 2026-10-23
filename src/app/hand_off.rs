@@ -615,6 +615,89 @@ impl AppModel {
             _ => unreachable!("not routed to on_hand_off"),
         }
     }
+
+    /// Files dragged onto the window with no composer open in it bring
+    /// up the cards for starting a new message with them (#293).
+    pub(super) fn install_drop_targets(
+        &mut self,
+        root: &adw::ApplicationWindow,
+        widgets: &AppModelWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        {
+            use crate::ui::drop_zones::{DropContext, DropZones};
+            let overlay = widgets.window_overlay.clone();
+            let s = sender.input_sender().clone();
+            let zones = DropZones::install(
+                DropContext::NewMessage,
+                root,
+                &overlay,
+                move |choice, paths| {
+                    s.emit(AppMsg::DropFilesAs(choice, paths));
+                },
+            );
+            let slots = [
+                self.reader_compose_revealer.clone(),
+                self.contacts_compose_revealer.clone(),
+                self.reader_split_top.clone(),
+                self.reader_split_bottom.clone(),
+            ];
+            zones.set_gate(move || {
+                !slots
+                    .iter()
+                    .any(|slot| slot.reveals_child() && slot.is_visible())
+            });
+            zones.set_refresh(|zones| {
+                zones
+                    .set_allow_inline(config::load_compose_format() == config::ComposeFormat::Rich);
+                zones.set_cloud_names(
+                    crate::cloud::load_enabled_accounts()
+                        .into_iter()
+                        .map(|a| a.name)
+                        .collect(),
+                );
+            });
+            // HYLKI_SHOWCASE_WINDOW_DROP=<attach|inline|cloud|none>:<file>[:<file>…]
+            // raises the window's cards at 3 s, for a capture.
+            if let Ok(v) = std::env::var("HYLKI_SHOWCASE_WINDOW_DROP") {
+                let mut parts = std::env::split_paths(&v);
+                let hover = match parts.next().as_deref().and_then(|p| p.to_str()) {
+                    Some("attach") => Some(crate::ui::drop_zones::DropChoice::Attach),
+                    Some("inline") => Some(crate::ui::drop_zones::DropChoice::Inline),
+                    Some("cloud") => Some(crate::ui::drop_zones::DropChoice::Cloud),
+                    _ => None,
+                };
+                let paths: Vec<std::path::PathBuf> = parts.collect();
+                let (zones, host) = (zones.clone(), root.clone().upcast::<gtk::Widget>());
+                gtk::glib::timeout_add_seconds_local_once(3, move || {
+                    zones.set_allow_inline(
+                        config::load_compose_format() == config::ComposeFormat::Rich,
+                    );
+                    zones.set_cloud_names(
+                        crate::cloud::load_enabled_accounts()
+                            .into_iter()
+                            .map(|a| a.name)
+                            .collect(),
+                    );
+                    zones.showcase(&paths, &host, hover);
+                });
+            }
+            self.window_drop_zones = Some(zones);
+        }
+        // With a composer open in the window, files dropped anywhere else in
+        // it go into that composer. The reader's web views would take a file
+        // themselves and never pass it up, so the reader gets a target that
+        // goes before them.
+        root.add_controller(window_drop_target(sender, gtk::PropagationPhase::Bubble));
+        self.message_view
+            .widget()
+            .add_controller(window_drop_target(sender, gtk::PropagationPhase::Capture));
+        if let Ok(list) = std::env::var("HYLKI_SHOWCASE_DROP") {
+            let paths: Vec<std::path::PathBuf> = std::env::split_paths(&list).collect();
+            let s = sender.clone();
+            gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::DropFiles(paths)));
+        }
+    }
 }
 
 #[cfg(test)]

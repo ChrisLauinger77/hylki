@@ -321,4 +321,51 @@ impl AppModel {
             _ => unreachable!("not routed to on_list_header"),
         }
     }
+
+    /// The list header's sort menu (moved out of the message list's own
+    /// toolbar): a stateful radio action feeding the list's SetSort.
+    pub(super) fn init_list_sort_menu(
+        &mut self,
+        widgets: &AppModelWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        use crate::ui::message_list::SortOrder;
+        let sort_group = gtk::gio::SimpleActionGroup::new();
+        let sort_action = gtk::gio::SimpleAction::new_stateful(
+            "order",
+            Some(gtk::glib::VariantTy::STRING),
+            &"date_newest".to_variant(),
+        );
+        let list = self.message_list.sender().clone();
+        sort_action.connect_activate(move |action, param| {
+            if let Some(key) = param.and_then(|v| v.str()) {
+                action.set_state(&key.to_variant());
+                let _ = list.send(MessageListInput::SetSort(SortOrder::from_key(key)));
+            }
+        });
+        sort_group.add_action(&sort_action);
+        widgets
+            .list_filter_btn
+            .insert_action_group("sortmenu", Some(&sort_group));
+
+        let _ = self.list_header_widgets.set(ListHeaderWidgets {
+            revealers: vec![
+                widgets.lh_search.clone(),
+                widgets.lh_filter.clone(),
+                widgets.lh_count.clone(),
+            ],
+            overflow: widgets.lh_overflow.clone(),
+            filter: SortFilterPopover::new(
+                widgets.list_filter_btn.clone(),
+                &sort_action,
+                sender.input_sender(),
+            ),
+            sort: sort_action,
+        });
+        // Focus Mode's chrome as saved: nothing is mapped yet, so the
+        // revealers jump to their state without animating.
+        self.sync_focus_chrome();
+        self.reader_overflow_btn
+            .set_visible(self.reader_overflow_wanted());
+    }
 }

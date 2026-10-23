@@ -309,4 +309,26 @@ impl AppModel {
             _ => unreachable!("not routed to on_outbox"),
         }
     }
+
+    /// Send Later (#145): the app's clock. Every half minute, any queued
+    /// message whose time has come is flushed by id, which sends it even
+    /// though the ordinary flush leaves scheduled mail alone. One try per
+    /// scheduling: a failure shows in the Outbox with Send Now to retry,
+    /// rather than a loud attempt every tick.
+    pub(super) fn start_outbox_clocks(&mut self, sender: &ComponentSender<Self>) {
+        {
+            let s = sender.clone();
+            gtk::glib::timeout_add_seconds_local(30, move || {
+                s.input(AppMsg::SendDueScheduled);
+                gtk::glib::ControlFlow::Continue
+            });
+        }
+        {
+            // Settings, built hidden a moment after startup (see PrewarmSettings).
+            let s = sender.clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
+                s.input(AppMsg::PrewarmSettings);
+            });
+        }
+    }
 }

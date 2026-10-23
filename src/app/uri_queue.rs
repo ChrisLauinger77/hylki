@@ -428,6 +428,24 @@ impl AppModel {
             _ => unreachable!("not routed to on_uri_queue"),
         }
     }
+
+    /// mailto: URIs can arrive (via GApplication `open`) before this init
+    /// ran — install the live sender and drain anything that queued early.
+    pub(super) fn drain_hand_off_queues(&mut self, sender: &ComponentSender<Self>) {
+        let _ = MAILTO_SENDER.set(sender.input_sender().clone());
+        for uri in MAILTO_PENDING.lock().unwrap().drain(..) {
+            sender.input(AppMsg::OpenMailto(uri));
+        }
+        for uri in MID_PENDING.lock().unwrap().drain(..) {
+            sender.input(AppMsg::OpenMid(uri));
+        }
+        for path in FILE_PENDING.lock().unwrap().drain(..) {
+            sender.input(AppMsg::OpenMessageFile(path));
+        }
+        for paths in ATTACH_PENDING.lock().unwrap().drain(..) {
+            sender.input(AppMsg::OpenWithFiles(paths));
+        }
+    }
 }
 
 #[cfg(test)]

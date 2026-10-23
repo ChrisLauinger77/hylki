@@ -288,4 +288,147 @@ impl AppModel {
             _ => unreachable!("not routed to on_notifications"),
         }
     }
+
+    /// Desktop-notification click actions: raise the window (error alerts) and
+    /// raise + open a specific message (new-mail alerts). Registered here rather
+    /// than in `notify` because opening a message needs the app's channel.
+    pub(super) fn install_notification_actions(&mut self, sender: &ComponentSender<Self>) {
+        use gtk::prelude::*;
+        let app = relm4::main_application();
+        let present = gtk::gio::SimpleAction::new(crate::notify::PRESENT_ACTION, None);
+        let win = self.window.clone();
+        present.connect_activate(move |_, _| {
+            crate::desktop::present_window(&win);
+        });
+        app.add_action(&present);
+
+        // "Message ready" alerts (a hand-off whose window stayed behind):
+        // the click raises the composer too, and the alert goes away by
+        // itself once any window of ours has the focus.
+        let present_compose =
+            gtk::gio::SimpleAction::new(crate::notify::PRESENT_COMPOSE_ACTION, None);
+        let psender = sender.clone();
+        present_compose.connect_activate(move |_, _| {
+            psender.input(AppMsg::PresentComposers);
+        });
+        app.add_action(&present_compose);
+        let fsender = sender.clone();
+        self.window.connect_is_active_notify(move |w| {
+            if w.is_active() {
+                crate::notify::withdraw_compose_ready();
+                // Focus comes back after an unlock, when the dock has
+                // just been rebuilt without the badge; and the mail
+                // that arrived meanwhile has now been seen (#431).
+                fsender.input(AppMsg::WindowInFront);
+            }
+        });
+
+        let ty = gtk::glib::VariantTy::new("(uuu)").unwrap();
+        let open = gtk::gio::SimpleAction::new(crate::notify::OPEN_MESSAGE_ACTION, Some(ty));
+        let win = self.window.clone();
+        let osender = sender.clone();
+        open.connect_activate(move |_, param| {
+            crate::desktop::present_window(&win);
+            if let Some((account_id, folder_id, message_id)) =
+                param.and_then(|v| v.get::<(u32, u32, u32)>())
+            {
+                osender.input(AppMsg::OpenMessageFromNotification {
+                    account_id,
+                    folder_id,
+                    message_id,
+                });
+            }
+        });
+        app.add_action(&open);
+
+        // Notification buttons (#38): act on the message where it lies,
+        // without presenting the window — that's their point.
+        for (name, mk) in [
+            (
+                crate::notify::MARK_READ_ACTION,
+                (&|account_id, folder_id, message_id| AppMsg::NotificationMarkRead {
+                    account_id,
+                    folder_id,
+                    message_id,
+                }) as &dyn Fn(u32, u32, u32) -> AppMsg,
+            ),
+            (
+                crate::notify::ARCHIVE_ACTION,
+                &|account_id, folder_id, message_id| AppMsg::NotificationArchive {
+                    account_id,
+                    folder_id,
+                    message_id,
+                },
+            ),
+            (
+                crate::notify::DELETE_ACTION,
+                &|account_id, folder_id, message_id| AppMsg::NotificationDelete {
+                    account_id,
+                    folder_id,
+                    message_id,
+                },
+            ),
+            (
+                crate::notify::SPAM_ACTION,
+                &|account_id, folder_id, message_id| AppMsg::NotificationSpam {
+                    account_id,
+                    folder_id,
+                    message_id,
+                },
+            ),
+        ] {
+            let act = gtk::gio::SimpleAction::new(name, Some(ty));
+            let asender = sender.clone();
+            act.connect_activate(move |_, param| {
+                // No window will spend the shell's launch token, so
+                // end the launch here, or the busy pointer stays up.
+                crate::startup::complete();
+                if let Some((account_id, folder_id, message_id)) =
+                    param.and_then(|v| v.get::<(u32, u32, u32)>())
+                {
+                    asender.input(mk(account_id, folder_id, message_id));
+                }
+            });
+            app.add_action(&act);
+        }
+        // Reply and Forward (#244) need the window: the message opens
+        // as a click on the notification would open it, and the
+        // composer follows once its body is in.
+        for (name, mk) in [
+            (
+                crate::notify::REPLY_ACTION,
+                (&|account_id, folder_id, message_id| AppMsg::NotificationReply {
+                    account_id,
+                    folder_id,
+                    message_id,
+                }) as &dyn Fn(u32, u32, u32) -> AppMsg,
+            ),
+            (
+                crate::notify::FORWARD_ACTION,
+                &|account_id, folder_id, message_id| AppMsg::NotificationForward {
+                    account_id,
+                    folder_id,
+                    message_id,
+                },
+            ),
+        ] {
+            let act = gtk::gio::SimpleAction::new(name, Some(ty));
+            let win = self.window.clone();
+            let asender = sender.clone();
+            act.connect_activate(move |_, param| {
+                crate::desktop::present_window(&win);
+                if let Some((account_id, folder_id, message_id)) =
+                    param.and_then(|v| v.get::<(u32, u32, u32)>())
+                {
+                    asender.input(AppMsg::OpenMessageFromNotification {
+                        account_id,
+                        folder_id,
+                        message_id,
+                    });
+                    asender.input(mk(account_id, folder_id, message_id));
+                }
+            });
+            app.add_action(&act);
+        }
+    }
 }

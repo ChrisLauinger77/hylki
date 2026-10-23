@@ -636,6 +636,64 @@ impl AppModel {
             _ => unreachable!("not routed to on_workers"),
         }
     }
+
+    /// The header Refresh's icon/spinner faces, and its click.
+    pub(super) fn init_refresh_buttons(
+        &mut self,
+        widgets: &AppModelWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        {
+            let icon = gtk::Image::from_icon_name("view-refresh-symbolic");
+            self.sidebar_refresh_stack.add_named(&icon, Some("icon"));
+            self.sidebar_refresh_stack
+                .add_named(&self.sidebar_refresh_spinner, Some("spinner"));
+            self.sidebar_refresh_stack.set_visible_child_name("icon");
+            self.sidebar_refresh
+                .set_child(Some(&self.sidebar_refresh_stack));
+            let s = sender.input_sender().clone();
+            self.sidebar_refresh.connect_clicked(move |_| {
+                let _ = s.send(AppMsg::Refresh);
+            });
+            // Long-press slides the status bar down — the place to see what
+            // the spinner is spinning about. Claiming the sequence keeps the
+            // release from also firing the button's click (a refresh).
+            let long = gtk::GestureLongPress::new();
+            let s = sender.input_sender().clone();
+            long.connect_pressed(move |gesture, _, _| {
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+                let _ = s.send(AppMsg::ToggleNotifications);
+            });
+            self.sidebar_refresh.add_controller(long);
+        }
+        // The peek panel's Refresh: the same icon/spinner faces.
+        {
+            let icon = gtk::Image::from_icon_name("view-refresh-symbolic");
+            self.peek_refresh_stack.add_named(&icon, Some("icon"));
+            self.peek_refresh_stack
+                .add_named(&self.peek_refresh_spinner, Some("spinner"));
+            self.peek_refresh_stack.set_visible_child_name("icon");
+        }
+        // Started with no network: orange from the first frame (#442).
+        if !crate::power::online() {
+            self.show_network_state();
+        }
+        if self.rail_active {
+            widgets
+                .sidebar_split
+                .set_min_sidebar_width(SIDEBAR_RAIL_WIDTH);
+            widgets
+                .sidebar_split
+                .set_max_sidebar_width(SIDEBAR_RAIL_WIDTH);
+            set_sidebar_header_compact(
+                &widgets.sidebar_header,
+                &widgets.app_title,
+                &widgets.sidebar_menu,
+                &self.sidebar_refresh,
+                true,
+            );
+        }
+    }
 }
 
 #[cfg(test)]

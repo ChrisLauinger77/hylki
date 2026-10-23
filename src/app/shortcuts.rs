@@ -505,4 +505,158 @@ impl AppModel {
             _ => unreachable!("not routed to on_shortcuts"),
         }
     }
+
+    /// Single-key shortcuts. The controller is on the window in the bubble
+    /// phase, so the focused widget always gets first refusal: a search entry
+    /// or the composer consumes the letter itself and nothing here fires.
+    /// `focus_takes_keys` covers the rest — chiefly the reader's web view,
+    /// which handles keys without consuming them.
+    pub(super) fn install_key_controller(
+        &mut self,
+        root: &adw::ApplicationWindow,
+        sender: &ComponentSender<Self>,
+    ) {
+        let keys = gtk::EventControllerKey::new();
+        let s = sender.clone();
+        let window = root.clone();
+        let enabled = self.single_key.clone();
+        let gmail = self.gmail_keys.clone();
+        let probe = self.message_list.model().selection_probe();
+        // A tag key carries the rows selected as it is pressed (#416).
+        let shortcut = move |action: Shortcut| match action {
+            Shortcut::Tag(n) => AppMsg::TagKey {
+                n,
+                slots: probe.slots(),
+            },
+            action => AppMsg::Shortcut(action),
+        };
+        // The first key of a Gmail sequence (g or *) and when it came.
+        let pending: std::rc::Rc<std::cell::Cell<Option<(char, std::time::Instant)>>> =
+            Default::default();
+        keys.connect_key_pressed(move |_, keyval, _, state| {
+            let keyval = without_caps_lock(keyval, state);
+            let ctrl = state.contains(gtk::gdk::ModifierType::CONTROL_MASK);
+            let shift = state.contains(gtk::gdk::ModifierType::SHIFT_MASK);
+            // Ctrl+? opens the reference whether or not the shortcuts
+            // themselves are switched on.
+            if ctrl && matches!(keyval, gtk::gdk::Key::question | gtk::gdk::Key::slash) {
+                s.input(AppMsg::ShowShortcuts);
+                return gtk::glib::Propagation::Stop;
+            }
+            // Ctrl+Z undoes the last action, Ctrl+Shift+Z and Ctrl+Y put
+            // it back (#200). Text fields and the composer keep all three
+            // for their own text history.
+            let undo_key = ctrl && !shift && keyval == gtk::gdk::Key::z;
+            let redo_key = ctrl
+                && ((shift && matches!(keyval, gtk::gdk::Key::z | gtk::gdk::Key::Z))
+                    || keyval == gtk::gdk::Key::y);
+            if undo_key || redo_key {
+                if focus_is_text(&window) || focus_in_compose(&window) {
+                    return gtk::glib::Propagation::Proceed;
+                }
+                s.input(if redo_key { AppMsg::Redo } else { AppMsg::Undo });
+                return gtk::glib::Propagation::Stop;
+            }
+            // Ctrl+C with the keyboard on the list or the window itself:
+            // a selection made in the reader still wants copying (the
+            // list takes focus back after a click over a message body).
+            // The reader's own document handles the key when it has focus;
+            // a text field or composer keeps its native copy.
+            if ctrl
+                && !shift
+                && keyval == gtk::gdk::Key::c
+                && !focus_takes_keys(&window)
+                && !focus_in_compose(&window)
+            {
+                s.input(AppMsg::CopyReaderSelection);
+                return gtk::glib::Propagation::Proceed;
+            }
+            // The keys other mail apps use (#328), with or without
+            // single-key shortcuts. A composer keeps them: Ctrl+U
+            // underlines there, and a reply should not start from the
+            // middle of another.
+            if ctrl
+                && !state.contains(gtk::gdk::ModifierType::ALT_MASK)
+                && !focus_in_compose(&window)
+            {
+                if let Some(msg) = ctrl_shortcut_for(keyval, shift) {
+                    s.input(msg);
+                    return gtk::glib::Propagation::Stop;
+                }
+            }
+            if ctrl || state.contains(gtk::gdk::ModifierType::ALT_MASK) {
+                return gtk::glib::Propagation::Proceed;
+            }
+            // Escape backs out to the message list whatever else is going on,
+            // and without needing single-key shortcuts switched on. A text
+            // field keeps it, though — there it clears the search.
+            if keyval == gtk::gdk::Key::Escape {
+                if focus_is_text(&window) {
+                    return gtk::glib::Propagation::Proceed;
+                }
+                s.input(AppMsg::Shortcut(Shortcut::BackToList));
+                return gtk::glib::Propagation::Stop;
+            }
+            // Delete moves the selection to Trash and Shift+Delete erases
+            // it, Thunderbird's key (#471), also without single-key
+            // shortcuts. The list catches both first when it has focus;
+            // this is the reader and the rest (#486).
+            if matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete)
+                && !focus_is_text(&window)
+                && !focus_in_compose(&window)
+            {
+                s.input(shortcut(if shift {
+                    Shortcut::DeleteForever
+                } else {
+                    Shortcut::Delete
+                }));
+                return gtk::glib::Propagation::Stop;
+            }
+            if !enabled.get() || focus_is_text(&window) || focus_in_compose(&window) {
+                return gtk::glib::Propagation::Proceed;
+            }
+            if focus_takes_keys(&window) && reader_keeps(keyval) {
+                return gtk::glib::Propagation::Proceed;
+            }
+            if gmail.get() {
+                // Shift alone starts nothing and ends nothing.
+                if matches!(keyval, gtk::gdk::Key::Shift_L | gtk::gdk::Key::Shift_R) {
+                    return gtk::glib::Propagation::Proceed;
+                }
+                let first = pending
+                    .take()
+                    .filter(|(_, at)| at.elapsed() < std::time::Duration::from_millis(1500));
+                if let Some((first, _)) = first {
+                    if let Some(action) = gmail_sequence(first, keyval) {
+                        s.input(shortcut(action));
+                    }
+                    return gtk::glib::Propagation::Stop;
+                }
+                let start = match keyval {
+                    gtk::gdk::Key::g => Some('g'),
+                    gtk::gdk::Key::asterisk => Some('*'),
+                    _ => None,
+                };
+                if let Some(c) = start {
+                    pending.set(Some((c, std::time::Instant::now())));
+                    return gtk::glib::Propagation::Stop;
+                }
+                return match gmail_shortcut_for(keyval, shift) {
+                    Some(action) => {
+                        s.input(shortcut(action));
+                        gtk::glib::Propagation::Stop
+                    }
+                    None => gtk::glib::Propagation::Proceed,
+                };
+            }
+            match shortcut_for(keyval, shift) {
+                Some(action) => {
+                    s.input(shortcut(action));
+                    gtk::glib::Propagation::Stop
+                }
+                None => gtk::glib::Propagation::Proceed,
+            }
+        });
+        root.add_controller(keys);
+    }
 }

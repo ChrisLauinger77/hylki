@@ -380,4 +380,54 @@ impl AppModel {
             _ => unreachable!("not routed to on_compose_host"),
         }
     }
+
+    /// The inline compose/reply pane is an overlay over the WHOLE reader
+    /// pane — its header bar included: revealed, it slides down from the
+    /// top and covers everything (the composer's own header carries the
+    /// window decorations meanwhile). While closed it must not eat the
+    /// reader's clicks. Wrapping happens here because the view macro's
+    /// deep nesting makes an in-place Overlay unwieldy.
+    pub(super) fn init_compose_overlay(&mut self, widgets: &AppModelWidgets) {
+        self.reader_compose_revealer.set_can_target(false);
+        {
+            let pane = widgets.reader_bin.child().expect("reader pane");
+            widgets.reader_bin.set_child(None::<&gtk::Widget>);
+            // Split-reply slot (#86) above the reader; the full-cover
+            // revealer stays an overlay above the whole assembly. A Paned
+            // rather than a Box so the composer's height is the divider
+            // position — dragged by the user, immune to the editor's natural
+            // height — instead of whatever the composer asks for.
+            pane.set_vexpand(true);
+            // The reader over the bottom slot (#212), the pair beneath the
+            // top slot. Each slot is hidden while no split reply is open in
+            // it, which hides its divider too.
+            let lower = &self.reader_split_lower;
+            lower.set_start_child(Some(&pane));
+            lower.set_end_child(Some(&self.reader_split_bottom));
+            lower.set_resize_start_child(true);
+            lower.set_shrink_start_child(true);
+            lower.set_resize_end_child(false);
+            lower.set_shrink_end_child(false);
+            lower.set_vexpand(true);
+            self.reader_split_bottom.set_visible(false);
+            let split = &self.reader_split;
+            split.set_start_child(Some(&self.reader_split_top));
+            split.set_end_child(Some(lower));
+            // Window resizes go to the reader; the composer keeps its set
+            // height and never shrinks below its minimum. The reader may
+            // shrink — the divider clamp at open time is what keeps a slice
+            // of it on screen.
+            split.set_resize_start_child(false);
+            split.set_shrink_start_child(false);
+            split.set_resize_end_child(true);
+            split.set_shrink_end_child(true);
+            self.reader_split_top.set_visible(false);
+            let overlay = gtk::Overlay::new();
+            overlay.set_child(Some(split));
+            overlay.add_overlay(&self.reader_compose_revealer);
+            // Over everything: the send morph's stage covers the whole pane.
+            overlay.add_overlay(&self.send_morph);
+            widgets.reader_bin.set_child(Some(&overlay));
+        }
+    }
 }

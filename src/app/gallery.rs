@@ -206,4 +206,42 @@ impl AppModel {
             _ => unreachable!("not routed to on_gallery"),
         }
     }
+
+    /// The attachments gallery is the content stack's second page. Wrap it in a
+    /// ToolbarView + HeaderBar so it keeps the window controls (close/minimize)
+    /// that otherwise live only on the reader pane's header.
+    pub(super) fn init_gallery_page(
+        &mut self,
+        widgets: &AppModelWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        use gtk::prelude::*;
+        let gallery_tv = adw::ToolbarView::new();
+        let gallery_hb = adw::HeaderBar::new();
+        gallery_hb.add_css_class("flat");
+        let title = gtk::Label::new(Some(i18n("Attachments").as_str()));
+        title.add_css_class("pane-title");
+        gallery_hb.set_title_widget(Some(&title));
+        // Leftmost, same spot as the message list header's: the sidebar
+        // collapse/expand toggle.
+        let sidebar_btn = gtk::Button::from_icon_name("sidebar-show-symbolic");
+        sidebar_btn.set_tooltip_text(Some(i18n("Toggle sidebar").as_str()));
+        sidebar_btn.add_css_class("flat");
+        let s = sender.input_sender().clone();
+        sidebar_btn.connect_clicked(move |_| {
+            let _ = s.send(AppMsg::ToggleSidebar);
+        });
+        gallery_hb.pack_start(&sidebar_btn);
+        gallery_tv.add_top_bar(&gallery_hb);
+        gallery_tv.set_content(Some(self.gallery.widget()));
+        widgets
+            .content_stack
+            .add_named(&gallery_tv, Some("gallery"));
+
+        // The contacts view brings its own per-pane headers (so its
+        // divider runs to the very top, like the mail panes').
+        widgets
+            .content_stack
+            .add_named(self.contacts_page.widget(), Some("contacts"));
+    }
 }

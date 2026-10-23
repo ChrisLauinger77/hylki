@@ -311,4 +311,39 @@ impl AppModel {
             _ => unreachable!("not routed to on_sidebar_peek"),
         }
     }
+
+    /// Pointer tracking drives the hover peek: with the hover-expand
+    /// preference on, moving the pointer over the docked rail floats the
+    /// panel out. The peek never folds back on its own — the pointer
+    /// leaving used to arm a one-second dismissal, but the panel's menu
+    /// popover is its own surface, so merely opening it counted as
+    /// leaving and the panel slid away under the menu. Now only a click
+    /// outside the panel (the scrim), a swipe, or a navigation closes it.
+    /// The handler fires in every mode — the guards in the AppMsg handler
+    /// keep it meaningless outside a rail.
+    pub(super) fn init_hover_peek(
+        &mut self,
+        widgets: &AppModelWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        if let Some(rail) = widgets.sidebar_split.sidebar() {
+            let motion = gtk::EventControllerMotion::new();
+            let armed = std::rc::Rc::new(std::cell::Cell::new(false));
+            {
+                let armed = armed.clone();
+                motion.connect_enter(move |_, _, _| armed.set(true));
+            }
+            // Hover-open waits for the pointer to actually move over the
+            // rail. GTK also synthesises an "enter" when the rail reappears
+            // under a resting pointer as the panel slides away — opening on
+            // that would fold and float forever.
+            let s = sender.input_sender().clone();
+            motion.connect_motion(move |_, _, _| {
+                if armed.replace(false) {
+                    let _ = s.send(AppMsg::SidebarHoverEnter);
+                }
+            });
+            rail.add_controller(motion);
+        }
+    }
 }

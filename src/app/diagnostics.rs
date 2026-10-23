@@ -237,3 +237,16 @@ impl AppModel {
         }
     }
 }
+
+/// Return freed heap to the system now and then. What the gallery,
+/// the composer or a big conversation allocated and dropped otherwise
+/// stays held by the allocator, and a system monitor counts it against
+/// the app: a user's log showed 1.73 GB held with 270 MB live.
+pub(super) fn start_heap_trim() {
+    gtk::glib::timeout_add_seconds_local(30, || {
+        if let Some(held) = crate::memory_report::trim_if_worthwhile() {
+            tracing::debug!(target: "hylki::memory", "trimmed the heap: {} was freed but held", crate::memory_report::human_bytes(held as u64));
+        }
+        gtk::glib::ControlFlow::Continue
+    });
+}

@@ -600,6 +600,35 @@ impl AppModel {
             _ => unreachable!("not routed to on_accounts"),
         }
     }
+
+    /// One-time, dismissible keyring setup tip for Linux Mint / Cinnamon, where
+    /// the Secret Service often needs configuring so passwords persist and the
+    /// keyring auto-unlocks at login. Only shown once the user actually has an
+    /// account (so it isn't the very first thing a new user sees), and never
+    /// again after "Don't show again".
+    pub(super) fn show_startup_notices(&mut self, sender: &ComponentSender<Self>) {
+        if !self.config.is_empty()
+            && crate::platform::is_mint_cinnamon()
+            && !config::mint_keyring_help_dismissed()
+        {
+            sender.input(AppMsg::ShowKeyringHelp { problem: false });
+        }
+
+        // An earlier install's data came across at this start (see
+        // `legacy`): say so once, and take its start-at-login over — the
+        // portal's autostart entry is per app ID, so it has to be asked
+        // for again under this one.
+        if let Some(from) = crate::legacy::migrated_from() {
+            if self.run_in_background.get() && self.autostart {
+                crate::background::request(true);
+            }
+            sender.input(AppMsg::ShowCarryOverNotice(from));
+        } else if std::env::var_os("HYLKI_SHOWCASE_CARRY_OVER").is_some() {
+            // Opens the notice as if Vireo's data had just come across, for
+            // checking it by hand.
+            sender.input(AppMsg::ShowCarryOverNotice(&crate::legacy::PREDECESSORS[0]));
+        }
+    }
 }
 
 #[cfg(test)]
