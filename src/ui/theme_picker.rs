@@ -25,6 +25,8 @@ const THUMB_H: f64 = 50.0;
 const THUMB_RADIUS: f64 = 6.0;
 /// Air around the thumbnail for its shadow to fall in: the card shadow's
 /// deepest layer reaches 10pt below the edge, but is all but gone past 6.
+/// The miniature window's header bar height.
+const THUMB_HEADER_H: f64 = 11.0;
 const THUMB_INSET: f64 = 6.0;
 
 /// libadwaita's `.card` shadow — the one the Settings groups around this
@@ -191,142 +193,7 @@ fn thumbnail(m: Mini) -> gtk::DrawingArea {
     area.set_halign(gtk::Align::Center);
     area.set_valign(gtk::Align::Center);
     area.set_draw_func(move |_, cr, w, h| {
-        let (x0, y0) = (
-            ((w as f64 - THUMB_W) / 2.0).round(),
-            ((h as f64 - THUMB_H) / 2.0).round(),
-        );
-        let accent = match m.accent {
-            Some(hex) => rgb(hex),
-            // The desktop's own accent, as libadwaita paints its buttons.
-            None => {
-                let c = adw::StyleManager::default().accent_color().to_rgba();
-                (c.red() as f64, c.green() as f64, c.blue() as f64)
-            }
-        };
-
-        for (dy, blur, spread, alpha) in CARD_SHADOW {
-            shadow(
-                cr,
-                x0,
-                y0 + dy,
-                THUMB_W,
-                THUMB_H,
-                THUMB_RADIUS,
-                blur,
-                spread,
-                alpha,
-            );
-        }
-
-        // Everything inside is clipped to the window's rounded shape.
-        let _ = cr.save();
-        rounded(cr, x0, y0, THUMB_W, THUMB_H, THUMB_RADIUS);
-        cr.clip();
-
-        fill(cr, x0, y0, THUMB_W, THUMB_H, rgb(m.window), 1.0);
-
-        // The header bar, over a hairline.
-        let header_h = 11.0;
-        fill(cr, x0, y0, THUMB_W, header_h, rgb(m.header), 1.0);
-        fill(
-            cr,
-            x0,
-            y0 + header_h - 0.5,
-            THUMB_W,
-            0.5,
-            rgb(m.border),
-            1.0,
-        );
-
-        // The sidebar, with one row selected in the accent.
-        let side_w = 24.0;
-        let body_y = y0 + header_h;
-        fill(
-            cr,
-            x0,
-            body_y,
-            side_w,
-            THUMB_H - header_h,
-            rgb(m.sidebar),
-            1.0,
-        );
-        fill(
-            cr,
-            x0 + side_w - 0.5,
-            body_y,
-            0.5,
-            THUMB_H - header_h,
-            rgb(m.border),
-            1.0,
-        );
-        let row_h = 7.0;
-        rounded(
-            cr,
-            x0 + 2.5,
-            body_y + 4.0 + row_h - 1.5,
-            side_w - 5.0,
-            row_h - 1.0,
-            2.0,
-        );
-        cr.set_source_rgba(accent.0, accent.1, accent.2, 0.22);
-        let _ = cr.fill();
-
-        // The content pane, with a raised card and an accent button.
-        fill(
-            cr,
-            x0 + side_w,
-            body_y,
-            THUMB_W - side_w,
-            THUMB_H - header_h,
-            rgb(m.view),
-            1.0,
-        );
-        let (cx, cy, cw, ch) = (
-            x0 + side_w + 5.0,
-            body_y + 5.0,
-            THUMB_W - side_w - 10.0,
-            THUMB_H - header_h - 10.0,
-        );
-        rounded(cr, cx, cy, cw, ch, 3.5);
-        let card = rgb(m.card);
-        cr.set_source_rgb(card.0, card.1, card.2);
-        let _ = cr.fill_preserve();
-        let border = rgb(m.border);
-        cr.set_source_rgba(border.0, border.1, border.2, 0.9);
-        cr.set_line_width(0.75);
-        let _ = cr.stroke();
-        let (bw, bh) = (15.0, 6.5);
-        rounded(cr, cx + cw - bw - 3.5, cy + ch - bh - 3.5, bw, bh, 3.25);
-        cr.set_source_rgb(accent.0, accent.1, accent.2);
-        let _ = cr.fill();
-        pill(
-            cr,
-            cx + cw - bw - 3.5 + 4.0,
-            cy + ch - bh - 3.5 + 2.5,
-            bw - 8.0,
-            1.5,
-            rgb(m.accent_fg),
-            0.9,
-        );
-
-        let _ = cr.restore();
-
-        // The window's own edge: a hairline so a light window still reads
-        // as a window on a light card, and a dark one on a dark card.
-        rounded(
-            cr,
-            x0 + 0.5,
-            y0 + 0.5,
-            THUMB_W - 1.0,
-            THUMB_H - 1.0,
-            THUMB_RADIUS - 0.5,
-        );
-        let window = rgb(m.window);
-        let lum = 0.299 * window.0 + 0.587 * window.1 + 0.114 * window.2;
-        let line = if lum > 0.5 { 0.0 } else { 1.0 };
-        cr.set_source_rgba(line, line, line, 0.16);
-        cr.set_line_width(1.0);
-        let _ = cr.stroke();
+        paint_thumbnail(cr, w, h, &m);
     });
     // The System card outlives an accent change — the Settings window is
     // kept warm between openings — so its thumbnails follow it. The handler
@@ -343,6 +210,174 @@ fn thumbnail(m: Mini) -> gtk::DrawingArea {
         }
     });
     area
+}
+
+/// Draw one theme's miniature window centred in a `w` by `h` area.
+fn paint_thumbnail(cr: &gtk::cairo::Context, w: i32, h: i32, m: &Mini) {
+    let (x0, y0) = (
+        ((w as f64 - THUMB_W) / 2.0).round(),
+        ((h as f64 - THUMB_H) / 2.0).round(),
+    );
+    let accent = match m.accent {
+        Some(hex) => rgb(hex),
+        // The desktop's own accent, as libadwaita paints its buttons.
+        None => {
+            let c = adw::StyleManager::default().accent_color().to_rgba();
+            (c.red() as f64, c.green() as f64, c.blue() as f64)
+        }
+    };
+
+    for (dy, blur, spread, alpha) in CARD_SHADOW {
+        shadow(
+            cr,
+            x0,
+            y0 + dy,
+            THUMB_W,
+            THUMB_H,
+            THUMB_RADIUS,
+            blur,
+            spread,
+            alpha,
+        );
+    }
+
+    // Everything inside is clipped to the window's rounded shape.
+    let _ = cr.save();
+    rounded(cr, x0, y0, THUMB_W, THUMB_H, THUMB_RADIUS);
+    cr.clip();
+
+    fill(cr, x0, y0, THUMB_W, THUMB_H, rgb(m.window), 1.0);
+
+    // The header bar, over a hairline.
+    let header_h = THUMB_HEADER_H;
+    fill(cr, x0, y0, THUMB_W, header_h, rgb(m.header), 1.0);
+    fill(
+        cr,
+        x0,
+        y0 + header_h - 0.5,
+        THUMB_W,
+        0.5,
+        rgb(m.border),
+        1.0,
+    );
+
+    let body_y = y0 + header_h;
+    let side_w = paint_sidebar(cr, x0, body_y, m, accent);
+    paint_content(cr, x0, side_w, body_y, m, accent);
+
+    let _ = cr.restore();
+
+    paint_window_edge(cr, x0, y0, m);
+}
+
+/// The thumbnail's sidebar, with one row selected in the accent; its width.
+fn paint_sidebar(
+    cr: &gtk::cairo::Context,
+    x0: f64,
+    body_y: f64,
+    m: &Mini,
+    accent: (f64, f64, f64),
+) -> f64 {
+    let header_h = THUMB_HEADER_H;
+    let side_w = 24.0;
+    fill(
+        cr,
+        x0,
+        body_y,
+        side_w,
+        THUMB_H - header_h,
+        rgb(m.sidebar),
+        1.0,
+    );
+    fill(
+        cr,
+        x0 + side_w - 0.5,
+        body_y,
+        0.5,
+        THUMB_H - header_h,
+        rgb(m.border),
+        1.0,
+    );
+    let row_h = 7.0;
+    rounded(
+        cr,
+        x0 + 2.5,
+        body_y + 4.0 + row_h - 1.5,
+        side_w - 5.0,
+        row_h - 1.0,
+        2.0,
+    );
+    cr.set_source_rgba(accent.0, accent.1, accent.2, 0.22);
+    let _ = cr.fill();
+    side_w
+}
+
+/// The thumbnail's content pane, right of the sidebar, with a raised card
+/// and an accent button.
+fn paint_content(
+    cr: &gtk::cairo::Context,
+    x0: f64,
+    side_w: f64,
+    body_y: f64,
+    m: &Mini,
+    accent: (f64, f64, f64),
+) {
+    let header_h = THUMB_HEADER_H;
+    fill(
+        cr,
+        x0 + side_w,
+        body_y,
+        THUMB_W - side_w,
+        THUMB_H - header_h,
+        rgb(m.view),
+        1.0,
+    );
+    let (cx, cy, cw, ch) = (
+        x0 + side_w + 5.0,
+        body_y + 5.0,
+        THUMB_W - side_w - 10.0,
+        THUMB_H - header_h - 10.0,
+    );
+    rounded(cr, cx, cy, cw, ch, 3.5);
+    let card = rgb(m.card);
+    cr.set_source_rgb(card.0, card.1, card.2);
+    let _ = cr.fill_preserve();
+    let border = rgb(m.border);
+    cr.set_source_rgba(border.0, border.1, border.2, 0.9);
+    cr.set_line_width(0.75);
+    let _ = cr.stroke();
+    let (bw, bh) = (15.0, 6.5);
+    rounded(cr, cx + cw - bw - 3.5, cy + ch - bh - 3.5, bw, bh, 3.25);
+    cr.set_source_rgb(accent.0, accent.1, accent.2);
+    let _ = cr.fill();
+    pill(
+        cr,
+        cx + cw - bw - 3.5 + 4.0,
+        cy + ch - bh - 3.5 + 2.5,
+        bw - 8.0,
+        1.5,
+        rgb(m.accent_fg),
+        0.9,
+    );
+}
+
+/// The window's own edge: a hairline so a light window still reads as a
+/// window on a light card, and a dark one on a dark card.
+fn paint_window_edge(cr: &gtk::cairo::Context, x0: f64, y0: f64, m: &Mini) {
+    rounded(
+        cr,
+        x0 + 0.5,
+        y0 + 0.5,
+        THUMB_W - 1.0,
+        THUMB_H - 1.0,
+        THUMB_RADIUS - 0.5,
+    );
+    let window = rgb(m.window);
+    let lum = 0.299 * window.0 + 0.587 * window.1 + 0.114 * window.2;
+    let line = if lum > 0.5 { 0.0 } else { 1.0 };
+    cr.set_source_rgba(line, line, line, 0.16);
+    cr.set_line_width(1.0);
+    let _ = cr.stroke();
 }
 
 /// A rounded-rectangle path.
