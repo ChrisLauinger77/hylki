@@ -288,11 +288,74 @@ pub fn list() -> Vec<Source> {
     sources
 }
 
-/// The sources as EDS and GNOME Online Accounts name them.
+/// The sources as EDS and GNOME Online Accounts name them: the Hylki book
+/// first, then every account, book group and directory by name.
 fn list_own() -> Vec<Source> {
     let off = off();
+    let mut out = vec![hylki_source(&off)];
+    let Some(registry) = crate::contacts::registry_sources() else {
+        return out;
+    };
+    let sources: HashMap<String, String> = registry
+        .iter()
+        .map(|(_, uid, data)| (uid.clone(), data.clone()))
+        .collect();
+    let online = crate::goa::contacts_accounts();
+    let carddav: HashMap<String, crate::carddav::Account> = crate::carddav::list()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|a| (a.uid.clone(), a))
+        .collect();
+
+    let mut accounts = Vec::new();
+    for (id, books) in books_by_group(&sources, &carddav, &off) {
+        let (books, all_eds_off) = sorted_books(books);
+        let on = !off.contains(&id);
+        if id == THIS_COMPUTER {
+            out.push(this_computer_source(id, books, on));
+            continue;
+        }
+        let data = sources.get(&id).cloned().unwrap_or_default();
+        let kf = crate::platform::keyfile(&data);
+        let display = key_of(&kf, "Data Source", "DisplayName");
+        let goa_id = key_of(&kf, "GNOME Online Accounts", "AccountId");
+        let source = if !goa_id.is_empty() {
+            let identity = key_of(&kf, "Collection", "Identity");
+            let goa = online.get(&goa_id);
+            online_source(
+                id,
+                books,
+                on,
+                all_eds_off,
+                goa,
+                [identity, display],
+                &sources,
+            )
+        } else if let Some(account) = carddav.get(&id) {
+            carddav_source(id, books, on, account, &data)
+        } else {
+            other_source(id, books, on, all_eds_off, display)
+        };
+        accounts.push(source);
+    }
+    accounts.extend(ldap_sources(&off));
+    // By name, and two of one name (an address used for iCloud and for
+    // Microsoft 365) always in the same order: the books are read from a
+    // map, whose order changes from one read to the next.
+    accounts.sort_by(|a, b| {
+        a.title
+            .to_lowercase()
+            .cmp(&b.title.to_lowercase())
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    out.extend(accounts);
+    out
+}
+
+/// The Hylki book's row.
+fn hylki_source(off: &HashSet<String>) -> Source {
     let count = crate::local_contacts::count();
-    let mut out = vec![Source {
+    Source {
         own_title: String::new(),
         given: None,
         id: HYLKI.to_string(),
@@ -310,24 +373,19 @@ fn list_own() -> Vec<Source> {
         on: !off.contains(HYLKI),
         paused: None,
         status: None,
-    }];
-    let Some(registry) = crate::contacts::registry_sources() else {
-        return out;
-    };
-    let sources: HashMap<String, String> = registry
-        .iter()
-        .map(|(_, uid, data)| (uid.clone(), data.clone()))
-        .collect();
-    let online = crate::goa::contacts_accounts();
-    let carddav: HashMap<String, crate::carddav::Account> = crate::carddav::list()
-        .unwrap_or_default()
-        .into_iter()
-        .map(|a| (a.uid.clone(), a))
-        .collect();
+    }
+}
 
-    // The address books by the source they are grouped under, LDAP aside.
+/// The address books by the source they are grouped under, LDAP aside,
+/// each with whether EDS has it on. A CardDAV account still looking for
+/// its books is listed all the same.
+fn books_by_group(
+    sources: &HashMap<String, String>,
+    carddav: &HashMap<String, crate::carddav::Account>,
+    off: &HashSet<String>,
+) -> HashMap<String, Vec<(Book, bool)>> {
     let mut groups: HashMap<String, Vec<(Book, bool)>> = HashMap::new();
-    for (uid, data) in &sources {
+    for (uid, data) in sources {
         let Some(kf) = crate::platform::keyfile(data) else {
             continue;
         };
@@ -349,188 +407,209 @@ fn list_own() -> Vec<Source> {
             on: !off.contains(uid),
         };
         groups
-            .entry(group_of(uid, &sources))
+            .entry(group_of(uid, sources))
             .or_default()
             .push((book, eds_on));
     }
-    // A CardDAV account still looking for its books is listed all the same.
     for uid in carddav.keys() {
         groups.entry(uid.clone()).or_default();
     }
+    groups
+}
 
-    let mut accounts = Vec::new();
-    for (id, mut books) in groups {
-        books.sort_by_key(|(b, _)| b.name.to_lowercase());
-        let all_eds_off = !books.is_empty() && books.iter().all(|(_, eds_on)| !eds_on);
-        let books: Vec<Book> = books.into_iter().map(|(b, _)| b).collect();
-        let on = !off.contains(&id);
-        if id == THIS_COMPUTER {
-            out.push(Source {
+/// A group's books by name, and whether EDS has every one of them off.
+fn sorted_books(mut books: Vec<(Book, bool)>) -> (Vec<Book>, bool) {
+    books.sort_by_key(|(b, _)| b.name.to_lowercase());
+    let all_eds_off = !books.is_empty() && books.iter().all(|(_, eds_on)| !eds_on);
+    (books.into_iter().map(|(b, _)| b).collect(), all_eds_off)
+}
+
+/// A key of a source's key file, empty when absent.
+fn key_of(kf: &Option<gtk::glib::KeyFile>, group: &str, key: &str) -> String {
+    kf.as_ref()
+        .and_then(|k| k.string(group, key).ok())
+        .map(|s| s.to_string())
+        .unwrap_or_default()
+}
+
+/// The row of the books on this computer, which no source groups.
+fn this_computer_source(id: String, books: Vec<Book>, on: bool) -> Source {
+    Source {
+        own_title: String::new(),
+        given: None,
+        id,
+        kind: Kind::ThisComputer,
+        title: i18n("On This Computer"),
+        detail: i18n_f(
+            "{books} · kept by GNOME Contacts and Evolution",
+            &[("books", &books_line(&books))],
+        ),
+        mark: "computer-symbolic",
+        origin: Origin::Evolution,
+        books,
+        on,
+        paused: None,
+        status: None,
+    }
+}
+
+/// The row of a GNOME Online Accounts account. `names` are the
+/// collection's identity and display name, looked through for an address.
+fn online_source(
+    id: String,
+    books: Vec<Book>,
+    on: bool,
+    all_eds_off: bool,
+    goa: Option<&crate::goa::GoaContactsAccount>,
+    names: [String; 2],
+    sources: &HashMap<String, String>,
+) -> Source {
+    let host = books
+        .iter()
+        .find_map(|b| {
+            sources
+                .get(&b.uid)
+                .and_then(|d| crate::platform::keyfile_value(d, "Authentication", "Host"))
+        })
+        .unwrap_or_default();
+    let mark = online_mark(goa.map_or("", |g| g.provider_type.as_str()), &host);
+    // GNOME names an iCloud account by how it connects (WebDAV).
+    let provider = if mark == "icloud" {
+        "iCloud".to_string()
+    } else {
+        goa.map(|g| g.provider_name.clone())
+            .filter(|p| !p.is_empty())
+            .unwrap_or_else(|| i18n("Online account"))
+    };
+    // An address over the provider's name ("Microsoft 365").
+    let [collection_identity, display] = names;
+    let identity = [
+        goa.map(|g| g.identity.clone()).unwrap_or_default(),
+        collection_identity,
+        display,
+    ]
+    .into_iter()
+    .filter(|i| !i.is_empty())
+    .find(|i| i.contains('@'))
+    .or_else(|| goa.map(|g| g.identity.clone()).filter(|i| !i.is_empty()))
+    .unwrap_or_default();
+    let paused = (goa.is_some_and(|g| g.contacts_disabled) || all_eds_off)
+        .then(|| i18n("Contacts is switched off for this account in GNOME Online Accounts."));
+    Source {
+        own_title: String::new(),
+        given: None,
+        detail: format!("{provider} · {}", books_line(&books)),
+        mark,
+        id,
+        kind: Kind::Online,
+        title: identity,
+        origin: Origin::Online,
+        on: on && paused.is_none(),
+        books,
+        paused,
+        status: None,
+    }
+}
+
+/// The row of a CardDAV account; `data` is its source's key file.
+fn carddav_source(
+    id: String,
+    books: Vec<Book>,
+    on: bool,
+    account: &crate::carddav::Account,
+    data: &str,
+) -> Source {
+    let status = crate::carddav::status(account);
+    let detail = match status.problem() {
+        Some(problem) if account.enabled => problem,
+        _ if books.is_empty() => i18n("Looking for address books…"),
+        _ => format!("CardDAV · {}", books_line(&books)),
+    };
+    let origin = if is_hylki_made(data) {
+        Origin::Hylki
+    } else {
+        Origin::Evolution
+    };
+    Source {
+        own_title: String::new(),
+        given: None,
+        title: account.title(),
+        detail,
+        mark: carddav_mark(&account.url),
+        kind: Kind::CardDav(account.clone()),
+        origin,
+        on: on && account.enabled,
+        books,
+        paused: None,
+        status: Some(status),
+        id,
+    }
+}
+
+/// The row of any other group of books (an Evolution collection).
+fn other_source(
+    id: String,
+    books: Vec<Book>,
+    on: bool,
+    all_eds_off: bool,
+    display: String,
+) -> Source {
+    let title = if display.is_empty() {
+        books.first().map(|b| b.name.clone()).unwrap_or_default()
+    } else {
+        display
+    };
+    Source {
+        own_title: String::new(),
+        given: None,
+        title,
+        detail: books_line(&books),
+        mark: "x-office-address-book-symbolic",
+        kind: Kind::Other,
+        origin: Origin::Evolution,
+        on: on && !all_eds_off,
+        paused: all_eds_off.then(|| i18n("This address book is switched off in Evolution.")),
+        books,
+        status: None,
+        id,
+    }
+}
+
+/// A row for each LDAP directory.
+fn ldap_sources(off: &HashSet<String>) -> Vec<Source> {
+    crate::directory::list()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|dir| {
+            let failed = if dir.enabled {
+                crate::directory::last_error(&dir.uid)
+            } else {
+                None
+            };
+            let mut detail = format!("LDAP · {}", dir.host);
+            if !dir.base_dn.is_empty() {
+                detail.push_str(&format!(" · {}", dir.base_dn));
+            }
+            Source {
                 own_title: String::new(),
                 given: None,
-                id,
-                kind: Kind::ThisComputer,
-                title: i18n("On This Computer"),
-                detail: i18n_f(
-                    "{books} · kept by GNOME Contacts and Evolution",
-                    &[("books", &books_line(&books))],
-                ),
-                mark: "computer-symbolic",
-                origin: Origin::Evolution,
-                books,
-                on,
+                id: dir.uid.clone(),
+                title: dir.title(),
+                detail: failed.unwrap_or(detail),
+                mark: "network-server-symbolic",
+                origin: if is_hylki_made_ldap(&dir) {
+                    Origin::Hylki
+                } else {
+                    Origin::Evolution
+                },
+                on: !off.contains(&dir.uid) && dir.enabled,
+                kind: Kind::Ldap(dir),
+                books: Vec::new(),
                 paused: None,
                 status: None,
-            });
-            continue;
-        }
-        let data = sources.get(&id).cloned().unwrap_or_default();
-        let kf = crate::platform::keyfile(&data);
-        let get = |group: &str, key: &str| {
-            kf.as_ref()
-                .and_then(|k| k.string(group, key).ok())
-                .map(|s| s.to_string())
-                .unwrap_or_default()
-        };
-        let display = get("Data Source", "DisplayName");
-        let goa_id = get("GNOME Online Accounts", "AccountId");
-        if !goa_id.is_empty() {
-            let goa = online.get(&goa_id);
-            let host = books
-                .iter()
-                .find_map(|b| {
-                    sources
-                        .get(&b.uid)
-                        .and_then(|d| crate::platform::keyfile_value(d, "Authentication", "Host"))
-                })
-                .unwrap_or_default();
-            let mark = online_mark(goa.map_or("", |g| g.provider_type.as_str()), &host);
-            // GNOME names an iCloud account by how it connects (WebDAV).
-            let provider = if mark == "icloud" {
-                "iCloud".to_string()
-            } else {
-                goa.map(|g| g.provider_name.clone())
-                    .filter(|p| !p.is_empty())
-                    .unwrap_or_else(|| i18n("Online account"))
-            };
-            // An address over the provider's name ("Microsoft 365").
-            let identity = [
-                goa.map(|g| g.identity.clone()).unwrap_or_default(),
-                get("Collection", "Identity"),
-                display,
-            ]
-            .into_iter()
-            .filter(|i| !i.is_empty())
-            .find(|i| i.contains('@'))
-            .or_else(|| goa.map(|g| g.identity.clone()).filter(|i| !i.is_empty()))
-            .unwrap_or_default();
-            let paused = (goa.is_some_and(|g| g.contacts_disabled) || all_eds_off).then(|| {
-                i18n("Contacts is switched off for this account in GNOME Online Accounts.")
-            });
-            accounts.push(Source {
-                own_title: String::new(),
-                given: None,
-                detail: format!("{provider} · {}", books_line(&books)),
-                mark,
-                id,
-                kind: Kind::Online,
-                title: identity,
-                origin: Origin::Online,
-                on: on && paused.is_none(),
-                books,
-                paused,
-                status: None,
-            });
-            continue;
-        }
-        if let Some(account) = carddav.get(&id) {
-            let status = crate::carddav::status(account);
-            let detail = match status.problem() {
-                Some(problem) if account.enabled => problem,
-                _ if books.is_empty() => i18n("Looking for address books…"),
-                _ => format!("CardDAV · {}", books_line(&books)),
-            };
-            let origin = if is_hylki_made(&data) {
-                Origin::Hylki
-            } else {
-                Origin::Evolution
-            };
-            accounts.push(Source {
-                own_title: String::new(),
-                given: None,
-                title: account.title(),
-                detail,
-                mark: carddav_mark(&account.url),
-                kind: Kind::CardDav(account.clone()),
-                origin,
-                on: on && account.enabled,
-                books,
-                paused: None,
-                status: Some(status),
-                id,
-            });
-            continue;
-        }
-        let title = if display.is_empty() {
-            books.first().map(|b| b.name.clone()).unwrap_or_default()
-        } else {
-            display
-        };
-        accounts.push(Source {
-            own_title: String::new(),
-            given: None,
-            title,
-            detail: books_line(&books),
-            mark: "x-office-address-book-symbolic",
-            kind: Kind::Other,
-            origin: Origin::Evolution,
-            on: on && !all_eds_off,
-            paused: all_eds_off.then(|| i18n("This address book is switched off in Evolution.")),
-            books,
-            status: None,
-            id,
-        });
-    }
-    for dir in crate::directory::list().unwrap_or_default() {
-        let failed = if dir.enabled {
-            crate::directory::last_error(&dir.uid)
-        } else {
-            None
-        };
-        let mut detail = format!("LDAP · {}", dir.host);
-        if !dir.base_dn.is_empty() {
-            detail.push_str(&format!(" · {}", dir.base_dn));
-        }
-        accounts.push(Source {
-            own_title: String::new(),
-            given: None,
-            id: dir.uid.clone(),
-            title: dir.title(),
-            detail: failed.unwrap_or(detail),
-            mark: "network-server-symbolic",
-            origin: if is_hylki_made_ldap(&dir) {
-                Origin::Hylki
-            } else {
-                Origin::Evolution
-            },
-            on: !off.contains(&dir.uid) && dir.enabled,
-            kind: Kind::Ldap(dir),
-            books: Vec::new(),
-            paused: None,
-            status: None,
-        });
-    }
-    // By name, and two of one name (an address used for iCloud and for
-    // Microsoft 365) always in the same order: the books are read from a
-    // map, whose order changes from one read to the next.
-    accounts.sort_by(|a, b| {
-        a.title
-            .to_lowercase()
-            .cmp(&b.title.to_lowercase())
-            .then_with(|| a.id.cmp(&b.id))
-    });
-    out.extend(accounts);
-    out
+            }
+        })
+        .collect()
 }
 
 /// Whether Hylki made this collection: Evolution's carry keys Hylki never
@@ -568,6 +647,23 @@ pub fn switch_source(source: &Source, on: bool) -> Result<(), String> {
 mod tests {
     use super::{book_used, group_of, THIS_COMPUTER};
     use std::collections::{HashMap, HashSet};
+
+    /// contacts.toml as written: the switched-off IDs, then the names.
+    #[test]
+    fn contacts_toml_format() {
+        let file = super::SwitchFile {
+            off: vec!["eds-local".into(), "goa1".into()],
+            names: [("book-1".to_string(), "Family".to_string())]
+                .into_iter()
+                .collect(),
+        };
+        assert_eq!(
+            toml::to_string_pretty(&file).unwrap(),
+            "off = [\n    \"eds-local\",\n    \"goa1\",\n]\n\n[names]\nbook-1 = \"Family\"\n"
+        );
+        let empty: super::SwitchFile = toml::from_str("").unwrap();
+        assert!(empty.off.is_empty() && empty.names.is_empty());
+    }
 
     fn sources() -> HashMap<String, String> {
         HashMap::from([

@@ -111,9 +111,7 @@ fn suggestion(name: &str, address: &str) -> Option<Suggestion> {
         email: address.to_string(),
         from_contacts: true,
         from_directory: true,
-        score: 0,
-        own: false,
-        group: None,
+        ..Default::default()
     })
 }
 

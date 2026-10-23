@@ -18,12 +18,12 @@ pub fn present(
 ) {
     let on_choose = std::rc::Rc::new(on_choose);
     let mut contacts = crate::contacts::read_contacts();
-    contacts.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    contacts.sort_by_key(|c| c.name.to_lowercase());
 
     let win = adw::Window::builder()
         .transient_for(parent)
         .modal(true)
-        .title(&i18n("Contacts"))
+        .title(i18n("Contacts"))
         .default_width(420)
         .default_height(560)
         .build();
@@ -59,8 +59,8 @@ pub fn present(
     if contacts.is_empty() {
         let empty = adw::StatusPage::builder()
             .icon_name("x-office-address-book-symbolic")
-            .title(&i18n("No Contacts"))
-            .description(&i18n("Add contacts in the Contacts view to see them here."))
+            .title(i18n("No Contacts"))
+            .description(i18n("Add contacts in the Contacts view to see them here."))
             .build();
         scroller.set_child(Some(&empty));
     } else {
