@@ -190,7 +190,7 @@ pub(super) fn choose_identity(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::demo_account_configs;
+    use crate::app::demo::demo_account_configs;
 
     fn identities_fixture() -> Vec<ComposeAccount> {
         let mut config = demo_account_configs();
