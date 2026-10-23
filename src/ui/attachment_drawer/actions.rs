@@ -78,7 +78,7 @@ impl AttachmentDrawer {
     pub(super) fn save_attachment(&self, att: &Attachment) {
         let dialog = gtk::FileDialog::builder()
             .initial_name(&att.name)
-            .title(&i18n("Save Attachment"))
+            .title(i18n("Save Attachment"))
             .build();
         let data = att.data.clone();
         dialog.save(
@@ -101,7 +101,7 @@ impl AttachmentDrawer {
         }
         let atts = self.items.clone();
         let dialog = gtk::FileDialog::builder()
-            .title(&i18n("Save All Attachments"))
+            .title(i18n("Save All Attachments"))
             .build();
         dialog.select_folder(
             self.window().as_ref(),

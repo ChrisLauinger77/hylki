@@ -132,106 +132,8 @@ fn attachment_chip(
     });
     chip.append(&rm);
 
-    // The hover card: a larger picture when there is one, the name, and what
-    // kind of file it is with its size.
-    chip.set_has_tooltip(true);
-    {
-        let thumbs = thumbs.clone();
-        let owned = path.to_path_buf();
-        let name = name.clone();
-        let detail = match size {
-            Some(n) => format!("{kind} \u{b7} {}", crate::models::human_size(n)),
-            None => kind,
-        };
-        chip.connect_query_tooltip(move |_, _, _, _, tooltip| {
-            let card = gtk::Box::new(gtk::Orientation::Vertical, 6);
-            if let Some(Some(thumb)) = thumbs.borrow().get(&owned) {
-                let tex = &thumb.card;
-                let pic = gtk::Picture::for_paintable(tex);
-                pic.set_content_fit(gtk::ContentFit::Contain);
-                let (w, h) = (tex.width().max(1) as f64, tex.height().max(1) as f64);
-                let scale = (CARD_THUMB as f64 / w.max(h)).min(1.0);
-                pic.set_size_request((w * scale) as i32, (h * scale) as i32);
-                card.append(&pic);
-            }
-            let title = gtk::Label::new(Some(&name));
-            title.set_xalign(0.0);
-            title.set_wrap(true);
-            title.set_max_width_chars(40);
-            title.add_css_class("heading");
-            card.append(&title);
-            let info = gtk::Label::new(Some(&detail));
-            info.set_xalign(0.0);
-            card.append(&info);
-            tooltip.set_custom(Some(&card));
-            true
-        });
-    }
-
-    let open = {
-        let owned = path.to_path_buf();
-        let name = name.clone();
-        let chip = chip.downgrade();
-        move || {
-            let parent = chip
-                .upgrade()
-                .and_then(|c| c.root())
-                .and_downcast::<gtk::Window>();
-            let owned = owned.clone();
-            let name = name.clone();
-            gtk::glib::spawn_future_local(async move {
-                let read = owned.clone();
-                match gtk::gio::spawn_blocking(move || std::fs::read(read)).await {
-                    Ok(Ok(data)) => {
-                        crate::ui::attachments_gallery::open_bytes(&name, &data, parent.as_ref())
-                    }
-                    Ok(Err(e)) => tracing::warn!("could not read the attachment to open it: {e}"),
-                    Err(_) => {}
-                }
-            });
-        }
-    };
-    let open = std::rc::Rc::new(open);
-    let double = gtk::GestureClick::new();
-    double.set_button(gtk::gdk::BUTTON_PRIMARY);
-    {
-        let open = open.clone();
-        double.connect_pressed(move |_, n, _, _| {
-            if n == 2 {
-                open();
-            }
-        });
-    }
-    chip.add_controller(double);
-    let right = gtk::GestureClick::new();
-    right.set_button(gtk::gdk::BUTTON_SECONDARY);
-    {
-        let s = sender.input_sender().clone();
-        let chip_weak = chip.downgrade();
-        right.connect_pressed(move |gesture, _, x, y| {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-            let Some(chip) = chip_weak.upgrade() else {
-                return;
-            };
-            let open = open.clone();
-            let s = s.clone();
-            show_context_menu(
-                &chip,
-                x,
-                y,
-                vec![
-                    vec![
-                        MenuEntry::new(i18n("Open"), move || open()).icon("document-open-symbolic")
-                    ],
-                    vec![MenuEntry::new(i18n("Remove"), move || {
-                        let _ = s.send(ComposeInput::RemoveAttachment(index));
-                    })
-                    .icon("window-close-symbolic")],
-                ],
-            );
-        });
-    }
-    chip.add_controller(right);
+    add_hover_card(&chip, thumbs, path, &name, kind, size);
+    add_open_and_menu(&chip, path, &name, index, sender);
     chip
 }
 
@@ -524,4 +426,121 @@ fn append_chip(flow: &gtk::FlowBox, chip: &gtk::Box) {
         cell.set_can_focus(false);
         cell.set_focusable(false);
     }
+}
+
+/// The hover card: a larger picture when there is one, the name, and what
+/// kind of file it is with its size.
+fn add_hover_card(
+    chip: &gtk::Box,
+    thumbs: &AttachThumbs,
+    path: &std::path::Path,
+    name: &str,
+    kind: String,
+    size: Option<u64>,
+) {
+    chip.set_has_tooltip(true);
+    let thumbs = thumbs.clone();
+    let owned = path.to_path_buf();
+    let name = name.to_string();
+    let detail = match size {
+        Some(n) => format!("{kind} \u{b7} {}", crate::models::human_size(n)),
+        None => kind,
+    };
+    chip.connect_query_tooltip(move |_, _, _, _, tooltip| {
+        let card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        if let Some(Some(thumb)) = thumbs.borrow().get(&owned) {
+            let tex = &thumb.card;
+            let pic = gtk::Picture::for_paintable(tex);
+            pic.set_content_fit(gtk::ContentFit::Contain);
+            let (w, h) = (tex.width().max(1) as f64, tex.height().max(1) as f64);
+            let scale = (CARD_THUMB as f64 / w.max(h)).min(1.0);
+            pic.set_size_request((w * scale) as i32, (h * scale) as i32);
+            card.append(&pic);
+        }
+        let title = gtk::Label::new(Some(&name));
+        title.set_xalign(0.0);
+        title.set_wrap(true);
+        title.set_max_width_chars(40);
+        title.add_css_class("heading");
+        card.append(&title);
+        let info = gtk::Label::new(Some(&detail));
+        info.set_xalign(0.0);
+        card.append(&info);
+        tooltip.set_custom(Some(&card));
+        true
+    });
+}
+
+/// Double click opens the file; right click offers Open and Remove.
+fn add_open_and_menu(
+    chip: &gtk::Box,
+    path: &std::path::Path,
+    name: &str,
+    index: usize,
+    sender: &ComponentSender<Compose>,
+) {
+    let open = {
+        let owned = path.to_path_buf();
+        let name = name.to_string();
+        let chip = chip.downgrade();
+        move || {
+            let parent = chip
+                .upgrade()
+                .and_then(|c| c.root())
+                .and_downcast::<gtk::Window>();
+            let owned = owned.clone();
+            let name = name.clone();
+            gtk::glib::spawn_future_local(async move {
+                let read = owned.clone();
+                match gtk::gio::spawn_blocking(move || std::fs::read(read)).await {
+                    Ok(Ok(data)) => {
+                        crate::ui::attachments_gallery::open_bytes(&name, &data, parent.as_ref())
+                    }
+                    Ok(Err(e)) => tracing::warn!("could not read the attachment to open it: {e}"),
+                    Err(_) => {}
+                }
+            });
+        }
+    };
+    let open = std::rc::Rc::new(open);
+    let double = gtk::GestureClick::new();
+    double.set_button(gtk::gdk::BUTTON_PRIMARY);
+    {
+        let open = open.clone();
+        double.connect_pressed(move |_, n, _, _| {
+            if n == 2 {
+                open();
+            }
+        });
+    }
+    chip.add_controller(double);
+    let right = gtk::GestureClick::new();
+    right.set_button(gtk::gdk::BUTTON_SECONDARY);
+    {
+        let s = sender.input_sender().clone();
+        let chip_weak = chip.downgrade();
+        right.connect_pressed(move |gesture, _, x, y| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            let Some(chip) = chip_weak.upgrade() else {
+                return;
+            };
+            let open = open.clone();
+            let s = s.clone();
+            show_context_menu(
+                &chip,
+                x,
+                y,
+                vec![
+                    vec![
+                        MenuEntry::new(i18n("Open"), move || open()).icon("document-open-symbolic")
+                    ],
+                    vec![MenuEntry::new(i18n("Remove"), move || {
+                        let _ = s.send(ComposeInput::RemoveAttachment(index));
+                    })
+                    .icon("window-close-symbolic")],
+                ],
+            );
+        });
+    }
+    chip.add_controller(right);
 }
