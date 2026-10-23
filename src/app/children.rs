@@ -1,6 +1,7 @@
-//! The child components' outputs turned into the messages they mean to the
-//! root component.
+//! The child components: their launch, and their outputs turned into the
+//! messages they mean to the root component.
 
+use super::boot::{sidebar_init, start_target, Boot};
 use super::*;
 
 /// What the message list reports, as the message it means here.
@@ -397,6 +398,109 @@ pub(super) fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         },
         SidebarOutput::SetFolderSort { account_id, sort } => {
             AppMsg::SetAccountFolderSort { account_id, sort }
+        }
+    }
+}
+
+/// The child components, launched before the model that owns them.
+pub(super) struct Children {
+    pub(super) sidebar: Controller<Sidebar>,
+    pub(super) peek_sidebar: Controller<Sidebar>,
+    pub(super) message_list: Controller<MessageList>,
+    pub(super) message_view: Controller<MessageView>,
+    pub(super) attachment_drawer: Controller<AttachmentDrawer>,
+    pub(super) lightbox: Controller<crate::ui::lightbox::Lightbox>,
+    pub(super) gallery: Controller<AttachmentsGallery>,
+    pub(super) contacts_compose_revealer: gtk::Revealer,
+    pub(super) contacts_page: Controller<ContactsPage>,
+    pub(super) notifications: Controller<NotificationCenter>,
+}
+
+impl Children {
+    /// Launches every child with its output forwarded to the root.
+    pub(super) fn launch(boot: &Boot, sender: &ComponentSender<AppModel>) -> Self {
+        let show_attachments = boot.prefs.show_attachments;
+        let start = start_target(boot.prefs.start_view);
+        let start_pending = start.is_some();
+        let sidebar = Sidebar::builder()
+            .launch(sidebar_init(
+                &boot.sidebar_state,
+                show_attachments,
+                boot.rail_now,
+                false,
+                start,
+            ))
+            .forward(sender.input_sender(), sidebar_output_msg);
+        // The sidebar waits for the launch view's account to list its
+        // folders; one that is offline with nothing cached never does.
+        if start_pending {
+            let s = sidebar.sender().clone();
+            gtk::glib::timeout_add_seconds_local_once(5, move || {
+                let _ = s.send(SidebarInput::DropStart);
+            });
+        }
+        // The peek panel's rows: a second, always-expanded instance.
+        let peek_sidebar = Sidebar::builder()
+            .launch(sidebar_init(
+                &boot.sidebar_state,
+                show_attachments,
+                false,
+                true,
+                None,
+            ))
+            .forward(sender.input_sender(), sidebar_output_msg);
+
+        let message_list = MessageList::builder()
+            .launch(())
+            .forward(sender.input_sender(), message_list_output_msg);
+
+        let message_view = MessageView::builder()
+            .launch(())
+            .forward(sender.input_sender(), message_view_output_msg);
+
+        // The drawer owns a Paned whose top pane is the reader body, so hand it
+        // the message-view widget to dock beneath.
+        let attachment_drawer = AttachmentDrawer::builder()
+            .launch(crate::ui::attachment_drawer::DrawerInit {
+                state: config::load_drawer_state(),
+                reader: message_view.widget().clone().upcast(),
+            })
+            .forward(sender.input_sender(), attachment_drawer_output_msg);
+
+        let lightbox = crate::ui::lightbox::Lightbox::builder().launch(()).detach();
+
+        let gallery = AttachmentsGallery::builder()
+            .launch(())
+            .forward(sender.input_sender(), gallery_output_msg);
+
+        // Built here (not in the model literal) because the contacts page
+        // mounts it over its detail pane at launch.
+        let contacts_compose_revealer = {
+            let r = gtk::Revealer::new();
+            r.set_transition_type(gtk::RevealerTransitionType::SlideDown);
+            r.set_transition_duration(300);
+            r.set_reveal_child(false);
+            r.set_can_target(false);
+            r
+        };
+        let contacts_page = ContactsPage::builder()
+            .launch(contacts_compose_revealer.clone())
+            .forward(sender.input_sender(), contacts_page_output_msg);
+
+        let notifications = NotificationCenter::builder()
+            .launch(())
+            .forward(sender.input_sender(), notifications_output_msg);
+        Children {
+            sidebar,
+            peek_sidebar,
+            message_list,
+            message_view,
+            attachment_drawer,
+            lightbox,
+            gallery,
+            contacts_compose_revealer,
+            contacts_page,
+            notifications,
         }
     }
 }
