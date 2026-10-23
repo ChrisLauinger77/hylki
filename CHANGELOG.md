@@ -7,6 +7,10 @@
   none longer than 1,360 lines. Behaviour is unchanged, and 204 new tests pin
   it. The unused `relm4-components` dependency is gone.
 
+## 1.45.2 — 2026-10-23
+
+A folder the server will not open no longer keeps the CPU busy.
+
 - **Fixed: a folder the server would not open kept the CPU busy** (#512,
   reported by valqk). The background index put the folder back in its queue
   after every failed SELECT and tried again at once, logging in afresh each
