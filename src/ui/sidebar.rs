@@ -18,6 +18,7 @@ use crate::i18n::{i18n, i18n_f, i18n_noop};
 use crate::models::{Account, Folder, FolderKind};
 use crate::ui::context_menu::{show_context_menu, show_context_menu_with_header, MenuEntry};
 
+mod account_section;
 mod contents;
 mod dnd;
 mod menus;
