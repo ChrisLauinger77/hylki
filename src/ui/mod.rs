@@ -24,6 +24,7 @@ pub mod initials;
 pub mod keymap;
 pub mod launch;
 pub mod lightbox;
+pub mod message_actions;
 pub mod message_list;
 pub mod message_row;
 pub mod message_view;
