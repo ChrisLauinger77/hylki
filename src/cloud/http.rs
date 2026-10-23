@@ -187,7 +187,7 @@ mod tests {
             .map(|(_, l)| l)
             .sum();
         assert_eq!(total, 1_234_567);
-        assert!(CLOUDFLARE_CHUNK < 100 * 1000 * 1000);
+        const { assert!(CLOUDFLARE_CHUNK < 100 * 1000 * 1000) };
     }
 
     #[test]

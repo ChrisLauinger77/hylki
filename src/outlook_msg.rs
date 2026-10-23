@@ -199,8 +199,18 @@ fn kept_headers(headers: &str) -> String {
 pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
     let mut file =
         cfb::CompoundFile::open(Cursor::new(bytes.to_vec())).map_err(|e| e.to_string())?;
+    let headers = headers(&mut file);
+    let (body, subtype, charset) = body(&mut file);
+    let attachments = attachments(&mut file);
+    Ok(assemble(headers, &body, subtype, charset, &attachments))
+}
+
+/// The header block: the server's own transport headers when the message
+/// kept them (with a Date added if they lack one), else headers rebuilt
+/// from the message's properties.
+fn headers(file: &mut Cfb) -> String {
     let root = "";
-    let props = fixed(&mut file, root, 32);
+    let props = fixed(file, root, 32);
 
     // Sent, received, or for a message never sent (a draft saved from
     // Outlook), last changed or made.
@@ -215,8 +225,8 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
     .and_then(|t| chrono::DateTime::from_timestamp(unix_time(t), 0))
     .map(|d| format!("Date: {}\r\n", d.to_rfc2822()));
     let mut headers = String::new();
-    let transport = string(&mut file, root, TRANSPORT_HEADERS)
-        .filter(|h| h.to_ascii_lowercase().contains("from:"));
+    let transport =
+        string(file, root, TRANSPORT_HEADERS).filter(|h| h.to_ascii_lowercase().contains("from:"));
     if let Some(kept) = transport {
         headers.push_str(&kept_headers(&kept));
         // Not every server's header block has one.
@@ -228,72 +238,86 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
         }
     } else {
         headers.extend(date);
-        let sender_name = string(&mut file, root, SENT_REPRESENTING_NAME)
-            .or_else(|| string(&mut file, root, SENDER_NAME));
-        let sender = smtp(&[
-            string(&mut file, root, SENDER_SMTP),
-            string(&mut file, root, SENT_REPRESENTING_EMAIL),
-            string(&mut file, root, SENDER_EMAIL),
-        ]);
-        if let Some(from) = mailbox(sender_name.as_deref(), sender.as_deref()) {
-            headers.push_str(&format!("From: {from}\r\n"));
-        }
-        // The recipients, by kind: 1 is To, 2 Cc; Bcc is left out.
-        let mut to = Vec::new();
-        let mut cc = Vec::new();
-        for dir in children(&file, "__recip_version1.0_") {
-            let dir = format!("/{dir}");
-            let kind = fixed(&mut file, &dir, 8)
-                .get(&RECIPIENT_TYPE)
-                .copied()
-                .unwrap_or(1) as u32;
-            let name = string(&mut file, &dir, RECIPIENT_NAME);
-            let addr = smtp(&[
-                string(&mut file, &dir, RECIPIENT_SMTP),
-                string(&mut file, &dir, RECIPIENT_EMAIL),
-            ]);
-            let Some(m) = mailbox(name.as_deref(), addr.as_deref()) else {
-                continue;
-            };
-            match kind {
-                1 => to.push(m),
-                2 => cc.push(m),
-                _ => {}
-            }
-        }
-        if to.is_empty() {
-            to.extend(string(&mut file, root, DISPLAY_TO).map(|t| encode_word(&t)));
-        }
-        if cc.is_empty() {
-            cc.extend(string(&mut file, root, DISPLAY_CC).map(|t| encode_word(&t)));
-        }
-        if !to.is_empty() {
-            headers.push_str(&format!("To: {}\r\n", to.join(", ")));
-        }
-        if !cc.is_empty() {
-            headers.push_str(&format!("Cc: {}\r\n", cc.join(", ")));
-        }
-        if let Some(subject) = string(&mut file, root, SUBJECT) {
-            headers.push_str(&format!("Subject: {}\r\n", encode_word(&subject)));
-        }
+        headers.push_str(&rebuilt_headers(file));
+    }
+    headers
+}
 
-        for (id, name) in [
-            (INTERNET_MESSAGE_ID, "Message-ID"),
-            (IN_REPLY_TO, "In-Reply-To"),
-            (REFERENCES, "References"),
-        ] {
-            if let Some(v) = string(&mut file, root, id) {
-                headers.push_str(&format!("{name}: {v}\r\n"));
-            }
+/// From, To, Cc, Subject and the threading headers, from the message's
+/// properties, for a message that kept no transport headers.
+fn rebuilt_headers(file: &mut Cfb) -> String {
+    let root = "";
+    let mut headers = String::new();
+    let sender_name =
+        string(file, root, SENT_REPRESENTING_NAME).or_else(|| string(file, root, SENDER_NAME));
+    let sender = smtp(&[
+        string(file, root, SENDER_SMTP),
+        string(file, root, SENT_REPRESENTING_EMAIL),
+        string(file, root, SENDER_EMAIL),
+    ]);
+    if let Some(from) = mailbox(sender_name.as_deref(), sender.as_deref()) {
+        headers.push_str(&format!("From: {from}\r\n"));
+    }
+    // The recipients, by kind: 1 is To, 2 Cc; Bcc is left out.
+    let mut to = Vec::new();
+    let mut cc = Vec::new();
+    for dir in children(file, "__recip_version1.0_") {
+        let dir = format!("/{dir}");
+        let kind = fixed(file, &dir, 8)
+            .get(&RECIPIENT_TYPE)
+            .copied()
+            .unwrap_or(1) as u32;
+        let name = string(file, &dir, RECIPIENT_NAME);
+        let addr = smtp(&[
+            string(file, &dir, RECIPIENT_SMTP),
+            string(file, &dir, RECIPIENT_EMAIL),
+        ]);
+        let Some(m) = mailbox(name.as_deref(), addr.as_deref()) else {
+            continue;
+        };
+        match kind {
+            1 => to.push(m),
+            2 => cc.push(m),
+            _ => {}
         }
     }
+    if to.is_empty() {
+        to.extend(string(file, root, DISPLAY_TO).map(|t| encode_word(&t)));
+    }
+    if cc.is_empty() {
+        cc.extend(string(file, root, DISPLAY_CC).map(|t| encode_word(&t)));
+    }
+    if !to.is_empty() {
+        headers.push_str(&format!("To: {}\r\n", to.join(", ")));
+    }
+    if !cc.is_empty() {
+        headers.push_str(&format!("Cc: {}\r\n", cc.join(", ")));
+    }
+    if let Some(subject) = string(file, root, SUBJECT) {
+        headers.push_str(&format!("Subject: {}\r\n", encode_word(&subject)));
+    }
 
-    // The body: HTML when the message has it, else the plain text.
-    let html = binary(&mut file, root, HTML)
-        .or_else(|| string(&mut file, root, HTML).map(String::into_bytes));
+    for (id, name) in [
+        (INTERNET_MESSAGE_ID, "Message-ID"),
+        (IN_REPLY_TO, "In-Reply-To"),
+        (REFERENCES, "References"),
+    ] {
+        if let Some(v) = string(file, root, id) {
+            headers.push_str(&format!("{name}: {v}\r\n"));
+        }
+    }
+    headers
+}
+
+/// The body and how to label it: HTML when the message has it, else the
+/// plain text; and the character set it is in.
+fn body(file: &mut Cfb) -> (Vec<u8>, &'static str, &'static str) {
+    let root = "";
+    let html =
+        binary(file, root, HTML).or_else(|| string(file, root, HTML).map(String::into_bytes));
     let (body, subtype) = match html {
         Some(h) if !h.is_empty() => (h, "html"),
-        _ => match string(&mut file, root, BODY) {
+        _ => match string(file, root, BODY) {
             Some(text) => (text.into_bytes(), "plain"),
             None => (Vec::new(), "plain"),
         },
@@ -306,19 +330,24 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
         "windows-1252"
     };
 
+    (body, subtype, charset)
+}
+
+/// The attached files (an attached message, being a storage, is left out).
+fn attachments(file: &mut Cfb) -> Vec<Attachment> {
     let mut attachments = Vec::new();
-    for dir in children(&file, "__attach_version1.0_") {
+    for dir in children(file, "__attach_version1.0_") {
         let dir = format!("/{dir}");
         // An attached message is a storage, not data: left out.
-        let Some(data) = binary(&mut file, &dir, ATTACH_DATA) else {
+        let Some(data) = binary(file, &dir, ATTACH_DATA) else {
             continue;
         };
-        let name = string(&mut file, &dir, ATTACH_LONG_FILENAME)
-            .or_else(|| string(&mut file, &dir, ATTACH_FILENAME))
+        let name = string(file, &dir, ATTACH_LONG_FILENAME)
+            .or_else(|| string(file, &dir, ATTACH_FILENAME))
             .unwrap_or_else(|| "attachment".to_string());
-        let mime = string(&mut file, &dir, ATTACH_MIME)
+        let mime = string(file, &dir, ATTACH_MIME)
             .unwrap_or_else(|| "application/octet-stream".to_string());
-        let content_id = string(&mut file, &dir, ATTACH_CONTENT_ID);
+        let content_id = string(file, &dir, ATTACH_CONTENT_ID);
         attachments.push(Attachment {
             name,
             mime,
@@ -327,6 +356,19 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
         });
     }
 
+    attachments
+}
+
+/// The whole message: headers, then a multipart/mixed body holding the text
+/// (with the pictures it shows by Content-ID in a related part) and the
+/// attached files.
+fn assemble(
+    headers: String,
+    body: &[u8],
+    subtype: &str,
+    charset: &str,
+    attachments: &[Attachment],
+) -> Vec<u8> {
     let mut out = headers;
     out.push_str("MIME-Version: 1.0\r\n");
     let boundary = "hylki-msg-mixed";
@@ -336,7 +378,7 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
     ));
     let body_part = format!(
         "Content-Type: text/{subtype}; charset={charset}\r\nContent-Transfer-Encoding: base64\r\n\r\n{}",
-        base64_lines(&body)
+        base64_lines(body)
     );
     let attachment_part = |a: &Attachment, inline: bool| -> String {
         let name = a.name.replace('"', "");
@@ -384,7 +426,7 @@ pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
         out.push_str(&format!("--{boundary}\r\n{}", attachment_part(a, false)));
     }
     out.push_str(&format!("--{boundary}--\r\n"));
-    Ok(out.into_bytes())
+    out.into_bytes()
 }
 
 #[cfg(test)]
