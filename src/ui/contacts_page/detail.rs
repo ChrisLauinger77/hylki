@@ -21,6 +21,185 @@ use super::types::{
 };
 use super::ContactsPageWidgets;
 
+/// The top of a contact's card: the photo (opening the lightbox when there
+/// is one), the name, who they are, and for a person found in a directory
+/// the button that keeps them as a contact.
+fn identity_header(
+    detail: &gtk::Box,
+    sender: &ComponentSender<ContactsPage>,
+    c: &ContactDetails,
+    hit: Option<usize>,
+) {
+    let photo = c.photo_bytes();
+    let avatar = avatar_with(c, 96, photo.as_deref());
+    if let Some(photo) = &photo {
+        // A real photo expands to the lightbox on click.
+        let btn = gtk::Button::new();
+        btn.set_child(Some(&avatar));
+        btn.add_css_class("flat");
+        btn.add_css_class("circular");
+        btn.set_halign(gtk::Align::Center);
+        btn.set_tooltip_text(Some(i18n("View photo").as_str()));
+        let s = sender.input_sender().clone();
+        let name = c.name.clone();
+        let data = photo.clone();
+        btn.connect_clicked(move |_| {
+            let _ = s.send(ContactsPageInput::OpenPhoto {
+                name: name.clone(),
+                data: data.clone(),
+            });
+        });
+        detail.append(&btn);
+    } else {
+        avatar.set_halign(gtk::Align::Center);
+        detail.append(&avatar);
+    }
+
+    let name = gtk::Label::new(Some(&c.name));
+    name.add_css_class("title-1");
+    name.set_wrap(true);
+    name.set_justify(gtk::Justification::Center);
+    name.set_margin_top(12);
+    detail.append(&name);
+
+    let mut byline = Vec::new();
+    if !c.nickname.is_empty() && c.nickname != c.name {
+        byline.push(format!("“{}”", c.nickname));
+    }
+    match (!c.title.is_empty(), !c.org.is_empty()) {
+        (true, true) => byline.push(format!("{} · {}", c.title, c.org)),
+        (true, false) => byline.push(c.title.clone()),
+        (false, true) => byline.push(c.org.clone()),
+        (false, false) => {}
+    }
+    if !byline.is_empty() {
+        let sub = gtk::Label::new(Some(&byline.join("  —  ")));
+        sub.add_css_class("dim-label");
+        sub.set_wrap(true);
+        sub.set_justify(gtk::Justification::Center);
+        sub.set_margin_top(4);
+        detail.append(&sub);
+    }
+
+    // From a directory: it can be kept as a contact, not edited here.
+    if let Some(idx) = hit {
+        let add = gtk::Button::with_label(&i18n("Add to Contacts"));
+        add.add_css_class("pill");
+        add.set_halign(gtk::Align::Center);
+        add.set_margin_top(12);
+        let s = sender.input_sender().clone();
+        add.connect_clicked(move |b| {
+            b.set_sensitive(false);
+            let _ = s.send(ContactsPageInput::AddDirectoryHit(idx));
+        });
+        detail.append(&add);
+    }
+}
+
+/// The card's groups of fields: addresses with a button to write to them,
+/// phones, postal addresses, websites, and the details below.
+fn field_groups(
+    detail: &gtk::Box,
+    sender: &ComponentSender<ContactsPage>,
+    c: &ContactDetails,
+    hit: Option<usize>,
+) {
+    if !c.emails.is_empty() {
+        let list = group(detail, &i18n("Email"));
+        for e in &c.emails {
+            let row = labeled_row(e);
+            let compose = flat_button("mail-message-new-symbolic", &i18n("New message"));
+            let s = sender.input_sender().clone();
+            let addr = e.value.clone();
+            compose.connect_clicked(move |_| {
+                let _ = s.send(ContactsPageInput::Compose(addr.clone()));
+            });
+            row.add_suffix(&copy_button(&e.value));
+            row.add_suffix(&compose);
+            row.set_activatable(true);
+            let s = sender.input_sender().clone();
+            let addr = e.value.clone();
+            row.connect_activated(move |_| {
+                let _ = s.send(ContactsPageInput::Compose(addr.clone()));
+            });
+            list.append(&row);
+        }
+    }
+
+    if !c.phones.is_empty() {
+        let list = group(detail, &i18n("Phone"));
+        for p in &c.phones {
+            let row = labeled_row(p);
+            row.add_suffix(&copy_button(&p.value));
+            list.append(&row);
+        }
+    }
+
+    if !c.addresses.is_empty() {
+        let list = group(detail, &i18n("Address"));
+        for a in &c.addresses {
+            let row = labeled_row(a);
+            row.add_suffix(&copy_button(&a.value));
+            list.append(&row);
+        }
+    }
+
+    if !c.urls.is_empty() {
+        let list = group(detail, &i18n("Website"));
+        for url in &c.urls {
+            let row = adw::ActionRow::new();
+            row.set_title(&gtk::glib::markup_escape_text(url));
+            row.set_activatable(true);
+            let icon = gtk::Image::from_icon_name("adw-external-link-symbolic");
+            icon.add_css_class("dim-label");
+            row.add_suffix(&icon);
+            let s = sender.input_sender().clone();
+            let url = url.clone();
+            row.connect_activated(move |_| {
+                let _ = s.send(ContactsPageInput::OpenUrl(url.clone()));
+            });
+            list.append(&row);
+        }
+    }
+
+    let mut extras: Vec<Labeled> = Vec::new();
+    if !c.birthday.is_empty() {
+        extras.push(Labeled {
+            label: i18n("Birthday"),
+            value: c.birthday.clone(),
+        });
+    }
+    if !c.note.is_empty() {
+        extras.push(Labeled {
+            label: i18n("Note"),
+            value: c.note.clone(),
+        });
+    }
+    // Where this entry lives: the local book, a synced account, or the
+    // directory it was found in.
+    if hit.is_some() {
+        extras.push(Labeled {
+            label: i18n("Directory"),
+            value: c.book_name.clone(),
+        });
+    } else if !c.book_name.is_empty() {
+        extras.push(Labeled {
+            label: i18n("Address Book"),
+            value: c.book_name.clone(),
+        });
+    }
+    if !extras.is_empty() {
+        let list = group(detail, &i18n("Details"));
+        for x in &extras {
+            let row = adw::ActionRow::new();
+            row.set_title(&gtk::glib::markup_escape_text(&x.label));
+            row.set_subtitle(&gtk::glib::markup_escape_text(&x.value));
+            row.add_css_class("property");
+            list.append(&row);
+        }
+    }
+}
+
 /// A group's card: who is in it, and a message to them all.
 fn render_group_card(
     detail: &gtk::Box,
@@ -175,6 +354,44 @@ pub(super) fn group_byline(c: &ContactDetails) -> String {
     crate::contacts::group_reach(c.members.len(), c.hide_addresses)
 }
 
+/// Follow the group form's book choice: the note on Apple groups, and what
+/// saving in another book than the group's own (`own`, named `old_name`)
+/// does.
+fn follow_book_choice(
+    row: &adw::ComboRow,
+    books: &[crate::contacts::Book],
+    note: &gtk::Label,
+    move_note: &gtk::Label,
+    cards: Rc<Cell<bool>>,
+    own: Option<usize>,
+    old_name: String,
+) {
+    let formats: Vec<Option<GroupFormat>> = books.iter().map(|b| b.groups).collect();
+    let (note, move_note) = (note.downgrade(), move_note.downgrade());
+    row.connect_selected_notify(move |row| {
+        let at = row.selected() as usize;
+        let format = formats.get(at).copied().flatten();
+        cards.set(format == Some(GroupFormat::Apple));
+        if let Some(note) = note.upgrade() {
+            note.set_visible(format == Some(GroupFormat::Apple));
+        }
+        let Some(move_note) = move_note.upgrade() else { return };
+        let moving = own.is_some_and(|own| own != at);
+        move_note.set_visible(moving);
+        if moving {
+            let mut text = i18n_f(
+                "Saving moves the group to this address book, with its people, and removes it from {book}.",
+                &[("book", &old_name)],
+            );
+            if format == Some(GroupFormat::Evolution) {
+                text.push(' ');
+                text.push_str(&i18n("Groups here hold addresses, so people with no email address are left out."));
+            }
+            move_note.set_label(&text);
+        }
+    });
+}
+
 impl ContactsPage {
     /// Fill the right-hand pane with the selected contact's card.
     pub(super) fn render_detail(
@@ -204,167 +421,8 @@ impl ContactsPage {
             return;
         }
 
-        // ---- identity header: photo, name, who they are ----
-        let photo = c.photo_bytes();
-        let avatar = avatar_with(c, 96, photo.as_deref());
-        if let Some(photo) = &photo {
-            // A real photo expands to the lightbox on click.
-            let btn = gtk::Button::new();
-            btn.set_child(Some(&avatar));
-            btn.add_css_class("flat");
-            btn.add_css_class("circular");
-            btn.set_halign(gtk::Align::Center);
-            btn.set_tooltip_text(Some(i18n("View photo").as_str()));
-            let s = sender.input_sender().clone();
-            let name = c.name.clone();
-            let data = photo.clone();
-            btn.connect_clicked(move |_| {
-                let _ = s.send(ContactsPageInput::OpenPhoto {
-                    name: name.clone(),
-                    data: data.clone(),
-                });
-            });
-            detail.append(&btn);
-        } else {
-            avatar.set_halign(gtk::Align::Center);
-            detail.append(&avatar);
-        }
-
-        let name = gtk::Label::new(Some(&c.name));
-        name.add_css_class("title-1");
-        name.set_wrap(true);
-        name.set_justify(gtk::Justification::Center);
-        name.set_margin_top(12);
-        detail.append(&name);
-
-        let mut byline = Vec::new();
-        if !c.nickname.is_empty() && c.nickname != c.name {
-            byline.push(format!("“{}”", c.nickname));
-        }
-        match (!c.title.is_empty(), !c.org.is_empty()) {
-            (true, true) => byline.push(format!("{} · {}", c.title, c.org)),
-            (true, false) => byline.push(c.title.clone()),
-            (false, true) => byline.push(c.org.clone()),
-            (false, false) => {}
-        }
-        if !byline.is_empty() {
-            let sub = gtk::Label::new(Some(&byline.join("  —  ")));
-            sub.add_css_class("dim-label");
-            sub.set_wrap(true);
-            sub.set_justify(gtk::Justification::Center);
-            sub.set_margin_top(4);
-            detail.append(&sub);
-        }
-
-        // From a directory: it can be kept as a contact, not edited here.
-        if let Some(idx) = hit {
-            let add = gtk::Button::with_label(&i18n("Add to Contacts"));
-            add.add_css_class("pill");
-            add.set_halign(gtk::Align::Center);
-            add.set_margin_top(12);
-            let s = sender.input_sender().clone();
-            add.connect_clicked(move |b| {
-                b.set_sensitive(false);
-                let _ = s.send(ContactsPageInput::AddDirectoryHit(idx));
-            });
-            detail.append(&add);
-        }
-
-        // ---- field groups ----
-        if !c.emails.is_empty() {
-            let list = group(detail, &i18n("Email"));
-            for e in &c.emails {
-                let row = labeled_row(e);
-                let compose = flat_button("mail-message-new-symbolic", &i18n("New message"));
-                let s = sender.input_sender().clone();
-                let addr = e.value.clone();
-                compose.connect_clicked(move |_| {
-                    let _ = s.send(ContactsPageInput::Compose(addr.clone()));
-                });
-                row.add_suffix(&copy_button(&e.value));
-                row.add_suffix(&compose);
-                row.set_activatable(true);
-                let s = sender.input_sender().clone();
-                let addr = e.value.clone();
-                row.connect_activated(move |_| {
-                    let _ = s.send(ContactsPageInput::Compose(addr.clone()));
-                });
-                list.append(&row);
-            }
-        }
-
-        if !c.phones.is_empty() {
-            let list = group(detail, &i18n("Phone"));
-            for p in &c.phones {
-                let row = labeled_row(p);
-                row.add_suffix(&copy_button(&p.value));
-                list.append(&row);
-            }
-        }
-
-        if !c.addresses.is_empty() {
-            let list = group(detail, &i18n("Address"));
-            for a in &c.addresses {
-                let row = labeled_row(a);
-                row.add_suffix(&copy_button(&a.value));
-                list.append(&row);
-            }
-        }
-
-        if !c.urls.is_empty() {
-            let list = group(detail, &i18n("Website"));
-            for url in &c.urls {
-                let row = adw::ActionRow::new();
-                row.set_title(&gtk::glib::markup_escape_text(url));
-                row.set_activatable(true);
-                let icon = gtk::Image::from_icon_name("adw-external-link-symbolic");
-                icon.add_css_class("dim-label");
-                row.add_suffix(&icon);
-                let s = sender.input_sender().clone();
-                let url = url.clone();
-                row.connect_activated(move |_| {
-                    let _ = s.send(ContactsPageInput::OpenUrl(url.clone()));
-                });
-                list.append(&row);
-            }
-        }
-
-        let mut extras: Vec<Labeled> = Vec::new();
-        if !c.birthday.is_empty() {
-            extras.push(Labeled {
-                label: i18n("Birthday"),
-                value: c.birthday.clone(),
-            });
-        }
-        if !c.note.is_empty() {
-            extras.push(Labeled {
-                label: i18n("Note"),
-                value: c.note.clone(),
-            });
-        }
-        // Where this entry lives: the local book, a synced account, or the
-        // directory it was found in.
-        if hit.is_some() {
-            extras.push(Labeled {
-                label: i18n("Directory"),
-                value: c.book_name.clone(),
-            });
-        } else if !c.book_name.is_empty() {
-            extras.push(Labeled {
-                label: i18n("Address Book"),
-                value: c.book_name.clone(),
-            });
-        }
-        if !extras.is_empty() {
-            let list = group(detail, &i18n("Details"));
-            for x in &extras {
-                let row = adw::ActionRow::new();
-                row.set_title(&gtk::glib::markup_escape_text(&x.label));
-                row.set_subtitle(&gtk::glib::markup_escape_text(&x.value));
-                row.add_css_class("property");
-                list.append(&row);
-            }
-        }
+        identity_header(detail, sender, c, hit);
+        field_groups(detail, sender, c, hit);
     }
 
     /// Open the form for the entry at `idx`: a group's, or a contact's. A
@@ -415,29 +473,8 @@ impl ContactsPage {
         editor_bar(detail, sender, &heading);
 
         let identity = group(detail, &i18n("Group"));
-        // Any book that keeps groups: a new group goes in one, a group
-        // being edited can move to another. The Hylki book when none is
-        // listed yet.
-        let mut books: Vec<crate::contacts::Book> = self
-            .books
-            .iter()
-            .filter(|b| b.groups.is_some())
-            .cloned()
-            .collect();
         let editing = self.editing_target.is_some();
-        if editing && !books.iter().any(|b| b.uid == c.book_uid) {
-            books.insert(
-                0,
-                crate::contacts::Book {
-                    uid: c.book_uid.clone(),
-                    name: c.book_name.clone(),
-                    groups: c.group,
-                },
-            );
-        }
-        if books.is_empty() {
-            books.push(crate::contacts::local_book());
-        }
+        let books = self.group_books(c, editing);
         let row = adw::ComboRow::new();
         row.set_title(&i18n("Address book"));
         let labels: Vec<&str> = books.iter().map(|b| b.name.as_str()).collect();
@@ -472,6 +509,82 @@ impl ContactsPage {
         hide.set_active(c.hide_addresses);
         identity.append(&hide);
 
+        self.seed_suggestions();
+        let _ = sender.output(ContactsPageOutput::WantSuggestions);
+        let no_address = self.members_without_address(c);
+        let cards = Rc::new(Cell::new(apple));
+        let members = member_editor(
+            detail,
+            &c.members,
+            self.suggestions.clone(),
+            Rc::new(no_address),
+            cards.clone(),
+        );
+        // An Apple group (iCloud's) holds cards of its own book.
+        let note = gtk::Label::new(Some(&i18n(
+            "Groups in this address book hold its own contacts: anyone added who is not in it yet is added to it.",
+        )));
+        note.add_css_class("dim-label");
+        note.add_css_class("caption");
+        note.set_wrap(true);
+        note.set_xalign(0.0);
+        note.set_margin_top(6);
+        note.set_visible(apple);
+        detail.append(&note);
+        if let Some(row) = &book_row {
+            follow_book_choice(
+                row,
+                &books,
+                &note,
+                &move_note,
+                cards,
+                editing.then_some(at),
+                c.book_name.clone(),
+            );
+        }
+        if self.editing_target.is_none() {
+            name.grab_focus();
+        }
+        self.editor = Some(Editor::Group(GroupForm {
+            name,
+            hide,
+            members,
+            book: book_row,
+            books,
+        }));
+    }
+
+    /// The books a group can be saved in: any that keeps groups, with the
+    /// group's own first when it is not one of them, else the Hylki book.
+    fn group_books(&self, c: &ContactDetails, editing: bool) -> Vec<crate::contacts::Book> {
+        // Any book that keeps groups: a new group goes in one, a group
+        // being edited can move to another. The Hylki book when none is
+        // listed yet.
+        let mut books: Vec<crate::contacts::Book> = self
+            .books
+            .iter()
+            .filter(|b| b.groups.is_some())
+            .cloned()
+            .collect();
+        if editing && !books.iter().any(|b| b.uid == c.book_uid) {
+            books.insert(
+                0,
+                crate::contacts::Book {
+                    uid: c.book_uid.clone(),
+                    name: c.book_name.clone(),
+                    groups: c.group,
+                },
+            );
+        }
+        if books.is_empty() {
+            books.push(crate::contacts::local_book());
+        }
+        books
+    }
+
+    /// Offer the contacts here as people to add until the composer's
+    /// suggestions are read.
+    fn seed_suggestions(&self) {
         // People to add are offered as the composer offers recipients: from
         // Contacts and from the mail sent and received. Until that is read,
         // the contacts here stand in.
@@ -493,11 +606,14 @@ impl ContactsPage {
                 });
             self.suggestions.borrow_mut().extend(contacts);
         }
-        let _ = sender.output(ContactsPageOutput::WantSuggestions);
+    }
+
+    /// The contacts with no address, by their book's name, who can join a
+    /// group that names its members by contact.
+    fn members_without_address(&self, c: &ContactDetails) -> Vec<(Member, String)> {
         // The contacts with no address, who can join a group that names
         // its members by contact.
-        let no_address: Vec<(Member, String)> = self
-            .contacts
+        self.contacts
             .iter()
             .filter(|p| !p.is_group() && p.emails.is_empty() && !p.eds_uid.is_empty())
             .map(|p| {
@@ -514,63 +630,7 @@ impl ContactsPage {
                 };
                 (m, p.book_name.clone())
             })
-            .collect();
-        let cards = Rc::new(Cell::new(apple));
-        let members = member_editor(
-            detail,
-            &c.members,
-            self.suggestions.clone(),
-            Rc::new(no_address),
-            cards.clone(),
-        );
-        // An Apple group (iCloud's) holds cards of its own book.
-        let note = gtk::Label::new(Some(&i18n(
-            "Groups in this address book hold its own contacts: anyone added who is not in it yet is added to it.",
-        )));
-        note.add_css_class("dim-label");
-        note.add_css_class("caption");
-        note.set_wrap(true);
-        note.set_xalign(0.0);
-        note.set_margin_top(6);
-        note.set_visible(apple);
-        detail.append(&note);
-        if let Some(row) = &book_row {
-            let formats: Vec<Option<GroupFormat>> = books.iter().map(|b| b.groups).collect();
-            let (note, move_note) = (note.downgrade(), move_note.downgrade());
-            let (own, old_name) = (editing.then_some(at), c.book_name.clone());
-            row.connect_selected_notify(move |row| {
-                let at = row.selected() as usize;
-                let format = formats.get(at).copied().flatten();
-                cards.set(format == Some(GroupFormat::Apple));
-                if let Some(note) = note.upgrade() {
-                    note.set_visible(format == Some(GroupFormat::Apple));
-                }
-                let Some(move_note) = move_note.upgrade() else { return };
-                let moving = own.is_some_and(|own| own != at);
-                move_note.set_visible(moving);
-                if moving {
-                    let mut text = i18n_f(
-                        "Saving moves the group to this address book, with its people, and removes it from {book}.",
-                        &[("book", &old_name)],
-                    );
-                    if format == Some(GroupFormat::Evolution) {
-                        text.push(' ');
-                        text.push_str(&i18n("Groups here hold addresses, so people with no email address are left out."));
-                    }
-                    move_note.set_label(&text);
-                }
-            });
-        }
-        if self.editing_target.is_none() {
-            name.grab_focus();
-        }
-        self.editor = Some(Editor::Group(GroupForm {
-            name,
-            hide,
-            members,
-            book: book_row,
-            books,
-        }));
+            .collect()
     }
 
     /// Replace the detail pane with the editor form for `editing_target`

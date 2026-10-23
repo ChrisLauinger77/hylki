@@ -43,9 +43,57 @@ impl ContactsPage {
             .set_visible_child_name(if empty { "none" } else { "browser" });
 
         let grouped = self.grouped_addresses();
+        let people = self.listed_people(&grouped);
+        self.show_count(widgets, &people);
+        let lines = self.directory_lines(&grouped, people.is_empty());
+        let missing = self.fill_store(&people, lines);
+
+        // Several selected together stay so while two of them are listed.
+        let multi_pos: Vec<u32> = self
+            .multi
+            .iter()
+            .filter_map(|&idx| self.row_map.iter().position(|&i| i == Some(idx)))
+            .map(|pos| pos as u32)
+            .collect();
+        if multi_pos.len() > 1 {
+            for &pos in &multi_pos {
+                self.selection.select_item(pos, false);
+            }
+            self.multi.retain(|idx| self.row_map.contains(&Some(*idx)));
+            self.selected = None;
+            self.render_detail(widgets, sender);
+            self.decode_photos(missing, sender);
+            return;
+        }
+        self.multi.clear();
+
+        // Selection: keep it if it survived the filter, else the first match.
+        let shown_pos = self
+            .selected
+            .and_then(|sel| self.row_map.iter().position(|&i| i == Some(sel)))
+            .or_else(|| self.row_map.iter().position(Option::is_some));
+        match shown_pos {
+            Some(pos) => {
+                self.selected = self.row_map[pos];
+                self.selection.select_item(pos as u32, true);
+            }
+            None => self.selected = None,
+        }
+        self.render_detail(widgets, sender);
+        self.decode_photos(missing, sender);
+        tracing::debug!(
+            "contacts: listed {} in {:?}",
+            self.row_map.len(),
+            started.elapsed()
+        );
+    }
+
+    /// The contacts the list shows, in its order: in scope, matching the
+    /// search and the filters, groups first.
+    fn listed_people(&self, grouped: &std::collections::HashSet<String>) -> Vec<usize> {
         let mut people: Vec<usize> = (0..self.contacts.len())
             .filter(|&i| {
-                self.matches(&self.contacts[i]) && self.passes_filters(&self.contacts[i], &grouped)
+                self.matches(&self.contacts[i]) && self.passes_filters(&self.contacts[i], grouped)
             })
             .collect();
         people.sort_by_key(|&i| {
@@ -65,6 +113,12 @@ impl ContactsPage {
             };
             (!c.is_group(), key)
         });
+        people
+    }
+
+    /// The count over the list: everyone in scope, or so many of them while
+    /// a search or a filter narrows it.
+    fn show_count(&self, widgets: &ContactsPageWidgets, people: &[usize]) {
         // People in what the list shows, and of them those it lists.
         let total = self
             .contacts
@@ -84,6 +138,16 @@ impl ContactsPage {
                 &[("shown", &shown.to_string()), ("total", &total.to_string())],
             )
         });
+    }
+
+    /// The lines after the people: the directories' answers, the
+    /// directories that did not answer, and a note for a directory picked
+    /// but not searched.
+    fn directory_lines(
+        &self,
+        grouped: &std::collections::HashSet<String>,
+        no_people: bool,
+    ) -> Vec<Line> {
         let mut lines: Vec<Line> = Vec::new();
         // Directories are searched with every book, or alone; a group has
         // none of their people.
@@ -100,7 +164,7 @@ impl ContactsPage {
         let mut listed = std::collections::HashSet::new();
         let mut hits = Vec::new();
         for (i, c) in self.directory_hits.iter().enumerate() {
-            if groups || !in_filter(&c.book_uid) || !self.passes_filters(c, &grouped) {
+            if groups || !in_filter(&c.book_uid) || !self.passes_filters(c, grouped) {
                 continue;
             }
             let emails: Vec<String> = c.emails.iter().map(|e| e.value.to_lowercase()).collect();
@@ -143,7 +207,7 @@ impl ContactsPage {
             ContactScope::Book(b) => self.directories.iter().any(|(d, _)| d == b),
             _ => false,
         };
-        if directory_picked && !groups && people.is_empty() && lines.is_empty() {
+        if directory_picked && !groups && no_people && lines.is_empty() {
             let text = if self.query.trim().chars().count() < crate::directory::MIN_QUERY {
                 i18n("Type three letters or more to search the directory.")
             } else {
@@ -151,7 +215,12 @@ impl ContactsPage {
             };
             lines.push(Line::other(LineKind::Note, text, String::new()));
         }
+        lines
+    }
 
+    /// Put `people` and then `lines` in the list, and answer the photos the
+    /// new lines show that are not decoded yet.
+    fn fill_store(&mut self, people: &[usize], lines: Vec<Line>) -> std::collections::HashSet<u64> {
         let items: Vec<gtk::glib::BoxedAnyObject> = people
             .iter()
             .filter_map(|&idx| self.items.get(idx).cloned())
@@ -175,45 +244,7 @@ impl ContactsPage {
         // lines through the swap and report a position in the new ones.
         self.selection.unselect_all();
         self.store.splice(0, self.store.n_items(), &items);
-
-        // Several selected together stay so while two of them are listed.
-        let multi_pos: Vec<u32> = self
-            .multi
-            .iter()
-            .filter_map(|&idx| self.row_map.iter().position(|&i| i == Some(idx)))
-            .map(|pos| pos as u32)
-            .collect();
-        if multi_pos.len() > 1 {
-            for &pos in &multi_pos {
-                self.selection.select_item(pos, false);
-            }
-            self.multi.retain(|idx| self.row_map.contains(&Some(*idx)));
-            self.selected = None;
-            self.render_detail(widgets, sender);
-            self.decode_photos(missing, sender);
-            return;
-        }
-        self.multi.clear();
-
-        // Selection: keep it if it survived the filter, else the first match.
-        let shown_pos = self
-            .selected
-            .and_then(|sel| self.row_map.iter().position(|&i| i == Some(sel)))
-            .or_else(|| self.row_map.iter().position(Option::is_some));
-        match shown_pos {
-            Some(pos) => {
-                self.selected = self.row_map[pos];
-                self.selection.select_item(pos as u32, true);
-            }
-            None => self.selected = None,
-        }
-        self.render_detail(widgets, sender);
-        self.decode_photos(missing, sender);
-        tracing::debug!(
-            "contacts: listed {} in {:?}",
-            self.row_map.len(),
-            started.elapsed()
-        );
+        missing
     }
 
     /// The list items for a fresh read: an unchanged line keeps the item it
@@ -319,73 +350,97 @@ impl ContactsPage {
     ) -> Vec<Vec<MenuEntry>> {
         let s = sender.input_sender();
         if idx >= DIRECTORY {
-            let Some(c) = self.entry(idx) else {
-                return Vec::new();
-            };
-            let mut entries = Vec::new();
-            if let Some(email) = c.primary_email().map(str::to_string) {
-                let sc = s.clone();
-                entries.push(
-                    MenuEntry::new(i18n("New message"), move || {
-                        let _ = sc.send(ContactsPageInput::Compose(email.clone()));
-                    })
-                    .icon("mail-message-new-symbolic"),
-                );
-            }
-            let sa = s.clone();
-            entries.push(
-                MenuEntry::new(i18n("Add to Contacts"), move || {
-                    let _ = sa.send(ContactsPageInput::AddDirectoryHit(idx));
-                })
-                .icon("contact-new-symbolic"),
-            );
-            return vec![entries];
+            return self.directory_hit_menu(idx, s);
         }
         let Some(c) = self.contacts.get(idx) else {
             return Vec::new();
         };
         // On one of several selected: what can be done to them all.
         if self.multi.contains(&idx) {
-            let choices = self.bulk_choices();
-            let mut first = Vec::new();
-            if let Some(g) = self.scope_group().filter(|g| g.group_editable()) {
-                let chosen = self.chosen();
-                if chosen
-                    .iter()
-                    .any(|&i| g.members.iter().any(|m| is_member(g, m, &self.contacts[i])))
-                {
-                    let sr = s.clone();
-                    first.push(
-                        MenuEntry::new(i18n("Remove from Group"), move || {
-                            let _ = sr.send(ContactsPageInput::RemoveFromGroup(chosen.clone()));
-                        })
-                        .icon("list-remove-symbolic"),
-                    );
-                }
-            }
-            if !choices.groups.is_empty() {
-                first.push(
-                    MenuEntry::submenu(i18n("Add to Group"), vec![choices.group_entries(s)])
-                        .icon("system-users-symbolic"),
-                );
-            }
-            if !choices.books.is_empty() {
-                first.push(
-                    MenuEntry::submenu(i18n("Move to Address Book"), vec![choices.book_entries(s)])
-                        .icon("x-office-address-book-symbolic"),
-                );
-            }
-            let sd = s.clone();
-            let delete = vec![MenuEntry::new(i18n("Delete…"), move || {
-                let _ = sd.send(ContactsPageInput::BulkDeleteRequest);
-            })
-            .icon("user-trash-symbolic")];
-            return if first.is_empty() {
-                vec![delete]
-            } else {
-                vec![first, delete]
-            };
+            return self.selection_menu(s);
         }
+        self.contact_menu(idx, c, s)
+    }
+
+    /// The menu of a person found in a directory.
+    fn directory_hit_menu(
+        &self,
+        idx: usize,
+        s: &relm4::Sender<ContactsPageInput>,
+    ) -> Vec<Vec<MenuEntry>> {
+        let Some(c) = self.entry(idx) else {
+            return Vec::new();
+        };
+        let mut entries = Vec::new();
+        if let Some(email) = c.primary_email().map(str::to_string) {
+            let sc = s.clone();
+            entries.push(
+                MenuEntry::new(i18n("New message"), move || {
+                    let _ = sc.send(ContactsPageInput::Compose(email.clone()));
+                })
+                .icon("mail-message-new-symbolic"),
+            );
+        }
+        let sa = s.clone();
+        entries.push(
+            MenuEntry::new(i18n("Add to Contacts"), move || {
+                let _ = sa.send(ContactsPageInput::AddDirectoryHit(idx));
+            })
+            .icon("contact-new-symbolic"),
+        );
+        vec![entries]
+    }
+
+    /// The menu of several selected contacts: what can be done to them all.
+    fn selection_menu(&self, s: &relm4::Sender<ContactsPageInput>) -> Vec<Vec<MenuEntry>> {
+        let choices = self.bulk_choices();
+        let mut first = Vec::new();
+        if let Some(g) = self.scope_group().filter(|g| g.group_editable()) {
+            let chosen = self.chosen();
+            if chosen
+                .iter()
+                .any(|&i| g.members.iter().any(|m| is_member(g, m, &self.contacts[i])))
+            {
+                let sr = s.clone();
+                first.push(
+                    MenuEntry::new(i18n("Remove from Group"), move || {
+                        let _ = sr.send(ContactsPageInput::RemoveFromGroup(chosen.clone()));
+                    })
+                    .icon("list-remove-symbolic"),
+                );
+            }
+        }
+        if !choices.groups.is_empty() {
+            first.push(
+                MenuEntry::submenu(i18n("Add to Group"), vec![choices.group_entries(s)])
+                    .icon("system-users-symbolic"),
+            );
+        }
+        if !choices.books.is_empty() {
+            first.push(
+                MenuEntry::submenu(i18n("Move to Address Book"), vec![choices.book_entries(s)])
+                    .icon("x-office-address-book-symbolic"),
+            );
+        }
+        let sd = s.clone();
+        let delete = vec![MenuEntry::new(i18n("Delete…"), move || {
+            let _ = sd.send(ContactsPageInput::BulkDeleteRequest);
+        })
+        .icon("user-trash-symbolic")];
+        if first.is_empty() {
+            vec![delete]
+        } else {
+            vec![first, delete]
+        }
+    }
+
+    /// The menu of one contact or group, `c` at `idx`.
+    fn contact_menu(
+        &self,
+        idx: usize,
+        c: &ContactDetails,
+        s: &relm4::Sender<ContactsPageInput>,
+    ) -> Vec<Vec<MenuEntry>> {
         let local = crate::contacts::is_local_book(&c.book_uid);
         let group = c.is_group();
         let (se, sd, sg) = (s.clone(), s.clone(), s.clone());
