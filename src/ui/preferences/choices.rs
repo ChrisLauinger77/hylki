@@ -217,6 +217,180 @@ pub(super) fn sound_index(sound: &str) -> u32 {
         }) as u32
 }
 
+/// The row of the start view combo that shows `value`.
+pub(super) fn start_view_index(value: crate::config::StartView) -> u32 {
+    use crate::config::StartView;
+    match value {
+        StartView::AllInboxes => 0,
+        StartView::AccountInbox => 1,
+        StartView::LastFolder => 2,
+    }
+}
+
+/// The start view value at row `idx` of its combo; past the end reads as the first.
+pub(super) fn start_view_at(idx: u32) -> crate::config::StartView {
+    use crate::config::StartView;
+    match idx {
+        1 => StartView::AccountInbox,
+        2 => StartView::LastFolder,
+        _ => StartView::AllInboxes,
+    }
+}
+
+/// The row of the list layout combo that shows `value`.
+pub(super) fn list_layout_index(value: crate::config::ListLayout) -> u32 {
+    use crate::config::ListLayout;
+    match value {
+        ListLayout::Cards => 0,
+        ListLayout::SingleLine => 1,
+        ListLayout::Automatic => 2,
+    }
+}
+
+/// The list layout value at row `idx` of its combo; past the end reads as the first.
+pub(super) fn list_layout_at(idx: u32) -> crate::config::ListLayout {
+    use crate::config::ListLayout;
+    match idx {
+        1 => ListLayout::SingleLine,
+        2 => ListLayout::Automatic,
+        _ => ListLayout::Cards,
+    }
+}
+
+/// The row of the read mark combo that shows `value`.
+pub(super) fn read_mark_index(value: crate::config::ReadMark) -> u32 {
+    use crate::config::ReadMark;
+    match value {
+        ReadMark::Shown => 0,
+        ReadMark::Delay => 1,
+        ReadMark::Manual => 2,
+    }
+}
+
+/// The read mark value at row `idx` of its combo; past the end reads as the first.
+pub(super) fn read_mark_at(idx: u32) -> crate::config::ReadMark {
+    use crate::config::ReadMark;
+    match idx {
+        1 => ReadMark::Delay,
+        2 => ReadMark::Manual,
+        _ => ReadMark::Shown,
+    }
+}
+
+/// The row of the fold messages combo that shows `value`.
+pub(super) fn fold_messages_index(value: crate::config::FoldMessages) -> u32 {
+    use crate::config::FoldMessages;
+    match value {
+        FoldMessages::Never => 0,
+        FoldMessages::Read => 1,
+        FoldMessages::AllButNewest => 2,
+    }
+}
+
+/// The fold messages value at row `idx` of its combo; past the end reads as the first.
+pub(super) fn fold_messages_at(idx: u32) -> crate::config::FoldMessages {
+    use crate::config::FoldMessages;
+    match idx {
+        1 => FoldMessages::Read,
+        2 => FoldMessages::AllButNewest,
+        _ => FoldMessages::Never,
+    }
+}
+
+/// The row of the reader default combo that shows `value`.
+pub(super) fn reader_default_index(value: crate::config::ReaderDefault) -> u32 {
+    use crate::config::ReaderDefault;
+    match value {
+        ReaderDefault::Remember => 0,
+        ReaderDefault::On => 1,
+        ReaderDefault::Off => 2,
+    }
+}
+
+/// The reader default value at row `idx` of its combo; past the end reads as the first.
+pub(super) fn reader_default_at(idx: u32) -> crate::config::ReaderDefault {
+    use crate::config::ReaderDefault;
+    match idx {
+        1 => ReaderDefault::On,
+        2 => ReaderDefault::Off,
+        _ => ReaderDefault::Remember,
+    }
+}
+
+/// The row of the compose format combo that shows `value`.
+pub(super) fn compose_format_index(value: crate::config::ComposeFormat) -> u32 {
+    use crate::config::ComposeFormat;
+    match value {
+        ComposeFormat::Rich => 0,
+        ComposeFormat::Markdown => 1,
+        ComposeFormat::Html => 2,
+        ComposeFormat::Plain => 3,
+    }
+}
+
+/// The compose format value at row `idx` of its combo; past the end reads as the first.
+pub(super) fn compose_format_at(idx: u32) -> crate::config::ComposeFormat {
+    use crate::config::ComposeFormat;
+    match idx {
+        1 => ComposeFormat::Markdown,
+        2 => ComposeFormat::Html,
+        3 => ComposeFormat::Plain,
+        _ => ComposeFormat::Rich,
+    }
+}
+
+/// The row of the signature position combo that shows `value`.
+pub(super) fn signature_position_index(value: crate::config::SignaturePosition) -> u32 {
+    use crate::config::SignaturePosition;
+    match value {
+        SignaturePosition::AboveQuote => 0,
+        SignaturePosition::BelowQuote => 1,
+    }
+}
+
+/// The signature position value at row `idx` of its combo; past the end reads as the first.
+pub(super) fn signature_position_at(idx: u32) -> crate::config::SignaturePosition {
+    use crate::config::SignaturePosition;
+    match idx {
+        1 => SignaturePosition::BelowQuote,
+        _ => SignaturePosition::AboveQuote,
+    }
+}
+
+/// The row of the reply position combo that shows `value`.
+pub(super) fn reply_position_index(value: crate::config::ReplyPosition) -> u32 {
+    use crate::config::ReplyPosition;
+    match value {
+        ReplyPosition::Top => 0,
+        ReplyPosition::Bottom => 1,
+        ReplyPosition::Follow => 2,
+    }
+}
+
+/// The reply position value at row `idx` of its combo; past the end reads as the first.
+pub(super) fn reply_position_at(idx: u32) -> crate::config::ReplyPosition {
+    use crate::config::ReplyPosition;
+    match idx {
+        1 => ReplyPosition::Bottom,
+        2 => ReplyPosition::Follow,
+        _ => ReplyPosition::Top,
+    }
+}
+
+/// The row of the section style combo: Unified, then Tree.
+pub(super) fn section_style_index(value: crate::config::SectionStyle) -> u32 {
+    u32::from(value == crate::config::SectionStyle::Tree)
+}
+
+/// The section style at row `idx`; anything but the second row is Unified.
+pub(super) fn section_style_at(idx: u32) -> crate::config::SectionStyle {
+    if idx == 1 {
+        crate::config::SectionStyle::Tree
+    } else {
+        crate::config::SectionStyle::Unified
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::system::link_group_description;
@@ -365,5 +539,76 @@ mod tests {
         );
         let secs: Vec<u64> = FETCH_INTERVALS.iter().map(|(_, s)| *s).collect();
         assert_eq!(secs, [0, 60, 300, 900, 1800]);
+    }
+
+    #[test]
+    fn enum_rows_round_trip_and_fall_back_to_the_first() {
+        use crate::config::*;
+        for v in [
+            StartView::AllInboxes,
+            StartView::AccountInbox,
+            StartView::LastFolder,
+        ] {
+            assert_eq!(start_view_at(start_view_index(v)), v);
+        }
+        assert_eq!(start_view_at(9), StartView::AllInboxes);
+        for v in [
+            ListLayout::Cards,
+            ListLayout::SingleLine,
+            ListLayout::Automatic,
+        ] {
+            assert_eq!(list_layout_at(list_layout_index(v)), v);
+        }
+        assert_eq!(list_layout_at(9), ListLayout::Cards);
+        for v in [ReadMark::Shown, ReadMark::Delay, ReadMark::Manual] {
+            assert_eq!(read_mark_at(read_mark_index(v)), v);
+        }
+        assert_eq!(read_mark_at(9), ReadMark::Shown);
+        for v in [
+            FoldMessages::Never,
+            FoldMessages::Read,
+            FoldMessages::AllButNewest,
+        ] {
+            assert_eq!(fold_messages_at(fold_messages_index(v)), v);
+        }
+        assert_eq!(fold_messages_at(9), FoldMessages::Never);
+        for v in [
+            ReaderDefault::Remember,
+            ReaderDefault::On,
+            ReaderDefault::Off,
+        ] {
+            assert_eq!(reader_default_at(reader_default_index(v)), v);
+        }
+        assert_eq!(reader_default_at(9), ReaderDefault::Remember);
+        for (i, v) in [
+            ComposeFormat::Rich,
+            ComposeFormat::Markdown,
+            ComposeFormat::Html,
+            ComposeFormat::Plain,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(compose_format_index(v), i as u32);
+            assert_eq!(compose_format_at(i as u32), v);
+        }
+        assert_eq!(compose_format_at(9), ComposeFormat::Rich);
+        for v in [SignaturePosition::AboveQuote, SignaturePosition::BelowQuote] {
+            assert_eq!(signature_position_at(signature_position_index(v)), v);
+        }
+        assert_eq!(signature_position_at(9), SignaturePosition::AboveQuote);
+        for v in [
+            ReplyPosition::Top,
+            ReplyPosition::Bottom,
+            ReplyPosition::Follow,
+        ] {
+            assert_eq!(reply_position_at(reply_position_index(v)), v);
+        }
+        assert_eq!(reply_position_at(9), ReplyPosition::Top);
+        assert_eq!(section_style_index(SectionStyle::Unified), 0);
+        assert_eq!(section_style_index(SectionStyle::Tree), 1);
+        assert_eq!(section_style_at(1), SectionStyle::Tree);
+        assert_eq!(section_style_at(0), SectionStyle::Unified);
+        assert_eq!(section_style_at(5), SectionStyle::Unified);
     }
 }

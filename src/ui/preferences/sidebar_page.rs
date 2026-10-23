@@ -1,6 +1,7 @@
 //! Settings → Sidebar: the unified section, the placed sections, the icon
 //! rail's fold-ups and Focus Mode.
 
+use super::choices::{section_style_at, start_view_at};
 use super::*;
 
 impl Preferences {
@@ -105,11 +106,7 @@ impl Preferences {
     }
 
     pub(super) fn on_change_section_style(&mut self, idx: u32, sender: ComponentSender<Self>) {
-        let style = if idx == 1 {
-            crate::config::SectionStyle::Tree
-        } else {
-            crate::config::SectionStyle::Unified
-        };
+        let style = section_style_at(idx);
         let _ = sender.output(PrefOutput::SetSectionStyle(style));
     }
 
@@ -122,12 +119,7 @@ impl Preferences {
     }
 
     pub(super) fn on_change_start_view(&mut self, idx: u32, sender: ComponentSender<Self>) {
-        use crate::config::StartView;
-        let view = match idx {
-            1 => StartView::AccountInbox,
-            2 => StartView::LastFolder,
-            _ => StartView::AllInboxes,
-        };
+        let view = start_view_at(idx);
         let _ = sender.output(PrefOutput::SetStartView(view));
     }
 

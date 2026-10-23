@@ -1,5 +1,6 @@
 //! Settings → Message List, Conversations and Reading, and Printing.
 
+use super::choices::{fold_messages_at, list_layout_at, read_mark_at, reader_default_at};
 use super::*;
 
 impl Preferences {
@@ -19,11 +20,7 @@ impl Preferences {
     }
 
     pub(super) fn on_change_reader_default(&mut self, idx: u32, sender: ComponentSender<Self>) {
-        let policy = match idx {
-            1 => crate::config::ReaderDefault::On,
-            2 => crate::config::ReaderDefault::Off,
-            _ => crate::config::ReaderDefault::Remember,
-        };
+        let policy = reader_default_at(idx);
         let _ = sender.output(PrefOutput::SetReaderDefault(policy));
     }
 
@@ -76,20 +73,12 @@ impl Preferences {
     }
 
     pub(super) fn on_change_read_mark(&mut self, idx: u32, sender: ComponentSender<Self>) {
-        let policy = match idx {
-            1 => crate::config::ReadMark::Delay,
-            2 => crate::config::ReadMark::Manual,
-            _ => crate::config::ReadMark::Shown,
-        };
+        let policy = read_mark_at(idx);
         let _ = sender.output(PrefOutput::SetReadMark(policy));
     }
 
     pub(super) fn on_change_list_layout(&mut self, index: u32, sender: ComponentSender<Self>) {
-        let layout = match index {
-            1 => crate::config::ListLayout::SingleLine,
-            2 => crate::config::ListLayout::Automatic,
-            _ => crate::config::ListLayout::Cards,
-        };
+        let layout = list_layout_at(index);
         self.list_single_possible = layout != crate::config::ListLayout::Cards;
         let _ = sender.output(PrefOutput::SetListLayout(layout));
     }
@@ -101,11 +90,7 @@ impl Preferences {
     }
 
     pub(super) fn on_change_fold_messages(&mut self, idx: u32, sender: ComponentSender<Self>) {
-        let fold = match idx {
-            1 => crate::config::FoldMessages::Read,
-            2 => crate::config::FoldMessages::AllButNewest,
-            _ => crate::config::FoldMessages::Never,
-        };
+        let fold = fold_messages_at(idx);
         let _ = sender.output(PrefOutput::SetFoldMessages(fold));
     }
 }

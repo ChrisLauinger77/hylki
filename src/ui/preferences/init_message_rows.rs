@@ -1,5 +1,9 @@
 //! Filling the reading, files and composing rows when the window is built.
 
+use super::choices::{
+    compose_format_index, fold_messages_index, read_mark_index, reader_default_index,
+    reply_position_index, signature_position_index,
+};
 use super::rows::no_truncate;
 use super::*;
 
@@ -11,11 +15,9 @@ impl Preferences {
         init: &PrefInit,
     ) {
         no_truncate(&widgets.read_mark_row);
-        widgets.read_mark_row.set_selected(match init.read_mark {
-            crate::config::ReadMark::Shown => 0,
-            crate::config::ReadMark::Delay => 1,
-            crate::config::ReadMark::Manual => 2,
-        });
+        widgets
+            .read_mark_row
+            .set_selected(read_mark_index(init.read_mark));
         widgets.threading_row.set_active(init.threading);
         widgets
             .threads_expanded_row
@@ -33,11 +35,7 @@ impl Preferences {
         no_truncate(&widgets.fold_messages_row);
         widgets
             .fold_messages_row
-            .set_selected(match init.fold_messages {
-                crate::config::FoldMessages::Never => 0,
-                crate::config::FoldMessages::Read => 1,
-                crate::config::FoldMessages::AllButNewest => 2,
-            });
+            .set_selected(fold_messages_index(init.fold_messages));
         widgets
             .always_show_recipients_row
             .set_active(init.always_show_recipients);
@@ -65,11 +63,7 @@ impl Preferences {
         no_truncate(&widgets.reader_default_row);
         widgets
             .reader_default_row
-            .set_selected(match init.reader_default {
-                crate::config::ReaderDefault::Remember => 0,
-                crate::config::ReaderDefault::On => 1,
-                crate::config::ReaderDefault::Off => 2,
-            });
+            .set_selected(reader_default_index(init.reader_default));
         let zoom_labels: Vec<String> = crate::config::READER_ZOOM_STEPS
             .iter()
             .map(|z| format!("{z}%"))
@@ -249,12 +243,7 @@ impl Preferences {
         no_truncate(&widgets.compose_format_row);
         widgets
             .compose_format_row
-            .set_selected(match init.compose_format {
-                crate::config::ComposeFormat::Rich => 0,
-                crate::config::ComposeFormat::Markdown => 1,
-                crate::config::ComposeFormat::Html => 2,
-                crate::config::ComposeFormat::Plain => 3,
-            });
+            .set_selected(compose_format_index(init.compose_format));
         compose_font_setup(
             &widgets.compose_font_row,
             &init.compose_font,
@@ -295,10 +284,7 @@ impl Preferences {
         no_truncate(&widgets.signature_position_row);
         widgets
             .signature_position_row
-            .set_selected(match init.signature_position {
-                crate::config::SignaturePosition::AboveQuote => 0,
-                crate::config::SignaturePosition::BelowQuote => 1,
-            });
+            .set_selected(signature_position_index(init.signature_position));
         widgets
             .signature_dashes_row
             .set_active(init.signature_dashes);
@@ -331,11 +317,7 @@ impl Preferences {
         no_truncate(&widgets.reply_position_row);
         widgets
             .reply_position_row
-            .set_selected(match init.reply_position {
-                crate::config::ReplyPosition::Top => 0,
-                crate::config::ReplyPosition::Bottom => 1,
-                crate::config::ReplyPosition::Follow => 2,
-            });
+            .set_selected(reply_position_index(init.reply_position));
         widgets.spellcheck_row.set_active(init.spellcheck);
         // The language switches offer exactly what checking can use: the
         // installed dictionaries, behind a "System language" default. Typed

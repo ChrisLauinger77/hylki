@@ -1,5 +1,6 @@
 //! Settings → Composing.
 
+use super::choices::{compose_format_at, reply_position_at, signature_position_at};
 use super::*;
 
 impl Preferences {
@@ -17,21 +18,12 @@ impl Preferences {
     }
 
     pub(super) fn on_change_compose_format(&mut self, idx: u32, sender: ComponentSender<Self>) {
-        let format = match idx {
-            1 => crate::config::ComposeFormat::Markdown,
-            2 => crate::config::ComposeFormat::Html,
-            3 => crate::config::ComposeFormat::Plain,
-            _ => crate::config::ComposeFormat::Rich,
-        };
+        let format = compose_format_at(idx);
         let _ = sender.output(PrefOutput::SetComposeFormat(format));
     }
 
     pub(super) fn on_change_reply_position(&mut self, idx: u32, sender: ComponentSender<Self>) {
-        let position = match idx {
-            1 => crate::config::ReplyPosition::Bottom,
-            2 => crate::config::ReplyPosition::Follow,
-            _ => crate::config::ReplyPosition::Top,
-        };
+        let position = reply_position_at(idx);
         let _ = sender.output(PrefOutput::SetReplyPosition(position));
     }
 
@@ -42,10 +34,7 @@ impl Preferences {
     }
 
     pub(super) fn on_change_signature_position(&mut self, idx: u32, sender: ComponentSender<Self>) {
-        let position = match idx {
-            1 => crate::config::SignaturePosition::BelowQuote,
-            _ => crate::config::SignaturePosition::AboveQuote,
-        };
+        let position = signature_position_at(idx);
         let _ = sender.output(PrefOutput::SetSignaturePosition(position));
     }
 }

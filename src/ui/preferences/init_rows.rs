@@ -1,6 +1,7 @@
 //! Filling the settings rows from the saved values when the window is
 //! built, one step per page, in the order `init` runs them.
 
+use super::choices::{list_layout_index, section_style_index, start_view_index};
 use super::rows::no_truncate;
 use super::*;
 
@@ -183,9 +184,9 @@ impl Preferences {
                 i18n("Unified style").as_str(),
                 i18n("Tree style").as_str(),
             ])));
-        widgets.section_style_row.set_selected(u32::from(
-            init.section_style == crate::config::SectionStyle::Tree,
-        ));
+        widgets
+            .section_style_row
+            .set_selected(section_style_index(init.section_style));
         for (row, placement) in [
             (&widgets.filtered_placement_row, init.filtered_placement),
             (&widgets.tags_placement_row, init.tags_placement),
@@ -211,11 +212,9 @@ impl Preferences {
                 i18n("The last account's inbox").as_str(),
                 i18n("The last folder").as_str(),
             ])));
-        widgets.start_view_row.set_selected(match init.start_view {
-            crate::config::StartView::AllInboxes => 0,
-            crate::config::StartView::AccountInbox => 1,
-            crate::config::StartView::LastFolder => 2,
-        });
+        widgets
+            .start_view_row
+            .set_selected(start_view_index(init.start_view));
         let sort_labels: Vec<String> = crate::config::FolderSort::ALL
             .iter()
             .map(|s| s.label())
@@ -334,11 +333,7 @@ impl Preferences {
         }
         widgets
             .list_layout_row
-            .set_selected(match init.list_layout {
-                crate::config::ListLayout::Cards => 0,
-                crate::config::ListLayout::SingleLine => 1,
-                crate::config::ListLayout::Automatic => 2,
-            });
+            .set_selected(list_layout_index(init.list_layout));
     }
 
     /// Running in the background, then the theme gallery and the app-icon strip
