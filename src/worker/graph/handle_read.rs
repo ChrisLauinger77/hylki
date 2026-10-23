@@ -223,7 +223,7 @@ impl<E: Fn(WorkerEvent)> GraphWorker<E> {
                         check,
                     });
                 }
-                return;
+                continue;
             }
             match graph_fetch_raw(account, state, &path, uid, emit).await {
                 Ok(raw) => {
