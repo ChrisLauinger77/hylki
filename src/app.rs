@@ -85,7 +85,6 @@ mod prefs_general;
 mod prefs_list;
 mod prefs_reader;
 mod prefs_sidebar;
-mod quote;
 mod reader_select;
 mod reader_toolbar;
 mod release_notes;
@@ -126,7 +125,8 @@ pub(crate) use keymap::{
 };
 pub(crate) use model::AppModel;
 pub(crate) use msg::AppMsg;
-pub(crate) use quote::{body_is_pre_wrap, message_text};
+// The worker reads `crate::app::message_text` (until the worker branch is merged).
+pub(crate) use crate::quote::message_text;
 pub(crate) use showcase::showcase_capture;
 pub(crate) use theme::desktop_icon_theme;
 pub(crate) use uri_queue::{

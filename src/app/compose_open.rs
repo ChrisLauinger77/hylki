@@ -16,8 +16,8 @@ use super::prefill::{
     first_recipient, forward_prefill, reply_all_prefill, reply_prefill, reply_subject,
     stage_attachments,
 };
-use super::quote::editable_copy_html;
 use super::uri_queue::parse_mailto;
+use crate::quote::editable_copy_html;
 
 impl AppModel {
     /// Where a just-saved draft is, by its Message-ID, among the Drafts

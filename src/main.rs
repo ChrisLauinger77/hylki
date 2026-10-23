@@ -41,6 +41,7 @@ mod percent;
 mod pgp;
 mod platform;
 mod power;
+mod quote;
 mod ram_cache;
 mod reader;
 mod rng;
