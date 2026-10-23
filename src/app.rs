@@ -44,7 +44,6 @@ mod children;
 mod compose_host;
 mod compose_init;
 mod compose_open;
-mod confirm;
 mod consts;
 mod contacts;
 mod conversation;

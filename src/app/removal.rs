@@ -14,11 +14,11 @@ use crate::ui::message_view::MessageViewInput;
 use crate::ui::notifications::NotifyInput;
 use crate::worker::MailRequest;
 
-use super::confirm::confirm_destructive;
 use super::conversation::body_key;
 use super::folders::kind_label;
 use super::model::AppModel;
 use super::msg::AppMsg;
+use crate::ui::dialog::confirm_destructive;
 
 /// A bulk move per (account, source path): the destination path, the
 /// UIDs and the rows kept for undo.

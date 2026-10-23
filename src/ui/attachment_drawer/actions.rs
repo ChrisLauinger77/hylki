@@ -205,9 +205,7 @@ impl AttachmentDrawer {
                     Ok(_) => (i18n("Already in your keyring"), i18n("That key was imported before.")),
                     Err(e) => (i18n("Could not import the key"), e),
                 };
-                let dialog = adw::MessageDialog::new(window.as_ref(), Some(&title), Some(&body));
-                dialog.add_response("ok", &i18n("OK"));
-                dialog.present();
+                crate::ui::dialog::alert(window.as_ref(), &title, &body);
             });
         }
     }

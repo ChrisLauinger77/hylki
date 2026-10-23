@@ -16,10 +16,10 @@ use crate::ui::message_view::MessageViewInput;
 use crate::ui::message_window::MessageWindowInput;
 use crate::worker::MailRequest;
 
-use super::confirm::confirm_destructive;
 use super::conversation::{body_key, BodyKey};
 use super::model::AppModel;
 use super::msg::AppMsg;
+use crate::ui::dialog::confirm_destructive;
 
 /// Remove downloaded mail older than `days` (#394), off the main thread;
 /// 0 keeps it all.

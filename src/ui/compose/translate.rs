@@ -3,12 +3,12 @@
 
 use relm4::prelude::*;
 
-use super::host::show_alert;
 use super::messages::ComposeInput;
 use super::{Compose, ComposeWidgets};
 use crate::config::ComposeFormat;
 use crate::i18n::{i18n, i18n_f};
 use crate::ui::context_menu::MenuEntry;
+use crate::ui::dialog::alert;
 use adw::prelude::*;
 
 /// Which editor a translation (#327) was taken from, and so how it goes
@@ -201,7 +201,7 @@ impl Compose {
         // handed to a third party on the way.
         if self.encrypt {
             let parent = root.root().and_downcast::<gtk::Window>();
-            show_alert(
+            alert(
                 parent.as_ref(),
                 &i18n("Not translated"),
                 &i18n(
@@ -256,7 +256,7 @@ impl Compose {
             self.editor.run_js(TR_CANCEL);
             if v["empty"].as_bool() == Some(true) {
                 let parent = root.root().and_downcast::<gtk::Window>();
-                show_alert(
+                alert(
                     parent.as_ref(),
                     &i18n("Nothing to translate yet"),
                     &i18n("Write something first, or select the text to translate."),
@@ -350,7 +350,7 @@ impl Compose {
             Err(why) => {
                 self.editor.run_js(TR_CANCEL);
                 let parent = root.root().and_downcast::<gtk::Window>();
-                show_alert(parent.as_ref(), &i18n("Could not translate"), &why);
+                alert(parent.as_ref(), &i18n("Could not translate"), &why);
             }
         }
     }

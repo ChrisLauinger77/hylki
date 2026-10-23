@@ -427,13 +427,11 @@ impl PgpKeys {
             let pass = pass_row.text().to_string();
             if pass != confirm_row.text() {
                 let parent = dialog.transient_for();
-                let warn = adw::MessageDialog::new(
+                crate::ui::dialog::alert(
                     parent.as_ref(),
-                    Some(&i18n("The passphrases differ")),
-                    Some(&i18n("Type the same passphrase twice.")),
+                    &i18n("The passphrases differ"),
+                    &i18n("Type the same passphrase twice."),
                 );
-                warn.add_response("ok", &i18n("OK"));
-                warn.present();
                 return;
             }
             let expire = EXPIRIES

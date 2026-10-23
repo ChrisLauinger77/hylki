@@ -267,13 +267,11 @@ impl AccountsWindow {
             }
             Err(e) => {
                 let host = root.root().and_downcast::<gtk::Window>();
-                let dialog = adw::MessageDialog::new(
+                crate::ui::dialog::alert(
                     host.as_ref(),
-                    Some(i18n("Could Not Read the File").as_str()),
-                    Some(&format!("{}\n{e}", path.display())),
+                    i18n("Could Not Read the File").as_str(),
+                    &format!("{}\n{e}", path.display()),
                 );
-                dialog.add_response("ok", &i18n("OK"));
-                dialog.present();
             }
         }
     }

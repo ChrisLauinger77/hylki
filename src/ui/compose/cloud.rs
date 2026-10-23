@@ -2,13 +2,13 @@
 //! body.
 
 use super::attachments::pick_files;
-use super::host::show_alert;
 use super::messages::ComposeInput;
 use super::types::CloudLink;
 use super::{Compose, ComposeWidgets};
 use crate::encoding::escape_html;
 use crate::i18n::i18n;
 use crate::i18n::i18n_f;
+use crate::ui::dialog::alert;
 use crate::ui::rich_editor::{js_escape, SourceKind};
 use adw::prelude::*;
 use relm4::prelude::*;
@@ -323,7 +323,7 @@ impl Compose {
             }
             Err(e) => {
                 let parent = root.root().and_downcast::<gtk::Window>();
-                show_alert(
+                alert(
                     parent.as_ref(),
                     i18n_f("Could not upload {name}", &[("name", &name)]).as_str(),
                     &e,
@@ -381,5 +381,5 @@ impl Compose {
 /// The cloud account's sign-in is missing from the keyring.
 pub(super) fn not_signed_in(root: &adw::BreakpointBin, name: &str) {
     let parent = root.root().and_downcast::<gtk::Window>();
-    show_alert(parent.as_ref(), i18n("Not signed in").as_str(), i18n_f("The sign-in for {name} is not in the keyring. Open Settings, Cloud Storage, and enter it again.", &[("name", name)]).as_str());
+    alert(parent.as_ref(), i18n("Not signed in").as_str(), i18n_f("The sign-in for {name} is not in the keyring. Open Settings, Cloud Storage, and enter it again.", &[("name", name)]).as_str());
 }

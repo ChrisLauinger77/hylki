@@ -214,23 +214,15 @@ impl AccountsWindow {
         // The panel is embedded — dialogs parent to whatever window
         // it currently sits in (the combined settings window).
         let host = root.root().and_downcast::<gtk::Window>();
-        let dialog = adw::MessageDialog::new(
-            host.as_ref(),
-            Some(i18n("Remove Account?").as_str()),
-            Some(&body),
-        );
-        dialog.add_response("cancel", &i18n("Cancel"));
-        dialog.add_response("remove", &i18n("Remove"));
-        dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
         let s = sender.clone();
-        dialog.connect_response(None, move |_, resp| {
-            if resp == "remove" {
-                s.input_sender().emit(AccountsInput::ConfirmRemove);
-            }
-        });
-        dialog.present();
+        crate::ui::dialog::confirm_destructive(
+            host.as_ref(),
+            i18n("Remove Account?").as_str(),
+            &body,
+            "remove",
+            &i18n("Remove"),
+            move || s.input_sender().emit(AccountsInput::ConfirmRemove),
+        );
     }
 
     pub(super) fn on_confirm_remove(

@@ -408,23 +408,17 @@ impl ContactSources {
             ),
         };
         let parent = relm4::main_application().active_window();
-        let dialog = adw::MessageDialog::new(
-            parent.as_ref(),
-            Some(&i18n_f("Remove {name}?", &[("name", &source.title)])),
-            Some(&body),
-        );
-        dialog.add_response("cancel", &i18n("Cancel"));
-        dialog.add_response("remove", &i18n("Remove"));
-        dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
         let s = sender.input_sender().clone();
-        dialog.connect_response(None, move |_, response| {
-            if response == "remove" {
+        crate::ui::dialog::confirm_destructive(
+            parent.as_ref(),
+            &i18n_f("Remove {name}?", &[("name", &source.title)]),
+            &body,
+            "remove",
+            &i18n("Remove"),
+            move || {
                 let _ = s.send(ContactSourcesInput::Remove(i));
-            }
-        });
-        dialog.present();
+            },
+        );
     }
 
     /// Remove source `i` from EDS, off the main thread, with its switch.

@@ -1,7 +1,6 @@
 //! Sending and saving: the From, the outgoing message, OpenPGP checks before a
 //! send, and Send Later.
 
-use super::host::show_alert;
 use super::messages::ComposeOutput;
 use super::messages::{ComposeInput, OutgoingFields};
 use super::types::ComposeAccount;
@@ -11,6 +10,7 @@ use super::ComposeWidgets;
 use crate::config::ComposeFormat;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::DraftOrigin;
+use crate::ui::dialog::alert;
 use crate::worker::OutgoingMessage;
 use adw::prelude::*;
 use relm4::prelude::*;
@@ -166,7 +166,7 @@ pub(super) fn pick_send_time(
             _ => {
                 // An explicit time in the past is a slip, not a request to
                 // send at once.
-                show_alert(
+                alert(
                     dlg.transient_for().as_ref(),
                     i18n("That time has passed").as_str(),
                     i18n("Choose a time later than now.").as_str(),
@@ -433,7 +433,7 @@ impl Compose {
             }
             Err(problem) => {
                 let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-                show_alert(parent.as_ref(), &i18n("Cannot send with OpenPGP"), &problem);
+                alert(parent.as_ref(), &i18n("Cannot send with OpenPGP"), &problem);
             }
         }
     }
@@ -472,7 +472,7 @@ impl Compose {
         {
             row.add_css_class("error");
             let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-            show_alert(
+            alert(
                 parent.as_ref(),
                 &i18n("Check the address"),
                 &i18n_f("“{addr}” is not an email address.", &[("addr", &addr)]),
@@ -496,7 +496,7 @@ impl Compose {
         if !missing.is_empty() {
             self.rebuild_attachments(&widgets.attach_box, sender);
             let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-            show_alert(parent.as_ref(), &i18n("An attachment is missing"), &i18n_f(
+            alert(parent.as_ref(), &i18n("An attachment is missing"), &i18n_f(
                 "Hylki cannot read {names}. It was moved or deleted after it was attached. Remove it, or attach it again from where it is now.",
                 &[("names", &missing.join(", "))],
             ));
@@ -546,7 +546,7 @@ impl Compose {
             Ok(from) => from,
             Err(why) => {
                 let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-                show_alert(parent.as_ref(), &i18n("Check the From address"), &why);
+                alert(parent.as_ref(), &i18n("Check the From address"), &why);
                 return;
             }
         };

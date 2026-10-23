@@ -13,6 +13,7 @@ pub mod contact_tree;
 pub mod contacts_browser;
 pub mod contacts_page;
 pub mod context_menu;
+pub mod dialog;
 pub mod drop_zones;
 pub mod emoji;
 pub mod fade_label;

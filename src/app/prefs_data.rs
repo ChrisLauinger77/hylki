@@ -8,11 +8,11 @@ use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::ui::notifications::NotifyInput;
 use crate::ui::preferences::PrefOutput;
 
-use super::confirm::confirm_destructive;
 use super::contacts::{reload_contacts, sync_contact_books};
 use super::demo::demo_mode;
 use super::model::AppModel;
 use super::msg::AppMsg;
+use crate::ui::dialog::confirm_destructive;
 
 impl AppModel {
     /// Asks where to save, writes the file there with `write` and says in

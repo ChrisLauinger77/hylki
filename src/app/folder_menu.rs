@@ -8,11 +8,11 @@ use crate::models::FolderKind;
 use crate::ui::sidebar::CtxAction;
 use crate::worker::MailRequest;
 
-use super::confirm::confirm_destructive;
 use super::model::AppModel;
 use super::msg::AppMsg;
 use super::sidebar::folder_key;
 use super::undo::UndoStep;
+use crate::ui::dialog::confirm_destructive;
 
 impl AppModel {
     /// Prompt for a new custom folder name and create it under `account_id`.
