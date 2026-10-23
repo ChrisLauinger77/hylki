@@ -309,6 +309,9 @@ pub struct CalendarPart {
 }
 
 /// An event pushed from the worker back to the UI.
+// Events cross the channel one at a time and are matched all over the app;
+// boxing the large variant would change every place that builds or reads it.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum WorkerEvent {
     /// A batch of a folder's attachments was described (not downloaded).

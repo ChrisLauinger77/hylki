@@ -8,6 +8,12 @@
 //! (in practice, the component's input sender). The mock path implements the
 //! exact same protocol so the app behaves identically offline.
 
+// The worker's steps take the account's id, settings, cache, session or
+// protocol state and event sink as arguments of their own, each only what it
+// uses; a context struct bundling them would be a new interface for every
+// backend, not a restructure.
+#![allow(clippy::too_many_arguments)]
+
 use tokio::sync::mpsc;
 
 use crate::config::AccountConfig;

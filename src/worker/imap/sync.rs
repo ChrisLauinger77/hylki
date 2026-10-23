@@ -221,7 +221,7 @@ fn merge_index(cached: Vec<Message>, recent: Vec<Message>) -> Vec<Message> {
         map.insert(m.uid, m);
     }
     let mut out: Vec<Message> = map.into_values().collect();
-    out.sort_by(|a, b| b.uid.cmp(&a.uid)); // newest first
+    out.sort_by_key(|m| std::cmp::Reverse(m.uid)); // newest first
     out
 }
 

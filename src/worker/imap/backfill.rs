@@ -187,7 +187,6 @@ async fn fetch_summaries_by_uid(
 /// upserts them into the cache, and emits them as an append to the UI's index.
 /// Requeues the job (at the back) if more remain. Reconnects and, if needed,
 /// disables ENVELOPE parsing (iCloud) on a parse failure.
-#[allow(clippy::too_many_arguments)]
 pub(super) async fn run_one_backfill(
     queue: &mut std::collections::VecDeque<Backfill>,
     session: &mut Option<ImapSession>,

@@ -59,7 +59,6 @@ pub(super) async fn idle_done(
 /// server actually reports new data; `Quiet` on timeout (so the caller can do a
 /// prefetch pass and re-IDLE); `Request` to be handled normally; `Closed` when
 /// the channel ends. Any IDLE error falls back to a plain receive.
-#[allow(clippy::too_many_arguments)]
 pub(super) async fn idle_wait(
     session: &mut Option<ImapSession>,
     account: &AccountConfig,

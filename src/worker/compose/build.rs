@@ -683,7 +683,7 @@ mod tests {
         let line = raw
             .lines()
             .find(|l| l.starts_with("Message-ID:"))
-            .expect(&format!("a Message-ID is set: {raw}"));
+            .unwrap_or_else(|| panic!("a Message-ID is set: {raw}"));
         assert!(
             line.contains("@example.com>"),
             "in the sender's domain: {line}"

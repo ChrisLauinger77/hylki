@@ -292,7 +292,7 @@ impl<E: Emit> ImapWorker<E> {
                 // any request that arrives meanwhile goes first.
                 if self
                     .last_unread_sweep
-                    .map_or(true, |t| t.elapsed() >= UNREAD_SWEEP_MIN)
+                    .is_none_or(|t| t.elapsed() >= UNREAD_SWEEP_MIN)
                 {
                     self.sweep_due = true;
                 }

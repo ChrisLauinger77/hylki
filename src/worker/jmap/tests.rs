@@ -616,7 +616,7 @@ fn live() {
         &[],
     )
     .expect("seen");
-    let again = jmap_get_messages(&s, &[id.clone()], 1, inbox.folder.id).expect("get");
+    let again = jmap_get_messages(&s, std::slice::from_ref(&id), 1, inbox.folder.id).expect("get");
     assert!(!again[0].0.unread, "marked seen");
     jmap_set_emails(
         &s,
@@ -663,8 +663,14 @@ fn live() {
     // Send to ourselves: the Sent copy is the submitted message.
     let me = acc.username.clone();
     let msg = format!("From: {me}\r\nTo: {me}\r\nSubject: live test\r\nMessage-ID: <live-{}@hylki.test>\r\n\r\nsent over JMAP\r\n", crate::datefmt::now());
-    let sid =
-        jmap_submit(&s, msg.as_bytes(), &me, &[me.clone()], &sent.mailbox_id).expect("submit");
+    let sid = jmap_submit(
+        &s,
+        msg.as_bytes(),
+        &me,
+        std::slice::from_ref(&me),
+        &sent.mailbox_id,
+    )
+    .expect("submit");
     assert!(jmap_list_messages(&s, &sent.mailbox_id, 1, 0)
         .expect("sent")
         .iter()
@@ -822,7 +828,8 @@ fn live_signed_send() {
         .iter()
         .find(|f| f.folder.kind == FolderKind::Sent)
         .expect("sent");
-    let sid = jmap_submit(&s, &raw, &me, &[me.clone()], &sent.mailbox_id).expect("submit");
+    let sid =
+        jmap_submit(&s, &raw, &me, std::slice::from_ref(&me), &sent.mailbox_id).expect("submit");
     println!("submitted {sid}");
     std::fs::remove_dir_all(&home).ok();
 }

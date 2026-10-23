@@ -23,10 +23,13 @@ pub(in crate::worker) fn wire(cmd: &str) {
 pub(super) fn wired<T>(cmd: &str, r: &Result<T, async_imap::error::Error>) {
     match r {
         Ok(_) => tracing::debug!(target: "hylki::imap", "< OK ({})", cmd_head(cmd)),
-        Err(e) => {
-            tracing::warn!(target: "hylki::imap", "< {} ({cmd})", compact_parse_error(&e.to_string()))
-        }
+        Err(e) => wired_err(cmd, e),
     }
+}
+
+/// [`wired`] for a failure the caller still holds.
+pub(super) fn wired_err(cmd: &str, e: &async_imap::error::Error) {
+    tracing::warn!(target: "hylki::imap", "< {} ({cmd})", compact_parse_error(&e.to_string()))
 }
 
 /// The command's verb and first argument, for the terse OK line.

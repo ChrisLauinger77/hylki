@@ -545,7 +545,7 @@ async fn pop3_sync(
         .await?;
     let mut entries = pop.uidl().await?;
     // Newest first; bound how many we index.
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.0));
     entries.truncate(POP3_LIMIT);
 
     let cached: std::collections::HashMap<u32, Message> = cache
@@ -580,7 +580,7 @@ async fn pop3_sync(
     }
     pop.quit().await;
 
-    messages.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    messages.sort_by_key(|m| std::cmp::Reverse(m.timestamp));
     if let Some(c) = cache {
         c.save_messages(account_id, INBOX, &messages);
     }

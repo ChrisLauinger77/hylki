@@ -66,8 +66,7 @@ fn live_keyring_read_again() {
         .unwrap();
     let err = rt
         .block_on(connect(&account))
-        .err()
-        .expect("no keyring, no sign-in")
+        .expect_err("no keyring, no sign-in")
         .to_string();
     assert!(err.contains("keyring"), "{err}");
 
@@ -202,14 +201,6 @@ fn live_strip_attachment() {
     });
 }
 
-/// A folder moved with a sub-folder keeps both subscribed at their new
-/// names, so a client showing subscribed folders only still sees them.
-/// `IMAP_LIVE=host,port,user,password cargo test --bin hylki
-/// worker::imap::live_tests::live_rename_moves_subscriptions -- --ignored`
-#[test]
-/// #336 against a real server: mail appended while the connection is
-/// busy is picked up by the next wait, not left until something else
-/// happens to sync the folder.
 /// #349, #350 against a real server: a draft saved from an alias with a
 /// Bcc and a file comes back with all three.
 /// `IMAP_LIVE=host,port,user,password cargo test live_draft -- --ignored`
@@ -474,6 +465,9 @@ fn live_reply_is_filed_beside_its_original() {
     });
 }
 
+/// #336 against a real server: mail appended while the connection is
+/// busy is picked up by the next wait, not left until something else
+/// happens to sync the folder.
 #[test]
 #[ignore]
 fn live_idle_catches_mail_that_landed_between_commands() {
@@ -523,6 +517,11 @@ fn live_idle_catches_mail_that_landed_between_commands() {
     });
 }
 
+/// A folder moved with a sub-folder keeps both subscribed at their new
+/// names, so a client showing subscribed folders only still sees them.
+/// `IMAP_LIVE=host,port,user,password cargo test --bin hylki
+/// worker::imap::live_tests::live_rename_moves_subscriptions -- --ignored`
+#[test]
 #[ignore]
 fn live_rename_moves_subscriptions() {
     let Ok(spec) = std::env::var("IMAP_LIVE") else {
@@ -658,7 +657,7 @@ fn open_timing() {
             total[i] / n
         );
     }
-    whole.sort_by(|a, b| b.0.cmp(&a.0));
+    whole.sort_by_key(|w| std::cmp::Reverse(w.0));
     println!("slowest (render_raw ~ check+pgp+body+attach):");
     for (sum, t, name, len) in whole.iter().take(12) {
         println!(

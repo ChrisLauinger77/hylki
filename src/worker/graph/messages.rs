@@ -187,10 +187,10 @@ pub(super) fn graph_ids_url(base: &str, folder_graph_id: &str) -> String {
 
 /// One page of an id-only listing: (Graph id, `receivedDateTime`) pairs,
 /// and the link to the next page, if there is one.
-pub(super) fn graph_id_page(
-    token: &str,
-    url: &str,
-) -> Result<(Vec<(String, String)>, Option<String>), String> {
+type IdPage = (Vec<(String, String)>, Option<String>);
+
+/// Fetch one [`IdPage`].
+pub(super) fn graph_id_page(token: &str, url: &str) -> Result<IdPage, String> {
     let page = graph_get_json(token, url)?;
     let ids = page["value"]
         .as_array()

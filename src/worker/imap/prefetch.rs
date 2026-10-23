@@ -116,7 +116,7 @@ pub(super) fn queue_body_prefetch(
     emitted: &std::collections::HashSet<(String, u32)>,
 ) {
     let mut recent: Vec<&Message> = messages.iter().collect();
-    recent.sort_by(|a, b| b.uid.cmp(&a.uid)); // newest first
+    recent.sort_by_key(|m| std::cmp::Reverse(m.uid)); // newest first
     for m in recent.into_iter().take(PREFETCH_BODY_LIMIT) {
         let key = (path.to_string(), m.uid);
         if emitted.contains(&key) {
@@ -160,7 +160,7 @@ pub(super) fn queue_attachment_prefetch(
     account_id: u32,
 ) {
     let mut recent: Vec<&Message> = messages.iter().collect();
-    recent.sort_by(|a, b| b.uid.cmp(&a.uid)); // newest first
+    recent.sort_by_key(|m| std::cmp::Reverse(m.uid)); // newest first
     for m in recent.into_iter().take(PREFETCH_LIMIT) {
         if !m.has_attachment {
             continue;
