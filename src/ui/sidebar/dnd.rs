@@ -359,3 +359,75 @@ pub(super) fn folder_drag_source(row: &gtk::ListBoxRow, payload: String) -> gtk:
     });
     drag
 }
+
+impl Sidebar {
+    pub(super) fn on_reorder_folder(
+        &mut self,
+        account_id: u32,
+        path: String,
+        target: String,
+        after: bool,
+        sender: ComponentSender<Self>,
+    ) {
+        let Some(section) = self.sections.iter().find(|s| s.account.id == account_id) else {
+            return;
+        };
+        let h = &section.hierarchy;
+        let level = h.parent(&target);
+        let custom = section
+            .folders
+            .iter()
+            .any(|f| f.path == path && f.kind == FolderKind::Custom);
+        if !custom || level == h.parent(&path) {
+            // Already one of the target's siblings: only the order changes.
+            if let Some(paths) = placed_run(&section.folders, h, &path, &target, after) {
+                let _ = sender.output(SidebarOutput::ReorderFolders { account_id, paths });
+            }
+        } else {
+            // From another level: the server moves it there first.
+            let _ = sender.output(SidebarOutput::PlaceFolder {
+                account_id,
+                path,
+                dest: level,
+                target,
+                after,
+            });
+        }
+    }
+
+    pub(super) fn on_drop_on_folder(
+        &mut self,
+        dest_account: u32,
+        dest: String,
+        payload: String,
+        sender: ComponentSender<Self>,
+    ) {
+        // A dragged folder, not messages: reparent it (#51). Folders
+        // never cross accounts — mailboxes belong to one server.
+        if let Some(rest) = payload.strip_prefix("vireo-folder\t") {
+            let mut it = rest.splitn(2, '\t');
+            let src_account = it.next().and_then(|s| s.parse::<u32>().ok());
+            let src_path = it.next().map(String::from);
+            if let (Some(src_account), Some(src_path)) = (src_account, src_path) {
+                if src_account == dest_account && src_path != dest {
+                    let _ = sender.output(SidebarOutput::MoveFolder {
+                        account_id: dest_account,
+                        path: src_path,
+                        dest,
+                    });
+                }
+            }
+            return;
+        }
+        let items = parse_move_payload(&payload);
+        // "" is the Folders header (a folder-move destination only);
+        // messages need a real mailbox.
+        if !items.is_empty() && !dest.is_empty() {
+            let _ = sender.output(SidebarOutput::MoveMessages {
+                dest_account,
+                dest,
+                items,
+            });
+        }
+    }
+}

@@ -313,7 +313,7 @@ impl Sidebar {
         }
     }
 
-    pub(super) fn set_tags_open(&mut self, slot: Slot, open: bool, sender: &ComponentSender<Self>) {
+    fn set_tags_open(&mut self, slot: Slot, open: bool, sender: &ComponentSender<Self>) {
         match slot {
             Slot::Unified => {
                 self.tags_expanded = open;
@@ -389,5 +389,135 @@ impl Sidebar {
             smart: self.smart_expanded,
             contacts: self.contacts_expanded,
         });
+    }
+}
+
+impl Sidebar {
+    pub(super) fn on_toggle_contact_node(&mut self, key: String, sender: ComponentSender<Self>) {
+        let was_folded = self.contacts_folded.remove(&key);
+        if !was_folded {
+            self.contacts_folded.insert(key.clone());
+        }
+        for (k, chevron) in &self.contact_chevrons {
+            if *k == key {
+                if was_folded {
+                    chevron.add_css_class("open");
+                } else {
+                    chevron.remove_css_class("open");
+                }
+            }
+        }
+        for t in &self.contact_layout {
+            if t.under.contains(&key) {
+                let hidden = t.under.iter().any(|k| self.contacts_folded.contains(k));
+                slide_tree_row(&t.row, &t.revealer, hidden);
+            }
+        }
+        let mut keys: Vec<String> = self.contacts_folded.iter().cloned().collect();
+        keys.sort();
+        let _ = sender.output(SidebarOutput::ContactsFolded(keys));
+    }
+
+    // The unified slot is a unified row; an account's is a heading.
+    pub(super) fn on_toggle_tags_expand(&mut self, slot: Slot, sender: ComponentSender<Self>) {
+        if slot == Slot::Unified {
+            self.toggle_row(UnifiedRow::Tags, &sender);
+        } else {
+            let open = !self.tags_open(slot);
+            self.set_tags_open(slot, open, &sender);
+            if let Some(w) = self.tag_sections.get(&slot) {
+                w.revealer.set_reveal_child(open);
+                w.chevron.set_icon_name(Some(chevron_icon(open)));
+            }
+        }
+    }
+
+    pub(super) fn on_toggle_smart_expand(&mut self, sender: ComponentSender<Self>) {
+        self.toggle_row(UnifiedRow::Smart, &sender);
+        // The header is a toggle, not a view: it never stays picked.
+        if let Some(w) = self.kind_widgets.get(&UnifiedRow::Smart) {
+            let header = w.header.clone();
+            let quiet = self.quiet.clone();
+            gtk::glib::idle_add_local_once(move || {
+                quiet.set(true);
+                header.unselect_all();
+                quiet.set(false);
+            });
+        }
+    }
+
+    pub(super) fn on_toggle_filtered_expand(&mut self, slot: Slot, sender: ComponentSender<Self>) {
+        if slot == Slot::Unified {
+            self.toggle_row(UnifiedRow::Filtered, &sender);
+        }
+    }
+
+    pub(super) fn on_toggle_collapse_local(&mut self, id: u32, sender: ComponentSender<Self>) {
+        // In the rail this opens or folds the account for the rail
+        // alone — the saved state stays as it is for the full
+        // sidebar, which comes back as it was left.
+        let rail_only = self.collapsed;
+        if let Some(rev) = self.revealers.get(&id) {
+            let expanded = !rev.reveals_child();
+            rev.set_reveal_child(expanded);
+            if let Some(ch) = self.chevrons.get(&id) {
+                ch.set_icon_name(Some(if expanded {
+                    "pan-down-symbolic"
+                } else {
+                    "pan-end-symbolic"
+                }));
+            }
+            if rail_only {
+                self.rail_open_accounts.insert(id, expanded);
+            } else if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
+                s.collapsed = !expanded;
+            }
+            // The Inbox chip lives inside the folder list we just hid/shown,
+            // so mirror it onto the avatar: visible only while collapsed.
+            if let Some(label) = self.account_circle_badges.get(&id) {
+                let n = self
+                    .sections
+                    .iter()
+                    .find(|s| s.account.id == id)
+                    .and_then(|s| s.folders.iter().find(|f| f.kind == FolderKind::Inbox))
+                    .map(|f| f.unread)
+                    .unwrap_or(0);
+                label.set_text(&n.to_string());
+                label.set_visible(!expanded && n > 0);
+            }
+            if !rail_only {
+                let _ = sender.output(SidebarOutput::AccountFolded {
+                    id,
+                    folded: !expanded,
+                });
+            }
+        }
+    }
+
+    pub(super) fn on_toggle_custom_folders_local(
+        &mut self,
+        id: u32,
+        sender: ComponentSender<Self>,
+    ) {
+        if let Some(rev) = self.custom_revealers.get(&id) {
+            let expanded = !rev.reveals_child();
+            rev.set_reveal_child(expanded);
+            if let Some(ch) = self.custom_chevrons.get(&id) {
+                ch.set_icon_name(Some(if expanded {
+                    "pan-down-symbolic"
+                } else {
+                    "pan-end-symbolic"
+                }));
+            }
+            if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
+                s.custom_expanded = expanded;
+            }
+            let _ = sender.output(SidebarOutput::ToggleCustomFolders(id));
+        }
+    }
+
+    pub(super) fn on_expand_for_drop(&mut self, id: u32, sender: ComponentSender<Self>) {
+        // Expand a collapsed account so its folders become drop targets.
+        self.reveal_account(id, &sender);
     }
 }

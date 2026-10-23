@@ -435,7 +435,7 @@ impl Sidebar {
         }
     }
 
-    pub(super) fn select_folder(&self, account_id: u32, path: &str) {
+    fn select_folder(&self, account_id: u32, path: &str) {
         let idx = self
             .sections
             .iter()
@@ -482,5 +482,115 @@ impl Sidebar {
             .find(|s| s.account.id == account_id)
             .and_then(|s| s.folders.iter().find(|f| f.path == path))
             .map(|f| f.kind)
+    }
+}
+
+impl Sidebar {
+    pub(super) fn on_drop_start(&mut self) {
+        let waited = self.start.take().is_some() | self.reannounce.take().is_some();
+        if waited && self.selected == Sel::None {
+            self.restore_selection();
+        }
+    }
+
+    pub(super) fn on_reannounce(&mut self, sender: ComponentSender<Self>) {
+        if self.mirror || self.selected == Sel::None {
+            return;
+        }
+        let sel = std::mem::replace(&mut self.selected, Sel::None);
+        let email = sel.account().and_then(|acc| {
+            self.sections
+                .iter()
+                .find(|s| s.account.id == acc)
+                .map(|s| s.account.email.clone())
+        });
+        self.reannounce = Some((sel, email));
+        self.quiet.set(true);
+        self.clear_other_selections(Sel::None);
+        self.quiet.set(false);
+        // An account that never comes back online must not leave
+        // the list without a view.
+        let s = sender.input_sender().clone();
+        gtk::glib::timeout_add_seconds_local_once(8, move || {
+            let _ = s.send(SidebarInput::DropStart);
+        });
+    }
+
+    pub(super) fn on_mirror_selection(&mut self, sel: Sel) {
+        if self.selected != sel {
+            self.selected = sel.clone();
+            self.quiet.set(true);
+            self.clear_other_selections(sel);
+            self.quiet.set(false);
+            self.restore_selection();
+        }
+    }
+
+    pub(super) fn on_select_unified_row(&mut self, sender: ComponentSender<Self>) {
+        if self.selected == Sel::Unified {
+            return;
+        }
+        self.selected = Sel::Unified;
+        self.quiet.set(true);
+        self.clear_other_selections(Sel::Unified);
+        if let Some(l) = &self.unified_list {
+            l.select_row(l.row_at_index(0).as_ref());
+        }
+        self.quiet.set(false);
+        let _ = sender.output(SidebarOutput::UnifiedSelected);
+    }
+
+    pub(super) fn on_select_folder_row(
+        &mut self,
+        account_id: u32,
+        path: String,
+        sender: ComponentSender<Self>,
+    ) {
+        // A click on a per-account inbox under "All Inboxes" echoes
+        // back here as its plain folder path; that sub-row already
+        // shows this exact folder, so keep its highlight instead of
+        // jumping to the account section's own Inbox row.
+        if self.selected == Sel::UnifiedInbox(account_id)
+            && self
+                .unified_inboxes
+                .iter()
+                .any(|r| r.account_id == account_id && r.path == path)
+        {
+            return;
+        }
+        // Likewise a click on a filtered folder in either kind of
+        // Filtered Folders section, on a favorite, or on an account's
+        // folder in a unified Starred / Sent / Drafts row's list.
+        if self.selected == Sel::UnifiedFolder(account_id, path.clone())
+            || self.selected == Sel::AccountFiltered(account_id, path.clone())
+            || self.selected == Sel::Favorite(account_id, path.clone())
+        {
+            return;
+        }
+        if let Sel::UnifiedKindRow(kind, acc) = &self.selected {
+            if *acc == account_id
+                && self
+                    .kind_widgets
+                    .get(&UnifiedRow::Kind(*kind))
+                    .is_some_and(|w| {
+                        w.rows
+                            .iter()
+                            .any(|r| r.account_id == account_id && r.path == path)
+                    })
+            {
+                return;
+            }
+        }
+        let key = Sel::Folder(account_id, path.clone());
+        if self.selected != key {
+            self.selected = key.clone();
+            self.quiet.set(true);
+            self.clear_other_selections(key);
+            self.select_folder(account_id, &path);
+            self.quiet.set(false);
+        }
+        // A highlight inside a folded account shows nothing (#170:
+        // a notification click seemed to land nowhere); unfold it.
+        self.reveal_account(account_id, &sender);
     }
 }

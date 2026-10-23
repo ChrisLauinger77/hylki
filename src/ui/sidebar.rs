@@ -18,10 +18,13 @@ use crate::i18n::{i18n, i18n_f, i18n_noop};
 use crate::models::{Account, Folder, FolderKind};
 use crate::ui::context_menu::{show_context_menu, show_context_menu_with_header, MenuEntry};
 
+mod contents;
 mod dnd;
 mod menus;
 mod messages;
 mod open_state;
+mod picks;
+mod rail;
 mod rebuild;
 mod selection;
 mod tree;
@@ -29,14 +32,12 @@ mod types;
 mod unified;
 mod widgets;
 
-use dnd::parse_move_payload;
 pub use messages::{CtxAction, SidebarInput, SidebarOutput};
 pub use tree::Hierarchy;
 pub(crate) use tree::{folder_depth, order_folders, placed_run, TREE_EXPANDER_WIDTH};
 pub(crate) use types::kind_label;
-use types::{chevron_icon, InboxRef, KindWidgets, SectionWidgets, UnifiedRow};
+use types::{InboxRef, KindWidgets, SectionWidgets, UnifiedRow};
 pub use types::{SectionData, Sel, SidebarInit, Slot, StartTarget, UnifiedFolderRef};
-use widgets::slide_tree_row;
 pub(crate) use widgets::{account_initials, build_unified_sub_row, pin_icon_size};
 
 pub struct Sidebar {
@@ -449,1054 +450,113 @@ impl Sidebar {
         _root: &<Self as Component>::Root,
     ) {
         match msg {
-            SidebarInput::DropStart => {
-                let waited = self.start.take().is_some() | self.reannounce.take().is_some();
-                if waited && self.selected == Sel::None {
-                    self.restore_selection();
-                }
-            }
-
-            SidebarInput::Reannounce => {
-                if self.mirror || self.selected == Sel::None {
-                    return;
-                }
-                let sel = std::mem::replace(&mut self.selected, Sel::None);
-                let email = sel.account().and_then(|acc| {
-                    self.sections
-                        .iter()
-                        .find(|s| s.account.id == acc)
-                        .map(|s| s.account.email.clone())
-                });
-                self.reannounce = Some((sel, email));
-                self.quiet.set(true);
-                self.clear_other_selections(Sel::None);
-                self.quiet.set(false);
-                // An account that never comes back online must not leave
-                // the list without a view.
-                let s = sender.input_sender().clone();
-                gtk::glib::timeout_add_seconds_local_once(8, move || {
-                    let _ = s.send(SidebarInput::DropStart);
-                });
-            }
-
-            SidebarInput::MirrorSelection(sel) => {
-                if self.selected != sel {
-                    self.selected = sel.clone();
-                    self.quiet.set(true);
-                    self.clear_other_selections(sel);
-                    self.quiet.set(false);
-                    self.restore_selection();
-                }
-            }
-
-            SidebarInput::SetContents {
-                mut sections,
-                show_unified,
-                unified_kinds,
-                show_accounts,
-                unified_chips,
-                chevrons_left,
-                account_click_folds,
-                rail_dots,
-                rail_fold,
-                unified_unread,
-                unified_folders,
-                favorite_folders,
-                tags,
-                section_style,
-                filtered_placement,
-                tags_placement,
-                favorites_placement,
-                contacts_placement,
-                smart_folders,
-            } => {
-                // Order each account's folders essential-first, then custom, so
-                // the essential/custom split lines up with row indices (the main
-                // list holds indices 0..E, the custom list E..), each part in
-                // the user's own order where they set one.
-                for s in &mut sections {
-                    s.folders = order_folders(
-                        std::mem::take(&mut s.folders),
-                        &s.folder_order,
-                        s.folder_sort,
-                    );
-                }
-                // Seed the tree's collapsed nodes from the persisted state;
-                // later chevron clicks flip the local copy.
-                self.tree_collapsed = sections
-                    .iter()
-                    .map(|s| (s.account.id, s.tree_collapsed.iter().cloned().collect()))
-                    .collect();
-                self.sections = sections;
-                self.show_unified = show_unified;
-                self.unified_chips = unified_chips;
-                self.chevrons_left = chevrons_left;
-                self.account_click_folds = account_click_folds;
-                self.rail_dots = rail_dots;
-                // "Fold up expanded items" is a view of the rail, not a
-                // change to what is saved: the rebuild below draws the
-                // ticked items folded while the sidebar is collapsed and
-                // as they are once it expands (see `locked_row`).
-                self.rail_fold = rail_fold;
-                self.unified_unread = unified_unread;
-                self.unified_folders = unified_folders;
-                self.favorite_folders = favorite_folders;
-                self.tags = tags;
-                self.section_style = section_style;
-                self.filtered_placement = filtered_placement;
-                self.tags_placement = tags_placement;
-                self.favorites_placement = favorites_placement;
-                self.contacts_placement = contacts_placement;
-                self.smart_folders = smart_folders;
-                // The open smart folder was deleted: fall back to the
-                // default view.
-                if let Sel::Smart(id) = &self.selected {
-                    if !self.smart_folders.iter().any(|(i, _)| i == id) {
-                        self.selected = Sel::None;
-                    }
-                }
-                self.unified_kinds = unified_kinds;
-                self.show_accounts = show_accounts;
-                // Every Filtered Folders section's rows: the unified one's
-                // (narrowed by the app to the rules that opted in) and each
-                // account's own (every rule's destination).
-                self.filtered_rows.clear();
-                self.filtered_rows
-                    .insert(Slot::Unified, self.unified_folders.clone());
-                for s in &self.sections {
-                    let rows = s
-                        .filtered
-                        .iter()
-                        .map(|f| UnifiedFolderRef {
-                            account_id: s.account.id,
-                            folder: f.clone(),
-                        })
-                        .collect();
-                    self.filtered_rows.insert(Slot::Account(s.account.id), rows);
-                }
-                // The open tag was removed (or its account): fall back to
-                // the default view.
-                if let Sel::Tag(acc, kw) = &self.selected {
-                    let gone = !self.tags.iter().any(|t| t.keyword.eq_ignore_ascii_case(kw))
-                        || acc.is_some_and(|a| !self.sections.iter().any(|s| s.account.id == a));
-                    if gone {
-                        self.selected = Sel::None;
-                    }
-                }
-                // A unified row switched off in Settings (or with nothing
-                // left to list): its view stays, nothing shows selected.
-                if let Sel::UnifiedKind(kind) = &self.selected {
-                    if !self.unified_kinds.has(*kind) {
-                        self.selected = Sel::None;
-                    }
-                }
-                if self.selected == Sel::UnifiedFiltered && self.unified_folders.is_empty() {
-                    self.selected = Sel::None;
-                }
-                if self.selected == Sel::UnifiedFavorites && !self.favorites_shown() {
-                    self.selected = Sel::None;
-                }
-                // All Inboxes gone (one account or none left in the unified
-                // section, #267): the usual first view is picked again.
-                if self.selected == Sel::Unified && !self.show_unified {
-                    self.selected = Sel::None;
-                }
-                // An inbox or folder picked under a unified row whose account
-                // has just left the unified section is still the open
-                // folder: carry the highlight to the account's own row.
-                let left_unified = |acc: u32| {
-                    self.sections
-                        .iter()
-                        .find(|s| s.account.id == acc)
-                        .map(|s| !s.in_unified)
-                };
-                let moved = match &self.selected {
-                    Sel::UnifiedInbox(acc) => Some((*acc, FolderKind::Inbox)),
-                    Sel::UnifiedKindRow(kind, acc) => Some((*acc, *kind)),
-                    _ => None,
-                };
-                if let Some((acc, kind)) = moved.filter(|(acc, _)| left_unified(*acc) == Some(true))
-                {
-                    let path = self
-                        .sections
-                        .iter()
-                        .find(|s| s.account.id == acc)
-                        .and_then(|s| s.folders.iter().find(|f| f.kind == kind))
-                        .map(|f| f.path.clone());
-                    self.selected = path.map_or(Sel::None, |p| Sel::Folder(acc, p));
-                }
-                if self.selected == Sel::UnifiedTags && !self.unified_tags_shown() {
-                    self.selected = Sel::None;
-                }
-                // Contacts placed off takes its selection with it; in the
-                // footer, its one row is every scope.
-                if matches!(self.selected, Sel::Contacts | Sel::ContactScope(_)) {
-                    if self.contacts_placement == crate::config::SectionPlacement::Off {
-                        self.selected = Sel::None;
-                    } else if self.contacts_in_footer() {
-                        self.selected = Sel::Contacts;
-                    }
-                }
-                // A folder picked in a switched-off row's account list is
-                // still the open folder: carry the highlight to the
-                // account's own row.
-                if let Sel::UnifiedKindRow(kind, acc) = self.selected.clone() {
-                    if !self.unified_kinds.has(kind) {
-                        let path = self
-                            .sections
-                            .iter()
-                            .find(|s| s.account.id == acc)
-                            .and_then(|s| s.folders.iter().find(|f| f.kind == kind))
-                            .map(|f| f.path.clone());
-                        self.selected = path.map_or(Sel::None, |p| Sel::Folder(acc, p));
-                    }
-                }
-                // A folder taken out of Favorites is still the open folder.
-                if let Sel::Favorite(acc, path) = &self.selected {
-                    if !self
-                        .favorite_folders
-                        .iter()
-                        .any(|r| r.account_id == *acc && r.folder.path == *path)
-                    {
-                        self.selected = Sel::Folder(*acc, path.clone());
-                    }
-                }
-                // Likewise a folder that left an account's own Filtered
-                // Folders section (its rule was removed).
-                if let Sel::AccountFiltered(acc, path) = &self.selected {
-                    let listed = self
-                        .filtered_rows
-                        .get(&Slot::Account(*acc))
-                        .is_some_and(|rows| rows.iter().any(|r| r.folder.path == *path));
-                    if !listed {
-                        self.selected = Sel::Folder(*acc, path.clone());
-                    }
-                }
-                // A selected filtered folder that just left the section (its
-                // rule opted out, or the section was switched off) is still
-                // the open folder: carry the highlight to the account
-                // section's own row for it.
-                if let Sel::UnifiedFolder(acc, path) = &self.selected {
-                    let listed = self
-                        .unified_folders
-                        .iter()
-                        .any(|r| r.account_id == *acc && r.folder.path == *path);
-                    if !listed {
-                        self.selected = Sel::Folder(*acc, path.clone());
-                    }
-                }
-                self.rebuild_normal(
-                    &widgets.pinned_box,
-                    &widgets.normal_box,
-                    &widgets.footer_box,
-                    &sender,
-                );
-                self.restore_selection();
-            }
-
-            SidebarInput::UnifiedRowSelected => {
-                if self.selected == Sel::Unified {
-                    return;
-                }
-                self.selected = Sel::Unified;
-                self.clear_other_selections(Sel::Unified);
-                let _ = sender.output(SidebarOutput::UnifiedSelected);
-            }
-
-            SidebarInput::SelectUnifiedRow => {
-                if self.selected == Sel::Unified {
-                    return;
-                }
-                self.selected = Sel::Unified;
-                self.quiet.set(true);
-                self.clear_other_selections(Sel::Unified);
-                if let Some(l) = &self.unified_list {
-                    l.select_row(l.row_at_index(0).as_ref());
-                }
-                self.quiet.set(false);
-                let _ = sender.output(SidebarOutput::UnifiedSelected);
-            }
-
-            SidebarInput::AttachmentsRowSelected => {
-                if self.selected == Sel::Attachments {
-                    return;
-                }
-                self.selected = Sel::Attachments;
-                self.clear_other_selections(Sel::Attachments);
-                let _ = sender.output(SidebarOutput::AttachmentsSelected);
-            }
-
-            SidebarInput::ContactsRowClicked => {
-                if self.selected == Sel::Contacts {
-                    return;
-                }
-                self.selected = Sel::Contacts;
-                self.clear_other_selections(Sel::Contacts);
-                let _ = sender.output(SidebarOutput::ContactsClicked);
-                // The row itself is every contact. The footer's opens
-                // Contacts on the book its own picker last showed.
-                if !self.contacts_in_footer() {
-                    let _ = sender.output(SidebarOutput::ContactScope(
-                        crate::ui::contacts_page::ContactScope::All,
-                    ));
-                }
-            }
-
-            SidebarInput::SetContactTree(tree) => {
-                if self.contact_tree.as_ref() == Some(&tree) {
-                    return;
-                }
-                // The highlight follows a scope the contact page picked
-                // itself (a book's New Contact opens that book).
-                if matches!(self.selected, Sel::Contacts | Sel::ContactScope(_)) {
-                    self.selected = match &tree.scope {
-                        _ if self.contacts_in_footer() => Sel::Contacts,
-                        crate::ui::contacts_page::ContactScope::All => Sel::Contacts,
-                        scope => Sel::ContactScope(scope.clone()),
-                    };
-                    self.quiet.set(true);
-                    self.clear_other_selections(self.selected.clone());
-                    if self.selected == Sel::Contacts {
-                        self.select_contacts(None);
-                    }
-                    self.quiet.set(false);
-                }
-                self.contact_tree = Some(tree);
-                self.fill_contact_tree(&sender);
-            }
-
+            SidebarInput::DropStart => self.on_drop_start(),
+            SidebarInput::Reannounce => self.on_reannounce(sender),
+            SidebarInput::MirrorSelection(sel) => self.on_mirror_selection(sel),
+            msg @ SidebarInput::SetContents { .. } => self.on_set_contents(msg, widgets, sender),
+            SidebarInput::UnifiedRowSelected => self.on_unified_row_selected(sender),
+            SidebarInput::SelectUnifiedRow => self.on_select_unified_row(sender),
+            SidebarInput::AttachmentsRowSelected => self.on_attachments_row_selected(sender),
+            SidebarInput::ContactsRowClicked => self.on_contacts_row_clicked(sender),
+            SidebarInput::SetContactTree(tree) => self.on_set_contact_tree(tree, sender),
             SidebarInput::ToggleContactsExpand => {
                 self.toggle_row(UnifiedRow::Contacts, &sender);
             }
-
-            SidebarInput::ToggleContactNode(key) => {
-                let was_folded = self.contacts_folded.remove(&key);
-                if !was_folded {
-                    self.contacts_folded.insert(key.clone());
-                }
-                for (k, chevron) in &self.contact_chevrons {
-                    if *k == key {
-                        if was_folded {
-                            chevron.add_css_class("open");
-                        } else {
-                            chevron.remove_css_class("open");
-                        }
-                    }
-                }
-                for t in &self.contact_layout {
-                    if t.under.contains(&key) {
-                        let hidden = t.under.iter().any(|k| self.contacts_folded.contains(k));
-                        slide_tree_row(&t.row, &t.revealer, hidden);
-                    }
-                }
-                let mut keys: Vec<String> = self.contacts_folded.iter().cloned().collect();
-                keys.sort();
-                let _ = sender.output(SidebarOutput::ContactsFolded(keys));
-            }
-
+            SidebarInput::ToggleContactNode(key) => self.on_toggle_contact_node(key, sender),
             SidebarInput::ContactTreeSelected(scope) => {
-                let key = Sel::ContactScope(scope.clone());
-                if self.selected == key {
-                    return;
-                }
-                self.selected = key.clone();
-                self.clear_other_selections(key);
-                let _ = sender.output(SidebarOutput::ContactScope(scope));
+                self.on_contact_tree_selected(scope, sender)
             }
-
             SidebarInput::ContactTreeDrop { keys, on, moving } => {
                 let _ = sender.output(SidebarOutput::ContactDrop { keys, on, moving });
             }
-
             SidebarInput::ContactTreeMenu(action) => {
                 let _ = sender.output(SidebarOutput::ContactTreeAction(action));
             }
-
-            SidebarInput::OutboxRowSelected => {
-                if self.selected == Sel::Outbox {
-                    return;
-                }
-                self.selected = Sel::Outbox;
-                self.clear_other_selections(Sel::Outbox);
-                let _ = sender.output(SidebarOutput::OutboxSelected);
-            }
-
-            SidebarInput::SetOutboxCount(count) => {
-                if self.outbox_count == count {
-                    return;
-                }
-                let appearing = (self.outbox_count == 0) != (count == 0);
-                self.outbox_count = count;
-                // The row itself comes and goes with the count, so the sidebar
-                // only needs rebuilding when it crosses zero; otherwise just
-                // refresh the badge in place.
-                if appearing {
-                    // Leaving the Outbox selected when its row disappears would
-                    // strand the view on an empty list.
-                    if count == 0 && self.selected == Sel::Outbox {
-                        self.selected = Sel::None;
-                    }
-                    self.rebuild_normal(
-                        &widgets.pinned_box,
-                        &widgets.normal_box,
-                        &widgets.footer_box,
-                        &sender,
-                    );
-                    self.restore_selection();
-                } else if let Some(list) = &self.outbox_list {
-                    if let Some(row) = list.row_at_index(0) {
-                        if let Some(badge) = row.child().and_downcast::<gtk::Box>() {
-                            if let Some(label) = badge.last_child().and_downcast::<gtk::Label>() {
-                                label.set_label(&count.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-
+            SidebarInput::OutboxRowSelected => self.on_outbox_row_selected(sender),
+            SidebarInput::SetOutboxCount(count) => self.on_set_outbox_count(count, widgets, sender),
             SidebarInput::UnifiedInboxRowSelected(index) => {
-                if let Some(r) = self.unified_inboxes.get(index as usize).cloned() {
-                    let key = Sel::UnifiedInbox(r.account_id);
-                    if self.selected == key {
-                        return;
-                    }
-                    self.selected = key.clone();
-                    self.clear_other_selections(key);
-                    let _ = sender.output(SidebarOutput::FolderSelected {
-                        account_id: r.account_id,
-                        folder_id: r.folder_id,
-                        name: r.name,
-                        path: r.path,
-                    });
-                }
+                self.on_unified_inbox_row_selected(index, sender)
             }
-
             SidebarInput::ToggleUnifiedExpand => {
                 self.toggle_row(UnifiedRow::Kind(FolderKind::Inbox), &sender)
             }
-
             SidebarInput::FilteredRowSelected { slot, index } => {
-                let Some(r) = self
-                    .filtered_rows
-                    .get(&slot)
-                    .and_then(|rows| rows.get(index as usize))
-                    .cloned()
-                else {
-                    return;
-                };
-                let key = match slot {
-                    Slot::Unified => Sel::UnifiedFolder(r.account_id, r.folder.path.clone()),
-                    Slot::Account(_) => Sel::AccountFiltered(r.account_id, r.folder.path.clone()),
-                };
-                if self.selected == key {
-                    return;
-                }
-                self.selected = key.clone();
-                self.clear_other_selections(key);
-                let _ = sender.output(SidebarOutput::FolderSelected {
-                    account_id: r.account_id,
-                    folder_id: r.folder.id,
-                    name: r.folder.name,
-                    path: r.folder.path,
-                });
+                self.on_filtered_row_selected(slot, index, sender)
             }
-
             SidebarInput::TagRowSelected { slot, index } => {
-                if let Some(t) = self.tags.get(index as usize).cloned() {
-                    let account = slot.account();
-                    let key = Sel::Tag(account, t.keyword.clone());
-                    if self.selected == key {
-                        return;
-                    }
-                    self.selected = key.clone();
-                    self.clear_other_selections(key);
-                    let _ = sender.output(SidebarOutput::TagSelected {
-                        keyword: t.keyword,
-                        account,
-                    });
-                }
+                self.on_tag_row_selected(slot, index, sender)
             }
-
             // The unified slot is a unified row; an account's is a heading.
-            SidebarInput::ToggleTagsExpand(slot) => {
-                if slot == Slot::Unified {
-                    self.toggle_row(UnifiedRow::Tags, &sender);
-                } else {
-                    let open = !self.tags_open(slot);
-                    self.set_tags_open(slot, open, &sender);
-                    if let Some(w) = self.tag_sections.get(&slot) {
-                        w.revealer.set_reveal_child(open);
-                        w.chevron.set_icon_name(Some(chevron_icon(open)));
-                    }
-                }
-            }
-
+            SidebarInput::ToggleTagsExpand(slot) => self.on_toggle_tags_expand(slot, sender),
             SidebarInput::ToggleFavoritesExpand => {
                 self.toggle_row(UnifiedRow::Favorites, &sender);
             }
-
-            SidebarInput::ToggleSmartExpand => {
-                self.toggle_row(UnifiedRow::Smart, &sender);
-                // The header is a toggle, not a view: it never stays picked.
-                if let Some(w) = self.kind_widgets.get(&UnifiedRow::Smart) {
-                    let header = w.header.clone();
-                    let quiet = self.quiet.clone();
-                    gtk::glib::idle_add_local_once(move || {
-                        quiet.set(true);
-                        header.unselect_all();
-                        quiet.set(false);
-                    });
-                }
-            }
-
-            SidebarInput::SmartRowSelected(index) => {
-                let Some((id, _)) = self.smart_folders.get(index as usize).cloned() else {
-                    return;
-                };
-                let key = Sel::Smart(id.clone());
-                if self.selected == key {
-                    return;
-                }
-                self.selected = key.clone();
-                self.clear_other_selections(key);
-                let _ = sender.output(SidebarOutput::SmartSelected(id));
-            }
-
-            SidebarInput::SetSmartUnread(counts) => {
-                for (id, badge) in &self.smart_badges {
-                    let n = counts.get(id).copied().unwrap_or(0);
-                    badge.set_label(&n.to_string());
-                    badge.set_visible(n > 0);
-                }
-                self.smart_unread = counts;
-                if let Some(w) = self.kind_widgets.get(&UnifiedRow::Smart) {
-                    if let Some(b) = &w.badge {
-                        let total = self.row_unread(UnifiedRow::Smart);
-                        b.set_label(&total.to_string());
-                        b.set_visible(total > 0 && !self.row_shown_open(UnifiedRow::Smart));
-                    }
-                }
-            }
-
+            SidebarInput::ToggleSmartExpand => self.on_toggle_smart_expand(sender),
+            SidebarInput::SmartRowSelected(index) => self.on_smart_row_selected(index, sender),
+            SidebarInput::SetSmartUnread(counts) => self.on_set_smart_unread(counts),
             SidebarInput::FavoriteRowSelected(index) => {
-                let Some(r) = self.favorite_folders.get(index as usize).cloned() else {
-                    return;
-                };
-                let key = Sel::Favorite(r.account_id, r.folder.path.clone());
-                if self.selected == key {
-                    return;
-                }
-                self.selected = key.clone();
-                self.clear_other_selections(key);
-                let _ = sender.output(SidebarOutput::FolderSelected {
-                    account_id: r.account_id,
-                    folder_id: r.folder.id,
-                    name: r.folder.name,
-                    path: r.folder.path,
-                });
+                self.on_favorite_row_selected(index, sender)
             }
-
             SidebarInput::ToggleFilteredExpand(slot) => {
-                if slot == Slot::Unified {
-                    self.toggle_row(UnifiedRow::Filtered, &sender);
-                }
+                self.on_toggle_filtered_expand(slot, sender)
             }
-
             SidebarInput::UnifiedKindRowSelected(kind) => {
-                let key = Sel::UnifiedKind(kind);
-                if self.selected == key {
-                    return;
-                }
-                self.selected = key.clone();
-                self.clear_other_selections(key);
-                let _ = sender.output(SidebarOutput::UnifiedKindSelected(kind));
+                self.on_unified_kind_row_selected(kind, sender)
             }
-
-            SidebarInput::UnifiedFavoritesSelected => {
-                if self.selected == Sel::UnifiedFavorites {
-                    return;
-                }
-                self.selected = Sel::UnifiedFavorites;
-                self.clear_other_selections(Sel::UnifiedFavorites);
-                let _ = sender.output(SidebarOutput::UnifiedFavoritesSelected);
-            }
-
-            SidebarInput::UnifiedFilteredSelected => {
-                if self.selected == Sel::UnifiedFiltered {
-                    return;
-                }
-                self.selected = Sel::UnifiedFiltered;
-                self.clear_other_selections(Sel::UnifiedFiltered);
-                let _ = sender.output(SidebarOutput::UnifiedFilteredSelected);
-            }
-
-            SidebarInput::UnifiedTagsSelected => {
-                if self.selected == Sel::UnifiedTags {
-                    return;
-                }
-                self.selected = Sel::UnifiedTags;
-                self.clear_other_selections(Sel::UnifiedTags);
-                let _ = sender.output(SidebarOutput::UnifiedTagsSelected);
-            }
-
+            SidebarInput::UnifiedFavoritesSelected => self.on_unified_favorites_selected(sender),
+            SidebarInput::UnifiedFilteredSelected => self.on_unified_filtered_selected(sender),
+            SidebarInput::UnifiedTagsSelected => self.on_unified_tags_selected(sender),
             SidebarInput::KindSubRowSelected { kind, index } => {
-                let Some(r) = self
-                    .kind_widgets
-                    .get(&UnifiedRow::Kind(kind))
-                    .and_then(|w| w.rows.get(index as usize))
-                    .cloned()
-                else {
-                    return;
-                };
-                let key = Sel::UnifiedKindRow(kind, r.account_id);
-                if self.selected == key {
-                    return;
-                }
-                self.selected = key.clone();
-                self.clear_other_selections(key);
-                if r.path.is_empty() {
-                    let _ = sender.output(SidebarOutput::AccountStarredSelected(r.account_id));
-                    return;
-                }
-                let _ = sender.output(SidebarOutput::FolderSelected {
-                    account_id: r.account_id,
-                    folder_id: r.folder_id,
-                    name: r.name,
-                    path: r.path,
-                });
+                self.on_kind_sub_row_selected(kind, index, sender)
             }
-
             SidebarInput::ToggleKindExpand(kind) => {
                 self.toggle_row(UnifiedRow::Kind(kind), &sender)
             }
-
             SidebarInput::FolderRowSelected { account_id, index } => {
-                let folder = self
-                    .sections
-                    .iter()
-                    .find(|s| s.account.id == account_id)
-                    .and_then(|s| s.folders.get(index as usize))
-                    .cloned();
-                if let Some(folder) = folder {
-                    let key = Sel::Folder(account_id, folder.path.clone());
-                    if self.selected == key {
-                        return;
-                    }
-                    self.selected = key.clone();
-                    self.clear_other_selections(key);
-                    let _ = sender.output(SidebarOutput::FolderSelected {
-                        account_id,
-                        folder_id: folder.id,
-                        name: folder.name.clone(),
-                        path: folder.path.clone(),
-                    });
-                }
+                self.on_folder_row_selected(account_id, index, sender)
             }
-
             SidebarInput::SelectFolderRow { account_id, path } => {
-                // A click on a per-account inbox under "All Inboxes" echoes
-                // back here as its plain folder path; that sub-row already
-                // shows this exact folder, so keep its highlight instead of
-                // jumping to the account section's own Inbox row.
-                if self.selected == Sel::UnifiedInbox(account_id)
-                    && self
-                        .unified_inboxes
-                        .iter()
-                        .any(|r| r.account_id == account_id && r.path == path)
-                {
-                    return;
-                }
-                // Likewise a click on a filtered folder in either kind of
-                // Filtered Folders section, on a favorite, or on an account's
-                // folder in a unified Starred / Sent / Drafts row's list.
-                if self.selected == Sel::UnifiedFolder(account_id, path.clone())
-                    || self.selected == Sel::AccountFiltered(account_id, path.clone())
-                    || self.selected == Sel::Favorite(account_id, path.clone())
-                {
-                    return;
-                }
-                if let Sel::UnifiedKindRow(kind, acc) = &self.selected {
-                    if *acc == account_id
-                        && self
-                            .kind_widgets
-                            .get(&UnifiedRow::Kind(*kind))
-                            .is_some_and(|w| {
-                                w.rows
-                                    .iter()
-                                    .any(|r| r.account_id == account_id && r.path == path)
-                            })
-                    {
-                        return;
-                    }
-                }
-                let key = Sel::Folder(account_id, path.clone());
-                if self.selected != key {
-                    self.selected = key.clone();
-                    self.quiet.set(true);
-                    self.clear_other_selections(key);
-                    self.select_folder(account_id, &path);
-                    self.quiet.set(false);
-                }
-                // A highlight inside a folded account shows nothing (#170:
-                // a notification click seemed to land nowhere); unfold it.
-                self.reveal_account(account_id, &sender);
+                self.on_select_folder_row(account_id, path, sender)
             }
-
             SidebarInput::SetUnread {
                 folders,
                 unified,
                 fresh,
-            } => {
-                self.fresh = fresh;
-                // Mirror the fresh counts into every row list too, so a
-                // rebuild draws them right (the account folders are done
-                // below).
-                let fresh =
-                    |aid: u32, fid: u32, cur: u32| folders.get(&(aid, fid)).copied().unwrap_or(cur);
-                for r in self
-                    .unified_folders
-                    .iter_mut()
-                    .chain(self.favorite_folders.iter_mut())
-                {
-                    r.folder.unread = fresh(r.account_id, r.folder.id, r.folder.unread);
-                }
-                for rows in self.filtered_rows.values_mut() {
-                    for r in rows.iter_mut() {
-                        r.folder.unread = fresh(r.account_id, r.folder.id, r.folder.unread);
-                    }
-                }
-                for s in &mut self.sections {
-                    let aid = s.account.id;
-                    for f in &mut s.filtered {
-                        f.unread = fresh(aid, f.id, f.unread);
-                    }
-                }
-                for ((aid, fid), label) in self
-                    .folder_badges
-                    .iter()
-                    .chain(&self.unified_inbox_badges)
-                    .chain(self.filtered_badges.values().flatten())
-                    .chain(self.kind_widgets.values().flat_map(|w| &w.row_badges))
-                {
-                    let n = folders.get(&(*aid, *fid)).copied().unwrap_or(0);
-                    label.set_text(&n.to_string());
-                    label.set_visible(n > 0);
-                }
-                if let Some(label) = &self.unified_badge {
-                    label.set_text(&unified.to_string());
-                    label.set_visible(
-                        unified > 0
-                            && !self.row_shown_open(UnifiedRow::Kind(FolderKind::Inbox))
-                            && self.unified_chips.all_inboxes,
-                    );
-                }
-                for (row, w) in &self.kind_widgets {
-                    let total: u32 = w
-                        .row_badges
-                        .keys()
-                        .map(|k| folders.get(k).copied().unwrap_or(0))
-                        .sum();
-                    if let Some(b) = &w.badge {
-                        b.set_text(&total.to_string());
-                        b.set_visible(
-                            total > 0 && !self.row_shown_open(*row) && self.chip_shown(*row),
-                        );
-                    }
-                }
-                // Keep the avatar-circle badges in sync too. They only show while
-                // the account is collapsed (toggled live in ToggleCollapseLocal),
-                // so we just refresh the number and re-apply that visibility rule.
-                for section in &self.sections {
-                    if let Some(label) = self.account_circle_badges.get(&section.account.id) {
-                        let n = section
-                            .folders
-                            .iter()
-                            .find(|f| f.kind == FolderKind::Inbox)
-                            .and_then(|f| folders.get(&(section.account.id, f.id)))
-                            .copied()
-                            .unwrap_or(0);
-                        label.set_text(&n.to_string());
-                        label.set_visible(self.account_shown_folded(section) && n > 0);
-                    }
-                }
-                self.unified_unread = unified;
-                self.restyle_seen();
-                // Persist the fresh counts into `sections` as well. Otherwise the
-                // next rebuild_normal (e.g. toggling the sidebar collapse) recreates
-                // every badge from the folder unread values captured at the last
-                // SetContents, reverting in-place updates — so a read inbox's chip
-                // reappears on collapse. Keep `sections` a faithful mirror.
-                for section in &mut self.sections {
-                    for folder in &mut section.folders {
-                        folder.unread = folders
-                            .get(&(section.account.id, folder.id))
-                            .copied()
-                            .unwrap_or(0);
-                    }
-                }
-            }
-
+            } => self.on_set_unread(folders, unified, fresh),
             SidebarInput::SetAttachmentsRow(show) => {
-                self.show_attachments = show;
-                // The row is about to disappear from under the selection; fall
-                // back the same way an emptied selection does.
-                if !show && self.selected == Sel::Attachments {
-                    self.selected = Sel::None;
-                }
-                self.rebuild_normal(
-                    &widgets.pinned_box,
-                    &widgets.normal_box,
-                    &widgets.footer_box,
-                    &sender,
-                );
-                self.restore_selection();
+                self.on_set_attachments_row(show, widgets, sender)
             }
-
-            SidebarInput::SetBusy(busy) => {
-                self.busy = busy;
-                if let Some(sp) = &self.sync_spinner {
-                    sp.set_spinning(busy);
-                }
-                if let Some(stack) = &self.sync_stack {
-                    stack.set_visible_child_name(if busy { "spinner" } else { "icon" });
-                }
-            }
-
-            SidebarInput::SetOffline(offline) => {
-                self.offline = offline;
-                if let Some(button) = &self.sync_button {
-                    crate::ui::show_refresh_offline(button, offline);
-                }
-            }
-
+            SidebarInput::SetBusy(busy) => self.on_set_busy(busy),
+            SidebarInput::SetOffline(offline) => self.on_set_offline(offline),
             SidebarInput::SetFocus {
                 hide_accounts,
                 fold_unified,
                 animate,
-            } => {
-                let hiding = hide_accounts && !self.focus_hide_accounts;
-                let showing = !hide_accounts && self.focus_hide_accounts;
-                let folding = fold_unified && !self.focus_fold_unified;
-                if !hiding && !showing && fold_unified == self.focus_fold_unified {
-                    return;
-                }
-                self.focus_hide_accounts = hide_accounts;
-                self.focus_fold_unified = fold_unified;
-                // Whatever was opened for the mode alone goes with it.
-                self.rail_open.clear();
-                self.rail_open_accounts.clear();
-                if animate && (hiding || folding) {
-                    // Slide what goes: the accounts up and away, every open
-                    // unified row shut. The rebuild that draws the sidebar
-                    // without them follows once they have gone — the pixels
-                    // it replaces are then the ones it draws.
-                    if hiding {
-                        // SlideDown folding: the block slides up under the
-                        // unified section, the way a folder list folds.
-                        if let Some(r) = &self.accounts_revealer {
-                            r.set_transition_duration(crate::ui::FOCUS_ANIM_MS);
-                            r.set_reveal_child(false);
-                        }
-                    }
-                    if folding {
-                        self.fold_unified_rows_now();
-                    }
-                    let s = sender.clone();
-                    gtk::glib::timeout_add_local_once(
-                        std::time::Duration::from_millis(u64::from(crate::ui::FOCUS_ANIM_MS) + 40),
-                        move || s.input(SidebarInput::FocusSettled),
-                    );
-                } else {
-                    // Accounts coming back slide in after the rebuild.
-                    self.reveal_accounts_late = animate && showing;
-                    self.rebuild_normal(
-                        &widgets.pinned_box,
-                        &widgets.normal_box,
-                        &widgets.footer_box,
-                        &sender,
-                    );
-                    self.restore_selection();
-                }
-            }
-
-            SidebarInput::FocusSettled => {
-                self.rebuild_normal(
-                    &widgets.pinned_box,
-                    &widgets.normal_box,
-                    &widgets.footer_box,
-                    &sender,
-                );
-                self.restore_selection();
-            }
-
+            } => self.on_set_focus(hide_accounts, fold_unified, animate, widgets, sender),
+            SidebarInput::FocusSettled => self.on_focus_settled(widgets, sender),
             SidebarInput::SetCollapsed(collapsed) => {
-                // Driven by the app's narrow-window breakpoint: same visual
-                // change as the user's own toggle, but no CollapsedChanged
-                // output — automatic switches must not overwrite the user's
-                // persisted preference.
-                if self.collapsed != collapsed {
-                    self.collapsed = collapsed;
-                    self.rail_open.clear();
-                    self.rail_open_accounts.clear();
-                    self.rebuild_normal(
-                        &widgets.pinned_box,
-                        &widgets.normal_box,
-                        &widgets.footer_box,
-                        &sender,
-                    );
-                    self.restore_selection();
-                }
+                self.on_set_collapsed(collapsed, widgets, sender)
             }
-
-            SidebarInput::ToggleCollapsed => {
-                self.collapsed = !self.collapsed;
-                self.rail_open.clear();
-                self.rail_open_accounts.clear();
-                self.rebuild_normal(
-                    &widgets.pinned_box,
-                    &widgets.normal_box,
-                    &widgets.footer_box,
-                    &sender,
-                );
-                self.restore_selection();
-                let _ = sender.output(SidebarOutput::CollapsedChanged(self.collapsed));
-            }
-
-            SidebarInput::ToggleCollapseLocal(id) => {
-                // In the rail this opens or folds the account for the rail
-                // alone — the saved state stays as it is for the full
-                // sidebar, which comes back as it was left.
-                let rail_only = self.collapsed;
-                if let Some(rev) = self.revealers.get(&id) {
-                    let expanded = !rev.reveals_child();
-                    rev.set_reveal_child(expanded);
-                    if let Some(ch) = self.chevrons.get(&id) {
-                        ch.set_icon_name(Some(if expanded {
-                            "pan-down-symbolic"
-                        } else {
-                            "pan-end-symbolic"
-                        }));
-                    }
-                    if rail_only {
-                        self.rail_open_accounts.insert(id, expanded);
-                    } else if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
-                        s.collapsed = !expanded;
-                    }
-                    // The Inbox chip lives inside the folder list we just hid/shown,
-                    // so mirror it onto the avatar: visible only while collapsed.
-                    if let Some(label) = self.account_circle_badges.get(&id) {
-                        let n = self
-                            .sections
-                            .iter()
-                            .find(|s| s.account.id == id)
-                            .and_then(|s| s.folders.iter().find(|f| f.kind == FolderKind::Inbox))
-                            .map(|f| f.unread)
-                            .unwrap_or(0);
-                        label.set_text(&n.to_string());
-                        label.set_visible(!expanded && n > 0);
-                    }
-                    if !rail_only {
-                        let _ = sender.output(SidebarOutput::AccountFolded {
-                            id,
-                            folded: !expanded,
-                        });
-                    }
-                }
-            }
-
+            SidebarInput::ToggleCollapsed => self.on_toggle_collapsed(widgets, sender),
+            SidebarInput::ToggleCollapseLocal(id) => self.on_toggle_collapse_local(id, sender),
             SidebarInput::ToggleCustomFoldersLocal(id) => {
-                if let Some(rev) = self.custom_revealers.get(&id) {
-                    let expanded = !rev.reveals_child();
-                    rev.set_reveal_child(expanded);
-                    if let Some(ch) = self.custom_chevrons.get(&id) {
-                        ch.set_icon_name(Some(if expanded {
-                            "pan-down-symbolic"
-                        } else {
-                            "pan-end-symbolic"
-                        }));
-                    }
-                    if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
-                        s.custom_expanded = expanded;
-                    }
-                    let _ = sender.output(SidebarOutput::ToggleCustomFolders(id));
-                }
+                self.on_toggle_custom_folders_local(id, sender)
             }
-
             SidebarInput::ToggleFolderNode { account_id, path } => {
                 self.toggle_folder_node(account_id, path, &sender);
             }
-
             SidebarInput::ReorderFolder {
                 account_id,
                 path,
                 target,
                 after,
-            } => {
-                let Some(section) = self.sections.iter().find(|s| s.account.id == account_id)
-                else {
-                    return;
-                };
-                let h = &section.hierarchy;
-                let level = h.parent(&target);
-                let custom = section
-                    .folders
-                    .iter()
-                    .any(|f| f.path == path && f.kind == FolderKind::Custom);
-                if !custom || level == h.parent(&path) {
-                    // Already one of the target's siblings: only the order changes.
-                    if let Some(paths) = placed_run(&section.folders, h, &path, &target, after) {
-                        let _ = sender.output(SidebarOutput::ReorderFolders { account_id, paths });
-                    }
-                } else {
-                    // From another level: the server moves it there first.
-                    let _ = sender.output(SidebarOutput::PlaceFolder {
-                        account_id,
-                        path,
-                        dest: level,
-                        target,
-                        after,
-                    });
-                }
-            }
-
-            SidebarInput::ExpandForDrop(id) => {
-                // Expand a collapsed account so its folders become drop targets.
-                self.reveal_account(id, &sender);
-            }
-
+            } => self.on_reorder_folder(account_id, path, target, after, sender),
+            SidebarInput::ExpandForDrop(id) => self.on_expand_for_drop(id, sender),
             SidebarInput::DropOnFolder {
                 account_id: dest_account,
                 path: dest,
                 payload,
-            } => {
-                // A dragged folder, not messages: reparent it (#51). Folders
-                // never cross accounts — mailboxes belong to one server.
-                if let Some(rest) = payload.strip_prefix("vireo-folder\t") {
-                    let mut it = rest.splitn(2, '\t');
-                    let src_account = it.next().and_then(|s| s.parse::<u32>().ok());
-                    let src_path = it.next().map(String::from);
-                    if let (Some(src_account), Some(src_path)) = (src_account, src_path) {
-                        if src_account == dest_account && src_path != dest {
-                            let _ = sender.output(SidebarOutput::MoveFolder {
-                                account_id: dest_account,
-                                path: src_path,
-                                dest,
-                            });
-                        }
-                    }
-                    return;
-                }
-                let items = parse_move_payload(&payload);
-                // "" is the Folders header (a folder-move destination only);
-                // messages need a real mailbox.
-                if !items.is_empty() && !dest.is_empty() {
-                    let _ = sender.output(SidebarOutput::MoveMessages {
-                        dest_account,
-                        dest,
-                        items,
-                    });
-                }
-            }
+            } => self.on_drop_on_folder(dest_account, dest, payload, sender),
         }
     }
 }
