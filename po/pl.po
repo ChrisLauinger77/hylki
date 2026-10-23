@@ -5256,6 +5256,14 @@ msgstr "Wiadomość gotowa do wysłania"
 msgid "All but the newest"
 msgstr ""
 
+#, fuzzy
+msgid "Top of the message"
+msgstr "Pisanie w oknie głównym"
+
+#, fuzzy
+msgid "Bottom of the message"
+msgstr "Pisanie w oknie głównym"
+
 msgid "Remember the last choice"
 msgstr "Jak ostatnio"
 
@@ -7401,6 +7409,10 @@ msgstr ""
 
 msgid "Off shows the icons alone."
 msgstr ""
+
+#, fuzzy
+msgid "Find bar position"
+msgstr "Działania"
 
 #, fuzzy
 msgid "A message's text alone, without the sender's layout, colors and fonts."

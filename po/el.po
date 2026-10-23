@@ -5042,6 +5042,14 @@ msgstr "Μηνύματα που έχουν ήδη αναγνωστεί"
 msgid "All but the newest"
 msgstr "Όλα εκτός από το νεότερο"
 
+#, fuzzy
+msgid "Top of the message"
+msgstr "Στην κορυφή της λίστας"
+
+#, fuzzy
+msgid "Bottom of the message"
+msgstr "Στο κάτω μέρος της λίστας"
+
 msgid "Remember the last choice"
 msgstr "Απομνημόνευση της τελευταίας επιλογής"
 
@@ -7151,6 +7159,10 @@ msgstr "Ονομασία του αποτελέσματος OpenPGP"
 
 msgid "Off shows the icons alone."
 msgstr "Ανενεργό: εμφανίζονται μόνο τα εικονίδια."
+
+#, fuzzy
+msgid "Find bar position"
+msgstr "Θέση γραμμής επιλογής"
 
 msgid "A message's text alone, without the sender's layout, colors and fonts."
 msgstr ""

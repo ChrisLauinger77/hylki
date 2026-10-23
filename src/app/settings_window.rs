@@ -80,6 +80,7 @@ impl AppModel {
             fold_messages: self.fold_messages,
             always_show_recipients: self.always_show_recipients,
             pgp_labels: self.pgp_labels,
+            reader_find_bottom: self.reader_find_bottom,
             single_message_card: self.single_message_card,
             reader_switch: self.reader_switch,
             theme_switch: self.theme_switch,

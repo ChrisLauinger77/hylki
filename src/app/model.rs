@@ -527,6 +527,8 @@ pub(crate) struct AppModel {
     pub(super) always_show_recipients: bool,
     /// The OpenPGP chip says its verdict in words (#300).
     pub(super) pgp_labels: bool,
+    /// The reader's find bar opens under the message (#392).
+    pub(super) reader_find_bottom: bool,
     /// Whether the sidebar offers the unified "All Inboxes" section at all.
     pub(super) show_unified_pref: bool,
     /// Whether the collapsed "All Inboxes" row wears its total-unread chip.

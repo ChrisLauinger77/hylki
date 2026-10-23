@@ -359,6 +359,8 @@ pub(crate) enum MessageViewInput {
     /// In-message find (#103): open/close the bar, run/step the search.
     OpenFind,
     CloseFind,
+    /// The find bar under the message, not above it (#392).
+    SetFindBottom(bool),
     FindChanged(String),
     FindNext,
     FindPrev,

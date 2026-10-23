@@ -49,6 +49,13 @@ impl Preferences {
             .always_show_recipients_row
             .set_active(init.always_show_recipients);
         widgets.reading.pgp_labels_row.set_active(init.pgp_labels);
+        let find_place = &widgets.reading.find_place_row;
+        find_place.set_model(Some(&gtk::StringList::new(&[
+            &i18n("Top of the message"),
+            &i18n("Bottom of the message"),
+        ])));
+        find_place.set_selected(u32::from(init.reader_find_bottom));
+        no_truncate(find_place);
         widgets
             .reading
             .print_page_numbers_row

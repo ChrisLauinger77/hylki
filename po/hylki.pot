@@ -4628,6 +4628,12 @@ msgstr ""
 msgid "All but the newest"
 msgstr ""
 
+msgid "Top of the message"
+msgstr ""
+
+msgid "Bottom of the message"
+msgstr ""
+
 msgid "Remember the last choice"
 msgstr ""
 
@@ -6565,6 +6571,9 @@ msgid "Name the OpenPGP result"
 msgstr ""
 
 msgid "Off shows the icons alone."
+msgstr ""
+
+msgid "Find bar position"
 msgstr ""
 
 msgid "A message's text alone, without the sender's layout, colors and fonts."

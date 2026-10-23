@@ -5000,6 +5000,14 @@ msgstr "Mensajes ya leídos"
 msgid "All but the newest"
 msgstr "Todos excepto el más reciente"
 
+#, fuzzy
+msgid "Top of the message"
+msgstr "Parte superior de la lista"
+
+#, fuzzy
+msgid "Bottom of the message"
+msgstr "Parte inferior de la lista"
+
 msgid "Remember the last choice"
 msgstr "Recordar la última opción"
 
@@ -7079,6 +7087,10 @@ msgstr "Describir el estado de OpenPGP"
 
 msgid "Off shows the icons alone."
 msgstr "Al desactivarlo, solo se muestran los iconos."
+
+#, fuzzy
+msgid "Find bar position"
+msgstr "Posición de la barra de selección"
 
 msgid "A message's text alone, without the sender's layout, colors and fonts."
 msgstr ""

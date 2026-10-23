@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Added: the find bar can open under the message** (#392, requested by
+  3v1n0). **Settings → Reading → Find bar position** puts it at the top of
+  the message, as before, or at the bottom, where opening it leaves the
+  message where it is. With the attachment drawer showing, the bar sits
+  above the drawer's handle.
+
+- **Fixed: closing the find bar left the keyboard in the message list**
+  (#392, reported by 3v1n0). After Esc or a second Ctrl+F, the list had
+  the focus without showing it, so the next Ctrl+F searched the list
+  instead of the message. Closing the bar now gives the keyboard back to
+  where it was when the bar opened.
+
 - **Changed: the source is split into smaller files.** The 102 source
   files, the largest 29,364 lines, are now 608 grouped by area under `src/`,
   none longer than 1,360 lines. Behaviour is unchanged, and 204 new tests pin

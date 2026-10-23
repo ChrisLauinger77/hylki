@@ -236,6 +236,12 @@ impl AppModel {
                     self.popouts_emit(|| MessageWindowInput::SetPgpLabels(on));
                 }
             }
+            PrefOutput::SetReaderFindBottom(on) => {
+                if pref!(self.reader_find_bottom = on) {
+                    self.message_view.emit(MessageViewInput::SetFindBottom(on));
+                    self.popouts_emit(|| MessageWindowInput::SetFindBottom(on));
+                }
+            }
             PrefOutput::SetSingleMessageCard(on) => {
                 if pref!(self.single_message_card = on) {
                     self.message_view

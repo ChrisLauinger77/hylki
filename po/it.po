@@ -5143,6 +5143,14 @@ msgstr "Messaggi già letti"
 msgid "All but the newest"
 msgstr "Tutti tranne il più recente"
 
+#, fuzzy
+msgid "Top of the message"
+msgstr "Componi nella finestra principale"
+
+#, fuzzy
+msgid "Bottom of the message"
+msgstr "Componi nella finestra principale"
+
 msgid "Remember the last choice"
 msgstr "Ricorda l'ultima scelta"
 
@@ -7259,6 +7267,10 @@ msgstr "Nomina il risultato OpenPGP"
 
 msgid "Off shows the icons alone."
 msgstr ""
+
+#, fuzzy
+msgid "Find bar position"
+msgstr "Azioni"
 
 #, fuzzy
 msgid "A message's text alone, without the sender's layout, colors and fonts."

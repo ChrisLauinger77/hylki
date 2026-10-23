@@ -370,6 +370,7 @@ impl AppModel {
             reader_default: self.effective_reader_default(),
             tags: self.tags.clone(),
             pgp_labels: self.pgp_labels,
+            find_bottom: self.reader_find_bottom,
             single_key: self.single_key.clone(),
             gmail_keys: self.gmail_keys.clone(),
         }

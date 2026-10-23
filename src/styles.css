@@ -2284,6 +2284,15 @@ textview.console-view text selection {
   padding: 6px 10px;
   border-bottom: 1px solid alpha(currentColor, 0.1);
 }
+.reader-find.bottom {
+  border-bottom: none;
+  border-top: 1px solid alpha(currentColor, 0.1);
+}
+/* The attachment drawer's grab pill floats over the reader's last 24px
+   (.split-grab-hit); a find bar there sits above it. */
+.drawer-seam .reader-find.bottom {
+  padding-bottom: 24px;
+}
 
 
 /* A row being dragged to a folder (`.dragging`, set for the drag's

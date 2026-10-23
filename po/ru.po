@@ -5197,6 +5197,14 @@ msgstr "Уже прочитанные сообщения"
 msgid "All but the newest"
 msgstr "Все, кроме последнего"
 
+#, fuzzy
+msgid "Top of the message"
+msgstr "Создание писем в основном окне"
+
+#, fuzzy
+msgid "Bottom of the message"
+msgstr "Создание писем в основном окне"
+
 msgid "Remember the last choice"
 msgstr "Запоминать последний выбор"
 
@@ -7317,6 +7325,10 @@ msgstr "Подписывать статус OpenPGP текстом"
 
 msgid "Off shows the icons alone."
 msgstr ""
+
+#, fuzzy
+msgid "Find bar position"
+msgstr "Действия"
 
 #, fuzzy
 msgid "A message's text alone, without the sender's layout, colors and fonts."

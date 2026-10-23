@@ -4965,6 +4965,14 @@ msgstr "Missatges ja llegits"
 msgid "All but the newest"
 msgstr "Tots menys el més nou"
 
+#, fuzzy
+msgid "Top of the message"
+msgstr "A la part superior de la llista"
+
+#, fuzzy
+msgid "Bottom of the message"
+msgstr "A la part inferior de la llista"
+
 msgid "Remember the last choice"
 msgstr "Recorda l'última elecció"
 
@@ -7027,6 +7035,10 @@ msgstr "Anomena el resultat OpenPGP"
 
 msgid "Off shows the icons alone."
 msgstr "Desactivat mostra només les icones."
+
+#, fuzzy
+msgid "Find bar position"
+msgstr "Posició de la barra de selecció"
 
 msgid "A message's text alone, without the sender's layout, colors and fonts."
 msgstr ""

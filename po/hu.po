@@ -5194,6 +5194,14 @@ msgstr "Az üzenet elküldésre kész"
 msgid "All but the newest"
 msgstr ""
 
+#, fuzzy
+msgid "Top of the message"
+msgstr "Levélírás a főablakban"
+
+#, fuzzy
+msgid "Bottom of the message"
+msgstr "Levélírás a főablakban"
+
 msgid "Remember the last choice"
 msgstr "Emlékezz az utolsó választásra"
 
@@ -7345,6 +7353,10 @@ msgstr "Nevezze el az OpenPGP eredményt"
 
 msgid "Off shows the icons alone."
 msgstr ""
+
+#, fuzzy
+msgid "Find bar position"
+msgstr "Műveletek"
 
 #, fuzzy
 msgid "A message's text alone, without the sender's layout, colors and fonts."

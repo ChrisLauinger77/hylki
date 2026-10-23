@@ -37,6 +37,8 @@ pub(crate) struct PrefInit {
     pub(crate) always_show_recipients: bool,
     /// The OpenPGP chip says its verdict in words (#300).
     pub(crate) pgp_labels: bool,
+    /// The reader's find bar opens under the message (#392).
+    pub(crate) reader_find_bottom: bool,
     /// Lone messages render as inset cards, like conversation messages.
     pub(crate) single_message_card: bool,
     /// The Light / Dark Mode switch is shown in the reader header (PR #386).
@@ -414,6 +416,7 @@ pub(crate) enum PrefOutput {
     SetFoldMessages(crate::config::FoldMessages),
     SetAlwaysShowRecipients(bool),
     SetPgpLabels(bool),
+    SetReaderFindBottom(bool),
     SetSingleMessageCard(bool),
     SetReaderSwitch(bool),
     SetThemeSwitch(bool),

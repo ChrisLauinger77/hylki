@@ -1497,6 +1497,17 @@ message matches the new theme. In a conversation the choice follows the
 message the conversation was opened on. It works in a message's own window
 too. **Light / Dark Mode switch**, in the same group, hides the switch.
 
+### Finding in a message
+
+<kbd>Ctrl+F</kbd> with the message focused, or the magnifier in the reader's
+toolbar, opens a find bar for the message or conversation shown.
+<kbd>Enter</kbd> and the arrows step through the matches. <kbd>Esc</kbd>,
+<kbd>Ctrl+F</kbd> again or the close button puts the bar away and hands the
+keyboard back to the message, so the next <kbd>Ctrl+F</kbd> finds in it
+again. **Settings → Reading → Find bar position** opens the bar at the top
+of the message, the default, or at the bottom, where it leaves the message
+where it is. A message in its own window follows the same setting.
+
 ### Printing
 
 **Ctrl+P** prints the message or conversation in the reader, and

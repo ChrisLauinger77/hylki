@@ -38,6 +38,7 @@ impl AppModel {
             fold_messages: self.fold_messages,
             always_show_recipients: self.always_show_recipients,
             pgp_labels: self.pgp_labels,
+            reader_find_bottom: self.reader_find_bottom,
             single_message_card: self.single_message_card,
             reader_mode: self.reader_mode,
             reader_switch: self.reader_switch,
@@ -218,6 +219,8 @@ impl AppModel {
             ));
         self.message_view
             .emit(MessageViewInput::SetPgpLabels(self.pgp_labels));
+        self.message_view
+            .emit(MessageViewInput::SetFindBottom(self.reader_find_bottom));
         self.message_view
             .emit(MessageViewInput::SetSingleMessageCard(
                 self.single_message_card,

@@ -5107,6 +5107,14 @@ msgstr "Messages déjà lus"
 msgid "All but the newest"
 msgstr "Tous sauf le plus récent"
 
+#, fuzzy
+msgid "Top of the message"
+msgstr "Au-dessus des messages"
+
+#, fuzzy
+msgid "Bottom of the message"
+msgstr "Sous les messages"
+
 msgid "Remember the last choice"
 msgstr "Mémoriser le dernier choix"
 
@@ -7215,6 +7223,9 @@ msgid "Name the OpenPGP result"
 msgstr "Nommer le résultat OpenPGP"
 
 msgid "Off shows the icons alone."
+msgstr ""
+
+msgid "Find bar position"
 msgstr ""
 
 #, fuzzy

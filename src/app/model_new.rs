@@ -384,6 +384,7 @@ impl AppModel {
             fold_messages: prefs.fold_messages,
             always_show_recipients: prefs.always_show_recipients,
             pgp_labels: prefs.pgp_labels,
+            reader_find_bottom: prefs.reader_find_bottom,
             show_unified_pref: prefs.show_unified,
             unified_chips: config::load_unified_chips(),
             section_style: prefs.section_style,
