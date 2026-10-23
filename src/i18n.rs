@@ -212,7 +212,25 @@ pub fn ui_is_rtl() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_rtl_locale;
+    use super::{fill, is_rtl_locale};
+
+    #[test]
+    fn fill_replaces_each_named_placeholder_in_turn() {
+        let s = |t: &str| t.to_string();
+        assert_eq!(
+            fill(s("{n} of {total}"), &[("n", "3"), ("total", "9")]),
+            "3 of 9"
+        );
+        // Every occurrence, and a name with no placeholder is harmless.
+        assert_eq!(fill(s("{a}{a}"), &[("a", "x"), ("b", "y")]), "xx");
+        // An unknown placeholder is left as it is.
+        assert_eq!(fill(s("{a} {c}"), &[("a", "x")]), "x {c}");
+        // Replacement is sequential: a value that carries a later
+        // placeholder gets that one filled too.
+        assert_eq!(fill(s("{a} {b}"), &[("a", "{b}"), ("b", "x")]), "x x");
+        // An earlier placeholder in a later value is not revisited.
+        assert_eq!(fill(s("{a} {b}"), &[("a", "x"), ("b", "{a}")]), "x {a}");
+    }
 
     #[test]
     fn rtl_locales() {

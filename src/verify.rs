@@ -240,129 +240,21 @@ fn failed_and_nothing_passed(dkim: AuthResult, spf: AuthResult) -> bool {
 
 /// Turn the evidence into a verdict a person can act on.
 fn judge(ev: &Evidence) -> SenderCheck {
-    let mut findings = Vec::new();
     let from = if ev.from_domain.is_empty() {
         "(unknown)"
     } else {
         &ev.from_domain
     };
-
-    // --- Authentication ----------------------------------------------------
-    let dmarc = ev.get(Method::Dmarc);
-    let dkim = ev.get(Method::Dkim);
-    let spf = ev.get(Method::Spf);
-    // DKIM only vouches for the From: domain when the signing domain lines up
-    // with it — that alignment is exactly what DMARC checks, so we only fall
-    // back to it when DMARC wasn't reported.
-    let dkim_aligned = dkim == AuthResult::Pass
-        && ev
-            .dkim_domain
-            .as_deref()
-            .is_some_and(|d| same_site(d, &ev.from_domain));
-
-    let (mut trust, summary) = match (dmarc, dkim, spf) {
-        (AuthResult::Pass, _, _) => (
-            SenderTrust::Pass,
-            i18n_f("Your mail provider confirmed this really came from {from}.", &[("from", &from.to_string())]),
-        ),
-        (AuthResult::Fail, _, _) => (
-            SenderTrust::Fail,
-            i18n_f("This message failed the checks that prove it came from {from}. Treat it as a forgery.", &[("from", &from.to_string())]),
-        ),
-        _ if dkim_aligned => (
-            SenderTrust::Pass,
-            i18n_f("This message carries a valid signature from {from}.", &[("from", &from.to_string())]),
-        ),
-        // Without a DMARC verdict, one method failing while another passes is
-        // routine: mail relayed through a bulk sender or a mailing list breaks
-        // DKIM or SPF as a matter of course. Only when *nothing* passed is there
-        // something to say — and even then it's "couldn't confirm", not
-        // "forgery", which is a claim only DMARC's alignment check can support.
-        // Crying forgery over a broken relay signature would teach you to ignore
-        // the badge, which is worse than not having one.
-        _ if failed_and_nothing_passed(dkim, spf) => (
-            SenderTrust::Suspicious,
-            i18n_f("This message couldn't be confirmed as coming from {from}, and the checks that ran on it failed.", &[("from", &from.to_string())]),
-        ),
-        _ if !ev.checked => (
-            SenderTrust::Unverified,
-            i18n("Your mail provider didn't report any sender checks for this message."),
-        ),
-        _ => (
-            SenderTrust::Unverified,
-            i18n_f("Nothing here proves this came from {from} — or that it didn't.", &[("from", &from.to_string())]),
-        ),
-    };
-
-    let describe = |name: &str, r: AuthResult| match r {
-        AuthResult::Pass => Some(i18n_f("{name}: passed", &[("name", name)])),
-        AuthResult::Fail => Some(i18n_f("{name}: FAILED", &[("name", name)])),
-        AuthResult::Other => Some(i18n_f("{name}: inconclusive", &[("name", name)])),
-        AuthResult::Missing => None,
-    };
-    findings.extend(describe(
-        &i18n("DMARC (is the From: address genuine)"),
-        dmarc,
-    ));
-    findings.extend(describe(&i18n("DKIM (signature)"), dkim));
-    findings.extend(describe(&i18n("SPF (sending server)"), spf));
-    if let Some(d) = &ev.dkim_domain {
-        findings.push(i18n_f("Signed by: {d}", &[("d", d)]));
-    }
-    if let Some((_, who)) = ev.authorities.first() {
-        findings.push(i18n_f("Checked by: {who}", &[("who", who)]));
-    }
-    findings.push(i18n_f("From: {from}", &[("from", &from.to_string())]));
-
-    // --- Addressing --------------------------------------------------------
-    // These never rescue a failure, but they can pull a technically-authenticated
-    // message down: the classic phish is a real domain nobody recognises wearing
-    // a name everybody does.
-    let mut downgraded_by_addressing = false;
-    if let Some(reply) = &ev.reply_to_domain {
-        if !same_site(reply, &ev.from_domain) {
-            findings.push(i18n_f(
-                "Replies would go to {reply}, not {from}",
-                &[("reply", reply), ("from", &from.to_string())],
-            ));
-            // An organisation answering from another domain of its own (a
-            // newsletter's reply address on its mailing service, a1.at
-            // replying from email.a1.net) is everyday mail: the note says
-            // so, the verdict stands. What the verdict is for is the
-            // verified sender whose replies go to a mailbox anyone can
-            // open, the way a taken-over account diverts an invoice.
-            let diverted = crate::logo::is_mailbox_domain(reply)
-                && !crate::logo::is_mailbox_domain(&ev.from_domain);
-            if diverted && trust == SenderTrust::Pass {
-                trust = SenderTrust::Suspicious;
-                downgraded_by_addressing = true;
-            }
-        }
-    }
-    if let Some(rp) = &ev.return_path_domain {
-        if !same_site(rp, &ev.from_domain) {
-            findings.push(i18n_f("Bounces would go to {rp}", &[("rp", rp)]));
-        }
-    }
-    if let Some(claimed) = domain_in_display_name(&ev.from_name) {
-        if !same_site(&claimed, &ev.from_domain) {
-            findings.push(i18n_f(
-                "The sender's name says \"{claimed}\" but the address is {from}",
-                &[("claimed", &claimed), ("from", &from.to_string())],
-            ));
-            if trust == SenderTrust::Pass {
-                trust = SenderTrust::Suspicious;
-                downgraded_by_addressing = true;
-            }
-        }
-    }
+    let (mut trust, summary) = authentication_verdict(ev, from);
+    let mut findings = authentication_findings(ev, from);
+    let downgraded_by_addressing = check_addressing(ev, from, &mut trust, &mut findings);
 
     // Only relabel when the *addressing* is what pulled a clean pass down; a
     // "couldn't confirm" verdict already carries the right sentence.
     let summary = if trust == SenderTrust::Suspicious && downgraded_by_addressing {
         i18n_f(
             "{from} checks out, but the addressing doesn't match the name on the message.",
-            &[("from", &from.to_string())],
+            &[("from", from)],
         )
     } else {
         summary
@@ -376,6 +268,132 @@ fn judge(ev: &Evidence) -> SenderCheck {
         invite: ev.invite.clone(),
         label: ev.label.clone(),
     }
+}
+
+/// The verdict the authentication results alone give, with its sentence.
+fn authentication_verdict(ev: &Evidence, from: &str) -> (SenderTrust, String) {
+    let dmarc = ev.get(Method::Dmarc);
+    let dkim = ev.get(Method::Dkim);
+    let spf = ev.get(Method::Spf);
+    // DKIM only vouches for the From: domain when the signing domain lines up
+    // with it — that alignment is exactly what DMARC checks, so we only fall
+    // back to it when DMARC wasn't reported.
+    let dkim_aligned = dkim == AuthResult::Pass
+        && ev
+            .dkim_domain
+            .as_deref()
+            .is_some_and(|d| same_site(d, &ev.from_domain));
+
+    match (dmarc, dkim, spf) {
+        (AuthResult::Pass, _, _) => (
+            SenderTrust::Pass,
+            i18n_f("Your mail provider confirmed this really came from {from}.", &[("from", from)]),
+        ),
+        (AuthResult::Fail, _, _) => (
+            SenderTrust::Fail,
+            i18n_f("This message failed the checks that prove it came from {from}. Treat it as a forgery.", &[("from", from)]),
+        ),
+        _ if dkim_aligned => (
+            SenderTrust::Pass,
+            i18n_f("This message carries a valid signature from {from}.", &[("from", from)]),
+        ),
+        // Without a DMARC verdict, one method failing while another passes is
+        // routine: mail relayed through a bulk sender or a mailing list breaks
+        // DKIM or SPF as a matter of course. Only when *nothing* passed is there
+        // something to say — and even then it's "couldn't confirm", not
+        // "forgery", which is a claim only DMARC's alignment check can support.
+        // Crying forgery over a broken relay signature would teach you to ignore
+        // the badge, which is worse than not having one.
+        _ if failed_and_nothing_passed(dkim, spf) => (
+            SenderTrust::Suspicious,
+            i18n_f("This message couldn't be confirmed as coming from {from}, and the checks that ran on it failed.", &[("from", from)]),
+        ),
+        _ if !ev.checked => (
+            SenderTrust::Unverified,
+            i18n("Your mail provider didn't report any sender checks for this message."),
+        ),
+        _ => (
+            SenderTrust::Unverified,
+            i18n_f("Nothing here proves this came from {from} — or that it didn't.", &[("from", from)]),
+        ),
+    }
+}
+
+/// One line per authentication method reported, then who signed and who
+/// checked.
+fn authentication_findings(ev: &Evidence, from: &str) -> Vec<String> {
+    let mut findings = Vec::new();
+    let describe = |name: &str, r: AuthResult| match r {
+        AuthResult::Pass => Some(i18n_f("{name}: passed", &[("name", name)])),
+        AuthResult::Fail => Some(i18n_f("{name}: FAILED", &[("name", name)])),
+        AuthResult::Other => Some(i18n_f("{name}: inconclusive", &[("name", name)])),
+        AuthResult::Missing => None,
+    };
+    findings.extend(describe(
+        &i18n("DMARC (is the From: address genuine)"),
+        ev.get(Method::Dmarc),
+    ));
+    findings.extend(describe(&i18n("DKIM (signature)"), ev.get(Method::Dkim)));
+    findings.extend(describe(&i18n("SPF (sending server)"), ev.get(Method::Spf)));
+    if let Some(d) = &ev.dkim_domain {
+        findings.push(i18n_f("Signed by: {d}", &[("d", d)]));
+    }
+    if let Some((_, who)) = ev.authorities.first() {
+        findings.push(i18n_f("Checked by: {who}", &[("who", who)]));
+    }
+    findings.push(i18n_f("From: {from}", &[("from", from)]));
+    findings
+}
+
+/// Notes on where replies and bounces go and what the display name claims.
+/// These never rescue a failure, but they can pull a technically-authenticated
+/// message down: the classic phish is a real domain nobody recognises wearing
+/// a name everybody does. True when they took a pass down.
+fn check_addressing(
+    ev: &Evidence,
+    from: &str,
+    trust: &mut SenderTrust,
+    findings: &mut Vec<String>,
+) -> bool {
+    let mut downgraded = false;
+    if let Some(reply) = &ev.reply_to_domain {
+        if !same_site(reply, &ev.from_domain) {
+            findings.push(i18n_f(
+                "Replies would go to {reply}, not {from}",
+                &[("reply", reply), ("from", from)],
+            ));
+            // An organisation answering from another domain of its own (a
+            // newsletter's reply address on its mailing service, a1.at
+            // replying from email.a1.net) is everyday mail: the note says
+            // so, the verdict stands. What the verdict is for is the
+            // verified sender whose replies go to a mailbox anyone can
+            // open, the way a taken-over account diverts an invoice.
+            let diverted = crate::logo::is_mailbox_domain(reply)
+                && !crate::logo::is_mailbox_domain(&ev.from_domain);
+            if diverted && *trust == SenderTrust::Pass {
+                *trust = SenderTrust::Suspicious;
+                downgraded = true;
+            }
+        }
+    }
+    if let Some(rp) = &ev.return_path_domain {
+        if !same_site(rp, &ev.from_domain) {
+            findings.push(i18n_f("Bounces would go to {rp}", &[("rp", rp)]));
+        }
+    }
+    if let Some(claimed) = domain_in_display_name(&ev.from_name) {
+        if !same_site(&claimed, &ev.from_domain) {
+            findings.push(i18n_f(
+                "The sender's name says \"{claimed}\" but the address is {from}",
+                &[("claimed", &claimed), ("from", from)],
+            ));
+            if *trust == SenderTrust::Pass {
+                *trust = SenderTrust::Suspicious;
+                downgraded = true;
+            }
+        }
+    }
+    downgraded
 }
 
 /// The domain part of an email address, lowercased.
@@ -450,6 +468,35 @@ fn domain_in_display_name(name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The two registrable-domain rules in the crate, side by side: this
+    /// one (a fixed list of second-level labels) and the logo cache's (any
+    /// short label under a two-letter TLD). They disagree on some domains;
+    /// see REFACTOR_NOTES.md, suspected bug B6.
+    #[test]
+    fn registrable_domain_rules_agree_and_differ_as_recorded() {
+        let logo = |d: &str| crate::logo::domain_of(&format!("someone@{d}"));
+        for (domain, here, there) in [
+            ("example.com", "example.com", "example.com"),
+            ("a.b.example.org", "example.org", "example.org"),
+            ("mail.amazon.co.uk", "amazon.co.uk", "amazon.co.uk"),
+            ("em.example.com.au", "example.com.au", "example.com.au"),
+            ("news.ikea.com", "ikea.com", "ikea.com"),
+            ("mail.abc.xyz", "abc.xyz", "abc.xyz"),
+            ("mail.bmw.de", "bmw.de", "mail.bmw.de"),
+            ("x.gouv.fr", "x.gouv.fr", "gouv.fr"),
+        ] {
+            assert_eq!(registrable(domain), here, "verify: {domain}");
+            assert_eq!(logo(domain).as_deref(), Some(there), "logo: {domain}");
+        }
+        assert_eq!(registrable("localhost"), "localhost");
+        assert_eq!(logo("localhost"), None);
+        assert_eq!(logo("127.0.0.1"), None);
+        assert_eq!(
+            crate::logo::domain_of("someone@Mail.Example.COM."),
+            Some("example.com".into())
+        );
+    }
 
     fn msg(headers: &str) -> Vec<u8> {
         format!("{headers}\r\n\r\nbody\r\n").into_bytes()

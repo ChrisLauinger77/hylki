@@ -9,6 +9,7 @@
 //! is a separate matter the label only names.
 
 use crate::i18n::{i18n, i18n_f};
+use crate::mail_header::unfold;
 
 /// The label a message carries.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -92,16 +93,6 @@ pub fn detect(parsed: &mail_parser::Message) -> Option<SensitivityLabel> {
         .or_else(|| value("Sensitivity").and_then(|v| from_sensitivity(&v)))
 }
 
-/// A folded header value as one line.
-fn unfold(value: &str) -> String {
-    value
-        .split(['\r', '\n'])
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
 /// The enabled label of an `msip_labels` value. A message relabeled keeps
 /// the old label's pairs with `Enabled=false`; the first enabled one is the
 /// label it has.
@@ -177,6 +168,25 @@ fn looks_like_guid(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Header unfolding (`crate::mail_header::unfold`), on the corpus both
+    /// header readers were pinned with before their copies were merged.
+    #[test]
+    fn folded_header_values_become_one_line() {
+        let corpus = [
+            ("a\r\n b", "a b"),
+            ("a\r\n\tb\r\n  c", "a b c"),
+            ("  padded  ", "padded"),
+            ("a\n\n\nb", "a b"),
+            ("a\rb", "a b"),
+            ("<x>,\r\n <y>", "<x>, <y>"),
+            ("", ""),
+            ("\r\n", ""),
+        ];
+        for (raw, one) in corpus {
+            assert_eq!(unfold(raw), one, "{raw:?}");
+        }
+    }
 
     fn parse(headers: &str) -> Option<SensitivityLabel> {
         let raw = format!("From: a@b.c\r\nSubject: x\r\n{headers}\r\nbody\r\n");

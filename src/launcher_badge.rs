@@ -54,8 +54,9 @@ pub fn watch_dock<F: Fn() + Send + Sync + 'static>(on_back: F) {
         move |_, _, _| on_back(),
         |_, _| {},
     );
-    // Watched for the life of the process.
-    std::mem::forget(id);
+    // Watched for the life of the process: the id is never handed to
+    // bus_unwatch_name, and dropping it does not end the watch.
+    let _ = id;
 }
 
 /// Show `count` on the launcher icon; 0 hides the badge. Repeats of the
