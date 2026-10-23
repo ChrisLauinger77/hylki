@@ -46,6 +46,9 @@ impl AppModel {
             }
 
             AppMsg::Archive => {
+                if self.bulk_on_cards(BulkAction::Archive, &sender) {
+                    return;
+                }
                 if self.many_selected() {
                     self.message_list
                         .emit(MessageListInput::Bulk(BulkAction::Archive));
@@ -69,6 +72,9 @@ impl AppModel {
                 // whole selection, exactly as the bulk bar's Delete would. One
                 // row checked with Gmail's x is a lone row, whose conversation
                 // asks first as an open one does (#392).
+                if self.bulk_on_cards(BulkAction::Delete, &sender) {
+                    return;
+                }
                 if self.many_selected() {
                     self.message_list.emit(if self.list_selection.len() == 1 {
                         MessageListInput::ResolveDelete
@@ -104,6 +110,9 @@ impl AppModel {
                 // The list resolves its rows as it does for Delete, a
                 // conversation's row bringing all of it, and hands them back
                 // as a bulk action that asks first.
+                if self.bulk_on_cards(BulkAction::DeleteForever, &sender) {
+                    return;
+                }
                 if self.many_selected()
                     || (!self.selection_from_cards
                         && self.list_selection.len() == 1
@@ -173,6 +182,9 @@ impl AppModel {
             AppMsg::MarkSpam => {
                 // In Junk the same button, shortcut and menu entry mean the
                 // reverse (#168); for a selection the list makes that swap.
+                if self.bulk_on_cards(BulkAction::Spam, &sender) {
+                    return;
+                }
                 if self.many_selected() {
                     self.message_list
                         .emit(MessageListInput::Bulk(BulkAction::Spam));
@@ -410,6 +422,31 @@ impl AppModel {
             "filters",
             crate::ui::accounts::AccountsInput::AddFilterFrom(rule),
         );
+    }
+
+    /// Several cards of the open conversation picked in the reader: the
+    /// action is theirs alone. The list's row they share stands for the
+    /// whole conversation, so handing it the action deleted all of it.
+    pub(super) fn bulk_on_cards(
+        &mut self,
+        action: BulkAction,
+        sender: &ComponentSender<Self>,
+    ) -> bool {
+        if !self.many_selected() || !self.selection_from_cards {
+            return false;
+        }
+        let messages = self.multi_selection();
+        if messages.is_empty() {
+            return false;
+        }
+        // In Junk, Spam means the reverse, as it does for the list (#168).
+        let action = if action == BulkAction::Spam && messages.iter().all(|m| self.in_junk(m)) {
+            BulkAction::NotSpam
+        } else {
+            action
+        };
+        self.on_bulk(action, messages, sender.clone());
+        true
     }
 
     /// A bulk action applied to every selected message.
