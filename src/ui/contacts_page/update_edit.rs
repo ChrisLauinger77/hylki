@@ -156,79 +156,101 @@ impl ContactsPage {
         widgets: &mut ContactsPageWidgets,
         sender: ComponentSender<Self>,
     ) -> Flow {
-        let editor = match &self.editor {
-            Some(Editor::Contact(form)) => form,
-            Some(Editor::Group(form)) => {
-                let mut edit = GroupEdit {
-                    name: form.name.text().trim().to_string(),
-                    members: form.members.borrow().clone(),
-                    hide_addresses: form.hide.is_active(),
-                    ..GroupEdit::default()
-                };
-                // A group is known by its name alone.
-                if edit.name.is_empty() {
-                    form.name.add_css_class("error");
-                    form.name.grab_focus();
-                    return Flow::Break(());
-                }
-                let picked = form
-                    .book
-                    .as_ref()
-                    .and_then(|row| form.books.get(row.selected() as usize))
-                    .cloned();
-                let output = match self.editing_target.and_then(|i| self.contacts.get(i)) {
-                    // Saved in another book: made there, then removed
-                    // from its own.
-                    Some(g) if picked.as_ref().is_some_and(|b| b.uid != g.book_uid) => {
-                        let to = picked.unwrap_or_else(crate::contacts::local_book);
-                        let format = to.groups.unwrap_or(GroupFormat::Evolution);
-                        edit.members =
-                            self.members_for(edit.members, Some(&g.book_uid), &to.uid, format);
-                        let key = (g.book_uid.clone(), g.eds_uid.clone());
-                        self.forget(&[key.clone()]);
-                        let _ = sender.output(ContactsPageOutput::MoveGroup {
-                            from: key.0,
-                            uid: key.1,
-                            to: to.uid,
-                            format,
-                            edit,
-                        });
-                        self.editor = None;
-                        self.editing_target = None;
-                        self.rebuild(widgets, &sender);
-                        return Flow::Break(());
-                    }
-                    Some(g) => {
-                        let format = g.group.unwrap_or(GroupFormat::Evolution);
-                        edit.members =
-                            self.members_for(edit.members, Some(&g.book_uid), &g.book_uid, format);
-                        edit.kept = g.hidden_members.clone();
-                        ContactsPageOutput::SaveGroup {
-                            book_uid: g.book_uid.clone(),
-                            format,
-                            original: Some(g.raw_vcard.clone()),
-                            edit,
-                        }
-                    }
-                    None => {
-                        let book = picked.unwrap_or_else(crate::contacts::local_book);
-                        let format = book.groups.unwrap_or(GroupFormat::Evolution);
-                        edit.members = self.members_for(edit.members, None, &book.uid, format);
-                        ContactsPageOutput::SaveGroup {
-                            book_uid: book.uid,
-                            format,
-                            original: None,
-                            edit,
-                        }
-                    }
-                };
-                let _ = sender.output(output);
+        match &self.editor {
+            Some(Editor::Contact(_)) => self.save_contact_form(widgets, sender),
+            Some(Editor::Group(_)) => self.save_group_form(widgets, sender),
+            None => Flow::Break(()),
+        }
+    }
+
+    /// Save the group form: the group as it was edited, in its own book or,
+    /// when another book was picked, made there and removed from its own.
+    fn save_group_form(
+        &mut self,
+        widgets: &mut ContactsPageWidgets,
+        sender: ComponentSender<Self>,
+    ) -> Flow {
+        let Some(Editor::Group(form)) = &self.editor else {
+            return Flow::Break(());
+        };
+        let mut edit = GroupEdit {
+            name: form.name.text().trim().to_string(),
+            members: form.members.borrow().clone(),
+            hide_addresses: form.hide.is_active(),
+            ..GroupEdit::default()
+        };
+        // A group is known by its name alone.
+        if edit.name.is_empty() {
+            form.name.add_css_class("error");
+            form.name.grab_focus();
+            return Flow::Break(());
+        }
+        let picked = form
+            .book
+            .as_ref()
+            .and_then(|row| form.books.get(row.selected() as usize))
+            .cloned();
+        let output = match self.editing_target.and_then(|i| self.contacts.get(i)) {
+            // Saved in another book: made there, then removed
+            // from its own.
+            Some(g) if picked.as_ref().is_some_and(|b| b.uid != g.book_uid) => {
+                let to = picked.unwrap_or_else(crate::contacts::local_book);
+                let format = to.groups.unwrap_or(GroupFormat::Evolution);
+                edit.members = self.members_for(edit.members, Some(&g.book_uid), &to.uid, format);
+                let key = (g.book_uid.clone(), g.eds_uid.clone());
+                self.forget(&[key.clone()]);
+                let _ = sender.output(ContactsPageOutput::MoveGroup {
+                    from: key.0,
+                    uid: key.1,
+                    to: to.uid,
+                    format,
+                    edit,
+                });
                 self.editor = None;
                 self.editing_target = None;
-                self.render_detail(widgets, &sender);
+                self.rebuild(widgets, &sender);
                 return Flow::Break(());
             }
-            None => return Flow::Break(()),
+            Some(g) => {
+                let format = g.group.unwrap_or(GroupFormat::Evolution);
+                edit.members =
+                    self.members_for(edit.members, Some(&g.book_uid), &g.book_uid, format);
+                edit.kept = g.hidden_members.clone();
+                ContactsPageOutput::SaveGroup {
+                    book_uid: g.book_uid.clone(),
+                    format,
+                    original: Some(g.raw_vcard.clone()),
+                    edit,
+                }
+            }
+            None => {
+                let book = picked.unwrap_or_else(crate::contacts::local_book);
+                let format = book.groups.unwrap_or(GroupFormat::Evolution);
+                edit.members = self.members_for(edit.members, None, &book.uid, format);
+                ContactsPageOutput::SaveGroup {
+                    book_uid: book.uid,
+                    format,
+                    original: None,
+                    edit,
+                }
+            }
+        };
+        let _ = sender.output(output);
+        self.editor = None;
+        self.editing_target = None;
+        self.render_detail(widgets, &sender);
+        Flow::Break(())
+    }
+
+    /// Save the contact form: an edit, a new contact, or (another book
+    /// picked) a move once it is confirmed. An empty form saves nothing.
+    fn save_contact_form(
+        &mut self,
+        widgets: &mut ContactsPageWidgets,
+        sender: ComponentSender<Self>,
+    ) -> Flow {
+        let Some(Editor::Contact(editor)) = &self.editor else {
+            return Flow::Break(());
         };
         let edit = collect_edit(editor);
         // Anything at all is a contact; an empty form is nothing.
