@@ -22,7 +22,7 @@ pub(super) fn link_terms(account: &CloudAccount) -> Result<LinkTerms, String> {
     Ok(onedrive_terms(drive_type, total))
 }
 
-use super::http::short_error;
+use super::http::{short_error, status_error, Wording};
 use super::{expiry, local_file, share_password, CloudAccount, LinkTerms, ShareResult};
 
 fn onedrive_terms(drive_type: &str, quota_total: u64) -> LinkTerms {
@@ -62,18 +62,19 @@ fn bearer(token: &str) -> String {
     format!("Bearer {token}")
 }
 
+/// Microsoft Graph: the message inside its JSON error, with the status.
+const WORDING: Wording = Wording {
+    refused: &[401],
+    refused_text:
+        "the service refused the sign-in. Check the account under Settings, Online Accounts.",
+    not_found: false,
+    message: api_message,
+    code_first: false,
+};
+
 /// An error from a JSON API: the message inside, with the status.
 pub(super) fn api_err(what: &str, e: ureq::Error) -> String {
-    match e {
-        ureq::Error::Status(401, _) => {
-            format!("{what}: the service refused the sign-in. Check the account under Settings, Online Accounts.")
-        }
-        ureq::Error::Status(code, resp) => {
-            let text = resp.into_string().unwrap_or_default();
-            format!("{what}: {} (HTTP {code})", api_message(&text).trim())
-        }
-        ureq::Error::Transport(t) => format!("{what}: {t}"),
-    }
+    status_error(what, e, &WORDING)
 }
 
 /// The message of a Graph error body (`error.message`), else the plain

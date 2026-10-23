@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use super::http::short_error;
+use super::http::{short_error, status_error, Wording};
 use super::{expiry, local_file, share_password, CloudAccount, ShareResult};
 
 const DROPBOX_API: &str = "https://api.dropboxapi.com/2";
@@ -99,17 +99,17 @@ fn dropbox_arg(v: &serde_json::Value) -> String {
     out
 }
 
+const WORDING: Wording = Wording {
+    refused: &[401],
+    refused_text:
+        "Dropbox refused the sign-in. Open Settings, Cloud Storage, and connect the account again.",
+    not_found: false,
+    message: short_error,
+    code_first: false,
+};
+
 pub(super) fn dropbox_err(what: &str, e: ureq::Error) -> String {
-    match e {
-        ureq::Error::Status(401, _) => {
-            format!("{what}: Dropbox refused the sign-in. Open Settings, Cloud Storage, and connect the account again.")
-        }
-        ureq::Error::Status(code, resp) => {
-            let text = resp.into_string().unwrap_or_default();
-            format!("{what}: {} (HTTP {code})", short_error(&text).trim())
-        }
-        ureq::Error::Transport(t) => format!("{what}: {t}"),
-    }
+    status_error(what, e, &WORDING)
 }
 
 /// One RPC-style call: JSON in, JSON out.

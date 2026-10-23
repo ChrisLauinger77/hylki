@@ -39,19 +39,51 @@ pub(super) fn file_slice(
     Ok(f.take(len))
 }
 
-pub(super) fn http_err(what: &str, e: ureq::Error) -> String {
+/// How a service words a failed request: the codes that mean the sign-in
+/// was refused and what to say then, whether a 404 means a wrong server
+/// URL, how its error body is read, and whether the status code comes
+/// before the message or after it.
+pub(super) struct Wording {
+    pub(super) refused: &'static [u16],
+    pub(super) refused_text: &'static str,
+    pub(super) not_found: bool,
+    pub(super) message: fn(&str) -> String,
+    pub(super) code_first: bool,
+}
+
+/// A failed request as a sentence, in a service's own [`Wording`].
+pub(super) fn status_error(what: &str, e: ureq::Error, wording: &Wording) -> String {
     match e {
-        ureq::Error::Status(401, _) | ureq::Error::Status(403, _) => {
-            format!("{what}: the server refused the login. Check the user name and the password.")
+        ureq::Error::Status(code, _) if wording.refused.contains(&code) => {
+            format!("{what}: {}", wording.refused_text)
         }
-        ureq::Error::Status(404, _) => format!("{what}: not found. Check the server URL."),
+        ureq::Error::Status(404, _) if wording.not_found => {
+            format!("{what}: not found. Check the server URL.")
+        }
         ureq::Error::Status(code, resp) => {
             let text = resp.into_string().unwrap_or_default();
-            let text = short_error(&text);
-            format!("{what}: HTTP {code} {}", text.trim())
+            let message = (wording.message)(&text);
+            if wording.code_first {
+                format!("{what}: HTTP {code} {}", message.trim())
+            } else {
+                format!("{what}: {} (HTTP {code})", message.trim())
+            }
         }
         ureq::Error::Transport(t) => format!("{what}: {t}"),
     }
+}
+
+/// A WebDAV or OCS server: Nextcloud, ownCloud, OpenCloud.
+const WEBDAV: Wording = Wording {
+    refused: &[401, 403],
+    refused_text: "the server refused the login. Check the user name and the password.",
+    not_found: true,
+    message: short_error,
+    code_first: true,
+};
+
+pub(super) fn http_err(what: &str, e: ureq::Error) -> String {
+    status_error(what, e, &WEBDAV)
 }
 
 /// Cloudflare's proxy caps a request body at 100 MB; a bigger upload to a

@@ -6,25 +6,26 @@ use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
 
-use super::http::{chunk_ranges, cloudflare_error, file_slice, short_error, CLOUDFLARE_CHUNK};
+use super::http::{
+    chunk_ranges, cloudflare_error, file_slice, short_error, status_error, Wording,
+    CLOUDFLARE_CHUNK,
+};
 use super::{expiry, local_file, share_password, CloudAccount, ShareResult};
 
 fn seafile_auth(token: &str) -> String {
     format!("Token {token}")
 }
 
+const WORDING: Wording = Wording {
+    refused: &[401, 403],
+    refused_text: "the server refused the sign-in. Check the e-mail and the password or API token.",
+    not_found: true,
+    message: short_error,
+    code_first: false,
+};
+
 pub(super) fn seafile_err(what: &str, e: ureq::Error) -> String {
-    match e {
-        ureq::Error::Status(401, _) | ureq::Error::Status(403, _) => {
-            format!("{what}: the server refused the sign-in. Check the e-mail and the password or API token.")
-        }
-        ureq::Error::Status(404, _) => format!("{what}: not found. Check the server URL."),
-        ureq::Error::Status(code, resp) => {
-            let text = resp.into_string().unwrap_or_default();
-            format!("{what}: {} (HTTP {code})", short_error(&text).trim())
-        }
-        ureq::Error::Transport(t) => format!("{what}: {t}"),
-    }
+    status_error(what, e, &WORDING)
 }
 
 /// Sign in with the password and a two-step verification code, once:
