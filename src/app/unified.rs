@@ -38,6 +38,14 @@ pub(super) fn content_fp<'a>(msgs: impl Iterator<Item = &'a Message>) -> u64 {
     sum ^ n.rotate_left(32)
 }
 
+/// How many of a folder's newest messages a list not in memory shows at
+/// once, read from the index while the rest of the folder is.
+pub(super) const LIST_NEWEST: usize = 300;
+
+/// How long after an account's folders arrive the unified rows' folders are
+/// read into memory: past the start's own rush of work.
+pub(super) const PRELOAD_AFTER_SECS: u32 = 5;
+
 #[cfg(test)]
 mod tests {
     use super::*;

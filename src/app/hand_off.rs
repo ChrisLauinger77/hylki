@@ -66,3 +66,62 @@ pub(super) fn window_drop_target(
     });
     drop
 }
+
+/// Files handed in from outside the app (GNOME Files' "Send with Hylki",
+/// "Open With Hylki", a mailto: with attach=), on their way to a composer.
+#[derive(Debug, Default)]
+pub(crate) struct FileHandOff {
+    /// The composer's other fields (a mailto's recipient, subject, body):
+    /// used when the files go into a new message.
+    pub(super) base: ComposePrefill,
+    /// The readable files.
+    pub(super) files: Vec<std::path::PathBuf>,
+    /// The ones that were named but could not be read (reported once).
+    pub(super) dropped: Vec<std::path::PathBuf>,
+}
+
+/// Where a hand-off's files are going, once decided.
+#[derive(Debug)]
+pub(crate) enum HandOffTarget {
+    New,
+    Draft(Message),
+    Reply(Message),
+}
+
+/// A hand-off's files split by how the composer takes them: attached, or
+/// uploaded to cloud storage and linked (the ones over the size limit).
+#[derive(Debug, Default, Clone)]
+pub(crate) struct HandOffFiles {
+    pub(super) attach: Vec<std::path::PathBuf>,
+    pub(super) cloud: Vec<std::path::PathBuf>,
+}
+
+impl HandOffFiles {
+    pub(super) fn of(files: Vec<std::path::PathBuf>, cloud: bool) -> Self {
+        if cloud {
+            Self {
+                attach: Vec::new(),
+                cloud: files,
+            }
+        } else {
+            Self {
+                attach: files,
+                cloud: Vec::new(),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hand_off_files_go_to_one_side() {
+        let files = vec![std::path::PathBuf::from("/a"), "/b".into()];
+        let attached = HandOffFiles::of(files.clone(), false);
+        assert_eq!((attached.attach.len(), attached.cloud.len()), (2, 0));
+        let linked = HandOffFiles::of(files, true);
+        assert_eq!((linked.attach.len(), linked.cloud.len()), (0, 2));
+    }
+}

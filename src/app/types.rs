@@ -1,6 +1,6 @@
 //! Small types shared across the app's modules.
 
-use crate::models::Message;
+use crate::models::{FolderKind, Message};
 
 /// A folder's messages as [`AppModel::message_cache`] keeps them: shared,
 /// not copied, with a search pool being put together on another thread
@@ -41,6 +41,25 @@ impl From<Vec<Message>> for FolderMessages {
     fn from(messages: Vec<Message>) -> Self {
         Self(std::sync::Arc::new(messages))
     }
+}
+
+/// The currently selected mailbox.
+#[derive(Clone)]
+pub(super) struct SelectedFolder {
+    pub(super) account_id: u32,
+    pub(super) folder_id: u32,
+    pub(super) path: String,
+}
+
+/// Which folders a unified view merges (see `AppModel::unified_view`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum UnifiedView {
+    /// Every account's folder of this kind.
+    Kind(FolderKind),
+    /// Every filter rule's folder listed under All Inboxes.
+    Filtered,
+    /// Every favorite folder.
+    Favorites,
 }
 
 #[cfg(test)]

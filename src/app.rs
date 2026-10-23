@@ -12,297 +12,7 @@ use tokio::sync::mpsc::UnboundedSender;
 // width, #28); its floor lives with the pane in message_list.rs
 // (LIST_MIN_WIDTH).
 
-/// The narrowest the reader pane may be squeezed. The header's right-hand
-/// actions collapse into the overflow menu below READER_ACTIONS_BREAKPOINT
-/// (the left group — Reply … Delete — stays), so the floor only needs a
-/// usable body width plus that left group. Kept modest on purpose: the window's
-/// total minimum width must stay under half of a 1920px screen, or GNOME
-/// refuses to tile the window to the left/right screen edge (it only offers
-/// the top-edge maximize).
-const READER_MIN_WIDTH: i32 = 400;
-
-/// How long a read/unread change sent to a worker keeps overriding what the
-/// server reports for its message and folder, should the worker's
-/// confirmation never come (a dropped connection mid-request). A worker
-/// busy with a large sync can take well over 20 seconds to reach a mark,
-/// and read mail used to turn unread again in the meantime (#255).
-const PENDING_SEEN_MAX: std::time::Duration = std::time::Duration::from_secs(60);
-
-/// The same for a tag, which the worker confirms: a confirmed tag still
-/// wins for a few seconds over a list another connection fetched before
-/// the STORE, and an unconfirmed one for as long as a busy queue can take.
-const PENDING_TAG_MAX: std::time::Duration = std::time::Duration::from_secs(300);
-const PENDING_TAG_SETTLED: std::time::Duration = std::time::Duration::from_secs(10);
-
-/// How wide the list pane has to be dragged before Automatic lays the list
-/// out on one line, and how far back before it returns to cards (#334).
-const LIST_WIDE_ON: i32 = 600;
-const LIST_WIDE_OFF: i32 = 560;
-
-/// The same for mail taken out of a folder (moved, deleted, marked as
-/// spam): how long it stays off that folder's list without the worker's
-/// word that the move has run.
-const PENDING_MOVE_MAX: std::time::Duration = std::time::Duration::from_secs(120);
-
-/// How long a manual "Apply Filters" run (#198) waits for the folders it asked
-/// for before reporting on whatever came back. A folder that is offline, or
-/// that errors, would otherwise leave the run without an answer for good.
-const FILTER_RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
-
-/// The one response of the manual run's progress dialog: "Run in Background"
-/// while it works, "Close" once it holds the report.
-const FILTER_RUN_RESPONSE: &str = "close";
-
-/// What the rules did in one folder of a manual run.
-#[derive(Default, Clone, Copy)]
-struct FolderTally {
-    /// The most messages one pass over the folder was held up against. A
-    /// folder answers twice (cache, then server) over the same mail, so the
-    /// larger listing is the count — adding them would count it twice.
-    checked: usize,
-    /// Messages at least one rule matched, whether or not anything was
-    /// done about it (#201): mail tagged on an earlier sync matches again
-    /// and needs nothing, and a report that only counted actions called
-    /// that "none of them matched". Held the same way as `checked`.
-    matched: usize,
-    /// Tags put on, and messages filed away. Both only ever happen once per
-    /// message (a second pass sees the tag, or the pending move), so these
-    /// add up across passes.
-    tagged: usize,
-    filed: usize,
-}
-
-/// A manual "Apply Filters" run (#198): the folders it covers, what the rules
-/// have done in each so far, and the dialog watching it.
-struct FilterRun {
-    /// Every folder the run covers, with its tally. A folder load answers
-    /// twice (what the cache holds, then what the server sends), so the scope
-    /// has to outlive the cache's answer or the server's would go unfiltered
-    /// outside the Inbox. Cleared by [`FILTER_RUN_TIMEOUT`].
-    folders: std::collections::HashMap<(u32, u32), FolderTally>,
-    /// The folders that have not been to the server and back yet.
-    pending: std::collections::HashSet<(u32, u32)>,
-    /// Whether the run has already said what it did.
-    reported: bool,
-    /// The progress dialog, while it is up. Gone once the run was sent to the
-    /// background, in which case the report goes to the status bar instead.
-    dialog: Option<FilterRunDialog>,
-}
-
-impl FilterRun {
-    /// The run's totals so far.
-    fn totals(&self) -> FolderTally {
-        self.folders
-            .values()
-            .fold(FolderTally::default(), |mut t, f| {
-                t.checked += f.checked;
-                t.matched += f.matched;
-                t.tagged += f.tagged;
-                t.filed += f.filed;
-                t
-            })
-    }
-
-    /// How many of the run's folders are done.
-    fn done_count(&self) -> usize {
-        self.folders.len() - self.pending.len()
-    }
-}
-
-/// The widgets of a manual run's progress dialog, kept so its live text can be
-/// rewritten as folders report and so the finish can turn it into the report.
-struct FilterRunDialog {
-    dialog: adw::MessageDialog,
-    spinner: gtk::Spinner,
-    body: gtk::Label,
-}
-
-/// Fallback threshold for folding the reader header's right-hand actions
-/// into the overflow menu. Normally the threshold is *measured* at startup from the
-/// real row (see the breakpoint in init) so it tracks the user's decoration
-/// layout; this value only stands in if that measurement comes back empty.
-const READER_ACTIONS_BREAKPOINT: f64 = 490.0;
-
 use crate::ui::FOCUS_ANIM_MS;
-
-const SIDEBAR_RAIL_WIDTH: f64 = 80.0;
-
-/// Byte budgets for the in-RAM body and attachment caches (issue #106). Bodies
-/// average well under 1 MB even with inline images, so 64 MiB holds hundreds of
-/// recently seen messages; attachments run larger, and 128 MiB still keeps a
-/// handful of big ones for instant re-preview. Everything evicted re-reads from
-/// the SQLite cache.
-const BODY_CACHE_BUDGET: usize = 64 << 20;
-const ATTACHMENT_CACHE_BUDGET: usize = 128 << 20;
-
-/// The reader header's action buttons and fold breakpoint, kept for
-/// re-packing when the layout changes (see relayout_reader_toolbar).
-/// The message list header's controls that Focus Mode folds into a ⋯ menu:
-/// each sits in a revealer so it can slide away, and the toggles are kept so
-/// the menu can flip them (their own handlers then do the filtering).
-struct ListHeaderWidgets {
-    revealers: Vec<gtk::Revealer>,
-    overflow: gtk::Revealer,
-    filter: SortFilterPopover,
-    sort: gtk::gio::SimpleAction,
-}
-
-/// The orders the list header offers, by their keys in `SortOrder`. The
-/// column headings can set more (#443); none of these is ticked then.
-const SORT_ORDERS: [(&str, &str); 6] = [
-    (i18n_noop("Date (Newest first)"), "date_newest"),
-    (i18n_noop("Date (Oldest first)"), "date_oldest"),
-    (i18n_noop("Sender (A–Z)"), "sender"),
-    (i18n_noop("Subject (A–Z)"), "subject"),
-    (i18n_noop("Unread first"), "unread"),
-    (i18n_noop("Starred first"), "flagged"),
-];
-
-/// The list header's sort and filter button (#441): the sort orders in one
-/// column of its popover, the quick filters in the other.
-struct SortFilterPopover {
-    button: gtk::MenuButton,
-    filters: Vec<(QuickFilter, gtk::CheckButton)>,
-    clear: gtk::Button,
-}
-
-impl SortFilterPopover {
-    /// The popover stays open as rows are clicked, so an order and several
-    /// filters can be set in one visit.
-    fn new(
-        button: gtk::MenuButton,
-        sort: &gtk::gio::SimpleAction,
-        sender: &relm4::Sender<AppMsg>,
-    ) -> Self {
-        let column = |title: &str| {
-            let col = gtk::Box::new(gtk::Orientation::Vertical, 0);
-            col.add_css_class("sort-filter-column");
-            let caption = gtk::Label::new(Some(title));
-            caption.set_xalign(0.0);
-            caption.add_css_class("dim-label");
-            caption.add_css_class("caption-heading");
-            col.append(&caption);
-            col
-        };
-
-        let sort_col = column(&i18n("Sort by"));
-        let mut radios: Vec<(&'static str, gtk::CheckButton)> = Vec::new();
-        for (label, key) in SORT_ORDERS {
-            let radio = gtk::CheckButton::with_label(&i18n(label));
-            if let Some((_, first)) = radios.first() {
-                radio.set_group(Some(first));
-            }
-            let action = sort.clone();
-            radio.connect_toggled(move |r| {
-                let current = action.state().and_then(|v| v.str().map(String::from));
-                if r.is_active() && current.as_deref() != Some(key) {
-                    action.activate(Some(&key.to_variant()));
-                }
-            });
-            sort_col.append(&radio);
-            radios.push((key, radio));
-        }
-        // The headings and the ⋯ menu sort through the same action, so the
-        // radios follow its state wherever the change came from.
-        let show_sort = move |key: Option<String>| {
-            let key = key.unwrap_or_default();
-            match radios.iter().find(|(k, _)| *k == key) {
-                Some((_, r)) => r.set_active(true),
-                None => radios.iter().for_each(|(_, r)| r.set_active(false)),
-            }
-        };
-        show_sort(sort.state().and_then(|v| v.str().map(String::from)));
-        sort.connect_state_notify(move |a| {
-            show_sort(a.state().and_then(|v| v.str().map(String::from)))
-        });
-
-        let filter_col = column(&i18n("Show only"));
-        let mut filters = Vec::new();
-        for f in QuickFilter::ALL {
-            let check = gtk::CheckButton::with_label(&f.label());
-            let s = sender.clone();
-            check.connect_toggled(move |c| s.emit(AppMsg::SetQuickFilter(f, c.is_active())));
-            filter_col.append(&check);
-            filters.push((f, check));
-        }
-        let clear = gtk::Button::with_label(&i18n("Clear Filters"));
-        clear.add_css_class("flat");
-        clear.set_halign(gtk::Align::Start);
-        clear.set_sensitive(false);
-        let s = sender.clone();
-        clear.connect_clicked(move |_| s.emit(AppMsg::ClearQuickFilters));
-        filter_col.append(&clear);
-
-        let columns = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        columns.add_css_class("sort-filter-popover");
-        columns.append(&sort_col);
-        columns.append(&gtk::Separator::new(gtk::Orientation::Vertical));
-        columns.append(&filter_col);
-        let popover = gtk::Popover::new();
-        popover.set_child(Some(&columns));
-        button.set_popover(Some(&popover));
-        Self {
-            button,
-            filters,
-            clear,
-        }
-    }
-
-    /// Show `filters` on the checks, and tint the button while any is on
-    /// so a narrowed list never passes for an empty folder.
-    fn sync(&self, filters: QuickFilters) {
-        for (f, check) in &self.filters {
-            if check.is_active() != filters.has(*f) {
-                check.set_active(filters.has(*f));
-            }
-        }
-        self.clear.set_sensitive(!filters.is_empty());
-        if filters.is_empty() {
-            self.button.remove_css_class("list-filter-active");
-            self.button
-                .set_tooltip_text(Some(&i18n("Sort and filter messages")));
-        } else {
-            self.button.add_css_class("list-filter-active");
-            let names: Vec<String> = QuickFilter::ALL
-                .iter()
-                .filter(|f| filters.has(**f))
-                .map(|f| f.label())
-                .collect();
-            self.button.set_tooltip_text(Some(&i18n_f(
-                "Filtered: {names}",
-                &[("names", &names.join(", "))],
-            )));
-        }
-    }
-}
-
-struct ReaderToolbarWidgets {
-    /// Each action button inside its Focus Mode revealer.
-    buttons: Vec<(config::ToolbarItem, gtk::Widget)>,
-    /// The Outbox's own buttons' revealers (Edit, Send, Send all).
-    outbox: Vec<gtk::Revealer>,
-    spinner: gtk::Widget,
-    bin: adw::BreakpointBin,
-    breakpoint: adw::Breakpoint,
-    /// The row's cost with every action button gone (padding, spacing…).
-    base: i32,
-    /// One action button's natural width.
-    button_w: i32,
-    /// The window controls' width (re-measured when the decoration layout
-    /// changes).
-    controls: std::cell::Cell<i32>,
-}
-
-/// Slide a Focus Mode revealer's content away (and fade it, through the
-/// `away` class's opacity transition) or bring it back.
-fn focus_reveal(r: &gtk::Revealer, shown: bool) {
-    if shown {
-        r.remove_css_class("away");
-    } else {
-        r.add_css_class("away");
-    }
-    r.set_reveal_child(shown);
-}
 
 relm4::new_action_group!(WindowActionGroup, "win");
 relm4::new_stateless_action!(AccountsAction, WindowActionGroup, "accounts");
@@ -328,24 +38,36 @@ macro_rules! pref {
 mod about;
 mod accounts;
 mod attachments;
+mod compose_host;
 mod compose_init;
+mod consts;
 mod contacts;
 mod conversation;
 mod demo;
+mod filter_run;
 mod filters;
 mod flags;
+mod focus;
 mod folders;
+mod gallery;
 mod hand_off;
 mod keymap;
+mod list_header;
 mod notifications;
 mod palette;
+mod pending;
 mod picker;
+mod popout;
 mod prefill;
 mod quote;
+mod reader_toolbar;
 mod release_notes;
 mod search;
+mod send_morph;
 mod showcase;
 mod sidebar;
+mod sidebar_peek;
+mod smart;
 mod split_reply;
 mod tags;
 #[cfg(test)]
@@ -354,6 +76,7 @@ mod theme;
 mod transfer;
 mod tray;
 mod types;
+mod undo;
 mod unified;
 mod uri_queue;
 mod workers;
@@ -363,40 +86,57 @@ pub(crate) use accounts::finish_keyring_writes;
 use accounts::{
     forget_account_secrets, look_only_change, reconcile_goa, secrets_kept, GoaReconcile,
 };
-use attachments::{prune_downloads, save_attachment};
+use attachments::{prune_downloads, save_attachment, AttachmentTarget};
+use compose_host::{ComposeHost, ReaderCompose};
 use compose_init::{choose_identity, compose_identities};
+use consts::{ATTACHMENT_CACHE_BUDGET, BODY_CACHE_BUDGET, READER_MIN_WIDTH};
 use contacts::{import_summary, reload_contacts, sync_contact_books};
 use conversation::{
     batch_bodies_by_folder, body_key, dedupe_label_copies, is_event_target, next_after_vanish,
-    BodyKey, MissingBody, THREAD_BODY_WAIT, THREAD_LINK_LIMIT,
+    BodyKey, MissingBody, CARRIED_BODY_LIMIT, THREAD_BODY_WAIT, THREAD_LINK_LIMIT,
 };
 use demo::{demo_account_configs_saved, demo_filters, demo_mode, demo_tags};
+use filter_run::{
+    FilterRun, FilterRunDialog, FolderTally, FILTER_RUN_RESPONSE, FILTER_RUN_TIMEOUT,
+};
 use filters::rules_matching;
 use flags::{read_label, sender_label, star_label};
+use focus::focus_reveal;
 use folders::{
     apply_folder_roles, kind_label, merged_unread, pick_sent_copy, rekey_folder_key,
     same_folder_list,
 };
-use hand_off::{hand_off_names, hand_off_size, remember_check, window_drop_target};
+use gallery::GALLERY_DATA_CAP;
+use hand_off::{
+    hand_off_names, hand_off_size, remember_check, window_drop_target, FileHandOff, HandOffFiles,
+    HandOffTarget,
+};
 use keymap::{ctrl_shortcut_for, focus_in_compose, gmail_sequence, GoTarget, WindowCompose};
 pub(crate) use keymap::{
     focus_is_text, focus_takes_keys, gmail_shortcut_for, reader_keeps, shortcut_for,
     without_caps_lock, Shortcut,
 };
+use list_header::{ListHeaderWidgets, SortFilterPopover, LIST_WIDE_OFF, LIST_WIDE_ON, SORT_ORDERS};
 use notifications::notified_message;
 use palette::{keyed_item, palette_key, GMAIL_HELP, SHORTCUT_HELP};
+use pending::{PENDING_MOVE_MAX, PENDING_SEEN_MAX, PENDING_TAG_MAX, PENDING_TAG_SETTLED};
 use picker::show_message_picker;
+use popout::PopOut;
 use prefill::{
     forward_prefill, reply_all_prefill, reply_prefill, reply_subject, stage_attachments,
     unsent_prefill,
 };
 use quote::editable_copy_html;
 pub(crate) use quote::{body_is_pre_wrap, message_text};
+use reader_toolbar::{ReaderToolbarWidgets, READER_ACTIONS_BREAKPOINT};
 use release_notes::release_notes_page;
 use search::{build_search_pool, default_scope, pool_rank};
+use send_morph::{MorphPending, Provisional};
 pub(crate) use showcase::showcase_capture;
 use showcase::{scroll_all_to, showcase_at, showcase_log_focus, showcase_pgp};
 use sidebar::{set_sidebar_header_compact, sidebar_output_msg};
+use sidebar_peek::SIDEBAR_RAIL_WIDTH;
+use smart::{SmartContext, SMART_VIEW_LIMIT};
 use split_reply::{set_split_shrink, split_reply_height};
 use tags::TagScan;
 pub(crate) use theme::desktop_icon_theme;
@@ -406,8 +146,9 @@ use theme::{
 };
 use transfer::{Landed, Transfer, TransferTally};
 use tray::tray_mail_key;
-use types::FolderMessages;
-use unified::{content_fp, view_key_of};
+use types::{FolderMessages, SelectedFolder, UnifiedView};
+use undo::{FlagChange, FlagKind, FlagRef, UndoEntry, UndoStep, INSTANT_UNDO};
+use unified::{content_fp, view_key_of, LIST_NEWEST, PRELOAD_AFTER_SECS};
 use uri_queue::{
     eml_file_name, parse_mailto, parse_mid, ATTACH_PENDING, FILE_FOLDER, FILE_PENDING,
     MAILTO_PENDING, MAILTO_SENDER, MID_PENDING,
@@ -437,9 +178,6 @@ use crate::ui::message_list::{
     RowAction, SearchScope,
 };
 
-/// Largest cached attachment whose bytes ride along with a gallery page, so a
-/// thumbnail or preview is instant. Anything bigger is fetched when opened.
-const GALLERY_DATA_CAP: i64 = 6 * 1024 * 1024;
 use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
 use crate::ui::attachment_drawer::{AttachmentDrawer, AttachmentDrawerInput};
 use crate::ui::contacts_page::{ContactsPage, ContactsPageInput, ContactsPageOutput};
@@ -453,289 +191,6 @@ use crate::ui::sidebar::{
     CtxAction, SectionData, Sidebar, SidebarInit, SidebarInput, SidebarOutput, UnifiedFolderRef,
 };
 use crate::worker::{self, MailRequest, OutgoingMessage, WorkerEvent};
-
-/// The currently selected mailbox.
-#[derive(Clone)]
-struct SelectedFolder {
-    account_id: u32,
-    folder_id: u32,
-    path: String,
-}
-
-/// A standalone compose window (New Message, compose-to, edit-draft, or a
-/// popped-out reply) and its component. Both refs must stay alive: the window
-/// holds the content, the controller holds the component root.
-struct ComposeHost {
-    id: u32,
-    /// Held only to keep the component (and its widget tree) alive for the
-    /// window's lifetime; dropped when the host is removed.
-    #[allow(dead_code)]
-    controller: Controller<Compose>,
-    window: adw::Window,
-}
-
-/// A reply on its way from the split pane into its conversation: its card,
-/// the composer it was written in, and the conversation it answers.
-struct MorphPending {
-    message: Message,
-    composer: gtk::Widget,
-    conversation: (u32, u32),
-}
-
-/// The card a reply sent from the split pane has in its conversation until
-/// its copy is read back from Sent (send_morph.rs).
-struct Provisional {
-    message: Message,
-    /// The Message-ID it answers.
-    answers: String,
-}
-
-impl Provisional {
-    /// Whether `m` is this reply's own copy: from the same account, dated
-    /// when this was sent (by this machine's clock either way), and
-    /// answering the same message.
-    fn copied_by(&self, m: &Message) -> bool {
-        m.uid != 0
-            && m.account_id == self.message.account_id
-            && m.timestamp >= self.message.timestamp - 30
-            && m.references.split_whitespace().any(|x| x == self.answers)
-    }
-}
-
-/// The reader's inline reply/forward composer. `window` is `Some` only while the
-/// pane has been promoted to a floating window (else it lives in the reader's
-/// drop-down revealer).
-/// Which flag a recorded change touched (#200).
-#[derive(Clone, Debug, PartialEq)]
-enum FlagKind {
-    Read,
-    Star,
-    Tag(String),
-}
-
-/// One message a flag change covers. Folder ids are re-checked when the
-/// change is applied — they are index-based and shift as folders come and go.
-#[derive(Clone, Debug, PartialEq)]
-struct FlagRef {
-    folder_id: u32,
-    uid: u32,
-    /// The list row's id, which is how the setters find every copy of it.
-    id: u32,
-}
-
-/// Put `kind` to `value` on each of `items`. Only messages the original
-/// action actually changed are listed, so one value covers them all.
-#[derive(Clone, Debug, PartialEq)]
-struct FlagChange {
-    kind: FlagKind,
-    value: bool,
-    items: Vec<FlagRef>,
-}
-
-/// One step of the undo/redo history (#200). A step is a thing to *do*: the
-/// undo stack holds the step that reverses each action, and applying a step
-/// pushes its [`UndoStep::inverse`] onto the other stack. Operations with no
-/// inverse — a permanent delete, an emptied folder, a sent message — are
-/// never recorded.
-#[derive(Clone, Debug, PartialEq)]
-enum UndoStep {
-    /// Take `message_ids` out of `from` and put them in `to`. Symmetric, so
-    /// redoing a move is the same request with the two folders swapped.
-    Move {
-        from: String,
-        to: String,
-        message_ids: Vec<String>,
-    },
-    /// Set flags back to what they were.
-    Flags(Vec<FlagChange>),
-    CreateFolder {
-        path: String,
-    },
-    /// Only ever the inverse of a [`UndoStep::CreateFolder`]: deleting a
-    /// folder the user made is undoing that, not a delete of its own. A
-    /// folder the user deletes is not undoable at all and never recorded.
-    DeleteFolder {
-        path: String,
-    },
-    RenameFolder {
-        from: String,
-        to: String,
-    },
-}
-
-impl UndoStep {
-    /// The step that puts this one back.
-    fn inverse(&self) -> UndoStep {
-        match self {
-            UndoStep::Move {
-                from,
-                to,
-                message_ids,
-            } => UndoStep::Move {
-                from: to.clone(),
-                to: from.clone(),
-                message_ids: message_ids.clone(),
-            },
-            UndoStep::Flags(changes) => UndoStep::Flags(
-                changes
-                    .iter()
-                    .map(|c| FlagChange {
-                        value: !c.value,
-                        ..c.clone()
-                    })
-                    .collect(),
-            ),
-            UndoStep::CreateFolder { path } => UndoStep::DeleteFolder { path: path.clone() },
-            UndoStep::DeleteFolder { path } => UndoStep::CreateFolder { path: path.clone() },
-            UndoStep::RenameFolder { from, to } => UndoStep::RenameFolder {
-                from: to.clone(),
-                to: from.clone(),
-            },
-        }
-    }
-}
-
-/// How long after an action its undo still repaints the list itself rather
-/// than waiting for the server (#200). Long enough to cover "that was a
-/// mistake", short enough that the rows it puts back are still what is
-/// there — past this, another client or a sync may have moved on.
-const INSTANT_UNDO: std::time::Duration = std::time::Duration::from_secs(10);
-
-/// How many carried-over bodies to hold before giving up on them. They are
-/// meant to be claimed by the very next reload; a build-up means the reloads
-/// never came, and these are whole message bodies.
-const CARRIED_BODY_LIMIT: usize = 64;
-
-/// One entry on the undo (or redo) stack: the step to apply, and what the
-/// user called the action it belongs to, so the menu can say "Undo Archive"
-/// rather than just "Undo".
-/// Most messages one smart folder (#417) lists per account.
-const SMART_VIEW_LIMIT: usize = 5000;
-
-/// How many of a folder's newest messages a list not in memory shows at
-/// once, read from the index while the rest of the folder is.
-const LIST_NEWEST: usize = 300;
-
-/// How long after an account's folders arrive the unified rows' folders are
-/// read into memory: past the start's own rush of work.
-const PRELOAD_AFTER_SECS: u32 = 5;
-
-/// What a smart folder's conditions need besides the message itself, made
-/// on the main thread and taken to the one that reads the index.
-struct SmartContext {
-    /// The tags' keywords, lower case.
-    tags: Vec<String>,
-    /// The tags themselves, for the Gmail labels that stand for them (#374).
-    tag_list: Vec<config::Tag>,
-    contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
-}
-
-impl SmartContext {
-    fn matches(&self, folder: &config::SmartFolder, m: &Message) -> bool {
-        let recipients = [m.to.as_str(), m.cc.as_str()]
-            .into_iter()
-            .filter(|s| !s.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join(", ");
-        folder.matches(&config::SmartInput {
-            text: config::FilterInput {
-                from_addr: &m.from_addr,
-                from_name: &m.from_name,
-                subject: &m.subject,
-                recipients: &recipients,
-                reply_to: &m.reply_to,
-                body: if m.body.is_empty() {
-                    &m.preview
-                } else {
-                    &m.body
-                },
-                body_hits: &[],
-                contacts: self.contacts.as_deref(),
-            },
-            starred: m.starred,
-            unread: m.unread,
-            attachment: m.has_attachment,
-            keywords: &m.tag_keywords(&self.tag_list),
-            tags: &self.tags,
-        })
-    }
-}
-
-struct UndoEntry {
-    account_id: u32,
-    what: String,
-    step: UndoStep,
-    /// When the action happened, for the [`INSTANT_UNDO`] window.
-    at: std::time::Instant,
-    /// The rows a move took off screen, kept whole (bodies included) so a
-    /// quick undo can put them straight back without a round trip.
-    rows: Vec<Message>,
-    /// The conversations those rows were part of, by Message-ID. Taken as
-    /// the move is recorded: moving a message forgets its account's
-    /// conversations, so by the time the undo runs they are gone.
-    threads: Vec<(String, Vec<Message>)>,
-    /// Whether applying this entry puts `rows` back on screen (undoing a
-    /// move) or takes them away again (redoing it).
-    rows_return: bool,
-    /// Steps on other accounts that belong to the same action, applied with
-    /// `step`: a move to another account (#265) is undone by bringing the
-    /// original back on one account and taking the copy away on the other.
-    also: Vec<(u32, UndoStep)>,
-}
-
-struct ReaderCompose {
-    id: u32,
-    controller: Controller<Compose>,
-    window: Option<adw::Window>,
-    /// The message a split reply answers, by (account, id): its card in the
-    /// reader is the one the reply was opened from.
-    answering: Option<(u32, u32)>,
-}
-
-/// Files handed in from outside the app (GNOME Files' "Send with Hylki",
-/// "Open With Hylki", a mailto: with attach=), on their way to a composer.
-#[derive(Debug, Default)]
-pub struct FileHandOff {
-    /// The composer's other fields (a mailto's recipient, subject, body):
-    /// used when the files go into a new message.
-    base: ComposePrefill,
-    /// The readable files.
-    files: Vec<std::path::PathBuf>,
-    /// The ones that were named but could not be read (reported once).
-    dropped: Vec<std::path::PathBuf>,
-}
-
-/// Where a hand-off's files are going, once decided.
-#[derive(Debug)]
-pub enum HandOffTarget {
-    New,
-    Draft(Message),
-    Reply(Message),
-}
-
-/// A hand-off's files split by how the composer takes them: attached, or
-/// uploaded to cloud storage and linked (the ones over the size limit).
-#[derive(Debug, Default, Clone)]
-pub struct HandOffFiles {
-    attach: Vec<std::path::PathBuf>,
-    cloud: Vec<std::path::PathBuf>,
-}
-
-impl HandOffFiles {
-    fn of(files: Vec<std::path::PathBuf>, cloud: bool) -> Self {
-        if cloud {
-            Self {
-                attach: Vec::new(),
-                cloud: files,
-            }
-        } else {
-            Self {
-                attach: files,
-                cloud: Vec::new(),
-            }
-        }
-    }
-}
 
 pub struct AppModel {
     /// One mail worker per account (account_id → request sender).
@@ -1592,51 +1047,6 @@ pub struct AppModel {
     /// The id issued to each such message, keyed by where it really lives
     /// (account, folder, uid). Stable across re-opens so its body stays cached.
     related_ids: HashMap<(u32, u32, u32), u32>,
-}
-
-/// A message displayed in its own top-level window (double-click to pop out).
-struct PopOut {
-    window: adw::Window,
-    controller: Controller<MessageWindow>,
-    /// The popped-out message, where it lives (see [`body_key`]), for the
-    /// events that arrive about it by folder and UID.
-    message: BodyKey,
-    /// Every message the window shows, the same way, with its (account,
-    /// id): the files of each are the window's to show.
-    members: Vec<(BodyKey, (u32, u32))>,
-}
-
-/// Which folders a unified view merges (see `AppModel::unified_view`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum UnifiedView {
-    /// Every account's folder of this kind.
-    Kind(FolderKind),
-    /// Every filter rule's folder listed under All Inboxes.
-    Filtered,
-    /// Every favorite folder.
-    Favorites,
-}
-
-/// One attachment of one message on the server, to be removed (#289).
-#[derive(Debug, Clone)]
-pub struct AttachmentTarget {
-    account_id: u32,
-    message_id: u32,
-    path: String,
-    uid: u32,
-    name: String,
-    size: u64,
-}
-
-impl AttachmentTarget {
-    fn gallery_key(&self) -> crate::ui::attachments_gallery::FileKey {
-        (
-            self.account_id,
-            self.path.clone(),
-            self.uid,
-            self.name.clone(),
-        )
-    }
 }
 
 #[derive(Debug)]
@@ -28898,73 +28308,6 @@ mod tests {
     }
 
     #[test]
-    fn every_undo_step_is_its_own_inverse_twice_over() {
-        use super::{FlagChange, FlagKind, FlagRef, UndoStep};
-        let steps = vec![
-            UndoStep::Move {
-                from: "Archive".into(),
-                to: "INBOX".into(),
-                message_ids: vec!["a@b.c".into()],
-            },
-            UndoStep::Flags(vec![
-                FlagChange {
-                    kind: FlagKind::Read,
-                    value: false,
-                    items: vec![FlagRef {
-                        folder_id: 1,
-                        uid: 7,
-                        id: 7,
-                    }],
-                },
-                FlagChange {
-                    kind: FlagKind::Tag("Work".into()),
-                    value: true,
-                    items: vec![FlagRef {
-                        folder_id: 1,
-                        uid: 8,
-                        id: 8,
-                    }],
-                },
-            ]),
-            UndoStep::CreateFolder {
-                path: "Projects".into(),
-            },
-            UndoStep::DeleteFolder {
-                path: "Projects".into(),
-            },
-            UndoStep::RenameFolder {
-                from: "Old".into(),
-                to: "New".into(),
-            },
-        ];
-        for step in &steps {
-            assert_eq!(&step.inverse().inverse(), step, "{step:?} round-trips");
-            assert_ne!(&step.inverse(), step, "{step:?} actually reverses");
-        }
-        // A move undoes by swapping the two folders, which is what makes
-        // redo the very same request back the other way.
-        assert_eq!(
-            steps[0].inverse(),
-            UndoStep::Move {
-                from: "INBOX".into(),
-                to: "Archive".into(),
-                message_ids: vec!["a@b.c".into()],
-            }
-        );
-        // Undoing a folder someone made deletes it again; there is no step
-        // that undoes a folder the user deleted.
-        assert_eq!(
-            UndoStep::CreateFolder {
-                path: "Projects".into()
-            }
-            .inverse(),
-            UndoStep::DeleteFolder {
-                path: "Projects".into()
-            }
-        );
-    }
-
-    #[test]
     fn identities_split_into_name_and_address() {
         use crate::config::split_identity;
         assert_eq!(
@@ -29003,122 +28346,6 @@ mod tests {
 
     // Characterization tests (restructure step A0.1): they pin what these
     // helpers do today, quirks included, before the code moves.
-
-    #[test]
-    fn filter_run_totals_add_up_the_folders() {
-        let mut run = FilterRun {
-            folders: Default::default(),
-            pending: Default::default(),
-            reported: false,
-            dialog: None,
-        };
-        run.folders.insert(
-            (1, 1),
-            FolderTally {
-                checked: 3,
-                matched: 2,
-                tagged: 1,
-                filed: 0,
-            },
-        );
-        run.folders.insert(
-            (1, 2),
-            FolderTally {
-                checked: 4,
-                matched: 1,
-                tagged: 0,
-                filed: 1,
-            },
-        );
-        run.pending.insert((1, 2));
-        let t = run.totals();
-        assert_eq!((t.checked, t.matched, t.tagged, t.filed), (7, 3, 1, 1));
-        assert_eq!(run.done_count(), 1);
-    }
-
-    /// B2 in the map: an empty `answers` never matches, since an empty
-    /// reference is never in a whitespace split.
-    #[test]
-    fn a_provisional_card_is_copied_by_its_sent_copy() {
-        let mut sent = msg(1, 5, 0);
-        sent.timestamp = 1000;
-        let p = Provisional {
-            message: sent.clone(),
-            answers: "parent@x".into(),
-        };
-        let mut copy = msg(1, 9, 77);
-        copy.timestamp = 970;
-        copy.references = "root@x parent@x".into();
-        assert!(p.copied_by(&copy));
-        copy.timestamp = 969;
-        assert!(!p.copied_by(&copy));
-        copy.timestamp = 2000;
-        copy.uid = 0;
-        assert!(!p.copied_by(&copy));
-        copy.uid = 77;
-        copy.account_id = 2;
-        assert!(!p.copied_by(&copy));
-        let empty = Provisional {
-            message: sent,
-            answers: String::new(),
-        };
-        copy.account_id = 1;
-        assert!(!empty.copied_by(&copy));
-    }
-
-    #[test]
-    fn smart_folders_read_recipients_and_fall_back_to_the_preview() {
-        use crate::config::{FilterMatch, SmartCondition, SmartField, SmartFolder};
-        let ctx = SmartContext {
-            tags: Vec::new(),
-            tag_list: Vec::new(),
-            contacts: None,
-        };
-        let folder = |field, value: &str| SmartFolder {
-            id: "s".into(),
-            name: "S".into(),
-            account_email: String::new(),
-            folder: None,
-            any: false,
-            conditions: vec![SmartCondition {
-                field,
-                matcher: FilterMatch::Contains,
-                value: value.into(),
-            }],
-        };
-        let mut m = msg(1, 1, 1);
-        m.cc = "carol@x".into();
-        m.preview = "quarterly numbers".into();
-        assert!(ctx.matches(&folder(SmartField::Recipients, "carol"), &m));
-        assert!(ctx.matches(&folder(SmartField::Body, "quarterly"), &m));
-        m.body = "something else".into();
-        assert!(!ctx.matches(&folder(SmartField::Body, "quarterly"), &m));
-    }
-
-    #[test]
-    fn hand_off_files_go_to_one_side() {
-        let files = vec![std::path::PathBuf::from("/a"), "/b".into()];
-        let attached = HandOffFiles::of(files.clone(), false);
-        assert_eq!((attached.attach.len(), attached.cloud.len()), (2, 0));
-        let linked = HandOffFiles::of(files, true);
-        assert_eq!((linked.attach.len(), linked.cloud.len()), (0, 2));
-    }
-
-    #[test]
-    fn attachment_targets_key_the_gallery_by_path_uid_and_name() {
-        let t = AttachmentTarget {
-            account_id: 1,
-            message_id: 2,
-            path: "INBOX".into(),
-            uid: 3,
-            name: "a.pdf".into(),
-            size: 4,
-        };
-        assert_eq!(
-            t.gallery_key(),
-            (1, "INBOX".to_string(), 3, "a.pdf".to_string())
-        );
-    }
 
     /// B17 in the map: the delimiter is the first separator found in any
     /// path, so a '/' server whose first folder has a '.' in its name gets

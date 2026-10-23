@@ -143,6 +143,11 @@ pub(super) const THREAD_BODY_WAIT: std::time::Duration = std::time::Duration::fr
 /// where the mail being read lives.
 pub(super) const THREAD_LINK_LIMIT: usize = 20_000;
 
+/// How many carried-over bodies to hold before giving up on them. They are
+/// meant to be claimed by the very next reload; a build-up means the reloads
+/// never came, and these are whole message bodies.
+pub(super) const CARRIED_BODY_LIMIT: usize = 64;
+
 #[cfg(test)]
 mod tests {
     use super::*;
