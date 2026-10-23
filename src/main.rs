@@ -146,7 +146,7 @@ fn main() {
     nautilus_ext::record_launcher();
     // Attachments the user opened in a previous session were decrypted to a temp
     // directory and left there. Clear it before anything else runs.
-    ui::attachments_gallery::purge_attachment_dir();
+    ui::attachment_io::purge_attachment_dir();
     register_resources();
     start_logo_probe();
 

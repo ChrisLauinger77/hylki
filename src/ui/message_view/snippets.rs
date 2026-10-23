@@ -72,7 +72,7 @@ pub(super) fn att_row_html(key: (u32, u32), atts: Option<&[CardAttachment]>) -> 
 /// its color, the name, the size, and a save button. The chip opens the
 /// file; both post the message key and the attachment's index back.
 pub(super) fn att_chips_html(key: (u32, u32), atts: &[CardAttachment]) -> String {
-    use crate::ui::attachments_gallery::{icon_color_class, icon_for};
+    use crate::ui::thumbnails::{icon_color_class, icon_for};
     let mut out = String::new();
     for (idx, a) in atts.iter().enumerate() {
         let icon = icon_for(&a.name);

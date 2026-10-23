@@ -153,11 +153,7 @@ impl MessageWindow {
                 .saturating_sub(1);
             self.lightbox.emit(LightboxInput::Show { items, start });
         } else {
-            crate::ui::attachments_gallery::open_bytes(
-                &att.name,
-                &att.data,
-                Some(root.upcast_ref()),
-            );
+            crate::ui::attachment_io::open_bytes(&att.name, &att.data, Some(root.upcast_ref()));
         }
     }
 

@@ -3,9 +3,10 @@
 use super::{AttachmentDrawer, AttachmentDrawerInput};
 use crate::i18n::i18n;
 use crate::models::{is_image_name, Attachment};
-use crate::ui::attachments_gallery::{
-    deleting_label, deleting_over, deleting_veil, icon_color_class, icon_for, is_pdf_name,
-    spawn_thumbnail_render, texture_from, thumbnail_texture, Thumbnail,
+use crate::ui::attachments_gallery::{deleting_label, deleting_over, deleting_veil};
+use crate::ui::thumbnails::{
+    icon_color_class, icon_for, is_pdf_name, spawn_thumbnail_render, texture_from,
+    thumbnail_texture, Thumbnail,
 };
 use adw::prelude::*;
 use gtk::glib;
@@ -78,7 +79,7 @@ pub(super) fn build_cell(
             let holder = gtk::Box::new(gtk::Orientation::Horizontal, 0);
             holder.set_hexpand(true);
             holder.set_vexpand(true);
-            holder.append(&crate::ui::attachments_gallery::thumbnail_spinner());
+            holder.append(&crate::ui::thumbnails::thumbnail_spinner());
             let weak = holder.downgrade();
             let name = att.name.clone();
             spawn_thumbnail_render(&att.name, att.data.clone(), move |tex| {

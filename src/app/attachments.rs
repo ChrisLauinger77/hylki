@@ -374,7 +374,7 @@ impl AppModel {
                         start,
                     });
                 } else {
-                    crate::ui::attachments_gallery::open_bytes(
+                    crate::ui::attachment_io::open_bytes(
                         &att.name,
                         &att.data,
                         Some(self.window.upcast_ref::<gtk::Window>()),

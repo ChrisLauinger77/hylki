@@ -50,7 +50,7 @@ fn attachment_chip(
     sender: &ComponentSender<Compose>,
     index: usize,
 ) -> gtk::Box {
-    use crate::ui::attachments_gallery::is_pdf_name;
+    use crate::ui::thumbnails::is_pdf_name;
     let name = path
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
@@ -151,7 +151,7 @@ fn slide_on_hover(chip: &gtk::Box, lbl: &FadeLabel) {
 /// Put a chip's thumbnail in its leading slot, or the file type's icon when
 /// there is none.
 fn fill_thumb_slot(slot: &gtk::Box, name: &str, tex: Option<&gtk::gdk::Texture>) {
-    use crate::ui::attachments_gallery::{icon_color_class, icon_for};
+    use crate::ui::thumbnails::{icon_color_class, icon_for};
     while let Some(child) = slot.first_child() {
         slot.remove(&child);
     }
@@ -180,7 +180,7 @@ fn attachment_thumbnail(path: &std::path::Path, pdf: bool) -> Option<AttachThumb
     use gtk::gdk_pixbuf::{InterpType, Pixbuf};
     let pixbuf = if pdf {
         let data = std::fs::read(path).ok()?;
-        let page = crate::ui::attachments_gallery::pdf_page_texture(&data, CARD_THUMB as f64)?;
+        let page = crate::ui::thumbnails::pdf_page_texture(&data, CARD_THUMB as f64)?;
         let png = page.save_to_png_bytes();
         Pixbuf::from_stream(
             &gtk::gio::MemoryInputStream::from_bytes(&png),
@@ -494,7 +494,7 @@ fn add_open_and_menu(
                 let read = owned.clone();
                 match gtk::gio::spawn_blocking(move || std::fs::read(read)).await {
                     Ok(Ok(data)) => {
-                        crate::ui::attachments_gallery::open_bytes(&name, &data, parent.as_ref())
+                        crate::ui::attachment_io::open_bytes(&name, &data, parent.as_ref())
                     }
                     Ok(Err(e)) => tracing::warn!("could not read the attachment to open it: {e}"),
                     Err(_) => {}

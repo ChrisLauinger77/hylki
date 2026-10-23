@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod attachment_drawer;
+pub mod attachment_io;
 pub mod attachments_gallery;
 pub mod carry_over;
 pub mod chip_flow;
@@ -37,6 +38,7 @@ pub mod sender_row;
 pub mod showcase;
 pub mod sidebar;
 pub mod theme_picker;
+pub mod thumbnails;
 pub mod tool_flow;
 pub mod translation_page;
 pub mod web_signin;
