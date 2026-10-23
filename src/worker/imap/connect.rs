@@ -6,14 +6,13 @@ use tokio::net::TcpStream;
 use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::i18n::{i18n, i18n_f};
-use crate::models::Account;
 use crate::worker::auth::{fetch_oauth_token, oauth_user, sign_in_password};
 use crate::worker::imap::folders::list_folder_metadata;
 use crate::worker::imap::gmail::note_gmail_account;
 use crate::worker::imap::stream::ImapIo;
 use crate::worker::imap::ImapSession;
 use crate::worker::tls::{is_loopback_host, tls_connector};
-use crate::worker::{accent_for, forget_access_token, offline_text, WorkerEvent};
+use crate::worker::{forget_access_token, offline_text, WorkerEvent};
 
 /// Connect, announce the account, and list folders, updating the cache. Emits a
 /// fresh `Folders` event only when the listing differs from the cache (so an
@@ -37,13 +36,7 @@ pub(super) async fn connect_and_list(
 
     let result = match connect(account).await {
         Ok(mut session) => {
-            emit(WorkerEvent::Account(Account {
-                id: account_id,
-                name: account.name.clone(),
-                email: account.email.clone(),
-                label: account.display_label(),
-                accent: accent_for(account_id).into(),
-            }));
+            emit(WorkerEvent::account(account_id, account));
             let cached = cache
                 .map(|c| c.load_folders(account_id))
                 .unwrap_or_default();

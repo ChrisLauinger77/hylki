@@ -20,6 +20,7 @@
 //! standard but has not been tried by hand.
 
 use super::*;
+use crate::worker::auth::load_or_migrate_password;
 use crate::worker::jmap::folders::refresh_jmap_folders;
 use crate::worker::jmap::index::{
     jmap_backfill_pause, jmap_backfill_step, JmapState, JMAP_BACKFILL_BACKOFF,
@@ -84,26 +85,13 @@ impl<E: Fn(WorkerEvent)> JmapWorker<E> {
         emit: E,
     ) -> Self {
         // The password lives in the keyring, like an IMAP account's.
-        if account.password.is_empty() {
-            if let Some(pw) = crate::config::load_password(&account.email) {
-                account.password = pw;
-            }
-        } else {
-            let _ = crate::config::store_password(&account.email, &account.password);
-            crate::config::strip_passwords_on_disk();
-        }
+        load_or_migrate_password(&mut account);
 
         let cache = Cache::open()
             .map_err(|e| tracing::warn!("cache unavailable: {e}"))
             .ok();
 
-        emit(WorkerEvent::Account(Account {
-            id: account_id,
-            name: account.name.clone(),
-            email: account.email.clone(),
-            label: account.display_label(),
-            accent: accent_for(account_id).into(),
-        }));
+        emit(WorkerEvent::account(account_id, &account));
 
         let cached_folders = cache
             .as_ref()

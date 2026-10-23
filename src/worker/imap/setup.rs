@@ -13,8 +13,8 @@ use super::prefetch::gallery_folder;
 use super::{Emit, ImapWorker};
 use crate::cache::Cache;
 use crate::config::AccountConfig;
-use crate::models::Account;
-use crate::worker::{accent_for, MailRequest, WorkerEvent};
+use crate::worker::auth::{load_or_migrate_password, load_smtp_password};
+use crate::worker::{MailRequest, WorkerEvent};
 
 impl<E: Emit> ImapWorker<E> {
     /// Resolve the passwords, show the account and its cached folders, and
@@ -33,13 +33,7 @@ impl<E: Emit> ImapWorker<E> {
             .ok();
 
         // Show the account + any cached folders immediately, before any network.
-        emit(WorkerEvent::Account(Account {
-            id: account_id,
-            name: account.name.clone(),
-            email: account.email.clone(),
-            label: account.display_label(),
-            accent: accent_for(account_id).into(),
-        }));
+        emit(WorkerEvent::account(account_id, &account));
 
         let cached_folders = cache
             .as_ref()
@@ -144,20 +138,8 @@ impl<E: Emit> ImapWorker<E> {
 /// password into the keyring (and strip it from disk), otherwise load it
 /// from the keyring; then take what GNOME Online Accounts holds.
 async fn resolve_passwords(account: &mut AccountConfig, emit: &impl Fn(WorkerEvent)) {
-    if account.password.is_empty() {
-        if let Some(pw) = crate::config::load_password(&account.email) {
-            account.password = pw;
-        }
-    } else {
-        let _ = crate::config::store_password(&account.email, &account.password);
-        crate::config::strip_passwords_on_disk();
-    }
-    // Resolve the separate SMTP password from the keyring when in use.
-    if account.smtp_separate && account.smtp_password.is_empty() {
-        if let Some(pw) = crate::config::load_smtp_password(&account.email) {
-            account.smtp_password = pw;
-        }
-    }
+    load_or_migrate_password(account);
+    load_smtp_password(account);
     // An account from GNOME Online Accounts takes its password from GOA at
     // every connect, so one changed in GNOME Settings reaches Hylki without
     // being typed again (#254). The keyring copy is kept for a GOA that

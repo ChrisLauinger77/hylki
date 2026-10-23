@@ -5,8 +5,9 @@ use async_imap::types::{Fetch, Flag};
 use futures::TryStreamExt;
 
 use super::{After, Emit, ImapWorker};
+use crate::cache::Cache;
 use crate::i18n::{i18n, i18n_f};
-use crate::models::KeywordFinding;
+use crate::models::{KeywordFinding, SenderCheck};
 use crate::worker::imap::backfill::Backfill;
 use crate::worker::imap::bodies::settle_missing_bodies;
 use crate::worker::imap::connect::connect;
@@ -189,35 +190,16 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         match load_body_retry(session, account, &path, uid).await {
-            Ok((body, check, has_attachments)) => {
-                if let Some(c) = cache.as_ref() {
-                    if body_cacheable(&check) {
-                        c.save_body(account_id, &path, uid, &body);
-                    }
-                    c.save_sender_check(account_id, &path, uid, &check);
-                    c.set_has_attachment(account_id, &path, uid, has_attachments);
-                }
-                emit(WorkerEvent::Body {
+            Ok(rendered) => {
+                deliver_body(
+                    cache.as_ref(),
+                    account_id,
+                    &path,
                     message_id,
-                    path: path.clone(),
-                    body,
-                });
-                emit(WorkerEvent::SenderChecked {
-                    path: path.to_string(),
-                    message_id,
-                    check,
-                });
-                emit(if has_attachments {
-                    WorkerEvent::HasAttachments {
-                        path: path.to_string(),
-                        message_id,
-                    }
-                } else {
-                    WorkerEvent::NoAttachments {
-                        path: path.to_string(),
-                        message_id,
-                    }
-                });
+                    uid,
+                    rendered,
+                    emit,
+                );
             }
             Err(e) => {
                 emit(WorkerEvent::net_error(i18n_f(
@@ -257,38 +239,19 @@ impl<E: Emit> ImapWorker<E> {
                     // The UIDs the server answered without a body.
                     let mut missing: Vec<(u32, u32)> = Vec::new();
                     for (message_id, uid) in group {
-                        let Some((body, check, has_attachments)) = fetched.remove(uid) else {
+                        let Some(rendered) = fetched.remove(uid) else {
                             missing.push((*message_id, *uid));
                             continue;
                         };
-                        if let Some(c) = cache.as_ref() {
-                            if body_cacheable(&check) {
-                                c.save_body(account_id, &path, *uid, &body);
-                            }
-                            c.save_sender_check(account_id, &path, *uid, &check);
-                            c.set_has_attachment(account_id, &path, *uid, has_attachments);
-                        }
-                        emit(WorkerEvent::Body {
-                            message_id: *message_id,
-                            path: path.clone(),
-                            body,
-                        });
-                        emit(WorkerEvent::SenderChecked {
-                            path: path.to_string(),
-                            message_id: *message_id,
-                            check,
-                        });
-                        emit(if has_attachments {
-                            WorkerEvent::HasAttachments {
-                                path: path.to_string(),
-                                message_id: *message_id,
-                            }
-                        } else {
-                            WorkerEvent::NoAttachments {
-                                path: path.to_string(),
-                                message_id: *message_id,
-                            }
-                        });
+                        deliver_body(
+                            cache.as_ref(),
+                            account_id,
+                            &path,
+                            *message_id,
+                            *uid,
+                            rendered,
+                            emit,
+                        );
                     }
                     if !missing.is_empty() {
                         settle_missing_bodies(
@@ -646,4 +609,45 @@ impl<E: Emit> ImapWorker<E> {
         emit(WorkerEvent::KeywordsSynced { paths });
         After::Done
     }
+}
+
+/// A fetched body to the cache (unless it is OpenPGP mail) and to the
+/// reader: `Body`, then `SenderChecked`, then whether it has attachments.
+fn deliver_body(
+    cache: Option<&Cache>,
+    account_id: u32,
+    path: &str,
+    message_id: u32,
+    uid: u32,
+    (body, check, has_attachments): (String, SenderCheck, bool),
+    emit: &impl Fn(WorkerEvent),
+) {
+    if let Some(c) = cache {
+        if body_cacheable(&check) {
+            c.save_body(account_id, path, uid, &body);
+        }
+        c.save_sender_check(account_id, path, uid, &check);
+        c.set_has_attachment(account_id, path, uid, has_attachments);
+    }
+    emit(WorkerEvent::Body {
+        message_id,
+        path: path.to_string(),
+        body,
+    });
+    emit(WorkerEvent::SenderChecked {
+        path: path.to_string(),
+        message_id,
+        check,
+    });
+    emit(if has_attachments {
+        WorkerEvent::HasAttachments {
+            path: path.to_string(),
+            message_id,
+        }
+    } else {
+        WorkerEvent::NoAttachments {
+            path: path.to_string(),
+            message_id,
+        }
+    });
 }

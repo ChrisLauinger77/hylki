@@ -2,7 +2,9 @@
 //! UI sends ([`MailRequest`]), the events the worker answers with
 //! ([`WorkerEvent`]), and the outgoing message a send carries.
 
+use crate::config::AccountConfig;
 use crate::models::{Account, Folder, KeywordFinding, MailboxQuota, Message, ThreadSummary};
+use crate::worker::accent_for;
 
 /// A request from the UI to the worker.
 #[derive(Debug)]
@@ -571,5 +573,16 @@ impl WorkerEvent {
             text: text.into(),
             connectivity: true,
         }
+    }
+
+    /// The account as the sidebar shows it: sent first, before any network.
+    pub(super) fn account(account_id: u32, account: &AccountConfig) -> Self {
+        WorkerEvent::Account(Account {
+            id: account_id,
+            name: account.name.clone(),
+            email: account.email.clone(),
+            label: account.display_label(),
+            accent: accent_for(account_id).into(),
+        })
     }
 }

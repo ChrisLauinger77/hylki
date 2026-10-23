@@ -197,3 +197,25 @@ pub(super) async fn sign_in_password(
         .await
         .map_err(|e| e.to_string())?
 }
+
+/// The account password from the keyring; a legacy plaintext one is moved
+/// into the keyring first (and stripped from disk).
+pub(super) fn load_or_migrate_password(account: &mut AccountConfig) {
+    if account.password.is_empty() {
+        if let Some(pw) = crate::config::load_password(&account.email) {
+            account.password = pw;
+        }
+    } else {
+        let _ = crate::config::store_password(&account.email, &account.password);
+        crate::config::strip_passwords_on_disk();
+    }
+}
+
+/// The separate SMTP password from the keyring, when the account has one.
+pub(super) fn load_smtp_password(account: &mut AccountConfig) {
+    if account.smtp_separate && account.smtp_password.is_empty() {
+        if let Some(pw) = crate::config::load_smtp_password(&account.email) {
+            account.smtp_password = pw;
+        }
+    }
+}

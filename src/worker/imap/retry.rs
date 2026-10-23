@@ -81,6 +81,28 @@ pub(super) async fn load_messages_retry(
     result
 }
 
+/// Run a read on the session, and once more on a fresh login if it fails
+/// (typically a server-dropped idle connection). On success the (possibly
+/// new) session is stored back; on failure it is dropped.
+async fn with_one_retry<T>(
+    session: &mut Option<ImapSession>,
+    account: &AccountConfig,
+    mut read: impl AsyncFnMut(&mut ImapSession) -> Result<T, async_imap::error::Error>,
+) -> Result<T, async_imap::error::Error> {
+    let mut s = session.take().expect("session ensured before call");
+    let mut res = read(&mut s).await;
+    if res.is_err() {
+        if let Ok(fresh) = connect(account).await {
+            s = fresh;
+            res = read(&mut s).await;
+        }
+    }
+    if res.is_ok() {
+        *session = Some(s);
+    }
+    res
+}
+
 /// Like [`load_messages_retry`], but for a single body.
 pub(super) async fn load_body_retry(
     session: &mut Option<ImapSession>,
@@ -88,18 +110,7 @@ pub(super) async fn load_body_retry(
     path: &str,
     uid: u32,
 ) -> Result<(String, crate::models::SenderCheck, bool), async_imap::error::Error> {
-    let mut s = session.take().expect("session ensured before call");
-    let mut res = load_body(&mut s, path, uid).await;
-    if res.is_err() {
-        if let Ok(fresh) = connect(account).await {
-            s = fresh;
-            res = load_body(&mut s, path, uid).await;
-        }
-    }
-    if res.is_ok() {
-        *session = Some(s);
-    }
-    res
+    with_one_retry(session, account, async |s| load_body(s, path, uid).await).await
 }
 
 /// [`load_bodies`] with [`load_body_retry`]'s one reconnect-and-retry.
@@ -112,56 +123,25 @@ pub(super) async fn load_bodies_retry(
     std::collections::HashMap<u32, (String, crate::models::SenderCheck, bool)>,
     async_imap::error::Error,
 > {
-    let mut s = session.take().expect("session ensured before call");
-    let mut res = load_bodies(&mut s, path, uids).await;
-    if res.is_err() {
-        if let Ok(fresh) = connect(account).await {
-            s = fresh;
-            res = load_bodies(&mut s, path, uids).await;
-        }
-    }
-    if res.is_ok() {
-        *session = Some(s);
-    }
-    res
+    with_one_retry(session, account, async |s| load_bodies(s, path, uids).await).await
 }
 
+/// [`load_source`] with [`load_body_retry`]'s one reconnect-and-retry.
 pub(super) async fn load_source_retry(
     session: &mut Option<ImapSession>,
     account: &AccountConfig,
     path: &str,
     uid: u32,
 ) -> Result<String, async_imap::error::Error> {
-    let mut s = session.take().expect("session ensured before call");
-    let mut res = load_source(&mut s, path, uid).await;
-    if res.is_err() {
-        if let Ok(fresh) = connect(account).await {
-            s = fresh;
-            res = load_source(&mut s, path, uid).await;
-        }
-    }
-    if res.is_ok() {
-        *session = Some(s);
-    }
-    res
+    with_one_retry(session, account, async |s| load_source(s, path, uid).await).await
 }
 
+/// [`load_raw`] with [`load_body_retry`]'s one reconnect-and-retry.
 pub(super) async fn load_raw_retry(
     session: &mut Option<ImapSession>,
     account: &AccountConfig,
     path: &str,
     uid: u32,
 ) -> Result<Vec<u8>, async_imap::error::Error> {
-    let mut s = session.take().expect("session ensured before call");
-    let mut res = load_raw(&mut s, path, uid).await;
-    if res.is_err() {
-        if let Ok(fresh) = connect(account).await {
-            s = fresh;
-            res = load_raw(&mut s, path, uid).await;
-        }
-    }
-    if res.is_ok() {
-        *session = Some(s);
-    }
-    res
+    with_one_retry(session, account, async |s| load_raw(s, path, uid).await).await
 }

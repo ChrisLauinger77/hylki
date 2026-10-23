@@ -6,8 +6,8 @@ use tokio::sync::mpsc;
 use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::i18n::{i18n, i18n_f};
-use crate::models::{Account, Folder, FolderKind, Message};
-use crate::worker::auth::sign_in_password;
+use crate::models::{Folder, FolderKind, Message};
+use crate::worker::auth::{load_or_migrate_password, load_smtp_password, sign_in_password};
 use crate::worker::compose::build::restore_msgid_case;
 use crate::worker::ids::hash_uid;
 use crate::worker::imap::send::{flush_outbox, mark_answered};
@@ -17,7 +17,7 @@ use crate::worker::render::attachments::{attachments_of, extract_attachments};
 use crate::worker::render::body_cacheable;
 use crate::worker::smtp::{send_smtp, smtp_refused};
 use crate::worker::strip::strip_refused;
-use crate::worker::{accent_for, render_raw, summary_from_raw, MailRequest, WorkerEvent};
+use crate::worker::{render_raw, summary_from_raw, MailRequest, WorkerEvent};
 
 pub(super) mod client;
 
@@ -44,19 +44,8 @@ pub(super) async fn run_pop3(
     emit: impl Fn(WorkerEvent),
 ) {
     // Resolve credentials from the keyring (same as the IMAP path).
-    if account.password.is_empty() {
-        if let Some(pw) = crate::config::load_password(&account.email) {
-            account.password = pw;
-        }
-    } else {
-        let _ = crate::config::store_password(&account.email, &account.password);
-        crate::config::strip_passwords_on_disk();
-    }
-    if account.smtp_separate && account.smtp_password.is_empty() {
-        if let Some(pw) = crate::config::load_smtp_password(&account.email) {
-            account.smtp_password = pw;
-        }
-    }
+    load_or_migrate_password(&mut account);
+    load_smtp_password(&mut account);
 
     let cache = Cache::open()
         .map_err(|e| tracing::warn!("cache unavailable: {e}"))
@@ -64,13 +53,7 @@ pub(super) async fn run_pop3(
     const INBOX: &str = "INBOX";
     let inbox_id = 1u32;
 
-    emit(WorkerEvent::Account(Account {
-        id: account_id,
-        name: account.name.clone(),
-        email: account.email.clone(),
-        label: account.display_label(),
-        accent: accent_for(account_id).into(),
-    }));
+    emit(WorkerEvent::account(account_id, &account));
     let folders = pop3_folders(account_id);
     if let Some(c) = cache.as_ref() {
         c.save_folders(account_id, &folders);

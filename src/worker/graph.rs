@@ -94,13 +94,7 @@ impl<E: Fn(WorkerEvent)> GraphWorker<E> {
         let account = &worker.account;
         let cache = &worker.cache;
         let emit = &|ev| name_labels(&worker.account, &worker.emit, ev);
-        emit(WorkerEvent::Account(Account {
-            id: account_id,
-            name: account.name.clone(),
-            email: account.email.clone(),
-            label: account.display_label(),
-            accent: accent_for(account_id).into(),
-        }));
+        emit(WorkerEvent::account(account_id, account));
 
         // Cached folders immediately, then the live list.
         let cached_folders = cache
