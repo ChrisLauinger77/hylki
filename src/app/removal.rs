@@ -58,23 +58,15 @@ impl AppModel {
             "All {n} messages in this conversation will be deleted. \
              You can turn this warning off in Preferences."
         );
-        let dialog =
-            adw::MessageDialog::new(Some(&self.window), Some(&heading), Some(body.as_str()));
-        dialog.add_response("cancel", &i18n("Cancel"));
-        dialog.add_response("delete", &i18n("Delete Conversation"));
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
-        dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
         let s = sender.clone();
-        let messages = std::cell::RefCell::new(Some(messages));
-        dialog.connect_response(None, move |_, resp| {
-            if resp == "delete" {
-                if let Some(msgs) = messages.borrow_mut().take() {
-                    s.input(AppMsg::DeleteThreadConfirmed(msgs));
-                }
-            }
-        });
-        dialog.present();
+        confirm_destructive(
+            Some(self.window.upcast_ref()),
+            &heading,
+            &body,
+            "delete",
+            &i18n("Delete Conversation"),
+            move || s.input(AppMsg::DeleteThreadConfirmed(messages)),
+        );
     }
 
     /// Confirm erasing messages that are already in Trash — there's no undo, so
@@ -98,22 +90,15 @@ impl AppModel {
             (false, true) => i18n("It will be erased from the server instead of going to Trash. This can’t be undone."),
             (false, false) => i18n("They will be erased from the server instead of going to Trash. This can’t be undone."),
         };
-        let dialog = adw::MessageDialog::new(Some(&self.window), Some(&heading), Some(&body));
-        dialog.add_response("cancel", &i18n("Cancel"));
-        dialog.add_response("delete", &i18n("Delete"));
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
-        dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
         let s = sender.clone();
-        let messages = std::cell::RefCell::new(Some(messages));
-        dialog.connect_response(None, move |_, resp| {
-            if resp == "delete" {
-                if let Some(msgs) = messages.borrow_mut().take() {
-                    s.input(AppMsg::PurgeMessages(msgs));
-                }
-            }
-        });
-        dialog.present();
+        confirm_destructive(
+            Some(self.window.upcast_ref()),
+            &heading,
+            &body,
+            "delete",
+            &i18n("Delete"),
+            move || s.input(AppMsg::PurgeMessages(messages)),
+        );
     }
 
     /// Erase messages from the server for good (flag `\Deleted` + EXPUNGE),

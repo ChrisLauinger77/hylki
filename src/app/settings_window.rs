@@ -455,28 +455,18 @@ impl AppModel {
             return;
         };
         let label = self.account_label(account_id);
-        let dialog = adw::MessageDialog::new(
-            Some(&self.window),
-            Some(i18n("Remove Account?").as_str()),
-            Some(&format!(
+        let s = sender.clone();
+        confirm_destructive(
+            Some(self.window.upcast_ref()),
+            &i18n("Remove Account?"),
+            &format!(
                 "Remove {label} from Hylki? Its saved password is deleted. \
                  Mail on the server is not affected."
-            )),
+            ),
+            "remove",
+            &i18n("Remove"),
+            move || s.input(AppMsg::AccountRemoved { email }),
         );
-        dialog.add_response("cancel", &i18n("Cancel"));
-        dialog.add_response("remove", &i18n("Remove"));
-        dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
-        let s = sender.clone();
-        dialog.connect_response(None, move |_, resp| {
-            if resp == "remove" {
-                s.input(AppMsg::AccountRemoved {
-                    email: email.clone(),
-                });
-            }
-        });
-        dialog.present();
     }
 
     /// The messages the router sends here (see `AppModel::route`).

@@ -105,34 +105,26 @@ impl AppModel {
             }
             PrefOutput::DeleteAllLocalContacts => {
                 let n = crate::local_contacts::count();
-                let dialog = adw::MessageDialog::new(
+                let s = sender.clone();
+                confirm_destructive(
                     self.dialog_parent().as_ref(),
-                    Some(i18n("Delete All Contacts?").as_str()),
-                    Some(&ni18n_f(
+                    &i18n("Delete All Contacts?"),
+                    &ni18n_f(
                         "The {n} contact in the Hylki address book is deleted. This cannot be undone; export the book first to keep a copy.",
                         "The {n} contacts in the Hylki address book are deleted. This cannot be undone; export the book first to keep a copy.",
                         n as u32,
                         &[("n", &n.to_string())],
-                    )),
+                    ),
+                    "delete",
+                    &i18n("Delete All"),
+                    move || {
+                        std::thread::spawn(move || {
+                            let err = crate::local_contacts::delete_all().err();
+                            crate::contacts::local_changed();
+                            s.input(AppMsg::ContactWriteDone(err));
+                        });
+                    },
                 );
-                dialog.add_response("cancel", &i18n("Cancel"));
-                dialog.add_response("delete", &i18n("Delete All"));
-                dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
-                dialog.set_default_response(Some("cancel"));
-                dialog.set_close_response("cancel");
-                let s = sender.clone();
-                dialog.connect_response(None, move |_, resp| {
-                    if resp != "delete" {
-                        return;
-                    }
-                    let s = s.clone();
-                    std::thread::spawn(move || {
-                        let err = crate::local_contacts::delete_all().err();
-                        crate::contacts::local_changed();
-                        s.input(AppMsg::ContactWriteDone(err));
-                    });
-                });
-                dialog.present();
             }
 
             PrefOutput::ExportSettings => self.export_to_chosen_file(

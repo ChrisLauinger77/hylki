@@ -280,22 +280,15 @@ impl AppModel {
             "“{name}” will be removed from the message on the server. The rest of the message stays. This can’t be undone.",
             &[("name", &target.name)],
         );
-        let dialog = adw::MessageDialog::new(Some(parent), Some(&heading), Some(&body));
-        dialog.add_response("cancel", &i18n("Cancel"));
-        dialog.add_response("delete", &i18n("Delete"));
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
-        dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
         let s = sender.clone();
-        let target = std::cell::RefCell::new(Some(target));
-        dialog.connect_response(None, move |_, resp| {
-            if resp == "delete" {
-                if let Some(t) = target.borrow_mut().take() {
-                    s.input(AppMsg::DeleteAttachment(t));
-                }
-            }
-        });
-        dialog.present();
+        confirm_destructive(
+            Some(parent),
+            &heading,
+            &body,
+            "delete",
+            &i18n("Delete"),
+            move || s.input(AppMsg::DeleteAttachment(target)),
+        );
     }
 
     /// The messages the router sends here (see `AppModel::route`).

@@ -142,30 +142,21 @@ impl AppModel {
         path: String,
         sender: &ComponentSender<Self>,
     ) {
-        let dialog = adw::MessageDialog::new(
-            Some(&self.window),
-            Some(&i18n_f("Empty “{name}”?", &[("name", &name)])),
-            Some(
-                i18n("Every message in it will be erased from the server. This can’t be undone.")
-                    .as_str(),
-            ),
-        );
-        dialog.add_response("cancel", &i18n("Cancel"));
-        dialog.add_response("empty", &i18n("Empty"));
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
-        dialog.set_response_appearance("empty", adw::ResponseAppearance::Destructive);
         let s = sender.clone();
-        dialog.connect_response(None, move |_, resp| {
-            if resp == "empty" {
+        confirm_destructive(
+            Some(self.window.upcast_ref()),
+            &i18n_f("Empty “{name}”?", &[("name", &name)]),
+            &i18n("Every message in it will be erased from the server. This can’t be undone."),
+            "empty",
+            &i18n("Empty"),
+            move || {
                 s.input(AppMsg::EmptyFolder {
                     account_id,
                     folder_id,
-                    path: path.clone(),
-                });
-            }
-        });
-        dialog.present();
+                    path,
+                })
+            },
+        );
     }
 
     /// Empty every unified account's Trash or Junk (#413). One folder asks
@@ -203,26 +194,23 @@ impl AppModel {
                     i18n("Every message in them will be erased from the server. This can’t be undone."),
                     accounts.join("\n")
                 );
-                let dialog =
-                    adw::MessageDialog::new(Some(&self.window), Some(&heading), Some(&body));
-                dialog.add_response("cancel", &i18n("Cancel"));
-                dialog.add_response("empty", &i18n("Empty"));
-                dialog.set_default_response(Some("cancel"));
-                dialog.set_close_response("cancel");
-                dialog.set_response_appearance("empty", adw::ResponseAppearance::Destructive);
                 let s = sender.clone();
-                dialog.connect_response(None, move |_, resp| {
-                    if resp == "empty" {
-                        for (account_id, folder_id, _, path, _) in &targets {
+                confirm_destructive(
+                    Some(self.window.upcast_ref()),
+                    &heading,
+                    &body,
+                    "empty",
+                    &i18n("Empty"),
+                    move || {
+                        for (account_id, folder_id, _, path, _) in targets {
                             s.input(AppMsg::EmptyFolder {
-                                account_id: *account_id,
-                                folder_id: *folder_id,
-                                path: path.clone(),
+                                account_id,
+                                folder_id,
+                                path,
                             });
                         }
-                    }
-                });
-                dialog.present();
+                    },
+                );
             }
         }
     }

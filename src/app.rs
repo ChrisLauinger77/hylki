@@ -45,6 +45,7 @@ mod children;
 mod compose_host;
 mod compose_init;
 mod compose_open;
+mod confirm;
 mod consts;
 mod contacts;
 mod conversation;
@@ -124,6 +125,7 @@ use attachments::{prune_downloads, schedule_download_prune, AttachmentTarget};
 use boot::{build_main_menu, Boot};
 use children::Children;
 use compose_host::{ComposeHost, ReaderCompose};
+use confirm::confirm_destructive;
 use consts::{ATTACHMENT_CACHE_BUDGET, BODY_CACHE_BUDGET, READER_MIN_WIDTH};
 use contacts::{reload_contacts, start_contacts_sync, sync_contact_books};
 use conversation::{
