@@ -1,7 +1,8 @@
 //! The sender checks (#133): the verify badge, the sender popover, and
 //! trusting or fetching a signing key.
 
-use super::{MessageView, MessageViewInput};
+use super::types::MessageViewInput;
+use super::MessageView;
 use crate::i18n::{i18n, i18n_f};
 use adw::prelude::*;
 use relm4::prelude::*;

@@ -1,7 +1,9 @@
 //! A card's invitation banner (#223): the meeting, the answer given, and
 //! the buttons to give one.
 
-use super::{attr_escape, escape_text, inline_icon_svg, MessageView};
+use super::html::{attr_escape, escape_text};
+use super::snippets::inline_icon_svg;
+use super::MessageView;
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::models::Message;
 use relm4::prelude::*;

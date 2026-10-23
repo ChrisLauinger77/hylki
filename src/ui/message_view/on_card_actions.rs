@@ -1,7 +1,9 @@
 //! What a card asks of the app: its action buttons, its menus, Move To,
 //! templates, and the addresses in its header.
 
-use super::{MenuHit, MessageView, MessageViewInput, MessageViewOutput, TrState, TranslateEntry};
+use super::menu::{MenuHit, TranslateEntry};
+use super::types::{MessageViewInput, MessageViewOutput, TrState};
+use super::MessageView;
 use crate::i18n::i18n;
 use adw::prelude::*;
 use relm4::prelude::*;

@@ -2,10 +2,12 @@
 //! it with the live state handed to the static builder, and stamping the
 //! body with the settings the page script reads.
 
-use super::{
-    MessageView, TrState, LIVE_ATTS, LIVE_FOLDBAR, LIVE_FOLDED, LIVE_GROUNDS, LIVE_INVITE,
-    LIVE_TAGS, LIVE_TEMPLATES, LIVE_TRANSLATE, LIVE_TRANSLATE_ON, LIVE_UNSUB,
+use super::frame::{
+    LIVE_ATTS, LIVE_FOLDBAR, LIVE_FOLDED, LIVE_GROUNDS, LIVE_INVITE, LIVE_TAGS, LIVE_TEMPLATES,
+    LIVE_TRANSLATE, LIVE_TRANSLATE_ON, LIVE_UNSUB,
 };
+use super::types::TrState;
+use super::MessageView;
 use crate::i18n::i18n;
 use adw::prelude::*;
 use relm4::prelude::*;

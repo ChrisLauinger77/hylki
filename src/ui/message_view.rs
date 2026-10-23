@@ -6,38 +6,6 @@
 //! the originals are only used once the user (or a trusted sender) allows them.
 //! Link clicks open in the browser.
 
-use self::init::link_preview_plaque;
-
-use self::invite::invite_row_html;
-use self::page_fade::{PageFade, PendingLoad};
-use self::sender::{confirm_trust, fetch_sender_key};
-
-use self::bridge::{parse_bridge, Bridge};
-use self::chrome::{wear_class, ClassRules};
-use self::dark::{adapt_colors_for_dark, pin_color_scheme};
-use self::frame::{
-    ground_rgba, message_frame, CHROME, GROUND, LIVE_ATTS, LIVE_FOLDBAR, LIVE_FOLDED, LIVE_GROUNDS,
-    LIVE_INVITE, LIVE_TAGS, LIVE_TEMPLATES, LIVE_TRANSLATE, LIVE_TRANSLATE_ON, LIVE_UNSUB, PAGE,
-};
-use self::html::{attr_escape, body_html, escape_text};
-use self::links::{
-    decode_data_uri, default_image_name, is_launchable_uri, link_destination, CLICK_LINK_PROBE,
-};
-use self::menu::menu_lookup;
-use self::print::sanitize_filename;
-use self::remote::{has_remote_resources, strip_remote};
-use self::size_script::SIZE_SCRIPT;
-use self::snippets::{
-    att_chips_html, att_row_html, card_action_button, fold_bar_date, inline_icon_svg,
-    paints_own_background, recipient_count, recipients_html, tag_chips_html, template_row_html,
-    unsub_row_html, FOLD_BAR_FACE,
-};
-use self::style::{auto_direction, inject_csp, inject_reader_style, reader_style_css};
-use self::webview::new_webview;
-use relm4::prelude::*;
-
-use crate::models::Message;
-
 mod bridge;
 mod cards;
 mod chrome;
@@ -70,10 +38,15 @@ mod translation;
 mod types;
 mod unsub_banner;
 mod webview;
+mod wrapper_css;
+
+use self::chrome::ClassRules;
+use self::page_fade::{PageFade, PendingLoad};
+use crate::models::Message;
 
 pub use frame::theme_grounds_for;
+pub use menu::MenuHit;
 pub(crate) use menu::{hit_menu_entries, strip_navigation_items};
-pub use menu::{MenuHit, TranslateEntry};
 pub(crate) use page_fade::{on_next_page_fade, PAGE_FADE_MS};
 pub use types::{
     CardAttachment, InviteAction, MessageViewInput, MessageViewOutput, SelectMode, TrState,

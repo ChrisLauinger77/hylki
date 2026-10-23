@@ -1,7 +1,8 @@
 //! The reader's right-click menu: what the page reports under the pointer,
 //! and the entries offered for it.
 
-use super::{decode_data_uri, default_image_name, MessageViewInput};
+use super::links::{decode_data_uri, default_image_name};
+use super::types::MessageViewInput;
 use crate::i18n::i18n;
 use adw::prelude::*;
 use relm4::prelude::*;

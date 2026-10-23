@@ -4,10 +4,13 @@
 //! right-click point is recorded in the capture phase before the menu asks
 //! for it).
 
-use super::{
-    is_launchable_uri, link_destination, menu_lookup, parse_bridge, Bridge, ClassRules, MenuHit,
-    MessageView, MessageViewInput, PageFade, CLICK_LINK_PROBE,
-};
+use super::bridge::{parse_bridge, Bridge};
+use super::chrome::ClassRules;
+use super::links::{is_launchable_uri, link_destination, CLICK_LINK_PROBE};
+use super::menu::{menu_lookup, MenuHit};
+use super::page_fade::PageFade;
+use super::types::MessageViewInput;
+use super::MessageView;
 use adw::prelude::*;
 use relm4::prelude::*;
 use webkit6::prelude::WebViewExt;

@@ -1,7 +1,9 @@
 //! A card's translation (#327): the banner, the subject it shows, and
 //! patching both in place.
 
-use super::{escape_text, MessageView, TrState};
+use super::html::escape_text;
+use super::types::TrState;
+use super::MessageView;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::Message;
 use relm4::prelude::*;

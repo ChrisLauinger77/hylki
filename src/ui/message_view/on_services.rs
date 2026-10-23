@@ -1,10 +1,10 @@
 //! Printing, translation, unsubscribing, invitations and the sender's
 //! OpenPGP key: the reader's requests that leave the page.
 
-use super::{
-    confirm_trust, fetch_sender_key, sanitize_filename, InviteAction, MessageView,
-    MessageViewInput, MessageViewOutput, TrState, UnsubState,
-};
+use super::print::sanitize_filename;
+use super::sender::{confirm_trust, fetch_sender_key};
+use super::types::{InviteAction, MessageViewInput, MessageViewOutput, TrState, UnsubState};
+use super::MessageView;
 use crate::i18n::i18n;
 use adw::prelude::*;
 use relm4::prelude::*;

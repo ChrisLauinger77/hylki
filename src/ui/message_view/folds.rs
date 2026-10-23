@@ -1,6 +1,8 @@
 //! Folded cards (#326): which cards open folded, and their bars.
 
-use super::{attr_escape, escape_text, fold_bar_date, inline_icon_svg, MessageView, FOLD_BAR_FACE};
+use super::html::{attr_escape, escape_text};
+use super::snippets::{fold_bar_date, inline_icon_svg, FOLD_BAR_FACE};
+use super::MessageView;
 use crate::i18n::i18n;
 use crate::models::Message;
 use relm4::prelude::*;

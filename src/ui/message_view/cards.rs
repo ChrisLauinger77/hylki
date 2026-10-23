@@ -1,6 +1,7 @@
 //! Live patches to the cards on the page: selection and attachment rows.
 
-use super::{att_chips_html, MessageView};
+use super::snippets::att_chips_html;
+use super::MessageView;
 use relm4::prelude::*;
 use webkit6::prelude::WebViewExt;
 

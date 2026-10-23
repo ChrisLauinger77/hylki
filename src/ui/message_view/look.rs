@@ -1,7 +1,10 @@
 //! The reader's look: accent, light or dark, and the grounds the WebView is
 //! painted with.
 
-use super::{ground_rgba, paints_own_background, theme_grounds_for, wear_class, MessageView};
+use super::chrome::wear_class;
+use super::frame::{ground_rgba, theme_grounds_for};
+use super::snippets::paints_own_background;
+use super::MessageView;
 use adw::prelude::*;
 use relm4::prelude::*;
 use webkit6::prelude::WebViewExt;

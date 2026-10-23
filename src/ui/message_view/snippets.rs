@@ -1,7 +1,8 @@
 //! Small HTML pieces of a card: action buttons, inline icons, recipients,
 //! attachment and tag chips, and the banner containers.
 
-use super::{attr_escape, escape_text, CardAttachment};
+use super::html::{attr_escape, escape_text};
+use super::types::CardAttachment;
 use crate::i18n::i18n;
 use crate::models::Message;
 use relm4::prelude::*;

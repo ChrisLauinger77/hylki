@@ -6,7 +6,7 @@
 //! parse is dropped. `extra` is everything after the third colon, so it may
 //! itself contain colons.
 
-use super::{InviteAction, MessageViewInput, SelectMode};
+use super::types::{InviteAction, MessageViewInput, SelectMode};
 use crate::ui::message_list::RowAction;
 
 /// What one page message asks for.

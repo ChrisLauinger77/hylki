@@ -1,10 +1,10 @@
 //! The printed document (#16): every message inlined into one plain page
 //! under a header that exists only on paper.
 
-use super::{
-    body_html, escape_text, inject_csp, inject_reader_style, reader_style_css, strip_remote,
-    MessageView,
-};
+use super::html::{body_html, escape_text};
+use super::remote::strip_remote;
+use super::style::{inject_csp, inject_reader_style, reader_style_css};
+use super::MessageView;
 use crate::i18n::i18n;
 use crate::models::Message;
 

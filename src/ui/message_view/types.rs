@@ -1,6 +1,6 @@
 //! The reader's messages in and out, and the small types they carry.
 
-use super::MenuHit;
+use super::menu::MenuHit;
 use crate::models::Message;
 
 /// One attachment as a card lists it (#213): the name and size only. The

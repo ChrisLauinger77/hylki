@@ -1,7 +1,8 @@
 //! Building the reader's WebView and the WebContext it shares with print
 //! preview and the composer.
 
-use super::{decode_data_uri, default_image_name, is_launchable_uri, strip_navigation_items};
+use super::links::{decode_data_uri, default_image_name, is_launchable_uri};
+use super::menu::strip_navigation_items;
 use crate::i18n::i18n;
 use adw::prelude::*;
 use relm4::prelude::*;

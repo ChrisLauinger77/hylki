@@ -1,10 +1,11 @@
 //! One message's document inside its card (`message_frame`), and the theme
 //! grounds handed to the document builder through thread-locals.
 
-use super::{
-    adapt_colors_for_dark, attr_escape, auto_direction, body_html, inject_csp, inject_reader_style,
-    pin_color_scheme, reader_style_css, strip_remote, CardAttachment,
-};
+use super::dark::{adapt_colors_for_dark, pin_color_scheme};
+use super::html::{attr_escape, body_html};
+use super::remote::strip_remote;
+use super::style::{auto_direction, inject_csp, inject_reader_style, reader_style_css};
+use super::types::CardAttachment;
 use adw::prelude::*;
 use relm4::prelude::*;
 

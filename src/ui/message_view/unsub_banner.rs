@@ -1,6 +1,8 @@
 //! A card's Unsubscribe banner: what it says, and patching it in place.
 
-use super::{attr_escape, escape_text, MessageView, UnsubState};
+use super::html::{attr_escape, escape_text};
+use super::types::UnsubState;
+use super::MessageView;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::Message;
 use relm4::prelude::*;

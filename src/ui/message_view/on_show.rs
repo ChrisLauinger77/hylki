@@ -1,7 +1,10 @@
 //! Showing a message: `Show`, the remote-content choices, and the theme and
 //! paint events that render it again.
 
-use super::{has_remote_resources, wear_class, MessageView, MessageViewOutput};
+use super::chrome::wear_class;
+use super::remote::has_remote_resources;
+use super::types::MessageViewOutput;
+use super::MessageView;
 use crate::models::Message;
 use adw::prelude::*;
 use relm4::prelude::*;

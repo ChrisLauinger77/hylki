@@ -1,7 +1,9 @@
 //! The cards of a conversation: folding, selection, keyboard stepping,
 //! focus, scroll places and live patches.
 
-use super::{tag_chips_html, CardAttachment, MessageView, MessageViewOutput, SelectMode};
+use super::snippets::tag_chips_html;
+use super::types::{CardAttachment, MessageViewOutput, SelectMode};
+use super::MessageView;
 use adw::prelude::*;
 use relm4::prelude::*;
 use webkit6::prelude::WebViewExt;

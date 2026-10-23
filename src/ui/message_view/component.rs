@@ -1,7 +1,10 @@
 //! The reading pane as a relm4 component: its widget tree (view!), building
 //! it, and `update`, which routes each input to its `on_*` method.
 
-use super::{link_preview_plaque, new_webview, MessageView, MessageViewInput, MessageViewOutput};
+use super::init::link_preview_plaque;
+use super::types::{MessageViewInput, MessageViewOutput};
+use super::webview::new_webview;
+use super::MessageView;
 use crate::i18n::{i18n, i18n_f};
 use adw::prelude::*;
 use relm4::prelude::*;

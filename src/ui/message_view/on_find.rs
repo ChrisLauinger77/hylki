@@ -1,6 +1,7 @@
 //! Find in the message (Ctrl+F): the bar and the page's search functions.
 
-use super::{MessageView, MessageViewInput};
+use super::types::MessageViewInput;
+use super::MessageView;
 use adw::prelude::*;
 use relm4::prelude::*;
 use webkit6::prelude::WebViewExt;
