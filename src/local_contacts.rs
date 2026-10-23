@@ -667,6 +667,15 @@ pub fn db_paths() -> Vec<PathBuf> {
 mod tests {
     use super::*;
 
+    /// An imported card's UID comes from its text, so importing it again
+    /// finds the same contact: the derivation must never change.
+    #[test]
+    fn content_uids_stay_the_same() {
+        let card = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ada\r\nEND:VCARD\r\n\r\n";
+        assert_eq!(content_uid(card), "hylki-9f293ea101dd5869a7b8b61d");
+        assert_eq!(content_uid(&card.replace("\r\n", "\n")), content_uid(card));
+    }
+
     #[test]
     fn reading_the_book_leaves_the_file_untouched() {
         let dir = std::env::temp_dir().join(format!("hylki-local-contacts-{}", std::process::id()));

@@ -1559,6 +1559,40 @@ pub fn thread_ids<'a>(msgs: impl IntoIterator<Item = &'a Message>) -> Vec<String
 
 #[cfg(test)]
 mod tests {
+
+    /// The numbers and tags the cache and state.toml store these as.
+    #[test]
+    fn stored_codes_stay_put() {
+        use super::{GallerySort, Importance, SenderTrust};
+        for (importance, n) in [
+            (Importance::Normal, 0),
+            (Importance::High, 1),
+            (Importance::Low, -1),
+        ] {
+            assert_eq!(importance.to_i64(), n);
+            assert_eq!(Importance::from_i64(n), importance);
+        }
+        assert_eq!(Importance::from_i64(7), Importance::Normal);
+        for (trust, tag) in [
+            (SenderTrust::Pass, "pass"),
+            (SenderTrust::Unverified, "unverified"),
+            (SenderTrust::Suspicious, "suspicious"),
+            (SenderTrust::Fail, "fail"),
+        ] {
+            assert_eq!(trust.as_tag(), tag);
+            assert_eq!(SenderTrust::from_tag(tag), trust);
+        }
+        assert_eq!(SenderTrust::from_tag("other"), SenderTrust::Unverified);
+        let sorts: Vec<GallerySort> = (0..10).map(GallerySort::from_index).collect();
+        assert_eq!(
+            format!("{sorts:?}"),
+            "[Newest, Oldest, Name, NameDesc, Sender, SenderDesc, Largest, Smallest, Type, TypeDesc]"
+        );
+        for (i, sort) in sorts.iter().enumerate() {
+            assert_eq!(sort.index(), i as u32);
+        }
+        assert_eq!(GallerySort::from_index(10), GallerySort::Newest);
+    }
     use super::*;
 
     /// #374: tags first in Settings order, then the labels no tag stands

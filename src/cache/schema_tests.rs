@@ -240,3 +240,95 @@ fn every_version_gate_drops_and_rewrites_what_it_should() {
     }
     assert_golden("cache/testdata/migrations.txt", &report);
 }
+
+/// A sender check as `sender_checks` stores it: the trust tag, the findings
+/// one per line, and the JSON of the OpenPGP verdict, the unsubscribe
+/// handles, the invitation and the sensitivity label.
+#[test]
+fn a_sender_check_row_as_stored() {
+    use crate::models::{
+        Invite, InvitePerson, PgpSignature, PgpStatus, PgpTrust, ReplyRoute, SenderCheck,
+        SenderTrust, Unsubscribe,
+    };
+    let cache = Cache::in_memory().unwrap();
+    let check = SenderCheck {
+        trust: SenderTrust::Suspicious,
+        summary: "Looks off".into(),
+        findings: vec!["one".into(), "two".into()],
+        pgp: Some(PgpStatus {
+            encrypted: true,
+            decrypted: true,
+            signature: PgpSignature::Good {
+                signer: "Ada <ada@x>".into(),
+                key_id: "ABCD".into(),
+                trust: PgpTrust::Marginal,
+            },
+            ..Default::default()
+        }),
+        unsubscribe: Some(Unsubscribe {
+            one_click: Some("https://list.example/u".into()),
+            mailto: Some("mailto:leave@list.example".into()),
+            reply: Some(ReplyRoute {
+                to: "owner@list.example".into(),
+                subject: "UNSUBSCRIBE".into(),
+            }),
+            web: Some("https://list.example/page".into()),
+            list_id: "news.list.example".into(),
+            in_headers: true,
+        }),
+        invite: Some(Box::new(Invite {
+            method: "REQUEST".into(),
+            uid: "uid-1".into(),
+            sequence: 2,
+            summary: "Standup".into(),
+            location: "Room 1".into(),
+            start: 1_700_000_000,
+            end: 1_700_003_600,
+            all_day: false,
+            recurrence_id: "20240101T090000Z".into(),
+            repeats: "FREQ=DAILY".into(),
+            organizer: Some(InvitePerson {
+                name: "Ada".into(),
+                email: "ada@x".into(),
+                status: "ACCEPTED".into(),
+                rsvp: false,
+                resource: false,
+            }),
+            attendees: vec![InvitePerson {
+                name: String::new(),
+                email: "room@x".into(),
+                status: "NEEDS-ACTION".into(),
+                rsvp: true,
+                resource: true,
+            }],
+            cancelled: false,
+            ics: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n".into(),
+        })),
+        label: Some(crate::sensitivity::SensitivityLabel {
+            name: "Confidential".into(),
+            id: "id-1".into(),
+            color: String::new(),
+            tooltip: String::new(),
+        }),
+    };
+    cache.save_sender_check(1, "INBOX", 9, &check);
+    let row: Vec<String> = cache
+        .conn
+        .query_row(
+            "SELECT trust, summary, findings, pgp, unsubscribe, invite, label FROM sender_checks",
+            [],
+            |r| (0..7).map(|i| r.get::<_, String>(i)).collect(),
+        )
+        .unwrap();
+    assert_golden(
+        "cache/testdata/sender-check-row.txt",
+        &(row.join("\n---\n") + "\n"),
+    );
+    // Served back with the OpenPGP verdict left out: it is a marker only.
+    let back = cache.load_sender_check(1, "INBOX", 9).unwrap();
+    assert_eq!(back.pgp, None);
+    assert_eq!(back.unsubscribe, check.unsubscribe);
+    assert_eq!(back.invite, check.invite);
+    assert_eq!(back.label, check.label);
+    assert_eq!(back.findings, check.findings);
+}

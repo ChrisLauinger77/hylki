@@ -3304,6 +3304,9 @@ pub fn delete_contact(book_uid: &str, uid: &str) -> Result<(), String> {
 }
 
 #[cfg(test)]
+mod vcard_tests;
+
+#[cfg(test)]
 mod tests {
     #[test]
     fn registry_reply_keeps_sources_and_skips_unrelated_objects() {
