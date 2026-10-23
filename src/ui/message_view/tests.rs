@@ -1,6 +1,7 @@
 //! The reader's tests, by concern. `msg_for_print` is the shared fixture.
 
 use super::*;
+use super::{dark::*, links::*, print::*, remote::*, snippets::*, style::*};
 
 mod characterization;
 mod dark_style;
