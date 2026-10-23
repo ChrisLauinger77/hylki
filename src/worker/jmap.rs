@@ -32,6 +32,7 @@ use crate::worker::drafts::{draft_not_saved, saving_text};
 use crate::worker::folders::chip_count_of;
 use crate::worker::headers::label_from_timestamp;
 use crate::worker::ids::{hash_uid, normalize_msgid};
+use crate::worker::imap::strip_attachment::{cache_rewritten, strip_refused};
 use crate::worker::outbox::{
     delete_queued, drop_superseded_outbox, emit_outbox, raw_in_reply_to, schedule_send, send_failed,
 };

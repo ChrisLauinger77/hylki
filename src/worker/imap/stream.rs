@@ -12,10 +12,10 @@ use tokio::time::Sleep;
 
 use crate::i18n::i18n;
 
-pub(super) const IO_TIMEOUT: Duration = Duration::from_secs(60);
+pub(in crate::worker) const IO_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug)]
-pub(super) struct ImapIo<S> {
+pub(in crate::worker) struct ImapIo<S> {
     inner: S,
     timeout: Duration,
     read_timer: Option<Pin<Box<Sleep>>>,
@@ -26,7 +26,7 @@ pub(super) struct ImapIo<S> {
 }
 
 impl<S> ImapIo<S> {
-    pub(super) fn new(inner: S) -> Self {
+    pub(in crate::worker) fn new(inner: S) -> Self {
         Self {
             inner,
             timeout: IO_TIMEOUT,
@@ -40,16 +40,16 @@ impl<S> ImapIo<S> {
 
     // IDLE has its own wait, init and DONE deadlines. Silence while waiting
     // for new mail is expected; silence during any other read is not.
-    pub(super) fn set_idle(&mut self, idle: bool) {
+    pub(in crate::worker) fn set_idle(&mut self, idle: bool) {
         self.idle = idle;
         self.read_timer = None;
     }
 
-    pub(super) fn is_selected(&self, path: &str) -> bool {
+    pub(in crate::worker) fn is_selected(&self, path: &str) -> bool {
         !self.failed && self.selected_folder.as_deref() == Some(path)
     }
 
-    pub(super) fn set_selected_folder(&mut self, path: Option<&str>) {
+    pub(in crate::worker) fn set_selected_folder(&mut self, path: Option<&str>) {
         self.selected_folder = path.map(str::to_owned);
     }
 

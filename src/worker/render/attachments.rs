@@ -1,7 +1,7 @@
 //! The attachments of a raw message: which parts count as files (inline
 //! images only above a size, calendar parts always), and their names.
 
-use crate::worker::{mime_extension, strip};
+use crate::worker::strip;
 
 /// Decoded size at or above which a part carrying a Content-ID counts as an
 /// attachment as well as being rendered in the body.
@@ -217,5 +217,29 @@ mod guess_mime_tests {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         );
         assert_eq!(guess_mime("blob.zzqx"), "application/octet-stream");
+    }
+}
+
+/// A filename extension for a MIME type, for parts that arrive unnamed. Only
+/// the types that actually turn up without a filename are worth listing; the
+/// rest get none, and show as a generic file.
+pub(in crate::worker) fn mime_extension(ty: &str, subtype: &str) -> &'static str {
+    // A meeting request's calendar part often arrives with no name at all
+    // (Outlook sends one); without the suffix nothing would open it (#223).
+    if ty.eq_ignore_ascii_case("text") && subtype.eq_ignore_ascii_case("calendar") {
+        return ".ics";
+    }
+    if !ty.eq_ignore_ascii_case("image") {
+        return "";
+    }
+    match subtype.to_ascii_lowercase().as_str() {
+        "jpeg" | "jpg" => ".jpg",
+        "png" => ".png",
+        "gif" => ".gif",
+        "heic" => ".heic",
+        "heif" => ".heif",
+        "webp" => ".webp",
+        "tiff" => ".tif",
+        _ => "",
     }
 }
