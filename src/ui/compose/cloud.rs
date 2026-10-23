@@ -6,15 +6,12 @@ use super::host::show_alert;
 use super::messages::ComposeInput;
 use super::types::CloudLink;
 use super::{Compose, ComposeWidgets};
+use crate::encoding::escape_html;
 use crate::i18n::i18n;
 use crate::i18n::i18n_f;
 use crate::ui::rich_editor::{js_escape, SourceKind};
 use adw::prelude::*;
 use relm4::prelude::*;
-
-pub(super) fn html_escape(s: &str) -> String {
-    gtk::glib::markup_escape_text(s).into()
-}
 
 /// Which account to upload to, and how the links are made this time:
 /// the expiry and the password, seeded from the account's settings and
@@ -266,9 +263,9 @@ impl Compose {
                 }
                 let html = format!(
                 "<p id=\"{id}\" data-hylki-cloud=\"1\">\u{1F4CE} <a href=\"{url}\">{name}</a> ({caption})</p>",
-                url = html_escape(&share.url),
-                name = html_escape(&share.name),
-                caption = html_escape(&caption),
+                url = escape_html(&share.url),
+                name = escape_html(&share.name),
+                caption = escape_html(&caption),
             );
                 // Into the body where the user's own text ends: above
                 // the signature, and above a quoted original in a

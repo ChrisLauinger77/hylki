@@ -1,8 +1,9 @@
 //! Small HTML pieces of a card: action buttons, inline icons, recipients,
 //! attachment and tag chips, and the banner containers.
 
-use super::html::{attr_escape, escape_text};
+use super::html::attr_escape;
 use super::types::CardAttachment;
+use crate::encoding::escape_html;
 use crate::i18n::i18n;
 use crate::models::Message;
 use relm4::prelude::*;
@@ -31,12 +32,12 @@ pub(super) fn template_row_html(key: (u32, u32)) -> String {
             key.0,
             key.1,
             attr_escape(title),
-            escape_text(label),
+            escape_html(label),
         )
     };
     format!(
         "<div class=\"hylki-unsub hylki-tpl\"><span class=\"hylki-unsub-text\">{}</span>{}{}</div>",
-        escape_text(&i18n("This message is a template.")),
+        escape_html(&i18n("This message is a template.")),
         button(
             "edit",
             &i18n("Edit Template"),
@@ -91,7 +92,7 @@ pub(super) fn att_chips_html(key: (u32, u32), atts: &[CardAttachment]) -> String
             svg = inline_icon_svg(icon),
             // The name comes from the sender: text content, escaped like
             // every other header field.
-            name = escape_text(&a.name),
+            name = escape_html(&a.name),
             size = crate::models::human_size(a.size),
             save = gtk::glib::markup_escape_text(&i18n("Save\u{2026}")),
             dl = inline_icon_svg("folder-download-symbolic"),
@@ -222,8 +223,8 @@ pub(super) fn recipients_html(m: &Message, always_shown: bool) -> String {
             }
             parts.push_str(&format!(
                 "<span class=\"hylki-mail\" data-mail=\"{}\">{}</span>",
-                escape_text(mail).replace('"', "&quot;"),
-                escape_text(entry)
+                escape_html(mail).replace('"', "&quot;"),
+                escape_html(entry)
             ));
         }
         lines.push_str(&format!("<div><b>{label}:</b> {parts}</div>"));

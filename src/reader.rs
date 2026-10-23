@@ -16,6 +16,7 @@
 
 use self::tidy::tidy;
 use self::walk::walk;
+use crate::encoding::escape_html;
 
 use html5ever::tendril::TendrilSink;
 use markup5ever_rcdom::RcDom;
@@ -48,7 +49,7 @@ pub fn extract(body: &str) -> String {
     if !body.contains('<') {
         return format!(
             "<div class=\"hylki-plain\">{}</div>",
-            escape_text(body.trim_matches('\n'))
+            escape_html(body.trim_matches('\n'))
         );
     }
     extract_blocks(body).concat()
@@ -60,7 +61,7 @@ pub fn extract_blocks(body: &str) -> Vec<String> {
     if !body.contains('<') {
         return vec![format!(
             "<div class=\"hylki-plain\">{}</div>",
-            escape_text(body.trim_matches('\n'))
+            escape_html(body.trim_matches('\n'))
         )];
     }
     let dom = html5ever::parse_document(RcDom::default(), Default::default()).one(body);
@@ -189,7 +190,7 @@ impl Elem {
 impl Out {
     fn write(&self, into: &mut String) {
         match self {
-            Out::Text(t) => into.push_str(&escape_text(t)),
+            Out::Text(t) => into.push_str(&escape_html(t)),
             Out::Elem(e) => {
                 into.push('<');
                 into.push_str(e.tag);
@@ -197,7 +198,7 @@ impl Out {
                     into.push(' ');
                     into.push_str(k);
                     into.push_str("=\"");
-                    into.push_str(&escape_text(v));
+                    into.push_str(&escape_html(v));
                     into.push('"');
                 }
                 into.push('>');
@@ -257,11 +258,6 @@ fn is_blank(t: &str) -> bool {
                     | '\u{202f}'
             )
     })
-}
-
-/// Escape text for HTML: element content or a quoted attribute alike.
-fn escape_text(s: &str) -> String {
-    gtk::glib::markup_escape_text(s).into()
 }
 
 // ---------------------------------------------------------------------------
