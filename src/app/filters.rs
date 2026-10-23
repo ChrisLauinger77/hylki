@@ -121,6 +121,75 @@ impl AppModel {
         (kept, filed)
     }
 
+    /// The addresses whose mail a pass leaves alone in this folder. When
+    /// the account files copies of what it sends into it (#199), the
+    /// user's own mail sitting here is one of those copies, not an
+    /// arrival. Rules are written about incoming mail, so a rule on a
+    /// subject or a recipient would otherwise pick up your own reply and
+    /// move it away from the thread it was filed beside. The Sent folder
+    /// is the exception: everything in it is your own mail, so running
+    /// rules over it (#198) plainly means to act on exactly that. Replies
+    /// filed beside what they answer (#468) can be in any folder.
+    fn own_mail_to_skip(&self, account_id: u32, src: Option<&str>) -> Vec<String> {
+        let files_replies = self.account_config(account_id).is_some_and(|c| {
+            c.reply_copies != crate::config::ReplyCopies::WithSent && !c.server_saves_sent
+        });
+        let diverted = (files_replies || self.sent_copy_path(account_id).as_deref() == src)
+            && self
+                .folder_of_kind(account_id, FolderKind::Sent)
+                .map(|f| f.path.as_str())
+                != src;
+        if diverted {
+            self.own_identities(account_id)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Tags first (#71), from every matching rule, and only where the
+    /// message lacks the tag: this runs on every sync, and the flag comes
+    /// back down with the next one. Tagged before any move, so the move
+    /// carries the keyword along. A tag that no longer exists tags
+    /// nothing. Returns how many tags were put on.
+    fn tag_by_rules(
+        &self,
+        account_id: u32,
+        src: &str,
+        m: &mut Message,
+        matching: &[&&config::FilterRule],
+    ) -> usize {
+        let mut tagged = 0;
+        let wanted: Vec<(String, String)> = matching
+            .iter()
+            .filter(|r| !r.tag.is_empty() && !self.carries_tag(m, &r.tag))
+            .filter(|r| {
+                self.tags
+                    .iter()
+                    .any(|t| t.keyword.eq_ignore_ascii_case(&r.tag))
+            })
+            .map(|r| (r.tag.clone(), r.label()))
+            .collect();
+        for (tag, rule) in wanted {
+            if self.carries_tag(m, &tag) {
+                continue; // two rules naming one tag
+            }
+            tagged += 1;
+            tracing::info!("filter: {} tagged {tag} [{rule}]", m.from_addr);
+            self.send_to(
+                account_id,
+                MailRequest::SetKeyword {
+                    path: src.to_string(),
+                    uid: m.uid,
+                    message_id: m.message_id.clone(),
+                    keyword: tag.clone(),
+                    add: true,
+                },
+            );
+            m.keywords.push(tag);
+        }
+        tagged
+    }
+
     /// One pass of the rules over a folder's messages. Returns what stays,
     /// what was filed elsewhere, and (for a manual run) the pass's count:
     /// how many messages were looked at, how many a rule matched, and how
@@ -165,28 +234,7 @@ impl AppModel {
         let mut still_pending = std::collections::HashSet::new();
         let mut kept = Vec::with_capacity(messages.len());
         let mut filed = Vec::new();
-        // When the account files copies of what it sends into this folder
-        // (#199), the user's own mail sitting here is one of those copies, not
-        // an arrival. Rules are written about incoming mail, so a rule on a
-        // subject or a recipient would otherwise pick up your own reply and
-        // move it away from the thread it was filed beside. The Sent folder is
-        // the exception: everything in it is your own mail, so running rules
-        // over it (#198) plainly means to act on exactly that. Replies filed
-        // beside what they answer (#468) can be in any folder.
-        let files_replies = self.account_config(account_id).is_some_and(|c| {
-            c.reply_copies != crate::config::ReplyCopies::WithSent && !c.server_saves_sent
-        });
-        let diverted = (files_replies
-            || self.sent_copy_path(account_id).as_deref() == src.as_deref())
-            && self
-                .folder_of_kind(account_id, FolderKind::Sent)
-                .map(|f| f.path.as_str())
-                != src.as_deref();
-        let own: Vec<String> = if diverted {
-            self.own_identities(account_id)
-        } else {
-            Vec::new()
-        };
+        let own = self.own_mail_to_skip(account_id, src.as_deref());
         let hits = self.body_hits.get(&(account_id, folder_id));
         // The address books are read once per pass, and only when a rule asks
         // for them. An empty read counts as unknown: see FilterField::FromInContacts.
@@ -215,40 +263,8 @@ impl AppModel {
             if !matching.is_empty() {
                 matched += 1;
             }
-            // Tags first (#71), from every matching rule, and only where the
-            // message lacks the tag — this runs on every sync, and the flag
-            // comes back down with the next one. Tagged before any move, so
-            // the move carries the keyword along. A tag that no longer
-            // exists tags nothing.
             if let Some(src) = &src {
-                let wanted: Vec<(String, String)> = matching
-                    .iter()
-                    .filter(|r| !r.tag.is_empty() && !self.carries_tag(&m, &r.tag))
-                    .filter(|r| {
-                        self.tags
-                            .iter()
-                            .any(|t| t.keyword.eq_ignore_ascii_case(&r.tag))
-                    })
-                    .map(|r| (r.tag.clone(), r.label()))
-                    .collect();
-                for (tag, rule) in wanted {
-                    if self.carries_tag(&m, &tag) {
-                        continue; // two rules naming one tag
-                    }
-                    tagged += 1;
-                    tracing::info!("filter: {} tagged {tag} [{rule}]", m.from_addr);
-                    self.send_to(
-                        account_id,
-                        MailRequest::SetKeyword {
-                            path: src.clone(),
-                            uid: m.uid,
-                            message_id: m.message_id.clone(),
-                            keyword: tag.clone(),
-                            add: true,
-                        },
-                    );
-                    m.keywords.push(tag);
-                }
+                tagged += self.tag_by_rules(account_id, src, &mut m, &matching);
             }
             let hit = matching.iter().copied().find(|r| {
                 !r.dest_path.is_empty()
