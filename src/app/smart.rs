@@ -52,6 +52,45 @@ impl AppModel {
         self.smart_folders.iter().find(|f| &f.id == id)
     }
 
+    /// Switches to a view the index assembles, a tag (`tag_view`) or a
+    /// smart folder (`smart_view`): no folder selected, the reader blank,
+    /// the list reset to a colorized view whose rows cannot be restored,
+    /// junked or edited as drafts. Recipients are named in a smart folder
+    /// held to Sent, as Sent does; a tag view never is.
+    pub(super) fn enter_index_view(
+        &mut self,
+        sel: crate::ui::sidebar::Sel,
+        tag_view: Option<(Option<u32>, Option<String>)>,
+        smart_view: Option<String>,
+    ) {
+        self.close_sidebar_peek();
+        self.mirror_selection(sel);
+        self.leave_gallery();
+        self.showing_contacts = false;
+        self.showing_outbox = false;
+        self.unified = false;
+        self.selected = None;
+        self.tag_view = tag_view;
+        self.smart_view = smart_view;
+        self.blank_reader();
+        self.message_list.emit(MessageListInput::SetSelected(None));
+        self.message_list.emit(MessageListInput::ResetPaging);
+        self.message_list
+            .emit(MessageListInput::SetScope(SearchScope::ThisFolder));
+        self.message_list.emit(MessageListInput::SetColorize(true));
+        let sent = self
+            .open_smart_folder()
+            .is_some_and(|f| f.folder == Some(config::SmartFolderKind::Sent));
+        self.message_list
+            .emit(MessageListInput::SetShowRecipient(sent));
+        self.message_list
+            .emit(MessageListInput::SetRestorable(false));
+        self.message_list.emit(MessageListInput::SetInJunk(false));
+        self.message_list.emit(MessageListInput::SetInDrafts(false));
+        self.message_view
+            .emit(MessageViewInput::SetDraftsView(false));
+    }
+
     /// Where a smart folder (#417) looks, per account: the folders it is
     /// held to (`None` for all) and the ones it leaves out. One account
     /// when it names one, else every account in the unified section; one
@@ -322,39 +361,7 @@ impl AppModel {
                 if !self.smart_folders.iter().any(|f| f.id == id) {
                     return;
                 }
-                self.close_sidebar_peek();
-                self.mirror_selection(crate::ui::sidebar::Sel::Smart(id.clone()));
-                self.leave_gallery();
-                self.showing_contacts = false;
-                self.showing_outbox = false;
-                self.unified = false;
-                self.selected = None;
-                self.tag_view = None;
-                self.smart_view = Some(id);
-                self.current = None;
-                self.current_thread.clear();
-                self.attachments.clear();
-                self.attachments_loading = false;
-                self.sync_attachment_drawer();
-                self.show_message(None, false);
-                self.message_list.emit(MessageListInput::SetSelected(None));
-                self.message_list.emit(MessageListInput::ResetPaging);
-                self.message_list
-                    .emit(MessageListInput::SetScope(SearchScope::ThisFolder));
-                self.message_list.emit(MessageListInput::SetColorize(true));
-                // A folder held to Sent lists what you sent: name the
-                // recipients, as Sent does.
-                let sent = self
-                    .open_smart_folder()
-                    .is_some_and(|f| f.folder == Some(config::SmartFolderKind::Sent));
-                self.message_list
-                    .emit(MessageListInput::SetShowRecipient(sent));
-                self.message_list
-                    .emit(MessageListInput::SetRestorable(false));
-                self.message_list.emit(MessageListInput::SetInJunk(false));
-                self.message_list.emit(MessageListInput::SetInDrafts(false));
-                self.message_view
-                    .emit(MessageViewInput::SetDraftsView(false));
+                self.enter_index_view(crate::ui::sidebar::Sel::Smart(id.clone()), None, Some(id));
                 self.show_smart_view();
                 self.refresh_smart_view(&sender);
                 self.push_index_complete();

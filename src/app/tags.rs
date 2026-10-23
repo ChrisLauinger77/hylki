@@ -424,37 +424,11 @@ impl AppModel {
             }
 
             AppMsg::TagSelected { keyword, account } => {
-                self.close_sidebar_peek();
-                self.mirror_selection(match keyword.clone() {
+                let sel = match keyword.clone() {
                     Some(k) => crate::ui::sidebar::Sel::Tag(account, k),
                     None => crate::ui::sidebar::Sel::UnifiedTags,
-                });
-                self.leave_gallery();
-                self.showing_contacts = false;
-                self.showing_outbox = false;
-                self.unified = false;
-                self.selected = None;
-                self.smart_view = None;
-                self.tag_view = Some((account, keyword));
-                self.current = None;
-                self.current_thread.clear();
-                self.attachments.clear();
-                self.attachments_loading = false;
-                self.sync_attachment_drawer();
-                self.show_message(None, false);
-                self.message_list.emit(MessageListInput::SetSelected(None));
-                self.message_list.emit(MessageListInput::ResetPaging);
-                self.message_list
-                    .emit(MessageListInput::SetScope(SearchScope::ThisFolder));
-                self.message_list.emit(MessageListInput::SetColorize(true));
-                self.message_list
-                    .emit(MessageListInput::SetShowRecipient(false));
-                self.message_list
-                    .emit(MessageListInput::SetRestorable(false));
-                self.message_list.emit(MessageListInput::SetInJunk(false));
-                self.message_list.emit(MessageListInput::SetInDrafts(false));
-                self.message_view
-                    .emit(MessageViewInput::SetDraftsView(false));
+                };
+                self.enter_index_view(sel, Some((account, keyword)), None);
                 self.show_tag_view();
                 self.refresh_tag_view(&sender);
                 self.sync_tag_keywords();

@@ -342,6 +342,23 @@ impl AppModel {
         accounts
     }
 
+    /// Opens Settings on the accounts side at the page `page_id`, then
+    /// hands its accounts panel `input` (an editor to open, a rule to add).
+    pub(super) fn open_settings_at(
+        &mut self,
+        sender: &ComponentSender<Self>,
+        page_id: &str,
+        input: crate::ui::accounts::AccountsInput,
+    ) {
+        self.open_settings_window(sender, true, false);
+        if let Some(p) = &self.prefs {
+            p.emit(PrefInput::ShowPageById(page_id.to_string()));
+        }
+        if let Some(acc) = &self.accounts_win {
+            acc.emit(input);
+        }
+    }
+
     /// Show Settings: the window kept from a previous open (its accounts
     /// panel rebuilt over the current accounts) or a newly built one.
     ///

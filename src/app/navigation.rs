@@ -111,12 +111,7 @@ impl AppModel {
         if self.seen_counts {
             self.push_unread_counts_later(sender);
         }
-        self.current = None;
-        self.current_thread.clear();
-        self.attachments.clear();
-        self.attachments_loading = false;
-        self.sync_attachment_drawer();
-        self.show_message(None, false);
+        self.blank_reader();
         self.message_list.emit(MessageListInput::SetSelected(None));
         self.message_list.emit(MessageListInput::ResetPaging);
         self.message_list

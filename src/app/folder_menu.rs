@@ -287,33 +287,27 @@ impl AppModel {
                         })
                     });
                     if let Some(i) = index {
-                        self.open_settings_window(&sender, true, false);
-                        if let Some(p) = &self.prefs {
-                            p.emit(PrefInput::ShowPageById("filters".to_string()));
-                        }
-                        if let Some(acc) = &self.accounts_win {
-                            acc.emit(crate::ui::accounts::AccountsInput::EditFilter(i));
-                        }
+                        self.open_settings_at(
+                            &sender,
+                            "filters",
+                            crate::ui::accounts::AccountsInput::EditFilter(i),
+                        );
                     }
                 }
                 CtxAction::NewSmartFolder => {
-                    self.open_settings_window(&sender, true, false);
-                    if let Some(p) = &self.prefs {
-                        p.emit(PrefInput::ShowPageById("smart".to_string()));
-                    }
-                    if let Some(acc) = &self.accounts_win {
-                        acc.emit(crate::ui::accounts::AccountsInput::AddSmartFolder);
-                    }
+                    self.open_settings_at(
+                        &sender,
+                        "smart",
+                        crate::ui::accounts::AccountsInput::AddSmartFolder,
+                    );
                 }
                 CtxAction::EditSmartFolder(id) => {
                     if let Some(i) = self.smart_folders.iter().position(|f| f.id == id) {
-                        self.open_settings_window(&sender, true, false);
-                        if let Some(p) = &self.prefs {
-                            p.emit(PrefInput::ShowPageById("smart".to_string()));
-                        }
-                        if let Some(acc) = &self.accounts_win {
-                            acc.emit(crate::ui::accounts::AccountsInput::EditSmartFolder(i));
-                        }
+                        self.open_settings_at(
+                            &sender,
+                            "smart",
+                            crate::ui::accounts::AccountsInput::EditSmartFolder(i),
+                        );
                     }
                 }
                 CtxAction::DeleteSmartFolder(id) => {
@@ -321,13 +315,11 @@ impl AppModel {
                 }
                 CtxAction::EditTag(keyword) => {
                     if let Some(i) = self.tags.iter().position(|t| t.keyword == keyword) {
-                        self.open_settings_window(&sender, true, false);
-                        if let Some(p) = &self.prefs {
-                            p.emit(PrefInput::ShowPageById("tags".to_string()));
-                        }
-                        if let Some(acc) = &self.accounts_win {
-                            acc.emit(crate::ui::accounts::AccountsInput::EditTag(i));
-                        }
+                        self.open_settings_at(
+                            &sender,
+                            "tags",
+                            crate::ui::accounts::AccountsInput::EditTag(i),
+                        );
                     }
                 }
                 CtxAction::OpenAccountSettings(account_id) => {
@@ -465,10 +457,7 @@ impl AppModel {
                     .as_ref()
                     .is_some_and(|s| s.account_id == account_id && s.folder_id == folder_id)
                 {
-                    self.current = None;
-                    self.current_thread.clear();
-                    self.show_message(None, false);
-                    self.message_list.emit(MessageListInput::SetLoading);
+                    self.blank_for_folder_change();
                 }
                 self.push_unread_counts();
                 self.send_to(account_id, MailRequest::EmptyFolder { folder_id, path });

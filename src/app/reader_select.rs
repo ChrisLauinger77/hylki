@@ -4,6 +4,26 @@
 use super::*;
 
 impl AppModel {
+    /// Blanks the reader: nothing open, no conversation, no attachments.
+    pub(super) fn blank_reader(&mut self) {
+        self.current = None;
+        self.current_thread.clear();
+        self.attachments.clear();
+        self.attachments_loading = false;
+        self.sync_attachment_drawer();
+        self.show_message(None, false);
+    }
+
+    /// Blanks the reader and shows the list loading, while the folder on
+    /// screen is renamed, emptied, hidden or deleted under it. The
+    /// attachments are left as they are.
+    pub(super) fn blank_for_folder_change(&mut self) {
+        self.current = None;
+        self.current_thread.clear();
+        self.show_message(None, false);
+        self.message_list.emit(MessageListInput::SetLoading);
+    }
+
     /// The messages the router sends here (see `AppModel::route`).
     pub(super) fn on_reader_select(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
         match msg {
@@ -15,13 +35,8 @@ impl AppModel {
                 }
             }
             AppMsg::ClearReader => {
-                self.current = None;
-                self.current_thread.clear();
                 self.listed_thread.clear();
-                self.attachments.clear();
-                self.attachments_loading = false;
-                self.sync_attachment_drawer();
-                self.show_message(None, false);
+                self.blank_reader();
             }
             AppMsg::MessageSelected {
                 message: m,

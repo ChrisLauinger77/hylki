@@ -178,7 +178,7 @@ use uri_queue::{eml_file_name, parse_mailto, FILE_FOLDER};
 pub(crate) use uri_queue::{
     is_message_file, queue_attach_files, queue_mailto, queue_message_file, queue_mid,
 };
-use window::install_window_actions;
+use window::{exit_now, install_window_actions, save_window_geometry};
 use workers::watch_system_events;
 
 relm4::new_stateless_action!(StatusBarAction, WindowActionGroup, "status-bar");
@@ -231,14 +231,7 @@ impl SimpleComponent for AppModel {
             // which monitor can't be restored on Wayland — the compositor owns
             // placement — so only the geometry is saved.)
             connect_close_request[background = model.run_in_background.clone(), outgoing = model.outgoing.clone()] => move |w| {
-                let maximized = w.is_maximized();
-                let (width, height) = if maximized {
-                    let (sw, sh, _) = crate::config::load_window_state();
-                    (sw, sh)
-                } else {
-                    (w.width(), w.height())
-                };
-                crate::config::save_window_state(width, height, maximized);
+                save_window_geometry(w);
                 // Running in the background: hide the window and stay alive, so
                 // mail keeps arriving and GNOME lists Hylki under Background Apps
                 // (issue #3). The window is kept rather than rebuilt, so reopening
@@ -248,16 +241,7 @@ impl SimpleComponent for AppModel {
                     w.set_visible(false);
                     return gtk::glib::Propagation::Stop;
                 }
-                // Exit cleanly the moment window state is saved. Letting GTK,
-                // WebKit and the per-account worker threads tear down the normal
-                // way can abort — a Rust panic fired from a GObject dispose
-                // callback becomes SIGABRT, which the Flatpak surfaces as a crash
-                // notification. Nothing else needs persisting on quit: accounts
-                // and settings are written as they change, the keyring's share
-                // once its thread is done.
-                crate::outgoing::park_held(&outgoing);
-                finish_keyring_writes();
-                std::process::exit(0)
+                exit_now(&outgoing)
             },
 
             // Send's toasts (#434) float over everything, the status bar

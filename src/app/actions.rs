@@ -306,13 +306,11 @@ impl AppModel {
                             &m.from_addr,
                             &m.subject,
                         );
-                        self.open_settings_window(&sender, true, false);
-                        if let Some(p) = &self.prefs {
-                            p.emit(PrefInput::ShowPageById("filters".to_string()));
-                        }
-                        if let Some(acc) = &self.accounts_win {
-                            acc.emit(crate::ui::accounts::AccountsInput::AddFilterFrom(rule));
-                        }
+                        self.open_settings_at(
+                            &sender,
+                            "filters",
+                            crate::ui::accounts::AccountsInput::AddFilterFrom(rule),
+                        );
                     }
                 }
             }

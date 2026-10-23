@@ -230,10 +230,7 @@ impl AppModel {
         if self.selected.as_ref().is_some_and(|s| {
             s.account_id == account_id && crate::models::folder_is_hidden(&s.path, None, &hidden)
         }) {
-            self.current = None;
-            self.current_thread.clear();
-            self.show_message(None, false);
-            self.message_list.emit(MessageListInput::SetLoading);
+            self.blank_for_folder_change();
         }
         if let Some(folders) = self.folders.get_mut(&account_id) {
             folders.retain(|f| !crate::models::folder_is_hidden(&f.path, None, &hidden));
@@ -252,10 +249,7 @@ impl AppModel {
             .as_ref()
             .is_some_and(|s| s.account_id == account_id && s.path == path)
         {
-            self.current = None;
-            self.current_thread.clear();
-            self.show_message(None, false);
-            self.message_list.emit(MessageListInput::SetLoading);
+            self.blank_for_folder_change();
         }
         // A deleted folder leaves Favorites (#367), with what was inside it.
         if let Some(email) = self.email_of(account_id) {
@@ -390,15 +384,11 @@ impl AppModel {
         let delim = self.folder_delimiter(account_id);
         // If the affected folder (or one of its children) is open, clear the
         // view — its path is about to stop existing.
-        // — its path is about to stop existing.
         if self.selected.as_ref().is_some_and(|s| {
             s.account_id == account_id
                 && (s.path == path || s.path.starts_with(&format!("{path}{delim}")))
         }) {
-            self.current = None;
-            self.current_thread.clear();
-            self.show_message(None, false);
-            self.message_list.emit(MessageListInput::SetLoading);
+            self.blank_for_folder_change();
         }
 
         // Optimistic: reshape the local tree NOW so the sidebar shows the move

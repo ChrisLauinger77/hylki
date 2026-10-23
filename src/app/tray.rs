@@ -298,9 +298,7 @@ impl AppModel {
                         tracing::info!("wizard: restart helper up, exiting");
                         let (w, h, maximized) = crate::config::load_window_state();
                         crate::config::save_window_state(w, h, maximized);
-                        crate::outgoing::park_held(&self.outgoing);
-                        finish_keyring_writes();
-                        std::process::exit(0);
+                        exit_now(&self.outgoing);
                     }
                     Err(e) => {
                         std::env::remove_var(crate::WIZARD_AGAIN_VAR);

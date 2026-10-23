@@ -2,6 +2,32 @@
 
 use super::*;
 
+/// Saves the window's size and maximized state. Only the geometry: on
+/// Wayland the compositor owns placement and the monitor. A maximized
+/// window keeps the size saved before it was maximized.
+pub(super) fn save_window_geometry(w: &adw::ApplicationWindow) {
+    let maximized = w.is_maximized();
+    let (width, height) = if maximized {
+        let (sw, sh, _) = crate::config::load_window_state();
+        (sw, sh)
+    } else {
+        (w.width(), w.height())
+    };
+    crate::config::save_window_state(width, height, maximized);
+}
+
+/// Exits the process the moment state is saved. Letting GTK, WebKit and
+/// the per-account worker threads tear down the normal way can abort — a
+/// Rust panic fired from a GObject dispose callback becomes SIGABRT, which
+/// the Flatpak surfaces as a crash notification. Nothing else needs
+/// persisting on quit: accounts and settings are written as they change,
+/// held sends are parked, the keyring's share once its thread is done.
+pub(super) fn exit_now(outgoing: &crate::outgoing::OutgoingList) -> ! {
+    crate::outgoing::park_held(outgoing);
+    finish_keyring_writes();
+    std::process::exit(0)
+}
+
 impl AppModel {
     /// Restore the last window size + maximized state (Wayland can't restore
     /// position/monitor).
@@ -73,18 +99,9 @@ impl AppModel {
         quit.connect_activate(move |_, _| {
             // Same teardown as closing the last window: save the geometry,
             // then exit rather than unwinding through GTK and WebKit.
-            let maximized = window.is_maximized();
-            let (width, height) = if maximized {
-                let (sw, sh, _) = crate::config::load_window_state();
-                (sw, sh)
-            } else {
-                (window.width(), window.height())
-            };
-            crate::config::save_window_state(width, height, maximized);
+            save_window_geometry(&window);
             crate::background::set_status("");
-            crate::outgoing::park_held(&outgoing);
-            finish_keyring_writes();
-            std::process::exit(0)
+            exit_now(&outgoing)
         });
         app.add_action(&quit);
         gtk::prelude::GtkApplicationExt::set_accels_for_action(&app, "app.quit", &["<Ctrl>q"]);
