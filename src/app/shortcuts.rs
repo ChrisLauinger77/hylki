@@ -48,40 +48,7 @@ impl AppModel {
                 }
             }
             Shortcut::OpenCursor => self.message_list.emit(MessageListInput::OpenCursor),
-            Shortcut::MarkRead(read) => {
-                if self.rows_selected() {
-                    self.message_list.emit(MessageListInput::Bulk(if read {
-                        BulkAction::MarkRead
-                    } else {
-                        BulkAction::MarkUnread
-                    }));
-                    return;
-                }
-                let mut targets = self.multi_selection();
-                if targets.is_empty() && self.acts_on_conversation(self.gmail_keys.get()) {
-                    // The whole conversation, as Gmail marks it (#392).
-                    targets = if read {
-                        self.current_thread.clone()
-                    } else {
-                        self.conversation_to_mark_unread()
-                    };
-                }
-                if targets.is_empty() {
-                    targets.extend(self.reply_target());
-                }
-                if !read {
-                    self.hold_unread(&targets);
-                }
-                targets.retain(|m| m.unread == read);
-                if !targets.is_empty() {
-                    self.user_set_flags(read_label(read), &targets, FlagKind::Read, read);
-                }
-                // Gmail's Shift+U puts the conversation back in the list,
-                // unread, rather than leave it open to be read again.
-                if !read {
-                    self.close_after_unread();
-                }
-            }
+            Shortcut::MarkRead(read) => self.mark_read_by_key(read),
             Shortcut::Undo => sender.input(AppMsg::Undo),
             Shortcut::MoveTo => sender.input(AppMsg::MoveToMenu),
             Shortcut::Label => sender.input(AppMsg::ReaderTagMenu),
@@ -172,48 +139,90 @@ impl AppModel {
                     sender.input(AppMsg::ToggleTagCurrent(tag.keyword.clone()));
                 }
             }
-            Shortcut::ClearTags => {
-                // Only configured tags come off: a message's other keywords
-                // ($Forwarded, a client's own flags) are not ours to drop.
-                // Every selected message loses them when several are
-                // selected (#313). Re-read the message between removals,
-                // since set_tag patches the copy the next call will read.
-                let targets = if self.many_selected() {
-                    self.multi_selection()
-                } else {
-                    self.reply_target().into_iter().collect()
-                };
-                let mut changes: HashMap<u32, Vec<FlagChange>> = HashMap::new();
-                for target in targets {
-                    let keywords: Vec<String> = self
-                        .tags
-                        .iter()
-                        .filter(|t| target.has_tag(t))
-                        .map(|t| t.keyword.clone())
-                        .collect();
-                    for keyword in keywords {
-                        let m = self
-                            .shown_copy(target.account_id, target.id)
-                            .unwrap_or_else(|| target.clone());
-                        changes.entry(m.account_id).or_default().push(FlagChange {
-                            kind: FlagKind::Tag(keyword.clone()),
-                            // The step is the reversal: undo puts them back.
-                            value: true,
-                            items: vec![FlagRef {
-                                folder_id: m.folder_id,
-                                uid: m.uid,
-                                id: m.id,
-                            }],
-                        });
-                        self.set_tag(&m, &keyword, false);
-                    }
-                }
-                // One entry per account, so a single Ctrl+Z restores the
-                // whole set rather than giving back one tag per press.
-                for (account_id, changes) in changes {
-                    self.push_undo(account_id, i18n("Remove Tags"), UndoStep::Flags(changes));
-                }
+            Shortcut::ClearTags => self.clear_tags_on_target(),
+        }
+    }
+
+    /// Marks read or unread by key: the checked rows, else the selection,
+    /// else the whole conversation under Gmail's keys (#392), else the
+    /// open message.
+    fn mark_read_by_key(&mut self, read: bool) {
+        if self.rows_selected() {
+            self.message_list.emit(MessageListInput::Bulk(if read {
+                BulkAction::MarkRead
+            } else {
+                BulkAction::MarkUnread
+            }));
+            return;
+        }
+        let mut targets = self.multi_selection();
+        if targets.is_empty() && self.acts_on_conversation(self.gmail_keys.get()) {
+            // The whole conversation, as Gmail marks it (#392).
+            targets = if read {
+                self.current_thread.clone()
+            } else {
+                self.conversation_to_mark_unread()
+            };
+        }
+        if targets.is_empty() {
+            targets.extend(self.reply_target());
+        }
+        if !read {
+            self.hold_unread(&targets);
+        }
+        targets.retain(|m| m.unread == read);
+        if !targets.is_empty() {
+            self.user_set_flags(read_label(read), &targets, FlagKind::Read, read);
+        }
+        // Gmail's Shift+U puts the conversation back in the list,
+        // unread, rather than leave it open to be read again.
+        if !read {
+            self.close_after_unread();
+        }
+    }
+
+    /// Takes the configured tags off the selected messages, or the open
+    /// one, as one undo step per account.
+    fn clear_tags_on_target(&mut self) {
+        // Only configured tags come off: a message's other keywords
+        // ($Forwarded, a client's own flags) are not ours to drop.
+        // Every selected message loses them when several are
+        // selected (#313). Re-read the message between removals,
+        // since set_tag patches the copy the next call will read.
+        let targets = if self.many_selected() {
+            self.multi_selection()
+        } else {
+            self.reply_target().into_iter().collect()
+        };
+        let mut changes: HashMap<u32, Vec<FlagChange>> = HashMap::new();
+        for target in targets {
+            let keywords: Vec<String> = self
+                .tags
+                .iter()
+                .filter(|t| target.has_tag(t))
+                .map(|t| t.keyword.clone())
+                .collect();
+            for keyword in keywords {
+                let m = self
+                    .shown_copy(target.account_id, target.id)
+                    .unwrap_or_else(|| target.clone());
+                changes.entry(m.account_id).or_default().push(FlagChange {
+                    kind: FlagKind::Tag(keyword.clone()),
+                    // The step is the reversal: undo puts them back.
+                    value: true,
+                    items: vec![FlagRef {
+                        folder_id: m.folder_id,
+                        uid: m.uid,
+                        id: m.id,
+                    }],
+                });
+                self.set_tag(&m, &keyword, false);
             }
+        }
+        // One entry per account, so a single Ctrl+Z restores the
+        // whole set rather than giving back one tag per press.
+        for (account_id, changes) in changes {
+            self.push_undo(account_id, i18n("Remove Tags"), UndoStep::Flags(changes));
         }
     }
 
