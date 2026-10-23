@@ -113,129 +113,14 @@ impl MessageView {
         } else {
             inv.summary.clone()
         };
-        let kind = if inv.cancelled || inv.method == "CANCEL" {
-            i18n("Cancelled")
-        } else if inv.method == "REPLY" {
-            i18n("Reply")
-        } else if inv.sequence > 0 {
-            i18n("Updated invitation")
-        } else if inv.method == "REQUEST" || inv.method == "COUNTER" {
-            i18n("Invitation")
-        } else {
-            String::new()
-        };
-        let when = if inv.start == 0 {
-            String::new()
-        } else {
-            let span = crate::datefmt::event_span(inv.start, inv.end, inv.all_day);
-            match repeat_text(&inv.repeats) {
-                Some(repeat) => format!("{span} · {repeat}"),
-                None => span,
-            }
-        };
-        // Who is behind it, and how many are invited. The rooms on the
-        // attendee list are not people and are not counted.
-        let guests = inv.guests().count() as u32;
-        let who = match (&inv.organizer, guests) {
-            (Some(o), 0) => i18n_f("Organised by {name}", &[("name", o.label())]),
-            (Some(o), n) => format!(
-                "{} · {}",
-                i18n_f("Organised by {name}", &[("name", o.label())]),
-                ni18n_f("{n} guest", "{n} guests", n, &[("n", &n.to_string())]),
-            ),
-            (None, 0) => String::new(),
-            (None, n) => ni18n_f("{n} guest", "{n} guests", n, &[("n", &n.to_string())]),
-        };
+        let kind = invite_kind(inv);
+        let when = invite_when(inv);
+        let who = invite_who(inv);
 
         let answered = self.invite_answer_of(inv, m.account_id);
-        let note = if inv.cancelled || inv.method == "CANCEL" {
-            i18n("This meeting has been called off.")
-        } else if inv.method == "REPLY" {
-            // A reply from someone else: say who answered and how.
-            reply_note(inv)
-        } else {
-            match answered {
-                Some((crate::models::Rsvp::Accepted, at)) => answer_note(
-                    i18n("You accepted this invitation."),
-                    i18n_f(
-                        "You accepted this invitation on {date}.",
-                        &[("date", &crate::datefmt::day_month_year(at))],
-                    ),
-                    at,
-                ),
-                Some((crate::models::Rsvp::Tentative, at)) => answer_note(
-                    i18n("You answered maybe to this invitation."),
-                    i18n_f(
-                        "You answered maybe to this invitation on {date}.",
-                        &[("date", &crate::datefmt::day_month_year(at))],
-                    ),
-                    at,
-                ),
-                Some((crate::models::Rsvp::Declined, at)) => answer_note(
-                    i18n("You declined this invitation."),
-                    i18n_f(
-                        "You declined this invitation on {date}.",
-                        &[("date", &crate::datefmt::day_month_year(at))],
-                    ),
-                    at,
-                ),
-                None => String::new(),
-            }
-        };
+        let note = invite_note(inv, answered);
 
-        // The buttons. An invitation that has been called off, and an
-        // answer from someone else, are not things to answer.
-        let mut buttons = String::new();
-        if inv.asks_for_an_answer() {
-            use crate::models::Rsvp;
-            let answer = |rsvp: Rsvp, verb: &str, label: String, title: String| {
-                format!(
-                    "<button type=\"button\" class=\"hylki-inv-btn {verb}{on}\" \
-                     data-key=\"{}:{}\" data-inv=\"{verb}\" title=\"{}\">{}</button>",
-                    key.0,
-                    key.1,
-                    attr_escape(&title),
-                    escape_text(&label),
-                    on = if answered.map(|(a, _)| a) == Some(rsvp) {
-                        " on"
-                    } else {
-                        ""
-                    },
-                )
-            };
-            buttons.push_str(&answer(
-                Rsvp::Accepted,
-                "yes",
-                i18n("Accept"),
-                i18n("Tells the organiser you will be there"),
-            ));
-            buttons.push_str(&answer(
-                Rsvp::Tentative,
-                "maybe",
-                i18n("Maybe"),
-                i18n("Tells the organiser you might be there"),
-            ));
-            buttons.push_str(&answer(
-                Rsvp::Declined,
-                "no",
-                i18n("Decline"),
-                i18n("Tells the organiser you will not be there"),
-            ));
-        }
-        // Handing the event to a calendar is worth offering for anything
-        // that is still an event — including a published one nobody is
-        // asking about.
-        if !inv.cancelled && inv.method != "CANCEL" && inv.method != "REPLY" && !inv.ics.is_empty()
-        {
-            buttons.push_str(&format!(
-                "<button type=\"button\" class=\"hylki-inv-btn cal\" data-key=\"{}:{}\" \
-                 data-inv=\"cal\" title=\"{}\">{}</button>",
-                key.0,
-                key.1,
-                attr_escape(&i18n("Opens the meeting in your calendar application")),
-                escape_text(&i18n("Add to Calendar")),
-            ));
-        }
+        let buttons = invite_buttons(key, inv, answered);
 
         format!(
             "<div class=\"hylki-inv-icon\">{icon}</div>\
@@ -316,4 +201,153 @@ impl MessageView {
         );
         self.run_js(&js);
     }
+}
+
+/// What this message does to the meeting, for the banner's heading.
+fn invite_kind(inv: &crate::models::Invite) -> String {
+    if inv.cancelled || inv.method == "CANCEL" {
+        i18n("Cancelled")
+    } else if inv.method == "REPLY" {
+        i18n("Reply")
+    } else if inv.sequence > 0 {
+        i18n("Updated invitation")
+    } else if inv.method == "REQUEST" || inv.method == "COUNTER" {
+        i18n("Invitation")
+    } else {
+        String::new()
+    }
+}
+
+/// When the meeting is, and how it repeats.
+fn invite_when(inv: &crate::models::Invite) -> String {
+    if inv.start == 0 {
+        String::new()
+    } else {
+        let span = crate::datefmt::event_span(inv.start, inv.end, inv.all_day);
+        match repeat_text(&inv.repeats) {
+            Some(repeat) => format!("{span} · {repeat}"),
+            None => span,
+        }
+    }
+}
+
+/// Who is behind the meeting, and how many are invited.
+fn invite_who(inv: &crate::models::Invite) -> String {
+    // Who is behind it, and how many are invited. The rooms on the
+    // attendee list are not people and are not counted.
+    let guests = inv.guests().count() as u32;
+    match (&inv.organizer, guests) {
+        (Some(o), 0) => i18n_f("Organised by {name}", &[("name", o.label())]),
+        (Some(o), n) => format!(
+            "{} · {}",
+            i18n_f("Organised by {name}", &[("name", o.label())]),
+            ni18n_f("{n} guest", "{n} guests", n, &[("n", &n.to_string())]),
+        ),
+        (None, 0) => String::new(),
+        (None, n) => ni18n_f("{n} guest", "{n} guests", n, &[("n", &n.to_string())]),
+    }
+}
+
+/// Where the answer stands: called off, someone else's reply, or the
+/// reader's own answer.
+fn invite_note(
+    inv: &crate::models::Invite,
+    answered: Option<(crate::models::Rsvp, i64)>,
+) -> String {
+    if inv.cancelled || inv.method == "CANCEL" {
+        i18n("This meeting has been called off.")
+    } else if inv.method == "REPLY" {
+        // A reply from someone else: say who answered and how.
+        reply_note(inv)
+    } else {
+        match answered {
+            Some((crate::models::Rsvp::Accepted, at)) => answer_note(
+                i18n("You accepted this invitation."),
+                i18n_f(
+                    "You accepted this invitation on {date}.",
+                    &[("date", &crate::datefmt::day_month_year(at))],
+                ),
+                at,
+            ),
+            Some((crate::models::Rsvp::Tentative, at)) => answer_note(
+                i18n("You answered maybe to this invitation."),
+                i18n_f(
+                    "You answered maybe to this invitation on {date}.",
+                    &[("date", &crate::datefmt::day_month_year(at))],
+                ),
+                at,
+            ),
+            Some((crate::models::Rsvp::Declined, at)) => answer_note(
+                i18n("You declined this invitation."),
+                i18n_f(
+                    "You declined this invitation on {date}.",
+                    &[("date", &crate::datefmt::day_month_year(at))],
+                ),
+                at,
+            ),
+            None => String::new(),
+        }
+    }
+}
+
+/// The answer buttons, when the sender asks for one, and Add to
+/// Calendar for anything that is still an event.
+fn invite_buttons(
+    key: (u32, u32),
+    inv: &crate::models::Invite,
+    answered: Option<(crate::models::Rsvp, i64)>,
+) -> String {
+    // The buttons. An invitation that has been called off, and an
+    // answer from someone else, are not things to answer.
+    let mut buttons = String::new();
+    if inv.asks_for_an_answer() {
+        use crate::models::Rsvp;
+        let answer = |rsvp: Rsvp, verb: &str, label: String, title: String| {
+            format!(
+                "<button type=\"button\" class=\"hylki-inv-btn {verb}{on}\" \
+                 data-key=\"{}:{}\" data-inv=\"{verb}\" title=\"{}\">{}</button>",
+                key.0,
+                key.1,
+                attr_escape(&title),
+                escape_text(&label),
+                on = if answered.map(|(a, _)| a) == Some(rsvp) {
+                    " on"
+                } else {
+                    ""
+                },
+            )
+        };
+        buttons.push_str(&answer(
+            Rsvp::Accepted,
+            "yes",
+            i18n("Accept"),
+            i18n("Tells the organiser you will be there"),
+        ));
+        buttons.push_str(&answer(
+            Rsvp::Tentative,
+            "maybe",
+            i18n("Maybe"),
+            i18n("Tells the organiser you might be there"),
+        ));
+        buttons.push_str(&answer(
+            Rsvp::Declined,
+            "no",
+            i18n("Decline"),
+            i18n("Tells the organiser you will not be there"),
+        ));
+    }
+    // Handing the event to a calendar is worth offering for anything
+    // that is still an event — including a published one nobody is
+    // asking about.
+    if !inv.cancelled && inv.method != "CANCEL" && inv.method != "REPLY" && !inv.ics.is_empty() {
+        buttons.push_str(&format!(
+            "<button type=\"button\" class=\"hylki-inv-btn cal\" data-key=\"{}:{}\" \
+             data-inv=\"cal\" title=\"{}\">{}</button>",
+            key.0,
+            key.1,
+            attr_escape(&i18n("Opens the meeting in your calendar application")),
+            escape_text(&i18n("Add to Calendar")),
+        ));
+    }
+    buttons
 }

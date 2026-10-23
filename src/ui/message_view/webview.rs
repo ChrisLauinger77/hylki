@@ -74,12 +74,19 @@ fn build_webview(role: &'static str) -> webkit6::WebView {
     settings.set_enable_write_console_messages_to_stdout(true);
     webview.set_settings(&settings);
 
-    // "Save Image As…" on a right-clicked image. WebKit's own item hands the
-    // image to a download, which needs a `WebKitNetworkSession` destination
-    // handler we don't have — so it silently did nothing. Every image the reader
-    // shows inline (attached photos, and `cid:` images since 1.7.1) is a `data:`
-    // URI whose bytes are already in the document, so swap in our own item that
-    // decodes them and opens a real save dialog.
+    offer_save_image(&webview);
+    launch_links(&webview);
+    show_link_tooltips(&webview);
+    webview
+}
+
+/// "Save Image As…" on a right-clicked image. WebKit's own item hands the
+/// image to a download, which needs a `WebKitNetworkSession` destination
+/// handler we don't have — so it silently did nothing. Every image the reader
+/// shows inline (attached photos, and `cid:` images since 1.7.1) is a `data:`
+/// URI whose bytes are already in the document, so swap in our own item that
+/// decodes them and opens a real save dialog.
+fn offer_save_image(webview: &webkit6::WebView) {
     webview.connect_context_menu(|view, menu, hit| {
         strip_navigation_items(menu);
         if !hit.context_is_image() {
@@ -127,7 +134,13 @@ fn build_webview(role: &'static str) -> webkit6::WebView {
         );
         false // show the (edited) menu
     });
+}
 
+/// Navigation decisions: a clicked link, or a request for a new window, is
+/// handed to the desktop when it is a web or mail link and never followed
+/// in the reader; a reload is refused (#301). Anything else gets WebKit's
+/// default.
+fn launch_links(webview: &webkit6::WebView) {
     webview.connect_decide_policy(|view, decision, decision_type| {
         // Links (including ones inside sandboxed message iframes, and `_blank`
         // links that request a new window) open in the external browser.
@@ -170,10 +183,12 @@ fn build_webview(role: &'static str) -> webkit6::WebView {
         }
         false
     });
+}
 
-    // Show the target URL as a tooltip while hovering a link. WebKit doesn't do
-    // this itself; we track the hovered link and answer GTK's query-tooltip,
-    // re-querying whenever the hovered link changes so it updates immediately.
+/// Show the target URL as a tooltip while hovering a link. WebKit doesn't do
+/// this itself; we track the hovered link and answer GTK's query-tooltip,
+/// re-querying whenever the hovered link changes so it updates immediately.
+fn show_link_tooltips(webview: &webkit6::WebView) {
     let hovered: std::rc::Rc<std::cell::RefCell<Option<String>>> =
         std::rc::Rc::new(std::cell::RefCell::new(None));
     webview.set_has_tooltip(true);
@@ -201,8 +216,6 @@ fn build_webview(role: &'static str) -> webkit6::WebView {
             view.trigger_tooltip_query();
         }
     });
-
-    webview
 }
 
 impl MessageView {
