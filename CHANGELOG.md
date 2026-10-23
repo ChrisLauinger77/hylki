@@ -24,6 +24,10 @@
   window, a message window and a composer window, as it closes the main
   one; before, it reached only the main window.
 
+- **Fixed: a composer in a window of its own had no close button.** Its
+  header hid the window buttons, as it does inline, where they belong to
+  the main window.
+
 ## 1.45.0 — 2026-10-22
 
 Everything from 1.45.0-beta.1 to 1.45.0-beta.4: a Debian package with its

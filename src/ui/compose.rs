@@ -139,6 +139,7 @@ fn header_rows_width(header: &gtk::Widget) -> Option<i32> {
 /// covers, or tops), so it takes over the GNOME window decorations — unless
 /// `decorations` is off: a split reply beneath the reader leaves the reader's
 /// own header in place, and a second set of controls mid-pane would be wrong.
+/// In a window of its own the header is the window's, close button and all.
 fn size_for_host(
     root: &adw::ToolbarView,
     header: &adw::HeaderBar,
@@ -149,7 +150,7 @@ fn size_for_host(
     root.set_vexpand(true);
     editor_holder.set_vexpand(true);
     editor_holder.set_height_request(-1);
-    header.set_show_end_title_buttons(!windowed && decorations);
+    header.set_show_end_title_buttons(windowed || decorations);
 }
 
 /// Set the inline/window toggle button's icon + tooltip for the current host.
