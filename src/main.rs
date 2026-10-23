@@ -19,6 +19,7 @@ mod desktop;
 mod directory;
 mod encoding;
 mod goa;
+mod graph_api;
 mod graph_directory;
 mod graph_labels;
 mod i18n;

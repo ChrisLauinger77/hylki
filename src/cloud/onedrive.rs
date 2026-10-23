@@ -5,6 +5,8 @@
 use std::path::Path;
 use std::time::Duration;
 
+use crate::graph_api::{bearer, GRAPH_BASE};
+
 use super::http::{read_chunk, short_error, status_error, Wording};
 use super::{expiry, local_file, share_password, CloudAccount, LinkTerms, ShareResult};
 
@@ -13,7 +15,7 @@ use super::{expiry, local_file, share_password, CloudAccount, LinkTerms, ShareRe
 pub(super) fn link_terms(account: &CloudAccount) -> Result<LinkTerms, String> {
     let token = goa_token(account)?;
     let v = graph_json(
-        ureq::get(&format!("{GRAPH}/me/drive?$select=driveType,quota"))
+        ureq::get(&format!("{GRAPH_BASE}/me/drive?$select=driveType,quota"))
             .set("Authorization", &bearer(&token))
             .timeout(Duration::from_secs(60)),
         None,
@@ -57,10 +59,6 @@ pub(super) fn goa_token(account: &CloudAccount) -> Result<String, String> {
     })
 }
 
-fn bearer(token: &str) -> String {
-    format!("Bearer {token}")
-}
-
 /// Microsoft Graph: the message inside its JSON error, with the status.
 const WORDING: Wording = Wording {
     refused: &[401],
@@ -87,7 +85,6 @@ pub(super) fn api_message(body: &str) -> String {
     short_error(body)
 }
 
-const GRAPH: &str = "https://graph.microsoft.com/v1.0";
 /// Above this the file goes up in an upload session (the simple upload
 /// takes up to 250 MB; stay well under).
 const ONEDRIVE_SINGLE_LIMIT: u64 = 60 * 1024 * 1024;
@@ -111,10 +108,10 @@ fn graph_json(
 /// `/me/drive/root:/a/b` for a folder path, `/me/drive/root` for none.
 pub(super) fn onedrive_item(path: &str) -> String {
     if path.is_empty() {
-        format!("{GRAPH}/me/drive/root")
+        format!("{GRAPH_BASE}/me/drive/root")
     } else {
         format!(
-            "{GRAPH}/me/drive/root:/{}",
+            "{GRAPH_BASE}/me/drive/root:/{}",
             crate::encoding::percent::encode_path(path)
         )
     }
@@ -123,7 +120,7 @@ pub(super) fn onedrive_item(path: &str) -> String {
 /// The signed-in Microsoft account's display name.
 pub(super) fn onedrive_whoami(token: &str) -> Result<String, String> {
     let v = graph_json(
-        ureq::get(&format!("{GRAPH}/me/drive?$select=id,owner"))
+        ureq::get(&format!("{GRAPH_BASE}/me/drive?$select=id,owner"))
             .set("Authorization", &bearer(token))
             .timeout(Duration::from_secs(60)),
         None,
@@ -157,7 +154,7 @@ fn onedrive_folder(token: &str, folder: &str) -> Result<String, String> {
             Ok(_) => {}
             Err(ureq::Error::Status(404, _)) => {
                 let url = if dir.is_empty() {
-                    format!("{GRAPH}/me/drive/root/children")
+                    format!("{GRAPH_BASE}/me/drive/root/children")
                 } else {
                     format!("{}:/children", onedrive_item(&dir))
                 };
@@ -257,7 +254,7 @@ pub(super) fn onedrive_upload_and_share(
         body["password"] = p.as_str().into();
     }
     let v = graph_json(
-        ureq::post(&format!("{GRAPH}/me/drive/items/{id}/createLink"))
+        ureq::post(&format!("{GRAPH_BASE}/me/drive/items/{id}/createLink"))
             .set("Authorization", &bearer(&token))
             .timeout(Duration::from_secs(60)),
         Some(&body),

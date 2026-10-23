@@ -14,6 +14,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use crate::config::{AccountConfig, Protocol};
+use crate::graph_api::bearer;
 use crate::sensitivity::SensitivityLabel;
 
 const URL: &str =
@@ -141,11 +142,7 @@ fn agent() -> &'static ureq::Agent {
 
 fn get(token: &str, url: &str) -> Result<serde_json::Value, (Option<u16>, String)> {
     tracing::debug!(target: "hylki::graph", "> GET {}", url.strip_prefix("https://graph.microsoft.com").unwrap_or(url));
-    match agent()
-        .get(url)
-        .set("Authorization", &format!("Bearer {token}"))
-        .call()
-    {
+    match agent().get(url).set("Authorization", &bearer(token)).call() {
         Ok(resp) => resp.into_json().map_err(|e| (None, e.to_string())),
         Err(ureq::Error::Status(code, resp)) => {
             let v = resp.into_json::<serde_json::Value>().unwrap_or_default();
