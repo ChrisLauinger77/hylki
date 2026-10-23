@@ -93,7 +93,7 @@ pub(super) fn css_font(desc: &str) -> (String, String, String) {
         .split(',')
         .map(str::trim)
         .filter(|f| !f.is_empty())
-        .map(|f| format!("\"{}\"", f.replace('\\', "").replace('"', "")))
+        .map(|f| format!("\"{}\"", f.replace(['\\', '"'], "")))
         .collect();
     let generic = if family.to_ascii_lowercase().contains("mono") {
         "monospace"

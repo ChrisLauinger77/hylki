@@ -94,7 +94,7 @@ impl MessageList {
             let (messages, offer_whole) = self.move_to_messages(msg);
             let (wx, wy) = self.window_point(x, y);
             let s = sender.clone();
-            MenuEntry::new(&i18n("Move To…"), move || {
+            MenuEntry::new(i18n("Move To…"), move || {
                 let _ = s.output(MessageListOutput::MoveTo {
                     messages: messages.clone(),
                     offer_whole,
@@ -470,7 +470,7 @@ impl MessageList {
                     let (wx, wy) = self.window_point(x, y);
                     let s = sender.clone();
                     section.push(
-                        MenuEntry::new(&i18n("Move To…"), move || {
+                        MenuEntry::new(i18n("Move To…"), move || {
                             let _ = s.output(MessageListOutput::MoveTo {
                                 messages: messages.clone(),
                                 offer_whole: false,

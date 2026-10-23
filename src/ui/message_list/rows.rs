@@ -23,6 +23,9 @@ pub(super) const LIST_WINDOW: usize = 300;
 /// conversations are worked out (see `MessageList::threads_pending`).
 const PREVIEW_ROWS: usize = 2000;
 
+/// One conversation while the rows are built: its key and its messages.
+type Group = ((u32, String), Vec<Rc<Message>>);
+
 impl MessageList {
     /// Change a message wherever the list holds it — the index, the search
     /// pool and its row — and refresh the row if it is on screen.
@@ -465,7 +468,7 @@ impl MessageList {
         // The conversations in the order of their first message in the
         // sort. The keys are borrowed: a String per message was the larger
         // part of grouping a long list.
-        let mut grouped: Vec<((u32, String), Vec<Rc<Message>>)> = Vec::with_capacity(matches.len());
+        let mut grouped: Vec<Group> = Vec::with_capacity(matches.len());
         let mut at: std::collections::HashMap<&(u32, String), usize> =
             std::collections::HashMap::with_capacity(if keys.is_empty() {
                 0
@@ -507,8 +510,7 @@ impl MessageList {
                 .collect();
             let mut by: Vec<usize> = (0..grouped.len()).collect();
             by.sort_by(|a, b| flip(text_key_cmp(&people[*a], &people[*b])));
-            let mut slots: Vec<Option<((u32, String), Vec<Rc<Message>>)>> =
-                grouped.into_iter().map(Some).collect();
+            let mut slots: Vec<Option<Group>> = grouped.into_iter().map(Some).collect();
             grouped = by.into_iter().filter_map(|i| slots[i].take()).collect();
         }
 
@@ -655,8 +657,6 @@ impl MessageList {
         // On screen, the window: as many rows as were before (so a rebuild
         // does not pull the list back from where it was scrolled), at least
         // the first window, and far enough to hold the selection.
-        let mut shown = shown;
-        let mut rows = rows;
         let selected_at = shown
             .iter()
             .rposition(|m| {

@@ -304,11 +304,17 @@ fn fitted_anchor(parent: &gtk::Widget, natural: i32, x: f64, y: f64) -> f64 {
     else {
         return y;
     };
+    fitted_y(y, at.y() as f64, root.height(), natural)
+}
+
+/// The arithmetic of [`fitted_anchor`]: `top` is the point's height in a
+/// window `window_height` tall, `natural` the menu content's height.
+fn fitted_y(y: f64, top: f64, window_height: i32, natural: i32) -> f64 {
     // The popover itself measures nothing before it is mapped; its content
     // does (`natural`), and the menu's padding and shadow add a little.
-    let natural = root.height().saturating_sub(MENU_MARGIN).min(natural);
+    let natural = window_height.saturating_sub(MENU_MARGIN).min(natural);
     let height = natural + 2 * MENU_MARGIN;
-    let (top, bottom) = (at.y() as f64, root.height() as f64);
+    let bottom = window_height as f64;
     let fits_below = top + height as f64 <= bottom;
     let fits_above = top - (height as f64) >= 0.0;
     if fits_below || fits_above {
@@ -505,4 +511,32 @@ pub fn swatch_widget(color: &str, on: bool) -> gtk::DrawingArea {
         }
     });
     area
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fitted_y;
+
+    #[test]
+    fn a_menu_that_fits_either_way_stays_at_its_point() {
+        // 100 tall plus 24 of margins fits below 200 in an 800 window.
+        assert_eq!(fitted_y(50.0, 200.0, 800, 100), 50.0);
+        // And above 700, where it does not fit below.
+        assert_eq!(fitted_y(50.0, 700.0, 800, 100), 50.0);
+    }
+
+    #[test]
+    fn a_tall_menu_moves_up_just_enough_to_fit_below() {
+        // 500 + 24 fits neither below 400 nor above it in 800: the anchor
+        // moves to 800 - 524 - 12 = 264, 136 up from the point.
+        assert_eq!(fitted_y(390.0, 400.0, 800, 500), 254.0);
+        // A point given in another widget's coordinates moves by the same.
+        assert_eq!(fitted_y(10.0, 400.0, 800, 500), -126.0);
+    }
+
+    #[test]
+    fn a_menu_taller_than_the_window_is_cut_to_it() {
+        // Capped at 800 - 12, so 812 tall: it lands at the top.
+        assert_eq!(fitted_y(300.0, 300.0, 800, 5000), 0.0);
+    }
 }

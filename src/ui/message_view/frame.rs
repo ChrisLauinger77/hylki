@@ -59,6 +59,11 @@ pub(super) const PAGE: (&str, &str) = ("#f1f1f1", "#141414");
 /// paints its in-document header this color so the two read as one surface.
 pub(super) const CHROME: (&str, &str) = ("#fafafa", "#242424");
 
+/// Each card's translation banner, and the translation (and whether it is
+/// a Reader View fragment) the card shows instead of its message.
+pub(super) type TranslationsShown =
+    std::collections::HashMap<(u32, u32), (String, Option<(String, bool)>)>;
+
 thread_local! {
     /// The grounds as resolved from the live libadwaita theme, refreshed by
     /// `document_html` just before each build (issue #62). The document
@@ -85,7 +90,7 @@ thread_local! {
         std::cell::RefCell::new(std::collections::HashMap::new());
     /// Each card's translation banner (#327), and the translation the card
     /// shows instead of its message, if it shows one. Empty in tests.
-    pub(super) static LIVE_TRANSLATE: std::cell::RefCell<std::collections::HashMap<(u32, u32), (String, Option<(String, bool)>)>> =
+    pub(super) static LIVE_TRANSLATE: std::cell::RefCell<TranslationsShown> =
         std::cell::RefCell::new(std::collections::HashMap::new());
     /// Each card's folded bar (#326), already rendered. Empty in tests.
     pub(super) static LIVE_FOLDBAR: std::cell::RefCell<std::collections::HashMap<(u32, u32), String>> =

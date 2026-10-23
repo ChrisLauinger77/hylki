@@ -215,7 +215,7 @@ fn headings_sort_by_their_columns() {
         due,
         ..msg(id, "", "")
     };
-    let mut list = vec![due(1, 0), due(2, 300), due(3, 100)];
+    let mut list = [due(1, 0), due(2, 300), due(3, 100)];
     list.sort_by(|a, b| message_cmp(a, b, SortOrder::Due));
     assert_eq!(list.iter().map(|m| m.id).collect::<Vec<_>>(), vec![3, 2, 1]);
 }

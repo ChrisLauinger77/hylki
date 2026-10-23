@@ -54,6 +54,10 @@ pub use types::{
 };
 pub use webview::{new_preview_webview, shared_web_context};
 
+/// Each card's detected language, with the body length it was worked out
+/// for.
+type DetectedLanguages = std::collections::HashMap<(u32, u32), (usize, Option<String>)>;
+
 pub struct MessageView {
     /// Render a lone message as an inset card, same as a conversation's
     /// messages (#57, preference; off keeps the full-bleed view).
@@ -278,7 +282,7 @@ pub struct MessageView {
     translations: std::collections::HashMap<(u32, u32), TrState>,
     /// Which language each card's message is in, for the Translate offer,
     /// worked out once per body (by its length) rather than on every paint.
-    detected: std::cell::RefCell<std::collections::HashMap<(u32, u32), (usize, Option<String>)>>,
+    detected: std::cell::RefCell<DetectedLanguages>,
     /// The addresses each account answers to (its own and its aliases), so
     /// an invitation's attendee list can be searched for the reader (#223).
     identities: std::collections::HashMap<u32, Vec<String>>,

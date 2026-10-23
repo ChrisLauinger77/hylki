@@ -90,8 +90,7 @@ impl PageFade {
         self.held.set(true);
         let generation = self.generation.get().wrapping_add(1);
         self.generation.set(generation);
-        let then: std::rc::Rc<std::cell::RefCell<Option<Box<dyn FnOnce()>>>> =
-            std::rc::Rc::new(std::cell::RefCell::new(Some(Box::new(then))));
+        let then: SharedCallback = std::rc::Rc::new(std::cell::RefCell::new(Some(Box::new(then))));
         {
             let fade = self.clone();
             let then = then.clone();
@@ -309,3 +308,6 @@ impl MessageView {
         }
     }
 }
+
+/// A callback that runs once, from whichever of two paths gets there first.
+type SharedCallback = std::rc::Rc<std::cell::RefCell<Option<Box<dyn FnOnce()>>>>;

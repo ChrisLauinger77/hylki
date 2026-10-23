@@ -114,7 +114,7 @@ impl MessageList {
                     let pos =
                         |k: &(u32, u32)| self.shown.iter().position(|m| (m.account_id, m.id) == *k);
                     if let (Some(old), Some(new)) =
-                        (self.selected_id.as_ref().and_then(&pos), pos(key))
+                        (self.selected_id.as_ref().and_then(pos), pos(key))
                     {
                         if new != old {
                             self.nav_direction = if new > old { 1 } else { -1 };

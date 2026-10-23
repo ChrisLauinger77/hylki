@@ -96,7 +96,7 @@ pub(crate) fn hit_menu_entries(
                     MenuEntry::new(i18n("Save Image As…"), move || {
                         let dialog = gtk::FileDialog::builder()
                             .initial_name(default_image_name(&mime))
-                            .title(&i18n("Save Image"))
+                            .title(i18n("Save Image"))
                             .build();
                         let bytes = bytes.clone();
                         dialog.save(window.as_ref(), gtk::gio::Cancellable::NONE, move |res| {

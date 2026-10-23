@@ -89,6 +89,10 @@ pub(super) struct PaletteButtons {
     pub(super) built_for: (bool, bool),
 }
 
+/// What a row's tag chips were last built for: its keywords, its Gmail
+/// labels, the tags' generation and the folder pill it shows.
+type TagsKey = (Vec<String>, Vec<String>, u64, Option<String>);
+
 /// What a row remembers between binds, and while one message is bound.
 #[derive(Default)]
 pub(super) struct RowState {
@@ -103,7 +107,7 @@ pub(super) struct RowState {
     /// The address and look generation the circle was last looked up for.
     pub(super) face_for: Option<(String, u64)>,
     /// The keywords, Gmail labels and tag generation the chips were built for.
-    pub(super) tags_for: Option<(Vec<String>, Vec<String>, u64, Option<String>)>,
+    pub(super) tags_for: Option<TagsKey>,
     pub(super) avatar_shown: bool,
     pub(super) hovered: bool,
     /// The columns the widgets are laid out in on one line, or `None` for
