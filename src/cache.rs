@@ -15,6 +15,9 @@ use crate::models::{
     Attachment, Folder, FolderKind, GallerySort, Message, ThreadLatest, ThreadSummary,
 };
 
+#[cfg(test)]
+mod schema_tests;
+
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS folders (
     account_id INTEGER NOT NULL,
@@ -521,7 +524,6 @@ impl Cache {
         .unwrap_or_default()
     }
 
-    /// Open (creating if needed) the cache DB at `~/.local/share/hylki/cache.db`.
     /// A cache that lives only in memory, for the offline demo: the demo's
     /// sample mail must never reach the real `cache.db`, and running it through
     /// the same schema and the same queries is the point — the gallery's
@@ -622,6 +624,7 @@ impl Cache {
         Ok(Cache { conn })
     }
 
+    /// Open (creating if needed) the cache DB at `~/.local/share/hylki/cache.db`.
     pub fn open() -> rusqlite::Result<Cache> {
         // No `temp_dir` fallback: this database holds message bodies, attachment
         // bytes and the harvested address book, and a shared world-writable
@@ -636,12 +639,40 @@ impl Cache {
             .join("hylki");
         let _ = std::fs::create_dir_all(&path);
         restrict(&path, 0o700);
-        let db = path.join("cache.db");
-        let conn = Connection::open(&db)?;
+        Self::open_at(&path.join("cache.db"))
+    }
+
+    /// Open (creating if needed) the cache database at `db`, bring it to the
+    /// current schema, and share it in WAL mode.
+    fn open_at(db: &std::path::Path) -> rusqlite::Result<Cache> {
+        let conn = Connection::open(db)?;
         // The whole mailbox lives here, so it gets at least the care
         // `accounts.toml` gets.
-        restrict(&db, 0o600);
+        restrict(db, 0o600);
+        Self::migrate(&conn)?;
 
+        // Concurrency: multiple account workers share this file.
+        let _ = conn.pragma_update(None, "journal_mode", "WAL");
+        let _ = conn.busy_timeout(Duration::from_secs(5));
+
+        // SQLite creates the WAL sidecars itself, and only once WAL mode is on —
+        // hence here rather than beside the `Connection::open` above. They hold
+        // the same message data mid-transaction, so they get the same mode. The
+        // 0700 on the directory is what actually keeps other users out; this is
+        // in case the cache is ever moved somewhere less private.
+        for suffix in ["-wal", "-shm", "-journal"] {
+            let mut side = db.as_os_str().to_os_string();
+            side.push(suffix);
+            restrict(std::path::Path::new(&side), 0o600);
+        }
+
+        Ok(Cache { conn })
+    }
+
+    /// Bring a database of any earlier version to the current schema: drop
+    /// what an older build stored wrongly, add the columns added since, and
+    /// record the version.
+    fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap_or(0);
@@ -782,20 +813,20 @@ impl Cache {
             [crate::models::ENCRYPTED_PREVIEW],
         );
         if upgrading_index {
-            Self::redecode_encoded_subjects(&conn);
+            Self::redecode_encoded_subjects(conn);
         }
         if upgrading_index && version < 20 {
-            Self::clean_quoted_names(&conn);
+            Self::clean_quoted_names(conn);
         }
         if (LAYOUT_VERSION..21).contains(&version) {
-            Self::recheck_suspicious_senders(&conn);
+            Self::recheck_suspicious_senders(conn);
         }
         // `attachment_meta` is the gallery's record of every attachment that
         // *exists*; `attachments` holds the few whose bytes were downloaded.
         // Seed the first from the second so files already in hand keep showing
         // while the scan works back through the archive.
         if version < 14 {
-            Self::seed_attachment_meta(&conn);
+            Self::seed_attachment_meta(conn);
         }
         // Re-queue the messages a batched parse failure wrote off. Messages
         // that really do hold nothing are simply asked about once more and
@@ -821,23 +852,7 @@ impl Cache {
             );
         }
         let _ = conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION};"));
-
-        // Concurrency: multiple account workers share this file.
-        let _ = conn.pragma_update(None, "journal_mode", "WAL");
-        let _ = conn.busy_timeout(Duration::from_secs(5));
-
-        // SQLite creates the WAL sidecars itself, and only once WAL mode is on —
-        // hence here rather than beside the `Connection::open` above. They hold
-        // the same message data mid-transaction, so they get the same mode. The
-        // 0700 on the directory is what actually keeps other users out; this is
-        // in case the cache is ever moved somewhere less private.
-        for suffix in ["-wal", "-shm", "-journal"] {
-            let mut side = db.clone().into_os_string();
-            side.push(suffix);
-            restrict(std::path::Path::new(&side), 0o600);
-        }
-
-        Ok(Cache { conn })
+        Ok(())
     }
 
     /// One-time upgrade fix: earlier builds cached a message's subject verbatim
