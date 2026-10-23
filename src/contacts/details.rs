@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::read::{cache_dir, data_dir, local_details, open_book_db};
+use super::read::{local_details, open_book_db, EDS_LAYOUTS};
 use super::registry::{book_uid_active, book_uid_name, registry_books};
 use super::vcard::{
     escape_vcard_value, property_name, split_unescaped, split_vcard_line, unescape_vcard_text,
@@ -293,51 +293,14 @@ pub fn read_contact_details() -> Vec<ContactDetails> {
     let active = registry_books();
     // Walk the book directories directly (like `writable_books`) so each
     // contact remembers which book it belongs to.
-    if let Some(dir) = data_dir() {
-        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-            let db = entry.path().join("contacts.db");
-            if !db.is_file() {
-                continue;
-            }
-            let folder = entry.file_name().to_string_lossy().to_string();
-            let uid = if folder == "system" {
-                "system-address-book".to_string()
-            } else {
-                folder
-            };
+    for layout in EDS_LAYOUTS {
+        let sql = format!("SELECT {} FROM {}", layout.vcard, layout.cards);
+        for (db, uid) in layout.books() {
             if !book_uid_active(&uid, &active) {
                 continue;
             }
-            let name = book_uid_name(&uid, &active, "On This Computer");
-            read_detail_db(
-                &db,
-                "SELECT vcard FROM folder_id",
-                &uid,
-                &name,
-                &mut out,
-                &mut seen,
-            );
-        }
-    }
-    if let Some(dir) = cache_dir() {
-        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-            let db = entry.path().join("cache.db");
-            if !db.is_file() {
-                continue;
-            }
-            let uid = entry.file_name().to_string_lossy().to_string();
-            if !book_uid_active(&uid, &active) {
-                continue;
-            }
-            let name = book_uid_name(&uid, &active, "CardDAV Address Book");
-            read_detail_db(
-                &db,
-                "SELECT ECacheOBJ FROM ECacheObjects",
-                &uid,
-                &name,
-                &mut out,
-                &mut seen,
-            );
+            let name = book_uid_name(&uid, &active, layout.unnamed);
+            read_detail_db(&db, &sql, &uid, &name, &mut out, &mut seen);
         }
     }
     out.extend(local_details());

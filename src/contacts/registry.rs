@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use super::details::GroupFormat;
-use super::eds_write::remembered;
+use super::eds_write::{dest_from_service_files, remembered};
 use super::read::source_display_name;
 use crate::i18n::i18n;
 
@@ -234,18 +234,7 @@ pub(crate) fn sources_dest() -> Option<String> {
 /// Fallback: read the name from the host's D-Bus service files (works outside
 /// Flatpak only).
 fn sources_dest_from_files() -> Option<String> {
-    let dir = std::path::Path::new("/usr/share/dbus-1/services");
-    for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
-        let name = entry.file_name().to_string_lossy().to_string();
-        if name.contains("evolution.dataserver.Sources") && name.ends_with(".service") {
-            if let Ok(text) = std::fs::read_to_string(entry.path()) {
-                if let Some(n) = crate::platform::keyfile_value(&text, "D-BUS Service", "Name") {
-                    return Some(n);
-                }
-            }
-        }
-    }
-    None
+    dest_from_service_files("evolution.dataserver.Sources", |_| true)
 }
 
 /// Whether the registry lists `uid` as live (fail-open when unreachable,

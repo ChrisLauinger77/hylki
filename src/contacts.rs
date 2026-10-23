@@ -43,7 +43,8 @@ pub struct Contact {
 }
 
 /// A recipient autocomplete suggestion (from Contacts or mail history).
-#[derive(Debug, Clone)]
+/// `Default` is a person from mail history seen no times.
+#[derive(Debug, Clone, Default)]
 pub struct Suggestion {
     pub name: String,
     pub email: String,
@@ -136,10 +137,7 @@ pub fn suggestions(own: &[(String, String)]) -> Vec<Suggestion> {
             name: c.name,
             email: c.email,
             from_contacts: true,
-            from_directory: false,
-            score: 0,
-            own: false,
-            group: None,
+            ..Default::default()
         });
     }
 
@@ -154,11 +152,8 @@ pub fn suggestions(own: &[(String, String)]) -> Vec<Suggestion> {
                 .or_insert(Suggestion {
                     name,
                     email,
-                    from_contacts: false,
-                    from_directory: false,
                     score: count,
-                    own: false,
-                    group: None,
+                    ..Default::default()
                 });
         }
     }
@@ -175,11 +170,8 @@ pub fn suggestions(own: &[(String, String)]) -> Vec<Suggestion> {
                 name.clone()
             },
             email: email.clone(),
-            from_contacts: false,
-            from_directory: false,
-            score: 0,
             own: true,
-            group: None,
+            ..Default::default()
         });
     }
 
@@ -217,13 +209,11 @@ fn group_suggestions(groups: Vec<ContactDetails>) -> Vec<Suggestion> {
             name: g.name,
             email: String::new(),
             from_contacts: true,
-            from_directory: false,
-            score: 0,
-            own: false,
             group: Some(Arc::new(SuggestedGroup {
                 members,
                 hide_addresses: g.hide_addresses,
             })),
+            ..Default::default()
         });
     }
     out

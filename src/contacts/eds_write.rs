@@ -77,13 +77,22 @@ pub(crate) fn factory_dest() -> Option<String> {
 /// Fallback: read the name from the host's D-Bus service files (works outside
 /// Flatpak only).
 fn factory_dest_from_files() -> Option<String> {
+    dest_from_service_files("AddressBook", |name| name.contains("AddressBook"))
+}
+
+/// The bus name in the first of the host's D-Bus service files whose file
+/// name holds `file_needle` and whose name `accept` takes.
+pub(super) fn dest_from_service_files(
+    file_needle: &str,
+    accept: impl Fn(&str) -> bool,
+) -> Option<String> {
     let dir = std::path::Path::new("/usr/share/dbus-1/services");
     for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.contains("AddressBook") && name.ends_with(".service") {
+        if name.contains(file_needle) && name.ends_with(".service") {
             if let Ok(text) = std::fs::read_to_string(entry.path()) {
                 if let Some(n) = crate::platform::keyfile_value(&text, "D-BUS Service", "Name") {
-                    if n.contains("AddressBook") {
+                    if accept(&n) {
                         return Some(n);
                     }
                 }

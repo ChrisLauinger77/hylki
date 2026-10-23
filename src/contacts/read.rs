@@ -47,6 +47,110 @@ pub(super) fn cache_dir() -> Option<PathBuf> {
     host_xdg(dirs::cache_dir, ".cache").map(|d| d.join("evolution/addressbook"))
 }
 
+/// How EDS lays out one kind of address book on disk: a book kept on this
+/// computer is a `contacts.db` under the data directory, a book mirrored
+/// from a server (CardDAV, Google…) a `cache.db` under the cache directory,
+/// each with its own table and column names.
+pub(super) struct EdsLayout {
+    /// Where the books' directories are.
+    root: fn() -> Option<PathBuf>,
+    /// The database file in each book's directory.
+    pub(super) file: &'static str,
+    /// The table of cards, with its vCard and UID columns.
+    pub(super) cards: &'static str,
+    pub(super) vcard: &'static str,
+    pub(super) uid: &'static str,
+    /// The table of the cards' addresses: `value`, by `uid`.
+    pub(super) emails: &'static str,
+    /// A book mirrored from a server.
+    pub(super) cached: bool,
+    /// What a book is called when the registry names none.
+    pub(super) unnamed: &'static str,
+}
+
+pub(super) const LOCAL_BOOKS: EdsLayout = EdsLayout {
+    root: data_dir,
+    file: "contacts.db",
+    cards: "folder_id",
+    vcard: "vcard",
+    uid: "uid",
+    emails: "folder_id_email_list",
+    cached: false,
+    unnamed: "On This Computer",
+};
+
+pub(super) const CACHED_BOOKS: EdsLayout = EdsLayout {
+    root: cache_dir,
+    file: "cache.db",
+    cards: "ECacheObjects",
+    vcard: "ECacheOBJ",
+    uid: "ECacheUID",
+    emails: "attrlist_email_list",
+    cached: true,
+    unnamed: "CardDAV Address Book",
+};
+
+/// Both layouts, in the order the books are read.
+pub(super) const EDS_LAYOUTS: [&EdsLayout; 2] = [&LOCAL_BOOKS, &CACHED_BOOKS];
+
+impl EdsLayout {
+    /// Every book database of this layout.
+    pub(super) fn dbs(&self) -> Vec<PathBuf> {
+        (self.root)()
+            .map(|dir| find_dbs(&dir, self.file))
+            .unwrap_or_default()
+    }
+
+    /// The book databases [`db_book_wanted`] keeps.
+    pub(super) fn wanted_dbs<'a>(
+        &self,
+        active: &'a Option<HashMap<String, String>>,
+        saved_only: bool,
+    ) -> impl Iterator<Item = PathBuf> + 'a {
+        self.dbs()
+            .into_iter()
+            .filter(move |db| db_book_wanted(db, active, saved_only))
+    }
+
+    /// Every book of this layout as (database, source UID). The built-in
+    /// local book's folder is `system`, its source UID
+    /// `system-address-book`.
+    pub(super) fn books(&self) -> Vec<(PathBuf, String)> {
+        let Some(dir) = (self.root)() else {
+            return Vec::new();
+        };
+        std::fs::read_dir(&dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| {
+                let db = entry.path().join(self.file);
+                if !db.is_file() {
+                    return None;
+                }
+                let folder = entry.file_name().to_string_lossy().to_string();
+                let uid = if !self.cached && folder == "system" {
+                    "system-address-book".to_string()
+                } else {
+                    folder
+                };
+                Some((db, uid))
+            })
+            .collect()
+    }
+
+    /// Each card with one of its addresses, as (vCard, address).
+    fn cards_and_addresses(&self) -> String {
+        format!(
+            "SELECT c.{vcard}, e.value FROM {cards} c JOIN {emails} e ON c.{uid} = e.uid",
+            vcard = self.vcard,
+            cards = self.cards,
+            emails = self.emails,
+            uid = self.uid,
+        )
+    }
+}
+
 fn config_dir() -> Option<PathBuf> {
     host_xdg(dirs::config_dir, ".config").map(|d| d.join("evolution"))
 }
@@ -159,36 +263,13 @@ pub(super) fn read_contacts_in(
     let mut out = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
 
-    // Local books: table `folder_id` + `folder_id_email_list`. Read the vCard
-    // (not `full_name`, which EDS stores case-folded for search) so the display
+    // Local books, then cached ones (CardDAV etc.). Read the vCard (not
+    // `full_name`, which EDS stores case-folded for search) so the display
     // name keeps its original capitalisation.
-    if let Some(dir) = data_dir() {
-        for db in find_dbs(&dir, "contacts.db") {
-            if !db_book_wanted(&db, active, saved_only) {
-                continue;
-            }
-            complete &= read_book_db(
-                &db,
-                "SELECT f.vcard, e.value FROM folder_id f \
-                 JOIN folder_id_email_list e ON f.uid = e.uid",
-                &mut out,
-                &mut seen,
-            );
-        }
-    }
-    // Cached books (CardDAV etc.): table `ECacheObjects` + `attrlist_email_list`.
-    if let Some(dir) = cache_dir() {
-        for db in find_dbs(&dir, "cache.db") {
-            if !db_book_wanted(&db, active, saved_only) {
-                continue;
-            }
-            complete &= read_book_db(
-                &db,
-                "SELECT o.ECacheOBJ, e.value FROM ECacheObjects o \
-                 JOIN attrlist_email_list e ON o.ECacheUID = e.uid",
-                &mut out,
-                &mut seen,
-            );
+    for layout in EDS_LAYOUTS {
+        let sql = layout.cards_and_addresses();
+        for db in layout.wanted_dbs(active, saved_only) {
+            complete &= read_book_db(&db, &sql, &mut out, &mut seen);
         }
     }
     // The local Hylki book, last: an address EDS already has keeps EDS's name.
@@ -229,18 +310,9 @@ pub(super) fn read_groups_in(active: &Option<HashMap<String, String>>) -> Vec<Co
             out.push(c);
         }
     };
-    if let Some(dir) = data_dir() {
-        for db in find_dbs(&dir, "contacts.db") {
-            if db_book_wanted(&db, active, false) {
-                read(&db, "folder_id", "vcard", "uid");
-            }
-        }
-    }
-    if let Some(dir) = cache_dir() {
-        for db in find_dbs(&dir, "cache.db") {
-            if db_book_wanted(&db, active, false) {
-                read(&db, "ECacheObjects", "ECacheOBJ", "ECacheUID");
-            }
+    for layout in EDS_LAYOUTS {
+        for db in layout.wanted_dbs(active, false) {
+            read(&db, layout.cards, layout.vcard, layout.uid);
         }
     }
     if crate::local_contacts::exists() && crate::contact_sources::hylki_used() {
@@ -449,43 +521,20 @@ pub fn writable_books() -> Vec<Book> {
     let mut books = Vec::new();
     let active = registry_books();
     let formats = book_group_formats();
-    if let Some(dir) = data_dir() {
-        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-            if !entry.path().join("contacts.db").is_file() {
-                continue;
-            }
-            let folder = entry.file_name().to_string_lossy().to_string();
-            // The built-in local book's source UID is "system-address-book".
-            let uid = if folder == "system" {
-                "system-address-book".to_string()
-            } else {
-                folder
-            };
+    for layout in EDS_LAYOUTS {
+        // A book whose groups the registry does not describe keeps them as
+        // its kind of book usually does.
+        let usual = if layout.cached {
+            GroupFormat::Apple
+        } else {
+            GroupFormat::Evolution
+        };
+        for (_, uid) in layout.books() {
             if !book_uid_active(&uid, &active) {
                 continue;
             }
-            let name = book_uid_name(&uid, &active, "On This Computer");
-            let groups = formats
-                .get(&uid)
-                .copied()
-                .unwrap_or(Some(GroupFormat::Evolution));
-            books.push(Book { uid, name, groups });
-        }
-    }
-    if let Some(dir) = cache_dir() {
-        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-            if !entry.path().join("cache.db").is_file() {
-                continue;
-            }
-            let uid = entry.file_name().to_string_lossy().to_string();
-            if !book_uid_active(&uid, &active) {
-                continue;
-            }
-            let name = book_uid_name(&uid, &active, "CardDAV Address Book");
-            let groups = formats
-                .get(&uid)
-                .copied()
-                .unwrap_or(Some(GroupFormat::Apple));
+            let name = book_uid_name(&uid, &active, layout.unnamed);
+            let groups = formats.get(&uid).copied().unwrap_or(Some(usual));
             books.push(Book { uid, name, groups });
         }
     }

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, SystemTime};
 
-use super::read::{cache_dir, data_dir, db_book_wanted, open_book_db};
+use super::read::{open_book_db, CACHED_BOOKS, EDS_LAYOUTS, LOCAL_BOOKS};
 use super::registry::registry_books;
 use super::vcard::{vcard_photo, vcard_photo_with};
 
@@ -200,13 +200,7 @@ fn photo_db_fingerprint() -> DbFingerprint {
 }
 
 fn photo_db_paths() -> Vec<PathBuf> {
-    let mut dbs = Vec::new();
-    if let Some(dir) = data_dir() {
-        dbs.extend(find_dbs(&dir, "contacts.db"));
-    }
-    if let Some(dir) = cache_dir() {
-        dbs.extend(find_dbs(&dir, "cache.db"));
-    }
+    let mut dbs: Vec<PathBuf> = EDS_LAYOUTS.iter().flat_map(|l| l.dbs()).collect();
     dbs.sort();
     dbs
 }
@@ -215,34 +209,17 @@ fn load_contact_photo_index() -> HashMap<String, Vec<PhotoLocation>> {
     let mut photos = HashMap::new();
     // A book switched off, in EDS or for Hylki, lends no faces.
     let active = registry_books();
-    if let Some(dir) = data_dir() {
-        for db in find_dbs(&dir, "contacts.db")
-            .into_iter()
-            .filter(|db| db_book_wanted(db, &active, false))
-        {
-            read_photo_locations(
-                &db,
-                "SELECT e.value, f.uid FROM folder_id f \
-                 JOIN folder_id_email_list e ON f.uid = e.uid \
-                 WHERE f.vcard LIKE '%PHOTO%'",
-                false,
-                &mut photos,
-            );
-        }
-    }
-    if let Some(dir) = cache_dir() {
-        for db in find_dbs(&dir, "cache.db")
-            .into_iter()
-            .filter(|db| db_book_wanted(db, &active, false))
-        {
-            read_photo_locations(
-                &db,
-                "SELECT e.value, o.ECacheUID FROM ECacheObjects o \
-                 JOIN attrlist_email_list e ON o.ECacheUID = e.uid \
-                 WHERE o.ECacheOBJ LIKE '%PHOTO%'",
-                true,
-                &mut photos,
-            );
+    for layout in EDS_LAYOUTS {
+        let sql = format!(
+            "SELECT e.value, c.{uid} FROM {cards} c JOIN {emails} e ON c.{uid} = e.uid \
+             WHERE c.{vcard} LIKE '%PHOTO%'",
+            uid = layout.uid,
+            cards = layout.cards,
+            emails = layout.emails,
+            vcard = layout.vcard,
+        );
+        for db in layout.wanted_dbs(&active, false) {
+            read_photo_locations(&db, &sql, layout.cached, &mut photos);
         }
     }
     add_local_photo_locations(&mut photos);
@@ -341,13 +318,17 @@ fn read_photo_at(location: &PhotoLocation) -> Option<Vec<u8>> {
         return vcard_photo_with(&vcard, false);
     }
     let conn = open_book_db(&location.db).ok()?;
-    let query = if location.cached_book {
-        "SELECT ECacheOBJ FROM ECacheObjects WHERE ECacheUID = ?1"
+    let layout = if location.cached_book {
+        &CACHED_BOOKS
     } else {
-        "SELECT vcard FROM folder_id WHERE uid = ?1"
+        &LOCAL_BOOKS
     };
+    let query = format!(
+        "SELECT {} FROM {} WHERE {} = ?1",
+        layout.vcard, layout.cards, layout.uid
+    );
     let vcard: Option<String> = conn
-        .query_row(query, [&location.uid], |row| row.get(0))
+        .query_row(&query, [&location.uid], |row| row.get(0))
         .ok()?;
     vcard.as_deref().and_then(vcard_photo)
 }

@@ -862,9 +862,7 @@ fn suggestions_from_vcard(card: &str) -> Vec<Suggestion> {
             email,
             from_contacts: true,
             from_directory: true,
-            score: 0,
-            own: false,
-            group: None,
+            ..Default::default()
         })
         .collect()
 }
