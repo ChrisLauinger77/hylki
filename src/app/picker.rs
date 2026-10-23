@@ -1,7 +1,11 @@
 //! A small searchable list dialog that picks one message: a draft to add
 //! files to, a message to reply to, a template.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::i18n::i18n;
+use crate::models::Message;
 
 /// A dialog listing messages to pick one from: a draft to continue or a
 /// message to reply to for handed-in files, or a template to start from

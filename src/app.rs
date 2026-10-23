@@ -121,10 +121,10 @@ mod window;
 mod workers;
 
 pub(crate) use accounts::finish_keyring_writes;
-use attachments::{prune_downloads, schedule_download_prune, AttachmentTarget};
+use attachments::{prune_downloads, schedule_download_prune};
 use boot::{build_main_menu, Boot};
 use children::Children;
-use compose_host::{ComposeHost, ReaderCompose};
+use compose_host::ReaderCompose;
 use confirm::confirm_destructive;
 use consts::{ATTACHMENT_CACHE_BUDGET, BODY_CACHE_BUDGET, READER_MIN_WIDTH};
 use contacts::{reload_contacts, start_contacts_sync, sync_contact_books};
@@ -133,46 +133,42 @@ use conversation::{
 };
 use demo::{demo_account_configs_saved, demo_filters, demo_mode, demo_tags};
 use diagnostics::start_heap_trim;
-use filter_run::{FilterRun, FolderTally};
+use filter_run::FolderTally;
 use flags::{read_label, sender_label, star_label};
 use folders::{apply_folder_roles, kind_label, merged_unread, same_folder_list};
-use hand_off::{FileHandOff, HandOffFiles, HandOffTarget};
+use hand_off::{FileHandOff, HandOffFiles};
 use keymap::{ctrl_shortcut_for, focus_in_compose, gmail_sequence, GoTarget, WindowCompose};
 pub(crate) use keymap::{
     focus_is_text, focus_takes_keys, gmail_shortcut_for, reader_keeps, shortcut_for,
     without_caps_lock, Shortcut,
 };
-use list_header::{ListHeaderWidgets, LIST_WIDE_ON};
+use list_header::LIST_WIDE_ON;
 pub(crate) use model::AppModel;
 pub(crate) use msg::AppMsg;
 use palette::palette_key;
 use pending::{PENDING_MOVE_MAX, PENDING_SEEN_MAX, PENDING_TAG_MAX, PENDING_TAG_SETTLED};
 use picker::show_message_picker;
-use popout::PopOut;
 use prefill::{
     first_recipient, forward_prefill, reply_all_prefill, reply_prefill, reply_subject,
     stage_attachments, unsent_prefill,
 };
 use quote::editable_copy_html;
 pub(crate) use quote::{body_is_pre_wrap, message_text};
-use reader_toolbar::ReaderToolbarWidgets;
 use release_notes::release_notes_page;
 use search::default_scope;
 use send::machine_message;
-use send_morph::{MorphPending, Provisional};
 pub(crate) use showcase::showcase_capture;
 use showcase::showcase_pgp;
 use sidebar::{folder_key, set_sidebar_header_compact};
 use sidebar_peek::SIDEBAR_RAIL_WIDTH;
 use smart::SMART_VIEW_LIMIT;
 use split_reply::{set_split_shrink, split_reply_height};
-use tags::TagScan;
 pub(crate) use theme::desktop_icon_theme;
 use theme::{
     apply_app_theme, apply_icon_theme, follow_motion_setting, motion_wanted, refresh_scheme_css,
     WIZARD_HOLDS_LIGHT,
 };
-use transfer::{Transfer, TransferTally};
+use transfer::TransferTally;
 use types::{FolderMessages, SelectedFolder, UnifiedView};
 use undo::{FlagChange, FlagKind, FlagRef, UndoEntry, UndoStep};
 use unified::LIST_NEWEST;
@@ -194,27 +190,22 @@ use crate::models::{
     thread_ids, Account, Attachment, Folder, FolderKind, KeywordFinding, Message, ThreadSummary,
 };
 use crate::ui::accounts::{AccountsOutput, AccountsWindow};
-use crate::ui::attachments_gallery::{
-    AttachmentsGallery, GalleryAccount, GalleryFolder, GalleryInput, GalleryOutput, GalleryRequest,
-};
+use crate::ui::attachments_gallery::{GalleryAccount, GalleryFolder, GalleryInput};
 use crate::ui::compose::{Compose, ComposeInit, ComposeInput, ComposeOutput, ComposePrefill};
 use crate::ui::message_list::{
-    BulkAction, MessageList, MessageListInput, MessageListOutput, QuickFilter, QuickFilters,
-    RowAction, SearchScope,
+    BulkAction, MessageListInput, QuickFilter, QuickFilters, RowAction, SearchScope,
 };
 
 use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
-use crate::ui::attachment_drawer::{AttachmentDrawer, AttachmentDrawerInput};
-use crate::ui::contacts_page::{ContactsPage, ContactsPageInput, ContactsPageOutput};
-use crate::ui::message_view::{MessageView, MessageViewInput, MessageViewOutput, UnsubState};
+use crate::ui::attachment_drawer::AttachmentDrawerInput;
+use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::message_view::{MessageViewInput, UnsubState};
 use crate::ui::message_window::{
     MessageWindow, MessageWindowInit, MessageWindowInput, MessageWindowOutput,
 };
-use crate::ui::notifications::{NotificationCenter, NotifyInput, NotifyOutput};
+use crate::ui::notifications::NotifyInput;
 use crate::ui::preferences::{PrefInit, PrefInput, PrefOutput, Preferences};
-use crate::ui::sidebar::{
-    CtxAction, SectionData, Sidebar, SidebarInput, SidebarOutput, UnifiedFolderRef,
-};
+use crate::ui::sidebar::{CtxAction, SectionData, SidebarInput, UnifiedFolderRef};
 use crate::worker::{self, MailRequest, OutgoingMessage, WorkerEvent};
 
 #[relm4::component(pub)]

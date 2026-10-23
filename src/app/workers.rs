@@ -766,6 +766,7 @@ pub(super) fn watch_system_events(sender: &ComponentSender<AppModel>) {
 mod tests {
     use super::*;
     use crate::app::children::sidebar_output_msg;
+    use crate::ui::sidebar::SidebarOutput;
 
     #[test]
     fn sidebar_and_worker_outputs_map_to_app_messages() {

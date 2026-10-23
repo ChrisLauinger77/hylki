@@ -2,7 +2,14 @@
 //! folders, replies, new messages and forwards, the composer's menus and
 //! formats, handed-in files, the light/dark flip and themes.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::app::{AppModel, AppMsg};
+use crate::config;
+use crate::models::FolderKind;
+use crate::ui::preferences::PrefOutput;
+
+use super::{input_after, showcase_at, showcase_log_focus};
 
 /// HYLKI_SHOWCASE_FOCUS=<seconds> switches Focus Mode on at
 /// that moment (its parts as saved in focus.toml), so a

@@ -1,7 +1,24 @@
 //! Every message the root component handles: user actions, worker events,
 //! child component outputs and showcase hooks.
 
-use super::*;
+use std::collections::HashMap;
+
+use relm4::prelude::*;
+
+use crate::config::{self, AccountConfig};
+use crate::models::{
+    Account, Attachment, Folder, FolderKind, KeywordFinding, Message, ThreadSummary,
+};
+use crate::ui::attachments_gallery::GalleryRequest;
+use crate::ui::message_list::{BulkAction, QuickFilter, RowAction};
+use crate::ui::preferences::PrefOutput;
+use crate::ui::sidebar::CtxAction;
+use crate::worker::OutgoingMessage;
+
+use super::attachments::AttachmentTarget;
+use super::hand_off::{FileHandOff, HandOffTarget};
+use super::keymap::{Shortcut, WindowCompose};
+use super::types::UnifiedView;
 
 #[derive(Debug)]
 pub(crate) enum AppMsg {

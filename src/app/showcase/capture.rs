@@ -1,7 +1,10 @@
 //! Capturing the window to a PNG, and the small helpers the showcase hooks
 //! share.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::app::{AppModel, AppMsg};
 
 /// Render the window's widget tree to a PNG at 2x (crisp text for marketing
 /// shots). Content only — the compositor's shadow/frame is not part of the

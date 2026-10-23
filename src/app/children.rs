@@ -1,8 +1,25 @@
 //! The child components: their launch, and their outputs turned into the
 //! messages they mean to the root component.
 
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::models::FolderKind;
+use crate::ui::attachment_drawer::AttachmentDrawer;
+use crate::ui::attachments_gallery::{AttachmentsGallery, GalleryOutput};
+use crate::ui::contacts_page::{ContactsPage, ContactsPageOutput};
+use crate::ui::message_list::{MessageList, MessageListOutput};
+use crate::ui::message_view::{MessageView, MessageViewOutput};
+use crate::ui::notifications::{NotificationCenter, NotifyOutput};
+use crate::ui::preferences::PrefOutput;
+use crate::ui::sidebar::{Sidebar, SidebarInput, SidebarOutput};
+
+use super::attachments::AttachmentTarget;
 use super::boot::{sidebar_init, start_target, Boot};
-use super::*;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::types::UnifiedView;
 
 /// What the message list reports, as the message it means here.
 pub(super) fn message_list_output_msg(out: MessageListOutput) -> AppMsg {

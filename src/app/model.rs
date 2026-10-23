@@ -1,6 +1,40 @@
 //! The root component's state.
 
-use super::*;
+use std::collections::{HashMap, HashSet};
+
+use relm4::actions::RelmAction;
+use relm4::prelude::*;
+use tokio::sync::mpsc::UnboundedSender;
+
+use crate::config::{self, AccountConfig};
+use crate::models::{Account, Attachment, Folder, Message};
+use crate::ui::accounts::AccountsWindow;
+use crate::ui::attachment_drawer::AttachmentDrawer;
+use crate::ui::attachments_gallery::AttachmentsGallery;
+use crate::ui::compose::Compose;
+use crate::ui::contacts_page::ContactsPage;
+use crate::ui::message_list::{MessageList, QuickFilters};
+use crate::ui::message_view::MessageView;
+use crate::ui::notifications::NotificationCenter;
+use crate::ui::preferences::Preferences;
+use crate::ui::sidebar::Sidebar;
+use crate::worker::MailRequest;
+
+use super::attachments::AttachmentTarget;
+use super::compose_host::{ComposeHost, ReaderCompose};
+use super::conversation::BodyKey;
+use super::filter_run::FilterRun;
+use super::hand_off::{FileHandOff, HandOffFiles};
+use super::list_header::ListHeaderWidgets;
+use super::msg::AppMsg;
+use super::popout::PopOut;
+use super::reader_toolbar::ReaderToolbarWidgets;
+use super::send_morph::{MorphPending, Provisional};
+use super::tags::TagScan;
+use super::transfer::{Transfer, TransferTally};
+use super::types::{FolderMessages, SelectedFolder, UnifiedView};
+use super::undo::UndoEntry;
+use super::{RedoAction, UndoAction};
 
 pub(crate) struct AppModel {
     /// One mail worker per account (account_id → request sender).
