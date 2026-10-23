@@ -1,6 +1,8 @@
 //! Setting up a composer: the From identities it offers and which one it opens
 //! with.
 
+use super::*;
+
 use std::collections::HashMap;
 
 use crate::config::{split_identity, AccountConfig};
@@ -187,6 +189,155 @@ pub(super) fn choose_identity(
         .unwrap_or(0)
 }
 
+impl AppModel {
+    /// The account and identity a NEW message opens from (#157). With a
+    /// default sender chosen in Settings → Composing, that identity — an
+    /// account's own address or one of its aliases — as long as its account
+    /// is still enabled; otherwise `fallback` (the open folder's or open
+    /// message's account, as before) from its own address. Replies never
+    /// come through here: they answer from the address written to.
+    pub(super) fn new_message_from(
+        &self,
+        fallback: u32,
+        mut prefill: ComposePrefill,
+    ) -> (u32, ComposePrefill) {
+        let want = self.compose_default_from.trim();
+        if want.is_empty() {
+            return (fallback, prefill);
+        }
+        let owner = self.config.iter().enumerate().find(|(_, c)| {
+            c.enabled
+                && (c.email.eq_ignore_ascii_case(want)
+                    || c.aliases.iter().any(|al| {
+                        crate::config::split_identity(&al.identity)
+                            .1
+                            .eq_ignore_ascii_case(want)
+                    }))
+        });
+        match owner {
+            Some((idx, _)) => {
+                prefill.from_address = want.to_string();
+                (idx as u32 + 1, prefill)
+            }
+            None => (fallback, prefill),
+        }
+    }
+
+    /// Assemble the `ComposeInit` for a composer (from-accounts + signatures,
+    /// autocomplete suggestions, a fresh id, host mode).
+    pub(super) fn build_compose_init(
+        &mut self,
+        account_id: u32,
+        prefill: ComposePrefill,
+        windowed: bool,
+        can_toggle: bool,
+    ) -> (u32, ComposeInit) {
+        let accounts = compose_identities(
+            &self.account_order,
+            self.effective_config(),
+            &self.server_identities,
+        );
+        let mut prefill = prefill;
+        let selected = choose_identity(&accounts, account_id, &mut prefill);
+
+        // A reply or forward to plain-text mail answers in kind when the
+        // setting says so (#436); anything else starts in the chosen format.
+        let format = if self.follow_plain && prefill.original_plain {
+            config::ComposeFormat::Plain
+        } else {
+            self.compose_format
+        };
+        // The user's own addresses go last in the recipient suggestions.
+        let own: Vec<(String, String)> = self
+            .config
+            .iter()
+            .map(|c| (c.name.clone(), c.email.clone()))
+            .collect();
+        let id = self.next_compose_id;
+        self.next_compose_id += 1;
+        let init = ComposeInit {
+            compose_id: id,
+            prefill,
+            accounts,
+            selected,
+            own_addresses: own,
+            windowed,
+            can_toggle,
+            compact: false,
+            decorations: true,
+            format,
+            signature_position: self.signature_position,
+        };
+        (id, init)
+    }
+
+    /// Launch a `Compose` component, forwarding its outputs into `AppMsg`.
+    pub(super) fn spawn_compose(
+        &self,
+        init: ComposeInit,
+        sender: &ComponentSender<Self>,
+    ) -> Controller<Compose> {
+        Compose::builder()
+            .launch(init)
+            .forward(sender.input_sender(), |out| match out {
+                ComposeOutput::Send { id, message } => AppMsg::SendMessage {
+                    from: id,
+                    out: message,
+                },
+                ComposeOutput::SaveDraft(msg) => AppMsg::SaveDraftMessage(msg),
+                ComposeOutput::SaveTemplate(msg) => AppMsg::SaveTemplateMessage(msg),
+                ComposeOutput::AutoSave { id, message } => AppMsg::AutoSaveDraft { id, message },
+                ComposeOutput::DiscardAutosave { id, origin } => {
+                    AppMsg::DiscardAutosave { id, origin }
+                }
+                ComposeOutput::DeleteDraft { id, origin } => AppMsg::DeleteDraft { id, origin },
+                ComposeOutput::ToggleWindow(id) => AppMsg::ComposeToggleWindow(id),
+                ComposeOutput::Close(id) => AppMsg::ComposeClosed(id),
+                ComposeOutput::History { id, undo, redo } => {
+                    AppMsg::ComposeHistory { id, undo, redo }
+                }
+                ComposeOutput::SetSpellcheckLangs(langs) => {
+                    AppMsg::Pref(PrefOutput::SetSpellcheckLangs(langs))
+                }
+                ComposeOutput::DirectoryError(text) => AppMsg::DirectoryError(text),
+                ComposeOutput::ShowContacts => AppMsg::ShowContactsPage,
+            })
+    }
+
+    /// Host a compose pane in a fresh standalone window, transient for the app.
+    pub(super) fn compose_window_host(
+        &self,
+        content: &impl IsA<gtk::Widget>,
+        id: u32,
+        sender: &ComponentSender<Self>,
+    ) -> adw::Window {
+        let win = adw::Window::builder()
+            .modal(false)
+            // Room for the full compose toolbar (Cancel, Save Draft, the
+            // action icons, Send) before it folds into its ⋯ menu.
+            .default_width(720)
+            .default_height(760)
+            .title(&i18n("New Message"))
+            .transient_for(&self.window)
+            .build();
+        win.set_content(Some(content));
+        win.add_controller(palette_key(sender));
+        win.add_controller(crate::ui::close_key());
+        let s = sender.input_sender().clone();
+        win.connect_close_request(move |_| {
+            let _ = s.send(AppMsg::ComposeCloseRequested(id));
+            gtk::glib::Propagation::Stop
+        });
+        win.connect_is_active_notify(|w| {
+            if w.is_active() {
+                crate::notify::withdraw_compose_ready();
+            }
+        });
+        win.present();
+        win
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295,5 +446,22 @@ mod tests {
         };
         assert_eq!(choose_identity(&ids, 1, &mut typed), 2);
         assert_eq!(typed.custom_from, "Me <me@x.com>");
+    }
+
+    #[test]
+    fn identities_split_into_name_and_address() {
+        use crate::config::split_identity;
+        assert_eq!(
+            split_identity("Ann Work <ann@work.example>"),
+            ("Ann Work".into(), "ann@work.example".into())
+        );
+        assert_eq!(
+            split_identity("ann@shop.example"),
+            (String::new(), "ann@shop.example".into())
+        );
+        assert_eq!(
+            split_identity("\"Quoted\" <q@x.example>"),
+            ("Quoted".into(), "q@x.example".into())
+        );
     }
 }

@@ -1,6 +1,8 @@
 //! The search pool: every indexed folder's mail merged into one list for a
 //! search across folders and accounts, one copy of each mail.
 
+use super::*;
+
 use std::collections::HashMap;
 
 use super::conversation::same_mail;
@@ -62,6 +64,110 @@ pub(super) fn default_scope(inbox: bool) -> SearchScope {
         SearchScope::AllFolders
     } else {
         SearchScope::ThisFolder
+    }
+}
+
+impl AppModel {
+    /// The cross-folder search pool: the folders opened this run as they
+    /// are now, and `from_disk` for the rest, answered with
+    /// [`AppMsg::SearchPoolBuilt`]. Copying a mailbox's messages took the
+    /// main loop for a good part of a second as a search began (#515), so
+    /// the folders go to another thread shared, not copied.
+    pub(super) fn build_search_pool(
+        &self,
+        gen: u64,
+        from_disk: Vec<Vec<Message>>,
+        sender: &ComponentSender<Self>,
+    ) {
+        let kinds: HashMap<(u32, u32), FolderKind> = self
+            .folders
+            .iter()
+            .flat_map(|(aid, fs)| fs.iter().map(move |f| ((*aid, f.id), f.kind)))
+            .collect();
+        let opened: Vec<FolderMessages> = self.message_cache.values().cloned().collect();
+        let s = sender.clone();
+        std::thread::spawn(move || {
+            let t = std::time::Instant::now();
+            let pool =
+                build_search_pool(opened.iter().map(|f| &**f).chain(from_disk.iter()), |m| {
+                    pool_rank(kinds.get(&(m.account_id, m.folder_id)).copied())
+                });
+            // Let go of the folders before the answer is in, or the next
+            // change to one of them copies it.
+            drop(opened);
+            let text = pool
+                .iter()
+                .map(crate::ui::message_list::search_text_of)
+                .collect();
+            tracing::debug!(
+                "search: pool of {} messages put together in {:?}",
+                pool.len(),
+                t.elapsed()
+            );
+            s.input(AppMsg::SearchPoolBuilt { gen, pool, text });
+        });
+    }
+
+    /// Read the folders not opened this run from the disk cache, where the
+    /// background index keeps every folder whole, and hand them to the
+    /// search with [`AppMsg::SearchPoolLoaded`] (#472). Gmail's All Mail is
+    /// the one archived mail lives in, and it is rarely opened.
+    pub(super) fn load_search_pool(&self, sender: &ComponentSender<Self>) {
+        let gen = self.search_gen;
+        if self.cache.is_none() {
+            self.build_search_pool(gen, Vec::new(), sender);
+            return;
+        }
+        let unopened: Vec<(u32, u32, String)> = self
+            .folders
+            .iter()
+            .flat_map(|(aid, fs)| fs.iter().map(move |f| (*aid, f)))
+            .filter(|(aid, f)| !self.message_cache.contains_key(&(*aid, f.id)))
+            .map(|(aid, f)| (aid, f.id, f.path.clone()))
+            .collect();
+        if unopened.is_empty() {
+            self.build_search_pool(gen, Vec::new(), sender);
+            return;
+        }
+        let s = sender.clone();
+        std::thread::spawn(move || {
+            let Ok(cache) = crate::cache::Cache::open() else {
+                s.input(AppMsg::SearchPoolLoaded {
+                    gen,
+                    lists: Vec::new(),
+                });
+                return;
+            };
+            let t = std::time::Instant::now();
+            let lists: Vec<((u32, u32), Vec<Message>)> = unopened
+                .into_iter()
+                .map(|(aid, fid, path)| ((aid, fid), cache.load_messages(aid, &path, fid)))
+                .filter(|(_, ms)| !ms.is_empty())
+                .collect();
+            tracing::debug!(
+                "search: {} messages in {} unopened folders read in {:?}",
+                lists.iter().map(|(_, ms)| ms.len()).sum::<usize>(),
+                lists.len(),
+                t.elapsed()
+            );
+            s.input(AppMsg::SearchPoolLoaded { gen, lists });
+        });
+    }
+
+    /// Every folder as a search across folders shows its results (#374):
+    /// the name its pill says, and whether "All folders" leaves it out.
+    pub(super) fn pool_folders(&self) -> HashMap<(u32, u32), crate::ui::message_list::PoolFolder> {
+        self.folders
+            .iter()
+            .flat_map(|(aid, fs)| fs.iter().map(move |f| (*aid, f)))
+            .map(|(aid, f)| {
+                let folder = crate::ui::message_list::PoolFolder {
+                    name: f.name.clone(),
+                    waste: matches!(f.kind, FolderKind::Trash | FolderKind::Junk),
+                };
+                ((aid, f.id), folder)
+            })
+            .collect()
     }
 }
 

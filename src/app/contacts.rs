@@ -66,6 +66,121 @@ pub(super) fn import_summary(o: &crate::local_contacts::ImportOutcome) -> (Strin
     (text, false)
 }
 
+impl AppModel {
+    /// The window a dialog opened from Settings belongs to: Settings while
+    /// it is open, else the main window.
+    pub(super) fn dialog_parent(&self) -> Option<gtk::Window> {
+        let prefs = self
+            .prefs
+            .as_ref()
+            .map(|p| p.widget().clone().upcast::<gtk::Window>());
+        prefs
+            .filter(|w| w.is_visible())
+            .or_else(|| Some(self.window.clone().upcast()))
+    }
+
+    /// Dialog to add an email to GNOME Contacts (choosing the address book).
+    /// Which books can take it is asked of EDS first, off the UI thread:
+    /// that opens every book, and a remote one can go to its server (#315).
+    pub(super) fn show_add_contact_dialog(
+        &self,
+        name: &str,
+        email: &str,
+        sender: &ComponentSender<Self>,
+    ) {
+        let (name, email) = (name.to_string(), email.to_string());
+        let input = sender.input_sender().clone();
+        std::thread::spawn(move || {
+            let books = crate::contacts::writable_books();
+            let _ = input.send(AppMsg::AddContactBooks { name, email, books });
+        });
+    }
+
+    pub(super) fn add_contact_dialog(
+        &self,
+        name: &str,
+        email: &str,
+        books: Vec<crate::contacts::Book>,
+        sender: &ComponentSender<Self>,
+    ) {
+        if books.is_empty() || email.trim().is_empty() {
+            self.notifications.emit(NotifyInput::Push {
+                text: i18n("No address book available to add contacts"),
+                error: true,
+                connectivity: false,
+            });
+            return;
+        }
+
+        let dialog = adw::MessageDialog::new(
+            Some(&self.window),
+            Some(i18n("Add to Contacts").as_str()),
+            None,
+        );
+        dialog.add_response("cancel", &i18n("Cancel"));
+        dialog.add_response("add", &i18n("Add"));
+        dialog.set_response_appearance("add", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("add"));
+        dialog.set_close_response("cancel");
+
+        let form = gtk::ListBox::new();
+        form.add_css_class("boxed-list");
+        form.set_selection_mode(gtk::SelectionMode::None);
+        let name_row = adw::EntryRow::new();
+        name_row.set_title(&i18n("Name"));
+        name_row.set_text(name);
+        let email_row = adw::EntryRow::new();
+        email_row.set_title(&i18n("Email"));
+        email_row.set_text(email);
+        let book_row = adw::ComboRow::new();
+        book_row.set_title(&i18n("Address book"));
+        let labels: Vec<&str> = books.iter().map(|b| b.name.as_str()).collect();
+        book_row.set_model(Some(&gtk::StringList::new(&labels)));
+        form.append(&name_row);
+        form.append(&email_row);
+        form.append(&book_row);
+        dialog.set_extra_child(Some(&form));
+
+        let input = sender.input_sender().clone();
+        dialog.connect_response(None, move |_, resp| {
+            if resp != "add" {
+                return;
+            }
+            let name = name_row.text().trim().to_string();
+            let email = email_row.text().trim().to_string();
+            let idx = book_row.selected() as usize;
+            let Some(book) = books.get(idx).cloned() else {
+                return;
+            };
+            if email.is_empty() {
+                return;
+            }
+            // Writing talks to EDS over D-Bus (blocking) — do it off the UI thread.
+            let input = input.clone();
+            std::thread::spawn(move || {
+                let result = crate::contacts::add_or_merge(&book.uid, &name, &email);
+                let _ = input.send(AppMsg::ContactAdded(result));
+            });
+        });
+        dialog.present();
+    }
+
+    /// Show Contacts in place of the mail panes, read afresh.
+    pub(super) fn show_contacts_view(&mut self, sender: &ComponentSender<Self>) {
+        self.close_sidebar_peek();
+        self.showing_outbox = false;
+        self.leave_gallery();
+        self.showing_contacts = true;
+        // Read EDS off the UI thread (SQLite + photo decoding); the page
+        // shows its loading face until the list lands.
+        self.contacts_page.emit(ContactsPageInput::SetLoading);
+        reload_contacts(sender, 0);
+        if !demo_mode() {
+            sync_contact_books(sender, false, 0);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

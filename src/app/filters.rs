@@ -39,6 +39,298 @@ pub(super) fn rules_matching(
         .collect()
 }
 
+impl AppModel {
+    /// Whether a sender address matches the blacklist (exact address, or a bare
+    /// domain entry matching the sender's domain or any subdomain of it).
+    fn is_blacklisted(&self, addr: &str) -> bool {
+        let a = addr.trim().to_lowercase();
+        if a.is_empty() {
+            return false;
+        }
+        let domain = a.rsplit('@').next().unwrap_or("");
+        self.blacklist.iter().any(|entry| {
+            if entry.contains('@') {
+                a == *entry
+            } else {
+                domain == entry.as_str() || domain.ends_with(&format!(".{entry}"))
+            }
+        })
+    }
+
+    /// Move any blacklisted senders in an inbox sync to Trash, returning the rest.
+    pub(super) fn apply_blacklist(
+        &self,
+        account_id: u32,
+        folder_id: u32,
+        messages: Vec<Message>,
+    ) -> Vec<Message> {
+        if self.blacklist.is_empty() || self.inbox_of(account_id).map(|f| f.id) != Some(folder_id) {
+            return messages;
+        }
+        let folders = self.folders.get(&account_id);
+        let trash = folders
+            .and_then(|fs| fs.iter().find(|f| f.kind == FolderKind::Trash))
+            .map(|f| f.path.clone());
+        let src = folders
+            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+            .map(|f| f.path.clone());
+        let mut kept = Vec::with_capacity(messages.len());
+        for m in messages {
+            if self.is_blacklisted(&m.from_addr) {
+                if let (Some(trash), Some(src)) = (&trash, &src) {
+                    self.send_to(
+                        account_id,
+                        MailRequest::MoveMessage {
+                            path: src.clone(),
+                            uid: m.uid,
+                            dest: trash.clone(),
+                        },
+                    );
+                }
+            } else {
+                kept.push(m);
+            }
+        }
+        kept
+    }
+
+    /// Apply the mail filter rules (#47) to an inbox sync, Evolution-style:
+    /// the first matching rule files the message into its folder; everything
+    /// else passes through. On-sight like the blacklist, so mail that arrived
+    /// while Hylki was closed still gets filed on the next sync.
+    ///
+    /// Returns the messages staying in the inbox, plus the ones filed away on
+    /// this sync (paired with their destination path) so the caller can still
+    /// count them as new mail when notifying.
+    ///
+    /// A manual run (#198) adds the folder it was pointed at to the pass, even
+    /// when that is not the Inbox, and tallies what the rules did there so the
+    /// run can report it.
+    pub(super) fn apply_filters(
+        &mut self,
+        account_id: u32,
+        folder_id: u32,
+        messages: Vec<Message>,
+    ) -> (Vec<Message>, Vec<(Message, String)>) {
+        let manual = self
+            .filter_run
+            .as_ref()
+            .is_some_and(|r| r.folders.contains_key(&(account_id, folder_id)));
+        let (kept, filed, pass) = self.filter_pass(account_id, folder_id, messages, manual);
+        if manual {
+            self.filter_run_folder_pass(account_id, folder_id, pass);
+        }
+        (kept, filed)
+    }
+
+    /// One pass of the rules over a folder's messages. Returns what stays,
+    /// what was filed elsewhere, and (for a manual run) the pass's count:
+    /// how many messages were looked at, how many a rule matched, and how
+    /// many tags were put on and messages filed.
+    fn filter_pass(
+        &mut self,
+        account_id: u32,
+        folder_id: u32,
+        messages: Vec<Message>,
+        manual: bool,
+    ) -> (Vec<Message>, Vec<(Message, String)>, FolderTally) {
+        if self.filters.is_empty()
+            || (!manual && self.inbox_of(account_id).map(|f| f.id) != Some(folder_id))
+        {
+            return (messages, Vec::new(), FolderTally::default());
+        }
+        let Some(email) = self.email_of(account_id) else {
+            return (messages, Vec::new(), FolderTally::default());
+        };
+        let rules: Vec<&config::FilterRule> = self
+            .filters
+            .iter()
+            .filter(|r| r.account_email.eq_ignore_ascii_case(&email))
+            .collect();
+        if rules.is_empty() {
+            return (messages, Vec::new(), FolderTally::default());
+        }
+        let checked = messages.len();
+        let mut matched = 0usize;
+        let mut tagged = 0usize;
+        // How many messages each rule matched, said in the log at the end of
+        // a manual run: the one place a rule that matches nothing can be
+        // told apart from one whose matches needed nothing done (#201).
+        let mut per_rule = vec![0usize; rules.len()];
+        let folders = self.folders.get(&account_id);
+        let src = folders
+            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+            .map(|f| f.path.clone());
+        let known = |path: &str| folders.is_some_and(|fs| fs.iter().any(|f| f.path == path));
+        let pending = self
+            .filter_moved
+            .remove(&(account_id, folder_id))
+            .unwrap_or_default();
+        let mut still_pending = std::collections::HashSet::new();
+        let mut kept = Vec::with_capacity(messages.len());
+        let mut filed = Vec::new();
+        // When the account files copies of what it sends into this folder
+        // (#199), the user's own mail sitting here is one of those copies, not
+        // an arrival. Rules are written about incoming mail, so a rule on a
+        // subject or a recipient would otherwise pick up your own reply and
+        // move it away from the thread it was filed beside. The Sent folder is
+        // the exception: everything in it is your own mail, so running rules
+        // over it (#198) plainly means to act on exactly that. Replies filed
+        // beside what they answer (#468) can be in any folder.
+        let files_replies = self
+            .effective_config()
+            .get(account_id.saturating_sub(1) as usize)
+            .is_some_and(|c| {
+                c.reply_copies != crate::config::ReplyCopies::WithSent && !c.server_saves_sent
+            });
+        let diverted = (files_replies
+            || self.sent_copy_path(account_id).as_deref() == src.as_deref())
+            && self
+                .folder_of_kind(account_id, FolderKind::Sent)
+                .map(|f| f.path.as_str())
+                != src.as_deref();
+        let own: Vec<String> = if diverted {
+            self.own_identities(account_id)
+        } else {
+            Vec::new()
+        };
+        let hits = self.body_hits.get(&(account_id, folder_id));
+        // The address books are read once per pass, and only when a rule asks
+        // for them. An empty read counts as unknown: see FilterField::FromInContacts.
+        let contacts = if rules.iter().any(|r| r.needs_contacts()) {
+            self.saved_addresses.get()
+        } else {
+            None
+        };
+        for mut m in messages {
+            if own.iter().any(|a| a.eq_ignore_ascii_case(&m.from_addr)) {
+                kept.push(m);
+                continue;
+            }
+            let body_hits = hits
+                .and_then(|h| h.get(&m.uid))
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+            let matching: Vec<&&config::FilterRule> =
+                rules_matching(&rules, &m, body_hits, contacts.as_deref())
+                    .into_iter()
+                    .map(|i| {
+                        per_rule[i] += 1;
+                        &rules[i]
+                    })
+                    .collect();
+            if !matching.is_empty() {
+                matched += 1;
+            }
+            // Tags first (#71), from every matching rule, and only where the
+            // message lacks the tag — this runs on every sync, and the flag
+            // comes back down with the next one. Tagged before any move, so
+            // the move carries the keyword along. A tag that no longer
+            // exists tags nothing.
+            if let Some(src) = &src {
+                let wanted: Vec<(String, String)> = matching
+                    .iter()
+                    .filter(|r| !r.tag.is_empty() && !self.carries_tag(&m, &r.tag))
+                    .filter(|r| {
+                        self.tags
+                            .iter()
+                            .any(|t| t.keyword.eq_ignore_ascii_case(&r.tag))
+                    })
+                    .map(|r| (r.tag.clone(), r.label()))
+                    .collect();
+                for (tag, rule) in wanted {
+                    if self.carries_tag(&m, &tag) {
+                        continue; // two rules naming one tag
+                    }
+                    tagged += 1;
+                    tracing::info!("filter: {} tagged {tag} [{rule}]", m.from_addr);
+                    self.send_to(
+                        account_id,
+                        MailRequest::SetKeyword {
+                            path: src.clone(),
+                            uid: m.uid,
+                            message_id: m.message_id.clone(),
+                            keyword: tag.clone(),
+                            add: true,
+                        },
+                    );
+                    m.keywords.push(tag);
+                }
+            }
+            let hit = matching.iter().copied().find(|r| {
+                !r.dest_path.is_empty()
+                    // A destination that vanished from the server keeps the
+                    // mail in the inbox rather than erroring it into limbo.
+                    && known(&r.dest_path)
+                    && src.as_deref() != Some(r.dest_path.as_str())
+            });
+            match (hit, &src) {
+                (Some(rule), Some(src)) => {
+                    still_pending.insert(m.uid);
+                    if pending.contains(&m.uid) {
+                        // The move was already requested on an earlier sync;
+                        // this one raced the server. Requesting again would
+                        // error once the first move lands, and re-notifying
+                        // would repeat the toast.
+                        continue;
+                    }
+                    tracing::info!(
+                        "filter: {} → {} [{}]",
+                        m.from_addr,
+                        rule.dest_path,
+                        rule.label(),
+                    );
+                    self.send_to(
+                        account_id,
+                        MailRequest::MoveMessage {
+                            path: src.clone(),
+                            uid: m.uid,
+                            dest: rule.dest_path.clone(),
+                        },
+                    );
+                    filed.push((m, rule.dest_path.clone()));
+                }
+                _ => kept.push(m),
+            }
+        }
+        // UIDs absent from this sync have completed their move server-side;
+        // dropping them keeps the set from growing without bound.
+        if !still_pending.is_empty() {
+            self.filter_moved
+                .insert((account_id, folder_id), still_pending);
+        }
+        if manual {
+            let folder = src.as_deref().unwrap_or("?");
+            for (rule, n) in rules.iter().zip(&per_rule) {
+                tracing::info!(
+                    "filter: [{}] matched {n} of {checked} in {folder}",
+                    rule.label()
+                );
+            }
+        }
+        let pass = FolderTally {
+            checked,
+            matched,
+            tagged,
+            filed: filed.len(),
+        };
+        (kept, filed, pass)
+    }
+
+    /// Re-sync every inbox so a newly-blacklisted sender's existing mail is
+    /// caught and deleted by [`apply_blacklist`].
+    pub(super) fn sweep_blacklisted(&self) {
+        let reqs: Vec<(u32, u32, String)> = self
+            .accounts
+            .iter()
+            .filter_map(|a| self.inbox_of(a.id).map(|f| (a.id, f.id, f.path.clone())))
+            .collect();
+        for (account_id, folder_id, path) in reqs {
+            self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

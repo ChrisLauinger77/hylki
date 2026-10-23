@@ -2,7 +2,7 @@
 //! mid: links, .eml files and files to attach. Each is queued until the app
 //! can take it, then sent on as an AppMsg.
 
-use adw::prelude::*;
+use super::*;
 
 use super::AppMsg;
 
@@ -228,6 +228,110 @@ pub(crate) fn queue_attach_files(paths: Vec<std::path::PathBuf>) {
 /// batch opens its own composer.
 pub(super) static ATTACH_PENDING: std::sync::Mutex<Vec<Vec<std::path::PathBuf>>> =
     std::sync::Mutex::new(Vec::new());
+
+impl AppModel {
+    /// Ask where to put a message's bytes, and write them there (#398).
+    pub(super) fn save_message_file(&self, name: String, raw: Vec<u8>) {
+        let dialog = gtk::FileDialog::new();
+        dialog.set_title(&i18n("Save Message"));
+        dialog.set_initial_name(Some(&name));
+        let notifications = self.notifications.sender().clone();
+        dialog.save(
+            Some(&self.window),
+            gtk::gio::Cancellable::NONE,
+            move |res| {
+                let Ok(file) = res else { return };
+                let Some(path) = file.path() else { return };
+                if let Err(e) = std::fs::write(&path, &raw) {
+                    tracing::warn!("save {}: {e}", path.display());
+                    let _ = notifications.send(NotifyInput::Push {
+                        text: i18n_f("Could not save the message: {e}", &[("e", &e.to_string())]),
+                        error: true,
+                        connectivity: false,
+                    });
+                }
+            },
+        );
+    }
+
+    /// Pick a message file to read (#398).
+    pub(super) fn pick_message_file(&self, sender: &ComponentSender<Self>) {
+        let dialog = gtk::FileDialog::new();
+        dialog.set_title(&i18n("Open Message File"));
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&i18n("Email messages")));
+        filter.add_mime_type("message/rfc822");
+        filter.add_mime_type("application/vnd.ms-outlook");
+        filter.add_suffix("eml");
+        filter.add_suffix("msg");
+        let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        dialog.set_filters(Some(&filters));
+        let s = sender.input_sender().clone();
+        dialog.open(
+            Some(&self.window),
+            gtk::gio::Cancellable::NONE,
+            move |res| {
+                if let Some(path) = res.ok().and_then(|f| f.path()) {
+                    let _ = s.send(AppMsg::OpenMessageFile(path));
+                }
+            },
+        );
+    }
+
+    /// Read a message file in a window of its own (#398), rendered as the
+    /// reader renders mail from a server. It belongs to the account in view,
+    /// which is where Reply and Forward send from, and to no folder.
+    pub(super) fn open_message_file(
+        &mut self,
+        path: &std::path::Path,
+        sender: &ComponentSender<Self>,
+    ) {
+        // An Outlook .msg is turned into a message first (see outlook_msg).
+        let read = std::fs::read(path).and_then(|bytes| {
+            let outlook = path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("msg"));
+            if crate::outlook_msg::is_msg(&bytes) {
+                crate::outlook_msg::to_eml(&bytes).map_err(std::io::Error::other)
+            } else if outlook {
+                // Other programs name files .msg too (Tcl's catalogues).
+                Err(std::io::Error::other(i18n("it is not an Outlook message")))
+            } else {
+                Ok(bytes)
+            }
+        });
+        let raw = match read {
+            Ok(raw) => raw,
+            Err(e) => {
+                tracing::warn!("open {}: {e}", path.display());
+                self.notifications.emit(NotifyInput::Push {
+                    text: i18n_f(
+                        "Could not open {file}: {e}",
+                        &[("file", &path.display().to_string()), ("e", &e.to_string())],
+                    ),
+                    error: true,
+                    connectivity: false,
+                });
+                return;
+            }
+        };
+        let id = self.next_local_id;
+        self.next_local_id -= 1;
+        let mut m = crate::worker::summary_from_raw(self.active_account(), FILE_FOLDER, id, &raw);
+        let (body, check, has_attachment) = crate::worker::render_raw(&raw);
+        m.unread = false;
+        m.has_attachment = has_attachment;
+        m.body = body.clone();
+        let key = body_key(&m);
+        self.body_cache.insert(key, body);
+        self.attachment_cache
+            .insert(key, crate::worker::extract_attachments_of(&raw));
+        self.sender_cache.insert(key, Box::new(check));
+        tracing::info!("open: {} as a message", path.display());
+        self.open_message_window(m, Vec::new(), sender);
+    }
+}
 
 #[cfg(test)]
 mod tests {

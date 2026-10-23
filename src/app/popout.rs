@@ -13,3 +13,305 @@ pub(super) struct PopOut {
     /// id): the files of each are the window's to show.
     pub(super) members: Vec<(BodyKey, (u32, u32))>,
 }
+
+impl AppModel {
+    /// Present a read-only window showing raw message source (monospace).
+    pub(super) fn show_source_window(&self, text: &str) {
+        let buffer = gtk::TextBuffer::new(None);
+        buffer.set_text(text);
+        let view = gtk::TextView::with_buffer(&buffer);
+        view.set_editable(false);
+        view.set_monospace(true);
+        view.set_wrap_mode(gtk::WrapMode::WordChar);
+        view.set_left_margin(12);
+        view.set_right_margin(12);
+        view.set_top_margin(8);
+        view.set_bottom_margin(8);
+
+        let scroller = gtk::ScrolledWindow::builder()
+            .vexpand(true)
+            .hexpand(true)
+            .child(&view)
+            .build();
+
+        let toolbar = adw::ToolbarView::new();
+        toolbar.add_top_bar(&adw::HeaderBar::new());
+        toolbar.set_content(Some(&scroller));
+
+        let window = adw::Window::builder()
+            .transient_for(&self.window)
+            .title(&i18n("Message Source"))
+            .default_width(720)
+            .default_height(620)
+            .content(&toolbar)
+            .build();
+        window.present();
+    }
+
+    /// Pop a message out into its own standalone window with a dedicated
+    /// reader. `thread` is the whole conversation when `m` heads one (the
+    /// window then shows every card); empty for a single message.
+    pub(super) fn open_message_window(
+        &mut self,
+        m: Message,
+        thread: Vec<Message>,
+        sender: &ComponentSender<Self>,
+    ) {
+        let key = (m.account_id, m.id);
+        // Already open? Just bring it forward.
+        if let Some(p) = self.popouts.get(&key) {
+            p.window.present();
+            return;
+        }
+        let account_id = m.account_id;
+
+        // Reuse an already-fetched body so the window renders instantly.
+        let cached_body = if !m.body.is_empty() {
+            Some(m.body.clone())
+        } else if self
+            .current
+            .as_ref()
+            .is_some_and(|c| c.id == m.id && c.account_id == account_id && !c.body.is_empty())
+        {
+            self.current.as_ref().map(|c| c.body.clone())
+        } else {
+            self.body_cache.get(&body_key(&m)).cloned()
+        };
+        let needs_body = cached_body.is_none();
+
+        let mut display = m.clone();
+        display.unread = false;
+        if let Some(body) = cached_body {
+            display.body = body;
+        }
+
+        // Fetch the body unless the in-flight selection request already will
+        // (single click precedes the double click), to avoid a duplicate fetch.
+        let already_loading = self
+            .current
+            .as_ref()
+            .is_some_and(|c| c.id == m.id && c.account_id == account_id);
+        if needs_body && !already_loading {
+            if let Some(path) = self.resolve_folder_path(&m) {
+                self.send_to(
+                    account_id,
+                    MailRequest::LoadBody {
+                        message_id: m.id,
+                        path,
+                        uid: m.uid,
+                    },
+                );
+            }
+        }
+
+        // The conversation for the window: the assembled cache when this
+        // thread has been opened before (cross-folder members and bodies
+        // included), else what the list handed over. Members still missing
+        // bodies get them fetched; the replies land via SetBody below.
+        let mut thread = if thread.len() > 1 {
+            self.thread_cache
+                .get(&body_key(&m))
+                .cloned()
+                .unwrap_or(thread)
+        } else {
+            thread
+        };
+        for member in &mut thread {
+            let mkey = (member.account_id, member.id);
+            if mkey == key {
+                member.body = display.body.clone();
+                member.unread = false;
+                continue;
+            }
+            if member.body.is_empty() {
+                if let Some(body) = self.body_cache.get(&body_key(member)) {
+                    member.body = body.clone();
+                } else if let Some(path) = self.resolve_folder_path(member) {
+                    self.send_to(
+                        member.account_id,
+                        MailRequest::LoadBody {
+                            message_id: member.id,
+                            path,
+                            uid: member.uid,
+                        },
+                    );
+                }
+            }
+        }
+
+        // Attachments, for every message the window shows: the in-memory
+        // cache where present; otherwise fetched (disk cache first, then the
+        // server) with the reply routed to this window, as the main reader
+        // does for a conversation.
+        let shown: Vec<Message> = if thread.is_empty() {
+            vec![display.clone()]
+        } else {
+            thread.clone()
+        };
+        let mut atts: Vec<((u32, u32), Vec<Attachment>)> = Vec::new();
+        let mut atts_loading: Vec<(u32, u32)> = Vec::new();
+        for member in shown.iter().filter(|m| m.has_attachment) {
+            let mkey = (member.account_id, member.id);
+            if let Some(cached) = self.attachment_cache.get(&body_key(member)).cloned() {
+                atts.push((mkey, cached));
+            } else if let Some(path) = self.resolve_folder_path(member) {
+                atts_loading.push(mkey);
+                self.send_to(
+                    member.account_id,
+                    MailRequest::LoadAttachments {
+                        message_id: member.id,
+                        path,
+                        uid: member.uid,
+                        download: true,
+                    },
+                );
+            }
+        }
+        let members = shown
+            .iter()
+            .map(|m| (body_key(m), (m.account_id, m.id)))
+            .collect();
+
+        let allow_remote = self.remote_allowed(&display);
+        let folder_kind = self.folder_kind(display.account_id, display.folder_id);
+        let init_from_file = display.folder_id == FILE_FOLDER;
+        let init = MessageWindowInit {
+            message: display,
+            thread,
+            account_name: Some(self.account_name(account_id)),
+            account_color: Some(self.account_color(account_id)),
+            allow_remote,
+            loading: needs_body,
+            attachments: atts,
+            attachments_loading: atts_loading,
+            drawer_enabled: self.drawer_enabled,
+            card_attachments: self.card_attachments,
+            // A message from a file is in no folder: there is nothing to
+            // star, file or delete on a server.
+            toolbar: if init_from_file {
+                config::ReaderToolbar {
+                    left: vec![
+                        config::ToolbarItem::Reply,
+                        config::ToolbarItem::ReplyAll,
+                        config::ToolbarItem::Forward,
+                    ],
+                    right: vec![config::ToolbarItem::Find, config::ToolbarItem::Print],
+                }
+            } else {
+                self.reader_toolbar.clone()
+            },
+            in_junk: folder_kind == Some(FolderKind::Junk),
+            restorable: matches!(folder_kind, Some(FolderKind::Trash | FolderKind::Junk)),
+            content_dark: self.message_theme.dark_override(),
+            reader_style: self.reader_style(),
+            reader_mode: self.effective_reader_mode(),
+            zoom: self.zoom,
+            zoom_default: self.zoom_default,
+            reader_switch: self.reader_switch,
+            theme_switch: self.theme_switch,
+            reader_default: self.effective_reader_default(),
+            tags: self.tags.clone(),
+            pgp_labels: self.pgp_labels,
+            single_key: self.single_key.clone(),
+            gmail_keys: self.gmail_keys.clone(),
+        };
+
+        let controller =
+            MessageWindow::builder()
+                .launch(init)
+                .forward(sender.input_sender(), move |out| match out {
+                    MessageWindowOutput::Action { action, message } => {
+                        // The window's actions name the card they came from.
+                        AppMsg::RowAction {
+                            action,
+                            message,
+                            conversation: Vec::new(),
+                        }
+                    }
+                    MessageWindowOutput::AddToContacts { name, email } => {
+                        AppMsg::AddContactFrom { name, email }
+                    }
+                    MessageWindowOutput::LoadAttachments(message) => {
+                        AppMsg::LoadAttachmentsFor(message)
+                    }
+                    MessageWindowOutput::MoveTo { message, x, y } => {
+                        AppMsg::PopoutMoveTo { key, message, x, y }
+                    }
+                    MessageWindowOutput::Shortcut {
+                        action,
+                        message,
+                        thread,
+                    } => AppMsg::PopoutShortcut {
+                        action,
+                        message,
+                        thread,
+                    },
+                    MessageWindowOutput::SetTag {
+                        message,
+                        keyword,
+                        add,
+                    } => AppMsg::SetTag {
+                        message,
+                        keyword,
+                        add,
+                    },
+                    MessageWindowOutput::DeleteAttachment {
+                        message,
+                        attachment,
+                    } => AppMsg::DeletePopoutAttachment {
+                        key,
+                        message,
+                        attachment,
+                    },
+                    MessageWindowOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
+                    MessageWindowOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
+                    MessageWindowOutput::Notice(text) => AppMsg::Notice(text),
+                    MessageWindowOutput::Zoom(step) => AppMsg::ZoomMessage(step),
+                    MessageWindowOutput::Unsubscribe { message, info } => {
+                        AppMsg::Unsubscribe { message, info }
+                    }
+                    MessageWindowOutput::InviteAction {
+                        message,
+                        invite,
+                        action,
+                    } => AppMsg::InviteAction {
+                        message,
+                        invite,
+                        action,
+                    },
+                    MessageWindowOutput::ComposeTo(addr) => AppMsg::ComposeTo(addr),
+                    MessageWindowOutput::CardMenu { message, x, y, hit } => AppMsg::CardMenu {
+                        message,
+                        x,
+                        y,
+                        hit,
+                        popout: Some(key),
+                    },
+                    MessageWindowOutput::Closed => AppMsg::PopoutClosed(key),
+                });
+
+        let window = controller.widget().clone();
+        window.set_transient_for(Some(&self.window));
+        window.present();
+        controller.emit(MessageWindowInput::SetUnsubscribed(self.unsubscribed_map()));
+        controller.emit(MessageWindowInput::SetIdentities(self.identities_map()));
+        controller.emit(MessageWindowInput::SetInviteAnswers(
+            self.invite_answers_map(),
+        ));
+        // A verdict already in hand reaches the window now, not only one that
+        // arrives later: its seal, and a decrypted message's subject (#493).
+        if let Some(check) = self.sender_cache.get(&body_key(&m)) {
+            controller.emit(MessageWindowInput::SetSenderCheck(check.clone()));
+        }
+
+        self.popouts.insert(
+            key,
+            PopOut {
+                window,
+                controller,
+                message: body_key(&m),
+                members,
+            },
+        );
+    }
+}

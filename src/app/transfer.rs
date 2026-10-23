@@ -45,3 +45,431 @@ pub(super) struct TransferTally {
     /// What has landed so far, recorded as one undo step at the end.
     pub(super) landed: Vec<Landed>,
 }
+
+impl AppModel {
+    /// Whether mail from another account can be moved into this one (#265):
+    /// IMAP and JMAP accounts take a message whole. A Microsoft account
+    /// files one posted to a folder as a draft, and POP3 has only an inbox.
+    fn can_receive(&self, account_id: u32) -> bool {
+        if demo_mode() {
+            return true;
+        }
+        self.config
+            .get(account_id.saturating_sub(1) as usize)
+            .is_some_and(|c| {
+                c.enabled && matches!(c.protocol, config::Protocol::Imap | config::Protocol::Jmap)
+            })
+    }
+
+    /// What the Move To picker lists: `own` account's folders less
+    /// `exclude`, then, each under its name and in sidebar order, the
+    /// folders of the other accounts that can take the mail (#265).
+    pub(super) fn picker_accounts(
+        &self,
+        own: u32,
+        exclude: Option<String>,
+    ) -> Vec<crate::ui::folder_picker::PickerAccount> {
+        use crate::ui::folder_picker::PickerAccount;
+        let mut out = Vec::new();
+        if let Some(folders) = self.folders.get(&own).filter(|f| !f.is_empty()) {
+            out.push(PickerAccount {
+                account_id: own,
+                heading: None,
+                folders: folders.clone(),
+                exclude,
+            });
+        }
+        for email in self.ordered_emails() {
+            let Some(a) = self
+                .accounts
+                .iter()
+                .find(|a| a.email == email && a.id != own)
+            else {
+                continue;
+            };
+            if !self.can_receive(a.id) {
+                continue;
+            }
+            let Some(folders) = self.folders.get(&a.id).filter(|f| !f.is_empty()) else {
+                continue;
+            };
+            out.push(PickerAccount {
+                account_id: a.id,
+                heading: Some(self.account_name(a.id)),
+                folders: folders.clone(),
+                exclude: None,
+            });
+        }
+        out
+    }
+
+    /// Move mail from other accounts into `dest` on `dest_account` (#265):
+    /// each message is copied out of its account and into this one, with
+    /// its read and starred state, and only once the copy is stored is the
+    /// original put in its own account's Trash (erased where there is
+    /// none). The rows leave the list at once and come back if it fails.
+    fn transfer_messages(
+        &mut self,
+        items: Vec<(u32, u32, u32, u32)>,
+        dest_account: u32,
+        dest: String,
+    ) {
+        let mut removed_ids = Vec::new();
+        for (aid, fid, uid, id) in items {
+            let cached = self.find_cached_message(aid, id);
+            let src = match &cached {
+                Some(m) => self.resolve_folder_path(m),
+                None => self.folder_path(aid, fid),
+            };
+            let Some(src) = src else { continue };
+            let src_folder = cached.as_ref().map_or(fid, |m| m.folder_id);
+            let token = self.next_transfer;
+            self.next_transfer += 1;
+            self.transfers.insert(
+                token,
+                Transfer {
+                    src_account: aid,
+                    src_folder,
+                    src_path: src.clone(),
+                    uid,
+                    dest_account,
+                    dest_path: dest.clone(),
+                    seen: cached.as_ref().is_none_or(|m| !m.unread),
+                    flagged: cached.as_ref().is_some_and(|m| m.starred),
+                    row: cached.clone(),
+                },
+            );
+            // Off the source's lists until the move has landed or failed.
+            self.pending_moves
+                .borrow_mut()
+                .insert((aid, src.clone(), uid), std::time::Instant::now());
+            if let Some(m) = &cached {
+                self.discard_message_local(m);
+            }
+            removed_ids.push(id);
+            self.transfer_tally.total += 1;
+            self.send_to(
+                aid,
+                MailRequest::ExportRaw {
+                    token,
+                    path: src,
+                    uid,
+                    for_reader: false,
+                },
+            );
+        }
+        self.transfer_tally.dest_accounts.insert(dest_account);
+        self.transfer_tally
+            .dest_folders
+            .insert((dest_account, dest));
+        if !removed_ids.is_empty() {
+            self.message_list
+                .emit(MessageListInput::RemoveMany(removed_ids));
+            self.push_unread_counts();
+        }
+        self.show_transfer_status();
+    }
+
+    /// A message is stored in its new account: take the original out.
+    pub(super) fn transfer_landed(&mut self, token: u64) {
+        let Some(t) = self.transfers.remove(&token) else {
+            return;
+        };
+        let trash = self
+            .folder_path_for(t.src_account, FolderKind::Trash)
+            .filter(|trash| *trash != t.src_path);
+        if let Some(row) = t.row.filter(|m| !m.message_id.is_empty()) {
+            self.transfer_tally.landed.push(Landed {
+                src_account: t.src_account,
+                src_path: t.src_path.clone(),
+                src_trash: trash.clone(),
+                dest_account: t.dest_account,
+                dest_path: t.dest_path.clone(),
+                row,
+            });
+        }
+        let req = match trash {
+            Some(dest) => MailRequest::MoveMessage {
+                path: t.src_path,
+                uid: t.uid,
+                dest,
+            },
+            None => MailRequest::PurgeMessages {
+                path: t.src_path,
+                uids: vec![t.uid],
+            },
+        };
+        self.send_to(t.src_account, req);
+        self.transfer_tally.done += 1;
+        self.transfer_step();
+    }
+
+    /// A message could not be copied across: it stays where it was, and
+    /// comes back on its folder's list.
+    pub(super) fn transfer_failed(&mut self, token: u64, error: String) {
+        let Some(t) = self.transfers.remove(&token) else {
+            return;
+        };
+        tracing::warn!("move to another account failed: {error}");
+        self.pending_moves
+            .borrow_mut()
+            .remove(&(t.src_account, t.src_path.clone(), t.uid));
+        self.send_to(
+            t.src_account,
+            MailRequest::SyncFolder {
+                folder_id: t.src_folder,
+                path: t.src_path,
+            },
+        );
+        self.transfer_tally.failed += 1;
+        self.transfer_tally.error.get_or_insert(error);
+        self.transfer_step();
+    }
+
+    /// After each message: the status line, and once all are through, a
+    /// fresh look at the folders the mail went into and, if any failed, the
+    /// one error report.
+    fn transfer_step(&mut self) {
+        let tally = &self.transfer_tally;
+        if tally.done + tally.failed < tally.total {
+            self.show_transfer_status();
+            return;
+        }
+        let mut tally = std::mem::take(&mut self.transfer_tally);
+        self.notifications
+            .emit(NotifyInput::SetStatus(String::new()));
+        self.record_transfer_undo(std::mem::take(&mut tally.landed));
+        for (account_id, path) in &tally.dest_folders {
+            if let Some(folder_id) = self
+                .folders
+                .get(account_id)
+                .and_then(|fs| fs.iter().find(|f| f.path == *path))
+                .map(|f| f.id)
+            {
+                self.send_to(
+                    *account_id,
+                    MailRequest::SyncFolder {
+                        folder_id,
+                        path: path.clone(),
+                    },
+                );
+            }
+        }
+        // The bar only speaks up for a failure: a move that worked shows
+        // itself, in the folders.
+        if tally.failed > 0 {
+            let names: Vec<String> = tally
+                .dest_accounts
+                .iter()
+                .map(|a| self.account_name(*a))
+                .collect();
+            let text = ni18n_f(
+                "One message could not be moved to {account}: {error}",
+                "{n} messages could not be moved to {account}: {error}",
+                tally.failed as u32,
+                &[
+                    ("n", &tally.failed.to_string()),
+                    ("account", &names.join(", ")),
+                    ("error", tally.error.as_deref().unwrap_or("")),
+                ],
+            );
+            self.notifications.emit(NotifyInput::Push {
+                text,
+                error: true,
+                connectivity: false,
+            });
+        }
+    }
+
+    /// One undo step for everything a batch of moves to other accounts put
+    /// down (#265): per source folder, the originals come back out of their
+    /// account's Trash, and the copies go into the receiving account's.
+    /// Mail that was erased at the source, or that went to an account with
+    /// no Trash, is left out: undoing it would leave a copy behind.
+    fn record_transfer_undo(&mut self, landed: Vec<Landed>) {
+        let mut groups: Vec<((u32, String, String, u32, String, String), Vec<Message>)> =
+            Vec::new();
+        for l in landed {
+            let Some(src_trash) = l.src_trash else {
+                continue;
+            };
+            let Some(dest_trash) = self
+                .folder_path_for(l.dest_account, FolderKind::Trash)
+                .filter(|t| *t != l.dest_path)
+            else {
+                continue;
+            };
+            let key = (
+                l.src_account,
+                l.src_path,
+                src_trash,
+                l.dest_account,
+                l.dest_path,
+                dest_trash,
+            );
+            match groups.iter_mut().find(|(k, _)| *k == key) {
+                Some((_, rows)) => rows.push(l.row),
+                None => groups.push((key, vec![l.row])),
+            }
+        }
+        let Some(((src_account, src_path, src_trash, dest_account, dest_path, dest_trash), rows)) =
+            groups.first().cloned()
+        else {
+            return;
+        };
+        let ids = |rows: &[Message]| {
+            rows.iter()
+                .map(|m| m.message_id.clone())
+                .collect::<Vec<_>>()
+        };
+        // The first source folder is the entry's own step, so a quick undo
+        // puts its rows straight back; everything else rides along.
+        let mut also = vec![(
+            dest_account,
+            UndoStep::Move {
+                from: dest_path.clone(),
+                to: dest_trash,
+                message_ids: ids(&rows),
+            },
+        )];
+        for ((sa, sp, st, da, dp, dt), rows) in groups.iter().skip(1) {
+            also.push((
+                *sa,
+                UndoStep::Move {
+                    from: st.clone(),
+                    to: sp.clone(),
+                    message_ids: ids(rows),
+                },
+            ));
+            also.push((
+                *da,
+                UndoStep::Move {
+                    from: dp.clone(),
+                    to: dt.clone(),
+                    message_ids: ids(rows),
+                },
+            ));
+        }
+        let what = self.move_label(dest_account, &dest_path);
+        let threads = Vec::new();
+        self.push_undo_entry(UndoEntry {
+            account_id: src_account,
+            what,
+            step: UndoStep::Move {
+                from: src_trash,
+                to: src_path,
+                message_ids: ids(&rows),
+            },
+            at: std::time::Instant::now(),
+            rows,
+            threads,
+            rows_return: true,
+            also,
+        });
+    }
+
+    fn show_transfer_status(&self) {
+        let tally = &self.transfer_tally;
+        let left = tally.total.saturating_sub(tally.done + tally.failed);
+        if left == 0 {
+            return;
+        }
+        let names: Vec<String> = tally
+            .dest_accounts
+            .iter()
+            .map(|a| self.account_name(*a))
+            .collect();
+        self.notifications.emit(NotifyInput::SetStatus(ni18n_f(
+            "Moving one message to {account}…",
+            "Moving {n} messages to {account}…",
+            left as u32,
+            &[("n", &left.to_string()), ("account", &names.join(", "))],
+        )));
+    }
+
+    /// Move a dropped drag selection into `dest` on `dest_account`. Messages are
+    /// grouped by source folder and each group moved in a single `MoveMessages`
+    /// request, so dragging a multi-selection moves all of it (#23). Anything
+    /// from another account (a drag from the unified inbox, a folder of
+    /// another account picked in Move To) is copied across (#265), or, where
+    /// the destination cannot take it, stays put and is reported.
+    pub(super) fn drop_move(
+        &mut self,
+        dest_account: u32,
+        dest: String,
+        items: Vec<(u32, u32, u32, u32)>,
+    ) {
+        let mut groups: HashMap<String, (Vec<u32>, Vec<Message>)> = HashMap::new();
+        let mut removed_ids: Vec<u32> = Vec::new();
+        let (foreign, items): (Vec<_>, Vec<_>) = items
+            .into_iter()
+            .partition(|(aid, ..)| *aid != dest_account);
+        // Mail from another account is copied across when this one can take
+        // it (#265); otherwise it stays put, and says so.
+        let foreign = if !foreign.is_empty() && self.can_receive(dest_account) {
+            self.transfer_messages(foreign, dest_account, dest.clone());
+            0
+        } else {
+            foreign.len()
+        };
+        for (aid, fid, uid, id) in items {
+            // Prefer the cached message: it knows its own source folder (in the
+            // unified inbox that isn't the folder the row was listed under) and
+            // lets the caches be cleaned up optimistically.
+            let cached = self.find_cached_message(aid, id);
+            let src = match &cached {
+                Some(m) => self.resolve_folder_path(m),
+                None => self
+                    .folders
+                    .get(&aid)
+                    .and_then(|fs| fs.iter().find(|f| f.id == fid))
+                    .map(|f| f.path.clone()),
+            };
+            let Some(src) = src else { continue };
+            if src == dest {
+                continue; // already in that folder
+            }
+            if let Some(m) = &cached {
+                self.discard_message_local(m);
+            }
+            let slot = groups.entry(src).or_default();
+            slot.0.push(uid);
+            // A row with no cached message is moved, but not recorded: there
+            // is nothing to find it by, and nothing to put back on the list.
+            slot.1.extend(cached);
+            removed_ids.push(id);
+        }
+        if foreign > 0 {
+            self.notifications.emit(NotifyInput::Push {
+                text: if foreign == 1 {
+                    i18n("One message stayed put: this account can't take mail from another")
+                } else {
+                    i18n_f(
+                        "{foreign} messages stayed put: this account can't take mail from another",
+                        &[("foreign", &foreign.to_string())],
+                    )
+                },
+                error: true,
+                connectivity: false,
+            });
+        }
+        if removed_ids.is_empty() {
+            return;
+        }
+        self.bulk_pending += groups.len();
+        for (src, (uids, rows)) in groups {
+            self.push_undo_move(dest_account, &dest, &src, rows);
+            self.send_to(
+                dest_account,
+                MailRequest::MoveMessages {
+                    path: src,
+                    uids,
+                    dest: dest.clone(),
+                },
+            );
+        }
+        self.message_list
+            .emit(MessageListInput::RemoveMany(removed_ids));
+        self.push_unread_counts();
+    }
+}

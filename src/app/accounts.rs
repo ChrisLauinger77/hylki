@@ -160,6 +160,127 @@ pub(super) fn reconcile_goa(
     outcome
 }
 
+impl AppModel {
+    /// Launch (or re-present) the welcome wizard: the first run's greeting,
+    /// the HYLKI_WELCOME review mode, and — on beta builds only — the burger
+    /// menu's Welcome Wizard entry for testers.
+    pub(super) fn open_wizard(&mut self, sender: &ComponentSender<Self>) {
+        use crate::ui::welcome::{Welcome, WelcomeOutput};
+        if let Some(w) = self.welcome.as_ref().filter(|w| w.widget().is_visible()) {
+            w.widget().present();
+            return;
+        }
+        let welcome =
+            Welcome::builder()
+                .launch(())
+                .forward(sender.input_sender(), |out| match out {
+                    WelcomeOutput::AddAccount(account) => AppMsg::AccountSaved {
+                        original_email: None,
+                        account,
+                    },
+                    WelcomeOutput::ImportGoa(account) => AppMsg::ImportGoaAccount(account),
+                    WelcomeOutput::Prefs(p) => AppMsg::ApplyWelcomePrefs(p),
+                    WelcomeOutput::Done => AppMsg::PresentWindow,
+                    WelcomeOutput::Language(code) => AppMsg::WizardLanguage(code),
+                });
+        welcome.widget().set_transient_for(Some(&self.window));
+        welcome.widget().set_modal(true);
+        // Light only while it is up; the preference returns when it goes,
+        // however it goes (finished, closed, or replaced on a restart).
+        WIZARD_HOLDS_LIGHT.store(true, std::sync::atomic::Ordering::Relaxed);
+        apply_app_theme(self.app_theme);
+        welcome.widget().connect_unmap(|_| {
+            WIZARD_HOLDS_LIGHT.store(false, std::sync::atomic::Ordering::Relaxed);
+            apply_app_theme(config::load_privacy().app_theme);
+        });
+        // On a true first run the main window stays hidden (see main.rs)
+        // until the wizard finishes — or is dismissed.
+        {
+            let s = sender.clone();
+            welcome.widget().connect_close_request(move |_| {
+                s.input(AppMsg::PresentWindow);
+                gtk::glib::Propagation::Proceed
+            });
+        }
+        welcome.widget().present();
+        self.welcome = Some(welcome);
+    }
+
+    /// Explain how to set up the system keyring (Secret Service) so passwords
+    /// persist across restarts, and — on Linux Mint / Cinnamon — how to stop the
+    /// keyring asking for an unlock password at every login.
+    ///
+    /// `problem` is true when this is shown because a save actually failed;
+    /// false for the proactive one-time tip (which offers "Don't show again").
+    pub(super) fn show_keyring_help(&self, problem: bool) {
+        let mint = crate::platform::is_mint_cinnamon();
+
+        let heading = if problem {
+            i18n("Hylki couldn’t save your password")
+        } else {
+            i18n("Keyring setup on Linux Mint")
+        };
+
+        let mut body = String::new();
+        if problem {
+            body.push_str(
+                "Hylki stores account passwords in the system keyring (the Secret \
+                 Service), never on disk. The keyring didn’t accept the password, so \
+                 this account won’t stay signed in after you close Hylki.\n\n",
+            );
+        } else {
+            body.push_str(
+                "Hylki keeps your account passwords in the system keyring (the Secret \
+                 Service) rather than on disk. On Linux Mint with Cinnamon the keyring \
+                 sometimes needs a one-time setup so passwords persist — and so it \
+                 doesn’t ask you to unlock it at every login.\n\n",
+            );
+        }
+
+        if mint {
+            body.push_str(
+                "Set it up:\n\
+                 1. Install the keyring tools if needed:\n\
+                 \u{2003}sudo apt install gnome-keyring seahorse\n\
+                 2. Open “Passwords and Keys” (Seahorse) and make sure a keyring named \
+                 “Login” exists and is set as Default (right-click → Set as Default).\n\n\
+                 Stop it asking for a password at each login — pick one:\n\
+                 • Recommended: set the Login keyring’s password to match your user \
+                 login password (right-click the Login keyring → Change Password), and \
+                 log in with your password rather than using automatic login. The \
+                 keyring then unlocks automatically when you log in.\n\
+                 • Or, to remove the prompt entirely even with automatic login: set the \
+                 Login keyring’s password to blank (Change Password → leave the new \
+                 password empty). This is convenient, but your saved passwords are then \
+                 stored unencrypted at rest — only do this on a machine you trust.",
+            );
+            if crate::platform::is_flatpak() {
+                body.push_str(
+                    "\n\nNote: run these steps on the host system (not inside the \
+                     Flatpak) — Hylki uses whatever keyring your desktop provides.",
+                );
+            }
+        } else {
+            body.push_str(
+                "Make sure a Secret Service keyring is installed, running, and \
+                 unlocked — for example install “gnome-keyring” and “seahorse” \
+                 (Passwords and Keys), then create a default “Login” keyring and set \
+                 its password to your login password so it unlocks automatically.",
+            );
+        }
+
+        let dialog = adw::MessageDialog::new(Some(&self.window), Some(&heading), Some(&body));
+        dialog.add_response("ok", &i18n("Got it"));
+        dialog.set_default_response(Some("ok"));
+        // The proactive tip is a one-time thing: mark it seen once dismissed (by
+        // any means) so it never nags again. A real save failure always shows.
+        if !problem {
+            dialog.connect_response(None, |_, _| config::dismiss_mint_keyring_help());
+        }
+        dialog.present();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

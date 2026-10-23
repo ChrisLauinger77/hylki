@@ -147,3 +147,145 @@ impl SortFilterPopover {
         }
     }
 }
+
+impl AppModel {
+    /// Narrow the list to `filters`, and show them on the header's popover.
+    pub(super) fn set_quick_filters(&mut self, filters: QuickFilters) {
+        self.quick_filters = filters;
+        let contacts = if filters.has(QuickFilter::Contacts) {
+            self.saved_addresses.get()
+        } else {
+            None
+        };
+        self.message_list
+            .emit(MessageListInput::SetQuickFilters { filters, contacts });
+        if let Some(lh) = self.list_header_widgets.get() {
+            lh.filter.sync(filters);
+        }
+    }
+
+    /// The message list's search, filters, count and sort as a menu: what
+    /// the ⋯ in its header offers while Focus Mode has them folded away.
+    /// The toggles are flipped through their own buttons, so the filtering
+    /// happens where it always does.
+    pub(super) fn show_list_overflow_menu(&self, sender: &ComponentSender<Self>) {
+        use crate::ui::context_menu::{show_context_menu_with_header, MenuEntry};
+        let Some(lh) = self.list_header_widgets.get() else {
+            return;
+        };
+        let s = sender.input_sender().clone();
+        let search = MenuEntry::new(i18n("Search Messages…"), move || {
+            let _ = s.send(AppMsg::OpenListSearch);
+        })
+        .icon("system-search-symbolic");
+        let filters: Vec<MenuEntry> = QuickFilter::ALL
+            .into_iter()
+            .map(|f| {
+                let on = self.quick_filters.has(f);
+                let s = sender.input_sender().clone();
+                MenuEntry::new(f.label(), move || s.emit(AppMsg::SetQuickFilter(f, !on)))
+                    .icon(f.icon())
+                    .selected(on)
+            })
+            .collect();
+        let s = sender.input_sender().clone();
+        let clear = MenuEntry::new(i18n("Clear Filters"), move || {
+            s.emit(AppMsg::ClearQuickFilters)
+        })
+        .enabled(!self.quick_filters.is_empty());
+        let filter =
+            MenuEntry::submenu(i18n("Filter"), vec![filters, vec![clear]]).icon("filter-symbolic");
+        let current = lh
+            .sort
+            .state()
+            .and_then(|v| v.str().map(String::from))
+            .unwrap_or_default();
+        let orders: Vec<MenuEntry> = SORT_ORDERS
+            .into_iter()
+            .map(|(label, key)| {
+                let action = lh.sort.clone();
+                // The same route the sort menu takes, so the list and the
+                // action's own state both follow.
+                MenuEntry::new(i18n(label), move || {
+                    action.activate(Some(&key.to_variant()))
+                })
+                .selected(current == key)
+            })
+            .collect();
+        let sort =
+            MenuEntry::submenu(i18n("Sort"), vec![orders]).icon("view-sort-descending-symbolic");
+        let sections = vec![vec![search], vec![filter, sort]];
+        // The message count heads the menu, where the header showed it.
+        let header = (!self.list_count.is_empty()).then(|| self.list_count.clone());
+        let btn = lh.overflow.clone();
+        show_context_menu_with_header(
+            &btn,
+            (btn.width() / 2) as f64,
+            btn.height() as f64,
+            header.as_deref(),
+            sections,
+        );
+    }
+
+    /// Where the list's search field and bulk bar open (#496).
+    pub(super) fn push_list_bars(&self) {
+        self.message_list.emit(MessageListInput::SetBarsPlacement {
+            search_bottom: self.list_search_bottom,
+            bulk_bottom: self.list_bulk_bar_bottom,
+        });
+    }
+
+    /// Tell the list whether to lay messages out on one line (#334): the
+    /// Layout setting, or for Automatic, the width of the pane.
+    pub(super) fn push_single_line(&self) {
+        let on = match self.list_layout {
+            config::ListLayout::Cards => false,
+            config::ListLayout::SingleLine => true,
+            config::ListLayout::Automatic => self.list_wide,
+        };
+        self.message_list.emit(MessageListInput::SetSingleLine(on));
+    }
+
+    /// Hand the list its look; `animate` slides the avatars away or back
+    /// (a Focus Mode toggle) rather than rebuilding the rows outright.
+    pub(super) fn push_list_look(&self, animate: bool) {
+        self.message_list.emit(MessageListInput::SetLook {
+            avatars: self.list_avatars(),
+            preview_lines: self.list_preview_lines(),
+            subject: self.list_show_subject(),
+            animate,
+        });
+        // A folded card in a conversation shows what a list row does (#326).
+        self.message_view.emit(MessageViewInput::SetFoldLook {
+            preview_lines: self.list_preview_lines(),
+        });
+    }
+
+    /// The avatars the list draws: the setting, unless Focus Mode hides them.
+    pub(super) fn list_avatars(&self) -> bool {
+        self.avatars && !self.focus.active(config::FocusPart::HideAvatars)
+    }
+
+    /// The preview lines the list shows: the setting, hidden outright or
+    /// capped at one by Focus Mode (previews switched off stay off).
+    ///
+    /// Only what is *drawn* changes — the setting itself, and with it what
+    /// the workers fetch, is left alone. So the preview text is in hand the
+    /// moment Focus Mode ends, rather than waiting for the next sync the way
+    /// switching previews off in Settings does.
+    pub(super) fn list_preview_lines(&self) -> u32 {
+        if self.focus.active(config::FocusPart::HidePreview) {
+            0
+        } else if self.focus.active(config::FocusPart::OnePreviewLine) {
+            self.preview_lines.min(1)
+        } else {
+            self.preview_lines
+        }
+    }
+
+    /// Whether the list draws subject lines: always, unless Focus Mode's
+    /// subject part is in force (then a row is its sender and its date).
+    pub(super) fn list_show_subject(&self) -> bool {
+        !self.focus.active(config::FocusPart::HideSubject)
+    }
+}
