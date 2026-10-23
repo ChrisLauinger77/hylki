@@ -15,6 +15,11 @@
   the words the release page and About use.
 - **[SECURITY.md](SECURITY.md):** reporting a vulnerability privately.
 - **[LICENSE.md](LICENSE.md):** the licence and third-party notices.
+- **[REFACTOR_NOTES.md](REFACTOR_NOTES.md):** the 2026-10 restructure of the
+  source tree: before and after, the module layout, decisions, and the
+  suspected bugs it recorded without fixing.
+- **[REFACTOR_PLAN.md](REFACTOR_PLAN.md):** that restructure's plan and
+  checklist.
 
 Also at the top of the repository: [CHANGELOG.md](../CHANGELOG.md), and
 [po/README.md](../po/README.md) for translators.

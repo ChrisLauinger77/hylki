@@ -1,3 +1,7 @@
+//! Every window, page and widget below the root component: the reader, the
+//! message list, the composer, settings, the sidebar, contacts, the gallery,
+//! and the small widgets they share.
+
 pub(crate) mod accounts;
 pub(crate) mod attachment_drawer;
 pub(crate) mod attachment_io;
