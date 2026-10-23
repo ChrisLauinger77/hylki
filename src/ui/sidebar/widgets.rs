@@ -422,3 +422,19 @@ pub(super) fn build_folder_row(
     row.set_child(Some(&hbox));
     (row, badge)
 }
+
+/// Move a folder row's content into a revealer, so folding its parent
+/// slides it closed rather than snapping. Built with no transition (a
+/// rebuild must reach full height in one pass); the caller keeps the
+/// revealer to arm it, or to fold it later. `None` for a row with no content.
+pub(super) fn wrap_row_in_revealer(row: &gtk::ListBoxRow, hidden: bool) -> Option<gtk::Revealer> {
+    let content = row.child()?;
+    row.set_child(gtk::Widget::NONE);
+    let rev = gtk::Revealer::new();
+    rev.set_transition_type(gtk::RevealerTransitionType::SlideDown);
+    rev.set_transition_duration(0);
+    rev.set_child(Some(&content));
+    rev.set_reveal_child(!hidden);
+    row.set_child(Some(&rev));
+    Some(rev)
+}

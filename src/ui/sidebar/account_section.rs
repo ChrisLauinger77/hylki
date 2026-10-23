@@ -6,7 +6,7 @@ use super::menus::{attach_folder_context_menu, folder_sort_menu, show_sidebar_me
 use super::tree::{hidden_by_collapse, is_main_row, nests_in_inbox, path_is_under};
 use super::widgets::{
     account_gravatar, build_folder_row, filter_icon, heading_chevron, section_heading,
-    with_unread_overlay, ROW_LEFT_INSET,
+    with_unread_overlay, wrap_row_in_revealer, ROW_LEFT_INSET,
 };
 use super::*;
 
@@ -403,33 +403,8 @@ impl Sidebar {
                 };
             let lead: Option<gtk::Widget> = if !nest || self.collapsed {
                 None
-            } else if has_children {
-                let img = gtk::Image::from_icon_name("pan-end-symbolic");
-                img.add_css_class("tree-expander-icon");
-                if !collapsed_nodes.contains(&folder.path) {
-                    img.add_css_class("open");
-                }
-                img.set_pixel_size(12);
-                let btn = gtk::Button::new();
-                btn.set_child(Some(&img));
-                btn.add_css_class("flat");
-                btn.add_css_class("tree-expander");
-                btn.set_valign(gtk::Align::Center);
-                btn.set_tooltip_text(Some(i18n("Show or hide sub-folders").as_str()));
-                let st = sender.input_sender().clone();
-                let path = folder.path.clone();
-                btn.connect_clicked(move |_| {
-                    let _ = st.send(SidebarInput::ToggleFolderNode {
-                        account_id: id,
-                        path: path.clone(),
-                    });
-                });
-                self.tree_chevrons.insert((id, folder.path.clone()), img);
-                Some(btn.upcast())
             } else {
-                let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-                spacer.set_width_request(TREE_EXPANDER_WIDTH);
-                Some(spacer.upcast())
+                Some(self.tree_lead(id, folder, has_children, collapsed_nodes, sender))
             };
             let depth = if nested {
                 folder_depth(folder, inside) + 1
@@ -448,14 +423,7 @@ impl Sidebar {
                 // Hidden while the Inbox or a parent is folded, as in
                 // the Folders section.
                 let hidden = hidden_by_collapse(&folder.path, collapsed_nodes);
-                if let Some(content) = row.child() {
-                    row.set_child(gtk::Widget::NONE);
-                    let rev = gtk::Revealer::new();
-                    rev.set_transition_type(gtk::RevealerTransitionType::SlideDown);
-                    rev.set_transition_duration(0);
-                    rev.set_child(Some(&content));
-                    rev.set_reveal_child(!hidden);
-                    row.set_child(Some(&rev));
+                if let Some(rev) = wrap_row_in_revealer(&row, hidden) {
                     self.main_row_revealers
                         .entry(id)
                         .or_default()
@@ -478,41 +446,10 @@ impl Sidebar {
                 self.folder_badges.insert((id, folder.id), badge);
             }
         }
-        let s2 = sender.input_sender().clone();
-        let quiet = self.quiet.clone();
-        list.connect_row_selected(move |_, row| {
-            if quiet.get() {
-                return;
-            }
-            if let Some(row) = row {
-                let _ = s2.send(SidebarInput::FolderRowSelected {
-                    account_id: id,
-                    index: row.index(),
-                });
-            }
-        });
-        let (list_box, list_line) = with_drop_line(&list);
-        attach_folder_list_drop(
-            &list,
-            &list_line,
-            id,
-            essential.iter().map(|f| (*f).clone()).collect(),
-            // The folders inside the Inbox take folders dropped on them.
-            inside.iter().map(|f| f.path.clone()).collect(),
-            section.hierarchy.clone(),
-            sender,
-        );
         self.main_folders
             .insert(id, essential.iter().map(|f| (*f).clone()).collect());
-        attach_folder_context_menu(
-            &list,
-            id,
-            essential.iter().map(|f| (*f).clone()).collect(),
-            section.filtered.iter().map(|f| f.path.clone()).collect(),
-            self.favorite_paths(id),
-            section.has_filters,
-            sender,
-        );
+        // The folders inside the Inbox take folders dropped on them.
+        let list_box = self.wire_folder_list(&list, section, essential, inside, 0, sender);
         (list, list_box)
     }
 
@@ -549,36 +486,8 @@ impl Sidebar {
                 let has_children = custom.iter().any(|g| path_is_under(&g.path, &folder.path));
                 let lead: Option<gtk::Widget> = if self.collapsed {
                     None
-                } else if has_children {
-                    // One right-pointing caret; the "open" class rotates it
-                    // 90° via a CSS transition, so toggling spins smoothly
-                    // instead of swapping glyphs.
-                    let img = gtk::Image::from_icon_name("pan-end-symbolic");
-                    img.add_css_class("tree-expander-icon");
-                    if !collapsed_nodes.contains(&folder.path) {
-                        img.add_css_class("open");
-                    }
-                    img.set_pixel_size(12);
-                    let btn = gtk::Button::new();
-                    btn.set_child(Some(&img));
-                    btn.add_css_class("flat");
-                    btn.add_css_class("tree-expander");
-                    btn.set_valign(gtk::Align::Center);
-                    btn.set_tooltip_text(Some(i18n("Show or hide sub-folders").as_str()));
-                    let st = sender.input_sender().clone();
-                    let path = folder.path.clone();
-                    btn.connect_clicked(move |_| {
-                        let _ = st.send(SidebarInput::ToggleFolderNode {
-                            account_id: id,
-                            path: path.clone(),
-                        });
-                    });
-                    self.tree_chevrons.insert((id, folder.path.clone()), img);
-                    Some(btn.upcast())
                 } else {
-                    let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-                    spacer.set_width_request(TREE_EXPANDER_WIDTH);
-                    Some(spacer.upcast())
+                    Some(self.tree_lead(id, folder, has_children, collapsed_nodes, sender))
                 };
                 let (row, badge) = build_folder_row(
                     folder,
@@ -595,14 +504,7 @@ impl Sidebar {
                 // height in one pass; see the scroll-jump saga), armed to
                 // 200ms alongside the section revealers below.
                 let hidden = hidden_by_collapse(&folder.path, collapsed_nodes);
-                if let Some(content) = row.child() {
-                    row.set_child(gtk::Widget::NONE);
-                    let rev = gtk::Revealer::new();
-                    rev.set_transition_type(gtk::RevealerTransitionType::SlideDown);
-                    rev.set_transition_duration(0);
-                    rev.set_child(Some(&content));
-                    rev.set_reveal_child(!hidden);
-                    row.set_child(Some(&rev));
+                if let Some(rev) = wrap_row_in_revealer(&row, hidden) {
                     self.tree_row_revealers.entry(id).or_default().push(rev);
                 }
                 row.set_visible(!hidden);
@@ -619,40 +521,9 @@ impl Sidebar {
             }
             self.custom_folders
                 .insert(id, custom.iter().map(|f| (*f).clone()).collect());
-            let s3 = sender.input_sender().clone();
-            let quiet = self.quiet.clone();
-            custom_list.connect_row_selected(move |_, row| {
-                if quiet.get() {
-                    return;
-                }
-                if let Some(row) = row {
-                    // Offset past the essential folders into `section.folders`.
-                    let _ = s3.send(SidebarInput::FolderRowSelected {
-                        account_id: id,
-                        index: e + row.index(),
-                    });
-                }
-            });
-            let (custom_box, custom_line) = with_drop_line(&custom_list);
-            attach_folder_list_drop(
-                &custom_list,
-                &custom_line,
-                id,
-                custom.iter().map(|f| (*f).clone()).collect(),
-                custom.iter().map(|f| f.path.clone()).collect(),
-                section.hierarchy.clone(),
-                sender,
-            );
+            let custom_box =
+                self.wire_folder_list(&custom_list, section, custom, custom, e, sender);
             custom_revealer.set_child(Some(&custom_box));
-            attach_folder_context_menu(
-                &custom_list,
-                id,
-                custom.iter().map(|f| (*f).clone()).collect(),
-                section.filtered.iter().map(|f| f.path.clone()).collect(),
-                self.favorite_paths(id),
-                section.has_filters,
-                sender,
-            );
 
             custom_revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
             custom_revealer.set_transition_duration(0);
@@ -769,5 +640,97 @@ impl Sidebar {
             let _ = cs.output(SidebarOutput::Context(CtxAction::NewFolder(id)));
         });
         add_btn
+    }
+
+    /// A tree row's expander slot (#51): for a folder with sub-folders, one
+    /// right-pointing caret whose "open" class rotates it 90° via a CSS
+    /// transition, so toggling spins smoothly instead of swapping glyphs;
+    /// for a leaf, a spacer of the same width so names at one depth line up.
+    fn tree_lead(
+        &mut self,
+        id: u32,
+        folder: &Folder,
+        has_children: bool,
+        collapsed_nodes: &HashSet<String>,
+        sender: &ComponentSender<Self>,
+    ) -> gtk::Widget {
+        if has_children {
+            let img = gtk::Image::from_icon_name("pan-end-symbolic");
+            img.add_css_class("tree-expander-icon");
+            if !collapsed_nodes.contains(&folder.path) {
+                img.add_css_class("open");
+            }
+            img.set_pixel_size(12);
+            let btn = gtk::Button::new();
+            btn.set_child(Some(&img));
+            btn.add_css_class("flat");
+            btn.add_css_class("tree-expander");
+            btn.set_valign(gtk::Align::Center);
+            btn.set_tooltip_text(Some(i18n("Show or hide sub-folders").as_str()));
+            let st = sender.input_sender().clone();
+            let path = folder.path.clone();
+            btn.connect_clicked(move |_| {
+                let _ = st.send(SidebarInput::ToggleFolderNode {
+                    account_id: id,
+                    path: path.clone(),
+                });
+            });
+            self.tree_chevrons.insert((id, folder.path.clone()), img);
+            btn.upcast()
+        } else {
+            let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            spacer.set_width_request(TREE_EXPANDER_WIDTH);
+            spacer.upcast()
+        }
+    }
+
+    /// Wire a folder list: its selection (row `i` stands for the folder at
+    /// `offset + i` in `section.folders`), folders and messages dropped on
+    /// it (`parents` are the rows a folder can be dropped into), and its
+    /// right-click menu. Returns the list in the box that draws its drop
+    /// line.
+    fn wire_folder_list(
+        &self,
+        list: &gtk::ListBox,
+        section: &SectionData,
+        folders: &[&Folder],
+        parents: &[&Folder],
+        offset: i32,
+        sender: &ComponentSender<Self>,
+    ) -> gtk::Overlay {
+        let id = section.account.id;
+        let s = sender.input_sender().clone();
+        let quiet = self.quiet.clone();
+        list.connect_row_selected(move |_, row| {
+            if quiet.get() {
+                return;
+            }
+            if let Some(row) = row {
+                let _ = s.send(SidebarInput::FolderRowSelected {
+                    account_id: id,
+                    index: offset + row.index(),
+                });
+            }
+        });
+        let (list_box, list_line) = with_drop_line(list);
+        attach_folder_list_drop(
+            list,
+            &list_line,
+            id,
+            folders.iter().map(|f| (*f).clone()).collect(),
+            parents.iter().map(|f| f.path.clone()).collect(),
+            section.hierarchy.clone(),
+            sender,
+        );
+        attach_folder_context_menu(
+            list,
+            id,
+            folders.iter().map(|f| (*f).clone()).collect(),
+            section.filtered.iter().map(|f| f.path.clone()).collect(),
+            self.favorite_paths(id),
+            section.has_filters,
+            sender,
+        );
+        list_box
     }
 }
