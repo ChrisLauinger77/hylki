@@ -53,6 +53,8 @@ mod gallery;
 mod hand_off;
 mod keymap;
 mod list_header;
+mod model;
+mod msg;
 mod notifications;
 mod palette;
 mod pending;
@@ -117,6 +119,8 @@ pub(crate) use keymap::{
     without_caps_lock, Shortcut,
 };
 use list_header::{ListHeaderWidgets, SortFilterPopover, LIST_WIDE_OFF, LIST_WIDE_ON, SORT_ORDERS};
+pub(crate) use model::AppModel;
+pub(crate) use msg::AppMsg;
 use notifications::notified_message;
 use palette::{keyed_item, palette_key, GMAIL_HELP, SHORTCUT_HELP};
 use pending::{PENDING_MOVE_MAX, PENDING_SEEN_MAX, PENDING_TAG_MAX, PENDING_TAG_SETTLED};
@@ -191,2106 +195,6 @@ use crate::ui::sidebar::{
     CtxAction, SectionData, Sidebar, SidebarInit, SidebarInput, SidebarOutput, UnifiedFolderRef,
 };
 use crate::worker::{self, MailRequest, OutgoingMessage, WorkerEvent};
-
-pub struct AppModel {
-    /// One mail worker per account (account_id → request sender).
-    workers: HashMap<u32, UnboundedSender<MailRequest>>,
-    /// `mid:` lookups out at the servers (#130): the Message-ID and how many
-    /// accounts have yet to answer, so a miss is reported once, at the end.
-    mid_searches: HashMap<String, usize>,
-    /// The tag finder's scan in progress (Settings → Tags → Find Tags…):
-    /// how many accounts have yet to answer, and what the others found.
-    tag_scan: Option<TagScan>,
-    /// Counts scans, so a stale timeout cannot end a later one.
-    tag_scan_gen: u32,
-    config: Vec<AccountConfig>,
-    /// Demo mode's stand-in account configs (the sample accounts live only
-    /// at the backend): what the Accounts panel edits, kept in memory so a
-    /// changed color, emoji or picture shows without touching disk.
-    demo_config: Vec<AccountConfig>,
-    window: adw::ApplicationWindow,
-    prefs: Option<Controller<Preferences>>,
-    accounts_win: Option<Controller<AccountsWindow>>,
-    /// What the accounts panel was built over (its init, printed), to tell
-    /// whether a reopened Settings window needs a fresh one.
-    accounts_seed: Option<String>,
-    /// Standalone compose windows (multiple allowed at once). Pruned as they close.
-    composers: Vec<ComposeHost>,
-    /// The reader's inline reply/forward composer, if open.
-    reader_compose: Option<ReaderCompose>,
-    /// The stage over the reading pane that turns a sent split reply into
-    /// its card in the conversation (send_morph.rs).
-    send_morph: crate::ui::send_morph::SendMorph,
-    /// A reply just sent from the split pane, with the card it gets in the
-    /// conversation and whether it moves there: (composer id, message,
-    /// animated), until that composer closes.
-    arriving: Option<(u32, Message, bool)>,
-    /// A sent reply whose morph is under way, until the pane changes under
-    /// the stage.
-    morph_pending: Option<MorphPending>,
-    /// The app's own input, for the morph's steps that answer later.
-    self_sender: relm4::Sender<AppMsg>,
-    /// The cards standing in for replies sent from here until their copies
-    /// are read back from Sent, by (account, id).
-    provisionals: HashMap<(u32, u32), Provisional>,
-    /// Superseded inline composers still finishing a save-if-dirty before closing.
-    draining_composers: Vec<(u32, Controller<Compose>)>,
-    /// SlideDown revealer under the reader toolbar that hosts the inline pane.
-    reader_compose_revealer: gtk::Revealer,
-    /// The cards files dragged onto the window bring up when no composer is
-    /// open in it, each starting a new message (#293).
-    window_drop_zones: Option<std::rc::Rc<crate::ui::drop_zones::DropZones>>,
-    /// Split-reply slot (#86): a reply slides down from the pane's top and
-    /// the message(s) stay below it, visible and interactive.
-    reader_split_top: gtk::Revealer,
-    /// The same slot beneath the reader (#212): the reply slides up from the
-    /// pane's bottom edge when the reading order puts the newest message
-    /// there, so the editor continues the conversation where it ends. Only
-    /// one of the two slots is ever occupied.
-    reader_split_bottom: gtk::Revealer,
-    /// The vertical Paned dividing the split reply (start child, the slot
-    /// above) from the reader (end child). A Paned allocates by divider
-    /// position, so the composer holds the height it was given — a big paste
-    /// can't push it down over the messages — and its divider is the grab
-    /// handle that resizes the panel. Hidden slot = hidden divider.
-    reader_split: gtk::Paned,
-    /// The reader's own Paned, nested as `reader_split`'s end child: the
-    /// reader (start child) over the bottom slot (end child). A second Paned
-    /// rather than swapping children, so the reader is never reparented and
-    /// the bottom slot has a divider of its own to be sized by.
-    reader_split_lower: gtk::Paned,
-    /// The running slide (open or close) of the split reply — held so the
-    /// opposite motion can skip it to its end instead of fighting it over
-    /// the divider.
-    split_close_anim: std::rc::Rc<std::cell::RefCell<Option<adw::TimedAnimation>>>,
-    /// The reader pane's own header bar: hidden while a split reply hosts,
-    /// since it would show a second set of window decorations mid-window and
-    /// spend vertical space the split needs.
-    reader_header: std::cell::OnceCell<adw::HeaderBar>,
-    /// Where Send says what it is doing, with Undo while it can (#434).
-    toasts: std::cell::OnceCell<adw::ToastOverlay>,
-    /// Messages on their way out (#434), shared with the quit paths, which
-    /// park any still waiting out the Undo Send delay in the Outbox.
-    outgoing: crate::outgoing::OutgoingList,
-    /// The last ticket handed to a send; 0 is never used.
-    send_ticket: u64,
-    /// Same idea over the contacts view's detail pane: composing from a
-    /// contact slides down right there instead of yanking the mail view back.
-    contacts_compose_revealer: gtk::Revealer,
-    /// Monotonic id source for composers.
-    next_compose_id: u32,
-    menu: gtk::gio::Menu,
-    /// The burger menu's help section, rebuilt when Console mode toggles.
-    help_menu: gtk::gio::Menu,
-    /// Whether the status bar is down, so the menu offers to hide it (#294).
-    status_bar_shown: bool,
-    /// All known accounts, ordered by id.
-    accounts: Vec<Account>,
-    /// account_id → that account's folders.
-    folders: HashMap<u32, Vec<Folder>>,
-    /// Preferred sidebar account order (by email).
-    account_order: Vec<String>,
-    /// Accounts whose folder list is collapsed in the sidebar (by email).
-    collapsed: Vec<String>,
-    /// Accounts whose custom-folders section is expanded in the sidebar (by email).
-    folders_expanded: Vec<String>,
-    /// Collapsed folder-tree nodes ("email\tpath") — the sidebar's custom
-    /// folders render as a collapsible hierarchy (#51).
-    tree_collapsed: Vec<String>,
-    /// The folders the user has put in order in the sidebar ("email\tpath"):
-    /// each sorts among its siblings by its place in this list.
-    folder_order: Vec<String>,
-    selected: Option<SelectedFolder>,
-    /// Attachments of the currently-open message (shown in the drawer).
-    attachments: Vec<Attachment>,
-    /// True while the current message's attachments are downloading.
-    attachments_loading: bool,
-    /// The reader header's right-hand actions are collapsed into the overflow menu
-    /// (pane squeezed under READER_ACTIONS_BREAKPOINT).
-    reader_actions_collapsed: bool,
-    /// The collapsed header's ⋯ button — the anchor its menu pops from.
-    reader_overflow_btn: gtk::Button,
-    /// The reader header's layout: which buttons, which side, what order
-    /// (Settings → Appearance → Toolbar).
-    reader_toolbar: config::ReaderToolbar,
-    /// The header's action buttons and their breakpoint, for re-packing when
-    /// the layout changes. Set once after the view is built.
-    reader_toolbar_widgets: std::cell::OnceCell<ReaderToolbarWidgets>,
-    /// The toolbar's tag button (#71) — the anchor its menu pops from.
-    reader_tag_btn: gtk::Button,
-    /// The reader toolbar's Move To… button (#164): the folder picker
-    /// anchors to it.
-    reader_move_btn: gtk::Button,
-    /// Cache of fetched attachments, keyed by (account_id, message_id), so
-    /// revisiting a message doesn't re-download them. Byte-bounded — raw
-    /// attachment bytes for every message ever opened added up to hundreds of
-    /// megabytes over a long session (issue #106).
-    attachment_cache: crate::ram_cache::RamCache<BodyKey, Vec<Attachment>>,
-    /// The attachment lightbox over the whole window (drawer previews and
-    /// card attachment rows).
-    lightbox: Controller<crate::ui::lightbox::Lightbox>,
-    /// True when a unified view is active (no single folder): the folders
-    /// `unified_view` names, merged into one list.
-    unified: bool,
-    /// Which folders the unified view merges: every account's Inbox for All
-    /// Inboxes, its Starred / Sent / Drafts for those rows, or every
-    /// filter rule's folder for the Filtered Folders row.
-    unified_view: UnifiedView,
-    /// The one account the unified view is narrowed to: an account's row
-    /// under the unified Starred row, for one with no Starred folder (#482).
-    unified_account: Option<u32>,
-    /// (account, folder) → that folder's latest messages, for the unified
-    /// view's merge.
-    unified_slices: HashMap<(u32, u32), Vec<Message>>,
-    /// Accounts whose inbox has been requested for the unified view since
-    /// launch (the cache-primed slices still need their catch-up sync).
-    unified_boot_requested: HashSet<u32>,
-    /// Accounts whose sent mail has been asked for this run (#236).
-    sent_index_requested: HashSet<u32>,
-    /// (account_id, folder_id) → last-seen message list, shown instantly on
-    /// revisit while a fresh sync runs in the background. Only folders
-    /// listed whole this run: a cross-folder search reads the rest from disk.
-    message_cache: HashMap<(u32, u32), FolderMessages>,
-    /// Bumped as a search starts and ends, so a pool read from disk for a
-    /// search already over is dropped (#472).
-    search_gen: u64,
-    /// (account_id, folder_id) whose background backfill has fully finished, so the
-    /// message list knows no more rows will stream in for them.
-    indexed_folders: HashSet<(u32, u32)>,
-    /// Fetched bodies by (account, folder, UID) (see [`body_key`]), so
-    /// reopening a message renders instantly with no loading spinner. The
-    /// folder is part of the key because a UID is unique only within its
-    /// folder: keyed by account and UID alone, a Sent message's body filed by
-    /// the prefetch replaced an Inbox message's with the same UID, and the
-    /// Inbox message then opened showing the other one's text. Byte-bounded: the background prefetch
-    /// feeds this on every folder sync, and unbounded it grew past a gigabyte
-    /// on a long-running session (issue #106) — evicted bodies re-read from the
-    /// SQLite cache in a blink.
-    body_cache: crate::ram_cache::RamCache<BodyKey, String>,
-    /// Sender-authentication verdicts, keyed like `body_cache` (account,
-    /// folder, UID). Prefetch delivers
-    /// these well before a message is opened, and opening one renders from the
-    /// in-memory body cache without a worker round-trip — so the verdict has to
-    /// be held here or it would be lost by the time the reader needs it.
-    sender_cache: HashMap<BodyKey, Box<crate::models::SenderCheck>>,
-    /// (account_id, folder_id) → server-side unread count, accurate beyond the
-    /// loaded window (from IMAP STATUS/SEARCH). Drives the sidebar badges.
-    folder_unread: HashMap<(u32, u32), u32>,
-    /// Read/unread changes sent to a worker and not stored yet, keyed by
-    /// (account, folder path, uid) → (seen, when sent). The worker serves
-    /// one request at a time, so a folder list or unread count it fetched
-    /// ahead of the STORE still shows the old state; while an entry is
-    /// young the app's own state for that message and folder wins over it.
-    pending_seen: HashMap<(u32, String, u32), (bool, std::time::Instant)>,
-    /// (account, folder path, uid, lower-cased keyword) → (on, held until,
-    /// keyword): the same for tags. A folder list fetched ahead of the STORE took a
-    /// tag just set off the row until the next sync put it back.
-    pending_tags: HashMap<(u32, String, u32, String), (bool, std::time::Instant, String)>,
-    /// The messages a reply or forward on its way out marked as answered
-    /// ahead of time (#454), by send ticket: (account, folder id, uid,
-    /// forwarded). Undone or failed, the marks come off again.
-    pending_answers: HashMap<u64, Vec<(u32, u32, u32, bool)>>,
-    /// Folders (account, folder) whose server unread count arrived while a
-    /// read mark or a move was on its way and was set aside: synced again
-    /// once those are stored. The count may also have been the only word of
-    /// new mail, so a fresh count alone is not enough (#336).
-    dropped_unread: std::collections::HashSet<(u32, u32)>,
-    /// Mail taken out of a folder whose move the worker has not reached
-    /// yet, keyed by (account, folder path, uid) → when it was sent. A list
-    /// the worker fetched ahead of the move still holds it, and putting it
-    /// back on screen made deleted mail come back, to be deleted again for
-    /// a request that had already run (#255). Filled by [`Self::send_to`],
-    /// which every such request goes through.
-    pending_moves: std::cell::RefCell<HashMap<(u32, String, u32), std::time::Instant>>,
-    /// Messages on their way to another account (#265), by token.
-    transfers: HashMap<u64, Transfer>,
-    next_transfer: u64,
-    /// Ids for messages opened from files (#398), counting down from the
-    /// top so they never meet a server's UIDs.
-    next_local_id: u32,
-    /// The `ExportRaw` tokens of Save as File, with the name to offer.
-    pending_saves: HashMap<u64, String>,
-    /// How the moves to other accounts under way are going, for the status
-    /// line and the one report at the end.
-    transfer_tally: TransferTally,
-    /// The account-list split view, narrowed to icon-only width when collapsed.
-    sidebar_split: Option<adw::OverlaySplitView>,
-    /// The "Hylki" title label, hidden while the sidebar is collapsed.
-    app_title: Option<gtk::Label>,
-    /// Sidebar header. In the icon-only rail its window-control buttons are
-    /// hidden so the header stops forcing a minimum width wider than the rail.
-    sidebar_header: Option<adw::HeaderBar>,
-    /// The main-menu button, which moves into the header's centre (the title
-    /// slot) while the sidebar is a rail.
-    sidebar_menu: Option<gtk::MenuButton>,
-    /// The sidebar header's Refresh button — top-left, across from the menu —
-    /// shown expanded and in the peek. The rail has no header room for it, so
-    /// there the sidebar stacks its own refresh directly under the menu.
-    sidebar_refresh: gtk::Button,
-    /// The icon/spinner stack inside it, switched while any account syncs.
-    sidebar_refresh_stack: gtk::Stack,
-    sidebar_refresh_spinner: gtk::Spinner,
-    /// Whether the sidebar is in icon-only (collapsed) mode.
-    sidebar_collapsed: bool,
-    /// The narrow-window breakpoint is currently applied (window is too narrow
-    /// for the expanded sidebar + a full-width actions palette — e.g. tiled to
-    /// half of a 1920px screen).
-    auto_rail: bool,
-    /// The rail's current on-screen state — the user's choice OR'd with the
-    /// breakpoint, tracked so apply/unapply only animate real changes.
-    rail_active: bool,
-    /// While narrow: the sidebar is temporarily expanded as an overlay floating
-    /// above the panes (so the list and reader keep their widths).
-    sidebar_peek: bool,
-    /// True while set_sidebar_peek is mutating the split view, so the
-    /// show-sidebar notify (the scrim-dismiss detector) ignores the storm of
-    /// notifies our own transition emits — collapsing the split auto-hides
-    /// the sidebar, which read as an instant dismissal and closed every peek
-    /// the moment it opened.
-    peek_transition: std::rc::Rc<std::cell::Cell<bool>>,
-    /// The peek panel's own split view: always collapsed, nested in the
-    /// account split's content slot, so its overlay sidebar slides out from
-    /// the rail's right edge over the panes while the docked rail itself is
-    /// never touched — not collapsed, not re-laid, not snapshotted.
-    peek_split: Option<adw::OverlaySplitView>,
-    /// The icon/spinner stack in the peek panel's own Refresh button.
-    peek_refresh_stack: gtk::Stack,
-    peek_refresh_spinner: gtk::Spinner,
-    /// Preference: hovering the icon rail opens the peek by itself.
-    sidebar_hover_expand: bool,
-    /// Preference: accounts, folders and sections reopen as they were left.
-    remember_sidebar: bool,
-    /// Preference: the sidebar reopens in the icon rail if left there.
-    remember_rail: bool,
-    /// The sections' open state, as the sidebar last reported it,
-    /// persisted with the rest of the sidebar layout.
-    unified_expanded: bool,
-    filtered_expanded: bool,
-    tags_expanded: bool,
-    starred_expanded: bool,
-    sent_expanded: bool,
-    drafts_expanded: bool,
-    archive_expanded: bool,
-    junk_expanded: bool,
-    trash_expanded: bool,
-    /// Favorite folders (#367), as "email\tpath" entries in the order they
-    /// were added, and whether their list is open.
-    favorites: Vec<String>,
-    favorites_expanded: bool,
-    smart_expanded: bool,
-    contacts_expanded: bool,
-    /// The accounts and books folded under the sidebar's Contacts row.
-    contacts_folded: Vec<String>,
-    /// Account emails whose own Filtered Folders / Tags sections are open.
-    filtered_expanded_accounts: Vec<String>,
-    tags_expanded_accounts: Vec<String>,
-    /// Preference: the icon rail marks unread mail with a dot, not a count.
-    rail_dots: bool,
-    /// Preference: unread counts are accented only for mail that came in
-    /// since the folder was last looked at (#343).
-    seen_counts: bool,
-    /// Each folder's unread count when last looked at, keyed as in
-    /// state.toml ("address␟path").
-    unread_seen: std::cell::RefCell<std::collections::BTreeMap<String, u32>>,
-    /// Preference: the sections the icon rail folds up when the sidebar
-    /// collapses.
-    rail_fold: config::RailFold,
-    /// The app chrome's theme preference (follow system / light / dark).
-    app_theme: config::AppTheme,
-    /// The app's text size in percent of the desktop's (#267).
-    text_scale: u32,
-    /// The appearance theme: a bundled palette's id, or "system" for the
-    /// stock GNOME colors (see `theme.rs`).
-    theme: String,
-    /// Held so the in-flight collapse/expand width animation isn't dropped.
-    sidebar_anim: Option<adw::TimedAnimation>,
-    current: Option<Message>,
-    /// Sender addresses allowed to auto-load remote content (lowercased).
-    allowed_senders: Vec<String>,
-    /// The mailing lists left through the reader's Unsubscribe button
-    /// (unsubscribed.toml), so a later message from one says so.
-    unsubscribed: Vec<config::UnsubscribedList>,
-    /// The meeting invitations answered through the reader's buttons
-    /// (invites.toml, #223), so a meeting opened again says where it
-    /// stands.
-    invite_answers: Vec<config::InviteAnswer>,
-    /// Whether remote content is auto-loaded for every new message.
-    auto_remote_content: bool,
-    /// Whether the blocked-remote-content banner is shown at all. Hiding it changes nothing about what
-    /// is blocked — only whether the reader says so.
-    show_remote_banner: bool,
-    /// Whether a "Check this sender" verdict gets the red banner over the
-    /// message. A failed check gets it regardless.
-    show_spoof_banner: bool,
-    /// Addresses/domains whose incoming inbox mail is auto-deleted (lowercased).
-    blacklist: Vec<String>,
-    /// Seconds the message-list actions palette stays open after the cursor leaves.
-    palette_collapse_secs: u64,
-    /// Seconds a message card's actions palette stays open — the cards' own,
-    /// separate from the list's above.
-    card_palette_collapse_secs: u64,
-    /// Whether to load sender avatars from Gravatar.
-    gravatar: bool,
-    /// Whether the colored avatars are drawn at all (#29).
-    avatars: bool,
-    /// Whether the mail you sent wears its mailbox's face rather than the
-    /// circle any other sender would get (#189).
-    /// Whether tagged rows wear their tag's color (PR #383).
-    tag_row_tint: bool,
-    /// The address book new contacts go to (empty: automatic).
-    contact_book: String,
-    own_mailbox_face: bool,
-    /// Whether a sender's site icon may fill their circle (#30).
-    sender_logos: bool,
-    /// How dates are written, and on what clock (#32).
-    date_style: crate::config::DateStyle,
-    clock_style: crate::config::ClockStyle,
-    /// Seconds between automatic mail checks (0 = manual only).
-    fetch_interval_secs: u64,
-    /// Whether IMAP IDLE push is enabled.
-    push: bool,
-    /// Whether a metered connection holds back the work done ahead of the
-    /// user (#442).
-    metered_save_data: bool,
-    /// Whether desktop notifications (new mail, error alerts) are posted.
-    notifications_enabled: bool,
-    /// Whether new-mail notifications may name the sender and subject.
-    notification_content: bool,
-    /// Which action buttons a new-mail notification carries (#244).
-    notification_buttons: config::NotificationButtons,
-    /// Whether the sidebar's footer shows the "Attachments" row.
-    show_attachments: bool,
-    /// Whether the settings window opens on Accounts (vs Preferences).
-    settings_open_accounts: bool,
-    /// The Settings category last shown this session, to reopen on.
-    last_settings_page: Option<String>,
-    /// The list header's count text ("N" / "N of M"), from the message list.
-    list_count: String,
-    /// Lines of preview text per message-list row (1–3).
-    preview_lines: u32,
-    /// The message list's layout setting (#334).
-    list_layout: config::ListLayout,
-    /// The columns of a single-line list, in order (#334).
-    list_columns: Vec<config::ListColumn>,
-    /// Headings over them, which sort the list when clicked (#334).
-    list_headings: bool,
-    /// A single line too wide for the pane scrolls rather than fitting its
-    /// columns (#443).
-    list_column_scroll: bool,
-    /// Date headings over a list sorted by date (#435).
-    list_group_by_date: bool,
-    /// A card's pills on a line under its text (#374).
-    list_pills_below: bool,
-    /// The list's search field stays open (#446).
-    list_search_open: bool,
-    /// Contacts' search field stays open.
-    contacts_search_open: bool,
-    /// The list's search field and bulk bar open under the rows (#496).
-    list_search_bottom: bool,
-    list_bulk_bar_bottom: bool,
-    /// The widths columns were dragged to by their headings (#334).
-    list_column_widths: std::collections::HashMap<config::ListColumn, i32>,
-    /// The list pane is wide enough for one line per message, which
-    /// Automatic follows.
-    list_wide: bool,
-    /// The keyboard-shortcut reference, while it is open — so the shortcut that
-    /// opens it closes it again.
-    shortcuts_win: Option<adw::Window>,
-    /// Whether Hylki keeps running with no window. Shared with the window's
-    /// close handler, which has to read it without the model.
-    run_in_background: std::rc::Rc<std::cell::Cell<bool>>,
-    /// Whether Hylki starts at login (background running only).
-    autostart: bool,
-    /// Tray icon (issue #116): the setting, the icon choice, and the running
-    /// item while the setting is on.
-    tray_enabled: bool,
-    tray_icon: config::TrayIcon,
-    tray_mail: bool,
-    /// What the launcher icon's badge counts (#271, #431).
-    launcher_badge: config::LauncherBadge,
-    /// Inbox mail that arrived while the window was not in front (#431).
-    arrivals: crate::launcher_badge::Arrivals,
-    /// The chosen app icon (an `app_icon::catalog` id); the tray draws it.
-    app_icon: String,
-    /// A restart is on its way (Restart Now clicked, settle timer running).
-    restart_pending: bool,
-    tray: Option<crate::tray::TrayHandle>,
-    /// What the tray menu last listed (account, id, sender, subject; `None`
-    /// for no section), so an unchanged list isn't re-sent over D-Bus on
-    /// every unread-count push.
-    tray_mail_key: std::cell::RefCell<Option<Vec<(u32, u32, String, String)>>>,
-    /// Whether single-key (modifier-free) shortcuts are enabled. The window's key
-    /// controller needs to read this without the model, so it is shared: with the
-    /// feature off, keystrokes must pass straight through rather than be consumed
-    /// and dropped.
-    single_key: std::rc::Rc<std::cell::Cell<bool>>,
-    /// Gmail's single-key map in place of Hylki's (#392), shared with the
-    /// key controller like `single_key`.
-    gmail_keys: std::rc::Rc<std::cell::Cell<bool>>,
-    /// Settings → System → Keep downloaded mail, in days; 0 keeps it (#394).
-    keep_downloads_days: u32,
-    /// Whether messages are grouped into conversation threads.
-    threading: bool,
-    /// A conversation re-render is already scheduled, so further bodies arriving
-    /// in the same burst don't each queue one of their own.
-    thread_render_queued: bool,
-    /// When the conversation on screen was opened. Its bodies arrive one at a
-    /// time, and painting each arrival meant a stack of half-built renders
-    /// flashing past; the reader holds its spinner until they are all in, or
-    /// until this has been waiting [`THREAD_BODY_WAIT`].
-    thread_opened_at: Option<std::time::Instant>,
-    /// A cross-folder conversation lookup is still outstanding. Its answer can
-    /// add messages (and bodies) to what is on screen, so the reader waits for
-    /// it rather than painting a conversation it is about to paint again.
-    thread_related_pending: bool,
-    /// Whether the conversation on screen has had its one paint yet. Until it
-    /// has, the reader shows its spinner — opening a thread is a wait, however
-    /// short, and showing the previous message meanwhile reads as a glitch.
-    thread_painted: bool,
-    /// Conversations already assembled, keyed by the message that opens them.
-    /// Returning to a thread paints from here rather than re-running the
-    /// cross-folder lookup and re-gathering bodies: the wait belongs to the
-    /// first open, not to every one. Bounded — a conversation holds its
-    /// messages' bodies, which are not small. Keyed by the head's folder and
-    /// UID: a UID alone names a different message in every folder (#317).
-    thread_cache: HashMap<BodyKey, Vec<Message>>,
-    /// Attachments being deleted from the server (#289), shown as such in
-    /// the drawer and the gallery until the worker answers.
-    deleting_attachments: Vec<AttachmentTarget>,
-    /// Showcase only: answer the next delete question with Delete.
-    showcase_confirm_delete: bool,
-    /// Insertion order for `thread_cache`, oldest first.
-    thread_cache_order: Vec<BodyKey>,
-    /// Which conversation `current_thread` is, for storing it back.
-    thread_key: Option<BodyKey>,
-    /// Whether conversation threads start expanded in the message list.
-    threads_expanded: bool,
-    /// Reading pane shows conversations newest-message-first.
-    thread_newest_first: bool,
-    /// Which messages of a conversation open folded (#326).
-    fold_messages: config::FoldMessages,
-    /// Reader always shows the recipients line under the sender.
-    always_show_recipients: bool,
-    /// The OpenPGP chip says its verdict in words (#300).
-    pgp_labels: bool,
-    /// Whether the sidebar offers the unified "All Inboxes" section at all.
-    show_unified_pref: bool,
-    /// Whether the collapsed "All Inboxes" row wears its total-unread chip.
-    unified_chips: config::UnifiedChips,
-    /// Where the Filters, Tags, Favorites and Contacts sections sit
-    /// (Settings → Sidebar), and how they are drawn.
-    section_style: config::SectionStyle,
-    filtered_placement: config::SectionPlacement,
-    tags_placement: config::SectionPlacement,
-    favorites_placement: config::SectionPlacement,
-    contacts_placement: config::SectionPlacement,
-    /// The unified section's Starred / Sent / Drafts rows (Settings →
-    /// Sidebar → Unified).
-    unified_kinds: config::UnifiedKinds,
-    /// Whether the account sections are shown at all.
-    show_accounts: bool,
-    /// The main menu's "Show Accounts" check item, kept in step with the
-    /// setting wherever it is changed.
-    show_accounts_action: gtk::gio::SimpleAction,
-    /// Focus Mode (main menu, Ctrl+Shift+F, Settings → Appearance): the
-    /// master switch and the parts it strips. Applied on top of the ordinary
-    /// settings, which it never changes — off, everything comes back.
-    focus: config::FocusMode,
-    /// The main menu's "Focus Mode" check item.
-    focus_action: gtk::gio::SimpleAction,
-    /// The message list header's foldable controls and the ⋯ that stands in
-    /// for them in Focus Mode (set in init).
-    list_header_widgets: std::cell::OnceCell<ListHeaderWidgets>,
-    /// Whether the sidebar's disclosure chevrons lead their rows.
-    chevrons_left: bool,
-    /// Whether a click anywhere on an account's header folds it.
-    account_click_folds: bool,
-    /// What the window shows at launch (#256).
-    start_view: config::StartView,
-    /// How accounts' folders are sorted, unless an account chooses
-    /// (Settings → Sidebar).
-    folder_sort: config::FolderSort,
-    /// Console mode offered in the status bar (Settings → System & Appearance).
-    console_mode: bool,
-    /// The status bar at the top of the window, not its foot (#433).
-    status_bar_top: bool,
-    /// Read-marking policy (#100).
-    read_mark: config::ReadMark,
-    /// Mail filter rules (#47), applied to inbox syncs.
-    filters: Vec<config::FilterRule>,
-    /// The saved contacts' addresses, for rules on whether a sender is in
-    /// Contacts (PR #384).
-    saved_addresses: crate::contacts::SavedAddresses,
-    /// The list header's quick filters that are on (#441).
-    quick_filters: QuickFilters,
-    /// Tags (#71): a name and color per keyword.
-    tags: Vec<config::Tag>,
-    /// The tag view, if that is the view — alongside `unified` and
-    /// `selected`, never with: the account it is scoped to (`None` spans
-    /// every account) and the keyword (`None` for every tag at once).
-    tag_view: Option<(Option<u32>, Option<String>)>,
-    /// Each tag view's last result, by (scope, keyword): shown the moment
-    /// the view opens, while a fresh read of the index runs off the main
-    /// thread and replaces it only if it differs.
-    tag_view_cache: HashMap<(Option<u32>, Option<String>), Vec<Message>>,
-    /// A read of the index for the open tag view is in flight; one more
-    /// asked for meanwhile runs when it lands.
-    tag_view_loading: bool,
-    tag_view_dirty: bool,
-    /// Smart folders (#417): the saved searches, and the one open, by id,
-    /// read and cached the way the tag view is.
-    smart_folders: Vec<config::SmartFolder>,
-    smart_view: Option<String>,
-    smart_view_cache: HashMap<String, Vec<Message>>,
-    smart_view_loading: bool,
-    smart_view_dirty: bool,
-    /// The unified Starred view's read of the index (#482) is running, and
-    /// another is owed when it lands.
-    unified_starred_loading: bool,
-    unified_starred_dirty: bool,
-    /// The starred mail of the accounts with no Starred folder, by account,
-    /// with the folder path each message sits in: kept for the session, so
-    /// the unified Starred view opens at once (#482).
-    unified_starred_rows: HashMap<u32, Vec<(String, Message)>>,
-    unified_starred_due: bool,
-    /// A read of the unified rows' folders into memory is due (`Preload`).
-    preload_due: bool,
-    /// Unified rows still to build ahead for the message list (`PrebuildNext`).
-    prebuild_queue: Vec<UnifiedView>,
-    prebuild_due: bool,
-    /// A count of the smart folders' unread mail is waiting to run, or
-    /// running: syncs come in bursts, and one count covers a burst.
-    smart_counts_due: bool,
-    smart_counts_running: bool,
-    /// When each account's keywords were last re-synced from the server
-    /// (#166), so reopening a tag view within a few seconds does not scan
-    /// every folder again.
-    keyword_sync_at: HashMap<u32, std::time::Instant>,
-    /// The tag colors as `.tag-<keyword>` classes, app-wide (the list's
-    /// chips, the sidebar's rows, the menus' swatches).
-    tag_provider: crate::ui::DisplayCss,
-    /// The on-disk index, for reads the main thread makes itself: the tag
-    /// views and folding locally-kept tags into synced summaries.
-    cache: Option<crate::cache::Cache>,
-    /// A manual "Apply Filters" run (#198), while one is under way.
-    filter_run: Option<FilterRun>,
-    /// Inbox UIDs whose filter move has been requested but not yet observed
-    /// (the message still showed up in the last sync). A sync racing the
-    /// server-side move must neither re-request the move nor re-notify.
-    filter_moved: std::collections::HashMap<(u32, u32), std::collections::HashSet<u32>>,
-    /// Per (account, folder): the body-search hits of the last sync (#191),
-    /// uid → lowercased alternatives the server found in the message. What
-    /// [`apply_filters`] consults for "Message body" conditions.
-    body_hits: std::collections::HashMap<(u32, u32), std::collections::HashMap<u32, Vec<String>>>,
-    /// Lone messages render as inset cards (#57).
-    single_message_card: bool,
-    /// Reader View: every message in the reader shown as its content alone,
-    /// in the reader's own sheet (see `crate::reader`). The toggle sits in
-    /// the reader's subject block; the choice is remembered across runs.
-    /// The message zoom this session is at (Ctrl+ / Ctrl-). Starts at
-    /// `zoom_default` and is not saved: a launch begins at the setting.
-    zoom: u32,
-    /// Settings → Reading: the zoom every launch starts at, in percent.
-    zoom_default: u32,
-    reader_mode: bool,
-    /// The Reader View switch is shown in the reader header.
-    reader_switch: bool,
-    /// The Light / Dark Mode switch is shown in the reader header (PR #386).
-    theme_switch: bool,
-    /// Icons come from the desktop's icon theme, not Hylki's own (Settings).
-    desktop_icons: bool,
-    /// What Reader View does when a message is opened (Settings).
-    reader_default: config::ReaderDefault,
-    /// Each conversation message lists its own attachments (#213).
-    card_attachments: bool,
-    /// The attachment drawer beneath the reader is shown at all (#213).
-    drawer_enabled: bool,
-    /// Whether conversation rows may expand into their members in the list
-    /// (the row keeps its chip and chevron either way).
-    thread_expansion: bool,
-    /// Whether a conversation's row speaks for the newest message anywhere in
-    /// the account, the replies you sent included (#236). Off by default.
-    thread_row_newest: bool,
-    /// Whether deleting a whole selected conversation asks for confirmation.
-    confirm_thread_delete: bool,
-    /// Whether the current `list_selection` came from card clicks in the
-    /// reader (as opposed to rows picked in the list). A lone list-row
-    /// selection over an open conversation stands for the whole thread when
-    /// deleting; a lone picked card never does.
-    selection_from_cards: bool,
-    /// Conversation card actions hide until hovered (preference).
-    card_actions_hover: bool,
-    /// With the ⋯ toggle off: card actions appear automatically on hover.
-    card_actions_auto: bool,
-    /// The list's actions palette opens on row hover (no ⋯ click).
-    /// Whether the message list rows carry an actions palette at all.
-    list_palette: bool,
-    list_palette_hover: bool,
-    /// A message card's ⋯ opens the card menu instead of sliding its
-    /// actions palette out.
-    card_palette_menu: bool,
-    /// Message rows take a sideways swipe to archive / delete (#92).
-    swipe_enabled: bool,
-    /// The message list's swipe-gesture sides are swapped (#swipe).
-    swipe_reversed: bool,
-    /// How far a trackpad two-finger swipe has to travel to fire the action
-    /// (higher = shorter swipe); mouse and touch drags are unaffected.
-    swipe_sensitivity: f64,
-    /// "New message" composes inline over the reading pane (vs a window).
-    compose_inline: bool,
-    /// Reply, Reply All and Forward open in the reading pane (vs a window, #295).
-    reply_inline: bool,
-    reply_fields: bool,
-    /// The identity new messages are sent from (#157); empty = the open
-    /// folder's account.
-    compose_default_from: String,
-    paste_plain: bool,
-    /// Return starts a new paragraph in the composer; off, a new line.
-    return_paragraph: bool,
-    toolbar_expanded: bool,
-    /// The font and size rich-text messages are written in; empty and 0
-    /// leave them to the recipient.
-    compose_font: String,
-    compose_font_size: u32,
-    /// What a printed page carries besides the message (#359).
-    print_options: config::PrintOptions,
-    /// New messages start as plain text (#180).
-    compose_format: crate::config::ComposeFormat,
-    /// Replies and forwards to plain-text mail open in plain text (#436).
-    follow_plain: bool,
-    /// Where the split reply opens in the reading pane (#212).
-    reply_position: config::ReplyPosition,
-    /// Where the signature sits in a reply or forward (#237).
-    signature_position: config::SignaturePosition,
-    /// A `-- ` line goes above the signature in new messages.
-    signature_dashes: bool,
-    /// Undo Send delay in seconds, 0 for off (#434).
-    undo_send_secs: u32,
-    spellcheck: bool,
-    spellcheck_langs: String,
-    /// How email content is themed (message content only, not the app UI).
-    message_theme: config::MessageTheme,
-    /// Set every message in the reader's own font (#56).
-    override_fonts: bool,
-    /// That font, as a Pango description; empty = the interface font.
-    reader_font: String,
-    /// Ignore the senders' text and background colors (#56).
-    override_colors: bool,
-    /// Plain-text messages in monospace (#181), and the font ("" = the
-    /// desktop's monospace font).
-    plain_monospace: bool,
-    plain_font: String,
-    /// The repeating auto-fetch timer, if armed.
-    auto_fetch_source: Option<gtk::glib::SourceId>,
-    /// When the last wake from sleep was handled, so the second report of
-    /// the same wake is ignored.
-    last_wake: Option<std::time::Instant>,
-    notifications: Controller<NotificationCenter>,
-    /// The first-run welcome wizard, alive while it's on screen.
-    welcome: Option<Controller<crate::ui::welcome::Welcome>>,
-    notify_count: usize,
-    /// Accounts currently performing network activity (drives the spinner).
-    busy: HashSet<u32>,
-    sidebar: Controller<Sidebar>,
-    /// A second instance of the sidebar, always expanded, for the floating
-    /// peek panel. It is fed the same contents and counts as the docked one
-    /// (see `sidebars_emit`) and the two mirror each other's selection.
-    peek_sidebar: Controller<Sidebar>,
-    message_list: Controller<MessageList>,
-    message_view: Controller<MessageView>,
-    /// In-message attachment thumbnail drawer, docked below the reader body.
-    attachment_drawer: Controller<AttachmentDrawer>,
-    gallery: Controller<AttachmentsGallery>,
-    /// The in-app contacts view behind the sidebar's Contacts row.
-    contacts_page: Controller<ContactsPage>,
-    /// Whether the content area shows the contacts view.
-    showing_contacts: bool,
-    /// True when the attachments gallery replaces the mail panes.
-    showing_gallery: bool,
-    /// Whether the Outbox is showing instead of the mail panes.
-    showing_outbox: bool,
-    /// Messages waiting to be sent, per account, as last reported by its worker.
-    outbox_by_account: HashMap<u32, Vec<crate::models::OutboxItem>>,
-    /// The sending identities a JMAP server keeps, per account (#346):
-    /// offered as From addresses beside the account's own aliases.
-    server_identities: HashMap<u32, Vec<(String, String)>>,
-    /// A merge of the unified view is on its way (`queue_unified_emit`),
-    /// with new slices to merge, and new thread links to hand the list.
-    unified_emit_queued: std::cell::Cell<bool>,
-    unified_dirty: std::cell::Cell<bool>,
-    thread_links_due: std::cell::Cell<bool>,
-    unified_emitted_at: std::cell::Cell<std::time::Instant>,
-    /// The fingerprint of the unified view's content the list has, when it
-    /// has the open view's: a merge that would hand it the same is skipped.
-    list_fp: std::cell::Cell<Option<u64>>,
-    /// The open unified view's folders whose slice is not copied from the
-    /// folder's cache yet: a view the list kept is shown first, and the
-    /// copies (tens of thousands of messages for an Archive) made after.
-    /// Until then the folder's cache stands for the slice.
-    unified_unfilled: std::collections::HashSet<(u32, u32)>,
-    /// Gallery items per account inbox, merged for display.
-    /// How many attachments the gallery's current query matches, carried
-    /// between pages so only the first one pays for the COUNT.
-    gallery_total: u32,
-    /// Messages each in-scope folder has still to have described, so the
-    /// gallery's footer can show one figure for the whole scan.
-    gallery_scan_left: HashMap<(u32, String), u32>,
-    /// Messages popped out into their own windows, keyed by (account, message).
-    popouts: HashMap<(u32, u32), PopOut>,
-    /// The conversation currently shown in the reader (newest first), with bodies
-    /// filled in as they arrive. More than one entry = conversation/thread mode.
-    current_thread: Vec<Message>,
-    /// The members of the open conversation the list itself holds, as
-    /// opposed to the ones the reader brought in from Sent or another
-    /// folder: what archiving the conversation moves (#392).
-    listed_thread: Vec<(u32, u32)>,
-    /// The next message opened takes the keyboard into the reader (Gmail's
-    /// o and Enter, #392).
-    reader_focus_pending: bool,
-    /// Every message currently selected (list rows or reader cards), newest
-    /// report wins. Lets the toolbar's Delete act on the whole multi-selection.
-    list_selection: Vec<(u32, u32)>,
-    /// The folder of each message in `list_selection` when the list made
-    /// it, `(account_id, folder_id, id)`. The id is a UID, which several
-    /// folders of the Filters view can share, so it is these that say which
-    /// message each row is (#481). Empty for cards picked in the reader.
-    list_slots: Vec<crate::ui::message_row::Slot>,
-    /// How many rows Gmail's x has checked, while it is checking them
-    /// (#392): they are acted on, not opened.
-    checked: Option<usize>,
-    /// A composer is waiting for the busy pointer to be drawn, and one is
-    /// being built (see `AppMsg::ComposeNow`).
-    compose_waiting: bool,
-    compose_now: bool,
-    /// The list's own selection as it last reported it; `list_selection`
-    /// also follows the reader's cards.
-    list_heard: Vec<(u32, u32)>,
-    /// Undoable actions (#200): moves, flag changes, and folder creates and
-    /// renames, newest last. Unlimited: entries are a few strings each.
-    /// Ctrl+Z pops one, applies it, and pushes its inverse onto `redo_stack`.
-    undo_stack: Vec<UndoEntry>,
-    /// The other half of the history: what Ctrl+Shift+Z puts back. Cleared
-    /// whenever a new action is recorded, as every undo history does — the
-    /// branch it belonged to no longer exists.
-    redo_stack: Vec<UndoEntry>,
-    /// Conversations belonging to messages a move is bringing back (#200),
-    /// keyed and re-filed exactly like [`carried_bodies`]. The reader paints
-    /// an assembled conversation with no lookup and no spinner; without this
-    /// a restored message rebuilt its thread from scratch, which means a
-    /// round trip, which means the spinner.
-    carried_threads: HashMap<(u32, String), Vec<Message>>,
-    /// Bodies belonging to messages a move is bringing back (#200), by
-    /// Message-ID. A move gives a message a new UID, which orphans its body in
-    /// [`body_cache`] — that is keyed by the folder and UID it had. These are
-    /// re-keyed onto the new ids as the folder's reload arrives, so the
-    /// restored message renders from what is already here instead of blanking
-    /// to a spinner while the server sends it over again. Drained on use.
-    carried_bodies: HashMap<(u32, String), String>,
-    /// Per-message remote-content choices: show (true) or block (false) this
-    /// one message, whatever the standing policy says. Set from the reader's
-    /// menu and its banner, and kept for the session only — a decision about
-    /// one message is not a decision about a sender.
-    remote_override: HashMap<(u32, u32), bool>,
-    /// What the inline composer's own history can take back (#200), as it
-    /// last reported: `(undo, redo)`, each `None` when that side is empty.
-    /// While the composer holds keyboard focus the window's Undo and Redo
-    /// are its, not the mail history's — the same split the keys already
-    /// make, so the menu never offers to archive a message while someone is
-    /// typing into a reply.
-    compose_history: (Option<String>, Option<String>),
-    /// The burger menu's Undo/Redo section, relabelled as the stacks change.
-    undo_menu: gtk::gio::Menu,
-    /// Their actions, kept so they can be greyed out when there is nothing
-    /// on the stack.
-    undo_action: Option<RelmAction<UndoAction>>,
-    redo_action: Option<RelmAction<RedoAction>>,
-    /// A draft whose content is being fetched before its editor opens, and
-    /// whether that editor goes in the reading pane (true) or a window.
-    pending_draft: Option<(Message, bool, HandOffFiles)>,
-    /// The `ExportRaw` token the pending draft's bytes come back under.
-    /// While it is set, the draft waits for those and not for its body.
-    pending_draft_token: Option<u64>,
-    /// A message whose body is being fetched so a reply to it can open with
-    /// handed-in files (Send with Hylki → Reply to a Message…).
-    pending_reply: Option<(Message, HandOffFiles)>,
-    /// A draft picker waiting for Drafts folders never listed this run
-    /// (the hand-off, and the folders still to answer).
-    pending_draft_pick: Option<(FileHandOff, HashSet<(u32, u32)>)>,
-    /// The template picker, waiting on these Templates folders' lists.
-    pending_template_pick: Option<HashSet<(u32, u32)>>,
-    /// Settings → System → GNOME Files: what handed-in files open into and
-    /// what happens over the size limit.
-    files_prefs: config::FilesPrefs,
-    /// "Edit as New Message" (#232) waiting on the body, or the attachments,
-    /// it is to be copied from.
-    pending_edit_as_new: Option<Message>,
-    /// A forward (#240) waiting on the body, or the attachments, it is to
-    /// carry, and whether it opens inline or in a window.
-    pending_forward: Option<(Message, bool)>,
-    /// A reply started from a notification's button (#244), waiting for
-    /// the body it quotes.
-    pending_notified_reply: Option<Message>,
-    /// Settings → System → Links: which browser a link in a message opens in
-    /// (#232). Empty = the desktop's default, "ask" = its app chooser,
-    /// otherwise a desktop entry id.
-    link_browser: String,
-    /// Outstanding bulk MoveMessages requests awaiting a worker `BulkComplete`.
-    /// Outstanding server-side bulk operations; while > 0 the refresh spinner
-    /// spins and the status bar narrates.
-    bulk_pending: usize,
-    /// Ids handed to conversation messages pulled in from another folder,
-    /// allocated downwards from the top of the range. A message's id is its UID,
-    /// which is only unique within its own folder — and the reader keys bodies by
-    /// (account, id), so a Sent reply sharing a UID with the Inbox message it
-    /// answers would otherwise be handed the wrong body.
-    related_id_seq: u32,
-    /// The id issued to each such message, keyed by where it really lives
-    /// (account, folder, uid). Stable across re-opens so its body stays cached.
-    related_ids: HashMap<(u32, u32, u32), u32>,
-}
-
-#[derive(Debug)]
-pub enum AppMsg {
-    /// A setting changed in Preferences (or its equivalent elsewhere).
-    Pref(PrefOutput),
-    // User actions
-    /// A unified row was chosen: All Inboxes, the unified section's Starred
-    /// / Sent / Drafts row (every account's folder of that kind), or its
-    /// Filtered Folders row (every rule's folder).
-    UnifiedSelected(UnifiedView),
-    /// An account's starred mail, for an account with no Starred folder
-    /// (#482): the unified Starred view narrowed to it.
-    AccountStarredSelected(u32),
-    /// Show the attachments gallery (sidebar "Attachments" row).
-    ShowAttachments,
-    /// Show the Outbox (queued, unsent messages).
-    ShowOutbox,
-    /// A worker reported its queue: replaces that account's entries.
-    OutboxItems {
-        account_id: u32,
-        items: Vec<crate::models::OutboxItem>,
-    },
-    /// A worker reported something noteworthy that isn't a failure.
-    Notice(String),
-    /// Edit the queued message currently open in the reader.
-    EditCurrentOutbox,
-    /// Try to send the queued message currently open in the reader.
-    SendCurrentOutbox,
-    /// Try to send everything waiting, across accounts.
-    RetryAllOutbox,
-    /// Send Later (#145): the half-minute clock that sends due queued mail.
-    SendDueScheduled,
-    /// The gallery wants a page of attachments matching this query.
-    GalleryLoad(Box<GalleryRequest>),
-    /// Download an attachment the gallery knows of but has never fetched.
-    GalleryFetch {
-        account_id: u32,
-        folder_path: String,
-        uid: u32,
-    },
-    /// A chunk of a folder's attachments was described by the scan.
-    AttachmentsScanned {
-        account_id: u32,
-        folder_path: String,
-        added: u32,
-        remaining: u32,
-    },
-    /// Gallery "Go to Message" — open the attachment's source message.
-    OpenAttachmentMessage {
-        account_id: u32,
-        folder_path: String,
-        uid: u32,
-    },
-    FolderSelected {
-        account_id: u32,
-        folder_id: u32,
-        name: String,
-        path: String,
-    },
-    /// An account section opened or folded in the sidebar.
-    AccountFolded {
-        id: u32,
-        folded: bool,
-    },
-    /// A sidebar folder-tree node was collapsed/expanded (#51) — persist it.
-    FolderNodeCollapsed {
-        account_id: u32,
-        path: String,
-        collapsed: bool,
-    },
-    /// A run of sibling folders was put in a new order in the sidebar.
-    ReorderFolders {
-        account_id: u32,
-        paths: Vec<String>,
-    },
-    /// A folder was dropped beside one at another level: move it there on
-    /// the server, then put it just before or after `target`.
-    PlaceFolder {
-        account_id: u32,
-        path: String,
-        dest: String,
-        target: String,
-        after: bool,
-    },
-    /// An account's own folder order, chosen from its Folders heading.
-    SetAccountFolderSort {
-        account_id: u32,
-        sort: Option<config::FolderSort>,
-    },
-    ToggleCustomFolders(u32),
-    SidebarCollapsed(bool),
-    /// The message-pane header's sidebar button: flip the sidebar between the
-    /// expanded pane and the icon rail. Routed through the sidebar component so
-    /// its CollapsedChanged output drives the same peek/pin/persist logic as
-    /// ever (see `SidebarCollapsed`).
-    ToggleSidebar,
-    /// The narrow-window breakpoint applied/unapplied — collapse the sidebar to
-    /// its icon rail (and restore it) without touching the user's preference.
-    AutoRail(bool),
-    /// The floating sidebar overlay was dismissed from outside (a click on the
-    /// dimmed content, an Escape) rather than via the sidebar's own button.
-    SidebarPeekDismissed,
-    SidebarContext(CtxAction),
-    /// A folder's threading references were repaired — re-read it from the cache
-    /// so what is on screen groups with what was found.
-    RefsRepaired {
-        account_id: u32,
-        folder_id: u32,
-    },
-    /// The list's selection changed; the reader outlines the matching cards.
-    SelectionKeys(Vec<crate::ui::message_row::Slot>),
-    /// Gmail's x checked rows, this many, or stopped checking (#392).
-    ListChecked(Option<usize>),
-    /// A composer asked for, built now that the busy pointer is drawn.
-    ComposeNow(Box<AppMsg>),
-    /// The reader's selection changed — mirror what the list can represent.
-    SelectCards(Vec<(u32, u32)>),
-    /// A conversation message was scrolled all the way through — mark it read on
-    /// the server, in the caches and in the list.
-    ThreadMessageSeen {
-        account_id: u32,
-        id: u32,
-    },
-    /// The conversation on screen has new bodies to show (coalesced).
-    RenderThread,
-    /// Messages were dropped on a sidebar folder — move them there. `items` is
-    /// the dragged selection as (account, folder, uid, id).
-    DropMoveMessages {
-        dest_account: u32,
-        dest: String,
-        items: Vec<(u32, u32, u32, u32)>,
-    },
-    /// Create a custom folder under an account (from the right-click menu).
-    CreateFolder {
-        account_id: u32,
-        name: String,
-    },
-    /// Move a folder under a new parent (sidebar drag-and-drop, #51).
-    /// `dest` is the new parent's path, or "" for the account's top level.
-    MoveFolder {
-        account_id: u32,
-        path: String,
-        dest: String,
-    },
-    /// Rename a folder's leaf name in place (context menu).
-    RenameFolderTo {
-        account_id: u32,
-        path: String,
-        new_name: String,
-    },
-    /// Delete a custom folder (its contents are moved to Trash first).
-    DeleteFolder {
-        account_id: u32,
-        path: String,
-    },
-    /// Erase everything in a Trash or Junk folder (#152).
-    EmptyFolder {
-        account_id: u32,
-        folder_id: u32,
-        path: String,
-    },
-    AccountsReordered(Vec<String>),
-    /// `solo` marks a reply the user picked out of a conversation on screen:
-    /// show that message alone and don't go looking for its siblings.
-    MessageSelected {
-        message: Message,
-        thread: Vec<Message>,
-        solo: bool,
-    },
-    /// A new-mail desktop notification was clicked — open that message.
-    OpenMessageFromNotification {
-        account_id: u32,
-        folder_id: u32,
-        message_id: u32,
-    },
-    /// A notification action button (#38): mark the notified message read, or
-    /// archive it, without raising the window.
-    NotificationMarkRead {
-        account_id: u32,
-        folder_id: u32,
-        message_id: u32,
-    },
-    NotificationArchive {
-        account_id: u32,
-        folder_id: u32,
-        message_id: u32,
-    },
-    NotificationDelete {
-        account_id: u32,
-        folder_id: u32,
-        message_id: u32,
-    },
-    NotificationReply {
-        account_id: u32,
-        folder_id: u32,
-        message_id: u32,
-    },
-    NotificationForward {
-        account_id: u32,
-        folder_id: u32,
-        message_id: u32,
-    },
-    NotificationSpam {
-        account_id: u32,
-        folder_id: u32,
-        message_id: u32,
-    },
-    /// The search field became active/inactive — supply or drop the cross-folder
-    /// search pool (every folder's messages, so search can span the mailbox).
-    SearchActive(bool),
-    /// The indexes of the folders not opened this run, read from disk for
-    /// the search `gen` started (#472).
-    SearchPoolLoaded {
-        gen: u64,
-        lists: Vec<((u32, u32), Vec<Message>)>,
-    },
-    /// The pool [`AppModel::build_search_pool`] put together.
-    SearchPoolBuilt {
-        gen: u64,
-        pool: Vec<Message>,
-        text: Vec<Box<str>>,
-    },
-    /// The message list has no selection to show (e.g. the last message was
-    /// removed), so the reader should clear.
-    ClearReader,
-    /// Gmail's o or Enter opened a row (#392): the keyboard goes to the
-    /// reader, now if the row was already the one open, else once it opens.
-    OpenedByKey {
-        already_open: bool,
-    },
-    /// Double-click: open the message in its own standalone window.
-    OpenMessageWindow {
-        message: Message,
-        thread: Vec<Message>,
-    },
-    /// A popped-out message window was closed (remove it from the map).
-    PopoutClosed((u32, u32)),
-    /// Add a contact from a popout window's sender.
-    AddContactFrom {
-        name: String,
-        email: String,
-    },
-    /// Download a specific message's attachments (from a popout window).
-    LoadAttachmentsFor(Box<Message>),
-    /// A message's sender-authentication verdict arrived with its body.
-    SenderChecked {
-        account_id: u32,
-        path: String,
-        message_id: u32,
-        check: Box<crate::models::SenderCheck>,
-    },
-    /// HYLKI_SHOWCASE_POPOUT: open the open message in a window of its own.
-    ShowcasePopout,
-    /// A message window's Move To: the folder picker over that window, at
-    /// its point (x, y). The window closes once a folder is picked.
-    PopoutMoveTo {
-        key: (u32, u32),
-        message: Box<Message>,
-        x: f64,
-        y: f64,
-    },
-    /// A message window's single-key shortcut that needs the app (#392):
-    /// the window's message and the conversation it shows.
-    PopoutShortcut {
-        action: Shortcut,
-        message: Box<Message>,
-        thread: Vec<Message>,
-    },
-    /// A message window's drawer: delete this file from the server (#289),
-    /// asking over that window first.
-    DeletePopoutAttachment {
-        key: (u32, u32),
-        message: Box<Message>,
-        attachment: Box<Attachment>,
-    },
-    ToggleStar,
-    Archive,
-    Delete,
-    /// Shift+Delete: erase the selection from the server, skipping Trash,
-    /// once the user confirms (#471).
-    DeleteForever,
-    /// Erase messages for good (confirmed "Delete permanently" in Trash).
-    PurgeMessages(Vec<Message>),
-    /// The rest of an open message's conversation, found in other folders.
-    Related {
-        account_id: u32,
-        message_id: u32,
-        messages: Vec<Message>,
-    },
-    /// What the conversations on the list really look like, read across the
-    /// account's folders: their true size (#222) and their newest message
-    /// (#236). Tags are the list's own thread keys.
-    ThreadSummaries {
-        account_id: u32,
-        summaries: Vec<(String, ThreadSummary)>,
-    },
-    /// The list rebuilt its rows: which conversations are on screen, and the
-    /// Message-IDs each is threaded by, so their real sizes can be looked up.
-    ThreadsListed {
-        groups: Vec<(u32, String, Vec<String>)>,
-    },
-    /// A row's palette or context-menu action. `conversation` holds the whole
-    /// thread when the row stands for a collapsed conversation rather than for
-    /// `message` alone — a reply started there answers the conversation's
-    /// newest message, not the head it is filed under (#210). Empty otherwise.
-    RowAction {
-        action: RowAction,
-        message: Box<Message>,
-        conversation: Vec<Message>,
-    },
-    /// A conversation card's own action pill. Reply/Reply all/Forward open the
-    /// reader's inline composer (like the toolbar); the rest act like RowAction.
-    CardAction {
-        action: RowAction,
-        message: Box<Message>,
-    },
-    /// The open conversation gained a member (a reply synced in while it
-    /// was on screen): show it in place, without a re-selection.
-    ThreadGrew {
-        message: Box<Message>,
-        thread: Vec<Message>,
-    },
-    /// A card's "Add sender to Contacts" button.
-    CardContact(Box<Message>),
-    /// A right-click on a reader card: that message's full menu (the list
-    /// row's) at window point (x, y).
-    /// A reader's right-click: the message's menu at (x, y) in the main
-    /// window, or in the pop-out opened for `popout`.
-    CardMenu {
-        message: Box<Message>,
-        x: f64,
-        y: f64,
-        hit: crate::ui::message_view::MenuHit,
-        popout: Option<(u32, u32)>,
-    },
-    /// The reader toolbar's Mark as Read/Unread toggle for the open message.
-    ToggleReadCurrent,
-    /// A bulk action applied to every selected message.
-    Bulk {
-        action: BulkAction,
-        messages: Vec<Message>,
-    },
-    /// A worker finished one bulk MoveMessages request; stops the busy
-    /// indicator once all outstanding bulk moves are done.
-    BulkComplete,
-    Compose,
-    OpenAbout,
-    AllowSender(String),
-    AddSender(String),
-    RemoveSender(String),
-    /// A card's Unsubscribe button: confirm, then leave the list the message
-    /// came from by the handles its headers offered.
-    Unsubscribe {
-        message: Box<Message>,
-        info: Box<crate::models::Unsubscribe>,
-    },
-    /// Confirmed: send the request.
-    UnsubscribeGo {
-        message: Box<Message>,
-        info: Box<crate::models::Unsubscribe>,
-    },
-    /// The one-click route failed (or was not offered): write to the list's
-    /// `mailto:` handle instead, from the account the message arrived in.
-    UnsubscribeByMail {
-        message: Box<Message>,
-        info: Box<crate::models::Unsubscribe>,
-    },
-    /// The request is over: `Ok(true)` left the list, `Ok(false)` only opened
-    /// the list's web page, `Err` says what went wrong.
-    UnsubscribeDone {
-        message: Box<Message>,
-        result: Result<bool, String>,
-    },
-    /// A card's invitation button (#223): answer the organiser, or hand the
-    /// meeting to whatever application opens calendar files.
-    InviteAction {
-        message: Box<Message>,
-        invite: Box<crate::models::Invite>,
-        action: crate::ui::message_view::InviteAction,
-    },
-    AddBlacklist(String),
-    RemoveBlacklist(String),
-    MarkSpam,
-    /// The reader pane crossed the actions breakpoint (true = collapse the
-    /// header's buttons into the overflow menu).
-    SetReaderActionsCollapsed(bool),
-    /// Showcase only: open a drop gap in the Settings toolbar editor.
-    ShowcaseToolbarGap {
-        zone: usize,
-        index: usize,
-    },
-    /// A right-click on the reader header's empty space: the menu that
-    /// leads to the toolbar editor.
-    ReaderToolbarMenu {
-        x: f64,
-        y: f64,
-    },
-    /// Open Settings on the Appearance page (its Toolbar section).
-    CustomizeToolbar,
-    /// Settings, at Message List → Columns (#443).
-    CustomizeColumns,
-    /// The window controls were re-measured (decoration layout changed).
-    ReaderControlsChanged(i32),
-    /// The collapsed header's ⋯ button was clicked — pop its menu.
-    ReaderOverflowMenu,
-    /// Show the full-window attachment lightbox (from the drawer or the
-    /// toolbar popover's Preview) over these previewable items.
-    ShowLightbox {
-        items: Vec<Attachment>,
-        start: usize,
-    },
-    /// The GNOME Contacts photo index changed (EDS sync, or the first load
-    /// finished) — refresh the avatars that are on screen.
-    ContactPhotosChanged,
-    /// A Gravatar one of the accounts asked for came back (#189).
-    OwnGravatarFetched {
-        email: String,
-        outcome: crate::avatar::FetchOutcome,
-    },
-    /// The welcome wizard's first page picked a language: save it and
-    /// come back in it.
-    WizardLanguage(String),
-    /// Delete requested on a whole conversation (a lone selected thread-head
-    /// row): confirm (per preference), then delete every member.
-    DeleteThread(Vec<Message>),
-    /// The thread-delete dialog was confirmed.
-    DeleteThreadConfirmed(Vec<Message>),
-    /// Delete every message in an account from this address, after leaving
-    /// its list (#407).
-    DeleteFromAddress {
-        account_id: u32,
-        addr: String,
-    },
-    /// Reader View on or off (the header's switch).
-    SetReaderMode(bool),
-    /// Message zoom (Ctrl+ / Ctrl- / Ctrl+0): a step up, a step down, or
-    /// back to the default, for this session.
-    ZoomMessage(i8),
-    /// The zoom keys in the main window: the inline composer's while it has
-    /// the focus and its format zooms, else the message's.
-    ZoomKey(i8),
-    /// Ctrl+Shift+A or Ctrl+Shift+C in the main window: the inline
-    /// composer's while it has the focus, else the accounts switch or the
-    /// console.
-    ComposerKey(gtk::gdk::Key),
-    /// Settings → Reading: the zoom every launch starts at.
-    SetZoomDefault(u32),
-    /// Settings: show the Reader View switch in the reader header.
-    /// Settings: show the Light / Dark Mode switch in the reader header.
-    SetThemeSwitchShown(bool),
-    SetReaderSwitchShown(bool),
-    /// Copy the message the reader is on into a new one (#232).
-    EditAsNewCurrent,
-    /// A hand-off's files have a destination (the dialog answered, or the
-    /// preference decided); `remember` writes the choice to Settings.
-    HandOffAction {
-        hand_off: FileHandOff,
-        action: config::FilesAction,
-        remember: bool,
-    },
-    /// The draft picker answered (None: a new message instead).
-    HandOffDraft {
-        hand_off: FileHandOff,
-        draft: Option<Message>,
-    },
-    /// Show the draft picker with whatever Drafts lists have arrived.
-    HandOffDraftPickNow,
-    /// New Message from Template (#360): pick a template to start from,
-    /// once every Templates folder has been listed.
-    NewFromTemplate,
-    /// Show the template picker with whatever Templates lists have arrived.
-    TemplatePickNow,
-    /// The template picker answered (None: a blank message instead).
-    TemplatePicked(Option<Message>),
-    /// The reply picker answered (None: a new message instead).
-    HandOffReply {
-        hand_off: FileHandOff,
-        message: Option<Message>,
-    },
-    /// The size check answered: open the composer, attaching or uploading.
-    HandOffOpen {
-        hand_off: FileHandOff,
-        target: HandOffTarget,
-        cloud: bool,
-        remember: bool,
-    },
-    /// The Settings window showed a category; remembered for reopening.
-    SettingsPageShown(String),
-    /// Show or block remote content for one message, whatever the standing
-    /// policy is — the reader menu's entry, and what the banner's Load does.
-    SetRemoteContent {
-        account_id: u32,
-        id: u32,
-        show: bool,
-    },
-    /// Ctrl+Z: undo the most recent action.
-    Undo,
-    /// Ctrl+Shift+Z / Ctrl+Y: put back what undo took away.
-    Redo,
-    /// The inline composer's own history changed (#200): what its Undo and
-    /// Redo would take back now, or `None` for a direction with nothing in
-    /// it. The window's entries follow it while it holds focus.
-    ComposeHistory {
-        id: u32,
-        undo: Option<String>,
-        redo: Option<String>,
-    },
-    /// The ⋯ of the message list header (Focus Mode): search, filters and
-    /// sort as a menu.
-    ListOverflowMenu,
-    /// An account's own Tags section was opened or folded: record it with
-    /// the layout.
-    ToggleAccountTags(u32),
-    /// The message list's visible-count text changed.
-    ListCount(String),
-    /// A column heading sorted the list (#334): the sort menus follow.
-    ListSortChanged(&'static str),
-    /// A column heading was dragged to a new width (#334): keep it.
-    ListColumnWidths(std::collections::HashMap<config::ListColumn, i32>),
-    /// Build the Settings window ahead of its first open (see the handler).
-    PrewarmSettings,
-    /// Close the Settings window as the user would (the showcase's reopen
-    /// timing).
-    DebugCloseSettings,
-    /// The sidebar's All Inboxes / Filtered Folders / Tags sections were
-    /// opened or folded — record it with the layout.
-    SidebarSectionsOpen {
-        all_inboxes: bool,
-        filtered: bool,
-        tags: bool,
-        starred: bool,
-        sent: bool,
-        drafts: bool,
-        archive: bool,
-        junk: bool,
-        trash: bool,
-        favorites: bool,
-        smart: bool,
-        contacts: bool,
-    },
-    /// A tag view's rows, read from the index off the main thread: the
-    /// view they answer and, per message, its account and folder path.
-    TagViewLoaded {
-        key: (Option<u32>, Option<String>),
-        rows: Vec<(u32, String, Message)>,
-    },
-    /// The cursor entered the sidebar pane — open the hover peek (rail +
-    /// preference permitting).
-    SidebarHoverEnter,
-    /// "Restart Now" from the app-icon heads-up: quit into the restart
-    /// helper once the desktop has taken the new launcher in.
-    RestartApp,
-    /// The settle time is up: hand off to the restart helper and quit.
-    RestartNow,
-    /// Quit was chosen from the tray icon's menu.
-    QuitFromTray,
-    /// "View all unread" was chosen from the tray icon's menu: go to All
-    /// Inboxes, or without it to the first inbox holding unread mail.
-    TrayViewUnread,
-    /// A single-key shortcut fired.
-    Shortcut(Shortcut),
-    /// Show the keyboard-shortcut reference.
-    ShowShortcuts,
-    /// Ctrl+K: search what the app can do and where it can go (#399);
-    /// Ctrl+Shift+K opens it on the actions only (`true`).
-    CommandPalette(bool),
-    /// Print the message in the reader (issue #16).
-    PrintMessage,
-    /// Render it to a PDF and open that, to see what will come out.
-    PrintPreview,
-    /// A card's attachment chip (#213): open the file, or save it.
-    CardAttachment {
-        account_id: u32,
-        id: u32,
-        index: usize,
-        save: bool,
-    },
-    /// The drawer's "Show in Message": scroll the reader to the message this
-    /// attachment came with (#213).
-    ShowAttachmentInMessage(Attachment),
-    /// The drawer's "Delete from Server…" (#289): find the message the file
-    /// came with, then ask.
-    DeleteDrawerAttachment(Attachment),
-    /// Ask before an attachment is taken out of its message on the server.
-    AskDeleteAttachment(AttachmentTarget),
-    /// The user said yes: have the account's worker do it.
-    DeleteAttachment(AttachmentTarget),
-    /// Send the request (held back by HYLKI_SHOWCASE_DELETE_HOLD, otherwise
-    /// straight after [`AppMsg::DeleteAttachment`]).
-    SendDeleteAttachment(AttachmentTarget),
-    /// The worker could not delete it: show the file as it was.
-    AttachmentNotDeleted {
-        account_id: u32,
-        message_id: u32,
-        name: String,
-        size: u64,
-    },
-    /// Showcase only (HYLKI_SHOWCASE_DELETE_ATTACHMENT): the drawer's
-    /// Delete from Server for the file called `name`, asking first unless
-    /// `confirmed`.
-    ShowcaseDeleteAttachment {
-        name: String,
-        confirmed: bool,
-    },
-    /// The worker did it: the message is `new_uid` now (the same UID on
-    /// Microsoft 365, a new one elsewhere, `None` if it was not found again).
-    AttachmentDeleted {
-        account_id: u32,
-        message_id: u32,
-        path: String,
-        uid: u32,
-        new_uid: Option<u32>,
-        name: String,
-        size: u64,
-    },
-    /// Showcase only: turn the inline composer's preview on.
-    ShowcaseComposePreview,
-    /// Pick entry `n` of the inline composer's From row (#237 capture).
-    ShowcaseComposeFrom(u32),
-    /// Forward one message of the open conversation by its id (#240), as
-    /// its card's Forward button would.
-    ShowcaseForward {
-        account_id: u32,
-        id: u32,
-    },
-    /// Showcase only (HYLKI_SHOWCASE_COMPOSE_CLOSE): cancel the inline
-    /// composer, to check its web process goes with it.
-    ShowcaseComposeClose,
-    /// Showcase only (HYLKI_SHOWCASE_COMPOSE_UNDO): drive the inline
-    /// composer's history through a scripted round of edits and undos.
-    ShowcaseComposeUndo,
-    /// Showcase only: open the window's burger menu, to read its Undo and
-    /// Redo entries in the state they are actually seen in.
-    ShowcaseBurger,
-    /// Showcase only: put the inline composer into this composing format
-    /// first, so the same round runs over a source-mode body.
-    ShowcaseComposeFormat(config::ComposeFormat),
-    /// Showcase only: open the inline composer's format chooser, or its
-    /// overflow menu.
-    ShowcaseComposeMenu {
-        format: bool,
-    },
-    /// Fetch a message's body again: its OpenPGP verdict changed (#133).
-    ReloadBody(Box<crate::models::Message>),
-    /// Select a settings category by id (the showcase hook).
-    ShowSettingsPage(String),
-    ComposeTo(String),
-    /// A new message to these recipients in Bcc: a contact group that hides
-    /// its members' addresses.
-    ComposeBcc(String),
-    /// Read the composer's recipient suggestions for the Contacts view's
-    /// group form, off the main thread.
-    ContactSuggestions,
-    /// Showcase only (HYLKI_SHOWCASE_FOLDER): switch to the first account's
-    /// folder of this kind, so a capture can start from Drafts, Sent, etc.
-    ShowcaseFolder {
-        kind: FolderKind,
-        account: Option<u32>,
-    },
-    /// Showcase only (HYLKI_SHOWCASE_SEND): write `text` in the split
-    /// reply's editor and send it, to watch the send morph.
-    ShowcaseSend(String),
-    /// Showcase only (HYLKI_SHOWCASE_COPY): the sent reply's copy is read
-    /// back, made up from its stand-in card, as a server's would be.
-    ShowcaseCopy,
-    /// Showcase only (HYLKI_SHOWCASE_NOTIFY): post the new-mail notification
-    /// for the active account's newest Inbox message, focus or not, so the
-    /// notification, its buttons and its sound can be tried without
-    /// waiting for mail (#337).
-    ShowcaseNotify,
-    /// Showcase only (HYLKI_SHOWCASE_EDITOR_DIRTY): change the open account
-    /// editor, so leaving an edited one can be captured.
-    ShowcaseDirtyEditor,
-    /// Showcase only (HYLKI_SHOWCASE_ACCOUNT=new[:<provider>]): open a blank
-    /// account editor, on that provider when one is named.
-    ShowcaseNewAccount(Option<String>),
-    Reply,
-    ReplyAll,
-    Forward,
-    /// A reply, reply to all, forward or new message in a window of its
-    /// own, whatever Settings says (Gmail's Shift+R, Shift+A, Shift+F, d).
-    ComposeInWindow(WindowCompose),
-    AddContactAddr(String),
-    OpenMailto(String),
-    /// Ctrl+C while the reader's view does not hold the keyboard.
-    CopyReaderSelection,
-    /// A `mid:` link (RFC 2392) from anywhere on the system (#130): open the
-    /// message with that Message-ID.
-    OpenMid(String),
-    /// A message file (.eml) handed in from a file manager or the command
-    /// line, or picked with Open Message File (#398).
-    OpenMessageFile(std::path::PathBuf),
-    /// Choose a message file to read (#398).
-    PickMessageFile,
-    /// An account's answer to a server-side Message-ID search.
-    MidLocated {
-        account_id: u32,
-        message_id: String,
-        hit: Option<(String, u32)>,
-    },
-    /// The tag finder: scan every account for keywords in use.
-    FindTags,
-    /// One account's answer to the scan.
-    KeywordsFound {
-        account_id: u32,
-        findings: Vec<KeywordFinding>,
-    },
-    /// Settings opened this account's page: ask its server how much
-    /// storage is in use (#298).
-    WantQuota(String),
-    /// Settings opened this account's page: the identities its JMAP server
-    /// keeps, from the last connect (#346).
-    WantIdentities(String),
-    /// The server's answer, for the account's Settings page.
-    QuotaFound {
-        account_id: u32,
-        quota: Option<crate::models::MailboxQuota>,
-    },
-    /// A keyword re-sync (#166) changed the cached keywords of these folders.
-    KeywordsSynced {
-        account_id: u32,
-        paths: Vec<String>,
-    },
-    /// The scan's safety net: report what has come in, if the scan `gen` is
-    /// still the one running.
-    TagScanTimeout(u32),
-    /// Files handed in from outside the app (a file manager's "Open With
-    /// Hylki", or the command line): open a fresh composer with them attached
-    /// (Isaac's PR #96).
-    OpenWithFiles(Vec<std::path::PathBuf>),
-    /// Files dragged onto the main window from a file manager (#293).
-    DropFiles(Vec<std::path::PathBuf>),
-    /// Files let go on one of the main window's cards: a new message with
-    /// them attached, in its text, or uploaded to the cloud.
-    DropFilesAs(crate::ui::drop_zones::DropChoice, Vec<std::path::PathBuf>),
-    /// The click on a "message ready" desktop alert: raise the window and
-    /// the composer it announced.
-    PresentComposers,
-    ContactAdded(Result<crate::contacts::AddOutcome, String>),
-    /// The address books an "Add to Contacts" can go to, gathered off the
-    /// UI thread: the dialog for `name` and `email` opens with them.
-    AddContactBooks {
-        name: String,
-        email: String,
-        books: Vec<crate::contacts::Book>,
-    },
-    ViewSource,
-    /// User clicked "Load attachments" for a message whose attachments weren't
-    /// pre-downloaded — fetch them from the server now.
-    /// A composer sent a message; `from` is that composer's id.
-    SendMessage {
-        from: u32,
-        out: Box<OutgoingMessage>,
-    },
-    /// A message's Undo Send delay is over, or Send now was asked for it in
-    /// the Outbox: it goes to its worker (#434).
-    DispatchSend(u64),
-    /// Undo on a message still waiting out its delay (#434).
-    UndoSend(u64),
-    /// Where the conversation's cards stood when a reply was sent has been
-    /// measured: the pane can change under the send morph's stage.
-    SendMorphMeasured,
-    /// The pane could not be captured for the send morph.
-    SendMorphFailed,
-    SaveDraftMessage(Box<OutgoingMessage>),
-    /// Save a message to the Templates folder (#360): a composer's Save as
-    /// Template, or an edited template saved back.
-    SaveTemplateMessage(Box<OutgoingMessage>),
-    /// The composer's Delete Draft: trash the draft it was opened from and
-    /// close that composer without saving.
-    DeleteDraft {
-        id: u32,
-        origin: crate::models::DraftOrigin,
-    },
-    /// A draft is in the Drafts folder under `message_id` (`None`: an
-    /// automatic save that did not go through). `autosave` is the composer
-    /// that saved it on its own (#340).
-    DraftSaved {
-        account_id: u32,
-        autosave: Option<u32>,
-        message_id: Option<String>,
-    },
-    /// Merge the unified view's slices now (see `queue_unified_emit`).
-    EmitUnified,
-    /// A composer saving its message on its own (#340).
-    AutoSaveDraft {
-        id: u32,
-        message: Box<OutgoingMessage>,
-    },
-    /// A new message saved only automatically was discarded: the saved copy
-    /// goes too, and the composer closes.
-    DiscardAutosave {
-        id: u32,
-        origin: crate::models::DraftOrigin,
-    },
-    /// A composer (id) finished — tear down its host (window or inline revealer).
-    ComposeClosed(u32),
-    /// A composer window's close button: the composer decides, as for
-    /// Cancel, whether to ask first (#290).
-    ComposeCloseRequested(u32),
-    /// Promote/demote the reader's inline composer (id) between inline and window.
-    ComposeToggleWindow(u32),
-    Refresh,
-    OpenAccounts,
-    /// Open the accounts window straight to the "add account" form (empty state).
-    AddFirstAccount,
-    AccountSaved {
-        original_email: Option<String>,
-        account: Box<AccountConfig>,
-    },
-    /// Show the keyring / Secret Service setup help. `problem: true` when a save
-    /// actually failed to persist; `false` for the proactive one-time tip.
-    ShowKeyringHelp {
-        problem: bool,
-    },
-    /// Reconnect every account: a saved edit changed a secret, which the
-    /// keyring said after the save.
-    ReconnectAccounts,
-    /// The one-time notice that an earlier install's data was carried over.
-    ShowCarryOverNotice(&'static crate::legacy::Predecessor),
-    AccountRemoved {
-        email: String,
-    },
-    AccountEnabledChanged {
-        email: String,
-        enabled: bool,
-    },
-    ImportGoaAccount(Box<AccountConfig>),
-    /// The welcome wizard's privacy/personalize choices: fan out through the
-    /// existing Set* handlers so every side effect stays in one place.
-    ApplyWelcomePrefs(crate::ui::welcome::WelcomePrefs),
-    /// Raise and focus the main window (welcome wizard hand-off).
-    PresentWindow,
-    /// Open the status bar straight into console mode (button / burger menu).
-    OpenConsole,
-    /// Turn one of the list header's quick filters on or off (#97, #441).
-    SetQuickFilter(QuickFilter, bool),
-    /// Turn every quick filter off.
-    ClearQuickFilters,
-    /// Reveal (or toggle away) the message list's search bar (#102).
-    OpenListSearch,
-    /// Open the reader's in-message find bar (#103).
-    OpenReaderFind,
-    /// Delay-policy read marking (#100): fires a couple of seconds after a
-    /// message opened; only applies if it is still the one on screen.
-    DeferredMarkRead {
-        message: Box<Message>,
-    },
-    /// The list pane is this wide now (a drag of the divider, #334).
-    ListPaneWidth(i32),
-    /// Write the exported log straight to `path`, no chooser: the
-    /// HYLKI_SHOWCASE_MEMORY hook, for reading the memory section of a
-    /// running instance.
-    ExportLogTo(std::path::PathBuf),
-    /// The filter rules changed in Settings (#47).
-    SetFilters(Vec<config::FilterRule>),
-    /// Run the filter rules over mail that is already in these (account,
-    /// folder) pairs (#198), rather than waiting for the next arrival. An
-    /// empty list means every account's Inbox.
-    ApplyFilters(Vec<(u32, u32)>),
-    /// A manual filter run has waited long enough: report what it managed.
-    FilterRunTimeout,
-    /// The progress dialog of a manual filter run was dismissed: it goes on
-    /// in the background and reports in the status bar instead (#198).
-    FilterRunToBackground,
-    /// A folder's load has been to the server and back (#198).
-    FolderSynced {
-        account_id: u32,
-        folder_id: u32,
-    },
-    /// The tags changed in Settings (#71).
-    SetTags(Vec<config::Tag>),
-    /// A tag row in the sidebar was chosen: list everything carrying it.
-    /// A tag row was chosen: its keyword (`None` for the unified Tags row,
-    /// every tag at once), and the account it is scoped to (an account
-    /// section's own Tags row) or `None` for every account.
-    TagSelected {
-        keyword: Option<String>,
-        account: Option<u32>,
-    },
-    /// A smart folder (#417) was picked, by id.
-    SmartSelected(String),
-    /// A smart folder's rows, read from the index off the main thread.
-    SmartViewLoaded {
-        id: String,
-        rows: Vec<(u32, String, Message)>,
-    },
-    /// The starred mail of the accounts with no Starred folder, read from
-    /// the index for the unified Starred view (#482).
-    UnifiedStarredLoaded {
-        rows: HashMap<u32, Vec<(String, Message)>>,
-    },
-    /// Read the starred mail of accounts with no Starred folder again (the
-    /// debounce ran out).
-    RefreshUnifiedStarred,
-    /// Merge the unified view for the list now: the list had not kept it.
-    EmitUnifiedNow,
-    /// Copy the unified view's folders into its slices (`unified_unfilled`).
-    FillUnifiedSlices,
-    /// Folders not in memory yet, read whole from the index off the main
-    /// thread: for the unified view being opened, or ahead of it (`Preload`).
-    UnifiedFoldersLoaded {
-        lists: Vec<((u32, u32), Vec<Message>)>,
-    },
-    /// Read the folders the unified rows list into memory, off the main
-    /// thread, so the first visit after a start finds them there.
-    Preload,
-    /// Build the unified rows ahead for the message list, one at a time.
-    PrebuildViews,
-    PrebuildNext,
-    /// Push the sidebar's unread counts, put off from a view switch.
-    PushUnreadCounts,
-    /// Count every smart folder's unread mail now (the debounce ran out).
-    CountSmartFolders,
-    SmartCounts(HashMap<String, u32>),
-    /// The smart folders as Settings left them.
-    SetSmartFolders(Vec<config::SmartFolder>),
-    /// Put a tag on one message, or take it off (row menu, palette, card).
-    SetTag {
-        message: Box<Message>,
-        keyword: String,
-        add: bool,
-    },
-    /// Put a tag on several messages, or take it off (the list's bulk bar).
-    SetTagMany {
-        messages: Vec<Message>,
-        keyword: String,
-        add: bool,
-    },
-    /// The reader toolbar's tag menu: toggle a tag on the reader's target.
-    ToggleTagCurrent(String),
-    /// A tag's number key, with the list rows selected when it was pressed
-    /// (#416).
-    TagKey {
-        n: u8,
-        slots: Vec<crate::ui::message_row::Slot>,
-    },
-    /// Put the reader's target back in its Inbox (from Trash or Junk, #138).
-    MoveToInbox,
-    /// Pop the tag menu on the reader toolbar's tag button.
-    ReaderTagMenu,
-    /// Open the Move To… folder picker (#164) for the reader's target, or
-    /// the whole list selection.
-    MoveToMenu,
-    /// The picker's answer: file the target or selection into `dest` —
-    /// or, with `whole`, the open conversation entire (#171).
-    MoveSelectionTo {
-        account_id: u32,
-        dest: String,
-        whole: bool,
-    },
-    /// "Move To…" from the message list's right-click menu: open the
-    /// picker at window point (`x`, `y`) for `messages` (with
-    /// `offer_whole`, a conversation row and its members: the picker
-    /// offers all of them, or the row's own message alone).
-    ListMoveTo {
-        messages: Vec<Message>,
-        offer_whole: bool,
-        x: f64,
-        y: f64,
-    },
-    /// That picker's answer.
-    MoveMessagesTo {
-        account_id: u32,
-        dest: String,
-        messages: Vec<Message>,
-    },
-    /// Second stage of ImportSettings: the chosen file, applied on a clean
-    /// main-loop turn (working inside the chooser's completion callback froze
-    /// the app when the confirmation dialog presented there).
-    ImportSettingsFrom(std::path::PathBuf),
-    /// GNOME Online Accounts changed on the session bus. Carries the fresh live
-    /// state, already fetched (debounced) on the watcher thread so the GTK main
-    /// thread never does D-Bus I/O — re-reconcile against it.
-    GoaChanged(crate::goa::GoaLiveState),
-    /// The system resumed from sleep — worker IMAP sockets are stale, so
-    /// reconnect every account and reload the visible folder.
-    SystemResumed,
-    /// The dock may have dropped the launcher badge; send it again.
-    LauncherCountLost,
-    /// The main window became the active one.
-    WindowInFront,
-    /// The network came back after being down: the same reconnect as a wake.
-    NetworkBack,
-    /// The network went down: the Refresh button turns orange (#442).
-    NetworkLost,
-    /// The connection started or stopped being metered (#442).
-    MeteredChanged,
-    /// Open the settings window on the user's preferred view (the menu entry).
-    OpenSettings,
-    OpenPreferences,
-    ClosePreferences,
-    /// The accounts editor subpage opened/closed in the settings window.
-    SettingsEditorOpen(Option<&'static str>),
-    /// A settings editor was asked whether it can be left: `ask` when it
-    /// holds unsaved changes, otherwise it has already closed itself.
-    SettingsLeaveEditor {
-        page: String,
-        ask: bool,
-    },
-    // Worker events (each carries the account it came from)
-    SetAccount(Account),
-    /// A JMAP server's sending identities for an account (#346).
-    ServerIdentities {
-        account_id: u32,
-        identities: Vec<(String, String)>,
-    },
-    SetFolders {
-        account_id: u32,
-        folders: Vec<Folder>,
-    },
-    Messages {
-        account_id: u32,
-        folder_id: u32,
-        messages: Vec<Message>,
-    },
-    /// Showcase: open filter rule `i` in the current Accounts panel.
-    ShowcaseEditFilter(usize),
-    /// The message-body filter conditions the server confirmed for a folder's
-    /// listed mail (#191): uid → the lowercased alternatives found in it.
-    /// Arrives just ahead of the `Messages` it describes.
-    BodyHits {
-        account_id: u32,
-        folder_id: u32,
-        hits: std::collections::HashMap<u32, Vec<String>>,
-    },
-    /// Additional indexed summaries from the background backfill (search index).
-    MessagesAppend {
-        account_id: u32,
-        folder_id: u32,
-        messages: Vec<Message>,
-    },
-    UndoRestored {
-        account_id: u32,
-        folder_id: u32,
-        message_ids: Vec<String>,
-    },
-    /// A folder's background backfill finished — it's fully indexed now.
-    BackfillDone {
-        account_id: u32,
-        folder_id: u32,
-    },
-    FolderUnread {
-        account_id: u32,
-        folder_id: u32,
-        unread: u32,
-    },
-    /// From a per-folder IDLE watcher, which knows its folder only by path —
-    /// folder ids are positional and may have shifted since it was spawned.
-    FolderUnreadByPath {
-        account_id: u32,
-        path: String,
-        unread: u32,
-    },
-    /// The worker stored (or failed to store) a read/unread change the app
-    /// had applied ahead of it.
-    SeenSettled {
-        account_id: u32,
-        path: String,
-        uid: u32,
-    },
-    /// A message was replied to or forwarded, and the server told (#454).
-    Answered {
-        account_id: u32,
-        path: String,
-        uid: u32,
-        forwarded: bool,
-    },
-    TagSettled {
-        account_id: u32,
-        path: String,
-        uid: u32,
-        keyword: String,
-    },
-    /// The worker has run (or failed) the move that took these messages
-    /// out of `path`: its lists can be believed about them again.
-    MovesSettled {
-        account_id: u32,
-        path: String,
-        uids: Vec<u32>,
-    },
-    /// Moving mail to another account (#265): the source's copy of a
-    /// message, and the receiving account's answer.
-    RawExported {
-        token: u64,
-        raw: Result<Vec<u8>, String>,
-    },
-    RawImported {
-        token: u64,
-        result: Result<(), String>,
-    },
-    /// A message the cache listed is no longer in `path` on the server.
-    MessageGone {
-        account_id: u32,
-        message_id: u32,
-        path: String,
-        uid: u32,
-    },
-    /// `path` is the folder the body was read from — a UID only identifies a
-    /// message within its own folder, so applying a body to a message means
-    /// checking the folder too.
-    Body {
-        account_id: u32,
-        message_id: u32,
-        path: String,
-        body: String,
-    },
-    Source {
-        text: String,
-    },
-    /// These, like `Body`, name the folder: a UID means a message only
-    /// within its folder.
-    Attachments {
-        account_id: u32,
-        path: String,
-        message_id: u32,
-        items: Vec<Attachment>,
-    },
-    AttachmentsPending {
-        account_id: u32,
-        path: String,
-        message_id: u32,
-    },
-    /// A flagged message turned out to have no real attachments — drop its paperclip.
-    NoAttachments {
-        account_id: u32,
-        path: String,
-        message_id: u32,
-    },
-    /// An unflagged message turned out to carry attachments — give it one.
-    HasAttachments {
-        account_id: u32,
-        path: String,
-        message_id: u32,
-    },
-    Sent {
-        account_id: u32,
-    },
-    /// The worker is done with a message on its way out (#434).
-    SendDone {
-        ticket: u64,
-        sent: bool,
-    },
-    /// A message nothing could keep, back for a composer (#340).
-    Unsent {
-        account_id: u32,
-        message: Box<crate::worker::OutgoingMessage>,
-    },
-    Status {
-        account_id: u32,
-        text: String,
-    },
-    Error {
-        account_id: u32,
-        text: String,
-        connectivity: bool,
-    },
-    /// An LDAP directory could not be asked (#307), said once per failure.
-    DirectoryError(String),
-    NotifyCount(usize),
-    StatusBarShown(bool),
-    ToggleNotifications,
-    OpenContacts,
-    /// Contacts, asked for from a composer, which may be a window of its
-    /// own: the main window comes forward to show it.
-    ShowContactsPage,
-    /// The background EDS read for the contacts view finished.
-    ContactsLoaded(Vec<crate::contacts::ContactDetails>),
-    /// The address books that sync with a server fetched what changed
-    /// (#408): read the contacts again if they are showing.
-    ContactBooksSynced,
-    /// Read with the contacts: the books new contacts can go to, chosen one
-    /// first, and how many contacts the Hylki book holds.
-    ContactBooksLoaded {
-        books: Vec<crate::contacts::Book>,
-        local_count: usize,
-    },
-    /// Right-click on the sidebar's Contacts row: the external app.
-    LaunchGnomeContacts,
-    /// Contact editor writes (run on a background thread against EDS).
-    SaveContact {
-        book_uid: String,
-        vcard: String,
-    },
-    /// A new contact, into the book picked in the editor (`None`: the
-    /// default one).
-    CreateContact {
-        book_uid: Option<String>,
-        vcard: String,
-    },
-    /// A group, new (`original` is `None`) or changed.
-    SaveGroup {
-        book_uid: String,
-        format: crate::contacts::GroupFormat,
-        original: Option<String>,
-        edit: crate::contacts::GroupEdit,
-    },
-    /// Contacts to delete, by book and UID.
-    DeleteContacts(Vec<(String, String)>),
-    /// A group to make in the book `to` and delete from `from`.
-    MoveGroup {
-        from: String,
-        uid: String,
-        to: String,
-        format: crate::contacts::GroupFormat,
-        edit: crate::contacts::GroupEdit,
-    },
-    /// Contacts to move to the book `to`: (book, UID, the card for `to`).
-    MoveContacts {
-        to: String,
-        cards: Vec<(String, String, String)>,
-    },
-    /// A contact write finished (`Some` = the error to show).
-    ContactWriteDone(Option<String>),
-    /// The Contacts page's books and groups, for the sidebars.
-    ContactTree(crate::ui::contacts_page::ContactTree),
-    /// Picked in the sidebar: what the contact list shows.
-    ContactScope(crate::ui::contacts_page::ContactScope),
-    /// Contacts dropped on a book or group in the sidebar.
-    ContactDrop {
-        keys: Vec<(String, String)>,
-        on: crate::ui::contacts_page::DropOn,
-        moving: bool,
-    },
-    /// A right-click choice on a book or group in the sidebar.
-    ContactTreeAction(crate::ui::contacts_page::TreeAction),
-    /// Copy these cards into the book `to`.
-    CopyContacts {
-        to: String,
-        cards: Vec<String>,
-    },
-    /// The accounts and books folded under the sidebar's Contacts row.
-    ContactsFolded(Vec<String>),
-    /// Name an address book in Hylki (`None`: its own name again).
-    RenameBook {
-        uid: String,
-        name: Option<String>,
-    },
-    /// `.vcf` files chosen in the Contacts page, to import into the Hylki book.
-    ImportContacts(Vec<std::path::PathBuf>),
-    /// The import finished.
-    ContactsImported(Result<crate::local_contacts::ImportOutcome, String>),
-}
 
 #[relm4::component(pub)]
 impl SimpleComponent for AppModel {
@@ -14448,7 +12352,6 @@ impl AppModel {
         self.show_message(current, false);
     }
 
-    /// Persist all app settings together.
     /// (Re)build the burger menu's help section: the Console entry appears
     /// only while Console mode is enabled in Settings.
     fn rebuild_help_menu(&self) {
@@ -14513,6 +12416,7 @@ impl AppModel {
         }
     }
 
+    /// Persist all app settings together.
     fn save_settings(&self) {
         config::save_privacy(config::PrivacyFile {
             allowed_senders: self.allowed_senders.clone(),
@@ -15844,8 +13748,6 @@ impl AppModel {
         }
     }
 
-    /// Spawn one worker per configured account (or a single mock worker when no
-    /// account is configured).
     /// Before anything reads the cache on disk: an account removed since the
     /// last start has moved the ones after it up a place, and their cached
     /// mail has to move with them (see `Cache::claim_accounts`).
@@ -15922,6 +13824,8 @@ impl AppModel {
         }
     }
 
+    /// Spawn one worker per configured account (or a single mock worker when no
+    /// account is configured).
     fn spawn_workers(&mut self, sender: &ComponentSender<Self>) {
         self.workers.clear();
         self.message_list
@@ -16029,10 +13933,6 @@ impl AppModel {
         self.set_header_refresh_busy(busy);
     }
 
-    /// An account's avatar picture (#162), when one is set and its file is
-    /// still there.
-    /// The configs the UI describes accounts from: the real ones, or the
-    /// demo's in-memory stand-ins while no account is configured.
     /// Every address the accounts send from, their aliases included, lower
     /// case.
     fn own_addresses(&self) -> std::collections::HashSet<String> {
@@ -16050,6 +13950,8 @@ impl AppModel {
             .collect()
     }
 
+    /// The configs the UI describes accounts from: the real ones, or the
+    /// demo's in-memory stand-ins while no account is configured.
     fn effective_config(&self) -> &[AccountConfig] {
         if self.config.is_empty() && demo_mode() {
             &self.demo_config
@@ -16058,6 +13960,8 @@ impl AppModel {
         }
     }
 
+    /// An account's avatar picture (#162), when one is set and its file is
+    /// still there.
     fn account_avatar(&self, account_id: u32) -> Option<std::path::PathBuf> {
         self.effective_config()
             .get(account_id.saturating_sub(1) as usize)
@@ -16317,8 +14221,6 @@ impl AppModel {
         self.refresh_undo_menu();
     }
 
-    /// The inline composer, while it holds keyboard focus: whoever the
-    /// window's Undo and Redo belong to at this moment.
     /// Who the window's Undo and Redo entries belong to. Not the same
     /// question as [`AppModel::focused_compose`], and deliberately not
     /// decided by focus: opening the menu is itself a focus change, and
@@ -17363,12 +15265,6 @@ impl AppModel {
         }
     }
 
-    /// Open or close the narrow-window sidebar *peek*: the expanded panel
-    /// (the second sidebar instance, with its own header) sliding out over
-    /// the panes from the rail's right edge, through the nested split view's
-    /// overlay mode. The docked rail is not involved: it keeps its rows,
-    /// header and width throughout and stays clickable beside the panel.
-    /// `animate` is advisory — libadwaita animates the overlay itself.
     /// Show Contacts in place of the mail panes, read afresh.
     fn show_contacts_view(&mut self, sender: &ComponentSender<Self>) {
         self.close_sidebar_peek();
@@ -17384,6 +15280,12 @@ impl AppModel {
         }
     }
 
+    /// Open or close the narrow-window sidebar *peek*: the expanded panel
+    /// (the second sidebar instance, with its own header) sliding out over
+    /// the panes from the rail's right edge, through the nested split view's
+    /// overlay mode. The docked rail is not involved: it keeps its rows,
+    /// header and width throughout and stays clickable beside the panel.
+    /// `animate` is advisory — libadwaita animates the overlay itself.
     fn set_sidebar_peek(&mut self, open: bool, animate: bool) {
         let Some(peek) = self.peek_split.clone() else {
             return;
@@ -17501,8 +15403,6 @@ impl AppModel {
         fresh
     }
 
-    /// Update the sidebar's unread badges in place (no rebuild), derived from the
-    /// loaded message lists. Cheap enough to call on every read/sync.
     /// `push_unread_counts` once the view switch has been drawn: it walks
     /// every folder, and the counts can wait a frame where the list cannot.
     fn push_unread_counts_later(&self, sender: &ComponentSender<Self>) {
@@ -17512,6 +15412,8 @@ impl AppModel {
         });
     }
 
+    /// Update the sidebar's unread badges in place (no rebuild), derived from the
+    /// loaded message lists. Cheap enough to call on every read/sync.
     fn push_unread_counts(&self) {
         let folders = self.folder_unread.clone();
         let unified = self.unified_unread();
@@ -17710,8 +15612,6 @@ impl AppModel {
             .collect()
     }
 
-    /// Push the current accounts + folders to the sidebar, in the user's chosen
-    /// order and with each account's collapsed state.
     /// The Special Folders choices per account email (#82): every folder of
     /// every configured account, for the settings editor's combos.
     fn folder_choice_map(&self) -> std::collections::HashMap<String, Vec<(String, String)>> {
@@ -17755,6 +15655,8 @@ impl AppModel {
         map
     }
 
+    /// Push the current accounts + folders to the sidebar, in the user's chosen
+    /// order and with each account's collapsed state.
     fn rebuild_sidebar(&self) {
         // The accounts are being redrawn because something about them changed;
         // the faces their own mail wears follow from the same place (#189).
@@ -18147,10 +16049,6 @@ impl AppModel {
         show_context_menu(btn, (btn.width() / 2) as f64, btn.height() as f64, sections);
     }
 
-    /// The message list's search, filters, count and sort as a menu: what
-    /// the ⋯ in its header offers while Focus Mode has them folded away.
-    /// The toggles are flipped through their own buttons, so the filtering
-    /// happens where it always does.
     /// Narrow the list to `filters`, and show them on the header's popover.
     fn set_quick_filters(&mut self, filters: QuickFilters) {
         self.quick_filters = filters;
@@ -18166,6 +16064,10 @@ impl AppModel {
         }
     }
 
+    /// The message list's search, filters, count and sort as a menu: what
+    /// the ⋯ in its header offers while Focus Mode has them folded away.
+    /// The toggles are flipped through their own buttons, so the filtering
+    /// happens where it always does.
     fn show_list_overflow_menu(&self, sender: &ComponentSender<Self>) {
         use crate::ui::context_menu::{show_context_menu_with_header, MenuEntry};
         let Some(lh) = self.list_header_widgets.get() else {
@@ -18383,8 +16285,6 @@ impl AppModel {
         });
     }
 
-    /// Hand the list its look; `animate` slides the avatars away or back
-    /// (a Focus Mode toggle) rather than rebuilding the rows outright.
     /// Tell the list whether to lay messages out on one line (#334): the
     /// Layout setting, or for Automatic, the width of the pane.
     fn push_single_line(&self) {
@@ -18396,6 +16296,8 @@ impl AppModel {
         self.message_list.emit(MessageListInput::SetSingleLine(on));
     }
 
+    /// Hand the list its look; `animate` slides the avatars away or back
+    /// (a Focus Mode toggle) rather than rebuilding the rows outright.
     fn push_list_look(&self, animate: bool) {
         self.message_list.emit(MessageListInput::SetLook {
             avatars: self.list_avatars(),
@@ -18409,8 +16311,6 @@ impl AppModel {
         });
     }
 
-    /// What Reader View does on each open: Focus Mode's "on" while it holds,
-    /// else the setting.
     /// The session's message zoom: every reader on screen follows.
     fn set_zoom(&mut self, zoom: u32) {
         if zoom == self.zoom {
@@ -18423,6 +16323,8 @@ impl AppModel {
         }
     }
 
+    /// What Reader View does on each open: Focus Mode's "on" while it holds,
+    /// else the setting.
     fn effective_reader_default(&self) -> config::ReaderDefault {
         if self.focus.active(config::FocusPart::ReaderView) {
             config::ReaderDefault::On
@@ -19459,12 +17361,6 @@ impl AppModel {
         self.push_member_checks();
     }
 
-    /// Render the current conversation (thread) in the reader, newest first.
-    ///
-    /// The header follows the message the user selected, not whatever sorted to
-    /// the top: a conversation can now include replies of your own pulled in from
-    /// Sent, and one of those being the newest shouldn't retitle the reader.
-    /// Ask for one conversation re-render shortly from now, collapsing a burst of
     /// arriving bodies into a single one.
     ///
     /// A conversation is rendered as one document with every member's body
@@ -19481,6 +17377,12 @@ impl AppModel {
         });
     }
 
+    /// Render the current conversation (thread) in the reader, newest first.
+    ///
+    /// The header follows the message the user selected, not whatever sorted to
+    /// the top: a conversation can now include replies of your own pulled in from
+    /// Sent, and one of those being the newest shouldn't retitle the reader.
+    /// Ask for one conversation re-render shortly from now, collapsing a burst of
     fn show_thread(&self) {
         let Some(head) = self.current_thread.first() else {
             return;
@@ -19527,9 +17429,6 @@ impl AppModel {
         self.push_member_checks();
     }
 
-    /// Name the folder each conversation message came from, for the ones that
-    /// aren't from the folder on screen. The message list only ever shows one
-    /// folder, so anything else was pulled in from the cache (#21).
     /// The open conversation's messages that are filed in a Sent folder.
     fn thread_sent(&self) -> std::collections::HashSet<(u32, u32)> {
         self.current_thread
@@ -19539,6 +17438,9 @@ impl AppModel {
             .collect()
     }
 
+    /// Name the folder each conversation message came from, for the ones that
+    /// aren't from the folder on screen. The message list only ever shows one
+    /// folder, so anything else was pulled in from the cache (#21).
     fn thread_folder_labels(&self) -> HashMap<(u32, u32), String> {
         let shown_folder = self.current.as_ref().map(|m| m.folder_id);
         self.current_thread
@@ -19959,8 +17861,6 @@ impl AppModel {
         }
     }
 
-    /// Tooltip for the toolbar's trash button: says when it will delete the
-    /// whole multi-selection rather than just the open message.
     /// Whether the reader header shows `item` right now: it must be in the
     /// saved layout, and a right-group button also needs the pane wide
     /// enough (the left group never folds). Delete alone also serves the
@@ -20062,6 +17962,8 @@ impl AppModel {
         tb.bin.queue_resize();
     }
 
+    /// Tooltip for the toolbar's trash button: says when it will delete the
+    /// whole multi-selection rather than just the open message.
     fn delete_tooltip(&self) -> String {
         match self.list_selection.len() {
             n if n > 1 => i18n_f("Delete {n} messages", &[("n", &n.to_string())]),
@@ -21363,7 +19265,6 @@ impl AppModel {
         });
     }
 
-    /// Open (or replace) the reader's inline reply/forward drop-down pane.
     /// The revealer the inline composer should slide down in: the reader
     /// pane's, or — while the contacts view is up — the contact card's.
     fn compose_slot(&self) -> &gtk::Revealer {
@@ -21965,6 +19866,7 @@ impl AppModel {
         }
     }
 
+    /// Open (or replace) the reader's inline reply/forward drop-down pane.
     fn open_inline_reply(
         &mut self,
         account_id: u32,
@@ -22247,7 +20149,6 @@ impl AppModel {
         self.draining_composers.retain(|(cid, _)| *cid != id);
     }
 
-    /// Move a message to its account's folder of `kind` (archive/delete).
     /// Destination path for `kind` on an account: its existing folder of that kind,
     /// else a sensible default (the worker creates it on the server on first move).
     fn folder_path_for(&self, account_id: u32, kind: FolderKind) -> Option<String> {
@@ -22258,12 +20159,6 @@ impl AppModel {
             .or_else(|| self.default_folder_path(account_id, kind))
     }
 
-    /// Fold the rest of a conversation — messages from the account's other
-    /// folders, chiefly the replies you sent — into the open one (#21).
-    ///
-    /// Ignored unless it answers the message still on screen: the lookup is
-    /// asynchronous and the user may have moved on. Messages already in the
-    /// conversation are skipped, so this is safe to apply more than once.
     /// Ask the cache again for the rest of the conversation on screen, when
     /// it belongs to `account_id`. The answer goes through [`merge_related`],
     /// which adds only what the conversation lacks.
@@ -22306,6 +20201,12 @@ impl AppModel {
         self.related_id_seq
     }
 
+    /// Fold the rest of a conversation — messages from the account's other
+    /// folders, chiefly the replies you sent — into the open one (#21).
+    ///
+    /// Ignored unless it answers the message still on screen: the lookup is
+    /// asynchronous and the user may have moved on. Messages already in the
+    /// conversation are skipped, so this is safe to apply more than once.
     fn merge_related(&mut self, account_id: u32, message_id: u32, messages: Vec<Message>) {
         let Some(current) = self.current.clone() else {
             return;
@@ -22457,8 +20358,6 @@ impl AppModel {
         }
     }
 
-    /// Confirm erasing messages that are already in Trash — there's no undo, so
-    /// this always asks first.
     /// Ask before deleting a whole conversation (a selected thread head). Can
     /// be turned off in Preferences (`confirm_thread_delete`).
     fn confirm_delete_thread(&self, messages: Vec<Message>, sender: &ComponentSender<Self>) {
@@ -22555,6 +20454,8 @@ impl AppModel {
         dialog.present();
     }
 
+    /// Confirm erasing messages that are already in Trash — there's no undo, so
+    /// this always asks first.
     fn confirm_purge(&self, messages: Vec<Message>, sender: &ComponentSender<Self>) {
         let n = messages.len();
         if n == 0 {
@@ -22631,6 +20532,7 @@ impl AppModel {
         self.push_unread_counts();
     }
 
+    /// Move a message to its account's folder of `kind` (archive/delete).
     fn move_to(&mut self, m: Message, kind: FolderKind) {
         if kind == FolderKind::Archive && self.archives_in_place(&m) {
             self.apply_bulk_move(BulkAction::Archive, vec![m]);
@@ -23092,9 +20994,6 @@ impl AppModel {
         self.push_unread_counts();
     }
 
-    /// Move a custom folder under a new parent (or "" = the account's top
-    /// level) via IMAP RENAME, after checking the move makes sense. The server
-    /// carries any sub-hierarchy along with it.
     /// Make a folder at `path`. Optimistic: it appears in the sidebar right
     /// away (a server round-trip took seconds); the worker's confirming
     /// refresh matches the prediction and repaints nothing.
@@ -23120,8 +21019,6 @@ impl AppModel {
         self.send_to(account_id, MailRequest::CreateFolder { path });
     }
 
-    /// Remove a folder, its messages going to Trash first so nothing is lost
-    /// even when this is undoing a folder someone has since filed mail into.
     /// Hide folders (#239): remembered on the account, taken off the
     /// sidebar at once, and the worker told so its next listing, and every
     /// sync after it, leaves them out. A hidden folder that was open gives
@@ -23163,6 +21060,8 @@ impl AppModel {
         self.send_to(account_id, MailRequest::SetHiddenFolders { paths: hidden });
     }
 
+    /// Remove a folder, its messages going to Trash first so nothing is lost
+    /// even when this is undoing a folder someone has since filed mail into.
     fn delete_folder(&mut self, account_id: u32, path: String) {
         let trash = self.folder_path_for(account_id, FolderKind::Trash);
         // If the deleted folder is currently open, clear the view.
@@ -23193,6 +21092,10 @@ impl AppModel {
 
     /// Move a folder under `dest` ("" for the top level). Returns its new
     /// path when the move went ahead, `None` when it was refused.
+    ///
+    /// Move a custom folder under a new parent (or "" = the account's top
+    /// level) via IMAP RENAME, after checking the move makes sense. The server
+    /// carries any sub-hierarchy along with it.
     fn move_folder(&mut self, account_id: u32, path: String, dest: String) -> Option<String> {
         let complain = |me: &Self, text: &str| {
             me.notifications.emit(NotifyInput::Push {
@@ -23888,8 +21791,6 @@ impl AppModel {
         self.push_unread_counts();
     }
 
-    /// Re-emit the currently-visible folder/unified list from the caches, so
-    /// in-place changes (e.g. mark-all-read) show without a server round-trip.
     /// How many assembled conversations are kept. Each holds its messages'
     /// bodies, so this is a memory budget as much as a cache size.
     const THREAD_CACHE_MAX: usize = 8;
@@ -23984,9 +21885,6 @@ impl AppModel {
         }
     }
 
-    /// Push every account's inbox slice to the list as one date-sorted run. The
-    /// slices arrive independently (cache seed, then each account's load), so the
-    /// whole merged list is re-emitted each time one of them changes.
     /// Merge the unified view's slices for the list shortly (and hand it the
     /// new thread links), once for every answer that lands meanwhile. Each
     /// merge regroups the whole view, which across accounts can be tens of
@@ -24278,6 +22176,9 @@ impl AppModel {
         tracing::debug!("unified: slices filled in {:?}", t.elapsed());
     }
 
+    /// Push every account's inbox slice to the list as one date-sorted run. The
+    /// slices arrive independently (cache seed, then each account's load), so the
+    /// whole merged list is re-emitted each time one of them changes.
     fn emit_unified(&self) {
         let t = std::time::Instant::now();
         let fp = self.unified_fp();
@@ -24301,8 +22202,6 @@ impl AppModel {
             .emit(MessageListInput::SetMessages { messages: merged });
     }
 
-    /// The keywords a tag view answers: one, or — the unified Tags row —
-    /// every configured tag.
     /// With a tag view open, ask the accounts in its scope to bring their
     /// cached keywords in line with the server (#166). An account scanned
     /// within the last few seconds is left alone: reopening a view, or a
@@ -24347,6 +22246,8 @@ impl AppModel {
         scope.map_or_else(|| self.in_unified(account_id), |id| id == account_id)
     }
 
+    /// The keywords a tag view answers: one, or — the unified Tags row —
+    /// every configured tag.
     fn tag_view_keywords(&self, kw: &Option<String>) -> Vec<String> {
         match kw {
             Some(k) => vec![k.clone()],
@@ -24929,6 +22830,8 @@ impl AppModel {
         }
     }
 
+    /// Re-emit the currently-visible folder/unified list from the caches, so
+    /// in-place changes (e.g. mark-all-read) show without a server round-trip.
     fn refresh_list_display(&self) {
         if self.unified {
             self.emit_unified();
@@ -25038,9 +22941,6 @@ impl AppModel {
         dialog.present();
     }
 
-    /// Open (or focus) the combined Settings window on the
-    /// requested panel. When `add_new`, jump straight to the "add account"
-    /// form — used by the empty-state "Add first account" button.
     /// Build the Settings window and its accounts panel, hidden. It is
     /// kept for the life of the app once built: `open_settings_window`
     /// presents it, and closing it hides it, so opening never waits on
@@ -25471,6 +23371,10 @@ impl AppModel {
 
     /// Show Settings: the window kept from a previous open (its accounts
     /// panel rebuilt over the current accounts) or a newly built one.
+    ///
+    /// Open (or focus) the combined Settings window on the
+    /// requested panel. When `add_new`, jump straight to the "add account"
+    /// form — used by the empty-state "Add first account" button.
     fn open_settings_window(
         &mut self,
         sender: &ComponentSender<Self>,
@@ -26000,8 +23904,6 @@ impl AppModel {
         m
     }
 
-    /// Remove a handled message from the list, caches, and badges. Clears the
-    /// reader only if that message was the one open. Shared by archive/delete/spam.
     /// Apply a removing bulk action (archive/delete/spam) to many messages at once.
     /// Messages are grouped by (account, source folder) and each group is moved in a
     /// SINGLE `MoveMessages` request (one server-side UID MOVE) — far faster and more
@@ -26206,6 +24108,8 @@ impl AppModel {
         }
     }
 
+    /// Remove a handled message from the list, caches, and badges. Clears the
+    /// reader only if that message was the one open. Shared by archive/delete/spam.
     fn discard_message(&mut self, m: &Message) {
         if let Some(head) = self.leave_conversation(m) {
             // The conversation moved on first, so the message is no longer
@@ -26923,7 +24827,6 @@ impl AppModel {
         }
     }
 
-    /// The IMAP folder path a message lives in (its account's folder by id).
     /// What a reply takes over from how the reader showed the original. A
     /// reply to an encrypted message starts with Encrypt on (#133): the
     /// verdict the reader had for the original says whether it was.
@@ -26958,6 +24861,7 @@ impl AppModel {
         prefill
     }
 
+    /// The IMAP folder path a message lives in (its account's folder by id).
     fn resolve_folder_path(&self, m: &Message) -> Option<String> {
         self.folders
             .get(&m.account_id)?
@@ -26971,9 +24875,6 @@ impl AppModel {
         self.folder_of_kind(account_id, FolderKind::Inbox)
     }
 
-    /// Where a copy of outgoing mail is filed (#199): the folder chosen in the
-    /// account editor if it still exists, else the Sent folder. `None` when
-    /// the account has neither — the message is sent without a copy.
     /// The lists left, as the readers take them: key → when.
     fn unsubscribed_map(&self) -> HashMap<String, i64> {
         self.unsubscribed
@@ -27578,6 +25479,9 @@ impl AppModel {
         });
     }
 
+    /// Where a copy of outgoing mail is filed (#199): the folder chosen in the
+    /// account editor if it still exists, else the Sent folder. `None` when
+    /// the account has neither — the message is sent without a copy.
     fn sent_copy_path(&self, account_id: u32) -> Option<String> {
         let cfg = self
             .effective_config()
@@ -27874,7 +25778,6 @@ impl AppModel {
         out
     }
 
-    /// Server-side unread count for an account's inbox.
     /// The folders whose unread mail makes up an account's unread total: its
     /// inbox, then the destination of every filter rule marked to count
     /// (#116), in rule order and without repeats. Trash and Junk never
@@ -27908,12 +25811,6 @@ impl AppModel {
         out
     }
 
-    /// The folders the unified "Filtered Folders" section lists: the
-    /// destination of every rule, in account order then rule order, without
-    /// repeats; nothing when Settings → Sidebar has the section off. An
-    /// inbox destination is already an All Inboxes row and is skipped, and
-    /// an account left out of the unified section (#267) lists its rules'
-    /// folders under its own section only.
     /// The favorite folders (#367) as the sidebar draws them, in the order
     /// they were added. One whose account or folder is not listed (offline
     /// with nothing cached, hidden) is left out until it is.
@@ -27943,6 +25840,12 @@ impl AppModel {
         self.filtered_placement.shown()
     }
 
+    /// The folders the unified "Filtered Folders" section lists: the
+    /// destination of every rule, in account order then rule order, without
+    /// repeats; nothing when Settings → Sidebar has the section off. An
+    /// inbox destination is already an All Inboxes row and is skipped, and
+    /// an account left out of the unified section (#267) lists its rules'
+    /// folders under its own section only.
     fn unified_folder_refs(&self) -> Vec<UnifiedFolderRef> {
         let mut out: Vec<UnifiedFolderRef> = Vec::new();
         if !self.filtered_shown() {
@@ -28049,15 +25952,6 @@ impl AppModel {
             .is_none_or(|c| c.in_unified)
     }
 
-    /// A watcher or sweep reported a changed unread count for `folder_id`.
-    /// When that is one of the account's counted folders (its inbox, or a
-    /// folder a counting filter files into) and the worker's IDLE sits
-    /// elsewhere, the folder's message list used to refresh only when it
-    /// was next opened: the tray menu said "No unread mail" under a count
-    /// that said otherwise, and mail arriving in the inbox raised no
-    /// notification, since both read the list. Ask for a quiet resync so
-    /// the list follows the count. An open inbox (alone or as All Inboxes)
-    /// or an open folder is the IDLE folder, whose own resync covers it.
     /// Counts set aside while marks or moves were on their way (#333, #336):
     /// with those stored, sync each such folder that is clear now. A count
     /// was dropped because it could be stale, but it may also have been the
@@ -28086,6 +25980,15 @@ impl AppModel {
         self.send_to(account_id, MailRequest::RefreshUnread);
     }
 
+    /// A watcher or sweep reported a changed unread count for `folder_id`.
+    /// When that is one of the account's counted folders (its inbox, or a
+    /// folder a counting filter files into) and the worker's IDLE sits
+    /// elsewhere, the folder's message list used to refresh only when it
+    /// was next opened: the tray menu said "No unread mail" under a count
+    /// that said otherwise, and mail arriving in the inbox raised no
+    /// notification, since both read the list. Ask for a quiet resync so
+    /// the list follows the count. An open inbox (alone or as All Inboxes)
+    /// or an open folder is the IDLE folder, whose own resync covers it.
     fn sync_background_folder(&self, account_id: u32, folder_id: u32) {
         let Some(folder) = self
             .counted_folders(account_id)
@@ -28106,7 +26009,6 @@ impl AppModel {
         self.send_to(account_id, MailRequest::SyncFolder { folder_id, path });
     }
 
-    /// Counted folders (#116) whose lists have never been loaded this run:
     /// Index an account's sent mail without waiting for its folder to be
     /// opened (#236). A conversation pulls the user's own replies in from
     /// the cache, and the cache only held a folder once that folder had been
@@ -28147,6 +26049,7 @@ impl AppModel {
         }
     }
 
+    /// Counted folders (#116) whose lists have never been loaded this run:
     /// fetch them quietly, so the tray menu can show their unread mail
     /// without waiting for their counts to move.
     fn sync_unloaded_counted_folders(&self) {
