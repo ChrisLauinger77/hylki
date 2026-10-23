@@ -19,11 +19,15 @@ use std::time::{Duration, Instant};
 use crate::contacts::Suggestion;
 use crate::i18n::{i18n, i18n_f};
 
-const SOURCE_IFACE: &str = "org.gnome.evolution.dataserver.Source";
-const WRITABLE_IFACE: &str = "org.gnome.evolution.dataserver.Source.Writable";
-const REMOVABLE_IFACE: &str = "org.gnome.evolution.dataserver.Source.Removable";
-const MANAGER_PATH: &str = "/org/gnome/evolution/dataserver/SourceManager";
-const MANAGER_IFACE: &str = "org.gnome.evolution.dataserver.SourceManager";
+pub(crate) mod eds_source;
+
+pub(crate) use eds_source::bus;
+use eds_source::{
+    create_source, invoke_authenticate, new_source_uid, not_available, registry, remove_source,
+    write_source, SOURCE_IFACE,
+};
+#[cfg(test)]
+use eds_source::{MANAGER_IFACE, MANAGER_PATH};
 
 /// Fewer characters than this match too much of a large directory to be
 /// worth the round trip.
@@ -239,28 +243,9 @@ impl Directory {
     }
 }
 
-/// One session-bus connection for the process: EDS closes a book when the
-/// connection that opened it goes, so a connection per search would open
-/// and close the directory every time.
-pub(crate) fn bus() -> Result<zbus::blocking::Connection, String> {
-    static BUS: Mutex<Option<zbus::blocking::Connection>> = Mutex::new(None);
-    let mut guard = BUS.lock().map_err(|e| e.to_string())?;
-    if let Some(c) = guard.as_ref() {
-        return Ok(c.clone());
-    }
-    let c = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
-    *guard = Some(c.clone());
-    Ok(c)
-}
-
-fn registry() -> Result<String, String> {
-    crate::contacts::sources_dest().ok_or_else(|| i18n("Evolution Data Server is not available"))
-}
-
 /// Every LDAP directory EDS knows, Evolution's included, by name.
 pub fn list() -> Result<Vec<Directory>, String> {
-    let sources = crate::contacts::registry_sources()
-        .ok_or_else(|| i18n("Evolution Data Server is not available"))?;
+    let sources = crate::contacts::registry_sources().ok_or_else(not_available)?;
     let mut out: Vec<Directory> = sources
         .iter()
         .filter_map(|(path, uid, data)| Directory::from_source(uid, path, data))
@@ -279,25 +264,10 @@ pub fn save(dir: &Directory, password: Option<&str>) -> Result<String, String> {
     let dest = registry()?;
     let mut dir = dir.clone();
     if dir.uid.is_empty() {
-        dir.uid = gtk::glib::uuid_string_random().replace('-', "");
-        let sources: HashMap<&str, String> = HashMap::from([(dir.uid.as_str(), dir.to_source())]);
-        conn.call_method(
-            Some(dest.as_str()),
-            MANAGER_PATH,
-            Some(MANAGER_IFACE),
-            "CreateSources",
-            &(sources,),
-        )
-        .map_err(|e| e.to_string())?;
+        dir.uid = new_source_uid();
+        create_source(&conn, &dest, &dir.uid, dir.to_source())?;
     } else {
-        conn.call_method(
-            Some(dest.as_str()),
-            dir.path.as_str(),
-            Some(WRITABLE_IFACE),
-            "Write",
-            &(dir.to_source(),),
-        )
-        .map_err(|e| e.to_string())?;
+        write_source(&conn, &dest, &dir.path, dir.to_source())?;
     }
     if let Some(pw) = password.filter(|p| !p.is_empty()) {
         crate::config::store_cloud_password(&dir.keyring_key(), pw).map_err(|e| e.to_string())?;
@@ -312,17 +282,8 @@ pub fn save(dir: &Directory, password: Option<&str>) -> Result<String, String> {
 
 /// Write a directory's encryption where EDS reads it, once.
 fn move_security(dir: &mut Directory) {
-    let written = registry().and_then(|dest| {
-        bus()?
-            .call_method(
-                Some(dest.as_str()),
-                dir.path.as_str(),
-                Some(WRITABLE_IFACE),
-                "Write",
-                &(dir.to_source(),),
-            )
-            .map_err(|e| e.to_string())
-    });
+    let written =
+        registry().and_then(|dest| write_source(&bus()?, &dest, &dir.path, dir.to_source()));
     match written {
         Ok(_) => {
             tracing::info!(directory = %dir.title(), security = ?dir.security, "LDAP directory's encryption moved where EDS reads it");
@@ -345,14 +306,7 @@ pub fn set_enabled(dir: &Directory, enabled: bool) -> Result<(), String> {
 pub fn remove(dir: &Directory) -> Result<(), String> {
     let conn = bus()?;
     let dest = registry()?;
-    conn.call_method(
-        Some(dest.as_str()),
-        dir.path.as_str(),
-        Some(REMOVABLE_IFACE),
-        "Remove",
-        &(),
-    )
-    .map_err(|e| e.to_string())?;
+    remove_source(&conn, &dest, &dir.path)?;
     crate::config::delete_cloud_password(&dir.keyring_key());
     forget_book(&dir.uid);
     note_answer(&dir.uid);
@@ -492,19 +446,7 @@ fn authenticate(
     password: &str,
 ) -> Result<(), String> {
     let dest = registry()?;
-    let credentials = vec![
-        format!("username:{}", dir.bind_dn.trim()),
-        format!("password:{password}"),
-    ];
-    conn.call_method(
-        Some(dest.as_str()),
-        dir.path.as_str(),
-        Some(SOURCE_IFACE),
-        "InvokeAuthenticate",
-        &(credentials,),
-    )
-    .map(|_| ())
-    .map_err(|e| e.to_string())
+    invoke_authenticate(conn, &dest, &dir.path, &dir.bind_dn, password)
 }
 
 /// Ask one directory, signing in first when EDS says it wants that.
@@ -928,271 +870,4 @@ fn suggestions_from_vcard(card: &str) -> Vec<Suggestion> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_directory_entry_gives_a_suggestion_per_address() {
-        let card =
-            "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alan Turing\r\nEMAIL;TYPE=OTHER:alan@example.org\r\n\
-                    EMAIL;TYPE=OTHER:turing@example.org\r\nEND:VCARD\r\n";
-        let s = suggestions_from_vcard(card);
-        assert_eq!(s.len(), 2);
-        assert_eq!(
-            (s[0].name.as_str(), s[0].email.as_str()),
-            ("Alan Turing", "alan@example.org")
-        );
-        assert_eq!(s[1].email, "turing@example.org");
-        assert!(s.iter().all(|s| s.from_contacts && s.from_directory));
-    }
-
-    /// Save a directory through a real EDS, check it as Settings does, and
-    /// remove it again: `LDAP_LIVE=server|base|bind dn|password`, the server
-    /// as typed in Settings (`ldaps://host:636` and all). Run it on a sealed
-    /// session bus with a keyring of its own (see the EDS rig), never the
-    /// desktop's.
-    #[test]
-    #[ignore]
-    fn live() {
-        let Ok(spec) = std::env::var("LDAP_LIVE") else {
-            return;
-        };
-        let mut f = spec.splitn(4, '|').map(str::to_string);
-        let (server, base, bind, pw) = (
-            f.next().unwrap(),
-            f.next().unwrap(),
-            f.next().unwrap(),
-            f.next().unwrap(),
-        );
-        let (host, security, port) = parse_server(&server);
-        let mut d = Directory::empty();
-        d.name = "live".into();
-        d.host = host;
-        d.security = security.unwrap_or(Security::StartTls);
-        d.port = port.unwrap_or(d.security.default_port());
-        d.base_dn = base;
-        d.bind_dn = bind;
-        // LDAP_LIVE_OLD=1: the source as Hylki wrote it before #307's fix,
-        // encryption under the key EDS never read.
-        let uid = if std::env::var_os("LDAP_LIVE_OLD").is_some() {
-            d.uid = "hylkiliveold".into();
-            let old = d
-                .to_source()
-                .replace("[Security]\nMethod=", "[Old]\nX=")
-                .replace(
-                    "[LDAP Backend]\n",
-                    &format!("[LDAP Backend]\nSecurityMethod={}\n", d.security.key()),
-                );
-            let sources: HashMap<&str, String> = HashMap::from([("hylkiliveold", old)]);
-            bus()
-                .unwrap()
-                .call_method(
-                    Some(registry().unwrap().as_str()),
-                    MANAGER_PATH,
-                    Some(MANAGER_IFACE),
-                    "CreateSources",
-                    &(sources,),
-                )
-                .expect("old source");
-            crate::config::store_cloud_password("ldap:hylkiliveold", &pw).unwrap();
-            "hylkiliveold".to_string()
-        } else {
-            save(&d, Some(&pw)).expect("saved")
-        };
-        let mut found = None;
-        for _ in 0..20 {
-            found = list().unwrap().into_iter().find(|x| x.uid == uid);
-            if found.is_some() {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(200));
-        }
-        let found = found.expect("listed");
-        println!(
-            "saved host={:?} port={} security={:?}",
-            found.host, found.port, found.security
-        );
-        let t = Instant::now();
-        println!("check: {:?} after {:?}", check(&found), t.elapsed());
-        remove(&found).expect("removed");
-    }
-
-    /// Search the directories already in EDS, as the composer and Contacts
-    /// do: `LDAP_LIVE_SEARCH=<typed>`, twice, so the second shows a failed
-    /// directory is not asked again but still reported. On the EDS rig
-    /// only, as for `live`.
-    #[test]
-    #[ignore]
-    fn live_search() {
-        let Ok(typed) = std::env::var("LDAP_LIVE_SEARCH") else {
-            return;
-        };
-        for round in 1..=2 {
-            let t = Instant::now();
-            let (found, errors) = search(&typed);
-            println!("round {round} after {:?}", t.elapsed());
-            for s in &found {
-                println!("  suggestion: {} <{}>", s.name, s.email);
-            }
-            for e in &errors {
-                println!("  error: {}", e.text());
-            }
-        }
-        // A failed directory rests, so this one asks only those that
-        // answered, and names the one resting.
-        let (entries, errors) = search_contacts(&typed, 50);
-        for c in &entries {
-            println!(
-                "  entry: {} {:?} in {}",
-                c.name,
-                c.primary_email(),
-                c.book_name
-            );
-        }
-        println!(
-            "  contacts errors: {:?}",
-            errors
-                .iter()
-                .map(DirectoryFailure::text)
-                .collect::<Vec<_>>()
-        );
-        for d in list().unwrap() {
-            println!("  {} last error: {:?}", d.title(), last_error(&d.uid));
-        }
-    }
-
-    #[test]
-    fn a_server_typed_as_a_url_is_taken_apart() {
-        assert_eq!(
-            parse_server("ldaps://ldap.example.com"),
-            ("ldap.example.com".into(), Some(Security::Ldaps), None)
-        );
-        assert_eq!(
-            parse_server(" ldaps://ldap.example.com:3269/ou=x,dc=example,dc=com "),
-            ("ldap.example.com".into(), Some(Security::Ldaps), Some(3269))
-        );
-        assert_eq!(
-            parse_server("LDAP://ldap.example.com:389"),
-            ("ldap.example.com".into(), None, Some(389))
-        );
-        assert_eq!(
-            parse_server("ldap.example.com"),
-            ("ldap.example.com".into(), None, None)
-        );
-        assert_eq!(
-            parse_server("ldap.example.com:636"),
-            ("ldap.example.com".into(), None, Some(636))
-        );
-        assert_eq!(parse_server("[::1]:636"), ("::1".into(), None, Some(636)));
-        assert_eq!(parse_server("::1"), ("::1".into(), None, None));
-    }
-
-    #[test]
-    fn the_recorded_reason_beats_not_connected() {
-        let not_connected = || "Cannot get contact list: Not connected".to_string();
-        let last = |reason: &str, message: &str| LastCredentials {
-            reason: reason.into(),
-            message: message.into(),
-        };
-        let mut d = Directory::empty();
-        d.host = "ldap.example.com".into();
-        d.port = 636;
-        d.security = Security::Ldaps;
-        assert_eq!(
-            connect_error(
-                &d,
-                &last("error", "Can't contact LDAP server"),
-                not_connected()
-            ),
-            "Can't contact LDAP server"
-        );
-        assert!(
-            connect_error(&d, &last("error", "Repository offline"), not_connected())
-                .contains("ldap.example.com:636 over TLS")
-        );
-        assert!(
-            connect_error(&d, &last("error", "TLS not available"), not_connected())
-                .contains("StartTLS")
-        );
-        assert!(connect_error(&d, &last("ssl_failed", ""), not_connected()).contains("certificate"));
-        assert!(connect_error(&d, &last("rejected", ""), not_connected()).contains("password"));
-        assert_eq!(
-            connect_error(&d, &last("", ""), not_connected()),
-            not_connected()
-        );
-    }
-
-    #[test]
-    fn query_text_is_quoted_for_eds() {
-        assert_eq!(sexp_str(r#"a"b\c"#), r#""a\"b\\c""#);
-    }
-
-    #[test]
-    fn a_source_round_trips_and_keeps_what_hylki_does_not_show() {
-        let data = "[Data Source]\nDisplayName=Work\nEnabled=true\nParent=ldap-stub\n\n\
-                    [Address Book]\nBackendName=ldap\n\n\
-                    [Authentication]\nHost=ldap.example.org\nPort=636\nUser=cn=me,dc=example,dc=org\nMethod=ldap/simple-binddn\n\n\
-                    [LDAP Backend]\nRootDn=dc=example,dc=org\nScope=onelevel\nFilter=(ou=staff)\n\n\
-                    [Security]\nMethod=ldaps\n";
-        let d = Directory::from_source("abc", "/p", data).unwrap();
-        assert_eq!(d.host, "ldap.example.org");
-        assert_eq!(d.port, 636);
-        assert_eq!(d.security, Security::Ldaps);
-        assert!(!d.subtree);
-        assert_eq!(d.bind_dn, "cn=me,dc=example,dc=org");
-        let mut anon = d.clone();
-        anon.bind_dn.clear();
-        let out = anon.to_source();
-        assert!(out.contains("Filter=(ou=staff)"));
-        assert!(out.contains("Method=none"));
-        assert!(
-            Directory::from_source("x", "/p", "[Address Book]\nBackendName=carddav\n").is_none()
-        );
-    }
-
-    /// #307: Hylki once wrote the encryption where EDS never looks, so EDS
-    /// ran every such directory unencrypted; reading takes the old key, and
-    /// saving moves it to the one EDS reads.
-    #[test]
-    fn the_old_security_key_is_read_and_moved() {
-        let data = "[Address Book]\nBackendName=ldap\n\n[Authentication]\nHost=ldap.example.org\nPort=636\n\n\
-                    [LDAP Backend]\nRootDn=dc=example,dc=org\nSecurityMethod=ldaps\n";
-        let d = Directory::from_source("abc", "/p", data).unwrap();
-        assert_eq!(d.security, Security::Ldaps);
-        let out = d.to_source();
-        assert!(out.contains("[Security]\nMethod=ldaps"), "{out}");
-        assert!(!out.contains("SecurityMethod"), "{out}");
-    }
-
-    #[test]
-    fn a_new_source_is_filed_where_evolution_files_them() {
-        let mut d = Directory::empty();
-        d.host = "ldap.example.org".into();
-        d.base_dn = "dc=example,dc=org".into();
-        let out = d.to_source();
-        assert!(out.contains("Parent=ldap-stub"));
-        assert!(out.contains("[Security]\nMethod=starttls"), "{out}");
-        assert!(!out.contains("SecurityMethod"), "{out}");
-        assert!(out.contains("DisplayName=ldap.example.org"));
-    }
-
-    /// The key files written for EDS, pinned: a new directory, and one
-    /// rewritten over what EDS had.
-    #[test]
-    fn the_source_key_files_as_written() {
-        use crate::config::golden::assert_golden;
-        let mut d = Directory::empty();
-        d.host = "ldap.example.org".into();
-        d.base_dn = "dc=example,dc=org".into();
-        assert_golden("directory/testdata/source-new.ini", &d.to_source());
-        let data = "[Data Source]\nDisplayName=Work\nEnabled=true\nParent=ldap-stub\n\n\
-                    [Address Book]\nBackendName=ldap\n\n\
-                    [Authentication]\nHost=ldap.example.org\nPort=636\nUser=cn=me,dc=example,dc=org\nMethod=ldap/simple-binddn\n\n\
-                    [LDAP Backend]\nRootDn=dc=example,dc=org\nScope=onelevel\nFilter=(ou=staff)\n\n\
-                    [Security]\nMethod=ldaps\n";
-        let mut d = Directory::from_source("abc", "/p", data).unwrap();
-        d.subtree = true;
-        d.enabled = false;
-        assert_golden("directory/testdata/source-rewritten.ini", &d.to_source());
-    }
-}
+mod tests;

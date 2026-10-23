@@ -20,11 +20,10 @@ use std::time::{Duration, Instant};
 
 use crate::i18n::{i18n, i18n_f};
 
-const SOURCE_IFACE: &str = "org.gnome.evolution.dataserver.Source";
-const WRITABLE_IFACE: &str = "org.gnome.evolution.dataserver.Source.Writable";
-const REMOVABLE_IFACE: &str = "org.gnome.evolution.dataserver.Source.Removable";
-const MANAGER_PATH: &str = "/org/gnome/evolution/dataserver/SourceManager";
-const MANAGER_IFACE: &str = "org.gnome.evolution.dataserver.SourceManager";
+use crate::directory::eds_source::{
+    bus, create_source, invoke_authenticate, new_source_uid, not_available, registry,
+    remove_source, write_source, SOURCE_IFACE,
+};
 
 #[derive(Debug, Clone)]
 pub struct Account {
@@ -172,14 +171,6 @@ pub fn parse_url(text: &str) -> Result<ServerUrl, String> {
     })
 }
 
-fn registry() -> Result<String, String> {
-    crate::contacts::sources_dest().ok_or_else(not_available)
-}
-
-fn not_available() -> String {
-    i18n("Evolution Data Server is not available")
-}
-
 /// Every CardDAV account EDS knows that is not GNOME Online Accounts', with
 /// the address books found for each, Evolution's own accounts included.
 pub fn list() -> Result<Vec<Account>, String> {
@@ -220,53 +211,27 @@ pub fn list() -> Result<Vec<Account>, String> {
 /// keeps it. Answers the account's UID.
 pub fn save(account: &Account, password: Option<&str>) -> Result<String, String> {
     let url = parse_url(&account.url)?;
-    let conn = crate::directory::bus()?;
+    let conn = bus()?;
     let dest = registry()?;
     let mut account = account.clone();
     let password = password.filter(|p| !p.is_empty());
     if account.uid.is_empty() {
-        account.uid = gtk::glib::uuid_string_random().replace('-', "");
+        account.uid = new_source_uid();
         // In the keyring before the source exists, so EDS finds it the
         // moment it first looks.
         if let Some(pw) = password {
             crate::config::store_eds_password(&account.uid, &account.title(), pw)
                 .map_err(|e| e.to_string())?;
         }
-        let sources: HashMap<&str, String> =
-            HashMap::from([(account.uid.as_str(), account.to_source(&url))]);
-        conn.call_method(
-            Some(dest.as_str()),
-            MANAGER_PATH,
-            Some(MANAGER_IFACE),
-            "CreateSources",
-            &(sources,),
-        )
-        .map_err(|e| e.to_string())?;
+        create_source(&conn, &dest, &account.uid, account.to_source(&url))?;
     } else {
-        conn.call_method(
-            Some(dest.as_str()),
-            account.path.as_str(),
-            Some(WRITABLE_IFACE),
-            "Write",
-            &(account.to_source(&url),),
-        )
-        .map_err(|e| e.to_string())?;
+        write_source(&conn, &dest, &account.path, account.to_source(&url))?;
         if let Some(pw) = password {
             crate::config::store_eds_password(&account.uid, &account.title(), pw)
                 .map_err(|e| e.to_string())?;
             // A source that gave up on the old password tries the new one
             // now rather than at its next look.
-            let credentials = vec![
-                format!("username:{}", account.user.trim()),
-                format!("password:{pw}"),
-            ];
-            let _ = conn.call_method(
-                Some(dest.as_str()),
-                account.path.as_str(),
-                Some(SOURCE_IFACE),
-                "InvokeAuthenticate",
-                &(credentials,),
-            );
+            let _ = invoke_authenticate(&conn, &dest, &account.path, &account.user, pw);
         }
     }
     Ok(account.uid)
@@ -282,16 +247,9 @@ pub fn set_enabled(account: &Account, enabled: bool) -> Result<(), String> {
 /// Remove an account and its address books from EDS. Nothing on the server
 /// changes.
 pub fn remove(account: &Account) -> Result<(), String> {
-    let conn = crate::directory::bus()?;
+    let conn = bus()?;
     let dest = registry()?;
-    conn.call_method(
-        Some(dest.as_str()),
-        account.path.as_str(),
-        Some(REMOVABLE_IFACE),
-        "Remove",
-        &(),
-    )
-    .map_err(|e| e.to_string())?;
+    remove_source(&conn, &dest, &account.path)?;
     crate::config::delete_eds_password(&account.uid);
     Ok(())
 }
@@ -327,7 +285,7 @@ impl Status {
 
 /// Ask EDS how the account's sign-in went. Blocking: it asks the keyring too.
 pub fn status(account: &Account) -> Status {
-    let (Ok(conn), Ok(dest)) = (crate::directory::bus(), registry()) else {
+    let (Ok(conn), Ok(dest)) = (bus(), registry()) else {
         return Status::Failed(not_available());
     };
     let last = conn
@@ -430,8 +388,7 @@ fn server_books() -> Vec<String> {
 /// changed. Blocking: run it off the main thread. Answers whether any book
 /// was synced, so the caller can read the contacts again.
 pub fn sync_books(force: bool) -> bool {
-    let (Ok(conn), Some(factory)) = (crate::directory::bus(), crate::contacts::factory_dest())
-    else {
+    let (Ok(conn), Some(factory)) = (bus(), crate::contacts::factory_dest()) else {
         return false;
     };
     let mut synced = false;
