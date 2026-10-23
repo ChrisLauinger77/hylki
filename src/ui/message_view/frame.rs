@@ -17,7 +17,10 @@ use relm4::prelude::*;
 /// read from. When the caller asks for a scheme the app isn't currently in,
 /// the theme can't answer for that mode, so the stock GNOME values stand in.
 #[allow(deprecated)] // lookup_color: named theme colors have no successor yet
-pub fn theme_grounds_for(widget: &impl IsA<gtk::Widget>, dark: bool) -> (String, String, String) {
+pub(crate) fn theme_grounds_for(
+    widget: &impl IsA<gtk::Widget>,
+    dark: bool,
+) -> (String, String, String) {
     let style = widget.style_context();
     if dark == adw::StyleManager::default().is_dark() {
         if let Some(c) = style.lookup_color("view_bg_color") {
@@ -61,8 +64,7 @@ pub(super) const CHROME: (&str, &str) = ("#fafafa", "#242424");
 
 /// Each card's translation banner, and the translation (and whether it is
 /// a Reader View fragment) the card shows instead of its message.
-pub(super) type TranslationsShown =
-    std::collections::HashMap<(u32, u32), (String, Option<(String, bool)>)>;
+type TranslationsShown = std::collections::HashMap<(u32, u32), (String, Option<(String, bool)>)>;
 
 thread_local! {
     /// The grounds as resolved from the live libadwaita theme, refreshed by
@@ -115,6 +117,9 @@ pub(super) fn ground_rgba(hex: &str) -> gtk::gdk::RGBA {
 /// One message body as a sandboxed iframe: its own document (so CSS can't leak to
 /// other messages) with no `allow-scripts` (so the email can't run JavaScript).
 /// `allow-same-origin` lets the wrapper script measure its height.
+// Positional, as `conversation_document` and the tests call it: each
+// argument is one independent setting of the render.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn message_frame(
     body: &str,
     restrict: bool,

@@ -19,7 +19,7 @@ use crate::oauth::Authorization;
 /// (the window was closed, or the provider refused). `user` is the address
 /// being signed in, when known: it picks the identity broker's account, and
 /// with `hint` Microsoft's sign-in goes straight to it.
-pub fn run(
+pub(crate) fn run(
     parent: Option<&gtk::Window>,
     settings: &OAuthSettings,
     user: Option<String>,

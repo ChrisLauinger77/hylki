@@ -137,7 +137,7 @@ pub(crate) fn open_book(
 
 /// What happened when adding an email to Contacts.
 #[derive(Debug)]
-pub enum AddOutcome {
+pub(crate) enum AddOutcome {
     /// A new contact was created.
     Created,
     /// The email was merged into an existing contact (carries its name).
@@ -150,7 +150,7 @@ pub enum AddOutcome {
 /// - if the email already exists anywhere, do nothing;
 /// - else if a contact with the same name exists in the book, append the email;
 /// - else create a new contact. Blocking — call from a background thread.
-pub fn add_or_merge(book_uid: &str, name: &str, email: &str) -> Result<AddOutcome, String> {
+pub(crate) fn add_or_merge(book_uid: &str, name: &str, email: &str) -> Result<AddOutcome, String> {
     // 1. Already present (in any book)? Don't create a duplicate.
     let email_l = email.trim().to_lowercase();
     if let Some(existing) = read_contacts()

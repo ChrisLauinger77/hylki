@@ -26,6 +26,74 @@ const PREVIEW_ROWS: usize = 2000;
 /// One conversation while the rows are built: its key and its messages.
 type Group = ((u32, String), Vec<Rc<Message>>);
 
+/// What a conversation's row says of its newest message: when it came, who
+/// sent it, its preview and its time. The newer one in another folder
+/// (`elsewhere`) when there is one, else this folder's newest, and nothing
+/// for a row of one message.
+type NewestLine = (
+    Option<String>,
+    Option<(String, String)>,
+    Option<String>,
+    Option<(i64, String)>,
+);
+
+fn newest_line(
+    elsewhere: Option<&crate::models::ThreadLatest>,
+    newest_here: &Message,
+    count: usize,
+) -> NewestLine {
+    if let Some(l) = elsewhere {
+        (
+            Some(crate::models::datetime_list_at(l.timestamp, &l.date)),
+            Some((l.from_name.clone(), l.from_addr.clone())),
+            Some(l.preview.clone()),
+            Some((l.timestamp, l.date.clone())),
+        )
+    } else if count > 1 {
+        (
+            Some(newest_here.datetime_list()),
+            Some((newest_here.from_name.clone(), newest_here.from_addr.clone())),
+            Some(newest_here.preview.clone()),
+            Some((newest_here.timestamp, newest_here.date.clone())),
+        )
+    } else {
+        (None, None, None, None)
+    }
+}
+
+/// The conversations in the order of their first message in the sort; a
+/// message `keys` has no thread for is a group of its own. The keys are
+/// borrowed: a String per message was the larger part of grouping a long
+/// list.
+fn group_conversations(
+    matches: Vec<Rc<Message>>,
+    keys: &std::collections::HashMap<(u32, u32, u32), (u32, String)>,
+) -> Vec<Group> {
+    let mut grouped: Vec<Group> = Vec::with_capacity(matches.len());
+    let mut at: std::collections::HashMap<&(u32, String), usize> =
+        std::collections::HashMap::with_capacity(if keys.is_empty() { 0 } else { matches.len() });
+    let mut alone: std::collections::HashMap<(u32, u32, u32), usize> =
+        std::collections::HashMap::with_capacity(if keys.is_empty() { matches.len() } else { 0 });
+    for m in matches {
+        let slot = thread_slot(&m);
+        let i = match keys.get(&slot) {
+            Some(key) => *at.entry(key).or_insert_with(|| {
+                grouped.push((key.clone(), Vec::new()));
+                grouped.len() - 1
+            }),
+            None => *alone.entry(slot).or_insert_with(|| {
+                grouped.push((
+                    (m.account_id, format!("\u{0}uid{}/{}", m.folder_id, m.uid)),
+                    Vec::new(),
+                ));
+                grouped.len() - 1
+            }),
+        };
+        grouped[i].1.push(m);
+    }
+    grouped
+}
+
 impl MessageList {
     /// Change a message wherever the list holds it — the index, the search
     /// pool and its row — and refresh the row if it is on screen.
@@ -178,22 +246,7 @@ impl MessageList {
             && self.thread_expansion
             && (self.expanded_threads.contains(key) != self.default_expanded);
         if !full {
-            if !extras.is_empty() {
-                for m in &extras {
-                    self.nested.insert((m.account_id, m.id), m.clone());
-                }
-                let head = msgs.remove(0);
-                msgs.extend(extras);
-                msgs.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.uid.cmp(&b.uid)));
-                msgs.insert(0, head);
-            }
-            if count > 1 {
-                let members: Vec<(u32, u32)> = msgs.iter().map(|m| (m.account_id, m.id)).collect();
-                for k in &members {
-                    self.msg_thread.insert(*k, key.clone());
-                }
-                self.thread_members.insert(key.clone(), members);
-            }
+            self.join_members(key, &mut msgs, extras, count);
             let meta = RowMeta {
                 count: total,
                 expandable: count > 1,
@@ -239,47 +292,14 @@ impl MessageList {
         // newest wins whenever it is later than anything on screen (#236);
         // off, which is how Hylki has always behaved, the folder has the last
         // word.
-        let (latest, from, preview, latest_at) = if let Some(l) = &elsewhere {
-            (
-                Some(crate::models::datetime_list_at(l.timestamp, &l.date)),
-                Some((l.from_name.clone(), l.from_addr.clone())),
-                Some(l.preview.clone()),
-                Some((l.timestamp, l.date.clone())),
-            )
-        } else if count > 1 {
-            (
-                Some(newest_here.datetime_list()),
-                Some((newest_here.from_name.clone(), newest_here.from_addr.clone())),
-                Some(newest_here.preview.clone()),
-                Some((newest_here.timestamp, newest_here.date.clone())),
-            )
-        } else {
-            (None, None, None, None)
-        };
+        let (latest, from, preview, latest_at) =
+            newest_line(elsewhere.as_ref(), &newest_here, count);
         let any_starred = count > 1 && msgs.iter().any(|m| m.starred);
         let (answered, forwarded) = (
             count > 1 && newest_here.answered,
             count > 1 && newest_here.forwarded,
         );
-        // The row stays this folder's oldest message, whatever the other
-        // folders hold that is older, so what is done to the row is done to
-        // mail in this folder. The rest follow in time order.
-        if !extras.is_empty() {
-            for m in &extras {
-                self.nested.insert((m.account_id, m.id), m.clone());
-            }
-            let head = msgs.remove(0);
-            msgs.extend(extras);
-            msgs.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.uid.cmp(&b.uid)));
-            msgs.insert(0, head);
-        }
-        if count > 1 {
-            let members: Vec<(u32, u32)> = msgs.iter().map(|m| (m.account_id, m.id)).collect();
-            for k in &members {
-                self.msg_thread.insert(*k, key.clone());
-            }
-            self.thread_members.insert(key.clone(), members);
-        }
+        self.join_members(key, &mut msgs, extras, count);
         let meta = RowMeta {
             count: total,
             // The parts filed in other folders open out too (#309); a
@@ -302,6 +322,35 @@ impl MessageList {
             ..Default::default()
         };
         (meta, msgs)
+    }
+
+    /// Put a group's members in row order and remember them. The row stays
+    /// this folder's oldest message, whatever the other folders hold that
+    /// is older (`extras`), so what is done to the row is done to mail in
+    /// this folder; the rest follow in time order.
+    fn join_members(
+        &mut self,
+        key: &(u32, String),
+        msgs: &mut Vec<Rc<Message>>,
+        extras: Vec<Rc<Message>>,
+        count: usize,
+    ) {
+        if !extras.is_empty() {
+            for m in &extras {
+                self.nested.insert((m.account_id, m.id), m.clone());
+            }
+            let head = msgs.remove(0);
+            msgs.extend(extras);
+            msgs.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.uid.cmp(&b.uid)));
+            msgs.insert(0, head);
+        }
+        if count > 1 {
+            let members: Vec<(u32, u32)> = msgs.iter().map(|m| (m.account_id, m.id)).collect();
+            for k in &members {
+                self.msg_thread.insert(*k, key.clone());
+            }
+            self.thread_members.insert(key.clone(), members);
+        }
     }
 
     /// Ask again about the conversations on screen whose account's mail
@@ -349,7 +398,7 @@ impl MessageList {
         }
     }
 
-    /// `rebuild_rows`, keeping a list read from the very top at the top.
+    /// Run `rebuild_rows`, keeping a list read from the very top at the top.
     /// The view holds its place by a row, so a new message put in above the
     /// first one landed out of sight, just above the view (#400). Scrolled
     /// down, the view keeps the row it has, as before.
@@ -425,23 +474,7 @@ impl MessageList {
             self.sync_look();
         }
         let sort = self.sort;
-        let reversed = self.sort_reversed;
-        let flip = |order: std::cmp::Ordering| if reversed { order.reverse() } else { order };
-        if sort == SortOrder::Tags {
-            // Each message's tag names are worked out once, not at every
-            // comparison.
-            let tags = self.shared.tags.borrow();
-            let mut keyed: Vec<(String, Rc<Message>)> = matches
-                .drain(..)
-                .map(|m| (tag_sort_key(&m, &tags), m))
-                .collect();
-            keyed.sort_by(|(ka, a), (kb, b)| {
-                flip(text_key_cmp(ka, kb).then(b.timestamp.cmp(&a.timestamp)))
-            });
-            matches = keyed.into_iter().map(|(_, m)| m).collect();
-        } else {
-            matches.sort_by(|a, b| flip(message_cmp(a, b, sort)));
-        }
+        self.sort_matches(&mut matches);
         self.total_matches = matches.len();
         if preview {
             matches.truncate(PREVIEW_ROWS);
@@ -465,53 +498,9 @@ impl MessageList {
             own_keys = compute_thread_keys(&matches, &self.thread_links);
             &own_keys
         };
-        // The conversations in the order of their first message in the
-        // sort. The keys are borrowed: a String per message was the larger
-        // part of grouping a long list.
-        let mut grouped: Vec<Group> = Vec::with_capacity(matches.len());
-        let mut at: std::collections::HashMap<&(u32, String), usize> =
-            std::collections::HashMap::with_capacity(if keys.is_empty() {
-                0
-            } else {
-                matches.len()
-            });
-        let mut alone: std::collections::HashMap<(u32, u32, u32), usize> =
-            std::collections::HashMap::with_capacity(if keys.is_empty() {
-                matches.len()
-            } else {
-                0
-            });
-        for m in matches {
-            let slot = thread_slot(&m);
-            let i = match keys.get(&slot) {
-                Some(key) => *at.entry(key).or_insert_with(|| {
-                    grouped.push((key.clone(), Vec::new()));
-                    grouped.len() - 1
-                }),
-                None => *alone.entry(slot).or_insert_with(|| {
-                    grouped.push((
-                        (m.account_id, format!("\u{0}uid{}/{}", m.folder_id, m.uid)),
-                        Vec::new(),
-                    ));
-                    grouped.len() - 1
-                }),
-            };
-            grouped[i].1.push(m);
-        }
-        drop((at, alone));
-        // Correspondents sort by the whole conversation's writers, as the
-        // column names them, which no single message knows (#443). The
-        // conversations are in date order beneath, newest first, from the
-        // sort above.
+        let mut grouped = group_conversations(matches, keys);
         if sort == SortOrder::Correspondents {
-            let people: Vec<String> = grouped
-                .iter()
-                .map(|(k, msgs)| self.people_of(k, msgs).to_lowercase())
-                .collect();
-            let mut by: Vec<usize> = (0..grouped.len()).collect();
-            by.sort_by(|a, b| flip(text_key_cmp(&people[*a], &people[*b])));
-            let mut slots: Vec<Option<Group>> = grouped.into_iter().map(Some).collect();
-            grouped = by.into_iter().filter_map(|i| slots[i].take()).collect();
+            grouped = self.sort_by_correspondents(grouped);
         }
 
         // A reply that is sliding open, or shut, keeps doing so.
@@ -529,7 +518,46 @@ impl MessageList {
             self.group_by_date && matches!(sort, SortOrder::DateNewest | SortOrder::DateOldest);
         let day_starts = by_date.then(|| crate::datefmt::day_starts(crate::datefmt::now()));
 
-        // Flatten back into display order, recording per-row thread metadata.
+        let (mut shown, mut rows, any_expanded) =
+            self.flatten_groups(grouped, &passes, day_starts.as_ref(), &appearing);
+
+        self.follow_renumbered_selection(&shown);
+        // On screen, the window: as many rows as were before (so a rebuild
+        // does not pull the list back from where it was scrolled), at least
+        // the first window, and far enough to hold the selection.
+        let selected_at = shown
+            .iter()
+            .rposition(|m| {
+                self.selected_ids.contains(&(m.account_id, m.id))
+                    || self.selected_id == Some((m.account_id, m.id))
+            })
+            .map_or(0, |i| i + 1);
+        let limit = self
+            .window
+            .max(LIST_WINDOW)
+            .max(selected_at)
+            .min(rows.len());
+        later_drop(std::mem::replace(&mut self.tail, rows.split_off(limit)));
+        shown.truncate(limit);
+        self.window = limit.max(LIST_WINDOW);
+        self.shown = shown;
+        Built {
+            rows,
+            by_date,
+            any_expanded,
+        }
+    }
+
+    /// Flatten the conversations back into display order, recording each
+    /// row's thread metadata: the rows, the messages they show, and whether
+    /// any conversation is open.
+    fn flatten_groups(
+        &mut self,
+        grouped: Vec<Group>,
+        passes: &impl Fn(&Message) -> bool,
+        day_starts: Option<&[i64; 4]>,
+        appearing: &std::collections::HashSet<(u32, u32, u32)>,
+    ) -> (Vec<Rc<Message>>, Vec<Rc<RowData>>, bool) {
         let mut shown: Vec<Rc<Message>> = Vec::with_capacity(grouped.len());
         let mut rows: Vec<Rc<RowData>> = Vec::with_capacity(grouped.len());
         let mut thread_drag = crate::ui::message_row::ThreadDragKeys::new();
@@ -588,7 +616,7 @@ impl MessageList {
             }
             let expanded = meta.expanded;
             let mut it = members.into_iter();
-            let head = it.next().unwrap();
+            let head = it.next().expect("a group holds at least one message");
             shown.push(head.clone());
             rows.push(Rc::new(RowData {
                 msg: head,
@@ -618,65 +646,85 @@ impl MessageList {
             }
         }
         *self.shared.thread_drag.borrow_mut() = thread_drag;
+        (shown, rows, any_expanded)
+    }
 
-        // A message that was moved away and brought back comes home under a
-        // new UID, and a row's id is its UID. The selection would find no row
-        // to light, so the highlight blinked off and came back a moment later
-        // as the list caught up. Follow the selection by Message-ID over a
-        // renumbering instead (#200).
+    /// Sort the matches by the list's order: by tag name (each message's
+    /// tag names worked out once, not at every comparison) or by
+    /// `message_cmp`, reversed when the sort is.
+    fn sort_matches(&self, matches: &mut Vec<Rc<Message>>) {
+        let sort = self.sort;
+        let reversed = self.sort_reversed;
+        let flip = |order: std::cmp::Ordering| if reversed { order.reverse() } else { order };
+        if sort == SortOrder::Tags {
+            let tags = self.shared.tags.borrow();
+            let mut keyed: Vec<(String, Rc<Message>)> = matches
+                .drain(..)
+                .map(|m| (tag_sort_key(&m, &tags), m))
+                .collect();
+            keyed.sort_by(|(ka, a), (kb, b)| {
+                flip(text_key_cmp(ka, kb).then(b.timestamp.cmp(&a.timestamp)))
+            });
+            *matches = keyed.into_iter().map(|(_, m)| m).collect();
+        } else {
+            matches.sort_by(|a, b| flip(message_cmp(a, b, sort)));
+        }
+    }
+
+    /// Correspondents sort by the whole conversation's writers, as the
+    /// column names them, which no single message knows (#443). The
+    /// conversations are in date order beneath, newest first, from the
+    /// sort before grouping.
+    fn sort_by_correspondents(&self, grouped: Vec<Group>) -> Vec<Group> {
+        let reversed = self.sort_reversed;
+        let flip = |order: std::cmp::Ordering| if reversed { order.reverse() } else { order };
+        let people: Vec<String> = grouped
+            .iter()
+            .map(|(k, msgs)| self.people_of(k, msgs).to_lowercase())
+            .collect();
+        let mut by: Vec<usize> = (0..grouped.len()).collect();
+        by.sort_by(|a, b| flip(text_key_cmp(&people[*a], &people[*b])));
+        let mut slots: Vec<Option<Group>> = grouped.into_iter().map(Some).collect();
+        by.into_iter().filter_map(|i| slots[i].take()).collect()
+    }
+
+    /// A message that was moved away and brought back comes home under a
+    /// new UID, and a row's id is its UID. The selection would find no row
+    /// to light, so the highlight blinked off and came back a moment later
+    /// as the list caught up. Follow the selection by Message-ID over a
+    /// renumbering instead (#200): `shown` is the new list, `self.shown`
+    /// still the old one.
+    fn follow_renumbered_selection(&mut self, shown: &[Rc<Message>]) {
         let lost = self
             .selected_ids
             .iter()
             .any(|k| !shown.iter().any(|m| (m.account_id, m.id) == *k));
-        if lost {
-            let renumbered: Vec<((u32, u32), (u32, u32))> = self
-                .selected_ids
-                .iter()
-                .filter(|k| !shown.iter().any(|m| (m.account_id, m.id) == **k))
-                .filter_map(|k| {
-                    let was = self
-                        .shown
-                        .iter()
-                        .find(|m| (m.account_id, m.id) == *k)
-                        .filter(|m| !m.message_id.is_empty())?;
-                    let now = shown.iter().find(|m| {
-                        m.account_id == was.account_id && m.message_id == was.message_id
-                    })?;
-                    Some((*k, (now.account_id, now.id)))
-                })
-                .collect();
-            for (was, now) in renumbered {
-                for k in self.selected_ids.iter_mut().filter(|k| **k == was) {
-                    *k = now;
-                }
-                if self.selected_id == Some(was) {
-                    self.selected_id = Some(now);
-                }
-            }
+        if !lost {
+            return;
         }
-        // On screen, the window: as many rows as were before (so a rebuild
-        // does not pull the list back from where it was scrolled), at least
-        // the first window, and far enough to hold the selection.
-        let selected_at = shown
+        let renumbered: Vec<((u32, u32), (u32, u32))> = self
+            .selected_ids
             .iter()
-            .rposition(|m| {
-                self.selected_ids.contains(&(m.account_id, m.id))
-                    || self.selected_id == Some((m.account_id, m.id))
+            .filter(|k| !shown.iter().any(|m| (m.account_id, m.id) == **k))
+            .filter_map(|k| {
+                let was = self
+                    .shown
+                    .iter()
+                    .find(|m| (m.account_id, m.id) == *k)
+                    .filter(|m| !m.message_id.is_empty())?;
+                let now = shown
+                    .iter()
+                    .find(|m| m.account_id == was.account_id && m.message_id == was.message_id)?;
+                Some((*k, (now.account_id, now.id)))
             })
-            .map_or(0, |i| i + 1);
-        let limit = self
-            .window
-            .max(LIST_WINDOW)
-            .max(selected_at)
-            .min(rows.len());
-        later_drop(std::mem::replace(&mut self.tail, rows.split_off(limit)));
-        shown.truncate(limit);
-        self.window = limit.max(LIST_WINDOW);
-        self.shown = shown;
-        Built {
-            rows,
-            by_date,
-            any_expanded,
+            .collect();
+        for (was, now) in renumbered {
+            for k in self.selected_ids.iter_mut().filter(|k| **k == was) {
+                *k = now;
+            }
+            if self.selected_id == Some(was) {
+                self.selected_id = Some(now);
+            }
         }
     }
 

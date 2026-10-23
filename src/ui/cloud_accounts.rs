@@ -17,7 +17,7 @@ mod editor;
 use editor::build_editor;
 
 /// How a kind is named in the editor and the list.
-pub struct CloudAccounts {
+pub(super) struct CloudAccounts {
     accounts: Vec<CloudAccount>,
     /// Keyring keys of the servers already asked which product they are
     /// (accounts from before the picker told them apart), so a list
@@ -42,7 +42,7 @@ pub struct CloudAccounts {
 type SaveAction = Rc<RefCell<Option<Rc<dyn Fn() -> bool>>>>;
 
 #[derive(Debug)]
-pub enum CloudAccountsInput {
+pub(super) enum CloudAccountsInput {
     Add,
     /// The editor for a new account of that kind.
     AddOf(CloudKind),
@@ -64,10 +64,11 @@ pub enum CloudAccountsInput {
     /// the user moves on).
     CloseEditor,
     /// The editor's Save: `index` is the row being replaced, or none for a
-    /// new account. The password is stored only when given.
+    /// new account. The password is stored only when given. Boxed: an
+    /// account is far larger than any other message.
     Save {
         index: Option<usize>,
-        account: CloudAccount,
+        account: Box<CloudAccount>,
         password: String,
     },
     /// A sign-in the editor finished after closing went wrong.
@@ -81,13 +82,13 @@ pub enum CloudAccountsInput {
 }
 
 #[derive(Debug)]
-pub enum CloudAccountsOutput {
+pub(super) enum CloudAccountsOutput {
     /// The editor page is up (or gone): the settings window hides its
     /// shared header meanwhile and asks before moving on.
     EditorOpen(bool),
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl SimpleComponent for CloudAccounts {
     type Init = ();
     type Input = CloudAccountsInput;
@@ -362,6 +363,7 @@ impl SimpleComponent for CloudAccounts {
                 account,
                 password,
             } => {
+                let account = *account;
                 // On the keyring thread, in order: the new entry, then the
                 // old one dropped.
                 if !password.is_empty() && account.has_secret() {

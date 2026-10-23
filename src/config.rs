@@ -26,23 +26,23 @@ mod tags;
 mod toolbar;
 mod window;
 
-pub use accounts::*;
-pub use bundle::*;
-pub use filters::*;
-pub use focus::*;
-pub use launch_files::*;
-pub use look::*;
-pub use prefs::*;
-pub use privacy::*;
-pub use remembered::*;
-pub use secrets::*;
-pub use sections::*;
-pub use smart_folders::*;
-pub use sound::*;
-pub use state::*;
-pub use tags::*;
-pub use toolbar::*;
-pub use window::*;
+pub(crate) use accounts::*;
+pub(crate) use bundle::*;
+pub(crate) use filters::*;
+pub(crate) use focus::*;
+pub(crate) use launch_files::*;
+pub(crate) use look::*;
+pub(crate) use prefs::*;
+pub(crate) use privacy::*;
+pub(crate) use remembered::*;
+pub(crate) use secrets::*;
+pub(crate) use sections::*;
+pub(crate) use smart_folders::*;
+pub(crate) use sound::*;
+pub(crate) use state::*;
+pub(crate) use tags::*;
+pub(crate) use toolbar::*;
+pub(crate) use window::*;
 
 #[cfg(test)]
 mod filter_tests;
@@ -125,21 +125,21 @@ fn stable_data_present() -> bool {
     })
 }
 
-pub fn config_base() -> Option<PathBuf> {
+pub(crate) fn config_base() -> Option<PathBuf> {
     shared_base(dirs::config_dir, "config")
 }
 
-pub fn cache_base() -> Option<PathBuf> {
+pub(crate) fn cache_base() -> Option<PathBuf> {
     shared_base(dirs::cache_dir, "cache")
 }
 
-pub fn data_base() -> Option<PathBuf> {
+pub(crate) fn data_base() -> Option<PathBuf> {
     shared_base(dirs::data_dir, "data")
 }
 
 /// Write a settings file readable by the owner only (for modules outside
 /// this one that keep their own file, like `cloud.toml`).
-pub fn write_private_file(path: &std::path::Path, contents: &str) -> std::io::Result<()> {
+pub(crate) fn write_private_file(path: &std::path::Path, contents: &str) -> std::io::Result<()> {
     write_private(path, contents)
 }
 

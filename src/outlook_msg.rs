@@ -43,7 +43,7 @@ const ATTACH_MIME: u16 = 0x370E;
 const ATTACH_CONTENT_ID: u16 = 0x3712;
 
 /// Whether `bytes` are a compound file, which a `.msg` is.
-pub fn is_msg(bytes: &[u8]) -> bool {
+pub(crate) fn is_msg(bytes: &[u8]) -> bool {
     bytes.starts_with(&CFB_MAGIC)
 }
 
@@ -196,7 +196,7 @@ fn kept_headers(headers: &str) -> String {
 }
 
 /// The message in a `.msg` file, as RFC 5322 bytes.
-pub fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn to_eml(bytes: &[u8]) -> Result<Vec<u8>, String> {
     let mut file =
         cfb::CompoundFile::open(Cursor::new(bytes.to_vec())).map_err(|e| e.to_string())?;
     let headers = headers(&mut file);

@@ -37,11 +37,11 @@ use super::undo::UndoEntry;
 use super::{RedoAction, UndoAction};
 
 /// A pending tag change: (account, folder path, uid, lower-cased keyword).
-pub(super) type PendingTagKey = (u32, String, u32, String);
+type PendingTagKey = (u32, String, u32, String);
 
 /// One row of the tray's mail section: (account, message id, sender,
 /// subject).
-pub(super) type TrayMailRow = (u32, u32, String, String);
+type TrayMailRow = (u32, u32, String, String);
 
 /// The root component's state: the accounts and their workers, what the
 /// list and the reader show, the session caches, every setting the app
@@ -387,12 +387,12 @@ pub(crate) struct AppModel {
     pub(super) gravatar: bool,
     /// Whether the colored avatars are drawn at all (#29).
     pub(super) avatars: bool,
-    /// Whether the mail you sent wears its mailbox's face rather than the
-    /// circle any other sender would get (#189).
     /// Whether tagged rows wear their tag's color (PR #383).
     pub(super) tag_row_tint: bool,
     /// The address book new contacts go to (empty: automatic).
     pub(super) contact_book: String,
+    /// Whether the mail you sent wears its mailbox's face rather than the
+    /// circle any other sender would get (#189).
     pub(super) own_mailbox_face: bool,
     /// Whether a sender's site icon may fill their circle (#30).
     pub(super) sender_logos: bool,
@@ -639,14 +639,14 @@ pub(crate) struct AppModel {
         std::collections::HashMap<(u32, u32), std::collections::HashMap<u32, Vec<String>>>,
     /// Lone messages render as inset cards (#57).
     pub(super) single_message_card: bool,
-    /// Reader View: every message in the reader shown as its content alone,
-    /// in the reader's own sheet (see `crate::reader`). The toggle sits in
-    /// the reader's subject block; the choice is remembered across runs.
     /// The message zoom this session is at (Ctrl+ / Ctrl-). Starts at
     /// `zoom_default` and is not saved: a launch begins at the setting.
     pub(super) zoom: u32,
     /// Settings → Reading: the zoom every launch starts at, in percent.
     pub(super) zoom_default: u32,
+    /// Reader View: every message in the reader shown as its content alone,
+    /// in the reader's own sheet (see `crate::reader`). The toggle sits in
+    /// the reader's subject block; the choice is remembered across runs.
     pub(super) reader_mode: bool,
     /// The Reader View switch is shown in the reader header.
     pub(super) reader_switch: bool,
@@ -677,9 +677,9 @@ pub(crate) struct AppModel {
     pub(super) card_actions_hover: bool,
     /// With the ⋯ toggle off: card actions appear automatically on hover.
     pub(super) card_actions_auto: bool,
-    /// The list's actions palette opens on row hover (no ⋯ click).
     /// Whether the message list rows carry an actions palette at all.
     pub(super) list_palette: bool,
+    /// The list's actions palette opens on row hover (no ⋯ click).
     pub(super) list_palette_hover: bool,
     /// A message card's ⋯ opens the card menu instead of sliding its
     /// actions palette out.
@@ -783,7 +783,6 @@ pub(crate) struct AppModel {
     /// copies (tens of thousands of messages for an Archive) made after.
     /// Until then the folder's cache stands for the slice.
     pub(super) unified_unfilled: std::collections::HashSet<(u32, u32)>,
-    /// Gallery items per account inbox, merged for display.
     /// How many attachments the gallery's current query matches, carried
     /// between pages so only the first one pays for the COUNT.
     pub(super) gallery_total: u32,

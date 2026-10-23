@@ -3,16 +3,16 @@
 
 /// Where a `mailto:` handle sends its unsubscribe request.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MailtoTarget {
+pub(crate) struct MailtoTarget {
     /// Comma-separated addresses, as the composer takes them.
-    pub to: String,
-    pub subject: String,
-    pub body: String,
+    pub(crate) to: String,
+    pub(crate) subject: String,
+    pub(crate) body: String,
 }
 
 /// Take a `mailto:` URI apart (RFC 6068): the addresses before `?`, then
 /// `subject=`, `body=`, `to=` and `cc=` in the query, percent-decoded.
-pub fn parse_mailto(uri: &str) -> Option<MailtoTarget> {
+pub(crate) fn parse_mailto(uri: &str) -> Option<MailtoTarget> {
     let rest = strip_scheme(uri, "mailto:")?;
     let (addr_part, query) = match rest.split_once('?') {
         Some((a, q)) => (a, q),
@@ -70,7 +70,7 @@ fn strip_scheme<'a>(uri: &'a str, scheme: &str) -> Option<&'a str> {
 /// Send the RFC 8058 one-click request: a POST of `List-Unsubscribe=One-Click`
 /// to the list's handle. Blocking; run it off the UI thread. Only a 2xx
 /// answer to the POST itself means the list took the request.
-pub fn one_click_post(url: &str) -> Result<(), String> {
+pub(crate) fn one_click_post(url: &str) -> Result<(), String> {
     let l = url.to_ascii_lowercase();
     if !l.starts_with("https://") && !l.starts_with("http://") {
         return Err("the list's unsubscribe handle is not a web address".to_string());

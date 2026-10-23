@@ -31,7 +31,7 @@ static CLOCK_STYLE: AtomicU8 = AtomicU8::new(0);
 pub(crate) static TEST_STYLE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Apply the user's preference. Called at startup and whenever it changes.
-pub fn set_style(date: DateStyle, clock: ClockStyle) {
+pub(crate) fn set_style(date: DateStyle, clock: ClockStyle) {
     DATE_STYLE.store(
         match date {
             DateStyle::System => 0,
@@ -195,7 +195,7 @@ fn locale_ampm() -> bool {
 
 /// A whole hour on the clock in use: "8:00" or "8:00 AM", for labels
 /// that name a time of day (Send Later's presets).
-pub fn clock_label(hour: u32) -> String {
+pub(crate) fn clock_label(hour: u32) -> String {
     let Ok(dt) = glib::DateTime::from_local(2026, 1, 1, hour as i32, 0, 0.0) else {
         return format!("{hour}:00");
     };
@@ -212,7 +212,7 @@ fn ampm_from_probe(probe: &str) -> bool {
 }
 
 /// The time of day, without seconds: "2:03 PM" or "14:03", as the locale has it.
-pub fn time(ts: i64) -> String {
+pub(crate) fn time(ts: i64) -> String {
     let Some(dt) = local(ts) else {
         return String::new();
     };
@@ -224,7 +224,7 @@ pub fn time(ts: i64) -> String {
 }
 
 /// Day and month, no year: "Aug 23" or "23. Aug".
-pub fn day_month(ts: i64) -> String {
+pub(crate) fn day_month(ts: i64) -> String {
     let Some(dt) = local(ts) else {
         return String::new();
     };
@@ -243,7 +243,7 @@ pub fn day_month(ts: i64) -> String {
 /// a glance in a list of mail, and "Aug 23" is quicker to place than "08/23" —
 /// the point of #32 was that the *order* and the *clock* were American, not that
 /// the month should stop being spelled.
-pub fn day_month_year(ts: i64) -> String {
+pub(crate) fn day_month_year(ts: i64) -> String {
     let Some(dt) = local(ts) else {
         return String::new();
     };
@@ -258,7 +258,7 @@ pub fn day_month_year(ts: i64) -> String {
 }
 
 /// Date and time together, for the reader's header and printed pages.
-pub fn date_time(ts: i64) -> String {
+pub(crate) fn date_time(ts: i64) -> String {
     if local(ts).is_none() {
         return String::new();
     }
@@ -271,7 +271,7 @@ pub fn date_time(ts: i64) -> String {
 /// The day an event falls on, with its weekday: "Monday, 2 Nov 2026".
 /// An appointment is placed by its weekday more than by its date, which is
 /// why a calendar invitation names it and a message list does not.
-pub fn weekday_date(ts: i64) -> String {
+fn weekday_date(ts: i64) -> String {
     let Some(dt) = local(ts) else {
         return String::new();
     };
@@ -287,7 +287,7 @@ pub fn weekday_date(ts: i64) -> String {
 ///
 /// `end` at or before `start` (an event written with no end) shows the
 /// start alone rather than a range that goes backwards.
-pub fn event_span(start: i64, end: i64, all_day: bool) -> String {
+pub(crate) fn event_span(start: i64, end: i64, all_day: bool) -> String {
     if local(start).is_none() {
         return String::new();
     }
@@ -316,12 +316,12 @@ pub fn event_span(start: i64, end: i64, all_day: bool) -> String {
 }
 
 /// The year a timestamp falls in, locally.
-pub fn year(ts: i64) -> i32 {
+pub(crate) fn year(ts: i64) -> i32 {
     local(ts).map(|dt| dt.year()).unwrap_or_default()
 }
 
 /// The local calendar day a timestamp falls on, as (year, day-of-year).
-pub fn day_key(ts: i64) -> (i32, i32) {
+pub(crate) fn day_key(ts: i64) -> (i32, i32) {
     local(ts)
         .map(|dt| (dt.year(), dt.day_of_year()))
         .unwrap_or_default()
@@ -331,7 +331,7 @@ pub fn day_key(ts: i64) -> (i32, i32) {
 /// last 14 days, today included in both (#435). Counted in calendar days,
 /// so a day an hour short or long for daylight saving still starts at
 /// midnight.
-pub fn day_starts(now: i64) -> [i64; 4] {
+pub(crate) fn day_starts(now: i64) -> [i64; 4] {
     let midnight = local(now).and_then(|dt| {
         glib::DateTime::new(
             &dt.timezone(),
@@ -365,7 +365,7 @@ pub fn day_starts(now: i64) -> [i64; 4] {
 /// Now, as a timestamp. The demo's mail is dated in October 2025; a
 /// showcase can set the clock it is read against with `HYLKI_DEMO_NOW`
 /// (Unix seconds).
-pub fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     static DEMO_NOW: std::sync::OnceLock<Option<i64>> = std::sync::OnceLock::new();
     let demo = DEMO_NOW.get_or_init(|| {
         std::env::var_os("HYLKI_DEMO")?;

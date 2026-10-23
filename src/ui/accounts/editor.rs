@@ -10,11 +10,11 @@ use super::*;
 /// alias address, #34). Read off the main thread when the editor opens, so
 /// the Settings window never waits on the keyring.
 #[derive(Debug, Clone)]
-pub struct AccountSecrets {
-    pub email: String,
-    pub password: String,
-    pub smtp_password: String,
-    pub aliases: Vec<(String, String)>,
+pub(crate) struct AccountSecrets {
+    email: String,
+    password: String,
+    smtp_password: String,
+    aliases: Vec<(String, String)>,
 }
 
 impl AccountSecrets {
@@ -383,10 +383,10 @@ impl AccountsWindow {
         // account still carries the right servers). Manual/Custom are left alone.
         let servers = match p.kind {
             ProviderKind::Preset => Some((p.imap_host, p.imap_port, p.smtp_host, p.smtp_port)),
-            ProviderKind::Google | ProviderKind::Microsoft => {
-                crate::oauth::preset(p.oauth_name().unwrap())
-                    .map(|o| (o.imap_host, o.imap_port, o.smtp_host, o.smtp_port))
-            }
+            ProviderKind::Google | ProviderKind::Microsoft => p
+                .oauth_name()
+                .and_then(crate::oauth::preset)
+                .map(|o| (o.imap_host, o.imap_port, o.smtp_host, o.smtp_port)),
             ProviderKind::Manual | ProviderKind::CustomOAuth | ProviderKind::Jmap => None,
         };
         if let Some((ih, ip, sh, sp)) = servers {
@@ -600,29 +600,7 @@ impl AccountsWindow {
         self.editing = Some(i);
         self.new_editor_session();
         self.pending_oauth_refresh = None;
-        self.directory_granted = acc.goa_id.is_none()
-            && acc.oauth
-            && acc
-                .oauth_settings
-                .as_ref()
-                .is_some_and(|s| crate::oauth::has_directory_scopes(&s.scopes));
-        // On without the scopes would only be refused.
-        self.directory_on = acc.graph_directory && self.directory_granted;
-        widgets
-            .form
-            .graph_directory_row
-            .set_active(self.directory_on);
-        widgets
-            .form
-            .directory_only_row
-            .set_active(acc.graph_directory_only);
-        self.labels_granted = acc.goa_id.is_none()
-            && acc.oauth
-            && acc.oauth_settings.as_ref().is_some_and(|s| {
-                crate::oauth::has_scopes(&s.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES)
-            });
-        self.labels_on = acc.graph_label_names && self.labels_granted;
-        widgets.form.graph_labels_row.set_active(self.labels_on);
+        self.set_graph_switches(widgets, &acc);
         self.close_alias_dialog();
         self.alias_edits = acc.aliases.clone();
         self.server_identities.clear();
@@ -648,6 +626,43 @@ impl AccountsWindow {
         self.label_synced = acc.email.clone();
         let (signatures, default) = acc.signature_set();
         self.load_signatures(widgets, signatures, default);
+        self.fill_face(widgets, &acc);
+        show_goa_state(widgets, &acc);
+        self.editor_seed = Some(self.editor_fingerprint(widgets));
+        mount_editor(widgets);
+        widgets.nav.push_by_tag("editor");
+    }
+
+    /// The Microsoft directory and label switches, on only when the
+    /// account's sign-in carries their scopes (on without them would only
+    /// be refused).
+    fn set_graph_switches(&mut self, widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
+        self.directory_granted = acc.goa_id.is_none()
+            && acc.oauth
+            && acc
+                .oauth_settings
+                .as_ref()
+                .is_some_and(|s| crate::oauth::has_directory_scopes(&s.scopes));
+        self.directory_on = acc.graph_directory && self.directory_granted;
+        widgets
+            .form
+            .graph_directory_row
+            .set_active(self.directory_on);
+        widgets
+            .form
+            .directory_only_row
+            .set_active(acc.graph_directory_only);
+        self.labels_granted = acc.goa_id.is_none()
+            && acc.oauth
+            && acc.oauth_settings.as_ref().is_some_and(|s| {
+                crate::oauth::has_scopes(&s.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES)
+            });
+        self.labels_on = acc.graph_label_names && self.labels_granted;
+        widgets.form.graph_labels_row.set_active(self.labels_on);
+    }
+
+    /// The account's face: its color, emoji or picture, and Gravatar.
+    fn fill_face(&mut self, widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
         widgets
             .form
             .color_btn
@@ -662,62 +677,6 @@ impl AccountsWindow {
             widgets.form.mode_glyph_btn.set_active(true);
         }
         self.refresh_preview(widgets);
-        // GOA accounts: no "Remove" (it lives in the system) — offer an
-        // enable/disable toggle and a shortcut to Online Accounts instead.
-        let is_goa = acc.goa_id.is_some();
-        set_connection_editable(widgets, !is_goa);
-        widgets.form.goa_banner.set_visible(is_goa);
-        widgets.form.keyring_note.set_visible(!is_goa);
-        // GOA accounts get the same Remove flow — it removes the account
-        // from Hylki only (back to the import list); GNOME keeps it.
-        widgets.remove_btn.set_visible(true);
-        // GNOME owns a GOA account's connection outright, so the server
-        // and credential section isn't shown at all — only what Hylki
-        // owns (name, label, color, signature, aliases) plus the email
-        // for identification. `apply_provider` re-shows what applies the
-        // next time a native account or the add-form opens the editor.
-        widgets.form.provider_row.set_visible(!is_goa);
-        if is_goa {
-            for w in [
-                widgets.form.protocol_row.upcast_ref::<gtk::Widget>(),
-                widgets.form.host_row.upcast_ref(),
-                widgets.form.port_row.upcast_ref(),
-                widgets.form.smtp_row.upcast_ref(),
-                widgets.form.smtp_port_row.upcast_ref(),
-                widgets.form.user_row.upcast_ref(),
-                widgets.form.pass_row.upcast_ref(),
-                widgets.form.smtp_separate_row.upcast_ref(),
-                widgets.form.tls_mismatch_row.upcast_ref(),
-                widgets.form.smtp_user_row.upcast_ref(),
-                widgets.form.smtp_pass_row.upcast_ref(),
-                widgets.form.test_btn.upcast_ref(),
-                widgets.form.oauth_signin_btn.upcast_ref(),
-                widgets.form.oauth_status.upcast_ref(),
-                widgets.form.goa_hint.upcast_ref(),
-            ] {
-                w.set_visible(false);
-            }
-            // The Google/Microsoft "use GNOME" guidance hid these; a GOA
-            // account edits its display fields right here.
-            widgets.form.name_row.set_visible(true);
-            widgets.form.email_row.set_visible(true);
-        }
-        widgets.form.goa_enabled_row.set_active(acc.enabled);
-        // While Mail is switched off in GNOME Settings the account is
-        // paused from there, not from here — say so where the toggle is.
-        widgets
-            .form
-            .goa_enabled_row
-            .set_sensitive(!acc.goa_mail_disabled);
-        widgets.form.goa_enabled_row.set_subtitle(if acc.goa_mail_disabled {
-            "Paused: Mail is switched off for this account in GNOME Settings \u{2192} Online Accounts."
-        } else {
-            "Switching this off returns the account to the import list — it \
-             stays in GNOME Online Accounts."
-        });
-        self.editor_seed = Some(self.editor_fingerprint(widgets));
-        mount_editor(widgets);
-        widgets.nav.push_by_tag("editor");
     }
 
     pub(super) fn on_secrets_read(
@@ -775,6 +734,64 @@ impl AccountsWindow {
             self.editor_seed = Some(self.editor_fingerprint(widgets));
         }
     }
+}
+
+/// What the editor shows of an account from GNOME Online Accounts: no
+/// connection fields (GNOME owns them), and its on switch.
+fn show_goa_state(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
+    // GOA accounts: no "Remove" (it lives in the system) — offer an
+    // enable/disable toggle and a shortcut to Online Accounts instead.
+    let is_goa = acc.goa_id.is_some();
+    set_connection_editable(widgets, !is_goa);
+    widgets.form.goa_banner.set_visible(is_goa);
+    widgets.form.keyring_note.set_visible(!is_goa);
+    // GOA accounts get the same Remove flow — it removes the account
+    // from Hylki only (back to the import list); GNOME keeps it.
+    widgets.remove_btn.set_visible(true);
+    // GNOME owns a GOA account's connection outright, so the server
+    // and credential section isn't shown at all — only what Hylki
+    // owns (name, label, color, signature, aliases) plus the email
+    // for identification. `apply_provider` re-shows what applies the
+    // next time a native account or the add-form opens the editor.
+    widgets.form.provider_row.set_visible(!is_goa);
+    if is_goa {
+        for w in [
+            widgets.form.protocol_row.upcast_ref::<gtk::Widget>(),
+            widgets.form.host_row.upcast_ref(),
+            widgets.form.port_row.upcast_ref(),
+            widgets.form.smtp_row.upcast_ref(),
+            widgets.form.smtp_port_row.upcast_ref(),
+            widgets.form.user_row.upcast_ref(),
+            widgets.form.pass_row.upcast_ref(),
+            widgets.form.smtp_separate_row.upcast_ref(),
+            widgets.form.tls_mismatch_row.upcast_ref(),
+            widgets.form.smtp_user_row.upcast_ref(),
+            widgets.form.smtp_pass_row.upcast_ref(),
+            widgets.form.test_btn.upcast_ref(),
+            widgets.form.oauth_signin_btn.upcast_ref(),
+            widgets.form.oauth_status.upcast_ref(),
+            widgets.form.goa_hint.upcast_ref(),
+        ] {
+            w.set_visible(false);
+        }
+        // The Google/Microsoft "use GNOME" guidance hid these; a GOA
+        // account edits its display fields right here.
+        widgets.form.name_row.set_visible(true);
+        widgets.form.email_row.set_visible(true);
+    }
+    widgets.form.goa_enabled_row.set_active(acc.enabled);
+    // While Mail is switched off in GNOME Settings the account is
+    // paused from there, not from here — say so where the toggle is.
+    widgets
+        .form
+        .goa_enabled_row
+        .set_sensitive(!acc.goa_mail_disabled);
+    widgets.form.goa_enabled_row.set_subtitle(if acc.goa_mail_disabled {
+        "Paused: Mail is switched off for this account in GNOME Settings \u{2192} Online Accounts."
+    } else {
+        "Switching this off returns the account to the import list — it \
+         stays in GNOME Online Accounts."
+    });
 }
 
 #[cfg(test)]

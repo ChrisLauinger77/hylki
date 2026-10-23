@@ -29,9 +29,9 @@ enum SiblingRun {
 /// the namespace its top-level folders live in ("INBOX." on a Dovecot-style
 /// server, "" on most).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Hierarchy {
-    pub delimiter: char,
-    pub namespace: String,
+pub(crate) struct Hierarchy {
+    pub(crate) delimiter: char,
+    pub(crate) namespace: String,
 }
 
 impl Hierarchy {

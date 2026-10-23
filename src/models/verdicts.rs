@@ -12,7 +12,7 @@ use crate::i18n::{i18n, i18n_f};
 /// authenticates it properly earns [`SenderTrust::Pass`]; the check proves the
 /// From: address wasn't forged, nothing more.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SenderTrust {
+pub(crate) enum SenderTrust {
     /// The receiving server authenticated the From: domain (DMARC, or aligned
     /// SPF/DKIM). Forging this address would have been rejected.
     Pass,
@@ -28,7 +28,7 @@ pub enum SenderTrust {
 
 impl SenderTrust {
     /// Round-trip tag for the cache.
-    pub fn as_tag(self) -> &'static str {
+    pub(crate) fn as_tag(self) -> &'static str {
         match self {
             SenderTrust::Pass => "pass",
             SenderTrust::Unverified => "unverified",
@@ -37,7 +37,7 @@ impl SenderTrust {
         }
     }
 
-    pub fn from_tag(tag: &str) -> SenderTrust {
+    pub(crate) fn from_tag(tag: &str) -> SenderTrust {
         match tag {
             "pass" => SenderTrust::Pass,
             "suspicious" => SenderTrust::Suspicious,
@@ -48,7 +48,7 @@ impl SenderTrust {
 
     /// Heading for the details popover, and the badge's tooltip. Not drawn on
     /// screen: the toolbar badge is the icon alone, colored by verdict.
-    pub fn label(self) -> String {
+    pub(crate) fn label(self) -> String {
         match self {
             SenderTrust::Pass => i18n("Verified sender"),
             SenderTrust::Unverified => i18n("Sender not verified"),
@@ -58,7 +58,7 @@ impl SenderTrust {
     }
 
     /// CSS class for the badge's color.
-    pub fn css_class(self) -> &'static str {
+    pub(crate) fn css_class(self) -> &'static str {
         match self {
             SenderTrust::Pass => "trust-pass",
             SenderTrust::Unverified => "trust-unverified",
@@ -70,7 +70,7 @@ impl SenderTrust {
 
 /// How far the user's keyring trusts an OpenPGP signing key (#133).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum PgpTrust {
+pub(crate) enum PgpTrust {
     /// Fully or ultimately trusted: a key the user vouched for.
     Full,
     Marginal,
@@ -82,7 +82,7 @@ pub enum PgpTrust {
 
 /// The verdict on an OpenPGP signature (#133).
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum PgpSignature {
+pub(crate) enum PgpSignature {
     /// Not signed (or nothing gpg could say about it).
     #[default]
     None,
@@ -114,34 +114,34 @@ pub enum PgpSignature {
 /// not, and the signature's standing. Carried on the sender check so it
 /// reaches the reader and the cache by the same road.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct PgpStatus {
-    pub encrypted: bool,
-    pub decrypted: bool,
-    pub signature: PgpSignature,
+pub(crate) struct PgpStatus {
+    pub(crate) encrypted: bool,
+    pub(crate) decrypted: bool,
+    pub(crate) signature: PgpSignature,
     /// Supporting lines for the details popover.
-    pub notes: Vec<String>,
+    pub(crate) notes: Vec<String>,
     /// The From address, for fetching the sender's key.
     #[serde(default)]
-    pub sender_addr: String,
+    pub(crate) sender_addr: String,
     /// The sender's key from the message's Autocrypt header, base64, when
     /// it carried one: the first place a missing key is looked for.
     #[serde(default)]
-    pub autocrypt: Option<String>,
+    pub(crate) autocrypt: Option<String>,
     /// The real subject an encrypted message carries inside (protected
     /// headers, #493), where the outer one is a placeholder such as
     /// Thunderbird's "...". Plaintext, so never written to the cache.
     #[serde(skip)]
-    pub subject: Option<String>,
+    pub(crate) subject: Option<String>,
 }
 
 impl PgpStatus {
     /// Whether a signature was present at all.
-    pub fn signed(&self) -> bool {
+    pub(crate) fn signed(&self) -> bool {
         !matches!(self.signature, PgpSignature::None)
     }
 
     /// The key id the signature named, whether or not the keyring has it.
-    pub fn signing_key_id(&self) -> Option<&str> {
+    pub(crate) fn signing_key_id(&self) -> Option<&str> {
         match &self.signature {
             PgpSignature::Good { key_id, .. } | PgpSignature::NoKey { key_id } => Some(key_id),
             _ => None,
@@ -149,17 +149,17 @@ impl PgpStatus {
     }
 
     /// Whether the sender's key is missing from the keyring.
-    pub fn key_missing(&self) -> bool {
+    pub(crate) fn key_missing(&self) -> bool {
         matches!(self.signature, PgpSignature::NoKey { .. })
     }
 
     /// Whether the signature is good but the key is not vouched for yet.
-    pub fn key_untrusted(&self) -> bool {
+    pub(crate) fn key_untrusted(&self) -> bool {
         matches!(self.signature, PgpSignature::Good { trust, .. } if trust != PgpTrust::Full)
     }
 
     /// One line for the chip's tooltip and the popover heading.
-    pub fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         use PgpSignature as S;
         let key = |k: &str| crate::pgp::key_display(k);
         if self.encrypted && !self.decrypted {
@@ -220,7 +220,7 @@ impl PgpStatus {
     /// The chip's own words (#300): what the message is, or what is wrong
     /// with it, short enough to sit beside the sender's name. The tooltip
     /// and the details popover carry the full sentence.
-    pub fn short_label(&self) -> String {
+    pub(crate) fn short_label(&self) -> String {
         use PgpSignature as S;
         if self.encrypted && !self.decrypted {
             return i18n("Not decrypted");
@@ -247,7 +247,7 @@ impl PgpStatus {
 
     /// CSS class for the chip's color: green when everything checks out,
     /// amber for a doubt, red for a failure.
-    pub fn css_class(&self) -> &'static str {
+    pub(crate) fn css_class(&self) -> &'static str {
         use PgpSignature as S;
         if self.encrypted && !self.decrypted {
             return "pgp-bad";
@@ -272,54 +272,54 @@ impl PgpStatus {
 /// of the message's headers with the sender check, kept in the cache beside
 /// it, and drawn as the card's Unsubscribe banner. See [`crate::unsubscribe`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Unsubscribe {
+pub(crate) struct Unsubscribe {
     /// The https handle that takes a one-click POST (RFC 8058), when the
     /// message promised one. The route the button prefers: no browser, no
     /// page, no mail.
     #[serde(default)]
-    pub one_click: Option<String>,
+    pub(crate) one_click: Option<String>,
     /// A `mailto:` handle: a short message to the list from the account the
     /// message arrived in.
     #[serde(default)]
-    pub mailto: Option<String>,
+    pub(crate) mailto: Option<String>,
     /// A "reply with UNSUBSCRIBE" instruction read out of the body: where
     /// to answer and the word to put in the subject.
     #[serde(default)]
-    pub reply: Option<ReplyRoute>,
+    pub(crate) reply: Option<ReplyRoute>,
     /// A web page to visit — the browser, only when nothing better is on
     /// offer or the better routes failed.
     #[serde(default)]
-    pub web: Option<String>,
+    pub(crate) web: Option<String>,
     /// The list's own identifier (`List-Id`, lowercased, without the
     /// brackets); empty when the message named none.
     #[serde(default)]
-    pub list_id: String,
+    pub(crate) list_id: String,
     /// Whether the message's own headers said any of this. False means it
     /// was read out of the body, which is a guess — a good one, but the
     /// banner says "looks like" rather than stating it.
     #[serde(default)]
-    pub in_headers: bool,
+    pub(crate) in_headers: bool,
 }
 
 /// "Reply to this email with UNSUBSCRIBE in the subject": the oldest
 /// mechanism of all, and still in use by hand-run lists.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ReplyRoute {
+pub(crate) struct ReplyRoute {
     /// The address to answer (Reply-To, else From).
-    pub to: String,
+    pub(crate) to: String,
     /// The word the list asked for, as the subject (UNSUBSCRIBE, STOP, …).
-    pub subject: String,
+    pub(crate) subject: String,
 }
 
 impl Unsubscribe {
     /// Whether the button can unsubscribe without a browser.
-    pub fn direct(&self) -> bool {
+    pub(crate) fn direct(&self) -> bool {
         self.one_click.is_some() || self.mailto.is_some() || self.reply.is_some()
     }
 
     /// What a list is remembered by once left: its List-Id, or failing
     /// that the address its mail comes from.
-    pub fn key(&self, from_addr: &str) -> String {
+    pub(crate) fn key(&self, from_addr: &str) -> String {
         if self.list_id.is_empty() {
             format!("from:{}", from_addr.trim().to_ascii_lowercase())
         } else {
@@ -332,74 +332,74 @@ impl Unsubscribe {
 /// (#223), kept beside the sender check and drawn as the card's invitation
 /// banner. See [`crate::invite`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Invite {
+pub(crate) struct Invite {
     /// The iTIP method, upper-cased: REQUEST (an invitation), REPLY
     /// (someone answering one), CANCEL, PUBLISH, COUNTER.
     #[serde(default)]
-    pub method: String,
+    pub(crate) method: String,
     /// The event's identity, the same in every message about it. What a
     /// remembered answer is filed under.
     #[serde(default)]
-    pub uid: String,
+    pub(crate) uid: String,
     /// Which revision of the event this is: an organizer who moves a
     /// meeting sends it again with a higher number.
     #[serde(default)]
-    pub sequence: i64,
+    pub(crate) sequence: i64,
     #[serde(default)]
-    pub summary: String,
+    pub(crate) summary: String,
     #[serde(default)]
-    pub location: String,
+    pub(crate) location: String,
     /// Start and end in unix seconds; 0 when the event named no readable
     /// time (the banner then leaves the line out rather than inventing one).
     #[serde(default)]
-    pub start: i64,
+    pub(crate) start: i64,
     #[serde(default)]
-    pub end: i64,
+    pub(crate) end: i64,
     /// A whole-day event, which has a date but no time of day.
     #[serde(default)]
-    pub all_day: bool,
+    pub(crate) all_day: bool,
     /// `RECURRENCE-ID` as written, when the message is about one occurrence
     /// of a series rather than the series itself. Carried into the reply.
     #[serde(default)]
-    pub recurrence_id: String,
+    pub(crate) recurrence_id: String,
     /// The `RRULE` as written, when the event repeats; empty for a one-off.
     #[serde(default)]
-    pub repeats: String,
+    pub(crate) repeats: String,
     #[serde(default)]
-    pub organizer: Option<InvitePerson>,
+    pub(crate) organizer: Option<InvitePerson>,
     #[serde(default)]
-    pub attendees: Vec<InvitePerson>,
+    pub(crate) attendees: Vec<InvitePerson>,
     /// The event has been called off (`STATUS:CANCELLED`).
     #[serde(default)]
-    pub cancelled: bool,
+    pub(crate) cancelled: bool,
     /// The calendar part as it arrived, so the event can be handed to a
     /// calendar application without going back to the server.
     #[serde(default)]
-    pub ics: String,
+    pub(crate) ics: String,
 }
 
 /// Someone named on an invitation: the organizer, or one of the invited.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InvitePerson {
+pub(crate) struct InvitePerson {
     #[serde(default)]
-    pub name: String,
+    pub(crate) name: String,
     #[serde(default)]
-    pub email: String,
+    pub(crate) email: String,
     /// `PARTSTAT`: NEEDS-ACTION, ACCEPTED, TENTATIVE, DECLINED.
     #[serde(default)]
-    pub status: String,
+    pub(crate) status: String,
     /// The organizer asked this person for an answer.
     #[serde(default)]
-    pub rsvp: bool,
+    pub(crate) rsvp: bool,
     /// A room or a piece of equipment rather than a person.
     #[serde(default)]
-    pub resource: bool,
+    pub(crate) resource: bool,
 }
 
 impl InvitePerson {
     /// What to call them: their name if the invitation gave one, else the
     /// address.
-    pub fn label(&self) -> &str {
+    pub(crate) fn label(&self) -> &str {
         if self.name.trim().is_empty() {
             &self.email
         } else {
@@ -410,7 +410,7 @@ impl InvitePerson {
 
 /// An answer to an invitation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum Rsvp {
+pub(crate) enum Rsvp {
     Accepted,
     Tentative,
     Declined,
@@ -418,7 +418,7 @@ pub enum Rsvp {
 
 impl Rsvp {
     /// The `PARTSTAT` value that says this.
-    pub fn partstat(self) -> &'static str {
+    pub(crate) fn partstat(self) -> &'static str {
         match self {
             Rsvp::Accepted => "ACCEPTED",
             Rsvp::Tentative => "TENTATIVE",
@@ -428,7 +428,7 @@ impl Rsvp {
 
     /// The word a `PARTSTAT` stands for, or `None` for one that is not an
     /// answer (NEEDS-ACTION, DELEGATED).
-    pub fn from_partstat(value: &str) -> Option<Rsvp> {
+    pub(crate) fn from_partstat(value: &str) -> Option<Rsvp> {
         match value.trim().to_ascii_uppercase().as_str() {
             "ACCEPTED" => Some(Rsvp::Accepted),
             "TENTATIVE" => Some(Rsvp::Tentative),
@@ -441,7 +441,7 @@ impl Rsvp {
 impl Invite {
     /// What an answer to this event is remembered by: the event's UID, plus
     /// the occurrence when the message is about one of a series.
-    pub fn key(&self) -> String {
+    pub(crate) fn key(&self) -> String {
         if self.recurrence_id.is_empty() {
             self.uid.clone()
         } else {
@@ -452,7 +452,7 @@ impl Invite {
     /// Whether this message is asking the reader to answer: an invitation
     /// (or a re-invitation) that has not been called off, from an organizer
     /// there is somewhere to answer to.
-    pub fn asks_for_an_answer(&self) -> bool {
+    pub(crate) fn asks_for_an_answer(&self) -> bool {
         !self.cancelled
             && matches!(self.method.as_str(), "REQUEST" | "COUNTER")
             && !self.uid.is_empty()
@@ -464,7 +464,7 @@ impl Invite {
 
     /// The attendee entry for whoever is reading, matched against the
     /// addresses this account answers to.
-    pub fn me<'a>(&'a self, addresses: &[String]) -> Option<&'a InvitePerson> {
+    pub(crate) fn me<'a>(&'a self, addresses: &[String]) -> Option<&'a InvitePerson> {
         self.attendees.iter().find(|a| {
             addresses
                 .iter()
@@ -475,7 +475,7 @@ impl Invite {
     /// The people invited: not the rooms and the equipment, and not the
     /// organizer, whom several calendars put on the attendee list as well
     /// and who is named in their own right.
-    pub fn guests(&self) -> impl Iterator<Item = &InvitePerson> {
+    pub(crate) fn guests(&self) -> impl Iterator<Item = &InvitePerson> {
         let chair = self
             .organizer
             .as_ref()
@@ -488,24 +488,24 @@ impl Invite {
 
 /// The result of checking whether a message's From: address was forged.
 #[derive(Debug, Clone)]
-pub struct SenderCheck {
-    pub trust: SenderTrust,
+pub(crate) struct SenderCheck {
+    pub(crate) trust: SenderTrust,
     /// One-line plain-English verdict, shown in the banner and popover heading.
-    pub summary: String,
+    pub(crate) summary: String,
     /// Supporting detail, one line each, for the "Details" popover.
-    pub findings: Vec<String>,
+    pub(crate) findings: Vec<String>,
     /// The OpenPGP verdict (#133), when the message carried any.
-    pub pgp: Option<PgpStatus>,
+    pub(crate) pgp: Option<PgpStatus>,
     /// How to leave the list this came from, when it is from one. Read with
     /// the verdict: both come out of the raw headers at the one fetch.
-    pub unsubscribe: Option<Unsubscribe>,
+    pub(crate) unsubscribe: Option<Unsubscribe>,
     /// The meeting this message invites the reader to (#223), when it
     /// carries a `text/calendar` part. Read in the same pass, for the same
     /// reason: the raw message is in hand exactly once.
-    pub invite: Option<Box<Invite>>,
+    pub(crate) invite: Option<Box<Invite>>,
     /// The sensitivity label the sender's organization set (#411), read in
     /// the same pass.
-    pub label: Option<crate::sensitivity::SensitivityLabel>,
+    pub(crate) label: Option<crate::sensitivity::SensitivityLabel>,
 }
 
 impl Default for SenderCheck {

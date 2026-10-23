@@ -6,7 +6,7 @@ use crate::i18n::i18n;
 
 /// A key id or fingerprint in readable groups: the last sixteen hex digits,
 /// four at a time.
-pub fn key_display(id: &str) -> String {
+pub(crate) fn key_display(id: &str) -> String {
     let hex: String = id
         .chars()
         .filter(|c| c.is_ascii_hexdigit())
@@ -35,7 +35,7 @@ fn groups_of_four(hex: &str) -> String {
 /// How far the keyring vouches for a key (the validity column of
 /// `--with-colons`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KeyValidity {
+pub(crate) enum KeyValidity {
     Revoked,
     Expired,
     Unknown,
@@ -59,11 +59,11 @@ impl KeyValidity {
     }
 
     /// Whether signatures by this key count as trusted.
-    pub fn trusted(self) -> bool {
+    pub(crate) fn trusted(self) -> bool {
         matches!(self, KeyValidity::Full | KeyValidity::Ultimate)
     }
 
-    pub fn label(self) -> String {
+    pub(crate) fn label(self) -> String {
         match self {
             KeyValidity::Revoked => i18n("Revoked"),
             KeyValidity::Expired => i18n("Expired"),
@@ -78,31 +78,31 @@ impl KeyValidity {
 
 /// One key in the keyring.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KeyInfo {
-    pub fingerprint: String,
+pub(crate) struct KeyInfo {
+    pub(crate) fingerprint: String,
     /// The long key id (the fingerprint's last sixteen digits).
-    pub key_id: String,
+    pub(crate) key_id: String,
     /// User ids, the primary first.
-    pub uids: Vec<String>,
+    pub(crate) uids: Vec<String>,
     /// Whether the secret half is in the keyring (one of the user's own).
-    pub secret: bool,
+    pub(super) secret: bool,
     /// Whether the key (some subkey) can encrypt.
-    pub can_encrypt: bool,
+    pub(crate) can_encrypt: bool,
     /// Whether the key can sign.
-    pub can_sign: bool,
-    pub created: i64,
-    pub expires: Option<i64>,
-    pub validity: KeyValidity,
-    pub disabled: bool,
+    pub(crate) can_sign: bool,
+    created: i64,
+    pub(crate) expires: Option<i64>,
+    pub(crate) validity: KeyValidity,
+    pub(super) disabled: bool,
 }
 
 impl KeyInfo {
-    pub fn primary_uid(&self) -> &str {
+    pub(crate) fn primary_uid(&self) -> &str {
         self.uids.first().map(String::as_str).unwrap_or("")
     }
 
     /// The addresses in the user ids, lowercased.
-    pub fn emails(&self) -> Vec<String> {
+    pub(crate) fn emails(&self) -> Vec<String> {
         self.uids
             .iter()
             .filter_map(|u| {
@@ -113,26 +113,26 @@ impl KeyInfo {
             .collect()
     }
 
-    pub fn matches_address(&self, addr: &str) -> bool {
+    pub(super) fn matches_address(&self, addr: &str) -> bool {
         let addr = addr.trim().to_ascii_lowercase();
         self.emails().contains(&addr)
     }
 
     /// Whether the key can still be used at all.
-    pub fn usable(&self) -> bool {
+    pub(crate) fn usable(&self) -> bool {
         !self.disabled
             && !matches!(self.validity, KeyValidity::Revoked | KeyValidity::Expired)
             && self.expires.is_none_or(|e| e > crate::datefmt::now())
     }
 
     /// The fingerprint in readable groups of four.
-    pub fn fingerprint_display(&self) -> String {
+    pub(crate) fn fingerprint_display(&self) -> String {
         groups_of_four(&self.fingerprint)
     }
 }
 
 /// The keys in the keyring: the user's own (`secret`) or everyone's.
-pub fn list_keys(gpg: &Gpg, secret: bool) -> Vec<KeyInfo> {
+pub(crate) fn list_keys(gpg: &Gpg, secret: bool) -> Vec<KeyInfo> {
     let list = if secret {
         "--list-secret-keys"
     } else {
@@ -216,21 +216,21 @@ pub(super) fn parse_colons(text: &str, secret: bool) -> Vec<KeyInfo> {
 }
 
 /// The user's own usable key for an address, if any.
-pub fn secret_key_for(gpg: &Gpg, addr: &str) -> Option<KeyInfo> {
+pub(crate) fn secret_key_for(gpg: &Gpg, addr: &str) -> Option<KeyInfo> {
     list_keys(gpg, true)
         .into_iter()
         .find(|k| k.usable() && k.can_sign && k.matches_address(addr))
 }
 
 /// A usable public key that can encrypt to an address, if any.
-pub fn public_key_for(gpg: &Gpg, addr: &str) -> Option<KeyInfo> {
+pub(crate) fn public_key_for(gpg: &Gpg, addr: &str) -> Option<KeyInfo> {
     list_keys(gpg, false)
         .into_iter()
         .find(|k| k.usable() && k.can_encrypt && k.matches_address(addr))
 }
 
 /// The key with this fingerprint, if the keyring holds it.
-pub fn key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
+pub(crate) fn key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
     let fpr = fpr.to_ascii_uppercase();
     list_keys(gpg, false)
         .into_iter()
@@ -239,11 +239,11 @@ pub fn key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
 
 /// What an import did.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ImportSummary {
-    pub imported: u32,
-    pub unchanged: u32,
+pub(crate) struct ImportSummary {
+    pub(crate) imported: u32,
+    pub(super) unchanged: u32,
     /// The fingerprints the import touched.
-    pub fingerprints: Vec<String>,
+    pub(crate) fingerprints: Vec<String>,
 }
 
 impl ImportSummary {
@@ -277,7 +277,7 @@ pub(super) fn import_summary(out: &Run) -> ImportSummary {
 }
 
 /// Import keys (armoured or binary) into the keyring.
-pub fn import_keys(gpg: &Gpg, bytes: &[u8]) -> Result<ImportSummary, String> {
+pub(crate) fn import_keys(gpg: &Gpg, bytes: &[u8]) -> Result<ImportSummary, String> {
     let out = run(gpg, &["--import"], bytes, None);
     let s = import_summary(&out);
     if s.fingerprints.is_empty() {
@@ -289,7 +289,7 @@ pub fn import_keys(gpg: &Gpg, bytes: &[u8]) -> Result<ImportSummary, String> {
 }
 
 /// A key's public half, armoured, for sending to someone.
-pub fn export_public(gpg: &Gpg, fpr: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn export_public(gpg: &Gpg, fpr: &str) -> Result<Vec<u8>, String> {
     let out = run(gpg, &["--armor", "--export", fpr], b"", None);
     if out.stdout.is_empty() {
         return Err(out.detail.unwrap_or_else(|| i18n("Nothing to export.")));
@@ -301,7 +301,7 @@ pub fn export_public(gpg: &Gpg, fpr: &str) -> Result<Vec<u8>, String> {
 /// encryption subkey (`default default`, the pair the terminal command's
 /// bare `rsa4096` does NOT give), protected by `passphrase` (empty = none).
 /// The passphrase goes down a pipe, never a command line.
-pub fn generate_key(
+pub(crate) fn generate_key(
     gpg: &Gpg,
     name: &str,
     email: &str,
@@ -343,7 +343,11 @@ pub fn generate_key(
 
 /// Look a key up by address (WKD, then the keyservers), and by key id
 /// when the message named one, importing what is found.
-pub fn fetch_key(gpg: &Gpg, addr: &str, key_id: Option<&str>) -> Result<ImportSummary, String> {
+pub(crate) fn fetch_key(
+    gpg: &Gpg,
+    addr: &str,
+    key_id: Option<&str>,
+) -> Result<ImportSummary, String> {
     let mut total = ImportSummary::default();
     let mut detail = None;
     if !addr.trim().is_empty() {
@@ -378,7 +382,7 @@ pub fn fetch_key(gpg: &Gpg, addr: &str, key_id: Option<&str>) -> Result<ImportSu
 
 /// Vouch for a key: a local (non-exportable) signature with one of the
 /// user's own keys, which is what makes gpg call it trusted.
-pub fn trust_key(gpg: &Gpg, fpr: &str, signer: Option<&str>) -> Result<(), String> {
+pub(crate) fn trust_key(gpg: &Gpg, fpr: &str, signer: Option<&str>) -> Result<(), String> {
     let mut args = vec!["--yes"];
     if let Some(s) = signer {
         args.extend(["--local-user", s]);
@@ -399,7 +403,7 @@ pub fn trust_key(gpg: &Gpg, fpr: &str, signer: Option<&str>) -> Result<(), Strin
 
 /// Remove a key from the keyring; the secret half too when it is the
 /// user's own.
-pub fn delete_key(gpg: &Gpg, fpr: &str, secret: bool) -> Result<(), String> {
+pub(crate) fn delete_key(gpg: &Gpg, fpr: &str, secret: bool) -> Result<(), String> {
     let cmd = if secret {
         "--delete-secret-and-public-key"
     } else {
@@ -415,7 +419,7 @@ pub fn delete_key(gpg: &Gpg, fpr: &str, secret: bool) -> Result<(), String> {
 }
 
 /// One of the user's own keys by fingerprint, if usable for signing.
-pub fn secret_key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
+pub(crate) fn secret_key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
     list_keys(gpg, true)
         .into_iter()
         .find(|k| k.fingerprint.eq_ignore_ascii_case(fpr) && k.usable() && k.can_sign)

@@ -15,7 +15,7 @@ use super::{config_file, read_toml, save_plain_toml};
 /// width; the right group folds into the ⋯ overflow menu when the pane is
 /// narrow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ToolbarItem {
+pub(crate) enum ToolbarItem {
     Reply,
     ReplyAll,
     Forward,
@@ -31,7 +31,7 @@ pub enum ToolbarItem {
 }
 
 impl ToolbarItem {
-    pub const ALL: [ToolbarItem; 12] = [
+    pub(crate) const ALL: [ToolbarItem; 12] = [
         ToolbarItem::Reply,
         ToolbarItem::ReplyAll,
         ToolbarItem::Forward,
@@ -47,7 +47,7 @@ impl ToolbarItem {
     ];
 
     /// The stable name written to `toolbar.toml`.
-    pub fn key(self) -> &'static str {
+    pub(crate) fn key(self) -> &'static str {
         match self {
             ToolbarItem::Reply => "reply",
             ToolbarItem::ReplyAll => "reply_all",
@@ -64,12 +64,12 @@ impl ToolbarItem {
         }
     }
 
-    pub fn from_key(key: &str) -> Option<ToolbarItem> {
+    pub(crate) fn from_key(key: &str) -> Option<ToolbarItem> {
         ToolbarItem::ALL.iter().copied().find(|i| i.key() == key)
     }
 
     /// The symbolic icon the button (and the settings chip) wears.
-    pub fn icon(self) -> &'static str {
+    pub(crate) fn icon(self) -> &'static str {
         match self {
             ToolbarItem::Reply => "mail-reply-sender-symbolic",
             ToolbarItem::ReplyAll => "mail-reply-all-symbolic",
@@ -87,7 +87,7 @@ impl ToolbarItem {
     }
 
     /// The untranslated label (callers pass it through `i18n`).
-    pub fn label(self) -> &'static str {
+    pub(crate) fn label(self) -> &'static str {
         match self {
             ToolbarItem::Reply => crate::i18n::i18n_noop("Reply"),
             ToolbarItem::ReplyAll => crate::i18n::i18n_noop("Reply All"),
@@ -107,19 +107,19 @@ impl ToolbarItem {
 
 /// Which side of the reader header a button sits on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ToolbarSide {
+pub(crate) enum ToolbarSide {
     Left,
     Right,
 }
 
 /// How many buttons one side of the reader toolbar holds at most.
-pub const TOOLBAR_SIDE_MAX: usize = 6;
+pub(crate) const TOOLBAR_SIDE_MAX: usize = 6;
 
 /// The reader header's layout. A button absent from both lists is hidden.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReaderToolbar {
-    pub left: Vec<ToolbarItem>,
-    pub right: Vec<ToolbarItem>,
+pub(crate) struct ReaderToolbar {
+    pub(crate) left: Vec<ToolbarItem>,
+    pub(crate) right: Vec<ToolbarItem>,
 }
 
 impl Default for ReaderToolbar {
@@ -147,7 +147,7 @@ impl Default for ReaderToolbar {
 
 impl ReaderToolbar {
     /// The side an item sits on, or None when it is hidden.
-    pub fn side(&self, item: ToolbarItem) -> Option<ToolbarSide> {
+    pub(crate) fn side(&self, item: ToolbarItem) -> Option<ToolbarSide> {
         if self.left.contains(&item) {
             Some(ToolbarSide::Left)
         } else if self.right.contains(&item) {
@@ -158,7 +158,7 @@ impl ReaderToolbar {
     }
 
     /// The items on neither side, in canonical order.
-    pub fn hidden(&self) -> Vec<ToolbarItem> {
+    pub(crate) fn hidden(&self) -> Vec<ToolbarItem> {
         ToolbarItem::ALL
             .iter()
             .copied()
@@ -178,7 +178,7 @@ impl ReaderToolbar {
 
     /// Whether `side` has room for one more button that is not already on
     /// it (`None`, the hidden zone, always has).
-    pub fn has_room(&self, side: Option<ToolbarSide>, item: ToolbarItem) -> bool {
+    pub(crate) fn has_room(&self, side: Option<ToolbarSide>, item: ToolbarItem) -> bool {
         let list = match side {
             Some(ToolbarSide::Left) => &self.left,
             Some(ToolbarSide::Right) => &self.right,
@@ -189,7 +189,7 @@ impl ReaderToolbar {
 
     /// Take `item` out of wherever it is and put it at `index` of `side`
     /// (clamped); `side` None hides it. A full side is left as it is.
-    pub fn place(&mut self, item: ToolbarItem, side: Option<ToolbarSide>, index: usize) {
+    pub(crate) fn place(&mut self, item: ToolbarItem, side: Option<ToolbarSide>, index: usize) {
         if !self.has_room(side, item) {
             return;
         }
@@ -219,7 +219,7 @@ fn toolbar_path() -> Option<PathBuf> {
 
 /// The saved reader toolbar layout, or the default when there is none.
 /// Unknown names (a newer Hylki's buttons) are skipped, not fatal.
-pub fn load_reader_toolbar() -> ReaderToolbar {
+pub(crate) fn load_reader_toolbar() -> ReaderToolbar {
     let Some(file) = read_toml::<ToolbarFile>(toolbar_path()) else {
         return ReaderToolbar::default();
     };
@@ -239,7 +239,7 @@ pub fn load_reader_toolbar() -> ReaderToolbar {
     layout
 }
 
-pub fn save_reader_toolbar(layout: &ReaderToolbar) {
+pub(crate) fn save_reader_toolbar(layout: &ReaderToolbar) {
     let file = ToolbarFile {
         left: layout.left.iter().map(|i| i.key().to_string()).collect(),
         right: layout.right.iter().map(|i| i.key().to_string()).collect(),

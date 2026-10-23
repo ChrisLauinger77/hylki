@@ -14,7 +14,7 @@ use relm4::prelude::*;
 /// Replace the recipient being typed with the chosen suggestion, as a pill.
 /// A group puts in its members, less those the field already has; one that
 /// hides its addresses puts them in Bcc, whichever field it was typed in.
-pub(super) fn complete_field(row: &RecipientRow, bcc: &RecipientRow, sug: &Suggestion) {
+fn complete_field(row: &RecipientRow, bcc: &RecipientRow, sug: &Suggestion) {
     let Some(group) = &sug.group else {
         row.complete(&sug.display());
         return;
@@ -63,13 +63,13 @@ pub(super) fn merge_loaded_suggestions(current: &mut Vec<Suggestion>, mut loaded
 }
 
 /// The recipient being typed, after the field's pills.
-pub(super) fn recipient_token(row: &RecipientRow) -> String {
+fn recipient_token(row: &RecipientRow) -> String {
     row.typed()
 }
 
 /// Whether the field has the keyboard. The row holds its focus in the
 /// GtkText inside it, so the row's own has_focus() is never true.
-pub(super) fn recipient_focused(row: &RecipientRow) -> bool {
+fn recipient_focused(row: &RecipientRow) -> bool {
     row.root()
         .and_downcast::<gtk::Window>()
         .and_then(|w| gtk::prelude::GtkWindowExt::focus(&w))
@@ -87,7 +87,7 @@ impl Compose {
 
     /// Suggestions matching `token`, ranked best-first (prefix match, then most
     /// frequently used), capped to a handful.
-    pub(super) fn ranked_matches(&self, token: &str) -> Vec<Suggestion> {
+    fn ranked_matches(&self, token: &str) -> Vec<Suggestion> {
         let narrowed = self.narrowed();
         let mut matches: Vec<Suggestion> = self
             .suggestions
@@ -127,7 +127,7 @@ impl Compose {
 
     /// Filter suggestions by the recipient fragment being typed and show them in
     /// a popover under the field; clicking one completes that recipient.
-    pub(super) fn show_completion(&mut self, field: Field, row: &RecipientRow, bcc: &RecipientRow) {
+    fn show_completion(&mut self, field: Field, row: &RecipientRow, bcc: &RecipientRow) {
         let token = row.typed();
         if token.is_empty() {
             self.completion_open.set(false);

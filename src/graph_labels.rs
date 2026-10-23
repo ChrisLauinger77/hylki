@@ -44,7 +44,7 @@ struct TenantLabel {
 /// The accounts whose list is read: Microsoft 365 over Graph with the
 /// switch on, signed in within Hylki. A token from GNOME Online Accounts
 /// carries only the scopes GNOME asked for.
-pub fn usable(account: &AccountConfig) -> bool {
+fn usable(account: &AccountConfig) -> bool {
     account.enabled
         && account.protocol == Protocol::Graph
         && account.graph_label_names
@@ -70,7 +70,7 @@ fn state() -> &'static Mutex<State> {
 /// `label` with its name, color and the organization's description filled
 /// in from the account's list, when it is a Purview label on that list.
 /// Blocking: the first label of a session reads the list.
-pub fn fill(account: &AccountConfig, label: &mut SensitivityLabel) {
+pub(crate) fn fill(account: &AccountConfig, label: &mut SensitivityLabel) {
     if label.id.is_empty() || !usable(account) {
         return;
     }

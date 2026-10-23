@@ -8,7 +8,7 @@ use crate::models::DraftOrigin;
 use crate::ui::drop_zones::DropZones;
 use crate::ui::rich_editor::RichEditor;
 
-pub struct Compose {
+pub(crate) struct Compose {
     pub(super) accounts: Vec<ComposeAccount>,
     /// The rich-text (HTML) body editor.
     pub(super) editor: RichEditor,

@@ -12,7 +12,7 @@ use super::{expiry, local_file, share_password, CloudAccount, ShareResult};
 /// ownCloud 10 answer `productname`; Infinite Scale and OpenCloud answer
 /// `product`). Unauthenticated and quick; none when the server does not
 /// say or cannot be reached.
-pub fn detect_product(base: &str) -> Option<String> {
+pub(crate) fn detect_product(base: &str) -> Option<String> {
     let base = base.trim().trim_end_matches('/');
     if base.is_empty() {
         return None;

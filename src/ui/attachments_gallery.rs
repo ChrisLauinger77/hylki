@@ -29,7 +29,7 @@ use cell::build_cell;
 pub(crate) use cell::{deleting_label, deleting_over, deleting_veil, fade_out};
 use labels::{caption, column_header, count_text, scan_text};
 use msg::key_of;
-pub use msg::{FileKey, GalleryInput, GalleryOutput, GalleryRequest};
+pub(crate) use msg::{FileKey, GalleryInput, GalleryOutput, GalleryRequest};
 
 use crate::ui::attachment_io::open_bytes;
 use crate::ui::thumbnails::{
@@ -37,7 +37,7 @@ use crate::ui::thumbnails::{
     texture_from, thumb_cache_key, thumbnail_spinner, thumbnail_texture, Thumbnail, PDF_PREVIEWS,
 };
 use ratio_box::RatioBox;
-pub use scope::{GalleryAccount, GalleryFolder};
+pub(crate) use scope::{GalleryAccount, GalleryFolder};
 use table::build_row;
 
 /// Width of the table's trailing quick-actions column (three icon buttons);
@@ -59,7 +59,7 @@ const LOAD_MORE_MARGIN: f64 = 700.0;
 /// would spend most of its time on words half-typed.
 const SEARCH_DEBOUNCE_MS: u32 = 250;
 
-pub struct AttachmentsGallery {
+pub(crate) struct AttachmentsGallery {
     /// The pages loaded so far, already filtered and ordered by the database.
     /// This is a window onto `total`, not the whole set: an archive of two
     /// decades holds far more attachments than the UI can hold widgets for, so
@@ -127,7 +127,7 @@ pub struct AttachmentsGallery {
     deleting: Vec<FileKey>,
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for AttachmentsGallery {
     type Init = ();
     type Input = GalleryInput;

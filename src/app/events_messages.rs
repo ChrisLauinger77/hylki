@@ -312,14 +312,19 @@ impl AppModel {
         folder_id: u32,
         messages: &[Message],
     ) -> (bool, Option<(u32, u32)>) {
-        let vanished = self.current.as_ref().is_some_and(|c| {
-            c.account_id == account_id
-                && c.folder_id == folder_id
-                && !messages.iter().any(|m| m.uid == c.uid)
-        });
+        // The open message's uid, when the new list no longer has it.
+        let vanished_uid = self
+            .current
+            .as_ref()
+            .filter(|c| {
+                c.account_id == account_id
+                    && c.folder_id == folder_id
+                    && !messages.iter().any(|m| m.uid == c.uid)
+            })
+            .map(|c| c.uid);
+        let vanished = vanished_uid.is_some();
 
-        let next_after_vanish = if vanished {
-            let cur_uid = self.current.as_ref().unwrap().uid;
+        let next_after_vanish = if let Some(cur_uid) = vanished_uid {
             next_after_vanish(
                 self.message_cache
                     .get(&(account_id, folder_id))

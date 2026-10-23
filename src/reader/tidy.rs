@@ -178,28 +178,29 @@ fn paragraphs(kids: Vec<Out>, keep_lone: bool) -> Vec<Out> {
 /// Split an inline run at two or more consecutive line breaks (blank text
 /// between them notwithstanding).
 fn split_breaks(run: Vec<Out>) -> Vec<Vec<Out>> {
-    let mut pieces = vec![Vec::new()];
+    let mut pieces = Vec::new();
+    let mut piece = Vec::new();
     let mut it = run.into_iter().peekable();
     while let Some(item) = it.next() {
         if item.is_br() {
             let mut gap = vec![item];
             let mut breaks = 1;
-            while it.peek().is_some_and(|n| n.is_br() || n.is_blank_text()) {
-                let n = it.next().unwrap();
+            while let Some(n) = it.next_if(|n| n.is_br() || n.is_blank_text()) {
                 if n.is_br() {
                     breaks += 1;
                 }
                 gap.push(n);
             }
             if breaks >= 2 {
-                pieces.push(Vec::new());
+                pieces.push(std::mem::take(&mut piece));
             } else {
-                pieces.last_mut().unwrap().extend(gap);
+                piece.extend(gap);
             }
             continue;
         }
-        pieces.last_mut().unwrap().push(item);
+        piece.push(item);
     }
+    pieces.push(piece);
     pieces
 }
 

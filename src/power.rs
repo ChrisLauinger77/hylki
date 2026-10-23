@@ -35,7 +35,7 @@ const SLEEP_GAP: Duration = Duration::from_secs(5);
 /// Watch systemd-logind for resume-from-sleep, invoking `on_wake` each time the
 /// system wakes. Runs on a dedicated thread; silently no-ops if logind or the
 /// system bus is unavailable.
-pub fn watch_resume<F: Fn() + Send + 'static>(on_wake: F) {
+pub(crate) fn watch_resume<F: Fn() + Send + 'static>(on_wake: F) {
     let _ = std::thread::Builder::new()
         .name("logind-watch".into())
         .spawn(move || {
@@ -64,7 +64,7 @@ fn watch_loop<F: Fn()>(on_wake: &F) -> Result<(), Box<dyn std::error::Error>> {
 /// `Instant` is CLOCK_MONOTONIC, which stands still while the system sleeps;
 /// /proc/uptime is the boot clock, which keeps counting. Must be called on the
 /// GTK main thread.
-pub fn watch_clock_gap<F: Fn() + 'static>(on_wake: F) {
+pub(crate) fn watch_clock_gap<F: Fn() + 'static>(on_wake: F) {
     let Some(mut uptime) = boot_clock() else {
         return;
     };
@@ -93,7 +93,7 @@ fn boot_clock() -> Option<Duration> {
 
 /// What the network monitor reported, for [`watch_network`]'s callback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NetworkChange {
+pub(crate) enum NetworkChange {
     /// Reachable again after being down.
     Back,
     /// No longer reachable.
@@ -124,7 +124,7 @@ fn since_start() -> u64 {
 /// Read the monitor's current state into [`online`] and [`metered`]. Called
 /// before the workers start, so their first connection already knows it.
 /// Must be called on the GTK main thread.
-pub fn read_network(save_data: bool) {
+pub(crate) fn read_network(save_data: bool) {
     use gtk::gio::prelude::*;
     let monitor = gtk::gio::NetworkMonitor::default();
     ONLINE.store(monitor.is_network_available(), Ordering::Relaxed);
@@ -136,7 +136,7 @@ pub fn read_network(save_data: bool) {
 /// Invoke `on_change` when the network goes down, comes back, or turns
 /// metered or not. GIO answers through the network-monitor portal inside the
 /// Flatpak, so this needs no permission. Must be called on the GTK main thread.
-pub fn watch_network<F: Fn(NetworkChange) + 'static>(on_change: F) {
+pub(crate) fn watch_network<F: Fn(NetworkChange) + 'static>(on_change: F) {
     use gtk::gio::prelude::*;
     let monitor = gtk::gio::NetworkMonitor::default();
     let on_change = std::rc::Rc::new(on_change);
@@ -165,37 +165,37 @@ pub fn watch_network<F: Fn(NetworkChange) + 'static>(on_change: F) {
 }
 
 /// Whether the network looks reachable right now.
-pub fn online() -> bool {
+pub(crate) fn online() -> bool {
     ONLINE.load(Ordering::Relaxed)
 }
 
 /// Whether the connection is metered.
-pub fn metered() -> bool {
+pub(crate) fn metered() -> bool {
     METERED.load(Ordering::Relaxed)
 }
 
 /// Settings: hold back the work done ahead of the user on a metered
 /// connection.
-pub fn set_save_data(on: bool) {
+pub(crate) fn set_save_data(on: bool) {
     SAVE_DATA.store(on, Ordering::Relaxed);
 }
 
 /// Whether the work done ahead of the user (prefetching bodies and
 /// attachments, indexing old mail, watching extra folders, fetching logos)
 /// waits: the connection is metered and Settings asks to save data there.
-pub fn saving_data() -> bool {
+pub(crate) fn saving_data() -> bool {
     metered() && SAVE_DATA.load(Ordering::Relaxed)
 }
 
 /// Whether pictures nobody asked for yet (sender logos, Gravatars) may be
 /// fetched: there is a network, and it is not one to save data on.
-pub fn fetches_ahead() -> bool {
+pub(crate) fn fetches_ahead() -> bool {
     reaches_internet() && !saving_data()
 }
 
 /// A Refresh clicked while offline: let connections through for a while,
 /// since the monitor can be wrong (a network with no default route).
-pub fn try_anyway() {
+pub(crate) fn try_anyway() {
     TRY_UNTIL.store(
         since_start() + TRY_ANYWAY.as_millis() as u64,
         Ordering::Relaxed,
@@ -204,18 +204,18 @@ pub fn try_anyway() {
 
 /// Whether a connection to `host` is worth trying. A server on this machine
 /// (Proton Mail Bridge) is reachable with no network at all.
-pub fn reaches(host: &str) -> bool {
+pub(crate) fn reaches(host: &str) -> bool {
     online() || is_local(host) || since_start() < TRY_UNTIL.load(Ordering::Relaxed)
 }
 
 /// Whether background traffic to the internet should go out: not while
 /// offline, unless a Refresh asked to try anyway.
-pub fn reaches_internet() -> bool {
+pub(crate) fn reaches_internet() -> bool {
     reaches("")
 }
 
 /// [`reaches`] for a server given as a URL (JMAP).
-pub fn reaches_url(url: &str) -> bool {
+pub(crate) fn reaches_url(url: &str) -> bool {
     reaches(url_host(url))
 }
 

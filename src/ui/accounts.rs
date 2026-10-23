@@ -38,13 +38,13 @@ mod tags;
 
 use account_list::importable_goa_accounts;
 use aliases::AliasDialog;
-pub use editor::AccountSecrets;
+pub(crate) use editor::AccountSecrets;
 pub(crate) use form::non_ellipsizing_factory;
 use form::{
     apply_protocol, clear_editor, fill_editor, form_protocol, import_avatar_file, mount_editor,
     parse_color, read_account, set_connection_editable, show_quota, trimmed,
 };
-pub use messages::{AccountsCmd, AccountsInit, AccountsInput, AccountsOutput, TagProposal};
+pub(crate) use messages::{AccountsCmd, AccountsInit, AccountsInput, AccountsOutput, TagProposal};
 pub(crate) use oauth::open_online_accounts;
 use pages::{AccountsPage, EditorForm, FiltersPage, SendersPage, SmartPage, TagsPage};
 use providers::provider_at;
@@ -56,7 +56,7 @@ const DEFAULT_COLOR: &str = "#3584e4";
 /// The open form page's Save (see `AccountsWindow::form_save`).
 type FormSave = std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn() -> bool>>>>;
 
-pub struct AccountsWindow {
+pub(crate) struct AccountsWindow {
     /// Accounts in display order.
     accounts: Vec<AccountConfig>,
     /// Each account's live folder list (path, display name), for the editor's
@@ -124,7 +124,6 @@ pub struct AccountsWindow {
     /// filled the form without recording it, where the safe answer is that
     /// it was touched.
     editor_seed: Option<String>,
-    /// WYSIWYG editor for the account signature.
     /// The signature's rich editor — a WebKit view, so it is created when
     /// an account's editor first opens rather than with the panel.
     sig_editor: Option<RichEditor>,
@@ -189,7 +188,7 @@ pub struct AccountsWindow {
     alias_dialog: Option<AliasDialog>,
 }
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for AccountsWindow {
     type Init = AccountsInit;
     type Input = AccountsInput;

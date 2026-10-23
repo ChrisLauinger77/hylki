@@ -25,7 +25,7 @@ pub(super) const DIRECTORY_LIMIT: usize = 50;
 /// What the list shows, picked in the sidebar: every contact, one address
 /// book's, or one group's people (the group first).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum ContactScope {
+pub(crate) enum ContactScope {
     #[default]
     All,
     Book(String),
@@ -40,52 +40,52 @@ pub enum ContactScope {
 /// The address books and their groups, as the sidebar lists them while
 /// Contacts is open.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ContactTree {
+pub(crate) struct ContactTree {
     /// Every contact, groups left out.
-    pub total: usize,
-    pub books: Vec<TreeBook>,
-    pub scope: ContactScope,
+    pub(super) total: usize,
+    pub(crate) books: Vec<TreeBook>,
+    pub(crate) scope: ContactScope,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TreeBook {
-    pub uid: String,
+pub(crate) struct TreeBook {
+    pub(crate) uid: String,
     /// The account the book is in, for the line under its name ("CardDAV —
     /// a@b.org", or the service of a book that is its account alone);
     /// empty for the Hylki book.
-    pub account: String,
+    pub(crate) account: String,
     /// What the books of one account share: the books with one key are
     /// listed under their account.
-    pub key: String,
-    pub name: String,
-    pub count: usize,
+    pub(crate) key: String,
+    pub(crate) name: String,
+    pub(crate) count: usize,
     /// Hylki can write to it, so contacts can be copied or moved in.
-    pub writable: bool,
-    pub takes_groups: bool,
+    pub(crate) writable: bool,
+    pub(crate) takes_groups: bool,
     /// An LDAP directory, searched rather than listed.
-    pub directory: bool,
-    pub groups: Vec<TreeGroup>,
+    pub(crate) directory: bool,
+    pub(crate) groups: Vec<TreeGroup>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TreeGroup {
-    pub book: String,
-    pub uid: String,
-    pub name: String,
-    pub count: usize,
-    pub editable: bool,
+pub(crate) struct TreeGroup {
+    pub(crate) book: String,
+    pub(crate) uid: String,
+    pub(crate) name: String,
+    pub(crate) count: usize,
+    pub(crate) editable: bool,
 }
 
 /// Where contacts dragged to the sidebar land.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DropOn {
+pub(crate) enum DropOn {
     Book(String),
     Group { book: String, uid: String },
 }
 
 /// What a right-click on the sidebar's book or group asks for.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TreeAction {
+pub(crate) enum TreeAction {
     NewContact(String),
     NewGroup(String),
     EditGroup {
@@ -106,12 +106,12 @@ pub enum TreeAction {
 
 /// The start of what a contact row carries when dragged, before a line of
 /// book and UID per contact.
-pub const DRAG_MARK: &str = "hylki-contacts";
+pub(super) const DRAG_MARK: &str = "hylki-contacts";
 
 /// The "Show only" filters of the sort and filter button, as the message
 /// list has for mail. They narrow the people; groups are not filtered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ContactFilter {
+pub(crate) enum ContactFilter {
     Photo,
     Email,
     Phone,
@@ -122,7 +122,7 @@ pub enum ContactFilter {
 }
 
 impl ContactFilter {
-    pub const ALL: [ContactFilter; 7] = [
+    pub(crate) const ALL: [ContactFilter; 7] = [
         ContactFilter::Photo,
         ContactFilter::Email,
         ContactFilter::Phone,
@@ -178,7 +178,7 @@ impl ContactFilter {
 
 /// How the contact list is ordered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ContactSort {
+pub(crate) enum ContactSort {
     FirstName,
     LastName,
     Email,
@@ -221,7 +221,7 @@ pub(super) enum Editor {
     Group(GroupForm),
 }
 
-pub struct ContactsPage {
+pub(crate) struct ContactsPage {
     pub(super) contacts: Vec<ContactDetails>,
     pub(super) query: String,
     pub(super) sort: ContactSort,
@@ -314,7 +314,7 @@ pub struct ContactsPage {
 }
 
 #[derive(Debug)]
-pub enum ContactsPageInput {
+pub(crate) enum ContactsPageInput {
     /// Fresh EDS read: replace everything (keeps the selection when possible).
     SetContacts(Vec<ContactDetails>),
     /// The page was just opened; a read is on its way.
@@ -442,7 +442,7 @@ pub enum ContactsPageInput {
 }
 
 #[derive(Debug)]
-pub enum ContactsPageOutput {
+pub(crate) enum ContactsPageOutput {
     /// Start a message to this address, or these (a group).
     Compose(String),
     /// Start a message with these recipients in Bcc: a group that hides

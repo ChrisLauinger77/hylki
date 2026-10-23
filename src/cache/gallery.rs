@@ -11,22 +11,22 @@ use super::Cache;
 /// ordering, all of which have to reach the database — the archive holds far
 /// more attachments than the UI can hold in memory, so filtering after the fact
 /// would page through the wrong set.
-pub struct GalleryQuery<'a> {
+pub(crate) struct GalleryQuery<'a> {
     /// `(account id, folder path)` pairs whose attachments are in scope. Empty
     /// means "every folder", which is what a gallery opened before the folder
     /// list arrives should show.
-    pub folders: &'a [(u32, String)],
+    pub(crate) folders: &'a [(u32, String)],
     /// Narrow to one account, as the footer's account dropdown does.
-    pub account_id: Option<u32>,
+    pub(crate) account_id: Option<u32>,
     /// Search words; a row has to match every one of them somewhere.
-    pub tokens: &'a [String],
+    pub(crate) tokens: &'a [String],
     /// A [`crate::models::type_bucket`] value, or 0 for every type.
-    pub bucket: u32,
-    pub sort: GallerySort,
-    pub limit: u32,
-    pub offset: u32,
+    pub(crate) bucket: u32,
+    pub(crate) sort: GallerySort,
+    pub(crate) limit: u32,
+    pub(crate) offset: u32,
     /// Largest cached file whose bytes ride along with the page.
-    pub data_cap: i64,
+    pub(crate) data_cap: i64,
 }
 
 impl GalleryQuery<'_> {
@@ -140,7 +140,7 @@ impl Cache {
     /// joined to `attachments`, which holds the few whose bytes were actually
     /// downloaded. Bytes ride along only for a cached file under `data_cap`, so
     /// a page stays small however far back it reaches.
-    pub fn gallery_page(&self, q: &GalleryQuery) -> Vec<crate::models::GalleryItem> {
+    pub(crate) fn gallery_page(&self, q: &GalleryQuery) -> Vec<crate::models::GalleryItem> {
         // Three leading parameters of our own, so the scope starts at ?4.
         let (where_sql, params) = q.where_clause(4);
         let sql = format!(
@@ -185,7 +185,7 @@ impl Cache {
 
     /// How many attachments the same query matches in total — what the footer
     /// counts up to, and how the UI knows whether another page exists.
-    pub fn gallery_total(&self, q: &GalleryQuery) -> u32 {
+    pub(crate) fn gallery_total(&self, q: &GalleryQuery) -> u32 {
         let (where_sql, params) = q.where_clause(1);
         let sql = format!(
             "SELECT COUNT(*) FROM attachment_meta am \
@@ -207,7 +207,7 @@ impl Cache {
     /// Record what a message's attachments are, without their bytes: one row
     /// per attachment plus a scan mark, so a message with none is never asked
     /// about again. Replaces any earlier answer for that message.
-    pub fn save_attachment_meta(
+    pub(crate) fn save_attachment_meta(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -248,7 +248,7 @@ impl Cache {
 
     /// The next `limit` messages in a folder that carry an attachment and have
     /// not been scanned yet, newest first — the gallery's backfill work queue.
-    pub fn unscanned_attachment_uids(
+    pub(crate) fn unscanned_attachment_uids(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -274,7 +274,7 @@ impl Cache {
 
     /// How many attachment-carrying messages in a folder are still unscanned —
     /// what the gallery reports as work outstanding.
-    pub fn unscanned_attachment_count(&self, account_id: u32, folder_path: &str) -> u32 {
+    pub(crate) fn unscanned_attachment_count(&self, account_id: u32, folder_path: &str) -> u32 {
         self.conn
             .query_row(
                 "SELECT COUNT(*) FROM messages m \

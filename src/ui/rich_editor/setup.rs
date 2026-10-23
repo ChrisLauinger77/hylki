@@ -25,7 +25,7 @@ impl RichEditor {
     /// pictures): opening a reply must not fetch what reading the message
     /// did not (#295). The markup keeps every address, so the recipient
     /// gets the quote whole.
-    pub fn new(initial_html: &str, remote_images: Option<&[String]>, plain: bool) -> Self {
+    pub(crate) fn new(initial_html: &str, remote_images: Option<&[String]>, plain: bool) -> Self {
         let plain = std::rc::Rc::new(std::cell::Cell::new(plain));
         let image_policy: std::rc::Rc<str> = image_policy_meta(remote_images).into();
         let (webview, ucm) = editor_view();

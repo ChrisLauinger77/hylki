@@ -30,10 +30,10 @@ mod nextcloud;
 mod onedrive;
 mod seafile;
 
-pub use account::{CloudAccount, CloudKind, LinkTerms, Service, SERVICES};
-pub use dropbox::{dropbox_client_id, dropbox_connect};
-pub use nextcloud::detect_product;
-pub use seafile::seafile_login_with_code;
+pub(crate) use account::{CloudAccount, CloudKind, LinkTerms, Service, SERVICES};
+pub(crate) use dropbox::{dropbox_client_id, dropbox_connect};
+pub(crate) use nextcloud::detect_product;
+pub(crate) use seafile::seafile_login_with_code;
 
 use dropbox::{dropbox_access, dropbox_upload_and_share, dropbox_whoami};
 use nextcloud::{nextcloud_upload_and_share, nextcloud_verify};
@@ -50,18 +50,18 @@ fn path() -> Option<PathBuf> {
     crate::config::config_file("cloud.toml")
 }
 
-pub fn load_accounts() -> Vec<CloudAccount> {
+pub(crate) fn load_accounts() -> Vec<CloudAccount> {
     crate::config::read_toml::<CloudFile>(path())
         .map(|f| f.accounts)
         .unwrap_or_default()
 }
 
 /// The accounts the composer offers: those switched on.
-pub fn load_enabled_accounts() -> Vec<CloudAccount> {
+pub(crate) fn load_enabled_accounts() -> Vec<CloudAccount> {
     load_accounts().into_iter().filter(|a| a.enabled).collect()
 }
 
-pub fn save_accounts(accounts: &[CloudAccount]) {
+pub(crate) fn save_accounts(accounts: &[CloudAccount]) {
     let file = CloudFile {
         accounts: accounts.to_vec(),
     };
@@ -70,14 +70,14 @@ pub fn save_accounts(accounts: &[CloudAccount]) {
 
 /// What an upload produced: the public link and what it was made with.
 #[derive(Clone, Debug)]
-pub struct ShareResult {
-    pub name: String,
-    pub size: u64,
-    pub url: String,
+pub(crate) struct ShareResult {
+    pub(crate) name: String,
+    pub(crate) size: u64,
+    pub(crate) url: String,
     /// The download password, when the account protects links.
-    pub password: Option<String>,
+    pub(crate) password: Option<String>,
     /// The expiry date (YYYY-MM-DD), when the account sets one.
-    pub expires: Option<String>,
+    pub(crate) expires: Option<String>,
 }
 
 /// The upload's name and size, checked before anything goes over the wire.
@@ -101,7 +101,7 @@ fn expiry(account: &CloudAccount) -> Option<String> {
 }
 
 /// Check the account signs in; answers with the display name.
-pub fn verify(account: &CloudAccount, secret: &str) -> Result<String, String> {
+pub(crate) fn verify(account: &CloudAccount, secret: &str) -> Result<String, String> {
     match account.kind {
         CloudKind::Nextcloud => nextcloud_verify(account, secret),
         CloudKind::Dropbox => {
@@ -126,7 +126,7 @@ pub fn verify(account: &CloudAccount, secret: &str) -> Result<String, String> {
 /// an expiry but no link password. Microsoft does not say which plan a
 /// drive is on; a personal drive's quota tells a free one (5 GB) from a
 /// subscription (100 GB and up).
-pub fn probe_link_terms(
+pub(crate) fn probe_link_terms(
     account: &CloudAccount,
     _secret: &str,
 ) -> Result<Option<LinkTerms>, String> {
@@ -142,7 +142,7 @@ pub fn probe_link_terms(
 /// how the link is made (the composer hands in a copy with the user's
 /// choices for this upload); `fixed_password` is the password to use
 /// when one is wanted, else one is generated per file.
-pub fn upload_and_share(
+pub(crate) fn upload_and_share(
     account: &CloudAccount,
     secret: &str,
     path: &Path,

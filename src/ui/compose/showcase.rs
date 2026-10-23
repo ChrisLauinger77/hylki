@@ -65,10 +65,10 @@ pub(super) fn showcase_hooks(
         });
         if let Ok(v) = std::env::var("HYLKI_SHOWCASE_ATTACH_SHOT") {
             // <png>[:<seconds>], three seconds unless given.
-            let (shot, at) = match v.rsplit_once(':') {
-                Some((p, n)) if n.parse::<u32>().is_ok() => (p.to_string(), n.parse().unwrap()),
-                _ => (v, 3),
-            };
+            let given = v
+                .rsplit_once(':')
+                .and_then(|(p, n)| Some((p.to_string(), n.parse::<u32>().ok()?)));
+            let (shot, at) = given.unwrap_or((v, 3));
             let host = root.clone().upcast::<gtk::Widget>();
             gtk::glib::timeout_add_seconds_local_once(at, move || {
                 if host.is_mapped() {

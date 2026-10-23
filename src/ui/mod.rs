@@ -1,60 +1,60 @@
-pub mod accounts;
-pub mod attachment_drawer;
-pub mod attachment_io;
-pub mod attachments_gallery;
-pub mod carry_over;
-pub mod chip_flow;
-pub mod cloud_accounts;
-pub mod column_bin;
-pub mod command_palette;
-pub mod compose;
-pub mod contact_sources;
-pub mod contact_tree;
-pub mod contacts_browser;
-pub mod contacts_page;
-pub mod context_menu;
-pub mod dialog;
-pub mod drop_zones;
-pub mod emoji;
-pub mod fade_label;
-pub mod folder_picker;
-pub mod grab_pill;
-pub mod icon_picker;
-pub mod initials;
-pub mod keymap;
-pub mod launch;
-pub mod lightbox;
-pub mod message_actions;
-pub mod message_list;
-pub mod message_row;
-pub mod message_view;
-pub mod message_window;
-pub mod notifications;
-pub mod pgp_keys;
-pub mod preferences;
-pub mod print_preview;
-pub mod recipient_row;
-pub mod rich_editor;
-pub mod send_morph;
-pub mod sender_row;
-pub mod showcase;
-pub mod sidebar;
-pub mod theme_picker;
-pub mod thumbnails;
-pub mod tool_flow;
-pub mod translation_page;
-pub mod web_signin;
-pub mod welcome;
+pub(crate) mod accounts;
+pub(crate) mod attachment_drawer;
+pub(crate) mod attachment_io;
+pub(crate) mod attachments_gallery;
+pub(crate) mod carry_over;
+mod chip_flow;
+mod cloud_accounts;
+mod column_bin;
+pub(crate) mod command_palette;
+pub(crate) mod compose;
+mod contact_sources;
+mod contact_tree;
+pub(crate) mod contacts_browser;
+pub(crate) mod contacts_page;
+pub(crate) mod context_menu;
+pub(crate) mod dialog;
+pub(crate) mod drop_zones;
+pub(crate) mod emoji;
+mod fade_label;
+pub(crate) mod folder_picker;
+pub(crate) mod grab_pill;
+mod icon_picker;
+pub(crate) mod initials;
+pub(crate) mod keymap;
+pub(crate) mod launch;
+pub(crate) mod lightbox;
+pub(crate) mod message_actions;
+pub(crate) mod message_list;
+pub(crate) mod message_row;
+pub(crate) mod message_view;
+pub(crate) mod message_window;
+pub(crate) mod notifications;
+mod pgp_keys;
+pub(crate) mod preferences;
+pub(crate) mod print_preview;
+mod recipient_row;
+pub(crate) mod rich_editor;
+pub(crate) mod send_morph;
+mod sender_row;
+pub(crate) mod showcase;
+pub(crate) mod sidebar;
+mod theme_picker;
+pub(crate) mod thumbnails;
+mod tool_flow;
+mod translation_page;
+mod web_signin;
+pub(crate) mod welcome;
 
 /// How long Focus Mode's parts take to slide and fade away (and back), in
 /// milliseconds: the reader toolbar, the list header, the sidebar's
 /// accounts and the list's avatars all move on this one clock.
-pub const FOCUS_ANIM_MS: u32 = 320;
+pub(crate) const FOCUS_ANIM_MS: u32 = 320;
 
 /// Give a Refresh button its face for the network's state: orange, with a
 /// tooltip that says why, while the network is down (#442). The header's, the
 /// peek's and the rail's buttons all wear it.
-pub fn show_refresh_offline(button: &gtk::Button, offline: bool) {
+pub(crate) fn show_refresh_offline(button: &gtk::Button, offline: bool) {
     use gtk::prelude::*;
     let tip = if offline {
         crate::i18n::i18n(
@@ -76,7 +76,7 @@ pub fn show_refresh_offline(button: &gtk::Button, offline: bool) {
 /// added, they would take the main window's other keys too (zoom, Focus
 /// Mode). Capture phase, so a web view with the focus cannot swallow it; it
 /// runs the window's close, as its titlebar button does.
-pub fn close_key() -> gtk::ShortcutController {
+pub(crate) fn close_key() -> gtk::ShortcutController {
     use gtk::prelude::*;
     let shortcuts = gtk::ShortcutController::new();
     shortcuts.set_scope(gtk::ShortcutScope::Global);
@@ -92,7 +92,7 @@ pub fn close_key() -> gtk::ShortcutController {
 /// move to another widget of its own row (the scope dropdown, a button, the
 /// popover a dropdown opens). The check waits for an idle turn because the
 /// new focus widget is not set yet while the leave event runs.
-pub fn close_if_focus_left_row(entry: &gtk::SearchEntry, close: impl Fn() + 'static) {
+fn close_if_focus_left_row(entry: &gtk::SearchEntry, close: impl Fn() + 'static) {
     use gtk::prelude::*;
     if !entry.text().trim().is_empty() {
         return;
@@ -114,13 +114,13 @@ pub fn close_if_focus_left_row(entry: &gtk::SearchEntry, close: impl Fn() + 'sta
 /// holds changes. Loading one restyles every widget in every window, the
 /// message list's rows included, and with hundreds of rows that takes longer
 /// than the work the reload was for (#323).
-pub struct DisplayCss {
+pub(crate) struct DisplayCss {
     provider: gtk::CssProvider,
     css: std::cell::RefCell<String>,
 }
 
 impl DisplayCss {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let provider = gtk::CssProvider::new();
         if let Some(display) = gtk::gdk::Display::default() {
             gtk::style_context_add_provider_for_display(
@@ -135,7 +135,7 @@ impl DisplayCss {
         }
     }
 
-    pub fn load(&self, css: String) {
+    pub(crate) fn load(&self, css: String) {
         if *self.css.borrow() != css {
             self.provider.load_from_string(&css);
             *self.css.borrow_mut() = css;
@@ -150,7 +150,7 @@ impl DisplayCss {
 ///
 /// A touchpad reports pixels in small bites, so those add up to a step
 /// rather than each being one: otherwise a short swipe ran the whole scale.
-pub fn ctrl_scroll_zoom(
+fn ctrl_scroll_zoom(
     zooms: impl Fn() -> bool + 'static,
     step: impl Fn(i8) + 'static,
 ) -> gtk::EventControllerScroll {

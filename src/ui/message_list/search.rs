@@ -41,7 +41,7 @@ pub(super) struct SearchHits {
 
 /// Which messages the search field filters over.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SearchScope {
+pub(crate) enum SearchScope {
     /// Every folder of every account (the merged `search_pool`) but Trash
     /// and Junk, unless the list is showing one of them (#374).
     AllFolders,
@@ -93,7 +93,7 @@ impl SearchScope {
 /// an info button that tells what it searches.
 pub(super) struct ScopePicker {
     pub(super) button: gtk::MenuButton,
-    pub(super) label: gtk::Label,
+    label: gtk::Label,
     /// Follows the way the popover opens (#496).
     pub(super) arrow: gtk::Image,
     radios: Vec<(SearchScope, gtk::CheckButton)>,
@@ -179,11 +179,11 @@ impl ScopePicker {
 
 /// A folder of the cross-folder search pool, as its results show it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PoolFolder {
+pub(crate) struct PoolFolder {
     /// What the result's folder pill says.
-    pub name: String,
+    pub(crate) name: String,
     /// Trash or Junk: left out of an "All folders" search.
-    pub waste: bool,
+    pub(crate) waste: bool,
 }
 
 impl MessageList {

@@ -24,11 +24,11 @@ mod row;
 mod shared;
 mod swipe;
 
-pub use faces::recipient_names;
-pub use headings::{fill_headings, pill_label, tag_menu_entries};
-pub use model::{MessageModel, RowItem};
-pub use shared::{factory, header_factory, make_spare_rows, RowLook, RowShared};
-pub use swipe::SwipeSurface;
+pub(crate) use faces::recipient_names;
+pub(crate) use headings::{fill_headings, pill_label, tag_menu_entries};
+pub(crate) use model::{MessageModel, RowItem};
+pub(crate) use shared::{factory, header_factory, make_spare_rows, RowLook, RowShared};
+pub(crate) use swipe::SwipeSurface;
 // The row diff and the swipe math are tested from the list's tests.
 #[cfg(test)]
 pub(crate) use model::{row_edits, section_starts, swap_wanted, RowEdit};
@@ -36,7 +36,7 @@ pub(crate) use model::{row_edits, section_starts, swap_wanted, RowEdit};
 pub(crate) use swipe::swipe_progress_px;
 
 #[derive(Debug, Clone, Copy)]
-pub enum RowAction {
+pub(crate) enum RowAction {
     Reply,
     ReplyAll,
     Forward,
@@ -67,7 +67,7 @@ pub enum RowAction {
 
 /// A full swipe (#swipe): also `AdwSwipeable`'s reported `distance`, the px
 /// one full drag (progress ±1.0) spans.
-pub const SWIPE_MAX: f64 = 120.0;
+pub(super) const SWIPE_MAX: f64 = 120.0;
 
 /// How far a thread member's node dot reaches past the start of the row's
 /// content box (`.thread-node`: 8px wide, pulled 5px out by its negative
@@ -87,11 +87,11 @@ const TAGS_COLUMN_PX: i32 = 90;
 /// The star's and the paperclip's size on a single line.
 const LINE_ICON_PX: i32 = 12;
 /// The replied column's width: its two arrows and the gap between them.
-pub const REPLIED_PX: i32 = 2 * LINE_ICON_PX + 2;
+pub(super) const REPLIED_PX: i32 = 2 * LINE_ICON_PX + 2;
 
 /// The width a single-line column takes until it is dragged to another
 /// (#334): negative for a date, which is as wide as its text.
-pub fn default_width(column: ListColumn) -> i32 {
+pub(super) fn default_width(column: ListColumn) -> i32 {
     match column {
         ListColumn::Sender | ListColumn::Recipients => SENDER_COLUMN_PX,
         ListColumn::Correspondents => PEOPLE_COLUMN_PX,
@@ -103,7 +103,7 @@ pub fn default_width(column: ListColumn) -> i32 {
 
 /// Whether a column's width can be dragged: the ones of text and the tags,
 /// but not the subject, which takes the rest.
-pub fn resizable(column: ListColumn) -> bool {
+pub(super) fn resizable(column: ListColumn) -> bool {
     matches!(
         column,
         ListColumn::Sender
@@ -127,7 +127,7 @@ fn column_width(look: &RowLook, column: ListColumn) -> i32 {
 /// Distance past which the indicator reads as "armed" (full color) — purely
 /// a visual cue; `AdwSwipeTracker` makes the real commit decision on
 /// release, factoring in velocity too.
-pub const SWIPE_ARM: f64 = 72.0;
+pub(super) const SWIPE_ARM: f64 = 72.0;
 
 /// The commit exit (#swipe): a released swipe that cleared `SWIPE_ARM` flies
 /// the row off the side it was dragged to over this long, while the row's
@@ -143,63 +143,63 @@ const SWIPE_RESTORE_MS: u64 = 600;
 /// Every member of each conversation, keyed by its head's (account, id) —
 /// so a drag that starts on a conversation row carries the whole thread,
 /// as its Delete does (#171).
-pub type ThreadDragKeys = HashMap<(u32, u32), Vec<(u32, u32, u32, u32)>>;
+pub(super) type ThreadDragKeys = HashMap<(u32, u32), Vec<(u32, u32, u32, u32)>>;
 
 /// Where a message sits in the list: its account, folder and id. The id
 /// alone is a UID, which only means something inside one folder (#317).
-pub type Slot = (u32, u32, u32);
+pub(crate) type Slot = (u32, u32, u32);
 
 /// What a row says about its conversation, worked out by the list's rebuild.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct RowMeta {
+pub(crate) struct RowMeta {
     /// Size of the conversation (thread heads only; 1 or 0 otherwise).
-    pub count: usize,
+    pub(super) count: usize,
     /// Whether the chip can open anything: the folder holds more of it.
-    pub expandable: bool,
+    pub(super) expandable: bool,
     /// A reply nested under a thread head — indented on the rail.
-    pub is_child: bool,
+    pub(super) is_child: bool,
     /// The last reply of its thread: the dotted rail stops at its node.
-    pub is_last: bool,
+    pub(super) is_last: bool,
     /// The head's conversation is opened out in the list.
-    pub expanded: bool,
+    pub(super) expanded: bool,
     /// The conversation key, on a head that can toggle.
-    pub key: Option<(u32, String)>,
+    pub(super) key: Option<(u32, String)>,
     /// The newest member's sender, preview and time (thread heads only):
     /// the row speaks for the conversation's latest message.
-    pub from: Option<(String, String)>,
-    pub preview: Option<String>,
-    pub latest: Option<String>,
+    pub(super) from: Option<(String, String)>,
+    pub(super) preview: Option<String>,
+    pub(super) latest: Option<String>,
     /// When that newest member arrived, and its date header, for a short
     /// date on a one-line row (#334).
-    pub latest_at: Option<(i64, String)>,
+    pub(super) latest_at: Option<(i64, String)>,
     /// Any message of the conversation is unread / starred (heads only).
-    pub unread: bool,
-    pub starred: bool,
+    pub(super) unread: bool,
+    pub(super) starred: bool,
     /// The newest member here was replied to / forwarded (heads only): the
     /// row speaks for it, and the arrow says whether it has been answered.
-    pub answered: bool,
-    pub forwarded: bool,
+    pub(super) answered: bool,
+    pub(super) forwarded: bool,
     /// Who took part in the conversation, for the Correspondents column
     /// (#334); worked out only while that column is shown.
-    pub people: Option<String>,
+    pub(super) people: Option<String>,
     /// The row's height is open. False only while a reply slides shut
     /// before it is taken out of the list.
-    pub revealed: bool,
+    pub(super) revealed: bool,
     /// A reply just put in by opening its conversation: it slides open the
     /// first time it is shown instead of simply appearing.
-    pub appear: bool,
+    pub(super) appear: bool,
     /// The group the row heads, for asking the cache how big it is (#222).
-    pub group: Option<(u32, String)>,
+    pub(super) group: Option<(u32, String)>,
     /// A head row past the list's window, described only as far as the
     /// conversation maps need, by this key: the rest is worked out when it
     /// comes on screen (a large folder holds tens of thousands).
-    pub pending: Option<(u32, String)>,
+    pub(super) pending: Option<(u32, String)>,
 }
 
 /// The date heading a row sits under while the list is grouped by date
 /// (#435). `None` everywhere when it is not: one section, and no heading.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum DaySection {
+pub(super) enum DaySection {
     #[default]
     None,
     Today,
@@ -214,7 +214,7 @@ impl DaySection {
     /// today, yesterday, the last 7 days and the last 14 days
     /// (`crate::datefmt::day_starts`). Mail dated ahead of the clock counts
     /// as today's.
-    pub fn of(ts: i64, starts: &[i64; 4]) -> Self {
+    pub(crate) fn of(ts: i64, starts: &[i64; 4]) -> Self {
         let [today, yesterday, week, fortnight] = *starts;
         if ts >= today {
             DaySection::Today
@@ -229,7 +229,7 @@ impl DaySection {
         }
     }
 
-    pub fn label(self) -> String {
+    pub(crate) fn label(self) -> String {
         match self {
             DaySection::None => String::new(),
             DaySection::Today => i18n("Today"),
@@ -243,16 +243,16 @@ impl DaySection {
 
 /// One row's worth of the list: the message and what the row says about it.
 #[derive(Clone, Debug, PartialEq)]
-pub struct RowData {
-    pub msg: Rc<Message>,
-    pub meta: RowMeta,
+pub(crate) struct RowData {
+    pub(super) msg: Rc<Message>,
+    pub(super) meta: RowMeta,
     /// The date heading it sits under (#435): a conversation's replies share
     /// their head's.
-    pub section: DaySection,
+    pub(super) section: DaySection,
 }
 
 impl RowData {
-    pub fn slot(&self) -> Slot {
+    pub(crate) fn slot(&self) -> Slot {
         (self.msg.account_id, self.msg.folder_id, self.msg.id)
     }
 }

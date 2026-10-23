@@ -20,7 +20,7 @@ pub(super) use indicator::TrayHandle;
 
 /// What identifies a tray mail list for change detection: the total, then
 /// each card.
-pub(super) fn tray_mail_key(mail: &indicator::TrayMailList) -> Vec<(u32, u32, String, String)> {
+fn tray_mail_key(mail: &indicator::TrayMailList) -> Vec<(u32, u32, String, String)> {
     std::iter::once((u32::MAX, mail.unread, String::new(), String::new()))
         .chain(mail.items.iter().map(|m| {
             (

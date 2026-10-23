@@ -36,6 +36,9 @@ impl AccountsWindow {
     /// its own page of groups. `entries` are the entry rows whose Enter
     /// should save. Returns the Save button, for a form that dims it while
     /// it cannot save.
+    // Each argument is a different part of the page; a struct would only
+    // name them twice.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn push_form_content(
         &self,
         nav: &adw::NavigationView,

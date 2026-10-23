@@ -15,9 +15,9 @@ use super::prefill::first_recipient;
 /// A reply on its way from the split pane into its conversation: its card,
 /// the composer it was written in, and the conversation it answers.
 pub(super) struct MorphPending {
-    pub(super) message: Message,
-    pub(super) composer: gtk::Widget,
-    pub(super) conversation: (u32, u32),
+    message: Message,
+    composer: gtk::Widget,
+    conversation: (u32, u32),
 }
 
 /// The card a reply sent from the split pane has in its conversation until

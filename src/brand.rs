@@ -47,7 +47,7 @@ thread_local! {
 }
 
 /// The mark decoded at `px` pixels, cached per size.
-pub fn texture(id: &str, px: i32) -> Option<gtk::gdk::Texture> {
+pub(crate) fn texture(id: &str, px: i32) -> Option<gtk::gdk::Texture> {
     use gtk::gdk_pixbuf::PixbufLoader;
     use gtk::prelude::PixbufLoaderExt;
     let key = (id.to_string(), px);
@@ -66,18 +66,18 @@ pub fn texture(id: &str, px: i32) -> Option<gtk::gdk::Texture> {
 
 /// The generic icons for a mark we do not have: a cloud for storage, an
 /// envelope for mail.
-pub const GENERIC_CLOUD: &str = "cloud-symbolic";
-pub const GENERIC_MAIL: &str = "mail-unread-symbolic";
+const GENERIC_CLOUD: &str = "cloud-symbolic";
+pub(crate) const GENERIC_MAIL: &str = "mail-unread-symbolic";
 
 /// An image of the mark, `px` logical pixels square (decoded at twice
 /// that for HiDPI). An unknown id gets the generic cloud icon, so a row
 /// whose service is not known yet still lines up with the others.
-pub fn image(id: &str, px: i32) -> gtk::Image {
+pub(crate) fn image(id: &str, px: i32) -> gtk::Image {
     image_or(id, px, GENERIC_CLOUD)
 }
 
 /// [`image`] with the symbolic icon to show for an id we have no mark for.
-pub fn image_or(id: &str, px: i32, fallback: &str) -> gtk::Image {
+fn image_or(id: &str, px: i32, fallback: &str) -> gtk::Image {
     let image = match texture(id, px * 2) {
         Some(t) => gtk::Image::from_paintable(Some(&t)),
         None => gtk::Image::from_icon_name(fallback),
@@ -113,7 +113,7 @@ fn protocol_pill(id: &str, px: i32) -> Option<gtk::Label> {
 }
 
 /// [`image_or`], or the protocol tile for an account with no provider mark.
-pub fn mark(id: &str, px: i32, fallback: &str) -> gtk::Widget {
+pub(crate) fn mark(id: &str, px: i32, fallback: &str) -> gtk::Widget {
     match protocol_pill(id, px) {
         Some(pill) => pill.upcast(),
         None => image_or(id, px, fallback).upcast(),

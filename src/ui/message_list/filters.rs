@@ -9,7 +9,7 @@ use relm4::prelude::*;
 /// One of the message list's quick filters (#97, #441): with it on, the
 /// list shows only the mail that has the property. Together they narrow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QuickFilter {
+pub(crate) enum QuickFilter {
     Unread,
     Starred,
     Attachment,
@@ -21,7 +21,7 @@ pub enum QuickFilter {
 }
 
 impl QuickFilter {
-    pub const ALL: [QuickFilter; 8] = [
+    pub(crate) const ALL: [QuickFilter; 8] = [
         QuickFilter::Unread,
         QuickFilter::Starred,
         QuickFilter::Attachment,
@@ -32,7 +32,7 @@ impl QuickFilter {
         QuickFilter::Today,
     ];
 
-    pub fn label(self) -> String {
+    pub(crate) fn label(self) -> String {
         use crate::i18n::i18n_noop;
         i18n(match self {
             QuickFilter::Unread => i18n_noop("Unread"),
@@ -47,7 +47,7 @@ impl QuickFilter {
     }
 
     /// The icon the row, the reader or the sidebar already uses for it.
-    pub fn icon(self) -> &'static str {
+    pub(crate) fn icon(self) -> &'static str {
         match self {
             QuickFilter::Unread => "mail-unread-symbolic",
             QuickFilter::Starred => "starred-symbolic",
@@ -67,14 +67,14 @@ impl QuickFilter {
 
 /// The quick filters that are on.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct QuickFilters(u16);
+pub(crate) struct QuickFilters(u16);
 
 impl QuickFilters {
-    pub fn has(self, f: QuickFilter) -> bool {
+    pub(crate) fn has(self, f: QuickFilter) -> bool {
         self.0 & f.bit() != 0
     }
 
-    pub fn with(self, f: QuickFilter, on: bool) -> Self {
+    pub(crate) fn with(self, f: QuickFilter, on: bool) -> Self {
         Self(if on {
             self.0 | f.bit()
         } else {
@@ -82,7 +82,7 @@ impl QuickFilters {
         })
     }
 
-    pub fn is_empty(self) -> bool {
+    pub(crate) fn is_empty(self) -> bool {
         self.0 == 0
     }
 }
@@ -153,7 +153,7 @@ pub(super) fn start_of_today() -> i64 {
 
 /// Which conversations Gmail's * r, * u, * s and * t select (#392).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CheckFilter {
+pub(crate) enum CheckFilter {
     Read,
     Unread,
     Starred,

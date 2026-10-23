@@ -8,14 +8,14 @@ use super::*;
 /// own title and subtitle as shown, so a search works in the language the
 /// app is in.
 #[derive(Clone)]
-pub(super) struct SearchHit {
-    pub(super) page: &'static str,
+struct SearchHit {
+    page: &'static str,
     title: String,
     /// Where it sits: the page, and the group or expander row around it.
     place: String,
     /// Lowercased title, subtitle and place, to match against.
     haystack: String,
-    pub(super) widget: gtk::glib::WeakRef<gtk::Widget>,
+    widget: gtk::glib::WeakRef<gtk::Widget>,
 }
 
 /// The settings search (#260): a search button in the sidebar's header
@@ -272,7 +272,7 @@ fn search_hit(
 }
 
 /// The class that keeps a row, and what it holds, out of the settings search.
-pub const NOT_SEARCHED: &str = "settings-not-searched";
+pub(crate) const NOT_SEARCHED: &str = "settings-not-searched";
 
 /// Walk a page for its groups and rows; `place` is where they sit so far.
 fn index_widget(page: &'static str, w: &gtk::Widget, place: &str, out: &mut Vec<SearchHit>) {

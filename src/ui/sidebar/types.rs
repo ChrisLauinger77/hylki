@@ -16,15 +16,15 @@ pub(super) struct InboxRef {
 /// section inside All Inboxes. The app resolves the rules to these; the
 /// sidebar only draws them (account pill + folder name + unread chip).
 #[derive(Debug, Clone)]
-pub struct UnifiedFolderRef {
-    pub account_id: u32,
-    pub folder: Folder,
+pub(crate) struct UnifiedFolderRef {
+    pub(crate) account_id: u32,
+    pub(crate) folder: Folder,
 }
 
 /// Which copy of the Filtered Folders / Tags section a widget belongs to:
 /// the unified section's, or an account's own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Slot {
+pub(crate) enum Slot {
     Unified,
     Account(u32),
 }
@@ -153,89 +153,89 @@ pub(crate) fn kind_label(kind: FolderKind) -> String {
 
 /// One account's section data, as handed to the sidebar.
 #[derive(Debug, Clone)]
-pub struct SectionData {
-    pub account: Account,
-    pub folders: Vec<Folder>,
-    pub collapsed: bool,
+pub(crate) struct SectionData {
+    pub(crate) account: Account,
+    pub(crate) folders: Vec<Folder>,
+    pub(crate) collapsed: bool,
     /// Whether this account's custom-folders section is expanded (default hidden).
-    pub custom_expanded: bool,
+    pub(crate) custom_expanded: bool,
     /// Resolved avatar background color ("#rrggbb").
-    pub color: String,
+    pub(crate) color: String,
     /// Avatar emoji; when absent, account-name initials are shown.
-    pub emoji: Option<String>,
+    pub(crate) emoji: Option<String>,
     /// Avatar picture (#162), shown before the emoji and the initials.
-    pub avatar: Option<std::path::PathBuf>,
+    pub(crate) avatar: Option<std::path::PathBuf>,
     /// Custom-folder paths whose tree node is collapsed (#51).
-    pub tree_collapsed: Vec<String>,
+    pub(crate) tree_collapsed: Vec<String>,
     /// The user's own folder order (paths): a folder sorts among its
     /// siblings by where it stands here, unlisted ones after, as the server
     /// sorted them. Empty keeps the default order.
-    pub folder_order: Vec<String>,
+    pub(crate) folder_order: Vec<String>,
     /// How the server spells its folder hierarchy, to tell a folder's
     /// siblings on the server from the folders merely drawn beside it.
-    pub hierarchy: Hierarchy,
+    pub(crate) hierarchy: Hierarchy,
     /// How the custom folders are sorted: the account's own choice
     /// (`own_folder_sort`) or else Settings' (`default_folder_sort`).
-    pub folder_sort: crate::config::FolderSort,
-    pub own_folder_sort: Option<crate::config::FolderSort>,
-    pub default_folder_sort: crate::config::FolderSort,
+    pub(crate) folder_sort: crate::config::FolderSort,
+    pub(crate) own_folder_sort: Option<crate::config::FolderSort>,
+    pub(crate) default_folder_sort: crate::config::FolderSort,
     /// The folders this account's filter rules file into (every rule's
     /// destination).
-    pub filtered: Vec<Folder>,
+    pub(crate) filtered: Vec<Folder>,
     /// Whether this account has any filter rule at all: only then is
     /// "Apply Filters" worth offering on its folders (#198).
-    pub has_filters: bool,
+    pub(crate) has_filters: bool,
     /// Whether this account's own "Tags" section is open.
-    pub tags_expanded: bool,
+    pub(crate) tags_expanded: bool,
     /// Whether the account takes part in the unified section (#267): off,
     /// its folders are left out of every unified row and chip, and only
     /// its own section lists them.
-    pub in_unified: bool,
+    pub(crate) in_unified: bool,
     /// A Gmail account, whose own folders are labels and say so (#374).
-    pub gmail: bool,
+    pub(crate) gmail: bool,
 }
 
 /// Initial state for the sidebar.
-pub struct SidebarInit {
+pub(crate) struct SidebarInit {
     /// Icon-only mode: hide all text, show just icons and account pills.
-    pub collapsed: bool,
+    pub(crate) collapsed: bool,
     /// A mirror instance (the floating peek panel): it never picks a view
     /// on its own when nothing is selected — the app hands it the primary
     /// sidebar's choice through `SidebarInput::MirrorSelection`.
-    pub mirror: bool,
+    pub(crate) mirror: bool,
     /// The three sections' open state as last left (persisted with the
     /// sidebar layout).
-    pub unified_expanded: bool,
-    pub filtered_expanded: bool,
-    pub tags_expanded: bool,
+    pub(crate) unified_expanded: bool,
+    pub(crate) filtered_expanded: bool,
+    pub(crate) tags_expanded: bool,
     /// The unified Starred / Sent / Drafts rows' account lists.
-    pub starred_expanded: bool,
-    pub sent_expanded: bool,
-    pub drafts_expanded: bool,
-    pub archive_expanded: bool,
-    pub junk_expanded: bool,
-    pub trash_expanded: bool,
-    pub favorites_expanded: bool,
-    pub smart_expanded: bool,
-    pub contacts_expanded: bool,
-    pub contacts_folded: Vec<String>,
+    pub(crate) starred_expanded: bool,
+    pub(crate) sent_expanded: bool,
+    pub(crate) drafts_expanded: bool,
+    pub(crate) archive_expanded: bool,
+    pub(crate) junk_expanded: bool,
+    pub(crate) trash_expanded: bool,
+    pub(crate) favorites_expanded: bool,
+    pub(crate) smart_expanded: bool,
+    pub(crate) contacts_expanded: bool,
+    pub(crate) contacts_folded: Vec<String>,
     /// Whether the "Attachments" row is shown.
-    pub show_attachments: bool,
+    pub(crate) show_attachments: bool,
     /// Where the first pick lands instead of All Inboxes (#256).
-    pub start: Option<StartTarget>,
+    pub(crate) start: Option<StartTarget>,
 }
 
 /// A view to open at launch (#256), by account address: an account's
 /// inbox, or one of its folders by path.
 #[derive(Clone, Debug)]
-pub enum StartTarget {
+pub(crate) enum StartTarget {
     Inbox(String),
     Folder(String, String),
 }
 
 /// What is currently selected in the sidebar.
 #[derive(Clone, PartialEq, Debug)]
-pub enum Sel {
+pub(crate) enum Sel {
     None,
     Unified,
     /// The attachments gallery (all inboxes).

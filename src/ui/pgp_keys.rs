@@ -12,12 +12,12 @@ use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::pgp::{self, Gpg, ImportSummary, KeyInfo};
 
 /// What the page needs at launch: the identities keys can be made for.
-pub struct PgpKeysInit {
+pub(super) struct PgpKeysInit {
     /// (name, address) per account and alias.
-    pub identities: Vec<(String, String)>,
+    pub(super) identities: Vec<(String, String)>,
 }
 
-pub struct PgpKeys {
+pub(super) struct PgpKeys {
     identities: Vec<(String, String)>,
     own: Vec<KeyInfo>,
     others: Vec<KeyInfo>,
@@ -32,7 +32,7 @@ pub struct PgpKeys {
 }
 
 #[derive(Debug)]
-pub enum PgpKeysInput {
+pub(super) enum PgpKeysInput {
     /// Re-read the keyring and rebuild both lists.
     Refresh,
     Generate,
@@ -62,7 +62,7 @@ pub enum PgpKeysInput {
 }
 
 #[derive(Debug)]
-pub enum PgpKeysCmd {
+pub(super) enum PgpKeysCmd {
     Generated(Result<String, String>),
     Fetched(Result<ImportSummary, String>),
     /// What an import, delete or trust has to say, if anything.
@@ -82,7 +82,7 @@ const EXPIRIES: &[(&str, &str)] = &[
     (crate::i18n::i18n_noop("Never"), "never"),
 ];
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for PgpKeys {
     type Init = PgpKeysInit;
     type Input = PgpKeysInput;

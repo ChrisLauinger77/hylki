@@ -69,6 +69,8 @@ pub(super) fn row_matches(row: &gtk::ListBoxRow, query: &str) -> bool {
     title.contains(query) || subtitle.contains(query)
 }
 
+/// A list-item factory whose labels never ellipsize, so a `ComboRow` popup grows
+/// to fit its longest option instead of truncating it.
 pub(crate) fn non_ellipsizing_factory() -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(|_, item| {

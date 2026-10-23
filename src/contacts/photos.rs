@@ -116,7 +116,7 @@ fn start_photo_watcher() {
     });
 }
 
-pub fn watch_photo_changes<F: Fn() + Send + Sync + 'static>(callback: F) {
+pub(crate) fn watch_photo_changes<F: Fn() + Send + Sync + 'static>(callback: F) {
     PHOTO_CHANGE_CALLBACKS
         .get_or_init(|| Mutex::new(Vec::new()))
         .lock()
@@ -128,7 +128,7 @@ pub fn watch_photo_changes<F: Fn() + Send + Sync + 'static>(callback: F) {
 
 /// Current index generation. Avatar textures and negative results use this to
 /// invalidate themselves after an EDS/CardDAV database change.
-pub fn photo_generation() -> u64 {
+pub(crate) fn photo_generation() -> u64 {
     start_photo_load();
     start_photo_watcher();
     CONTACT_PHOTOS
@@ -138,7 +138,7 @@ pub fn photo_generation() -> u64 {
         .generation
 }
 
-pub fn photos_ready() -> bool {
+pub(crate) fn photos_ready() -> bool {
     start_photo_load();
     CONTACT_PHOTOS
         .get_or_init(new_photo_index)
@@ -152,7 +152,7 @@ pub fn photos_ready() -> bool {
 /// CardDAV backends such as Nextcloud keep PHOTO in the cached vCard, so this
 /// does not contact the address-book server or disclose the sender address to a third
 /// party.
-pub fn contact_photos(email: &str) -> Vec<Arc<[u8]>> {
+pub(crate) fn contact_photos(email: &str) -> Vec<Arc<[u8]>> {
     let key = email.trim().to_lowercase();
     if key.is_empty() {
         return Vec::new();

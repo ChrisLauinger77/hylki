@@ -17,8 +17,10 @@ use crate::config::OAuthSettings;
 mod flow;
 mod tokens;
 
-pub use flow::{microsoft_prompt, open_uri, run_flow, run_flow_as, Authorization};
-pub use tokens::{exchange_code, microsoft_whoami, refresh_access_token, refresh_access_token_as};
+pub(crate) use flow::{microsoft_prompt, open_uri, run_flow, run_flow_as, Authorization};
+pub(crate) use tokens::{
+    exchange_code, microsoft_whoami, refresh_access_token, refresh_access_token_as,
+};
 
 // Built-in OAuth client credentials.
 //
@@ -66,22 +68,22 @@ const DROPBOX_CLIENT_ID: &str = match option_env!("HYLKI_DROPBOX_CLIENT_ID") {
 /// Dropbox matches loopback redirect URIs exactly, port included, so the
 /// listener for its sign-in is on this fixed port and the app's registered
 /// redirect URI is `http://localhost:41597/`.
-pub const DROPBOX_REDIRECT_PORT: u16 = 41597;
+pub(crate) const DROPBOX_REDIRECT_PORT: u16 = 41597;
 
 /// Server presets for a known provider (endpoints + IMAP/SMTP hosts). Client
 /// credentials come from [`provider_credentials`], not here.
-pub struct Preset {
-    pub auth_url: &'static str,
-    pub token_url: &'static str,
-    pub scopes: &'static str,
-    pub imap_host: &'static str,
-    pub imap_port: u16,
-    pub smtp_host: &'static str,
-    pub smtp_port: u16,
+pub(crate) struct Preset {
+    pub(crate) auth_url: &'static str,
+    pub(crate) token_url: &'static str,
+    pub(crate) scopes: &'static str,
+    pub(crate) imap_host: &'static str,
+    pub(crate) imap_port: u16,
+    pub(crate) smtp_host: &'static str,
+    pub(crate) smtp_port: u16,
 }
 
 /// Preset for a provider key ("google" / "microsoft"), or `None` for custom.
-pub fn preset(provider: &str) -> Option<Preset> {
+pub(crate) fn preset(provider: &str) -> Option<Preset> {
     match provider {
         "google" => Some(Preset {
             auth_url: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -116,7 +118,7 @@ pub fn preset(provider: &str) -> Option<Preset> {
 /// Asked for only when the account's directory switch is turned on, since a
 /// tenant that lets users approve mail access may still want an
 /// administrator for these.
-pub const MICROSOFT_DIRECTORY_SCOPES: [&str; 2] = [
+const MICROSOFT_DIRECTORY_SCOPES: [&str; 2] = [
     "https://graph.microsoft.com/People.Read",
     "https://graph.microsoft.com/User.ReadBasic.All",
 ];
@@ -125,7 +127,7 @@ pub const MICROSOFT_DIRECTORY_SCOPES: [&str; 2] = [
 /// (#411), when a message's label leaves its name out. Asked for only when
 /// the account's label switch is turned on, for the same reason as the
 /// directory's.
-pub const MICROSOFT_LABEL_SCOPES: [&str; 1] =
+pub(crate) const MICROSOFT_LABEL_SCOPES: [&str; 1] =
     ["https://graph.microsoft.com/InformationProtectionPolicy.Read"];
 
 /// Every scope Hylki adds to its own sign-in on request.
@@ -142,13 +144,13 @@ fn is_scope(scope: &str, full: &str) -> bool {
 }
 
 /// Whether a sign-in with `scopes` was granted all of `set`.
-pub fn has_scopes(scopes: &str, set: &[&str]) -> bool {
+pub(crate) fn has_scopes(scopes: &str, set: &[&str]) -> bool {
     set.iter()
         .all(|full| scopes.split_whitespace().any(|s| is_scope(s, full)))
 }
 
 /// `scopes` with those of `set` added where missing.
-pub fn with_scopes(scopes: &str, set: &[&str]) -> String {
+pub(crate) fn with_scopes(scopes: &str, set: &[&str]) -> String {
     let mut list: Vec<&str> = scopes.split_whitespace().collect();
     for full in set {
         if !list.iter().any(|s| is_scope(s, full)) {
@@ -159,12 +161,12 @@ pub fn with_scopes(scopes: &str, set: &[&str]) -> String {
 }
 
 /// Whether a sign-in with `scopes` was granted the directory search.
-pub fn has_directory_scopes(scopes: &str) -> bool {
+pub(crate) fn has_directory_scopes(scopes: &str) -> bool {
     has_scopes(scopes, &MICROSOFT_DIRECTORY_SCOPES)
 }
 
 /// `scopes` with the directory's added where missing.
-pub fn with_directory_scopes(scopes: &str) -> String {
+pub(crate) fn with_directory_scopes(scopes: &str) -> String {
     with_scopes(scopes, &MICROSOFT_DIRECTORY_SCOPES)
 }
 
@@ -190,7 +192,7 @@ fn without_extra_scopes(scopes: &str) -> String {
 /// what `settings` has. Scopes are Graph's short names, as Evolution lists
 /// them; `offline_access` is added when missing, or no refresh token comes
 /// back.
-pub fn microsoft_advanced(
+pub(crate) fn microsoft_advanced(
     settings: &mut OAuthSettings,
     client_id: &str,
     tenant: &str,
@@ -225,7 +227,7 @@ pub fn microsoft_advanced(
 /// [`microsoft_advanced`] read back from a saved account's settings, for
 /// the form: `(client_id, tenant, scopes, redirect)`, each empty where it
 /// is Hylki's own.
-pub fn microsoft_advanced_of(settings: &OAuthSettings) -> (String, String, String, String) {
+pub(crate) fn microsoft_advanced_of(settings: &OAuthSettings) -> (String, String, String, String) {
     let Some(p) = preset("microsoft") else {
         return Default::default();
     };
@@ -264,7 +266,7 @@ pub fn microsoft_advanced_of(settings: &OAuthSettings) -> (String, String, Strin
 /// A user override only takes effect once complete (both id and secret), so a
 /// half-configured `oauth.toml` (client_id but no secret yet) keeps working on the
 /// fallback instead of breaking sign-in.
-pub fn provider_credentials(provider: &str) -> (String, String) {
+pub(crate) fn provider_credentials(provider: &str) -> (String, String) {
     // `secret_required`: Google desktop clients always have a secret and its token
     // endpoint demands it, so the override only counts as complete with both. Azure
     // desktop apps are public clients (PKCE, no secret), so a client_id alone is a

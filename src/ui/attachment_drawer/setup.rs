@@ -36,6 +36,7 @@ pub(super) fn activate_on_keys(flow: &gtk::FlowBox, sender: &ComponentSender<Att
 /// state: a plain click toggles the drawer, a drag resizes it live —
 /// collapsed included, where the release point becomes the drawer's
 /// new height.
+///
 /// The full-width edge variant: the whole seam clicks and drags, not
 /// just the centred bar — hunting a 120px target over a busy reader
 /// made the handle feel unreliable.

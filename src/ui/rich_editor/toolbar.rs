@@ -19,9 +19,9 @@ use adw::prelude::*;
 /// menus, whose labels name the caret's block, font and size (#358).
 pub(super) struct ToolbarState {
     toggles: Vec<(char, gtk::ToggleButton)>,
-    pub(super) style: gtk::MenuButton,
-    pub(super) font: gtk::MenuButton,
-    pub(super) size: gtk::MenuButton,
+    style: gtk::MenuButton,
+    font: gtk::MenuButton,
+    size: gtk::MenuButton,
 }
 
 impl ToolbarState {

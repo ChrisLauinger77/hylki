@@ -14,20 +14,20 @@ use crate::ui::sidebar::SidebarInput;
 
 /// What [`fill`] made: the rows with the scope each picks, and what the
 /// sidebar folds and opens them with.
-pub struct Filled {
-    pub rows: Vec<(ContactScope, gtk::ListBoxRow)>,
-    pub layout: Vec<TreeRow>,
+pub(super) struct Filled {
+    pub(super) rows: Vec<(ContactScope, gtk::ListBoxRow)>,
+    pub(super) layout: Vec<TreeRow>,
     /// Each foldable node's chevron, by its key.
-    pub chevrons: Vec<(String, gtk::Image)>,
+    pub(super) chevrons: Vec<(String, gtk::Image)>,
 }
 
 /// A row that hides while the account or book above it is folded, sliding
 /// as folder rows do.
-pub struct TreeRow {
-    pub row: gtk::ListBoxRow,
-    pub revealer: gtk::Revealer,
+pub(super) struct TreeRow {
+    pub(super) row: gtk::ListBoxRow,
+    pub(super) revealer: gtk::Revealer,
     /// The keys of the nodes above it.
-    pub under: Vec<String>,
+    pub(super) under: Vec<String>,
 }
 
 /// The key that folds a book's groups.
@@ -42,7 +42,7 @@ fn book_key(uid: &str) -> String {
 /// account or book folds as a folder with sub-folders does (`folded` holds
 /// the keys of those folded). In the icon rail (`collapsed`) the books
 /// show as icons alone, with no accounts or groups.
-pub fn fill(
+pub(super) fn fill(
     list: &gtk::ListBox,
     tree: &ContactTree,
     collapsed: bool,

@@ -184,6 +184,8 @@ impl Sidebar {
         }
     }
 
+    /// Re-apply the current selection after a rebuild; on first populate (no
+    /// prior selection) default to the unified row if shown, else the first folder.
     pub(super) fn restore_selection(&mut self) {
         // With nothing selected the primary instance picks the opening view
         // (All Inboxes, else the first inbox) and must say so: that first

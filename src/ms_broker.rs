@@ -23,16 +23,16 @@ const PRT_SSO_COOKIE: u32 = 8;
 /// A sign-in cookie from the broker: its name (`x-ms-RefreshTokenCredential`
 /// in practice) and value.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SsoCookie {
-    pub name: String,
-    pub value: String,
+pub(crate) struct SsoCookie {
+    pub(crate) name: String,
+    pub(crate) value: String,
 }
 
 /// The broker's sign-in cookie for `user`, when `settings` signs in to
 /// Entra ID and a broker on this computer has that account. `user` is the
 /// address being signed in; without one, a broker holding a single
 /// account uses it. Blocking: call it off the main thread.
-pub fn sso_cookie(
+pub(crate) fn sso_cookie(
     settings: &crate::config::OAuthSettings,
     user: Option<&str>,
 ) -> Option<SsoCookie> {

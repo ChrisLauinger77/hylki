@@ -16,7 +16,7 @@ use crate::i18n::{i18n, i18n_f, ni18n, ni18n_f};
 
 /// Which surface the files were let go on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DropChoice {
+pub(crate) enum DropChoice {
     Attach,
     Inline,
     Cloud,
@@ -25,7 +25,7 @@ pub enum DropChoice {
 /// What the files are dropped into, which is what the cards say and how
 /// they are laid out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DropContext {
+pub(crate) enum DropContext {
     /// A composer: the cards stack as rows, the reading pane being tall.
     Composer,
     /// The main window with no composer open: each card starts a new
@@ -41,7 +41,10 @@ const LAYER_SPACING: i32 = 14;
 /// A card's side padding (`.drop-zone`) plus its border.
 const CARD_PADDING: i32 = 18;
 
-pub struct DropZones {
+/// What [`DropZones`] runs before the cards come up.
+type Refresh = Box<dyn Fn(&DropZones)>;
+
+pub(crate) struct DropZones {
     context: DropContext,
     layer: gtk::Box,
     zones: gtk::Box,
@@ -64,7 +67,7 @@ pub struct DropZones {
     gate: RefCell<Option<Box<dyn Fn() -> bool>>>,
     /// Run before the cards come up, to bring what they depend on (the
     /// format a new message starts in, the cloud accounts) up to date.
-    refresh: RefCell<Option<Box<dyn Fn(&DropZones)>>>,
+    refresh: RefCell<Option<Refresh>>,
 }
 
 struct Zone {
@@ -79,7 +82,7 @@ impl DropZones {
     /// Lay the surfaces over `host`'s content (`overlay` is the host's
     /// overlay) and watch `host` for file drags. `on_drop` gets the files
     /// and the surface they landed on.
-    pub fn install(
+    pub(crate) fn install(
         context: DropContext,
         host: &impl IsA<gtk::Widget>,
         overlay: &gtk::Overlay,
@@ -266,28 +269,33 @@ impl DropZones {
         }
     }
 
-    pub fn set_allow_inline(&self, on: bool) {
+    pub(crate) fn set_allow_inline(&self, on: bool) {
         self.allow_inline.set(on);
     }
 
-    pub fn set_cloud_names(&self, names: Vec<String>) {
+    pub(crate) fn set_cloud_names(&self, names: Vec<String>) {
         *self.cloud_names.borrow_mut() = names;
     }
 
     /// Bring the cards up only while `gate` says so.
-    pub fn set_gate(&self, gate: impl Fn() -> bool + 'static) {
+    pub(crate) fn set_gate(&self, gate: impl Fn() -> bool + 'static) {
         *self.gate.borrow_mut() = Some(Box::new(gate));
     }
 
     /// Run `refresh` each time the cards are about to come up.
-    pub fn set_refresh(&self, refresh: impl Fn(&DropZones) + 'static) {
+    pub(crate) fn set_refresh(&self, refresh: impl Fn(&DropZones) + 'static) {
         *self.refresh.borrow_mut() = Some(Box::new(refresh));
     }
 
     /// HYLKI_SHOWCASE_DROP_ZONES: bring the surfaces up for `paths` as a
     /// drag would, with `hover`'s card marked as under the pointer, since
     /// no drag can be made from a script.
-    pub fn showcase(&self, paths: &[PathBuf], host: &gtk::Widget, hover: Option<DropChoice>) {
+    pub(crate) fn showcase(
+        &self,
+        paths: &[PathBuf],
+        host: &gtk::Widget,
+        hover: Option<DropChoice>,
+    ) {
         self.show(paths, host.width(), host.height());
         // A capture's window is never drawn on screen, so its animations
         // do not advance: the end of the fade is what there is to see.

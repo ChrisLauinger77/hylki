@@ -3,11 +3,6 @@
 
 use relm4::prelude::*;
 
-/// Whether a clicked link may be handed to the desktop's default handler.
-///
-/// An allowlist, not a blocklist: every scheme a desktop registers is a program
-/// that would be started with a sender-controlled argument, and there is no way
-/// to enumerate the dangerous ones ahead of time.
 /// The HYLKI_SHOWCASE_CLICK_LINK probe: find the first web link in any
 /// message frame, say what the top document has at that point (the frame
 /// itself when nothing covers it), and click the link.
@@ -21,6 +16,11 @@ var who=el?el.tagName+(el.className?'.'+el.className:''):'nothing';a.click();\
 return 'clicked '+a.href+' at '+Math.round(x)+','+Math.round(y)+' over '+who;}\
 return 'no web link in any frame';})()";
 
+/// Whether a clicked link may be handed to the desktop's default handler.
+///
+/// An allowlist, not a blocklist: every scheme a desktop registers is a program
+/// that would be started with a sender-controlled argument, and there is no way
+/// to enumerate the dangerous ones ahead of time.
 pub(super) fn is_launchable_uri(uri: &str) -> bool {
     match uri.split_once(':') {
         Some((scheme, rest)) => {

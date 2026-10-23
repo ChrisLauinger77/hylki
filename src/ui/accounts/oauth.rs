@@ -2,6 +2,7 @@
 //! consents for the directory and labels, and the Online Accounts panel.
 
 use super::form::trimmed;
+use super::messages::SignInResult;
 use super::providers::provider_at;
 use super::*;
 
@@ -15,7 +16,7 @@ fn sign_in(
     settings: OAuthSettings,
     user: Option<String>,
     hint: bool,
-    wrap: fn(Result<(String, Option<(String, String)>), String>) -> AccountsCmd,
+    wrap: fn(SignInResult) -> AccountsCmd,
 ) {
     if !settings.redirect_uri.trim().is_empty() {
         let parent = root.root().and_downcast::<gtk::Window>();
@@ -62,8 +63,6 @@ fn sign_in(
     });
 }
 
-/// A list-item factory whose labels never ellipsize, so a `ComboRow` popup grows
-/// to fit its longest option instead of truncating it.
 /// Open GNOME Settings → Online Accounts. Uses D-Bus app activation so it works
 /// both natively and inside a Flatpak (with `--talk-name=org.gnome.Settings`);
 /// falls back to the CLI on non-GNOME/older setups.
@@ -105,7 +104,7 @@ impl AccountsWindow {
     fn take_consent(
         &mut self,
         widgets: &AccountsWindowWidgets,
-        result: Result<(String, Option<(String, String)>), String>,
+        result: SignInResult,
     ) -> Result<(), String> {
         // A saved account signs in as itself: another mailbox picked in
         // the browser would swap the account's token.
@@ -146,7 +145,8 @@ impl AccountsWindow {
     ) -> OAuthSettings {
         let provider = provider_at(widgets.form.provider_row.selected()).oauth_name();
         if let Some(name) = provider {
-            let p = crate::oauth::preset(name).unwrap();
+            let p = crate::oauth::preset(name)
+                .expect("oauth_name only names providers oauth has a preset for");
             let (client_id, client_secret) = crate::oauth::provider_credentials(name);
             let mut settings = OAuthSettings {
                 auth_url: p.auth_url.to_string(),
@@ -316,11 +316,7 @@ impl AccountsWindow {
         );
     }
 
-    pub(super) fn on_signed_in(
-        &mut self,
-        result: Result<(String, Option<(String, String)>), String>,
-        widgets: &AccountsWindowWidgets,
-    ) {
+    pub(super) fn on_signed_in(&mut self, result: SignInResult, widgets: &AccountsWindowWidgets) {
         widgets.form.oauth_signin_btn.set_sensitive(true);
         widgets.form.oauth_status.set_visible(true);
         match result {
@@ -352,7 +348,7 @@ impl AccountsWindow {
 
     pub(super) fn on_directory_consent(
         &mut self,
-        result: Result<(String, Option<(String, String)>), String>,
+        result: SignInResult,
         widgets: &AccountsWindowWidgets,
     ) {
         widgets.form.graph_directory_row.set_sensitive(true);
@@ -380,7 +376,7 @@ impl AccountsWindow {
 
     pub(super) fn on_labels_consent(
         &mut self,
-        result: Result<(String, Option<(String, String)>), String>,
+        result: SignInResult,
         widgets: &AccountsWindowWidgets,
     ) {
         widgets.form.graph_labels_row.set_sensitive(true);

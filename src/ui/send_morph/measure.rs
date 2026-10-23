@@ -7,7 +7,7 @@ use gtk::graphene;
 /// The script that lists the reader document's cards: each one's key, its
 /// box in the view's own pixels, and its header's height, with the view's
 /// width in the document's pixels to scale them by.
-pub const CARDS_JS: &str = concat!("(function(){", first_text_js!(), "var r=[];var ms=document.querySelectorAll('.hylki-msg');\
+pub(super) const CARDS_JS: &str = concat!("(function(){", first_text_js!(), "var r=[];var ms=document.querySelectorAll('.hylki-msg');\
 for(var i=0;i<ms.length;i++){var b=ms[i].getBoundingClientRect();\
 var h=ms[i].querySelector('.hylki-msg-hdr');\
 var f=ms[i].querySelector('iframe.hylki-frame'),t=null;\
@@ -19,7 +19,7 @@ for(var j=0;j<fs.length;j++){if(!fs[j].classList.contains('hylki-live'))live=fal
 return JSON.stringify({w:window.innerWidth,y:window.scrollY,live:live,cards:r});})()");
 
 /// The script that finds where the editor's first line of text begins.
-pub const EDITOR_TEXT_JS: &str = concat!(
+pub(super) const EDITOR_TEXT_JS: &str = concat!(
     "(function(){",
     first_text_js!(),
     "return JSON.stringify({w:window.innerWidth,t:ft(document)});})()"
@@ -41,7 +41,7 @@ macro_rules! first_text_js {
 use first_text_js;
 
 /// Where [`EDITOR_TEXT_JS`] found the first line, in stage coordinates.
-pub fn parse_text(json: &str, view: &graphene::Rect) -> Option<(graphene::Point, f32)> {
+pub(super) fn parse_text(json: &str, view: &graphene::Rect) -> Option<(graphene::Point, f32)> {
     let v: serde_json::Value = serde_json::from_str(json).ok()?;
     let css_w = v.get("w")?.as_f64()? as f32;
     let k = if css_w > 0.0 {
@@ -57,18 +57,23 @@ pub fn parse_text(json: &str, view: &graphene::Rect) -> Option<(graphene::Point,
     ))
 }
 
+/// One card as [`CARDS_JS`] reports it, in stage coordinates: its key, its
+/// box and header height `[x, y, width, height, head]`, and where its first
+/// line of text begins `(x, y, size)` when it has one.
+type MeasuredCard = (String, [f32; 5], Option<(f32, f32, f32)>);
+
 /// What [`CARDS_JS`] reported, placed in stage coordinates given the web
 /// view's box there.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Measured {
-    pub live: bool,
+pub(super) struct Measured {
+    pub(super) live: bool,
     /// The document's scroll, which must hold still too.
-    pub scroll: f64,
-    pub cards: Vec<(String, [f32; 5], Option<(f32, f32, f32)>)>,
+    scroll: f64,
+    pub(super) cards: Vec<MeasuredCard>,
 }
 
 impl Measured {
-    pub fn parse(json: &str, view: &graphene::Rect) -> Option<Measured> {
+    pub(super) fn parse(json: &str, view: &graphene::Rect) -> Option<Measured> {
         let v: serde_json::Value = serde_json::from_str(json).ok()?;
         let css_w = v.get("w")?.as_f64()? as f32;
         let k = if css_w > 0.0 {
@@ -112,7 +117,7 @@ impl Measured {
         })
     }
 
-    pub fn cards(&self) -> Vec<Card> {
+    pub(super) fn cards(&self) -> Vec<Card> {
         self.cards
             .iter()
             .map(|(key, b, t)| Card {

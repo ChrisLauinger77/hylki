@@ -239,6 +239,8 @@ impl MessageList {
         }
     }
 
+    /// The source changed: its conversations are to be worked out again,
+    /// and an answer still on its way from a background thread is stale.
     pub(super) fn drop_threads(&self) {
         self.source_threads.take();
         // A message's address says which it is only while the list lasts:
@@ -328,9 +330,6 @@ impl MessageList {
             .map(|m| (m.account_id, m.id))
     }
 
-    /// Every on-screen member of `m`'s conversation (oldest first) — from any
-    /// member, head or reply. Empty when threading is off or `m` stands alone,
-    /// so callers can treat non-empty as "this is a real thread".
     /// The conversation a row stands for, or empty when the row means only its
     /// own message. A row stands for its thread when it is the head of one and
     /// the thread is not currently opened out in the list — which, with
@@ -354,6 +353,9 @@ impl MessageList {
         }
     }
 
+    /// Every on-screen member of `m`'s conversation (oldest first) — from any
+    /// member, head or reply. Empty when threading is off or `m` stands alone,
+    /// so callers can treat non-empty as "this is a real thread".
     pub(super) fn thread_members(&self, m: &Message) -> Vec<Message> {
         if !self.threading {
             return Vec::new();

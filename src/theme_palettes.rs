@@ -7,7 +7,7 @@
 
 use crate::theme::{Palette, Theme};
 
-pub const ROSE: Theme = Theme {
+const ROSE: Theme = Theme {
     id: "rose",
     label: "Rose",
     light: Palette {
@@ -100,7 +100,7 @@ pub const ROSE: Theme = Theme {
     },
 };
 
-pub const FOREST: Theme = Theme {
+const FOREST: Theme = Theme {
     id: "forest",
     label: "Forest",
     light: Palette {
@@ -193,7 +193,7 @@ pub const FOREST: Theme = Theme {
     },
 };
 
-pub const TIDAL: Theme = Theme {
+const TIDAL: Theme = Theme {
     id: "tidal",
     label: "Tidal",
     light: Palette {
@@ -286,7 +286,7 @@ pub const TIDAL: Theme = Theme {
     },
 };
 
-pub const EARTH: Theme = Theme {
+const EARTH: Theme = Theme {
     id: "earth",
     label: "Earth",
     light: Palette {
@@ -379,7 +379,7 @@ pub const EARTH: Theme = Theme {
     },
 };
 
-pub const MIDNIGHT: Theme = Theme {
+const MIDNIGHT: Theme = Theme {
     id: "midnight",
     label: "Midnight",
     light: Palette {
@@ -473,4 +473,4 @@ pub const MIDNIGHT: Theme = Theme {
 };
 
 /// Every bundled theme, in the order the picker shows them.
-pub const THEMES: &[Theme] = &[MIDNIGHT, TIDAL, ROSE, EARTH, FOREST];
+pub(crate) const THEMES: &[Theme] = &[MIDNIGHT, TIDAL, ROSE, EARTH, FOREST];

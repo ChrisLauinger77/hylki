@@ -207,12 +207,7 @@ impl AppModel {
         messages: Vec<Message>,
         manual: bool,
     ) -> (Vec<Message>, Vec<(Message, String)>, FolderTally) {
-        if self.filters.is_empty()
-            || (!manual && self.inbox_of(account_id).map(|f| f.id) != Some(folder_id))
-        {
-            return (messages, Vec::new(), FolderTally::default());
-        }
-        let Some(email) = self.email_of(account_id) else {
+        let Some(email) = self.filtered_account(account_id, folder_id, manual) else {
             return (messages, Vec::new(), FolderTally::default());
         };
         let rules: Vec<&config::FilterRule> = self
@@ -289,20 +284,7 @@ impl AppModel {
                         // would repeat the toast.
                         continue;
                     }
-                    tracing::info!(
-                        "filter: {} → {} [{}]",
-                        m.from_addr,
-                        rule.dest_path,
-                        rule.label(),
-                    );
-                    self.send_to(
-                        account_id,
-                        MailRequest::MoveMessage {
-                            path: src.clone(),
-                            uid: m.uid,
-                            dest: rule.dest_path.clone(),
-                        },
-                    );
+                    self.request_filter_move(account_id, src, &m, rule);
                     filed.push((m, rule.dest_path.clone()));
                 }
                 _ => kept.push(m),
@@ -315,13 +297,7 @@ impl AppModel {
                 .insert((account_id, folder_id), still_pending);
         }
         if manual {
-            let folder = src.as_deref().unwrap_or("?");
-            for (rule, n) in rules.iter().zip(&per_rule) {
-                tracing::info!(
-                    "filter: [{}] matched {n} of {checked} in {folder}",
-                    rule.label()
-                );
-            }
+            log_rule_counts(&rules, &per_rule, checked, src.as_deref());
         }
         let pass = FolderTally {
             checked,
@@ -330,6 +306,42 @@ impl AppModel {
             filed: filed.len(),
         };
         (kept, filed, pass)
+    }
+
+    /// The address of `account_id` when this pass runs the filters at all:
+    /// there are rules, and the folder is the account's Inbox or the run
+    /// was asked for by hand.
+    fn filtered_account(&self, account_id: u32, folder_id: u32, manual: bool) -> Option<String> {
+        if self.filters.is_empty()
+            || (!manual && self.inbox_of(account_id).map(|f| f.id) != Some(folder_id))
+        {
+            return None;
+        }
+        self.email_of(account_id)
+    }
+
+    /// Ask the server to move `m` from `src` to where `rule` files it.
+    fn request_filter_move(
+        &self,
+        account_id: u32,
+        src: &str,
+        m: &Message,
+        rule: &config::FilterRule,
+    ) {
+        tracing::info!(
+            "filter: {} → {} [{}]",
+            m.from_addr,
+            rule.dest_path,
+            rule.label(),
+        );
+        self.send_to(
+            account_id,
+            MailRequest::MoveMessage {
+                path: src.to_string(),
+                uid: m.uid,
+                dest: rule.dest_path.clone(),
+            },
+        );
     }
 
     /// Re-sync every inbox so a newly-blacklisted sender's existing mail is
@@ -402,6 +414,23 @@ impl AppModel {
             }
             _ => unreachable!("not routed to on_filters"),
         }
+    }
+}
+
+/// Log how many of the `checked` messages in `folder` each rule matched,
+/// at the end of a manual run (see `per_rule` in `filter_pass`).
+fn log_rule_counts(
+    rules: &[&config::FilterRule],
+    per_rule: &[usize],
+    checked: usize,
+    folder: Option<&str>,
+) {
+    let folder = folder.unwrap_or("?");
+    for (rule, n) in rules.iter().zip(per_rule) {
+        tracing::info!(
+            "filter: [{}] matched {n} of {checked} in {folder}",
+            rule.label()
+        );
     }
 }
 

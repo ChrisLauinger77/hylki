@@ -9,7 +9,7 @@ use crate::ui::drop_zones::DropChoice;
 use crate::worker::OutgoingMessage;
 
 #[derive(Debug)]
-pub enum ComposeInput {
+pub(crate) enum ComposeInput {
     Send,
     /// The OpenPGP send check answered, for these inputs.
     PgpChecked {
@@ -235,20 +235,20 @@ pub enum ComposeInput {
 /// the body from the editor (source text in Markdown and HTML), the rest
 /// from the fields.
 #[derive(Debug, Clone)]
-pub struct OutgoingFields {
-    pub html: String,
-    pub text: String,
-    pub to: String,
-    pub cc: String,
-    pub bcc: String,
-    pub reply_to: String,
-    pub subject: String,
-    pub from_account_id: u32,
-    pub from_alias: Option<String>,
+pub(crate) struct OutgoingFields {
+    pub(super) html: String,
+    pub(super) text: String,
+    pub(super) to: String,
+    pub(super) cc: String,
+    pub(super) bcc: String,
+    pub(super) reply_to: String,
+    pub(super) subject: String,
+    pub(super) from_account_id: u32,
+    pub(super) from_alias: Option<String>,
 }
 
 #[derive(Debug)]
-pub enum ComposeOutput {
+pub(crate) enum ComposeOutput {
     /// Send the message. Carries the composer's id, so the app knows which
     /// pane it came from.
     Send {

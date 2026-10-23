@@ -7,16 +7,16 @@ use super::privacy::load_privacy;
 /// What a printed page carries besides the message (#359), from Settings →
 /// Reading → Printing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct PrintOptions {
+pub(crate) struct PrintOptions {
     /// "Page 2 of 5" at the foot of every page.
     #[serde(default = "default_on")]
-    pub page_numbers: bool,
+    pub(crate) page_numbers: bool,
     /// The date and time it was printed, at the foot of every page.
     #[serde(default)]
-    pub date: bool,
+    pub(crate) date: bool,
     /// A wider left margin, so a hole punch misses the text.
     #[serde(default)]
-    pub punch_margin: bool,
+    pub(crate) punch_margin: bool,
 }
 
 impl Default for PrintOptions {
@@ -32,7 +32,7 @@ impl Default for PrintOptions {
 /// Where an account files the copy of a reply it sends (#468).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ReplyCopies {
+pub(crate) enum ReplyCopies {
     /// Wherever the rest of sent mail goes.
     #[default]
     WithSent,
@@ -44,13 +44,13 @@ pub enum ReplyCopies {
 }
 
 impl ReplyCopies {
-    pub const ALL: [ReplyCopies; 3] = [
+    pub(crate) const ALL: [ReplyCopies; 3] = [
         ReplyCopies::WithSent,
         ReplyCopies::Original,
         ReplyCopies::OriginalNotInbox,
     ];
 
-    pub fn label(self) -> String {
+    pub(crate) fn label(self) -> String {
         match self {
             ReplyCopies::WithSent => crate::i18n::i18n("With sent mail"),
             ReplyCopies::Original => crate::i18n::i18n("Folder of the original"),
@@ -61,7 +61,7 @@ impl ReplyCopies {
     }
 
     /// Its place in [`ReplyCopies::ALL`], for combo rows.
-    pub fn index(self) -> u32 {
+    pub(crate) fn index(self) -> u32 {
         ReplyCopies::ALL
             .iter()
             .position(|s| *s == self)
@@ -76,7 +76,7 @@ impl ReplyCopies {
 /// When an opened message is marked read (#100).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ReadMark {
+pub(crate) enum ReadMark {
     /// The moment it is shown (conversation members as they scroll into view).
     #[default]
     Shown,
@@ -90,7 +90,7 @@ pub enum ReadMark {
 /// With Hylki", "Email…") opens them into.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum FilesAction {
+pub(crate) enum FilesAction {
     /// A dialog offers the three below, every time.
     #[default]
     Ask,
@@ -105,7 +105,7 @@ pub enum FilesAction {
 /// What happens to handed-in files that add up to more than the limit.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum FilesLarge {
+pub(crate) enum FilesLarge {
     /// A dialog asks, every time.
     #[default]
     Ask,
@@ -117,12 +117,12 @@ pub enum FilesLarge {
 
 /// The GNOME Files hand-off preferences (Settings → System → GNOME Files).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FilesPrefs {
-    pub action: FilesAction,
-    pub large: FilesLarge,
+pub(crate) struct FilesPrefs {
+    pub(crate) action: FilesAction,
+    pub(crate) large: FilesLarge,
     /// The size, in MB (decimal, like the sizes the composer shows), that
     /// the files together must stay under to be attached without a word.
-    pub limit_mb: u32,
+    pub(crate) limit_mb: u32,
 }
 
 impl Default for FilesPrefs {
@@ -137,7 +137,7 @@ impl Default for FilesPrefs {
 
 impl FilesPrefs {
     /// The limit in bytes.
-    pub fn limit_bytes(&self) -> u64 {
+    pub(crate) fn limit_bytes(&self) -> u64 {
         self.limit_mb as u64 * 1_000_000
     }
 }
@@ -146,7 +146,7 @@ pub(super) fn default_files_limit_mb() -> u32 {
     20
 }
 
-pub fn load_files_prefs() -> FilesPrefs {
+pub(crate) fn load_files_prefs() -> FilesPrefs {
     let f = load_privacy();
     FilesPrefs {
         action: f.files_action,
@@ -156,7 +156,8 @@ pub fn load_files_prefs() -> FilesPrefs {
 }
 
 /// The zoom steps Ctrl+ and Ctrl- walk, and Settings offers, in percent.
-pub const READER_ZOOM_STEPS: [u32; 12] = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 250];
+pub(crate) const READER_ZOOM_STEPS: [u32; 12] =
+    [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 250];
 
 pub(super) fn default_reader_zoom() -> u32 {
     100
@@ -164,7 +165,7 @@ pub(super) fn default_reader_zoom() -> u32 {
 
 /// The message zoom a launch starts at; anything off the step list reads
 /// as 100.
-pub fn load_reader_zoom() -> u32 {
+pub(crate) fn load_reader_zoom() -> u32 {
     let z = load_privacy().reader_zoom;
     if READER_ZOOM_STEPS.contains(&z) {
         z
@@ -176,7 +177,7 @@ pub fn load_reader_zoom() -> u32 {
 /// What Reader View does each time a message is opened.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ReaderDefault {
+pub(crate) enum ReaderDefault {
     /// Stay as last set; the switch's state is remembered across runs.
     #[default]
     Remember,
@@ -191,7 +192,7 @@ pub enum ReaderDefault {
 impl ReaderDefault {
     /// The state a freshly opened message starts in, or `None` to keep the
     /// last choice.
-    pub fn starts_on(self) -> Option<bool> {
+    pub(crate) fn starts_on(self) -> Option<bool> {
         match self {
             ReaderDefault::Remember => None,
             ReaderDefault::On => Some(true),
@@ -201,13 +202,13 @@ impl ReaderDefault {
 }
 
 /// The three reader-override preferences (#56): font switch, font, color switch.
-pub fn load_reader_override() -> (bool, String, bool) {
+pub(crate) fn load_reader_override() -> (bool, String, bool) {
     let p = load_privacy();
     (p.override_fonts, p.reader_font, p.override_colors)
 }
 
 /// Plain-text messages in monospace (#181): the switch and the font.
-pub fn load_plain_style() -> (bool, String) {
+pub(crate) fn load_plain_style() -> (bool, String) {
     let p = load_privacy();
     (p.plain_monospace, p.plain_font)
 }
@@ -217,7 +218,7 @@ pub fn load_plain_style() -> (bool, String) {
 /// plain text sends no HTML part at all.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ComposeFormat {
+pub(crate) enum ComposeFormat {
     #[default]
     Rich,
     Markdown,
@@ -227,7 +228,7 @@ pub enum ComposeFormat {
 
 impl ComposeFormat {
     /// Whether this format is edited as source rather than as rich text.
-    pub fn is_source(self) -> bool {
+    pub(crate) fn is_source(self) -> bool {
         matches!(self, ComposeFormat::Markdown | ComposeFormat::Html)
     }
 }
@@ -238,7 +239,7 @@ impl ComposeFormat {
     Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
 )]
 #[serde(rename_all = "snake_case")]
-pub enum FoldMessages {
+pub(crate) enum FoldMessages {
     /// Every message opens.
     #[default]
     Never,
@@ -254,7 +255,7 @@ pub enum FoldMessages {
 /// editor always continues the conversation in its reading direction.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ReplyPosition {
+pub(crate) enum ReplyPosition {
     #[default]
     Top,
     Bottom,
@@ -267,7 +268,7 @@ pub enum ReplyPosition {
 /// somebody else wrote. Below is the placement Hylki had before.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SignaturePosition {
+pub(crate) enum SignaturePosition {
     #[default]
     AboveQuote,
     BelowQuote,
@@ -276,7 +277,7 @@ pub enum SignaturePosition {
 /// What the number on the launcher icon counts (#431).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum LauncherBadge {
+pub(crate) enum LauncherBadge {
     /// No badge.
     Off,
     /// Every unread message in the inboxes, as the tray icon's dot.
@@ -289,7 +290,7 @@ pub enum LauncherBadge {
 
 /// What new messages start out as, falling back to the plain-text
 /// switch this setting replaced (#180).
-pub fn load_compose_format() -> ComposeFormat {
+pub(crate) fn load_compose_format() -> ComposeFormat {
     let p = load_privacy();
     p.compose_format.unwrap_or(if p.compose_plain {
         ComposeFormat::Plain
@@ -300,7 +301,7 @@ pub fn load_compose_format() -> ComposeFormat {
 
 /// One of the action buttons a new-mail notification can carry (#244).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NotificationButton {
+pub(crate) enum NotificationButton {
     MarkRead,
     Archive,
     Delete,
@@ -311,7 +312,7 @@ pub enum NotificationButton {
 
 impl NotificationButton {
     /// Every button, in the order they appear on a notification.
-    pub const ALL: [NotificationButton; 6] = [
+    pub(crate) const ALL: [NotificationButton; 6] = [
         NotificationButton::MarkRead,
         NotificationButton::Archive,
         NotificationButton::Delete,
@@ -337,17 +338,17 @@ impl NotificationButton {
 /// of the six, chosen in Settings → General → Notifications. Three is what
 /// GNOME's notification portal shows; a fourth would be dropped anyway.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NotificationButtons {
-    pub mark_read: bool,
-    pub archive: bool,
-    pub delete: bool,
-    pub reply: bool,
-    pub forward: bool,
-    pub spam: bool,
+pub(crate) struct NotificationButtons {
+    pub(crate) mark_read: bool,
+    pub(crate) archive: bool,
+    pub(crate) delete: bool,
+    pub(crate) reply: bool,
+    pub(crate) forward: bool,
+    pub(crate) spam: bool,
 }
 
 impl NotificationButtons {
-    pub const MAX: usize = 3;
+    pub(crate) const MAX: usize = 3;
 
     pub(super) const NONE: Self = Self {
         mark_read: false,
@@ -371,7 +372,7 @@ impl Default for NotificationButtons {
 }
 
 impl NotificationButtons {
-    pub fn get(self, button: NotificationButton) -> bool {
+    pub(crate) fn get(self, button: NotificationButton) -> bool {
         match button {
             NotificationButton::MarkRead => self.mark_read,
             NotificationButton::Archive => self.archive,
@@ -382,7 +383,7 @@ impl NotificationButtons {
         }
     }
 
-    pub fn set(&mut self, button: NotificationButton, on: bool) {
+    pub(crate) fn set(&mut self, button: NotificationButton, on: bool) {
         match button {
             NotificationButton::MarkRead => self.mark_read = on,
             NotificationButton::Archive => self.archive = on,
@@ -394,7 +395,7 @@ impl NotificationButtons {
     }
 
     /// How many are on.
-    pub fn count(self) -> usize {
+    pub(crate) fn count(self) -> usize {
         NotificationButton::ALL
             .into_iter()
             .filter(|b| self.get(*b))
@@ -402,7 +403,7 @@ impl NotificationButtons {
     }
 
     /// Whether the set is full, so another button cannot be switched on.
-    pub fn full(self) -> bool {
+    pub(crate) fn full(self) -> bool {
         self.count() >= Self::MAX
     }
 
@@ -430,14 +431,14 @@ impl NotificationButtons {
 }
 
 /// Which action buttons a new-mail notification carries (#244).
-pub fn load_notification_buttons() -> NotificationButtons {
+pub(crate) fn load_notification_buttons() -> NotificationButtons {
     NotificationButtons::from_list(&load_privacy().notification_buttons)
 }
 
 /// The narrowest and widest trackpad swipe sensitivity the setting offers,
 /// also the clamp a hand-edited file is held to (0 would divide by zero).
-pub const SWIPE_SENSITIVITY_MIN: f64 = 1.0;
-pub const SWIPE_SENSITIVITY_MAX: f64 = 10.0;
+pub(crate) const SWIPE_SENSITIVITY_MIN: f64 = 1.0;
+pub(crate) const SWIPE_SENSITIVITY_MAX: f64 = 10.0;
 
 pub(super) fn default_swipe_sensitivity() -> f64 {
     // libadwaita spends a fixed 400px of scroll on a full swipe whatever the
@@ -449,7 +450,7 @@ pub(super) fn default_swipe_sensitivity() -> f64 {
 
 /// How far a trackpad's two-finger swipe has to travel to fire the action
 /// (higher = shorter swipe).
-pub fn load_swipe_sensitivity() -> f64 {
+pub(crate) fn load_swipe_sensitivity() -> f64 {
     load_privacy()
         .swipe_sensitivity
         .clamp(SWIPE_SENSITIVITY_MIN, SWIPE_SENSITIVITY_MAX)
@@ -463,12 +464,12 @@ pub(super) fn default_undo_send_secs() -> u32 {
 }
 
 /// The address book chosen for new contacts (empty: automatic).
-pub fn load_contact_book() -> String {
+pub(crate) fn load_contact_book() -> String {
     load_privacy().contact_book
 }
 
 /// Whether Hylki starts at login (background running only).
-pub fn load_autostart() -> bool {
+pub(crate) fn load_autostart() -> bool {
     let p = load_privacy();
     p.run_in_background && p.autostart
 }

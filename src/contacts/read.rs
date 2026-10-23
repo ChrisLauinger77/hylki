@@ -17,14 +17,14 @@ use crate::i18n::i18n;
 
 /// A writable address book the user can add contacts to.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Book {
+pub(crate) struct Book {
     /// EDS source UID (what `OpenAddressBook` expects).
-    pub uid: String,
-    pub name: String,
+    pub(crate) uid: String,
+    pub(crate) name: String,
     /// How a new group is written to this book; `None` where the server
     /// keeps no groups (Google stores them as odd people, Microsoft 365
     /// refuses them).
-    pub groups: Option<GroupFormat>,
+    pub(crate) groups: Option<GroupFormat>,
 }
 
 // Inside a Flatpak sandbox `dirs::{data,cache,config}_dir()` are redirected into
@@ -55,7 +55,7 @@ pub(super) struct EdsLayout {
     /// Where the books' directories are.
     root: fn() -> Option<PathBuf>,
     /// The database file in each book's directory.
-    pub(super) file: &'static str,
+    file: &'static str,
     /// The table of cards, with its vCard and UID columns.
     pub(super) cards: &'static str,
     pub(super) vcard: &'static str,
@@ -156,7 +156,7 @@ fn config_dir() -> Option<PathBuf> {
 }
 
 /// Read every address email from the local + cached (CardDAV) EDS books.
-pub fn read_contacts() -> Vec<Contact> {
+pub(crate) fn read_contacts() -> Vec<Contact> {
     read_contacts_from(false).0
 }
 
@@ -166,7 +166,7 @@ pub fn read_contacts() -> Vec<Contact> {
 /// Contacts" does not trust an address just because you once mailed it.
 /// `None` when any book could not be read: a filter then cannot tell a
 /// stranger from a contact whose book failed, and must match neither way.
-pub fn read_saved_contacts() -> Option<Vec<Contact>> {
+fn read_saved_contacts() -> Option<Vec<Contact>> {
     let (contacts, complete) = read_contacts_from(true);
     complete.then_some(contacts)
 }
@@ -177,7 +177,7 @@ pub fn read_saved_contacts() -> Option<Vec<Contact>> {
 /// the set is refreshed in the background once it is a minute old, and the
 /// pass uses the last one. `None` inside means unknown: unreadable or empty.
 #[derive(Clone, Default)]
-pub struct SavedAddresses(std::sync::Arc<std::sync::Mutex<SavedAddressesState>>);
+pub(crate) struct SavedAddresses(std::sync::Arc<std::sync::Mutex<SavedAddressesState>>);
 
 #[derive(Default)]
 struct SavedAddressesState {
@@ -192,7 +192,7 @@ impl SavedAddresses {
     /// The addresses for this filter pass. Only the very first call reads
     /// on the caller's thread: mail filtered before any read would never be
     /// looked at again.
-    pub fn get(&self) -> Option<std::sync::Arc<HashSet<String>>> {
+    pub(crate) fn get(&self) -> Option<std::sync::Arc<HashSet<String>>> {
         let (never, stale) = {
             let st = self.0.lock().unwrap_or_else(|e| e.into_inner());
             (
@@ -213,7 +213,7 @@ impl SavedAddresses {
 
     /// Read the addresses again in the background (after a contact changed,
     /// or a rule that needs them was added).
-    pub fn refresh(&self) {
+    pub(crate) fn refresh(&self) {
         {
             let mut st = self.0.lock().unwrap_or_else(|e| e.into_inner());
             if st.refreshing {
@@ -370,12 +370,12 @@ fn add_local_contacts(out: &mut Vec<Contact>, seen: &mut HashSet<String>) -> boo
 }
 
 /// Whether `book_uid` is the local Hylki book rather than an EDS one.
-pub fn is_local_book(book_uid: &str) -> bool {
+pub(crate) fn is_local_book(book_uid: &str) -> bool {
     book_uid == crate::local_contacts::LOCAL_BOOK_UID
 }
 
 /// The local Hylki book as a [`Book`].
-pub fn local_book() -> Book {
+pub(crate) fn local_book() -> Book {
     Book {
         uid: crate::local_contacts::LOCAL_BOOK_UID.to_string(),
         name: crate::contact_sources::names()
@@ -425,7 +425,7 @@ pub(super) fn local_details() -> Vec<ContactDetails> {
 
 /// `book_uid_active` keyed off a book database's directory name, minus the
 /// auto-collected books when `saved_only` is set.
-pub(super) fn db_book_wanted(
+fn db_book_wanted(
     db: &std::path::Path,
     active: &Option<HashMap<String, String>>,
     saved_only: bool,
@@ -517,7 +517,7 @@ fn read_book_db(
 }
 
 /// Address books the user can add contacts to (local + cached/CardDAV).
-pub fn writable_books() -> Vec<Book> {
+pub(crate) fn writable_books() -> Vec<Book> {
     let mut books = Vec::new();
     let active = registry_books();
     let formats = book_group_formats();

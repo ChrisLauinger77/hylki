@@ -4,7 +4,7 @@
 use super::*;
 
 #[derive(Debug, Clone)]
-pub enum SidebarInput {
+pub(crate) enum SidebarInput {
     SetContents {
         sections: Vec<SectionData>,
         show_unified: bool,
@@ -190,7 +190,7 @@ pub enum SidebarInput {
 }
 
 #[derive(Debug)]
-pub enum SidebarOutput {
+pub(crate) enum SidebarOutput {
     /// The unified sections' open state changed (a click, or the rail's
     /// fold-up) — for persistence.
     SectionsOpen {
@@ -327,7 +327,7 @@ pub enum SidebarOutput {
 
 /// Actions offered by sidebar right-click menus.
 #[derive(Debug, Clone)]
-pub enum CtxAction {
+pub(crate) enum CtxAction {
     MarkFolderRead {
         account_id: u32,
         folder_id: u32,

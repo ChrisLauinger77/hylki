@@ -6,21 +6,21 @@ use super::*;
 /// The settings chosen on the privacy + personalize pages, applied by the app
 /// through its normal Set* handlers when the wizard finishes.
 #[derive(Debug, Clone)]
-pub struct WelcomePrefs {
-    pub block_remote: bool,
-    pub gravatar: bool,
-    pub sender_logos: bool,
-    pub notification_content: bool,
-    pub preview_lines: u32,
-    pub avatars: bool,
-    pub threading: bool,
+pub(crate) struct WelcomePrefs {
+    pub(crate) block_remote: bool,
+    pub(crate) gravatar: bool,
+    pub(crate) sender_logos: bool,
+    pub(crate) notification_content: bool,
+    pub(crate) preview_lines: u32,
+    pub(crate) avatars: bool,
+    pub(crate) threading: bool,
     /// The app icon picked from the gallery (an `app_icon::catalog` id), or
     /// empty when nothing was picked over an icon set outside Hylki.
-    pub app_icon: String,
+    pub(crate) app_icon: String,
 }
 
 #[derive(Debug)]
-pub enum WelcomeInput {
+pub(crate) enum WelcomeInput {
     Next,
     Back,
     ProviderChanged,
@@ -36,7 +36,7 @@ pub enum WelcomeInput {
 }
 
 #[derive(Debug)]
-pub enum WelcomeOutput {
+pub(crate) enum WelcomeOutput {
     /// A manual account passed its connection test, or a custom OAuth one
     /// signed in: save + connect it.
     AddAccount(Box<AccountConfig>),
@@ -52,7 +52,7 @@ pub enum WelcomeOutput {
 }
 
 #[derive(Debug)]
-pub enum WelcomeCmd {
+pub(crate) enum WelcomeCmd {
     Tested {
         account: Box<AccountConfig>,
         result: ConnTest,

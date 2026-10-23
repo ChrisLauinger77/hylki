@@ -8,7 +8,7 @@ use crate::models::{PgpSignature, PgpStatus};
 
 /// The OpenPGP structure a raw message carries, if any.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Shape {
+pub(crate) enum Shape {
     /// PGP/MIME `multipart/encrypted`: the armoured ciphertext (part two).
     Encrypted { armored: Vec<u8> },
     /// PGP/MIME `multipart/signed`: the signed entity's exact bytes and the
@@ -21,7 +21,7 @@ pub enum Shape {
 }
 
 impl Shape {
-    pub fn is_encrypted(&self) -> bool {
+    pub(super) fn is_encrypted(&self) -> bool {
         matches!(
             self,
             Shape::Encrypted { .. } | Shape::InlineEncrypted { .. }
@@ -30,7 +30,7 @@ impl Shape {
 }
 
 /// Find the OpenPGP structure in a raw message.
-pub fn detect(raw: &[u8]) -> Option<Shape> {
+pub(crate) fn detect(raw: &[u8]) -> Option<Shape> {
     use mail_parser::{MessageParser, MimeHeaders, PartType};
     let parsed = MessageParser::default().parse(raw)?;
     let root = parsed.root_part();
@@ -148,17 +148,17 @@ fn find(hay: &[u8], needle: &[u8]) -> Option<usize> {
 
 /// The outcome of handling a message: what to render, and the verdict.
 #[derive(Debug, Clone)]
-pub struct Unwrapped {
+pub(crate) struct Unwrapped {
     /// The MIME entity to render and take attachments from: the decrypted
     /// message, or the signed part. `None` when there is nothing readable
     /// (undecryptable), in which case the reader shows the verdict instead.
-    pub inner: Option<Vec<u8>>,
-    pub status: PgpStatus,
+    pub(crate) inner: Option<Vec<u8>>,
+    pub(crate) status: PgpStatus,
 }
 
 /// Decrypt and/or verify a message, whatever form it takes. `None` when the
 /// message carries no OpenPGP structure at all.
-pub fn unwrap_message(raw: &[u8], gpg: &Gpg) -> Option<Unwrapped> {
+pub(crate) fn unwrap_message(raw: &[u8], gpg: &Gpg) -> Option<Unwrapped> {
     let shape = detect(raw)?;
     let mut unwrapped = unwrap_shape(shape, raw, gpg);
     unwrapped.status.sender_addr = from_address(raw);
@@ -308,7 +308,7 @@ pub(super) fn protected_subject(entity: &[u8]) -> Option<String> {
 /// the headers inside. This one does, so the part is hidden, never shown in
 /// the body or listed as a file. `None` unless the entity is flagged as
 /// carrying protected headers, so ordinary mail is never touched.
-pub fn legacy_display_part(parsed: &mail_parser::Message) -> Option<usize> {
+pub(crate) fn legacy_display_part(parsed: &mail_parser::Message) -> Option<usize> {
     use mail_parser::MimeHeaders;
     let root = parsed.root_part();
     let ct = root.content_type()?;
@@ -376,7 +376,7 @@ pub(super) fn text_entity(text: &[u8]) -> Vec<u8> {
 
 /// The sender's key carried in an Autocrypt header (Level 1: `addr=…;
 /// keydata=<base64>`), decoded, if the message has one.
-pub fn autocrypt_key(raw: &[u8]) -> Option<Vec<u8>> {
+pub(super) fn autocrypt_key(raw: &[u8]) -> Option<Vec<u8>> {
     use mail_parser::MessageParser;
     let parsed = MessageParser::default().parse(raw)?;
     let header = parsed.header_raw("Autocrypt")?;

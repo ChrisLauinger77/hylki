@@ -9,11 +9,9 @@ use adw::prelude::*;
 use relm4::prelude::*;
 use webkit6::prelude::{PolicyDecisionExt, WebViewExt};
 
-/// Create a sandboxed WebView: no JavaScript or dev tools, smooth scrolling, and
-/// links routed to the external browser.
 /// A web view for the print preview: same sandboxing as the reader's, since it
 /// shows the same message.
-pub fn new_preview_webview() -> webkit6::WebView {
+pub(crate) fn new_preview_webview() -> webkit6::WebView {
     build_webview("print preview")
 }
 
@@ -43,7 +41,7 @@ thread_local! {
 }
 
 /// The shared document-viewer web context (see [`WEB_CONTEXT`]).
-pub fn shared_web_context() -> webkit6::WebContext {
+pub(crate) fn shared_web_context() -> webkit6::WebContext {
     WEB_CONTEXT.with(|c| c.clone())
 }
 
@@ -51,6 +49,8 @@ pub(super) fn new_webview() -> webkit6::WebView {
     build_webview("message view")
 }
 
+/// Create a sandboxed WebView: no JavaScript or dev tools, smooth scrolling, and
+/// links routed to the external browser.
 fn build_webview(role: &'static str) -> webkit6::WebView {
     // A user-content manager with a script message handler lets the wrapper
     // document notify us (e.g. a double-clicked conversation header).

@@ -14,7 +14,7 @@ use crate::ui::message_row::RowShared;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl SimpleComponent for MessageList {
     type Init = ();
     type Input = MessageListInput;

@@ -9,22 +9,22 @@ use super::config_file;
 /// ("fr", "en"); empty = the system's own (#179). Its own small file
 /// rather than a preference in privacy.toml: it is read before anything
 /// else starts, when no TOML has been parsed yet.
-pub fn load_language() -> String {
+pub(crate) fn load_language() -> String {
     read_line_file(language_path())
 }
 
-pub fn save_language(lang: &str) {
+pub(crate) fn save_language(lang: &str) {
     write_line_file(language_path(), lang);
 }
 
 /// How GTK draws the windows (#403): empty for GTK's own choice, else a
 /// `GSK_RENDERER` value ("vulkan", "gl", "cairo"). Its own small file, as
 /// the language is: it has to be read before GTK starts.
-pub fn load_renderer() -> String {
+pub(crate) fn load_renderer() -> String {
     read_line_file(renderer_path())
 }
 
-pub fn save_renderer(renderer: &str) {
+pub(crate) fn save_renderer(renderer: &str) {
     write_line_file(renderer_path(), renderer);
 }
 

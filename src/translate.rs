@@ -36,14 +36,14 @@ mod detect;
 mod in_place;
 mod services;
 
-pub use detect::{detect, differs};
+pub(crate) use detect::{detect, differs};
 use in_place::InPlace;
-pub use services::check;
+pub(crate) use services::check;
 use services::{batches, chunk, deepl, google, libre, microsoft, prepare_blocks};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Service {
+pub(crate) enum Service {
     #[default]
     Off,
     #[serde(rename = "deepl")]
@@ -56,7 +56,7 @@ pub enum Service {
 
 impl Service {
     /// In the order the Settings picker lists them.
-    pub const ALL: [Service; 5] = [
+    pub(crate) const ALL: [Service; 5] = [
         Service::Off,
         Service::DeepL,
         Service::Google,
@@ -65,7 +65,7 @@ impl Service {
     ];
 
     /// The service's own name, which is not translated.
-    pub fn name(self) -> String {
+    pub(crate) fn name(self) -> String {
         match self {
             Service::Off => i18n("Off"),
             Service::DeepL => "DeepL".into(),
@@ -89,32 +89,32 @@ impl Service {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct Settings {
+pub(crate) struct Settings {
     #[serde(default)]
-    pub service: Service,
+    pub(crate) service: Service,
     /// The language to translate into, as in [`LANGUAGES`]; empty means the
     /// language Hylki is shown in.
     #[serde(default)]
-    pub target: String,
+    pub(crate) target: String,
     /// Microsoft: the region of the Translator resource ("westeurope");
     /// empty for a global resource.
     #[serde(default)]
-    pub region: String,
+    pub(crate) region: String,
     /// LibreTranslate: the server, e.g. `https://translate.example.org`.
     #[serde(default)]
-    pub url: String,
+    pub(crate) url: String,
     /// Offer a translation on messages in another language.
     #[serde(default)]
-    pub offer: bool,
+    pub(crate) offer: bool,
 }
 
 impl Settings {
-    pub fn enabled(&self) -> bool {
+    pub(crate) fn enabled(&self) -> bool {
         self.service != Service::Off
     }
 
     /// The language translations go into: the chosen one, else Hylki's own.
-    pub fn target_language(&self) -> String {
+    pub(crate) fn target_language(&self) -> String {
         if self.target.is_empty() {
             ui_language()
         } else {
@@ -126,7 +126,7 @@ impl Settings {
 /// The languages offered as a target, by the code this module uses for
 /// them. Every service takes all of these; how each one spells them is
 /// [`service_code`]'s business.
-pub const LANGUAGES: &[&str] = &[
+pub(crate) const LANGUAGES: &[&str] = &[
     "ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "he", "hu", "id", "it", "ja",
     "ko", "lt", "lv", "nb", "nl", "pl", "pt-BR", "pt-PT", "ro", "ru", "sk", "sl", "sv", "tr", "uk",
     "vi", "zh-Hans", "zh-Hant",
@@ -134,7 +134,7 @@ pub const LANGUAGES: &[&str] = &[
 
 /// A language as it names itself ("Deutsch"), the way the spell checker's
 /// language list shows them.
-pub fn language_name(code: &str) -> String {
+pub(crate) fn language_name(code: &str) -> String {
     match code {
         "ja" => "日本語".into(),
         "zh-Hans" | "zh" => "中文（简体）".into(),
@@ -145,7 +145,7 @@ pub fn language_name(code: &str) -> String {
 
 /// The language Hylki's own text is in, as one of [`LANGUAGES`]' codes
 /// where it is one: the language chosen in Settings, else the session's.
-pub fn ui_language() -> String {
+pub(crate) fn ui_language() -> String {
     let chosen = crate::config::load_language();
     let raw = if chosen.is_empty() {
         crate::i18n::locale_env(true)
@@ -180,7 +180,7 @@ fn normalize(raw: &str) -> String {
 }
 
 /// The language part alone: `pt-BR` → `pt`, `zh-Hant` → `zh`.
-pub fn base(code: &str) -> &str {
+pub(crate) fn base(code: &str) -> &str {
     code.split('-').next().unwrap_or(code)
 }
 
@@ -233,17 +233,17 @@ fn path() -> Option<PathBuf> {
 /// Bumped on every save, so an open reader can tell its offer is stale.
 static GENERATION: AtomicU64 = AtomicU64::new(0);
 
-pub fn generation() -> u64 {
+pub(crate) fn generation() -> u64 {
     GENERATION.load(Ordering::Relaxed)
 }
 
-pub fn load() -> Settings {
+pub(crate) fn load() -> Settings {
     crate::config::read_toml(path()).unwrap_or_default()
 }
 
 /// Written as config's private files are, but not through its helper: a
 /// failure to serialize logs "could not save", not "could not serialize".
-pub fn save(settings: &Settings) {
+pub(crate) fn save(settings: &Settings) {
     let Some(path) = path() else { return };
     match toml::to_string_pretty(settings) {
         Ok(text) => {
@@ -256,11 +256,11 @@ pub fn save(settings: &Settings) {
     GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
-pub fn load_key(service: Service) -> Option<String> {
+pub(crate) fn load_key(service: Service) -> Option<String> {
     crate::config::load_cloud_password(&service.key_name()).filter(|k| !k.trim().is_empty())
 }
 
-pub fn store_key(service: Service, key: &str) {
+pub(crate) fn store_key(service: Service, key: &str) {
     if key.trim().is_empty() {
         crate::config::delete_cloud_password(&service.key_name());
     } else if let Err(e) = crate::config::store_cloud_password(&service.key_name(), key.trim()) {
@@ -272,19 +272,19 @@ pub fn store_key(service: Service, key: &str) {
 
 /// A translated message.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Translated {
+pub(crate) struct Translated {
     /// The translation: the whole message with its text replaced, or, for
     /// plain text, a Reader View fragment.
-    pub html: String,
+    pub(crate) html: String,
     /// `html` is a Reader View fragment, to be shown as Reader View shows
     /// a message.
-    pub reader: bool,
+    pub(crate) reader: bool,
     /// The language the service found the message to be in.
-    pub from: Option<String>,
-    pub service: Service,
-    pub to: String,
+    pub(crate) from: Option<String>,
+    pub(crate) service: Service,
+    to: String,
     /// The subject, translated with the body in the same request.
-    pub subject: Option<String>,
+    pub(crate) subject: Option<String>,
 }
 
 /// The most of a message, in characters of HTML, that is
@@ -304,7 +304,7 @@ static DONE: Mutex<Option<HashMap<String, Translated>>> = Mutex::new(None);
 
 /// What the session cache keys a translation by: the message, the service
 /// and the language it went into.
-pub fn cache_key(account_id: u32, message: &str, settings: &Settings) -> String {
+pub(crate) fn cache_key(account_id: u32, message: &str, settings: &Settings) -> String {
     format!(
         "{account_id}\u{1f}{message}\u{1f}{:?}\u{1f}{}",
         settings.service,
@@ -312,13 +312,13 @@ pub fn cache_key(account_id: u32, message: &str, settings: &Settings) -> String 
     )
 }
 
-pub fn cached(key: &str) -> Option<Translated> {
+pub(crate) fn cached(key: &str) -> Option<Translated> {
     DONE.lock().ok()?.as_ref()?.get(key).cloned()
 }
 
 /// Translate a message body (as cached: HTML, or plain text) and its
 /// subject with the configured service (blocking; call off the UI thread).
-pub fn translate(
+pub(crate) fn translate(
     settings: &Settings,
     key: &str,
     body: &str,
@@ -443,7 +443,7 @@ fn run(
 /// Translate what is being written (blocking): pieces of the composer's
 /// own HTML, each kept whole so it goes back where it came from, into
 /// `target`. Nothing is cached; the text is the user's, and changes.
-pub fn translate_parts(
+pub(crate) fn translate_parts(
     settings: &Settings,
     key: &str,
     parts: &[String],
@@ -472,7 +472,7 @@ pub fn translate_parts(
 /// first the next time.
 static COMPOSE_TARGET: Mutex<String> = Mutex::new(String::new());
 
-pub fn last_compose_target() -> Option<String> {
+pub(crate) fn last_compose_target() -> Option<String> {
     COMPOSE_TARGET
         .lock()
         .ok()
@@ -488,7 +488,7 @@ fn remember_compose_target(target: &str) {
 
 /// Plain text as paragraphs of HTML, for a service asked to keep markup:
 /// a blank line starts a paragraph, a line break stays a line break.
-pub fn text_to_parts(text: &str) -> Vec<String> {
+pub(crate) fn text_to_parts(text: &str) -> Vec<String> {
     text.split("\n\n")
         .map(|p| p.trim_matches('\n'))
         .filter(|p| !p.trim().is_empty())
@@ -503,7 +503,7 @@ pub fn text_to_parts(text: &str) -> Vec<String> {
 }
 
 /// [`text_to_parts`] the other way: the paragraphs that came back, as text.
-pub fn parts_to_text(parts: &[String]) -> String {
+pub(crate) fn parts_to_text(parts: &[String]) -> String {
     parts
         .iter()
         .map(|p| {

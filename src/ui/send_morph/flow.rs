@@ -12,23 +12,23 @@ use std::cell::{Cell, RefCell};
 /// What the send morph is made from: the pane (`root`, which the stage
 /// covers), the composer's slot in it and the editor card inside that, and
 /// the reader beside it with its web view.
-pub struct Pieces {
-    pub root: gtk::Widget,
-    pub composer: gtk::Widget,
-    pub editor: gtk::Widget,
-    pub reader: gtk::Widget,
-    pub view: webkit6::WebView,
+pub(crate) struct Pieces {
+    pub(crate) root: gtk::Widget,
+    pub(crate) composer: gtk::Widget,
+    pub(crate) editor: gtk::Widget,
+    pub(crate) reader: gtk::Widget,
+    pub(crate) view: webkit6::WebView,
     /// The reader's header bar, and whether it is showing now.
-    pub header: Option<gtk::Widget>,
-    pub header_shown: bool,
+    pub(crate) header: Option<gtk::Widget>,
+    pub(crate) header_shown: bool,
     /// The editor's web view, whose first line of text the card's meets.
-    pub editor_view: Option<webkit6::WebView>,
+    pub(crate) editor_view: Option<webkit6::WebView>,
 }
 
 /// Take the still the morph starts from and measure where the conversation's
 /// cards stand, then answer `ready`: true once the pane may change under the
 /// stage, false when the pane could not be captured.
-pub fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
+pub(crate) fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
     let stage = stage.clone();
     capture_next_frame(&p.root.clone(), move |still| {
         let bounds = |w: &gtk::Widget| w.compute_bounds(&p.root);
@@ -74,7 +74,6 @@ pub fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
             still,
             composer,
             editor,
-            reader,
             view,
             header,
             ground,
@@ -144,7 +143,7 @@ pub fn start(stage: &SendMorph, p: Pieces, ready: impl FnOnce(bool) + 'static) {
 /// each widget's last drawing and hands it to [`gtk::WidgetPaintable`], but
 /// anything waiting to be redrawn (a blinking caret is enough) has none until
 /// the frame is drawn; right after it, every part of the pane has one.
-pub fn capture_next_frame(
+pub(crate) fn capture_next_frame(
     widget: &gtk::Widget,
     then: impl FnOnce(Option<(gdk::Texture, f32)>) + 'static,
 ) {
@@ -194,7 +193,7 @@ pub fn capture_next_frame(
 /// so; the card counts as settled once it is there, every message frame is
 /// sized, and two answers in a row agree. A wait past
 /// [`READY_TIMEOUT_MS`] fades the stage instead.
-pub fn await_arrival(
+pub(crate) fn await_arrival(
     stage: &SendMorph,
     root: &gtk::Widget,
     reader: &gtk::Widget,
@@ -218,13 +217,13 @@ pub fn await_arrival(
 
 struct Poll {
     stage: SendMorph,
-    pub(super) header: Option<gtk::Widget>,
-    pub(super) root: gtk::Widget,
-    pub(super) reader: gtk::Widget,
-    pub(super) view: webkit6::WebView,
-    pub(super) key: String,
+    header: Option<gtk::Widget>,
+    root: gtk::Widget,
+    reader: gtk::Widget,
+    view: webkit6::WebView,
+    key: String,
     started: std::time::Instant,
-    pub(super) last: RefCell<Option<Measured>>,
+    last: RefCell<Option<Measured>>,
     same: Cell<u32>,
 }
 
@@ -307,7 +306,10 @@ fn land_on(p: &Poll) {
 }
 
 /// The first widget under `root` (itself included) that `pick` accepts.
-pub fn find_widget(root: &gtk::Widget, pick: &dyn Fn(&gtk::Widget) -> bool) -> Option<gtk::Widget> {
+pub(crate) fn find_widget(
+    root: &gtk::Widget,
+    pick: &dyn Fn(&gtk::Widget) -> bool,
+) -> Option<gtk::Widget> {
     if pick(root) {
         return Some(root.clone());
     }

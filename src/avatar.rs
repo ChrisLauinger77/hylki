@@ -10,18 +10,18 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 
 use gtk::prelude::{Cast, TextureExt};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AvatarSource {
+enum AvatarSource {
     Contact,
     Gravatar,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FetchMode {
+pub(crate) enum FetchMode {
     ContactOnly,
     ContactThenGravatar,
     GravatarOnly,
@@ -35,20 +35,20 @@ struct DecodedImage {
 }
 
 #[derive(Debug)]
-pub struct FetchedAvatar {
+pub(crate) struct FetchedAvatar {
     image: DecodedImage,
-    pub source: AvatarSource,
+    source: AvatarSource,
 }
 
 #[derive(Debug)]
-pub enum FetchOutcome {
+pub(crate) enum FetchOutcome {
     Found(FetchedAvatar),
     Missing,
     /// A transient Gravatar failure; retry on a later render.
     Retry,
 }
 
-pub enum CacheLookup {
+pub(crate) enum CacheLookup {
     Texture(gtk::gdk::Texture),
     Missing,
     Fetch { generation: u64, mode: FetchMode },
@@ -74,7 +74,7 @@ fn key(email: &str) -> String {
 /// The session's sender-face caches, for the memory section of an export:
 /// contact entries and the pixel bytes of their photos, then Gravatar
 /// entries (hits and misses alike) and the pixel bytes of the hits.
-pub fn cache_stats() -> (usize, u64, usize, u64) {
+pub(crate) fn cache_stats() -> (usize, u64, usize, u64) {
     let (contacts, contact_bytes) = CONTACT_CACHE.with(|c| {
         let c = c.borrow();
         let bytes = c
@@ -99,22 +99,22 @@ pub fn cache_stats() -> (usize, u64, usize, u64) {
 /// One of the user's own mailboxes, as its account was set up in Accounts
 /// (#162): what its circle draws, in the order it is tried.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OwnFace {
+pub(crate) struct OwnFace {
     /// The account asked for its own Gravatar (#189). It leads when the
     /// address has one; when it has none the rest of this still applies.
-    pub gravatar: bool,
+    pub(crate) gravatar: bool,
     /// The account's avatar picture, when it has one and the file is there.
-    pub picture: Option<std::path::PathBuf>,
+    pub(crate) picture: Option<std::path::PathBuf>,
     /// Its avatar emoji, for an account that chose one instead.
-    pub emoji: Option<String>,
+    pub(crate) emoji: Option<String>,
     /// The account color ("#rrggbb"), the ground behind the emoji.
-    pub color: String,
+    pub(crate) color: String,
 }
 
 impl OwnFace {
     /// Whether there is anything here to draw. An account that asked for
     /// nothing shows the initials circle any sender would get.
-    pub fn is_set(&self) -> bool {
+    pub(crate) fn is_set(&self) -> bool {
         self.gravatar || self.picture.is_some() || self.emoji.is_some()
     }
 }
@@ -138,7 +138,7 @@ thread_local! {
 /// Hand the face chain the mailboxes the user owns, keyed by address. Only
 /// accounts that asked for something belong here: one showing its initials
 /// has nothing to add to the circle a sender already gets.
-pub fn set_own_faces(faces: impl IntoIterator<Item = (String, OwnFace)>) {
+pub(crate) fn set_own_faces(faces: impl IntoIterator<Item = (String, OwnFace)>) {
     let faces: HashMap<String, OwnFace> = faces
         .into_iter()
         .map(|(address, face)| (key(&address), face))
@@ -154,7 +154,7 @@ pub fn set_own_faces(faces: impl IntoIterator<Item = (String, OwnFace)>) {
 
 /// Whether the mail the user sent wears its mailbox's face, or the circle any
 /// other sender would get (the Settings choice; #189).
-pub fn set_faces_on_own_mail(on: bool) {
+pub(crate) fn set_faces_on_own_mail(on: bool) {
     FACES_ON_OWN_MAIL.with(|flag| {
         if flag.get() == on {
             return;
@@ -166,7 +166,7 @@ pub fn set_faces_on_own_mail(on: bool) {
 
 /// The face `email`'s own account asked for, whatever the mail setting says:
 /// the sidebar's circle and the account editor's preview draw this.
-pub fn account_face(email: &str) -> Option<OwnFace> {
+pub(crate) fn account_face(email: &str) -> Option<OwnFace> {
     let key = key(email);
     OWN_FACES.with(|faces| faces.borrow().get(&key).cloned())
 }
@@ -176,7 +176,7 @@ pub fn account_face(email: &str) -> Option<OwnFace> {
 /// for that mailbox is the face on the messages it sent, in a conversation's
 /// cards and in the list. `None` for everyone else, for own accounts showing
 /// initials, and for everyone once the Settings switch is off.
-pub fn own_face(email: &str) -> Option<OwnFace> {
+pub(crate) fn own_face(email: &str) -> Option<OwnFace> {
     if !FACES_ON_OWN_MAIL.with(Cell::get) {
         return None;
     }
@@ -185,13 +185,13 @@ pub fn own_face(email: &str) -> Option<OwnFace> {
 
 /// Note that what the user's mailboxes show has changed (a Gravatar arrived,
 /// say), so cached renders are rebuilt.
-pub fn note_faces_changed() {
+fn note_faces_changed() {
     OWN_FACES_GENERATION.with(|g| g.set(g.get().wrapping_add(1)));
 }
 
 /// How many times what the user's mailboxes show has changed — a render token
 /// for views that cache their output.
-pub fn own_faces_generation() -> u64 {
+pub(crate) fn own_faces_generation() -> u64 {
     OWN_FACES_GENERATION.with(Cell::get)
 }
 
@@ -207,7 +207,7 @@ thread_local! {
 /// The Gravatar `email` asked for, once it has been fetched and found (#189).
 /// `None` covers "not looked up yet" and "there isn't one" alike: both mean
 /// the account's picture, emoji or initials are what to draw.
-pub fn own_gravatar(email: &str) -> Option<gtk::gdk::Texture> {
+pub(crate) fn own_gravatar(email: &str) -> Option<gtk::gdk::Texture> {
     let key = key(email);
     GRAVATAR_CACHE.with(|cache| cache.borrow().get(&key).cloned().flatten())
 }
@@ -215,7 +215,7 @@ pub fn own_gravatar(email: &str) -> Option<gtk::gdk::Texture> {
 /// Whether `email`'s Gravatar still wants looking up: true at most once a
 /// session per address, so a miss or a failure costs one request rather than
 /// one per redraw.
-pub fn wants_own_gravatar(email: &str) -> bool {
+pub(crate) fn wants_own_gravatar(email: &str) -> bool {
     let key = key(email);
     if GRAVATAR_CACHE.with(|cache| cache.borrow().contains_key(&key)) {
         return false;
@@ -225,13 +225,13 @@ pub fn wants_own_gravatar(email: &str) -> bool {
 
 /// Look up one of the user's own Gravatars. Blocking — for a worker thread;
 /// hand what comes back to [`cache_own_gravatar`] on the main thread.
-pub fn fetch_own_gravatar(email: &str) -> FetchOutcome {
+pub(crate) fn fetch_own_gravatar(email: &str) -> FetchOutcome {
     fetch(email, FetchMode::GravatarOnly)
 }
 
 /// Store what [`fetch_own_gravatar`] found, and say whether it gave the
 /// mailbox a face it did not have — which is when the views must redraw.
-pub fn cache_own_gravatar(email: &str, outcome: FetchOutcome) -> bool {
+pub(crate) fn cache_own_gravatar(email: &str, outcome: FetchOutcome) -> bool {
     let found = matches!(outcome, FetchOutcome::Found(_));
     // A request that failed (no network yet at startup, say) settles nothing:
     // forget that it was asked, so the next thing that would ask — an account
@@ -256,7 +256,7 @@ pub fn cache_own_gravatar(email: &str, outcome: FetchOutcome) -> bool {
 /// That Gravatar as a `data:` PNG of `size` CSS pixels, for a reader card —
 /// a document cannot be handed a texture. Scaled on the way in and kept, the
 /// same way the account pictures beside it are.
-pub fn own_gravatar_data_uri(email: &str, size: i32) -> Option<String> {
+pub(crate) fn own_gravatar_data_uri(email: &str, size: i32) -> Option<String> {
     // Twice the CSS size, as the account pictures are drawn: enough for a
     // HiDPI screen without carrying a full-size portrait per card.
     let px = (size * 2).max(1);
@@ -287,7 +287,7 @@ pub fn own_gravatar_data_uri(email: &str, size: i32) -> Option<String> {
 }
 
 /// Consult the main-thread texture/miss caches without doing I/O.
-pub fn lookup(email: &str, allow_gravatar: bool) -> CacheLookup {
+pub(crate) fn lookup(email: &str, allow_gravatar: bool) -> CacheLookup {
     let key = key(email);
     let generation = crate::contacts::photo_generation();
     if !crate::contacts::photos_ready() {
@@ -345,7 +345,7 @@ fn gravatar_url(email: &str) -> String {
 
 /// Blocking sender-avatar lookup. The chain is local vCard PHOTO, optional
 /// Gravatar, then the UI's initials fallback. Call off the main thread.
-pub fn fetch(email: &str, mode: FetchMode) -> FetchOutcome {
+pub(crate) fn fetch(email: &str, mode: FetchMode) -> FetchOutcome {
     if mode != FetchMode::GravatarOnly {
         for bytes in crate::contacts::contact_photos(email) {
             // Decode/downscale on this background thread. A corrupt candidate
@@ -377,7 +377,12 @@ pub fn fetch(email: &str, mode: FetchMode) -> FetchOutcome {
 /// Record a completed request. Contact results are stamped with the generation
 /// that was actually queried; stale results are discarded rather than masking a
 /// newly synchronized vCard photo.
-pub fn cache_result(email: &str, generation: u64, mode: FetchMode, outcome: FetchOutcome) -> bool {
+pub(crate) fn cache_result(
+    email: &str,
+    generation: u64,
+    mode: FetchMode,
+    outcome: FetchOutcome,
+) -> bool {
     let key = key(email);
     let generation_current = crate::contacts::photo_generation() == generation;
     match outcome {
@@ -448,7 +453,8 @@ fn cache_missing_contact(email: &str, generation: u64) {
 }
 
 // Raw Gravatar results coalesce duplicate rows for one sender and preserve a
-// definitive 404 across list rebuilds. Transient failures are never cached.
+// definitive 404 across list rebuilds. A transient failure is kept only for
+// a short while (`RetryAfter`), so the rows asking at once share one try.
 enum RawGravatar {
     Found(DecodedImage),
     Missing,
@@ -461,11 +467,26 @@ static GRAVATAR_EMAIL_LOCKS: OnceLock<Mutex<HashMap<String, Arc<Mutex<()>>>>> = 
 static GRAVATAR_GATE: OnceLock<(Mutex<usize>, Condvar)> = OnceLock::new();
 const MAX_GRAVATAR_REQUESTS: usize = 4;
 
+/// The Gravatar results so far, locked; a poisoned lock is taken over, as
+/// every lock here is.
+fn gravatar_bytes() -> MutexGuard<'static, RawGravatarCache> {
+    GRAVATAR_BYTES
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+}
+
+/// The count of Gravatar requests in flight, and the wake-up for a request
+/// waiting for a slot.
+fn gravatar_gate() -> &'static (Mutex<usize>, Condvar) {
+    GRAVATAR_GATE.get_or_init(|| (Mutex::new(0), Condvar::new()))
+}
+
 struct GravatarSlot;
 
 impl GravatarSlot {
     fn acquire() -> Self {
-        let (active, wake) = GRAVATAR_GATE.get_or_init(|| (Mutex::new(0), Condvar::new()));
+        let (active, wake) = gravatar_gate();
         let mut active = active.lock().unwrap_or_else(|p| p.into_inner());
         while *active >= MAX_GRAVATAR_REQUESTS {
             active = wake.wait(active).unwrap_or_else(|p| p.into_inner());
@@ -477,7 +498,7 @@ impl GravatarSlot {
 
 impl Drop for GravatarSlot {
     fn drop(&mut self) {
-        let (active, wake) = GRAVATAR_GATE.get().expect("Gravatar gate initialized");
+        let (active, wake) = gravatar_gate();
         let mut active = active.lock().unwrap_or_else(|p| p.into_inner());
         *active = active.saturating_sub(1);
         wake.notify_one();
@@ -501,10 +522,7 @@ fn gravatar_image(email: &str) -> Result<Option<DecodedImage>, ()> {
     };
     let _email_guard = email_lock.lock().unwrap_or_else(|p| p.into_inner());
     {
-        let mut cache = GRAVATAR_BYTES
-            .get_or_init(|| Mutex::new(HashMap::new()))
-            .lock()
-            .unwrap_or_else(|p| p.into_inner());
+        let mut cache = gravatar_bytes();
         match cache.get(&key) {
             Some(RawGravatar::Found(bytes)) => return Ok(Some(bytes.clone())),
             Some(RawGravatar::Missing) => return Ok(None),
@@ -529,12 +547,7 @@ fn gravatar_image(email: &str) -> Result<Option<DecodedImage>, ()> {
     {
         Ok(response) => response,
         Err(ureq::Error::Status(404, _)) => {
-            GRAVATAR_BYTES
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap_or_else(|p| p.into_inner())
-                .insert(key, RawGravatar::Missing);
+            gravatar_bytes().insert(key, RawGravatar::Missing);
             return Ok(None);
         }
         Err(_) => {
@@ -563,25 +576,15 @@ fn gravatar_image(email: &str) -> Result<Option<DecodedImage>, ()> {
         cache_gravatar_retry(key);
         return Err(());
     };
-    GRAVATAR_BYTES
-        .get()
-        .unwrap()
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .insert(key, RawGravatar::Found(image.clone()));
+    gravatar_bytes().insert(key, RawGravatar::Found(image.clone()));
     Ok(Some(image))
 }
 
 fn cache_gravatar_retry(key: String) {
-    GRAVATAR_BYTES
-        .get()
-        .expect("Gravatar cache initialized")
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .insert(
-            key,
-            RawGravatar::RetryAfter(std::time::Instant::now() + std::time::Duration::from_secs(30)),
-        );
+    gravatar_bytes().insert(
+        key,
+        RawGravatar::RetryAfter(std::time::Instant::now() + std::time::Duration::from_secs(30)),
+    );
 }
 
 /// Only hand known raster formats to GdkPixbuf. In particular, an address-book
@@ -606,7 +609,7 @@ static PHOTO_THUMBS: OnceLock<Mutex<HashMap<u64, Option<gtk::gdk::Texture>>>> = 
 const PHOTO_THUMB_EDGE: i32 = 96;
 
 /// The list photos decoded, and their pixel bytes, for the memory report.
-pub fn photo_thumb_stats() -> (usize, u64) {
+pub(crate) fn photo_thumb_stats() -> (usize, u64) {
     let Some(Ok(map)) = PHOTO_THUMBS.get().map(Mutex::lock) else {
         return (0, 0);
     };
@@ -620,13 +623,13 @@ pub fn photo_thumb_stats() -> (usize, u64) {
 }
 
 /// A photo's list avatar, if [`decode_photo_thumbnails`] has been at it.
-pub fn photo_thumbnail(key: u64) -> Option<Option<gtk::gdk::Texture>> {
+pub(crate) fn photo_thumbnail(key: u64) -> Option<Option<gtk::gdk::Texture>> {
     PHOTO_THUMBS.get()?.lock().ok()?.get(&key).cloned()
 }
 
 /// Decode the photos not cached yet, on every core, calling `progress` after
 /// each few. Blocking: for a worker thread.
-pub fn decode_photo_thumbnails(photos: Vec<(u64, Vec<u8>)>, progress: impl Fn() + Sync) {
+pub(crate) fn decode_photo_thumbnails(photos: Vec<(u64, Vec<u8>)>, progress: impl Fn() + Sync) {
     let cache = PHOTO_THUMBS.get_or_init(Default::default);
     let next = std::sync::atomic::AtomicUsize::new(0);
     let workers = std::thread::available_parallelism().map_or(2, |n| n.get().clamp(1, 4));
@@ -657,7 +660,7 @@ pub fn decode_photo_thumbnails(photos: Vec<(u64, Vec<u8>)>, progress: impl Fn() 
 }
 
 /// Forget the photos no longer in any address book.
-pub fn retain_photo_thumbnails(keep: &std::collections::HashSet<u64>) {
+pub(crate) fn retain_photo_thumbnails(keep: &std::collections::HashSet<u64>) {
     if let Some(Ok(mut map)) = PHOTO_THUMBS.get().map(Mutex::lock) {
         map.retain(|key, _| keep.contains(key));
     }

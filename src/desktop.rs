@@ -11,7 +11,7 @@
 //! `present` is not enough to get it there: see [`present_window`].
 
 /// The string value of `key` in `namespace`, if the desktop has one.
-pub fn setting(namespace: &str, key: &str) -> Option<String> {
+pub(crate) fn setting(namespace: &str, key: &str) -> Option<String> {
     fn from_value(v: zbus::zvariant::Value<'_>) -> Option<String> {
         match v {
             zbus::zvariant::Value::Value(inner) => from_value(*inner),
@@ -29,7 +29,7 @@ pub fn setting(namespace: &str, key: &str) -> Option<String> {
 }
 
 /// The boolean value of `key` in `namespace`, if the desktop has one.
-pub fn flag(namespace: &str, key: &str) -> Option<bool> {
+fn flag(namespace: &str, key: &str) -> Option<bool> {
     fn from_value(v: zbus::zvariant::Value<'_>) -> Option<bool> {
         match v {
             zbus::zvariant::Value::Value(inner) => from_value(*inner),
@@ -77,13 +77,13 @@ fn host_settings(namespace: &str) -> Option<gtk::gio::Settings> {
 /// who had switched the desktop's alert sound off, which is just who turns
 /// a mail client's own sound on, while the Play button in Settings still
 /// played (#337). The switch in Settings is the person's word on it.
-pub fn quiet() -> bool {
+pub(crate) fn quiet() -> bool {
     flag("org.gnome.desktop.notifications", "show-banners") == Some(false)
 }
 
 /// The desktop's monospace font as a Pango description, "Monospace 10"
 /// where the desktop names none.
-pub fn monospace_font() -> String {
+pub(crate) fn monospace_font() -> String {
     setting("org.gnome.desktop.interface", "monospace-font-name")
         .filter(|f| !f.trim().is_empty())
         .unwrap_or_else(|| "Monospace 10".to_string())
@@ -110,7 +110,7 @@ pub fn monospace_font() -> String {
 /// message — a compositor only raises a window for an activation token the
 /// launcher passed us, which `present` already spends (#187) — so this is
 /// X11's alone, Xwayland included.
-pub fn present_window(window: &impl gtk::prelude::IsA<gtk::Window>) {
+pub(crate) fn present_window(window: &impl gtk::prelude::IsA<gtk::Window>) {
     use gtk::prelude::*;
     let window = window.as_ref();
     window.set_visible(true);

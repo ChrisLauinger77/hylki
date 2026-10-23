@@ -16,9 +16,9 @@ use super::msg::AppMsg;
 
 /// A running tag-finder scan (see `AppMsg::FindTags`).
 pub(super) struct TagScan {
-    pub(super) gen: u32,
-    pub(super) remaining: usize,
-    pub(super) found: Vec<(u32, Vec<KeywordFinding>)>,
+    gen: u32,
+    remaining: usize,
+    found: Vec<(u32, Vec<KeywordFinding>)>,
 }
 
 impl AppModel {

@@ -11,7 +11,7 @@ fn rgb(hex: &str) -> Option<(u8, u8, u8)> {
 }
 
 /// A translucent ("pale") version of `hex` as a CSS color, e.g. for row tints.
-pub fn pale(hex: &str, alpha: f64) -> String {
+pub(crate) fn pale(hex: &str, alpha: f64) -> String {
     match rgb(hex) {
         Some((r, g, b)) => format!("rgba({r},{g},{b},{alpha})"),
         None => "transparent".to_string(),
@@ -19,7 +19,7 @@ pub fn pale(hex: &str, alpha: f64) -> String {
 }
 
 /// A readable text color (black or white) for text drawn on a `hex` background.
-pub fn readable_text(hex: &str) -> &'static str {
+pub(crate) fn readable_text(hex: &str) -> &'static str {
     if let Some((r, g, b)) = rgb(hex) {
         let lum = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
         if lum > 150.0 {
@@ -30,7 +30,7 @@ pub fn readable_text(hex: &str) -> &'static str {
 }
 
 /// Format a `gdk::RGBA` as a `#rrggbb` string.
-pub fn to_hex(c: &gtk::gdk::RGBA) -> String {
+pub(crate) fn to_hex(c: &gtk::gdk::RGBA) -> String {
     format!(
         "#{:02x}{:02x}{:02x}",
         (c.red() * 255.0).round() as u8,
@@ -43,7 +43,7 @@ pub fn to_hex(c: &gtk::gdk::RGBA) -> String {
 ///
 /// Used for hairlines that a palette pitches brighter than the surfaces
 /// they divide — see the theme's list/reader separator.
-pub fn darken(hex: &str, amount: f64) -> String {
+pub(crate) fn darken(hex: &str, amount: f64) -> String {
     let Some((r, g, b)) = rgb(hex) else {
         return hex.to_string();
     };

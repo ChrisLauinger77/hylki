@@ -19,7 +19,7 @@ impl Sidebar {
 
     /// Rebuild the list: optional unified row, then per-account headers with
     /// animated folder revealers, and refresh the per-account color rules.
-    pub(super) fn rebuild_normal(
+    fn rebuild_normal(
         &mut self,
         pinned: &gtk::Box,
         container: &gtk::Box,

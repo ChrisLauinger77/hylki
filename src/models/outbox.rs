@@ -11,39 +11,39 @@ use crate::i18n::{i18n, i18n_f};
 /// `from_addr` and `rcpts` are the SMTP envelope, which is not always what the
 /// headers say (Bcc is in the envelope only).
 #[derive(Debug, Clone)]
-pub struct OutboxItem {
-    pub id: u32,
-    pub account_id: u32,
+pub(crate) struct OutboxItem {
+    pub(crate) id: u32,
+    pub(crate) account_id: u32,
     /// Envelope sender.
-    pub from_addr: String,
+    pub(crate) from_addr: String,
     /// Envelope recipients (To + Cc + Bcc), one per line as stored.
-    pub rcpts: Vec<String>,
+    pub(crate) rcpts: Vec<String>,
     /// Header recipients, for display ("Ada Lovelace, bob@example.com").
-    pub recipients: String,
-    pub subject: String,
-    pub preview: String,
-    pub raw: Vec<u8>,
+    pub(crate) recipients: String,
+    pub(crate) subject: String,
+    pub(crate) preview: String,
+    pub(crate) raw: Vec<u8>,
     /// The account's Sent folder at queue time, appended to once it goes out.
-    pub sent_path: Option<String>,
+    pub(crate) sent_path: Option<String>,
     /// Unix seconds when it was first queued.
-    pub queued_at: i64,
-    pub attempts: u32,
+    pub(crate) queued_at: i64,
+    pub(crate) attempts: u32,
     /// Why the last attempt failed, shown in the list.
-    pub last_error: String,
+    pub(crate) last_error: String,
     /// Send Later (#145): unix seconds it is due; `None` goes as soon as it can.
-    pub send_at: Option<i64>,
+    pub(crate) send_at: Option<i64>,
     /// The Message-ID of the message a forward forwards, to mark once it
     /// goes (#454); a reply's original is in its own In-Reply-To.
-    pub forwards: String,
+    pub(crate) forwards: String,
     /// Set only for a message still on its way out (#434), never stored:
     /// what it is doing ("Sending…"), shown instead of how long it waited.
-    pub status: String,
+    pub(crate) status: String,
 }
 
 impl OutboxItem {
     /// "Waiting since 10 minutes ago" — what the reader shows where a received
     /// message shows its date, since an unsent message has no send time yet.
-    pub fn waiting_label(queued_at: i64) -> String {
+    pub(crate) fn waiting_label(queued_at: i64) -> String {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
@@ -64,7 +64,7 @@ impl OutboxItem {
     /// the message, so the Outbox reads as an ordinary folder: same list, same
     /// reader, same sorting. `folder_id` is `OUTBOX_FOLDER_ID`, which no real
     /// folder uses, so a row can always be traced back here.
-    pub fn as_message(&self) -> Message {
+    pub(crate) fn as_message(&self) -> Message {
         Message {
             id: self.id,
             account_id: self.account_id,
@@ -137,4 +137,4 @@ impl OutboxItem {
 
 /// Folder id for the Outbox's synthetic rows. Real folders are numbered from 1
 /// by the worker, so this can't collide.
-pub const OUTBOX_FOLDER_ID: u32 = u32::MAX;
+pub(super) const OUTBOX_FOLDER_ID: u32 = u32::MAX;

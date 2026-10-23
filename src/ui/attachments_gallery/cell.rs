@@ -214,7 +214,7 @@ pub(super) fn add_item_gestures(
 }
 
 /// The gallery's cover-cropped thumbnail picture for a ready texture.
-pub(super) fn gallery_picture(tex: &gdk::Texture) -> gtk::Picture {
+fn gallery_picture(tex: &gdk::Texture) -> gtk::Picture {
     let pic = gtk::Picture::for_paintable(tex);
     pic.set_content_fit(gtk::ContentFit::Cover);
     pic.set_hexpand(true);
@@ -224,7 +224,7 @@ pub(super) fn gallery_picture(tex: &gdk::Texture) -> gtk::Picture {
 }
 
 /// The gallery's centred type icon for anything without a thumbnail.
-pub(super) fn gallery_icon(name: &str) -> gtk::Image {
+fn gallery_icon(name: &str) -> gtk::Image {
     let img = gtk::Image::from_icon_name(icon_for(name));
     img.set_pixel_size(56);
     img.set_hexpand(true);

@@ -15,35 +15,35 @@ use super::{config_file, default_on, read_toml, save_plain_toml};
 pub(super) struct StateFile {
     /// Set once the user dismisses the Linux Mint keyring setup tip.
     #[serde(default)]
-    pub(super) mint_keyring_help_dismissed: bool,
+    mint_keyring_help_dismissed: bool,
     /// In-message attachment drawer: collapsed (showing only its header).
     #[serde(default)]
-    pub(super) drawer_collapsed: bool,
+    drawer_collapsed: bool,
     /// The way of asking for message summaries that worked for an account
     /// whose server rejects the default (#226), by email: "headers",
     /// "no-previews" or "headers-no-previews". Absent = the default. Written
     /// only once a stepped-to mode has actually loaded a folder, so a
     /// launch starts there instead of failing its way down the ladder.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    pub(super) fetch_modes: std::collections::BTreeMap<String, String>,
+    fetch_modes: std::collections::BTreeMap<String, String>,
     /// Expanded attachment-drawer height in px (the dragged split).
     #[serde(default = "default_drawer_height")]
-    pub(super) drawer_height: i32,
+    drawer_height: i32,
     /// Attachment drawer shows an alphabetical list instead of the thumbnail grid.
     #[serde(default)]
-    pub(super) drawer_list_view: bool,
+    drawer_list_view: bool,
     /// The drawer's list view sorts Z→A instead of A→Z.
     #[serde(default)]
-    pub(super) drawer_sort_desc: bool,
+    drawer_sort_desc: bool,
     /// Attachments gallery shows a table instead of the thumbnail grid.
     #[serde(default)]
-    pub(super) gallery_table_view: bool,
+    gallery_table_view: bool,
     /// Attachments gallery thumbnail cell width in px.
     #[serde(default = "default_gallery_thumb_width")]
     pub(super) gallery_thumb_width: i32,
     /// Attachments gallery sort criterion (the sort dropdown's row index).
     #[serde(default)]
-    pub(super) gallery_sort: u32,
+    gallery_sort: u32,
     /// Attachments gallery: pull from Archive folders.
     #[serde(default = "default_on")]
     pub(super) gallery_archive: bool,
@@ -56,81 +56,81 @@ pub(super) struct StateFile {
     /// from their kind's default are stored, so a new folder on the server
     /// follows the default rather than an entry that predates it.
     #[serde(default)]
-    pub(super) gallery_folders: Vec<String>,
+    gallery_folders: Vec<String>,
     /// Message-list pane width in px (#28 — it reset every launch).
     #[serde(default = "default_list_pane_width")]
     pub(super) list_pane_width: i32,
     /// Contacts view: the contact-list pane's width in px.
     #[serde(default = "default_contacts_pane_width")]
-    pub(super) contacts_pane_width: i32,
+    contacts_pane_width: i32,
     /// The About window's height, remembering the user's vertical resize.
     /// (The settings window's is fixed since its two-pane layout, #141; an
     /// old `prefs_height` key in the file is ignored.)
     #[serde(default = "default_about_height")]
-    pub(super) about_height: i32,
+    about_height: i32,
     /// Split-reply panel height in px (the dragged divider). 0 = never
     /// dragged: the panel opens at its computed default.
     #[serde(default)]
-    pub(super) split_reply_height: i32,
+    split_reply_height: i32,
     /// The welcome wizard has been completed once (Start Reading pressed),
     /// so an install with no accounts is not greeted with it again — a
     /// restart right after the wizard, for the app icon, must not loop.
     #[serde(default)]
-    pub(super) wizard_completed: bool,
+    wizard_completed: bool,
     /// The Flatpak runtime commit under which WebKit hung on the host's
     /// fonts and was given the runtime's own instead (#296). Kept per
     /// commit, so a runtime update gets another try with every font.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) web_font_fallback: Option<String>,
+    web_font_fallback: Option<String>,
     /// The mail view open last (#256): an account's folder, or All Inboxes
     /// when `email` is empty. Accounts are named by address, which stays
     /// true across launches where an account's number may not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) last_view: Option<LastView>,
+    last_view: Option<LastView>,
     /// The account whose mail was open last, kept through a visit to All
     /// Inboxes so "the last account's inbox" still has an account to mean.
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub(super) last_account: String,
+    last_account: String,
     /// The icon generation whose default has been asserted over the stored
     /// choice (see `app_icon::ICON_GENERATION`): a release that brings a new
     /// authoritative icon bumps the constant, and the first start on it puts
     /// that icon on every install once, whatever was chosen before.
     #[serde(default)]
-    pub(super) app_icon_generation: u32,
+    app_icon_generation: u32,
     /// The chosen app icon (an id from `app_icon::catalog`). Absent until
     /// the first start of a build that offers the choice settles it — see
     /// `app_icon::init_on_startup`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) app_icon: Option<String>,
+    app_icon: Option<String>,
     /// Each folder's unread count as of the last time it was looked at
     /// (#343), keyed "address␟folder path".
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    pub(super) unread_seen: std::collections::BTreeMap<String, u32>,
+    unread_seen: std::collections::BTreeMap<String, u32>,
     /// The fonts last picked with the composer's Other Font… (#358), the
     /// newest first, for the font menu to offer again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(super) recent_fonts: Vec<RecentFont>,
+    recent_fonts: Vec<RecentFont>,
 }
 
 /// A font family picked in the composer (#358), and whether it is
 /// monospaced, which decides the generic family it falls back to.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
-pub struct RecentFont {
-    pub name: String,
+pub(crate) struct RecentFont {
+    pub(crate) name: String,
     #[serde(default)]
-    pub mono: bool,
+    pub(crate) mono: bool,
 }
 
 /// How many picked fonts the font menu keeps.
 const RECENT_FONTS: usize = 5;
 
-pub fn load_recent_fonts() -> Vec<RecentFont> {
+pub(crate) fn load_recent_fonts() -> Vec<RecentFont> {
     load_state().recent_fonts
 }
 
 /// Put `font` at the head of the recent fonts, once, and keep the newest
 /// few.
-pub fn note_recent_font(font: RecentFont) {
+pub(crate) fn note_recent_font(font: RecentFont) {
     update_state(|s| {
         s.recent_fonts
             .retain(|f| !f.name.eq_ignore_ascii_case(&font.name));
@@ -176,11 +176,11 @@ fn load_state() -> StateFile {
 }
 
 /// Each folder's unread count when it was last looked at (#343).
-pub fn load_unread_seen() -> std::collections::BTreeMap<String, u32> {
+pub(crate) fn load_unread_seen() -> std::collections::BTreeMap<String, u32> {
     load_state().unread_seen
 }
 
-pub fn save_unread_seen(seen: &std::collections::BTreeMap<String, u32>) {
+pub(crate) fn save_unread_seen(seen: &std::collections::BTreeMap<String, u32>) {
     update_state(|s| s.unread_seen = seen.clone());
 }
 
@@ -197,24 +197,24 @@ fn save_state(state: &StateFile) {
 
 /// A mail view to reopen at launch (#256).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
-pub struct LastView {
+pub(crate) struct LastView {
     /// The account's address; empty for All Inboxes.
     #[serde(default)]
-    pub email: String,
+    pub(crate) email: String,
     /// The folder's path on the server.
     #[serde(default)]
-    pub path: String,
+    pub(crate) path: String,
 }
 
 /// The view open last and the account whose mail was open last.
-pub fn load_last_view() -> (Option<LastView>, String) {
+pub(crate) fn load_last_view() -> (Option<LastView>, String) {
     let s = load_state();
     (s.last_view, s.last_account)
 }
 
 /// Record the view just opened, unless it is the one already recorded:
 /// this runs on every folder switch.
-pub fn save_last_view(view: LastView) {
+pub(crate) fn save_last_view(view: LastView) {
     let mut s = load_state();
     let account = if view.email.is_empty() {
         s.last_account.clone()
@@ -230,11 +230,11 @@ pub fn save_last_view(view: LastView) {
 }
 
 /// Whether the welcome wizard has been completed before.
-pub fn wizard_completed() -> bool {
+pub(crate) fn wizard_completed() -> bool {
     load_state().wizard_completed
 }
 
-pub fn mark_wizard_completed() {
+pub(crate) fn mark_wizard_completed() {
     let mut s = load_state();
     if !s.wizard_completed {
         s.wizard_completed = true;
@@ -243,11 +243,11 @@ pub fn mark_wizard_completed() {
 }
 
 /// The runtime commit WebKit's font fallback was settled under (#296).
-pub fn load_web_font_fallback() -> Option<String> {
+pub(crate) fn load_web_font_fallback() -> Option<String> {
     load_state().web_font_fallback.filter(|s| !s.is_empty())
 }
 
-pub fn save_web_font_fallback(runtime: Option<&str>) {
+pub(crate) fn save_web_font_fallback(runtime: Option<&str>) {
     let mut s = load_state();
     let runtime = runtime.map(str::to_string);
     if s.web_font_fallback != runtime {
@@ -257,29 +257,29 @@ pub fn save_web_font_fallback(runtime: Option<&str>) {
 }
 
 /// The chosen app icon id, if one has been settled.
-pub fn load_app_icon() -> Option<String> {
+pub(crate) fn load_app_icon() -> Option<String> {
     load_state().app_icon.filter(|s| !s.is_empty())
 }
 
-pub fn load_app_icon_generation() -> u32 {
+pub(crate) fn load_app_icon_generation() -> u32 {
     load_state().app_icon_generation
 }
 
-pub fn save_app_icon_generation(generation: u32) {
+pub(crate) fn save_app_icon_generation(generation: u32) {
     update_state(|s| s.app_icon_generation = generation);
 }
 
-pub fn save_app_icon(id: &str) {
+pub(crate) fn save_app_icon(id: &str) {
     update_state(|s| s.app_icon = Some(id.to_string()));
 }
 
 /// Whether the one-time Mint keyring setup tip has already been dismissed.
-pub fn mint_keyring_help_dismissed() -> bool {
+pub(crate) fn mint_keyring_help_dismissed() -> bool {
     load_state().mint_keyring_help_dismissed
 }
 
 /// Persist that the user dismissed the Mint keyring setup tip ("Don't show again").
-pub fn dismiss_mint_keyring_help() {
+pub(crate) fn dismiss_mint_keyring_help() {
     let mut state = load_state();
     state.mint_keyring_help_dismissed = true;
     save_state(&state);
@@ -287,17 +287,17 @@ pub fn dismiss_mint_keyring_help() {
 
 /// Persisted state of the in-message attachment drawer.
 #[derive(Debug, Clone, Copy)]
-pub struct DrawerState {
+pub(crate) struct DrawerState {
     /// Expanded content height in px.
-    pub height: i32,
+    pub(crate) height: i32,
     /// Whether the drawer is collapsed to just its header.
-    pub collapsed: bool,
+    pub(crate) collapsed: bool,
     /// Thumbnail edge in px.
-    pub thumb: i32,
+    pub(crate) thumb: i32,
     /// Show an alphabetical list instead of the thumbnail grid.
-    pub list_view: bool,
+    pub(crate) list_view: bool,
     /// Sort the list Z→A instead of A→Z.
-    pub sort_desc: bool,
+    pub(crate) sort_desc: bool,
 }
 
 impl Default for DrawerState {
@@ -315,7 +315,7 @@ impl Default for DrawerState {
 /// Load the attachment drawer's remembered state. The collapsed flag, view
 /// settings and dragged height are persisted; thumbnail size always starts at
 /// its default.
-pub fn load_drawer_state() -> DrawerState {
+pub(crate) fn load_drawer_state() -> DrawerState {
     let s = load_state();
     DrawerState {
         collapsed: s.drawer_collapsed,
@@ -326,10 +326,9 @@ pub fn load_drawer_state() -> DrawerState {
     }
 }
 
-/// Persist whether the attachment drawer is collapsed.
 /// The remembered summary-fetch mode for an account (#226), as
 /// (use ENVELOPE, preview items rejected). The default when nothing is known.
-pub fn load_fetch_mode(email: &str) -> (bool, bool) {
+pub(crate) fn load_fetch_mode(email: &str) -> (bool, bool) {
     fetch_mode_from_name(
         load_state()
             .fetch_modes
@@ -362,7 +361,7 @@ pub(super) fn fetch_mode_name(use_envelope: bool, previews_rejected: bool) -> Op
 
 /// Remember the summary-fetch mode that worked for an account (#226); the
 /// default is remembered by forgetting.
-pub fn save_fetch_mode(email: &str, use_envelope: bool, previews_rejected: bool) {
+pub(crate) fn save_fetch_mode(email: &str, use_envelope: bool, previews_rejected: bool) {
     let mode = fetch_mode_name(use_envelope, previews_rejected);
     let key = email.to_ascii_lowercase();
     let mut s = load_state();
@@ -381,28 +380,29 @@ pub fn save_fetch_mode(email: &str, use_envelope: bool, previews_rejected: bool)
     save_state(&s);
 }
 
-pub fn save_drawer_collapsed(collapsed: bool) {
+/// Persist whether the attachment drawer is collapsed.
+pub(crate) fn save_drawer_collapsed(collapsed: bool) {
     update_state(|s| s.drawer_collapsed = collapsed);
 }
 
 /// Persist the attachment drawer's expanded (dragged) height.
-pub fn save_drawer_height(height: i32) {
+pub(crate) fn save_drawer_height(height: i32) {
     update_state(|s| s.drawer_height = height.clamp(96, 4000));
 }
 
 /// Persist the attachment drawer's view mode (list vs. thumbnail grid).
-pub fn save_drawer_list_view(list_view: bool) {
+pub(crate) fn save_drawer_list_view(list_view: bool) {
     update_state(|s| s.drawer_list_view = list_view);
 }
 
 /// Persist the attachment drawer's list sort direction.
-pub fn save_drawer_sort_desc(desc: bool) {
+pub(crate) fn save_drawer_sort_desc(desc: bool) {
     update_state(|s| s.drawer_sort_desc = desc);
 }
 
 /// The attachments gallery's remembered view settings:
 /// (table view, thumbnail width px, sort index).
-pub fn load_gallery_view() -> (bool, i32, u32) {
+pub(crate) fn load_gallery_view() -> (bool, i32, u32) {
     let s = load_state();
     (
         s.gallery_table_view,
@@ -412,17 +412,17 @@ pub fn load_gallery_view() -> (bool, i32, u32) {
 }
 
 /// Persist whether the attachments gallery shows the table view.
-pub fn save_gallery_table_view(table: bool) {
+pub(crate) fn save_gallery_table_view(table: bool) {
     update_state(|s| s.gallery_table_view = table);
 }
 
 /// Persist the attachments gallery's thumbnail width.
-pub fn save_gallery_thumb_width(width: i32) {
+pub(crate) fn save_gallery_thumb_width(width: i32) {
     update_state(|s| s.gallery_thumb_width = width);
 }
 
 /// Persist the attachments gallery's sort criterion (dropdown row index).
-pub fn save_gallery_sort(sort: u32) {
+pub(crate) fn save_gallery_sort(sort: u32) {
     update_state(|s| s.gallery_sort = sort);
 }
 
@@ -447,7 +447,7 @@ pub(super) fn decode_gallery_folder(entry: &str) -> Option<(u32, String, bool)> 
 
 /// The attachments gallery's remembered folder scope: (pull from Archive,
 /// pull from other folders, per-folder overrides as (account id, path, on)).
-pub fn load_gallery_scope() -> (bool, bool, Vec<(u32, String, bool)>) {
+pub(crate) fn load_gallery_scope() -> (bool, bool, Vec<(u32, String, bool)>) {
     let s = load_state();
     let folders = s
         .gallery_folders
@@ -458,7 +458,7 @@ pub fn load_gallery_scope() -> (bool, bool, Vec<(u32, String, bool)>) {
 }
 
 /// Persist the attachments gallery's folder scope.
-pub fn save_gallery_scope(archive: bool, other: bool, folders: &[(u32, String, bool)]) {
+pub(crate) fn save_gallery_scope(archive: bool, other: bool, folders: &[(u32, String, bool)]) {
     let mut s = load_state();
     s.gallery_archive = archive;
     s.gallery_other = other;
@@ -469,11 +469,9 @@ pub fn save_gallery_scope(archive: bool, other: bool, folders: &[(u32, String, b
     save_state(&s);
 }
 
-/// The About window's height: tall by default, remembering the user's own
-/// vertical resize across restarts.
 /// The split-reply panel's dragged height; 0 when it has never been dragged
 /// (the caller computes an opening default from the pane).
-pub fn load_split_reply_height() -> i32 {
+pub(crate) fn load_split_reply_height() -> i32 {
     let h = load_state().split_reply_height;
     if h == 0 {
         0
@@ -482,33 +480,35 @@ pub fn load_split_reply_height() -> i32 {
     }
 }
 
-pub fn save_split_reply_height(height: i32) {
+pub(crate) fn save_split_reply_height(height: i32) {
     update_state(|s| s.split_reply_height = height.clamp(220, 4000));
 }
 
-pub fn load_about_height() -> i32 {
+/// The About window's height: tall by default, remembering the user's own
+/// vertical resize across restarts.
+pub(crate) fn load_about_height() -> i32 {
     load_state().about_height.clamp(400, 4000)
 }
 
-pub fn save_about_height(height: i32) {
+pub(crate) fn save_about_height(height: i32) {
     update_state(|s| s.about_height = height.clamp(400, 4000));
 }
 
 /// The message-list pane's remembered width (clamped to something sane).
-pub fn load_list_pane_width() -> i32 {
+pub(crate) fn load_list_pane_width() -> i32 {
     load_state().list_pane_width.clamp(324, 4000)
 }
 
 /// Persist the message-list pane's width (#28).
-pub fn save_list_pane_width(width: i32) {
+pub(crate) fn save_list_pane_width(width: i32) {
     update_state(|s| s.list_pane_width = width.clamp(324, 4000));
 }
 
 /// The contacts view's remembered list-pane width (280 is also its floor).
-pub fn load_contacts_pane_width() -> i32 {
+pub(crate) fn load_contacts_pane_width() -> i32 {
     load_state().contacts_pane_width.clamp(280, 4000)
 }
 
-pub fn save_contacts_pane_width(width: i32) {
+pub(crate) fn save_contacts_pane_width(width: i32) {
     update_state(|s| s.contacts_pane_width = width.clamp(280, 4000));
 }

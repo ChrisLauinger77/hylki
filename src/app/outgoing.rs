@@ -14,26 +14,26 @@ use crate::i18n::{i18n, i18n_f};
 use crate::models::OutboxItem;
 use crate::worker::OutgoingMessage;
 
-pub(crate) struct Outgoing {
-    pub ticket: u64,
-    pub account_id: u32,
+pub(super) struct Outgoing {
+    pub(super) ticket: u64,
+    pub(super) account_id: u32,
     /// The account as configured when Send was pressed: quitting builds the
     /// message from it, after the app's own state is gone.
-    pub account: AccountConfig,
-    pub message: Box<OutgoingMessage>,
-    pub sent_path: Option<String>,
-    pub queued_at: i64,
+    pub(super) account: AccountConfig,
+    pub(super) message: Box<OutgoingMessage>,
+    pub(super) sent_path: Option<String>,
+    pub(super) queued_at: i64,
     /// Where it was written, for Undo to reopen it there.
-    pub origin: Origin,
+    pub(super) origin: Origin,
     /// Still waiting out the delay, so Undo can take it back. False once the
     /// worker has it.
-    pub held: bool,
-    pub toast: adw::Toast,
+    pub(super) held: bool,
+    pub(super) toast: adw::Toast,
 }
 
 /// The composer a message was sent from.
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub(crate) enum Origin {
+pub(super) enum Origin {
     /// The split reply beside the card it answers.
     Split((u32, u32)),
     /// The editor covering the reading pane.
@@ -42,17 +42,17 @@ pub(crate) enum Origin {
     Window,
 }
 
-pub(crate) type OutgoingList = Rc<RefCell<Vec<Outgoing>>>;
+pub(super) type OutgoingList = Rc<RefCell<Vec<Outgoing>>>;
 
 /// The Outbox row id of a message on its way out. Counted down from the top
 /// of the range, where the database's own ids for queued messages never reach.
-pub(crate) fn row_id(ticket: u64) -> u32 {
+pub(super) fn row_id(ticket: u64) -> u32 {
     u32::MAX - ticket as u32
 }
 
 impl Outgoing {
     /// What the toast says while the message waits out its delay.
-    pub fn sending_title(&self) -> String {
+    pub(super) fn sending_title(&self) -> String {
         match self.message.subject.trim() {
             "" => i18n("Sending message…"),
             subject => i18n_f("Sending “{subject}”…", &[("subject", subject)]),
@@ -60,7 +60,7 @@ impl Outgoing {
     }
 
     /// Its row in the Outbox.
-    pub fn as_outbox_item(&self) -> OutboxItem {
+    pub(super) fn as_outbox_item(&self) -> OutboxItem {
         let m = &self.message;
         let recipients = [&m.to, &m.cc]
             .iter()
@@ -108,7 +108,7 @@ impl Outgoing {
 /// due now, so the next launch sends it. The process exits right after, so
 /// this is the last chance. One already with its worker is past saving here,
 /// as it always was.
-pub(crate) fn park_held(list: &OutgoingList) {
+pub(super) fn park_held(list: &OutgoingList) {
     let Ok(list) = list.try_borrow() else { return };
     if !list.iter().any(|o| o.held) {
         return;

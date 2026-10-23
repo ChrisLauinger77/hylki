@@ -322,31 +322,9 @@ impl SendMorph {
         let (w, h) = (self.width() as f32, self.height() as f32);
         let full = graphene::Rect::new(0.0, 0.0, w, h);
         let chrome = ease_out(c) as f32;
-        let editor = &before.editor;
-        let cutout = inflate(editor, 4.0);
         let scene = imp.scene.borrow();
         let Some(scene) = scene.as_ref() else {
-            // Waiting for the conversation: the pane as it was, the
-            // composer's buttons and fields already on their way out.
-            if let Some(ground) = before.ground {
-                s.append_color(&ground, &full);
-            }
-            draw_still(s, &before.still, scale, &full, 0.0, 0.0);
-            if let (true, Some(base)) = (chrome > 0.0, imp.base.get()) {
-                let mut c = base;
-                c.set_alpha(chrome);
-                for r in around(&before.composer, &cutout) {
-                    s.append_color(&c, &r);
-                }
-            }
-            // The editor card lifts off the composer while it waits.
-            let rounded = rounded_rect(editor, EDITOR_RADIUS, EDITOR_RADIUS);
-            shadow(s, &rounded, chrome);
-            if let Some(c) = imp.editor_cut.borrow().as_ref() {
-                s.push_rounded_clip(&rounded);
-                draw_cut(s, c, scale, 0.0, 0.0);
-                s.pop();
-            }
+            self.draw_waiting(s, before, scale, &full, chrome);
             return;
         };
         let after = &scene.after;
@@ -357,7 +335,13 @@ impl SendMorph {
             return;
         }
         let e = ease(t) as f32;
-        let lerp = |a: f32, b: f32| a + (b - a) * e;
+        let p = Paint {
+            s,
+            scale,
+            full,
+            e,
+            t,
+        };
 
         // Where the composer stood, its ground giving way to the window's.
         {
@@ -366,133 +350,12 @@ impl SendMorph {
             s.append_color(&c, &before.composer);
         }
 
-        // The reader's header bar: back in from the top edge if the split
-        // had hidden it, as the split's own close brings it back.
         let view = lerp_rect(&before.view, &after.view, e);
-        let head_top = match (before.header, after.header) {
-            (None, Some(hb)) => {
-                if let Some(c) = scene.header_cut.as_ref() {
-                    let dy = -(1.0 - e) * (hb.y() + hb.height());
-                    s.push_opacity(smoothstep(0.0, 0.6, t));
-                    draw_cut(s, c, scale, 0.0, dy);
-                    s.pop();
-                }
-                hb.y() + hb.height()
-            }
-            (_, Some(hb)) => {
-                s.push_clip(&hb);
-                draw_still(s, &after.still, scale, &full, 0.0, 0.0);
-                s.pop();
-                hb.y() + hb.height()
-            }
-            (_, None) => after.reader.y(),
-        };
-        // The subject and everything else above the conversation, rising
-        // (or sinking) with its top edge.
-        {
-            let dy = (1.0 - e) * (before.view.y() - after.view.y());
-            let top = head_top + dy;
-            let clip = graphene::Rect::new(
-                after.reader.x(),
-                top,
-                after.reader.width(),
-                (view.y() - top).max(0.0),
-            );
-            s.push_clip(&clip);
-            draw_still(s, &after.still, scale, &full, 0.0, dy);
-            s.pop();
-        }
-        // And what sits under the conversation (the attachment drawer).
-        {
-            let bottom_after = after.view.y() + after.view.height();
-            let dy = (1.0 - e) * ((before.view.y() + before.view.height()) - bottom_after);
-            let top = view.y() + view.height();
-            let bottom = after.reader.y() + after.reader.height() + dy;
-            let clip = graphene::Rect::new(
-                after.reader.x(),
-                top,
-                after.reader.width(),
-                (bottom - top).max(0.0),
-            );
-            s.push_clip(&clip);
-            draw_still(s, &after.still, scale, &full, 0.0, dy);
-            s.pop();
-        }
+        draw_reader_around(&p, before, scene, &view);
 
         // The morphing card's frame, which the old conversation keeps clear of.
-        let frame = lerp_rect(editor, &scene.card, e);
-        let frame_bottom = frame.y() + frame.height();
-
-        // The conversation, sliding to its new place: what the reader showed
-        // before, with the finished document over it wherever the two meet,
-        // so whatever comes into view on the way is already the new one.
-        s.push_clip(&view);
-        s.append_color(&scene.page, &view);
-        let card = &scene.card;
-        let (sa, sb) = (scene.shift_above, scene.shift_below);
-        let old_split_above = card.y() - sa;
-        let old_split_below = card.y() + card.height() - sb;
-        {
-            let dy = e * sa;
-            let top = before.view.y() + dy;
-            let bottom = (old_split_above + dy).min(frame.y());
-            if bottom > top {
-                s.push_clip(&graphene::Rect::new(
-                    view.x(),
-                    top,
-                    view.width(),
-                    bottom - top,
-                ));
-                draw_still(s, &before.still, scale, &full, 0.0, dy);
-                s.pop();
-            }
-        }
-        {
-            let dy = e * sb;
-            let top = (old_split_below + dy).max(frame_bottom);
-            let bottom = before.view.y() + before.view.height() + dy;
-            if bottom > top {
-                s.push_clip(&graphene::Rect::new(
-                    view.x(),
-                    top,
-                    view.width(),
-                    bottom - top,
-                ));
-                draw_still(s, &before.still, scale, &full, 0.0, dy);
-                s.pop();
-            }
-        }
-        {
-            let dy = (e - 1.0) * sa;
-            let top = after.view.y() + dy;
-            let bottom = card.y() + dy;
-            if bottom > top {
-                s.push_clip(&graphene::Rect::new(
-                    view.x(),
-                    top,
-                    view.width(),
-                    bottom - top,
-                ));
-                draw_still(s, &after.still, scale, &full, 0.0, dy);
-                s.pop();
-            }
-        }
-        {
-            let dy = (e - 1.0) * sb;
-            let top = card.y() + card.height() + dy;
-            let bottom = after.view.y() + after.view.height() + dy;
-            if bottom > top {
-                s.push_clip(&graphene::Rect::new(
-                    view.x(),
-                    top,
-                    view.width(),
-                    bottom - top,
-                ));
-                draw_still(s, &after.still, scale, &full, 0.0, dy);
-                s.pop();
-            }
-        }
-        s.pop();
+        let frame = lerp_rect(&before.editor, &scene.card, e);
+        draw_conversation(&p, before, scene, &view, &frame);
 
         // The composer's buttons and fields, fading where they stood.
         if let (true, Some(c)) = (chrome < 1.0, imp.chrome_cut.borrow().as_ref()) {
@@ -501,13 +364,64 @@ impl SendMorph {
             s.pop();
         }
 
-        // The editor card becoming the message card. It lifts off the
-        // composer, its shadow growing and settling again as it lands, and
-        // its frame takes the message card's place and size.
+        self.draw_card(&p, before, scene, &frame, chrome);
+    }
+
+    /// Waiting for the conversation: the pane as it was, the composer's
+    /// buttons and fields already on their way out, and the editor card
+    /// lifting off the composer.
+    fn draw_waiting(
+        &self,
+        s: &gtk::Snapshot,
+        before: &Before,
+        scale: f32,
+        full: &graphene::Rect,
+        chrome: f32,
+    ) {
+        let imp = self.imp();
+        let editor = &before.editor;
+        let cutout = inflate(editor, 4.0);
+        if let Some(ground) = before.ground {
+            s.append_color(&ground, full);
+        }
+        draw_still(s, &before.still, scale, full, 0.0, 0.0);
+        if let (true, Some(base)) = (chrome > 0.0, imp.base.get()) {
+            let mut c = base;
+            c.set_alpha(chrome);
+            for r in around(&before.composer, &cutout) {
+                s.append_color(&c, &r);
+            }
+        }
+        // The editor card lifts off the composer while it waits.
+        let rounded = rounded_rect(editor, EDITOR_RADIUS, EDITOR_RADIUS);
+        shadow(s, &rounded, chrome);
+        if let Some(c) = imp.editor_cut.borrow().as_ref() {
+            s.push_rounded_clip(&rounded);
+            draw_cut(s, c, scale, 0.0, 0.0);
+            s.pop();
+        }
+    }
+
+    /// The editor card becoming the message card. It lifts off the
+    /// composer, its shadow growing and settling again as it lands, and
+    /// its frame takes the message card's place and size.
+    fn draw_card(
+        &self,
+        p: &Paint,
+        before: &Before,
+        scene: &Scene,
+        frame: &graphene::Rect,
+        chrome: f32,
+    ) {
+        let imp = self.imp();
+        let (s, e, t) = (p.s, p.e, p.t);
+        let lerp = |a: f32, b: f32| a + (b - a) * e;
+        let editor = &before.editor;
+        let card = &scene.card;
         let (rt, rb) = scene.card_radius;
         let top_r = lerp(EDITOR_RADIUS, rt);
         let bottom_r = lerp(EDITOR_RADIUS, rb);
-        let rounded = rounded_rect(&frame, top_r, bottom_r);
+        let rounded = rounded_rect(frame, top_r, bottom_r);
         // Lifted while waiting, it stays up for the first half of the
         // flight and settles as it lands.
         shadow(
@@ -516,7 +430,7 @@ impl SendMorph {
             chrome * (1.0 - smoothstep(0.45, 1.0, t) as f32),
         );
         s.push_rounded_clip(&rounded);
-        s.append_color(&mix(&scene.editor_ground, &scene.card_ground, e), &frame);
+        s.append_color(&mix(&scene.editor_ground, &scene.card_ground, e), frame);
         // The same words lie on top of each other, so the card's own
         // picture comes up over the editor's as the editor's goes: the text
         // never thins out on the way. Brief, because the two set the words
@@ -561,5 +475,141 @@ impl SendMorph {
             s.pop();
         }
         s.pop();
+    }
+}
+
+/// What every part of one frame of the flight is drawn with: the snapshot,
+/// the device scale, the stage's box, the eased progress `e` and the raw
+/// progress `t`.
+struct Paint<'a> {
+    s: &'a gtk::Snapshot,
+    scale: f32,
+    full: graphene::Rect,
+    e: f32,
+    t: f64,
+}
+
+/// The reader around the conversation: its header bar (back in from the
+/// top edge if the split had hidden it, as the split's own close brings it
+/// back), the subject and everything else above the conversation rising
+/// (or sinking) with its top edge, and what sits under it (the attachment
+/// drawer).
+fn draw_reader_around(p: &Paint, before: &Before, scene: &Scene, view: &graphene::Rect) {
+    let (s, scale, full, e, t) = (p.s, p.scale, &p.full, p.e, p.t);
+    let after = &scene.after;
+    let head_top = match (before.header, after.header) {
+        (None, Some(hb)) => {
+            if let Some(c) = scene.header_cut.as_ref() {
+                let dy = -(1.0 - e) * (hb.y() + hb.height());
+                s.push_opacity(smoothstep(0.0, 0.6, t));
+                draw_cut(s, c, scale, 0.0, dy);
+                s.pop();
+            }
+            hb.y() + hb.height()
+        }
+        (_, Some(hb)) => {
+            s.push_clip(&hb);
+            draw_still(s, &after.still, scale, full, 0.0, 0.0);
+            s.pop();
+            hb.y() + hb.height()
+        }
+        (_, None) => after.reader.y(),
+    };
+    {
+        let dy = (1.0 - e) * (before.view.y() - after.view.y());
+        let top = head_top + dy;
+        let clip = graphene::Rect::new(
+            after.reader.x(),
+            top,
+            after.reader.width(),
+            (view.y() - top).max(0.0),
+        );
+        s.push_clip(&clip);
+        draw_still(s, &after.still, scale, full, 0.0, dy);
+        s.pop();
+    }
+    {
+        let bottom_after = after.view.y() + after.view.height();
+        let dy = (1.0 - e) * ((before.view.y() + before.view.height()) - bottom_after);
+        let top = view.y() + view.height();
+        let bottom = after.reader.y() + after.reader.height() + dy;
+        let clip = graphene::Rect::new(
+            after.reader.x(),
+            top,
+            after.reader.width(),
+            (bottom - top).max(0.0),
+        );
+        s.push_clip(&clip);
+        draw_still(s, &after.still, scale, full, 0.0, dy);
+        s.pop();
+    }
+}
+
+/// The conversation, sliding to its new place: what the reader showed
+/// before, with the finished document over it wherever the two meet, so
+/// whatever comes into view on the way is already the new one. The old
+/// conversation keeps clear of the morphing card's `frame`.
+fn draw_conversation(
+    p: &Paint,
+    before: &Before,
+    scene: &Scene,
+    view: &graphene::Rect,
+    frame: &graphene::Rect,
+) {
+    let (s, e) = (p.s, p.e);
+    let after = &scene.after;
+    let frame_bottom = frame.y() + frame.height();
+    s.push_clip(view);
+    s.append_color(&scene.page, view);
+    let card = &scene.card;
+    let (sa, sb) = (scene.shift_above, scene.shift_below);
+    let old_split_above = card.y() - sa;
+    let old_split_below = card.y() + card.height() - sb;
+    {
+        let dy = e * sa;
+        let top = before.view.y() + dy;
+        let bottom = (old_split_above + dy).min(frame.y());
+        draw_band(p, &before.still, view, top, bottom, dy);
+    }
+    {
+        let dy = e * sb;
+        let top = (old_split_below + dy).max(frame_bottom);
+        let bottom = before.view.y() + before.view.height() + dy;
+        draw_band(p, &before.still, view, top, bottom, dy);
+    }
+    {
+        let dy = (e - 1.0) * sa;
+        let top = after.view.y() + dy;
+        let bottom = card.y() + dy;
+        draw_band(p, &after.still, view, top, bottom, dy);
+    }
+    {
+        let dy = (e - 1.0) * sb;
+        let top = card.y() + card.height() + dy;
+        let bottom = after.view.y() + after.view.height() + dy;
+        draw_band(p, &after.still, view, top, bottom, dy);
+    }
+    s.pop();
+}
+
+/// The band of `view` from `top` to `bottom` (nothing when it is empty),
+/// filled with `still` shifted down by `dy`.
+fn draw_band(
+    p: &Paint,
+    still: &gdk::Texture,
+    view: &graphene::Rect,
+    top: f32,
+    bottom: f32,
+    dy: f32,
+) {
+    if bottom > top {
+        p.s.push_clip(&graphene::Rect::new(
+            view.x(),
+            top,
+            view.width(),
+            bottom - top,
+        ));
+        draw_still(p.s, still, p.scale, &p.full, 0.0, dy);
+        p.s.pop();
     }
 }

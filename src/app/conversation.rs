@@ -197,6 +197,7 @@ impl AppModel {
         self.push_member_checks();
     }
 
+    /// Ask for one conversation re-render shortly from now, collapsing a burst of
     /// arriving bodies into a single one.
     ///
     /// A conversation is rendered as one document with every member's body
@@ -218,7 +219,6 @@ impl AppModel {
     /// The header follows the message the user selected, not whatever sorted to
     /// the top: a conversation can now include replies of your own pulled in from
     /// Sent, and one of those being the newest shouldn't retitle the reader.
-    /// Ask for one conversation re-render shortly from now, collapsing a burst of
     pub(super) fn show_thread(&self) {
         let Some(head) = self.current_thread.first() else {
             return;
@@ -404,8 +404,7 @@ impl AppModel {
                 .iter()
                 .find(|(_, p)| p.copied_by(r))
                 .map(|(k, _)| *k);
-            if let Some(key) = took_over {
-                let p = self.provisionals.remove(&key).expect("found above");
+            if let Some((key, p)) = took_over.and_then(|key| self.provisionals.remove_entry(&key)) {
                 self.related_ids
                     .insert((r.account_id, r.folder_id, r.uid), key.1);
                 conv.retain(|m| (m.account_id, m.id) != key);

@@ -22,44 +22,44 @@ const IFACE_OAUTH2: &str = "org.gnome.OnlineAccounts.OAuth2Based";
 
 /// A mail account discovered in GNOME Online Accounts.
 #[derive(Debug, Clone)]
-pub struct GoaMailAccount {
+pub(crate) struct GoaMailAccount {
     /// GOA account id (e.g. "account_1699…").
-    pub id: String,
-    pub email: String,
-    pub name: String,
-    pub provider: String,
-    pub imap_host: String,
-    pub imap_port: u16,
-    pub imap_user: String,
-    pub smtp_host: String,
-    pub smtp_port: u16,
-    pub smtp_user: String,
-    pub smtp_separate: bool,
+    pub(crate) id: String,
+    pub(crate) email: String,
+    pub(crate) name: String,
+    pub(crate) provider: String,
+    pub(crate) imap_host: String,
+    pub(crate) imap_port: u16,
+    pub(crate) imap_user: String,
+    pub(crate) smtp_host: String,
+    pub(crate) smtp_port: u16,
+    pub(crate) smtp_user: String,
+    pub(crate) smtp_separate: bool,
     /// Whether GOA can hand us a password (generic IMAP).
-    pub password_based: bool,
+    pub(crate) password_based: bool,
     /// Whether the provider uses OAuth2 — imported accounts authenticate with a
     /// GOA-issued token (XOAUTH2) fetched fresh at connect time.
-    pub oauth2: bool,
+    pub(crate) oauth2: bool,
     /// GOA's `ProviderType` ("google", "ms_graph", "imap_smtp", …). The
     /// Microsoft 365 (`ms_graph`) provider serves no IMAP — its token is scoped
     /// to the Graph API only, so mail runs over Graph (issue #36).
-    pub provider_type: String,
+    pub(crate) provider_type: String,
     /// The TLS modes and certificate choices GOA holds for the servers.
-    pub security: crate::config::ServerSecurity,
+    pub(crate) security: crate::config::ServerSecurity,
 }
 
 impl GoaMailAccount {
     /// Whether Hylki can reach this account's mail: over IMAP, or over Graph
     /// for Microsoft 365. An Exchange (EWS) account fills in the address
     /// and nothing else, and an import of it would only fail to connect (#316).
-    pub fn can_connect(&self) -> bool {
+    pub(crate) fn can_connect(&self) -> bool {
         !self.imap_host.is_empty() || (self.oauth2 && self.provider_type == "ms_graph")
     }
 
     /// Turn a discovered GOA account into a Hylki [`AccountConfig`]. Pass the
     /// password for password-based providers, or `oauth = true` for OAuth ones
     /// (the token is fetched from GOA at connect time).
-    pub fn to_config(&self, password: String, oauth: bool) -> AccountConfig {
+    pub(crate) fn to_config(&self, password: String, oauth: bool) -> AccountConfig {
         AccountConfig {
             folder_roles: Default::default(),
             hidden_folders: Vec::new(),
@@ -136,7 +136,7 @@ impl GoaMailAccount {
     /// GOA's security settings were read picks them up (#254). Returns
     /// whether anything changed. The protocol stays as it is: a Microsoft
     /// 365 account runs over Graph whatever GOA lists.
-    pub fn apply_servers(&self, account: &mut AccountConfig) -> bool {
+    pub(crate) fn apply_servers(&self, account: &mut AccountConfig) -> bool {
         let fresh = self.to_config(String::new(), account.oauth);
         let before = (
             account.imap_host.clone(),
@@ -210,7 +210,7 @@ type ManagedObjects = HashMap<OwnedObjectPath, HashMap<String, HashMap<String, O
 
 /// List mail-capable GNOME Online Accounts. Returns an empty list if GOA isn't
 /// running or has no mail accounts — never errors into the UI.
-pub fn list_mail_accounts() -> Vec<GoaMailAccount> {
+pub(crate) fn list_mail_accounts() -> Vec<GoaMailAccount> {
     match try_list() {
         Ok(v) => v,
         Err(e) => {
@@ -318,21 +318,21 @@ fn mail_account(ifaces: &HashMap<String, HashMap<String, OwnedValue>>) -> Option
 /// GOA's Google token carries no Drive scope on every system (Fedora
 /// builds the Files feature out), so Drive is not offered.
 #[derive(Debug, Clone)]
-pub struct GoaFilesAccount {
-    pub id: String,
+pub(crate) struct GoaFilesAccount {
+    pub(crate) id: String,
     /// The account's e-mail, or its presentation identity.
-    pub email: String,
+    pub(crate) email: String,
     /// GOA's `ProviderType`: "ms_graph".
-    pub provider_type: String,
+    pub(crate) provider_type: String,
     /// Whether the account's Files service is switched on in GNOME
     /// Settings; off means the user did not mean files to be reachable.
-    pub files_enabled: bool,
+    pub(crate) files_enabled: bool,
 }
 
 /// List the GOA accounts that can serve cloud attachments (#144): every
 /// OAuth2 Microsoft 365 account, Files switch or not. Empty when GOA is
 /// not around. Blocking.
-pub fn list_files_accounts() -> Vec<GoaFilesAccount> {
+pub(crate) fn list_files_accounts() -> Vec<GoaFilesAccount> {
     let list = || -> Result<Vec<GoaFilesAccount>, String> {
         let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
         let reply = conn
@@ -390,22 +390,22 @@ pub fn list_files_accounts() -> Vec<GoaFilesAccount> {
 
 /// A GNOME Online Account, as the Contacts settings name it.
 #[derive(Debug, Clone)]
-pub struct GoaContactsAccount {
+pub(crate) struct GoaContactsAccount {
     /// GOA's `ProviderType`: "google", "ms_graph", "owncloud" (Nextcloud),
     /// "webdav"...
-    pub provider_type: String,
+    pub(crate) provider_type: String,
     /// GOA's own name for the provider ("Google", "Nextcloud").
-    pub provider_name: String,
+    pub(crate) provider_name: String,
     /// The account as GOA shows it: its address or user name.
-    pub identity: String,
+    pub(crate) identity: String,
     /// Contacts is switched off for the account in GNOME Settings.
-    pub contacts_disabled: bool,
+    pub(crate) contacts_disabled: bool,
 }
 
 /// Every GNOME Online Account by its ID, for the Contacts settings to name
 /// the address books EDS keeps for them (#408). Empty when GOA is not
 /// around. Blocking.
-pub fn contacts_accounts() -> HashMap<String, GoaContactsAccount> {
+pub(crate) fn contacts_accounts() -> HashMap<String, GoaContactsAccount> {
     let list = || -> Result<HashMap<String, GoaContactsAccount>, String> {
         let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
         let reply = conn
@@ -446,21 +446,21 @@ pub fn contacts_accounts() -> HashMap<String, GoaContactsAccount> {
 /// cares: which account objects are present at all, and which of them have their
 /// Mail service switched off in GNOME Settings.
 #[derive(Debug, Clone)]
-pub struct GoaLiveState {
+pub(crate) struct GoaLiveState {
     /// Ids of every GOA account object, mail-capable or not — so merely
     /// disabling Mail doesn't count as removal.
-    pub account_ids: HashSet<String>,
+    pub(crate) account_ids: HashSet<String>,
     /// Ids whose Mail service is explicitly disabled in GNOME Settings.
-    pub disabled_mail_ids: HashSet<String>,
+    pub(crate) disabled_mail_ids: HashSet<String>,
     /// The mail accounts, by id, with their current server settings.
-    pub mail: HashMap<String, GoaMailAccount>,
+    pub(crate) mail: HashMap<String, GoaMailAccount>,
 }
 
 /// Snapshot the live GOA account state in one `GetManagedObjects` call. Returns
 /// `None` when GOA / the session bus can't be reached — callers MUST treat that
 /// as "unknown", not "no accounts", or they'd wrongly prune every imported GOA
 /// account whenever GOA is momentarily unavailable. Blocking.
-pub fn live_state() -> Option<GoaLiveState> {
+pub(crate) fn live_state() -> Option<GoaLiveState> {
     let conn = zbus::blocking::Connection::session().ok()?;
     let reply = conn
         .call_method(
@@ -503,7 +503,7 @@ pub fn live_state() -> Option<GoaLiveState> {
 /// Settings edit, so they are coalesced for 300 ms and snapshotted once, on a
 /// dedicated thread — never the GTK main thread. Silently no-ops if GOA or the
 /// session bus is unavailable.
-pub fn watch_changes<F: Fn(GoaLiveState) + Send + 'static>(on_change: F) {
+pub(crate) fn watch_changes<F: Fn(GoaLiveState) + Send + 'static>(on_change: F) {
     let (tx, rx) = std::sync::mpsc::channel::<()>();
     let _ = std::thread::Builder::new()
         .name("goa-watch-dispatch".into())
@@ -599,7 +599,7 @@ fn watch_property_signals(
 
 /// Fetch a fresh OAuth2 access token for a GOA account (by id). GOA refreshes the
 /// token as needed, so this always returns a currently-valid token. Blocking.
-pub fn oauth_token(goa_id: &str) -> Option<String> {
+pub(crate) fn oauth_token(goa_id: &str) -> Option<String> {
     // A failure here surfaces as an authentication error several layers up, with
     // nothing to say why. Log the D-Bus reason before discarding it.
     match try_oauth_token(goa_id) {
@@ -678,7 +678,7 @@ fn password_by_id(
 /// one, because getting it wrong leaves an account that silently can't log in
 /// (issue #17) — and since accounts imported from GOA no longer expose their
 /// password field, there is no longer a manual way out.
-pub fn mail_passwords(goa_id: &str) -> (Option<String>, Option<String>) {
+pub(crate) fn mail_passwords(goa_id: &str) -> (Option<String>, Option<String>) {
     let Ok(conn) = zbus::blocking::Connection::session() else {
         tracing::warn!("GOA passwords unavailable: no session bus");
         return (None, None);

@@ -53,16 +53,18 @@ pub(super) fn batches(chunks: &[String], service: Service) -> Vec<Vec<String>> {
     let mut out: Vec<Vec<String>> = Vec::new();
     let mut size = 0;
     for c in chunks {
-        let full = match out.last() {
-            None => true,
-            Some(last) => service == Service::Libre || size + c.len() > BATCH || last.len() >= 50,
-        };
-        if full {
-            out.push(Vec::new());
-            size = 0;
+        match out.last_mut() {
+            Some(last)
+                if service != Service::Libre && size + c.len() <= BATCH && last.len() < 50 =>
+            {
+                size += c.len();
+                last.push(c.clone());
+            }
+            _ => {
+                size = c.len();
+                out.push(vec![c.clone()]);
+            }
         }
-        size += c.len();
-        out.last_mut().unwrap().push(c.clone());
     }
     out
 }
@@ -247,7 +249,7 @@ pub(super) fn libre(
 /// Try the settings with a greeting, for the Settings page's check
 /// (blocking): what was sent and what came back. The greeting is in a
 /// language other than the target, or nothing would change.
-pub fn check(settings: &Settings, key: &str) -> Result<(String, String), String> {
+pub(crate) fn check(settings: &Settings, key: &str) -> Result<(String, String), String> {
     let greeting = if base(&settings.target_language()) == "en" {
         "Guten Morgen"
     } else {

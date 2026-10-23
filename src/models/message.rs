@@ -6,66 +6,66 @@ use crate::i18n::{i18n, i18n_f};
 /// A single message (summary + body). In a real backend the body is loaded
 /// lazily; here it is always present.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Message {
-    pub id: u32,
+pub(crate) struct Message {
+    pub(crate) id: u32,
     /// Owning account; needed to route actions and to merge the unified inbox.
-    pub account_id: u32,
-    pub folder_id: u32,
+    pub(crate) account_id: u32,
+    pub(crate) folder_id: u32,
     /// IMAP UID, used to fetch the full body lazily. Mock data reuses `id`.
-    pub uid: u32,
-    pub from_name: String,
-    pub from_addr: String,
+    pub(crate) uid: u32,
+    pub(crate) from_name: String,
+    pub(crate) from_addr: String,
     /// Where the sender asked replies to go (comma-separated emails), from the
     /// Reply-To header. Empty when the header is absent — reply to `from_addr`.
-    pub reply_to: String,
+    pub(crate) reply_to: String,
     /// Original recipients (comma-separated emails), used for Reply All.
-    pub to: String,
-    pub cc: String,
+    pub(crate) to: String,
+    pub(crate) cc: String,
     /// Bcc recipients, comma-separated. Only a sender's own copy names them
     /// (#476); a received message has none.
-    pub bcc: String,
-    pub subject: String,
-    pub preview: String,
-    pub body: String,
+    pub(crate) bcc: String,
+    pub(crate) subject: String,
+    pub(crate) preview: String,
+    pub(crate) body: String,
     /// Human-readable timestamp for display.
-    pub date: String,
+    pub(crate) date: String,
     /// Unix timestamp (seconds) for sorting, e.g. the unified inbox. 0 if unknown.
-    pub timestamp: i64,
-    pub unread: bool,
-    pub starred: bool,
+    pub(crate) timestamp: i64,
+    pub(crate) unread: bool,
+    pub(crate) starred: bool,
     /// Replied to (IMAP `\Answered`, JMAP `$answered`, Microsoft 365's last
     /// verb) and forwarded (`$Forwarded`, `$forwarded`), for the list's
     /// arrows (#454). Set by any client, this one included when it sends.
-    pub answered: bool,
-    pub forwarded: bool,
+    pub(crate) answered: bool,
+    pub(crate) forwarded: bool,
     /// The message's IMAP keywords (user flags) as the server reports them —
     /// `$label1`, `Work`, `$Junk`… — verbatim and in server order. Tags (#71)
     /// are the ones a [`crate::config::Tag`] maps to; the rest are ignored.
     /// Microsoft 365 categories and POP3's local-only tags land here too.
-    pub keywords: Vec<String>,
-    pub has_attachment: bool,
+    pub(crate) keywords: Vec<String>,
+    pub(crate) has_attachment: bool,
     /// This message's own Message-ID (normalized, no angle brackets). Empty if
     /// unknown. Used to thread replies accurately (instead of by subject alone).
-    pub message_id: String,
+    pub(crate) message_id: String,
     /// Referenced Message-IDs (In-Reply-To + References), space-separated and
     /// normalized. Links a reply to the messages it descends from.
-    pub references: String,
+    pub(crate) references: String,
     /// How important the sender marked it (#334).
-    pub importance: Importance,
+    pub(crate) importance: Importance,
     /// When a Microsoft 365 follow-up flag falls due (Unix seconds), or 0.
     /// Only Graph has such a date; IMAP and JMAP have no standard for one.
-    pub due: i64,
+    pub(crate) due: i64,
     /// The Gmail labels the message wears besides the folder it is listed
     /// in (#374), as the server names them (modified UTF-7, `Parent/Child`
     /// for a nested one). System labels (`\Inbox`, `\Important`…) are left
     /// out. Empty on every other server.
-    pub labels: Vec<String>,
+    pub(crate) labels: Vec<String>,
 }
 
 /// How important a message's sender marked it: the `X-Priority`, `Importance`
 /// or `Priority` header, or Microsoft 365's `importance` (#334).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Importance {
+pub(crate) enum Importance {
     #[default]
     Normal,
     High,
@@ -75,7 +75,7 @@ pub enum Importance {
 impl Importance {
     /// The value a header gives: `X-Priority: 1 (Highest)`, `Importance:
     /// high`, `Priority: urgent` and so on. Anything else is normal.
-    pub fn from_header(name: &str, value: &str) -> Importance {
+    pub(super) fn from_header(name: &str, value: &str) -> Importance {
         let value = value.trim().to_ascii_lowercase();
         if name.eq_ignore_ascii_case("x-priority") {
             return match value.chars().next() {
@@ -97,7 +97,7 @@ impl Importance {
 
     /// The first of `X-Priority`, `Importance` and `Priority` that says
     /// anything, from a lookup by header name.
-    pub fn from_headers<'a>(header: impl Fn(&'static str) -> Option<&'a str>) -> Importance {
+    pub(crate) fn from_headers<'a>(header: impl Fn(&'static str) -> Option<&'a str>) -> Importance {
         ["X-Priority", "Importance", "Priority"]
             .iter()
             .filter_map(|name| header(name).map(|v| Importance::from_header(name, v)))
@@ -106,7 +106,7 @@ impl Importance {
     }
 
     /// The number the cache stores.
-    pub fn to_i64(self) -> i64 {
+    pub(crate) fn to_i64(self) -> i64 {
         match self {
             Importance::Normal => 0,
             Importance::High => 1,
@@ -114,7 +114,7 @@ impl Importance {
         }
     }
 
-    pub fn from_i64(n: i64) -> Importance {
+    pub(crate) fn from_i64(n: i64) -> Importance {
         match n {
             1 => Importance::High,
             -1 => Importance::Low,
@@ -126,11 +126,11 @@ impl Importance {
 /// Identifies an existing draft being edited, so saving/sending replaces it
 /// (removing the previous version from the Drafts folder).
 #[derive(Debug, Clone)]
-pub struct DraftOrigin {
-    pub account_id: u32,
-    pub folder_id: u32,
-    pub path: String,
-    pub uid: u32,
+pub(crate) struct DraftOrigin {
+    pub(crate) account_id: u32,
+    pub(crate) folder_id: u32,
+    pub(crate) path: String,
+    pub(crate) uid: u32,
 }
 
 /// The list preview stored for an OpenPGP-encrypted message (#133): a
@@ -138,16 +138,16 @@ pub struct DraftOrigin {
 /// "Encrypted message" in whatever language is current, and nothing of the
 /// message itself is written down. A lock glyph, so it still reads if it
 /// ever shows raw.
-pub const ENCRYPTED_PREVIEW: &str = "\u{1F512}";
+pub(crate) const ENCRYPTED_PREVIEW: &str = "\u{1F512}";
 
 /// Whether a stored preview is the encrypted-message marker.
-pub fn preview_is_encrypted(preview: &str) -> bool {
+pub(crate) fn preview_is_encrypted(preview: &str) -> bool {
     preview.trim() == ENCRYPTED_PREVIEW
 }
 
 /// Whether a subject wears one of the prefixes mail programs put on an
 /// answer or a forward, in any of the languages they write them in.
-pub fn is_reply_or_forward_subject(subject: &str) -> bool {
+pub(crate) fn is_reply_or_forward_subject(subject: &str) -> bool {
     let subject = subject.trim_start().to_ascii_lowercase();
     [
         "re:", "fw:", "fwd:", "aw:", "sv:", "vs:", "tr:", "rv:", "wg:", "antw:", "r:", "i:",
@@ -157,7 +157,7 @@ pub fn is_reply_or_forward_subject(subject: &str) -> bool {
 }
 
 /// The words the list shows for a stored preview.
-pub fn preview_display(preview: &str) -> String {
+pub(crate) fn preview_display(preview: &str) -> String {
     if preview_is_encrypted(preview) {
         i18n("Encrypted message")
     } else {
@@ -168,14 +168,14 @@ pub fn preview_display(preview: &str) -> String {
 impl Message {
     /// Whether the message carries `keyword`. IMAP keywords are atoms
     /// compared case-insensitively (RFC 3501), so `work` and `Work` are one.
-    pub fn has_keyword(&self, keyword: &str) -> bool {
+    pub(crate) fn has_keyword(&self, keyword: &str) -> bool {
         self.keywords
             .iter()
             .any(|k| k.eq_ignore_ascii_case(keyword))
     }
 
     /// Add or drop `keyword`, keeping the list free of duplicates.
-    pub fn set_keyword(&mut self, keyword: &str, add: bool) {
+    pub(crate) fn set_keyword(&mut self, keyword: &str, add: bool) {
         self.keywords.retain(|k| !k.eq_ignore_ascii_case(keyword));
         if add {
             self.keywords.push(keyword.to_string());
@@ -184,13 +184,13 @@ impl Message {
 
     /// Whether the message carries `tag`: its keyword, or on Gmail a label
     /// named like it (#374), which is how a tag set in Gmail itself arrives.
-    pub fn has_tag(&self, tag: &crate::config::Tag) -> bool {
+    pub(crate) fn has_tag(&self, tag: &crate::config::Tag) -> bool {
         self.has_keyword(&tag.keyword) || self.labels.iter().any(|l| label_names_tag(l, tag))
     }
 
     /// The message's keywords, with the keyword of every tag a Gmail label
     /// stands for: what the tag checks go by.
-    pub fn tag_keywords(&self, tags: &[crate::config::Tag]) -> Vec<String> {
+    pub(crate) fn tag_keywords(&self, tags: &[crate::config::Tag]) -> Vec<String> {
         let mut out = self.keywords.clone();
         for t in tags {
             if !self.has_keyword(&t.keyword) && self.labels.iter().any(|l| label_names_tag(l, t)) {
@@ -202,13 +202,13 @@ impl Message {
 
     /// Take a tag off this copy of the message: its keyword and the labels
     /// that stand for it.
-    pub fn drop_tag(&mut self, tag: &crate::config::Tag) {
+    pub(crate) fn drop_tag(&mut self, tag: &crate::config::Tag) {
         self.set_keyword(&tag.keyword, false);
         self.labels.retain(|l| !label_names_tag(l, tag));
     }
 
     /// The pills the message wears in the list and the reader; see [`pills`].
-    pub fn pills<'a>(&self, tags: &'a [crate::config::Tag]) -> Vec<Pill<'a>> {
+    pub(crate) fn pills<'a>(&self, tags: &'a [crate::config::Tag]) -> Vec<Pill<'a>> {
         pills(&self.keywords, &self.labels, tags)
     }
 
@@ -218,7 +218,7 @@ impl Message {
     /// exist in the wild) took the whole message list down with it. Called at
     /// the ingestion choke points (envelope parse, cache load), so nothing
     /// NUL-bearing ever reaches a label, tooltip, or document.
-    pub fn scrub_nuls(&mut self) {
+    pub(crate) fn scrub_nuls(&mut self) {
         for s in [
             &mut self.from_name,
             &mut self.from_addr,
@@ -239,7 +239,7 @@ impl Message {
 
     /// Full receipt date and time for the reader header, e.g.
     /// "Jun 27, 2026 at 3:15 PM". Falls back to the short label if unknown.
-    pub fn datetime_full(&self) -> String {
+    pub(crate) fn datetime_full(&self) -> String {
         if self.timestamp <= 0 {
             return self.date.clone();
         }
@@ -253,7 +253,7 @@ impl Message {
 
     /// Compact date + time for list rows: always shows the time, with the day
     /// (and year, if not this year).
-    pub fn datetime_list(&self) -> String {
+    pub(crate) fn datetime_list(&self) -> String {
         datetime_list_at(self.timestamp, &self.date)
     }
 }
@@ -261,7 +261,7 @@ impl Message {
 /// One pill on a message: a tag (#71), or a Gmail label no tag stands for
 /// (#374), by its display name.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Pill<'a> {
+pub(crate) enum Pill<'a> {
     Tag(&'a crate::config::Tag),
     Label(String),
 }
@@ -270,7 +270,7 @@ pub enum Pill<'a> {
 /// Gmail labels none of them stands for, in the server's order. A label
 /// named like a tag (by keyword or by name) shows as that tag, once: on
 /// Gmail, which keeps no keywords, a label is how such a tag arrives.
-pub fn pills<'a>(
+pub(crate) fn pills<'a>(
     keywords: &[String],
     labels: &[String],
     tags: &'a [crate::config::Tag],
@@ -303,7 +303,7 @@ pub fn pills<'a>(
 /// (#374): worked out from its name, so a label has the same color on every
 /// row, in the reader and from one run to the next. A tag named like the
 /// label is how a user picks the color instead.
-pub fn label_hue(name: &str) -> usize {
+pub(crate) fn label_hue(name: &str) -> usize {
     // FNV-1a: std's hasher makes no promise to stay the same across releases.
     let hash = name.to_lowercase().bytes().fold(0x811c_9dc5_u32, |h, b| {
         (h ^ b as u32).wrapping_mul(0x0100_0193)
@@ -313,7 +313,7 @@ pub fn label_hue(name: &str) -> usize {
 
 /// Whether a Gmail label (as the server writes it, modified UTF-7) stands for
 /// a tag: named like its keyword, or like its name.
-pub fn label_names_tag(label: &str, tag: &crate::config::Tag) -> bool {
+fn label_names_tag(label: &str, tag: &crate::config::Tag) -> bool {
     tag.keyword.eq_ignore_ascii_case(label)
         || tag.name.eq_ignore_ascii_case(&crate::mutf7::decode(label))
 }
@@ -321,7 +321,7 @@ pub fn label_names_tag(label: &str, tag: &crate::config::Tag) -> bool {
 /// A short date for a single line: the time for today, the day and month
 /// this year, the year too before that. Used where the full list date would
 /// crowd out the text: a folded card (#326), a one-line list row (#334).
-pub fn date_short(timestamp: i64, date: &str) -> String {
+pub(crate) fn date_short(timestamp: i64, date: &str) -> String {
     use crate::datefmt as d;
     if timestamp <= 0 {
         return date.to_string();
@@ -340,7 +340,7 @@ pub fn date_short(timestamp: i64, date: &str) -> String {
 /// the newest member of a conversation that lives in another folder (#236),
 /// which the cache answers with as a timestamp and the header it was sent
 /// with. `date` is the fallback for a mail whose date could not be parsed.
-pub fn datetime_list_at(timestamp: i64, date: &str) -> String {
+pub(crate) fn datetime_list_at(timestamp: i64, date: &str) -> String {
     if timestamp <= 0 {
         return date.to_string();
     }
@@ -366,36 +366,36 @@ pub fn datetime_list_at(timestamp: i64, date: &str) -> String {
 /// row went on quoting the other side — nothing on screen said you had
 /// answered. This is that missing message, summarised.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ThreadLatest {
-    pub from_name: String,
-    pub from_addr: String,
-    pub preview: String,
+pub(crate) struct ThreadLatest {
+    pub(crate) from_name: String,
+    pub(crate) from_addr: String,
+    pub(crate) preview: String,
     /// Unix seconds, for deciding whether this really is newer than what the
     /// folder itself holds.
-    pub timestamp: i64,
+    pub(crate) timestamp: i64,
     /// The Date header as it was displayed, for a message with no usable
     /// timestamp.
-    pub date: String,
+    pub(crate) date: String,
 }
 
 /// What the list cannot work out about a conversation on its own: how big it
 /// really is (#222) and which message moved it last (#236). Both are answered
 /// in one pass of the cache, for a whole page of rows at a time.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct ThreadSummary {
-    pub count: usize,
-    pub latest: Option<ThreadLatest>,
+pub(crate) struct ThreadSummary {
+    pub(crate) count: usize,
+    pub(crate) latest: Option<ThreadLatest>,
     /// The conversation's messages across the account, drafts, Trash and
     /// Junk left out, for a row that opens out into the parts filed in other
     /// folders (#309). Empty for a conversation of one.
-    pub members: Vec<Message>,
+    pub(crate) members: Vec<Message>,
 }
 
 /// Every Message-ID that identifies a conversation: the messages' own ids plus
 /// the ones they reference. This is what the cache is searched by to find the
 /// parts of the thread filed in other folders — both to assemble a conversation
 /// the reader has opened and to count one the list is only showing a slice of.
-pub fn thread_ids<'a>(msgs: impl IntoIterator<Item = &'a Message>) -> Vec<String> {
+pub(crate) fn thread_ids<'a>(msgs: impl IntoIterator<Item = &'a Message>) -> Vec<String> {
     let mut ids: Vec<String> = Vec::new();
     let mut push = |id: &str| {
         if !id.is_empty() && !ids.iter().any(|x| x == id) {

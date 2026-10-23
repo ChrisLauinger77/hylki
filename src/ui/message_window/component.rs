@@ -13,7 +13,7 @@ use crate::ui::message_view::{MessageView, MessageViewInput, MessageViewOutput};
 use adw::prelude::*;
 use relm4::prelude::*;
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl Component for MessageWindow {
     type Init = MessageWindowInit;
     type Input = MessageWindowInput;

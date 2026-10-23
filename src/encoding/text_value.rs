@@ -3,7 +3,7 @@
 //! `\n` for a line break.
 
 /// Write a value with the escapes in place; a carriage return is dropped.
-pub fn escape_text_value(value: &str) -> String {
+pub(crate) fn escape_text_value(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for c in value.chars() {
         match c {
@@ -21,7 +21,7 @@ pub fn escape_text_value(value: &str) -> String {
 /// Undo the escapes: `\n` (and `\N`) is a line break, and any other
 /// escaped character stands for itself. A lone backslash at the end is
 /// kept.
-pub fn unescape_text_value(value: &str) -> String {
+pub(crate) fn unescape_text_value(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     let mut chars = value.chars();
     while let Some(c) = chars.next() {

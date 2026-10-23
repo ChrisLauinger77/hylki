@@ -34,7 +34,7 @@ pub(super) fn form_scaffold() -> (gtk::Box, gtk::ScrolledWindow) {
 /// remove button in its header (hidden while it is the only one).
 pub(super) struct CondRows {
     pub(super) group: adw::PreferencesGroup,
-    pub(super) remove: gtk::Button,
+    remove: gtk::Button,
     pub(super) field: adw::ComboRow,
     pub(super) matcher: adw::ComboRow,
     pub(super) value: adw::EntryRow,

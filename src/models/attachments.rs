@@ -3,25 +3,25 @@
 
 /// A decoded message attachment (fetched on demand for the reader).
 #[derive(Debug, Clone)]
-pub struct Attachment {
-    pub name: String,
-    pub data: Vec<u8>,
+pub(crate) struct Attachment {
+    pub(crate) name: String,
+    pub(crate) data: Vec<u8>,
 }
 
 impl Attachment {
     /// Human-readable size, e.g. "12.3 KB".
-    pub fn human_size(&self) -> String {
+    pub(crate) fn human_size(&self) -> String {
         human_size(self.data.len() as u64)
     }
 }
 
 /// Human-readable byte size, e.g. "12.3 KB".
-pub fn human_size(bytes: u64) -> String {
+pub(crate) fn human_size(bytes: u64) -> String {
     gtk::glib::format_size(bytes).into()
 }
 
 /// Whether a filename looks like a raster image we can thumbnail/preview inline.
-pub fn is_image_name(name: &str) -> bool {
+pub(crate) fn is_image_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     [
         ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".heic", ".heif", ".avif",
@@ -30,12 +30,11 @@ pub fn is_image_name(name: &str) -> bool {
     .any(|ext| lower.ends_with(ext))
 }
 
-/// The lowercase extension of a filename (empty when there is none).
 /// The file's extension, lower-cased, or empty when the name has none: a
 /// generated "attachment-1", or a dotless name from a sender's client.
 /// Whatever follows the last dot only counts as an extension when it looks
 /// like one (short, alphanumeric), so "Report v1.2 draft" has none either.
-pub fn ext_of(name: &str) -> String {
+pub(crate) fn ext_of(name: &str) -> String {
     let Some((_, ext)) = name.rsplit_once('.') else {
         return String::new();
     };
@@ -47,7 +46,7 @@ pub fn ext_of(name: &str) -> String {
 
 /// Searchable category words for a file, keyed off its extension, so a query
 /// like "image" or "spreadsheet" matches even when the word isn't in the name.
-pub fn type_keywords(name: &str) -> &'static str {
+pub(crate) fn type_keywords(name: &str) -> &'static str {
     match ext_of(name).as_str() {
         "pdf" => "pdf document",
         "doc" | "docx" | "odt" | "rtf" => "word document",
@@ -69,7 +68,7 @@ pub fn type_keywords(name: &str) -> &'static str {
 /// 2 PDFs, 3 documents, 4 archives, 5 audio/video, 6 anything else. Stored
 /// alongside each attachment so the filter and the "Type" sort are one SQL
 /// query rather than a pass over every row.
-pub fn type_bucket(name: &str) -> u32 {
+pub(crate) fn type_bucket(name: &str) -> u32 {
     match ext_of(name).as_str() {
         "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "heic" | "heif" | "avif" | "ico" => 1,
         "pdf" => 2,
@@ -84,7 +83,7 @@ pub fn type_bucket(name: &str) -> u32 {
 
 /// The file extension matching an image's magic bytes ("jpg" when unsure —
 /// for content that is known to be an image but arrived without a name).
-pub fn image_ext(data: &[u8]) -> &'static str {
+pub(crate) fn image_ext(data: &[u8]) -> &'static str {
     match data {
         [0x89, b'P', b'N', b'G', ..] => "png",
         [b'G', b'I', b'F', b'8', ..] => "gif",
@@ -99,7 +98,7 @@ pub fn image_ext(data: &[u8]) -> &'static str {
 /// pinned here rather than being re-derived at each call site; the cache turns
 /// the same value into an ORDER BY.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum GallerySort {
+pub(crate) enum GallerySort {
     #[default]
     Newest,
     Oldest,
@@ -116,7 +115,7 @@ pub enum GallerySort {
 impl GallerySort {
     /// Map the sort dropdown's selected row to a criterion. The order must match
     /// the `StringList` built in the view.
-    pub fn from_index(i: u32) -> GallerySort {
+    pub(crate) fn from_index(i: u32) -> GallerySort {
         match i {
             1 => GallerySort::Oldest,
             2 => GallerySort::Name,
@@ -133,7 +132,7 @@ impl GallerySort {
 
     /// The dropdown row for a criterion — [`GallerySort::from_index`]'s inverse, so
     /// a table-header click can move the dropdown's selection with it.
-    pub fn index(self) -> u32 {
+    pub(crate) fn index(self) -> u32 {
         match self {
             GallerySort::Newest => 0,
             GallerySort::Oldest => 1,
@@ -153,19 +152,19 @@ impl GallerySort {
 /// gallery's scan records so a file can be listed, searched and sorted long
 /// before anyone asks to open it.
 #[derive(Debug, Clone)]
-pub struct AttachmentMeta {
+pub(crate) struct AttachmentMeta {
     /// Which attachment of the message this is, in the order the scan found them.
-    pub idx: u32,
-    pub name: String,
+    pub(crate) idx: u32,
+    pub(crate) name: String,
     /// MIME type as declared, e.g. "application/pdf"; empty when unknown.
-    pub mime: String,
+    pub(crate) mime: String,
     /// Decoded size in bytes (BODYSTRUCTURE reports the encoded size, which
     /// base64 inflates by 4/3).
-    pub size: u64,
+    pub(crate) size: u64,
     /// IMAP part section, e.g. "2" or "1.3" — what to FETCH to get just this
     /// file. Empty when the scan could not work the structure out, in which
     /// case opening it falls back to fetching the whole message.
-    pub section: String,
+    pub(crate) section: String,
 }
 
 /// One attachment for the gallery: metadata plus the source message context.
@@ -174,35 +173,35 @@ pub struct AttachmentMeta {
 /// one that has never been downloaded — `downloaded` tells those apart, and
 /// either way opening it fetches on demand.
 #[derive(Debug, Clone)]
-pub struct GalleryItem {
-    pub account_id: u32,
-    pub folder_path: String,
-    pub uid: u32,
-    pub name: String,
+pub(crate) struct GalleryItem {
+    pub(crate) account_id: u32,
+    pub(crate) folder_path: String,
+    pub(crate) uid: u32,
+    pub(crate) name: String,
     /// Size in bytes as the server declared it, decoded.
-    pub size: u64,
+    pub(crate) size: u64,
     /// Whether the bytes are in the cache (regardless of `data`, which is only
     /// filled for files under the eager-load cap).
-    pub downloaded: bool,
+    pub(crate) downloaded: bool,
     /// Sender display name of the source message.
-    pub from_name: String,
-    pub subject: String,
+    pub(crate) from_name: String,
+    pub(crate) subject: String,
     /// Source message timestamp (for sorting, newest first).
-    pub timestamp: i64,
-    pub data: Option<Vec<u8>>,
+    pub(crate) timestamp: i64,
+    pub(crate) data: Option<Vec<u8>>,
 }
 
 impl GalleryItem {
-    pub fn is_image(&self) -> bool {
+    pub(crate) fn is_image(&self) -> bool {
         is_image_name(&self.name)
     }
-    pub fn human_size(&self) -> String {
+    pub(crate) fn human_size(&self) -> String {
         human_size(self.size)
     }
 
     /// Compact date of the source message for the gallery meta, e.g. "Jul 12"
     /// (or "Jul 12, 2025" if not this year). Empty when the date is unknown.
-    pub fn date_label(&self) -> String {
+    pub(crate) fn date_label(&self) -> String {
         if self.timestamp <= 0 {
             return String::new();
         }

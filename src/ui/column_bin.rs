@@ -16,11 +16,11 @@ mod imp {
     use std::cell::Cell;
 
     #[derive(Default)]
-    pub struct ColumnBin {
+    pub(crate) struct ColumnBin {
         /// The width asked for; 0 asks for no more than the minimum, for
         /// the column that takes whatever room the others leave, and a
         /// negative width asks for whatever the child does.
-        pub width: Cell<i32>,
+        pub(super) width: Cell<i32>,
     }
 
     #[glib::object_subclass]
@@ -67,32 +67,32 @@ mod imp {
 }
 
 glib::wrapper! {
-    pub struct ColumnBin(ObjectSubclass<imp::ColumnBin>)
+    pub(crate) struct ColumnBin(ObjectSubclass<imp::ColumnBin>)
         @extends gtk::Widget;
 }
 
 impl ColumnBin {
     /// A column `width` pixels wide, or 0 for the one that takes the rest.
-    pub fn new(width: i32) -> Self {
+    pub(crate) fn new(width: i32) -> Self {
         let obj: Self = glib::Object::new();
         obj.imp().width.set(width);
         obj
     }
 
     /// Ask for `width` instead (see `width`): a column resized.
-    pub fn set_width(&self, width: i32) {
+    pub(super) fn set_width(&self, width: i32) {
         if self.imp().width.replace(width) != width {
             self.queue_resize();
         }
     }
 
     /// The width asked for, as set (not the width given).
-    pub fn asked_width(&self) -> i32 {
+    pub(super) fn asked_width(&self) -> i32 {
         self.imp().width.get()
     }
 
     /// Hold `child`, or nothing.
-    pub fn set_child(&self, child: Option<&impl IsA<gtk::Widget>>) {
+    pub(crate) fn set_child(&self, child: Option<&impl IsA<gtk::Widget>>) {
         while let Some(old) = self.first_child() {
             old.unparent();
         }

@@ -23,7 +23,7 @@ const KEY: &std::ffi::CStr = c"gtk-emoji-chooser";
 /// Set up the text fields of every window, those open now and those still
 /// to come. Not every window is the application's (Settings is not), so
 /// this goes by GTK's list of all of them.
-pub fn follow_all() {
+pub(crate) fn follow_all() {
     let windows = gtk::Window::toplevels();
     let each = |model: &gtk::gio::ListModel, from: u32, count: u32| {
         for i in from..from + count {

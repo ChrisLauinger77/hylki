@@ -6,13 +6,13 @@ use crate::models::Message;
 /// One attachment as a card lists it (#213): the name and size only. The
 /// bytes stay with the app, which opens or saves the file on request.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CardAttachment {
-    pub name: String,
-    pub size: u64,
+pub(crate) struct CardAttachment {
+    pub(crate) name: String,
+    pub(crate) size: u64,
 }
 
 #[derive(Debug)]
-pub enum MessageViewInput {
+pub(crate) enum MessageViewInput {
     /// Whether the blocked-remote-content banner is shown. It doesn't change
     /// what is blocked — only what the reader says about it.
     SetBannerShown(bool),
@@ -415,7 +415,7 @@ pub enum MessageViewInput {
 /// How a click on a conversation card changes the selection, mirroring what the
 /// message list does with the same modifiers.
 #[derive(Debug, Clone, Copy)]
-pub enum SelectMode {
+pub(crate) enum SelectMode {
     /// Plain click: this message alone.
     Plain,
     /// Ctrl: add or remove this one, leaving the rest.
@@ -425,7 +425,7 @@ pub enum SelectMode {
 }
 
 #[derive(Debug)]
-pub enum MessageViewOutput {
+pub(crate) enum MessageViewOutput {
     /// Add this sender address to the remote-content allowlist.
     AllowSender(String),
     /// Open a conversation message in its own window (header double-clicked).
@@ -507,7 +507,7 @@ pub enum MessageViewOutput {
 
 /// Where a card's unsubscribe request stands while it is not at rest.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum UnsubState {
+pub(crate) enum UnsubState {
     /// The request is on its way.
     Working,
     /// It failed, and this is why (plain words for the banner).
@@ -516,7 +516,7 @@ pub enum UnsubState {
 
 /// Where a card's translation stands (#327).
 #[derive(Debug, Clone, PartialEq)]
-pub enum TrState {
+pub(crate) enum TrState {
     /// The service has been asked.
     Working,
     /// The card shows the translation.
@@ -529,7 +529,7 @@ pub enum TrState {
 
 /// What a card's invitation banner can be asked to do (#223).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InviteAction {
+pub(crate) enum InviteAction {
     /// One of the three answers.
     Answer(crate::models::Rsvp),
     /// Hand the event to whatever application opens calendar files.

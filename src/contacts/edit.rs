@@ -18,24 +18,24 @@ use crate::i18n::i18n;
 
 /// The fields the in-app contact editor can change.
 #[derive(Debug, Clone, Default)]
-pub struct ContactEdit {
-    pub name: String,
-    pub nickname: String,
-    pub org: String,
-    pub title: String,
-    pub note: String,
-    pub emails: Vec<Labeled>,
-    pub phones: Vec<Labeled>,
-    pub urls: Vec<String>,
-    pub addresses: Vec<Postal>,
+pub(crate) struct ContactEdit {
+    pub(crate) name: String,
+    pub(crate) nickname: String,
+    pub(crate) org: String,
+    pub(crate) title: String,
+    pub(crate) note: String,
+    pub(crate) emails: Vec<Labeled>,
+    pub(crate) phones: Vec<Labeled>,
+    pub(crate) urls: Vec<String>,
+    pub(crate) addresses: Vec<Postal>,
     /// A BDAY value ([`birthday_value`]), empty for none.
-    pub birthday: String,
-    pub photo: PhotoEdit,
+    pub(crate) birthday: String,
+    pub(crate) photo: PhotoEdit,
 }
 
 /// What the editor does to a contact's photo.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub enum PhotoEdit {
+pub(crate) enum PhotoEdit {
     #[default]
     Keep,
     Remove,
@@ -57,7 +57,7 @@ fn type_param_for(label: &str) -> &'static str {
 /// Rewrite a stored vCard with the editor's values. Only the editable
 /// properties are replaced — everything else (UID, PHOTO, ADR, REV, X-…)
 /// passes through untouched, so nothing GNOME Contacts manages is lost.
-pub fn patched_vcard(original: &str, e: &ContactEdit) -> String {
+pub(crate) fn patched_vcard(original: &str, e: &ContactEdit) -> String {
     const REPLACED: [&str; 11] = [
         "FN", "N", "NICKNAME", "ORG", "TITLE", "NOTE", "EMAIL", "TEL", "URL", "ADR", "BDAY",
     ];
@@ -157,7 +157,7 @@ pub fn patched_vcard(original: &str, e: &ContactEdit) -> String {
 }
 
 /// A brand-new contact's vCard from the editor's values.
-pub fn new_vcard(e: &ContactEdit) -> String {
+pub(crate) fn new_vcard(e: &ContactEdit) -> String {
     patched_vcard(EMPTY_VCARD, e)
 }
 
@@ -196,10 +196,10 @@ fn kept_lines_by(original: &str, drop: impl Fn(&str) -> bool) -> Vec<String> {
 
 /// The fields the group editor can change.
 #[derive(Debug, Clone, Default)]
-pub struct GroupEdit {
-    pub name: String,
-    pub members: Vec<Member>,
-    pub hide_addresses: bool,
+pub(crate) struct GroupEdit {
+    pub(crate) name: String,
+    pub(crate) members: Vec<Member>,
+    pub(crate) hide_addresses: bool,
     /// Member lines the editor did not show ([`ContactDetails::hidden_members`]),
     /// written back as they were.
     pub(crate) kept: Vec<String>,
@@ -208,7 +208,7 @@ pub struct GroupEdit {
 /// Rewrite a stored Evolution list with the editor's values. A member who
 /// was already there keeps the line it was read from; one added here gets
 /// a line of the same shape as Evolution's.
-pub fn patched_group_vcard(original: &str, e: &GroupEdit) -> String {
+pub(super) fn patched_group_vcard(original: &str, e: &GroupEdit) -> String {
     const REPLACED: [&str; 7] = [
         "FN",
         "N",
@@ -258,7 +258,7 @@ pub fn patched_group_vcard(original: &str, e: &GroupEdit) -> String {
 }
 
 /// A brand-new group's vCard from the editor's values.
-pub fn new_group_vcard(e: &GroupEdit) -> String {
+pub(crate) fn new_group_vcard(e: &GroupEdit) -> String {
     patched_group_vcard(EMPTY_VCARD, e)
 }
 
@@ -301,7 +301,7 @@ pub(super) fn patched_apple_group(original: &str, e: &GroupEdit) -> String {
 /// else new. An Apple group holds cards of its own book, so a member with
 /// no card there gets one first, with their name and address (blocking:
 /// call from a background thread).
-pub fn save_group(
+pub(crate) fn save_group(
     book_uid: &str,
     format: GroupFormat,
     original: Option<&str>,
@@ -334,7 +334,7 @@ pub fn save_group(
 
 /// Move a group to another book: made in `to_book` as `format` from `edit`,
 /// then deleted from `from_book`, and only once made.
-pub fn move_group(
+pub(crate) fn move_group(
     from_book: &str,
     uid: &str,
     to_book: &str,
@@ -449,7 +449,9 @@ fn write_local(result: Result<(), String>) -> Result<(), String> {
 
 /// Import `.vcf` files into the local Hylki book (blocking: call from a
 /// background thread).
-pub fn import_vcf_files(paths: &[PathBuf]) -> Result<crate::local_contacts::ImportOutcome, String> {
+pub(crate) fn import_vcf_files(
+    paths: &[PathBuf],
+) -> Result<crate::local_contacts::ImportOutcome, String> {
     let outcome = crate::local_contacts::import_files(paths)?;
     if outcome.added + outcome.updated > 0 {
         local_changed();
@@ -458,7 +460,7 @@ pub fn import_vcf_files(paths: &[PathBuf]) -> Result<crate::local_contacts::Impo
 }
 
 /// Write a modified vCard back to its book through EDS.
-pub fn modify_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
+pub(crate) fn modify_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
     if is_local_book(book_uid) {
         return write_local(crate::local_contacts::modify(vcard));
     }
@@ -476,7 +478,7 @@ pub fn modify_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
 }
 
 /// Create a contact from a full vCard through EDS.
-pub fn create_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
+pub(crate) fn create_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
     if is_local_book(book_uid) {
         return write_local(crate::local_contacts::create(vcard));
     }
@@ -494,7 +496,7 @@ pub fn create_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
 }
 
 /// Delete contacts (by their EDS UIDs) from one book, in one call.
-pub fn delete_contacts(book_uid: &str, uids: &[String]) -> Result<(), String> {
+pub(crate) fn delete_contacts(book_uid: &str, uids: &[String]) -> Result<(), String> {
     if is_local_book(book_uid) {
         for uid in uids {
             crate::local_contacts::delete(uid)?;
@@ -512,7 +514,7 @@ pub fn delete_contacts(book_uid: &str, uids: &[String]) -> Result<(), String> {
 /// revision and what the old book's server kept in it, and with its photo
 /// in the card itself. A cached photo is a file of the old book, which goes
 /// with the contact.
-pub fn moved_vcard(c: &ContactDetails) -> String {
+pub(crate) fn moved_vcard(c: &ContactDetails) -> String {
     use base64::Engine as _;
     let mut out = kept_lines_by(&c.raw_vcard, |prop| {
         matches!(
@@ -540,13 +542,18 @@ pub fn moved_vcard(c: &ContactDetails) -> String {
 
 /// Move a contact: made in `to_book` from `vcard` ([`moved_vcard`]), then
 /// deleted from `from_book`, and only once the new one is made.
-pub fn move_contact(from_book: &str, uid: &str, vcard: &str, to_book: &str) -> Result<(), String> {
+pub(crate) fn move_contact(
+    from_book: &str,
+    uid: &str,
+    vcard: &str,
+    to_book: &str,
+) -> Result<(), String> {
     create_contact(to_book, vcard)?;
     delete_contact(from_book, uid)
 }
 
 /// Delete a contact (by its EDS UID) from its book.
-pub fn delete_contact(book_uid: &str, uid: &str) -> Result<(), String> {
+pub(super) fn delete_contact(book_uid: &str, uid: &str) -> Result<(), String> {
     if is_local_book(book_uid) {
         return write_local(crate::local_contacts::delete(uid));
     }

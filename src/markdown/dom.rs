@@ -85,7 +85,7 @@ pub(super) fn parse(html: &str) -> Vec<Node> {
 /// An HTML body as plain text, for list previews: its words, a line break
 /// for each block and `<br>`, whitespace collapsed as a browser does
 /// outside `<pre>`, each line trimmed, and at most one blank line in a row.
-pub fn plain_text(html: &str) -> String {
+pub(crate) fn plain_text(html: &str) -> String {
     fn walk(nodes: &[Node], pre: bool, out: &mut String) {
         for node in nodes {
             match node {

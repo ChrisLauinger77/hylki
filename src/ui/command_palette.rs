@@ -11,17 +11,17 @@ use adw::prelude::*;
 use crate::i18n::i18n;
 
 /// One thing the palette offers.
-pub struct Entry {
-    pub title: String,
+pub(crate) struct Entry {
+    pub(crate) title: String,
     /// What kind of thing it is, or where it is: "Action", an account's
     /// folder path. Searched along with the title.
-    pub detail: String,
+    pub(crate) detail: String,
     /// The shortcut that does the same, shown beside it; empty for none.
-    pub key: String,
+    pub(crate) key: String,
     /// Something to do rather than somewhere to go: what a query starting
     /// with `>` keeps.
-    pub action: bool,
-    pub run: Box<dyn Fn()>,
+    pub(crate) action: bool,
+    pub(crate) run: Box<dyn Fn()>,
 }
 
 /// What was typed: the words, and whether a leading `>` asked for actions
@@ -52,7 +52,7 @@ impl Query {
 }
 
 /// Open the palette over `parent` with `entries`, in the order given.
-pub fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>, typed: &str) {
+pub(crate) fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>, typed: &str) {
     let dialog = adw::Dialog::builder()
         .title(i18n("Command Palette"))
         .content_width(560)

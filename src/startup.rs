@@ -26,7 +26,7 @@ mod protocol {
     use wayland_client;
     use wayland_client::protocol::*;
 
-    pub mod __interfaces {
+    pub(super) mod __interfaces {
         use wayland_client::protocol::__interfaces::*;
         wayland_scanner::generate_interfaces!("resources/protocols/gtk-shell.xml");
     }
@@ -55,7 +55,7 @@ extern "C" {
 /// End the launch that brought in the action being run right now, if it
 /// came with one. Call it from the action's own handler: GTK holds the token
 /// only from the start of that emission until the next one.
-pub fn complete() {
+pub(crate) fn complete() {
     let Some(display) = gtk::gdk::Display::default() else {
         return;
     };

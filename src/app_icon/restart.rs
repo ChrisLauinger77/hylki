@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 /// Command-line flag for the restart helper: waits for the running instance
 /// to let go of its D-Bus name, then becomes a fresh one.
-pub const RESTART_FLAG: &str = "--restart-helper";
+pub(crate) const RESTART_FLAG: &str = "--restart-helper";
 
 /// Well-known name of the restart helper's D-Bus service. Inside Flatpak the
 /// helper can't just be spawned — the sandbox is torn down with the process
@@ -19,7 +19,7 @@ fn restart_service_name() -> String {
 /// Start the helper that will bring the app back, and report whether it is
 /// in place. The caller quits only on `Ok`, so a failed attempt leaves the
 /// app running rather than gone.
-pub fn launch_restart_helper() -> Result<(), String> {
+pub(crate) fn launch_restart_helper() -> Result<(), String> {
     if crate::platform::is_flatpak() {
         activate_restart_service()
     } else {
@@ -84,7 +84,7 @@ fn activate_restart_service() -> Result<(), String> {
 /// completes), wait for the app to release its own name, then exec a normal
 /// instance in this process — inside Flatpak that keeps the helper's
 /// sandbox alive as the app's.
-pub fn run_restart_helper() -> ! {
+pub(crate) fn run_restart_helper() -> ! {
     use gtk::glib::prelude::ToVariant;
     use std::os::unix::process::CommandExt;
     let conn = gtk::gio::bus_get_sync(gtk::gio::BusType::Session, gtk::gio::Cancellable::NONE).ok();

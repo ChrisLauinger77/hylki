@@ -6,7 +6,7 @@ use crate::i18n::i18n;
 /// A detached, armoured signature over `data` by `local_user`, with the
 /// `micalg` value RFC 3156 wants beside it ("pgp-sha256"), read from gpg's
 /// SIG_CREATED line.
-pub fn sign_detached(
+pub(crate) fn sign_detached(
     gpg: &Gpg,
     data: &[u8],
     local_user: &str,
@@ -46,7 +46,7 @@ pub fn sign_detached(
 /// address, armoured. The sender is a recipient too, so the Sent copy stays
 /// readable. Keys are used as found: a recipient's key that is in the
 /// keyring but not vouched for still encrypts, as Thunderbird does.
-pub fn encrypt(
+pub(crate) fn encrypt(
     gpg: &Gpg,
     data: &[u8],
     recipients: &[String],

@@ -22,7 +22,7 @@ pub(crate) fn unfold_vcard(vcard: &str) -> String {
 
 /// The name in a content line's property part, without its parameters
 /// or group prefix: `item1.EMAIL;TYPE=WORK` gives `EMAIL`.
-pub(crate) fn property_name(property: &str) -> &str {
+pub(super) fn property_name(property: &str) -> &str {
     property
         .split(';')
         .next()

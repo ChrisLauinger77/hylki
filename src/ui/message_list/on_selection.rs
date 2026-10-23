@@ -102,42 +102,40 @@ impl MessageList {
         }
         match keys.as_slice() {
             [] => self.selected_id = None,
-            [key] => {
-                // Exactly one selected → show it in the reader. Skip when
-                // it's already the viewed row (e.g. programmatic restore
-                // after a rebuild) so it isn't needlessly reloaded.
-                if self.selected_id != Some(*key) {
-                    // Which way did the user move? Only a change with a
-                    // known previous row says anything — the post-delete
-                    // advance clears selected_id first, so it can never
-                    // flip the direction it is itself steering by.
-                    let pos =
-                        |k: &(u32, u32)| self.shown.iter().position(|m| (m.account_id, m.id) == *k);
-                    if let (Some(old), Some(new)) =
-                        (self.selected_id.as_ref().and_then(pos), pos(key))
-                    {
-                        if new != old {
-                            self.nav_direction = if new > old { 1 } else { -1 };
-                        }
-                    }
-                    self.selected_id = Some(*key);
-                    if let Some(m) = self
-                        .shown
-                        .iter()
-                        .find(|m| (m.account_id, m.id) == *key)
-                        .map(|m| Message::clone(m))
-                    {
-                        let (thread, solo) = self.conversation_for(&m);
-                        self.emitted_thread = thread.iter().map(|t| (t.account_id, t.id)).collect();
-                        let _ = sender.output(MessageListOutput::Selected {
-                            message: m,
-                            thread,
-                            solo,
-                        });
+            // Exactly one selected → show it in the reader. Skip when
+            // it's already the viewed row (e.g. programmatic restore
+            // after a rebuild) so it isn't needlessly reloaded.
+            [key] if self.selected_id != Some(*key) => {
+                // Which way did the user move? Only a change with a
+                // known previous row says anything — the post-delete
+                // advance clears selected_id first, so it can never
+                // flip the direction it is itself steering by.
+                let pos =
+                    |k: &(u32, u32)| self.shown.iter().position(|m| (m.account_id, m.id) == *k);
+                if let (Some(old), Some(new)) = (self.selected_id.as_ref().and_then(pos), pos(key))
+                {
+                    if new != old {
+                        self.nav_direction = if new > old { 1 } else { -1 };
                     }
                 }
+                self.selected_id = Some(*key);
+                if let Some(m) = self
+                    .shown
+                    .iter()
+                    .find(|m| (m.account_id, m.id) == *key)
+                    .map(|m| Message::clone(m))
+                {
+                    let (thread, solo) = self.conversation_for(&m);
+                    self.emitted_thread = thread.iter().map(|t| (t.account_id, t.id)).collect();
+                    let _ = sender.output(MessageListOutput::Selected {
+                        message: m,
+                        thread,
+                        solo,
+                    });
+                }
             }
-            // Multiple selected → keep the reader on the primary message.
+            // Multiple selected → keep the reader on the primary message;
+            // the one row already shown stays as it is.
             _ => {}
         }
         self.selected_ids = keys;

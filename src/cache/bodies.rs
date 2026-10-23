@@ -12,7 +12,7 @@ impl Cache {
     /// What downloaded mail takes up (#394), in bytes: the message bodies
     /// and the attachment files. The index of every message, which the list
     /// and search read, is not counted: it stays whatever is removed.
-    pub fn downloaded_size(&self) -> (u64, u64) {
+    pub(crate) fn downloaded_size(&self) -> (u64, u64) {
         let sum = |sql: &str| -> u64 {
             self.conn
                 .query_row(sql, [], |r| r.get::<_, i64>(0))
@@ -29,7 +29,7 @@ impl Cache {
     /// messages older than `before` (a Unix time), or of every message with
     /// `None`. Opening one fetches it again. The message index stays, so the
     /// list and search are as they were. Returns how many bodies went.
-    pub fn remove_downloaded(&self, before: Option<i64>) -> rusqlite::Result<usize> {
+    pub(crate) fn remove_downloaded(&self, before: Option<i64>) -> rusqlite::Result<usize> {
         let tx = self.conn.unchecked_transaction()?;
         let mut removed = 0;
         for table in DOWNLOADED_TABLES {
@@ -53,7 +53,7 @@ impl Cache {
     }
 
     /// How big the cache is on disk, with its write-ahead log, in bytes.
-    pub fn file_size() -> u64 {
+    pub(crate) fn file_size() -> u64 {
         let Some(dir) = crate::config::data_base().map(|d| d.join("hylki")) else {
             return 0;
         };
@@ -66,11 +66,11 @@ impl Cache {
 
     /// Give the space freed by `remove_downloaded` back to the disk. Fails
     /// harmlessly while a worker is writing; the space is then reused.
-    pub fn compact(&self) -> rusqlite::Result<()> {
+    pub(crate) fn compact(&self) -> rusqlite::Result<()> {
         self.conn.execute_batch("VACUUM")
     }
 
-    pub fn load_body(&self, account_id: u32, folder_path: &str, uid: u32) -> Option<String> {
+    pub(crate) fn load_body(&self, account_id: u32, folder_path: &str, uid: u32) -> Option<String> {
         self.body_of(account_id, folder_path, uid).or_else(|| {
             self.sibling_copies(account_id, folder_path, uid)
                 .into_iter()
@@ -133,14 +133,14 @@ impl Cache {
 
     /// Forget a message's rendered body, so the next open renders it
     /// afresh from the server's copy.
-    pub fn delete_body(&self, account_id: u32, folder_path: &str, uid: u32) {
+    pub(crate) fn delete_body(&self, account_id: u32, folder_path: &str, uid: u32) {
         let _ = self.conn.execute(
             "DELETE FROM bodies WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
             params![account_id, folder_path, uid],
         );
     }
 
-    pub fn save_body(&self, account_id: u32, folder_path: &str, uid: u32, body: &str) {
+    pub(crate) fn save_body(&self, account_id: u32, folder_path: &str, uid: u32, body: &str) {
         if let Err(e) = self.conn.execute(
             "INSERT OR REPLACE INTO bodies (account_id, folder_path, uid, body) VALUES (?1, ?2, ?3, ?4)",
             params![account_id, folder_path, uid, body],
@@ -151,7 +151,7 @@ impl Cache {
 
     /// The cached sender-authentication verdict for a message, if one was stored
     /// when its body was fetched.
-    pub fn load_sender_check(
+    pub(crate) fn load_sender_check(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -198,7 +198,7 @@ impl Cache {
             .ok()
     }
 
-    pub fn save_sender_check(
+    pub(crate) fn save_sender_check(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -242,7 +242,7 @@ impl Cache {
         }
     }
 
-    pub fn load_attachments(
+    pub(crate) fn load_attachments(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -281,7 +281,7 @@ impl Cache {
         })
     }
 
-    pub fn save_attachments(
+    pub(crate) fn save_attachments(
         &self,
         account_id: u32,
         folder_path: &str,
@@ -310,7 +310,7 @@ impl Cache {
 
     /// Mark a message's attachments as fetched (even if it turned out to have
     /// none), so the background prefetch never re-downloads it to re-check.
-    pub fn mark_attachments_checked(&self, account_id: u32, folder_path: &str, uid: u32) {
+    pub(crate) fn mark_attachments_checked(&self, account_id: u32, folder_path: &str, uid: u32) {
         let _ = self.conn.execute(
             "INSERT OR IGNORE INTO attachments_checked (account_id, folder_path, uid) VALUES (?1, ?2, ?3)",
             params![account_id, folder_path, uid],
@@ -326,7 +326,7 @@ impl Cache {
     /// full second and third copy of blobs it can already answer from.
     ///
     /// [`load_attachments`]: Self::load_attachments
-    pub fn attachments_checked(&self, account_id: u32, folder_path: &str, uid: u32) -> bool {
+    pub(crate) fn attachments_checked(&self, account_id: u32, folder_path: &str, uid: u32) -> bool {
         if self.checked_of(account_id, folder_path, uid) {
             return true;
         }

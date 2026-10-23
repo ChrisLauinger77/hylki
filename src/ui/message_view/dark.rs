@@ -191,6 +191,16 @@ fn adapt_color(token: &str, background: bool, bare_hex: bool) -> Option<String> 
     })
 }
 
+/// The character that starts at byte `i` of `s`. The scanners below call it
+/// only while `i` is below the length, and step by whole characters, so
+/// there always is one.
+fn char_at(s: &str, i: usize) -> char {
+    s[i..]
+        .chars()
+        .next()
+        .expect("the scanners stay inside the text, on character boundaries")
+}
+
 /// Rewrite one CSS declaration list (an inline `style` attribute's content or
 /// a rule body). Declarations are split at `;` outside parentheses and quotes
 /// — data: URLs contain semicolons — and only `color`, `background-color`,
@@ -202,7 +212,7 @@ fn rewrite_declarations(decls: &str) -> String {
     let mut start = 0;
     let mut i = 0;
     while i < decls.len() {
-        let c = decls[i..].chars().next().unwrap();
+        let c = char_at(decls, i);
         // Comments may contain `;` — `/* background: #fff; */` must not split
         // the declaration after it in half (seen in the wild, issue #35).
         if quote.is_none() && decls[i..].starts_with("/*") {
@@ -295,11 +305,11 @@ fn split_value_tokens(value: &str) -> Vec<ValuePiece<'_>> {
     let lower = value.to_ascii_lowercase();
     let mut i = 0;
     while i < value.len() {
-        let c = value[i..].chars().next().unwrap();
+        let c = char_at(value, i);
         if c.is_whitespace() || c == ',' {
             let start = i;
             while i < value.len() {
-                let c = value[i..].chars().next().unwrap();
+                let c = char_at(value, i);
                 if c.is_whitespace() || c == ',' {
                     i += c.len_utf8();
                 } else {
@@ -312,7 +322,7 @@ fn split_value_tokens(value: &str) -> Vec<ValuePiece<'_>> {
             i += 4;
             let mut depth = 1;
             while i < value.len() && depth > 0 {
-                let c = value[i..].chars().next().unwrap();
+                let c = char_at(value, i);
                 if c == '(' {
                     depth += 1;
                 } else if c == ')' {
@@ -325,7 +335,7 @@ fn split_value_tokens(value: &str) -> Vec<ValuePiece<'_>> {
             let start = i;
             i += 1;
             while i < value.len() {
-                let ch = value[i..].chars().next().unwrap();
+                let ch = char_at(value, i);
                 i += ch.len_utf8();
                 if ch == c {
                     break;
@@ -337,7 +347,7 @@ fn split_value_tokens(value: &str) -> Vec<ValuePiece<'_>> {
             // parens if one opens immediately after the name.
             let start = i;
             while i < value.len() {
-                let ch = value[i..].chars().next().unwrap();
+                let ch = char_at(value, i);
                 if ch.is_whitespace() || ch == ',' {
                     break;
                 }
@@ -345,7 +355,7 @@ fn split_value_tokens(value: &str) -> Vec<ValuePiece<'_>> {
                 if ch == '(' {
                     let mut depth = 1;
                     while i < value.len() && depth > 0 {
-                        let c2 = value[i..].chars().next().unwrap();
+                        let c2 = char_at(value, i);
                         if c2 == '(' {
                             depth += 1;
                         } else if c2 == ')' {
@@ -374,7 +384,7 @@ fn rewrite_css(css: &str) -> String {
     let mut quote: Option<char> = None;
     let mut decl_start: Option<usize> = None;
     while i < css.len() {
-        let c = css[i..].chars().next().unwrap();
+        let c = char_at(css, i);
         if in_comment {
             if css[i..].starts_with("*/") {
                 in_comment = false;
@@ -433,19 +443,21 @@ fn rewrite_tag_attrs(tag: &str) -> String {
                 && rest_lower[a.len()..].trim_start().starts_with('=')
         });
         let Some(attr) = attr else {
-            let c = tag[i..].chars().next().unwrap();
+            let c = char_at(tag, i);
             out.push(c);
             i += c.len_utf8();
             continue;
         };
         if *attr == "text" && !is_body {
-            let c = tag[i..].chars().next().unwrap();
+            let c = char_at(tag, i);
             out.push(c);
             i += c.len_utf8();
             continue;
         }
         // name, '=', then a quoted or bare value.
-        let eq = i + rest_lower.find('=').unwrap();
+        let eq = i + rest_lower
+            .find('=')
+            .expect("an attribute is only matched with an `=` after it");
         let mut v = eq + 1;
         while v < tag.len() && tag.as_bytes()[v].is_ascii_whitespace() {
             v += 1;

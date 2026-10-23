@@ -15,50 +15,50 @@ use std::rc::{Rc, Weak};
 
 /// How every row looks: the list's settings, read on each bind.
 #[derive(Clone, Debug)]
-pub struct RowLook {
-    pub gravatar: bool,
+pub(crate) struct RowLook {
+    pub(crate) gravatar: bool,
     /// Whether the avatar is drawn at all (#29).
-    pub avatars: bool,
+    pub(crate) avatars: bool,
     /// Whether a sender's site icon may fill it (#30).
-    pub sender_logos: bool,
+    pub(crate) sender_logos: bool,
     /// One line per message, in columns, instead of the three-line card
     /// (#334).
-    pub single_line: bool,
+    pub(crate) single_line: bool,
     /// Those columns, in order, the Due column left out of a list without
     /// Microsoft 365 mail in it.
-    pub columns: Vec<ListColumn>,
+    pub(crate) columns: Vec<ListColumn>,
     /// The widths columns were dragged to; the rest keep their own.
-    pub widths: HashMap<ListColumn, i32>,
+    pub(crate) widths: HashMap<ListColumn, i32>,
     /// The narrowest a single line goes before the list scrolls sideways
     /// (#443); -1 for none.
-    pub min_width: i32,
+    pub(crate) min_width: i32,
     /// How many lines of the message's text a row shows (0–3).
-    pub preview_lines: u32,
+    pub(crate) preview_lines: u32,
     /// Whether the subject line is drawn (Focus Mode can take it away).
-    pub show_subject: bool,
+    pub(crate) show_subject: bool,
     /// A card's pills go on a line of their own under its text (#374).
-    pub pills_below: bool,
+    pub(crate) pills_below: bool,
     /// The folder each result of a search across folders is in, by
     /// `(account_id, folder_id)`, worn as its first pill (#374). Empty
     /// otherwise.
-    pub folder_pills: Rc<HashMap<(u32, u32), String>>,
+    pub(crate) folder_pills: Rc<HashMap<(u32, u32), String>>,
     /// Whether rows carry the actions palette at all.
-    pub show_palette: bool,
+    pub(crate) show_palette: bool,
     /// The list shows Junk: the palette's spam button reads "Not Spam".
-    pub in_junk: bool,
+    pub(crate) in_junk: bool,
     /// The list shows Drafts: no read/unread toggle, a draft is neither.
-    pub in_drafts: bool,
+    pub(crate) in_drafts: bool,
     /// Sent-folder rows name the recipient, not the sender (#27).
-    pub show_recipient: bool,
+    pub(crate) show_recipient: bool,
     /// The accounts whose avatars wear their color as a ring (unified view).
-    pub ringed: std::collections::HashSet<u32>,
+    pub(crate) ringed: std::collections::HashSet<u32>,
     /// Whether conversations open out in the list at all.
-    pub thread_expansion: bool,
+    pub(crate) thread_expansion: bool,
     /// Bumped whenever the circles must be looked up again (contact photos
     /// changed, Gravatar or logos switched).
-    pub face_gen: u64,
+    pub(crate) face_gen: u64,
     /// Bumped whenever the tag definitions change.
-    pub tags_gen: u64,
+    pub(crate) tags_gen: u64,
 }
 
 impl Default for RowLook {
@@ -88,30 +88,30 @@ impl Default for RowLook {
 }
 
 /// What every row shares with the list.
-pub struct RowShared {
-    pub look: RefCell<RowLook>,
+pub(crate) struct RowShared {
+    pub(crate) look: RefCell<RowLook>,
     /// The tags (#71): the chips a row shows are the message's keywords that
     /// name one of these.
-    pub tags: RefCell<Vec<crate::config::Tag>>,
+    pub(crate) tags: RefCell<Vec<crate::config::Tag>>,
     /// Each account's name, for the Account column (#334).
-    pub account_names: RefCell<HashMap<u32, String>>,
+    pub(crate) account_names: RefCell<HashMap<u32, String>>,
     /// How long an actions palette stays open after the pointer leaves it.
-    pub palette_collapse_secs: Cell<u64>,
+    pub(crate) palette_collapse_secs: Cell<u64>,
     /// Open the palette on row hover.
-    pub palette_hover: Cell<bool>,
+    pub(crate) palette_hover: Cell<bool>,
     /// Swap which side a swipe archives or deletes on.
-    pub swipe_reversed: Cell<bool>,
+    pub(crate) swipe_reversed: Cell<bool>,
     /// Whether the swipe gesture is on at all (#92).
-    pub swipe_enabled: Cell<bool>,
+    pub(crate) swipe_enabled: Cell<bool>,
     /// How sensitive a trackpad's two-finger swipe is.
-    pub swipe_sensitivity: Cell<f64>,
-    pub input: relm4::Sender<MessageListInput>,
-    pub model: MessageModel,
-    pub selection: gtk::MultiSelection,
-    pub view: glib::WeakRef<gtk::ListView>,
-    pub thread_drag: RefCell<ThreadDragKeys>,
+    pub(crate) swipe_sensitivity: Cell<f64>,
+    pub(crate) input: relm4::Sender<MessageListInput>,
+    pub(crate) model: MessageModel,
+    pub(crate) selection: gtk::MultiSelection,
+    pub(crate) view: glib::WeakRef<gtk::ListView>,
+    pub(crate) thread_drag: RefCell<ThreadDragKeys>,
     /// Every row widget the view has made, by its list item.
-    pub(super) rows: RefCell<HashMap<usize, Rc<Row>>>,
+    rows: RefCell<HashMap<usize, Rc<Row>>>,
     /// Rows the view let go of, kept for the next it asks for. A short list
     /// (an Inbox of ten) gives most of its rows back, and the next long one
     /// asked for them all again, at a few milliseconds each, inside the
@@ -129,7 +129,7 @@ pub struct RowShared {
 }
 
 impl RowShared {
-    pub fn new(input: relm4::Sender<MessageListInput>) -> Rc<Self> {
+    pub(crate) fn new(input: relm4::Sender<MessageListInput>) -> Rc<Self> {
         let model = MessageModel::default();
         let selection = gtk::MultiSelection::new(Some(model.clone()));
         let privacy = crate::config::load_privacy();
@@ -158,7 +158,7 @@ impl RowShared {
     }
 
     /// How tall the heading over the first row is drawn, once it is.
-    pub fn first_heading_height(&self) -> Option<i32> {
+    pub(crate) fn first_heading_height(&self) -> Option<i32> {
         self.headers
             .borrow()
             .iter()
@@ -174,7 +174,7 @@ impl RowShared {
     /// first row of its section, which can stay the first row while the
     /// section becomes another (the day turning over): the view does not
     /// bind it again for that.
-    pub fn refresh_headers(&self) {
+    pub(crate) fn refresh_headers(&self) {
         self.headers.borrow_mut().retain(|h| h.upgrade().is_some());
         for header in self.headers.borrow().iter().filter_map(|h| h.upgrade()) {
             fill_header(&header);
@@ -182,7 +182,7 @@ impl RowShared {
     }
 
     /// The rows showing a message right now.
-    pub fn bound_rows(&self) -> Vec<Rc<Row>> {
+    pub(crate) fn bound_rows(&self) -> Vec<Rc<Row>> {
         self.rows
             .borrow()
             .values()
@@ -192,19 +192,19 @@ impl RowShared {
     }
 
     /// The row showing the list's position `pos`, if it is on screen.
-    pub fn row_at(&self, pos: usize) -> Option<Rc<Row>> {
+    pub(crate) fn row_at(&self, pos: usize) -> Option<Rc<Row>> {
         self.bound_rows()
             .into_iter()
             .find(|r| r.position() == Some(pos))
     }
 
     /// The row the keyboard cursor is on, if any.
-    pub fn cursor(&self) -> Option<(u32, u32)> {
+    pub(crate) fn cursor(&self) -> Option<(u32, u32)> {
         self.cursor.get()
     }
 
     /// Put the keyboard cursor on the row showing `key`, or take it away.
-    pub fn set_cursor(&self, key: Option<(u32, u32)>) {
+    pub(crate) fn set_cursor(&self, key: Option<(u32, u32)>) {
         if self.cursor.replace(key) == key {
             return;
         }
@@ -214,7 +214,7 @@ impl RowShared {
     }
 
     /// Fill every row on screen again (the look changed).
-    pub fn refresh_all(&self) {
+    pub(crate) fn refresh_all(&self) {
         for row in self.bound_rows() {
             row.refresh();
         }
@@ -222,7 +222,7 @@ impl RowShared {
 
     /// Ask the list, once the current pass is over, about the conversations
     /// rows have just started showing (#222).
-    pub fn want(&self, group: (u32, String)) {
+    pub(crate) fn want(&self, group: (u32, String)) {
         self.wanted.borrow_mut().push(group);
         if !self.wanted_queued.replace(true) {
             let input = self.input.clone();
@@ -232,7 +232,7 @@ impl RowShared {
         }
     }
 
-    pub fn take_wanted(&self) -> Vec<(u32, String)> {
+    pub(crate) fn take_wanted(&self) -> Vec<(u32, String)> {
         self.wanted_queued.set(false);
         std::mem::take(&mut *self.wanted.borrow_mut())
     }
@@ -278,7 +278,7 @@ const SPARE_ROWS: usize = 220;
 const SPARE_AHEAD: usize = 210;
 
 /// Make spare rows ahead, a few per idle pass.
-pub fn make_spare_rows(shared: &Rc<RowShared>) {
+pub(crate) fn make_spare_rows(shared: &Rc<RowShared>) {
     let weak = Rc::downgrade(shared);
     glib::idle_add_local(move || {
         let Some(shared) = weak.upgrade() else {
@@ -297,7 +297,7 @@ pub fn make_spare_rows(shared: &Rc<RowShared>) {
 }
 
 /// The view's row factory: makes rows, binds them to items and back.
-pub fn factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
+pub(crate) fn factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     let key = |obj: &glib::Object| obj.as_ptr() as usize;
     {
@@ -368,7 +368,7 @@ pub fn factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
 
 /// The view's factory for the date headings (#435): a dim heading over each
 /// section, not a row, so it is never selected or focused.
-pub fn header_factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
+pub(crate) fn header_factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     let weak = Rc::downgrade(shared);
     factory.connect_setup(move |_, obj| {

@@ -10,15 +10,15 @@
 use std::path::PathBuf;
 
 /// The extension, verbatim: `data/nautilus/hylki-nautilus.py`.
-pub const SOURCE: &str = include_str!("../data/nautilus/hylki-nautilus.py");
-pub const FILE_NAME: &str = "hylki-nautilus.py";
+pub(crate) const SOURCE: &str = include_str!("../data/nautilus/hylki-nautilus.py");
+pub(crate) const FILE_NAME: &str = "hylki-nautilus.py";
 /// Written by the extension itself when Files loads it: the SHA-256 of the
 /// file it loaded (see `_mark_loaded` in the extension).
 const LOADED_MARKER: &str = ".hylki-nautilus.loaded";
 
 /// Whether (and which) copy of the extension the user's directory holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Status {
+pub(crate) enum Status {
     NotInstalled,
     /// The installed file is this build's copy.
     Installed,
@@ -30,7 +30,7 @@ pub enum Status {
 /// The per-user extension directory as Nautilus sees it. Inside Flatpak
 /// XDG_DATA_HOME is the sandbox's private dir, so the host's default is
 /// used (where the manifest mounts `xdg-data/nautilus-python/extensions`).
-pub fn dir() -> Option<PathBuf> {
+pub(crate) fn dir() -> Option<PathBuf> {
     let base = if crate::platform::is_flatpak() {
         crate::platform::home()?.join(".local/share")
     } else {
@@ -40,11 +40,11 @@ pub fn dir() -> Option<PathBuf> {
 }
 
 /// Where the extension is (or would be) installed.
-pub fn path() -> Option<PathBuf> {
+pub(crate) fn path() -> Option<PathBuf> {
     dir().map(|d| d.join(FILE_NAME))
 }
 
-pub fn status() -> Status {
+pub(crate) fn status() -> Status {
     path()
         .map(|p| status_at(&p))
         .unwrap_or(Status::NotInstalled)
@@ -52,18 +52,18 @@ pub fn status() -> Status {
 
 /// Everything the settings row shows, read in one go.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct State {
-    pub status: Status,
+pub(crate) struct State {
+    pub(crate) status: Status,
     /// Files has loaded this very copy (its marker carries our hash).
-    pub loaded: bool,
+    pub(crate) loaded: bool,
     /// Whether the nautilus-python loader is on the system: `None` when that
     /// cannot be seen from here (inside the Flatpak the host's /usr is not
     /// mounted).
-    pub loader: Option<bool>,
+    pub(crate) loader: Option<bool>,
 }
 
 impl State {
-    pub fn read() -> Self {
+    pub(crate) fn read() -> Self {
         let status = status();
         let loaded = status == Status::Installed
             && path().is_some_and(|p| loaded_at(&p.with_file_name(LOADED_MARKER)));
@@ -87,7 +87,7 @@ fn loaded_at(marker: &std::path::Path) -> bool {
 /// Whether the nautilus-python bindings (the loader for Python extensions)
 /// are installed, judged by their library in the places distributions put
 /// it. `None` inside the Flatpak, which cannot see the host's /usr.
-pub fn loader_present() -> Option<bool> {
+fn loader_present() -> Option<bool> {
     if crate::platform::is_flatpak() {
         return None;
     }
@@ -130,7 +130,7 @@ fn launcher_record() -> Option<PathBuf> {
 /// follows a bundle that has been moved or replaced, and cleared whenever
 /// Hylki runs as anything else, so a later packaged install does not leave
 /// the extension chasing a bundle that is gone.
-pub fn record_launcher() {
+pub(crate) fn record_launcher() {
     let Some(path) = launcher_record() else {
         return;
     };
@@ -150,7 +150,7 @@ pub fn record_launcher() {
 }
 
 /// Write (or overwrite) this build's copy of the extension.
-pub fn install() -> Result<PathBuf, String> {
+pub(crate) fn install() -> Result<PathBuf, String> {
     let path = path().ok_or_else(|| "no home directory".to_string())?;
     install_at(&path)?;
     tracing::info!("nautilus extension installed at {}", path.display());
@@ -165,7 +165,7 @@ fn install_at(path: &std::path::Path) -> Result<(), String> {
 }
 
 /// Delete the installed copy, if any.
-pub fn remove() -> Result<(), String> {
+pub(crate) fn remove() -> Result<(), String> {
     let Some(path) = path() else { return Ok(()) };
     remove_at(&path)
 }
@@ -185,7 +185,7 @@ fn remove_at(path: &std::path::Path) -> Result<(), String> {
 /// Ask GNOME Files to quit (what `nautilus -q` does), so that its next
 /// window opens with the extension loaded — or without it, once removed.
 /// Nothing is started if Files is not running.
-pub fn quit_files() -> Result<(), String> {
+pub(crate) fn quit_files() -> Result<(), String> {
     use gtk::glib::prelude::ToVariant;
     let conn = gtk::gio::bus_get_sync(gtk::gio::BusType::Session, gtk::gio::Cancellable::NONE)
         .map_err(|e| e.to_string())?;

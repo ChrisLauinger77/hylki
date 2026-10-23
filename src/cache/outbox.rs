@@ -7,7 +7,7 @@ use super::Cache;
 impl Cache {
     /// Queue a message that failed to send. Returns its Outbox id.
     #[allow(clippy::too_many_arguments)]
-    pub fn queue_outbox(
+    pub(crate) fn queue_outbox(
         &self,
         account_id: u32,
         from_addr: &str,
@@ -49,7 +49,7 @@ impl Cache {
     }
 
     /// Note the message a queued forward forwards (#454).
-    pub fn set_outbox_forwards(&self, id: u32, forwards: &str) {
+    pub(crate) fn set_outbox_forwards(&self, id: u32, forwards: &str) {
         let _ = self.conn.execute(
             "UPDATE outbox SET forwards = ?1 WHERE id = ?2",
             params![forwards, id],
@@ -57,7 +57,7 @@ impl Cache {
     }
 
     /// Everything waiting for this account, oldest first (the order it is sent in).
-    pub fn outbox_items(&self, account_id: u32) -> Vec<crate::models::OutboxItem> {
+    pub(crate) fn outbox_items(&self, account_id: u32) -> Vec<crate::models::OutboxItem> {
         let mut stmt = match self.conn.prepare(
             "SELECT id, account_id, from_addr, rcpts, recipients, subject, preview, raw, \
              sent_path, queued_at, attempts, last_error, send_at, forwards FROM outbox \
@@ -99,14 +99,14 @@ impl Cache {
     }
 
     /// Drop a queued message — it went out, or the user discarded it.
-    pub fn delete_outbox(&self, id: u32) {
+    pub(crate) fn delete_outbox(&self, id: u32) {
         let _ = self
             .conn
             .execute("DELETE FROM outbox WHERE id = ?1", params![id]);
     }
 
     /// Record another failed attempt, so the list can say what went wrong.
-    pub fn record_outbox_failure(&self, id: u32, error: &str) {
+    pub(crate) fn record_outbox_failure(&self, id: u32, error: &str) {
         let _ = self.conn.execute(
             "UPDATE outbox SET attempts = attempts + 1, last_error = ?2 WHERE id = ?1",
             params![id, error],

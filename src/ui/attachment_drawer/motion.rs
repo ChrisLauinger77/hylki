@@ -275,7 +275,7 @@ impl AttachmentDrawer {
 
     /// The end state of a collapse: body hidden, divider locked, position
     /// pinned to exactly the header.
-    pub(super) fn settle_collapsed(&mut self) {
+    fn settle_collapsed(&mut self) {
         self.collapsed = true;
         self.apply_position();
     }
@@ -312,7 +312,7 @@ impl AttachmentDrawer {
     /// Move the Paned divider so the drawer body is the desired height: the
     /// header alone when collapsed, else `self.height`. Guarded so the resulting
     /// position-notify isn't taken for a user drag.
-    pub(super) fn apply_position(&self) {
+    fn apply_position(&self) {
         let total = self.paned.height();
         if total <= 1 {
             return; // not allocated yet
@@ -346,7 +346,7 @@ impl AttachmentDrawer {
     }
 
     /// Persist the dragged height, debounced past the end of the drag.
-    pub(super) fn schedule_height_save(&self) {
+    fn schedule_height_save(&self) {
         let height = self.height;
         let slot = self.height_save.clone();
         if let Some(prev) = slot.borrow_mut().take() {
@@ -364,7 +364,7 @@ impl AttachmentDrawer {
 
     /// Apply the remembered split once the Paned has been allocated. The drawer
     /// has just become visible, so defer one loop iteration for layout to settle.
-    pub(super) fn schedule_initial_position(&self) {
+    fn schedule_initial_position(&self) {
         let paned = self.paned.clone();
         let adjusting = self.adjusting.clone();
         let positioned = self.positioned.clone();

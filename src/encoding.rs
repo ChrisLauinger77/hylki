@@ -4,16 +4,16 @@
 //! module encodes the same way.
 
 mod base64;
-pub mod percent;
+pub(crate) mod percent;
 mod text_value;
 
-pub use self::base64::{base64_decode, base64_encode, base64_lines};
-pub use text_value::{escape_text_value, unescape_text_value};
+pub(crate) use self::base64::{base64_decode, base64_encode, base64_lines};
+pub(crate) use text_value::{escape_text_value, unescape_text_value};
 
 /// Text escaped for HTML, for element content and quoted attribute values
 /// alike: `&`, `<`, `>`, `'` and `"` become entities, as do the C0 and C1
 /// control characters XML forbids (GLib's markup escape).
-pub fn escape_html(text: &str) -> String {
+pub(crate) fn escape_html(text: &str) -> String {
     gtk::glib::markup_escape_text(text).into()
 }
 

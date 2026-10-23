@@ -22,35 +22,35 @@ pub(super) struct Built {
 
 /// A list as a rebuild left it (see `MessageList::keep_view`).
 pub(super) struct ViewSnapshot {
-    pub(super) key: u64,
-    pub(super) fp: u64,
+    key: u64,
+    fp: u64,
     sig: u64,
-    pub(super) all: Vec<Rc<Message>>,
-    pub(super) threads: Option<std::rc::Rc<SourceThreads>>,
-    pub(super) rows: Vec<Rc<RowData>>,
-    pub(super) shown: Vec<Rc<Message>>,
-    pub(super) tail: Vec<Rc<RowData>>,
-    pub(super) groups: std::collections::HashMap<(u32, String), Vec<Rc<Message>>>,
-    pub(super) msg_thread: std::collections::HashMap<(u32, u32), (u32, String)>,
-    pub(super) thread_members: std::collections::HashMap<(u32, String), Vec<(u32, u32)>>,
-    pub(super) nested: std::collections::HashMap<(u32, u32), Rc<Message>>,
-    pub(super) listed_folders: std::collections::HashSet<(u32, u32)>,
-    pub(super) total_matches: usize,
-    pub(super) thread_drag: crate::ui::message_row::ThreadDragKeys,
-    pub(super) window: usize,
+    all: Vec<Rc<Message>>,
+    threads: Option<std::rc::Rc<SourceThreads>>,
+    rows: Vec<Rc<RowData>>,
+    shown: Vec<Rc<Message>>,
+    tail: Vec<Rc<RowData>>,
+    groups: std::collections::HashMap<(u32, String), Vec<Rc<Message>>>,
+    msg_thread: std::collections::HashMap<(u32, u32), (u32, String)>,
+    thread_members: std::collections::HashMap<(u32, String), Vec<(u32, u32)>>,
+    nested: std::collections::HashMap<(u32, u32), Rc<Message>>,
+    listed_folders: std::collections::HashSet<(u32, u32)>,
+    total_matches: usize,
+    thread_drag: crate::ui::message_row::ThreadDragKeys,
+    window: usize,
 }
 
 /// How many views the list keeps as built: the unified rows built ahead
 /// after a start, and the views visited since. Each holds its messages,
 /// which for a large Archive is tens of megabytes.
-pub const KEPT_VIEWS: usize = 8;
+pub(crate) const KEPT_VIEWS: usize = 8;
 
 /// The most messages a view may hold and still be kept as built, or built
 /// ahead. A kept view holds its own copy of every message and its
 /// conversation maps besides: an 81,000-message unified Archive came to
 /// some 150 MB for a click made once a session, if at all (#504). Larger
 /// views are built at each visit, the newest first.
-pub const KEEP_AT_MOST: usize = 20_000;
+pub(crate) const KEEP_AT_MOST: usize = 20_000;
 
 /// Free `held` once the main loop is idle, not inside the pass that let go
 /// of it.
@@ -64,7 +64,7 @@ impl MessageList {
     /// folder's index, the rows listed from it, and the whole-mailbox search
     /// pool (empty unless a search is open), each as (messages, bytes). The
     /// rows share their messages with the index.
-    pub fn memory_stats(&self) -> [(usize, usize); 3] {
+    pub(crate) fn memory_stats(&self) -> [(usize, usize); 3] {
         use crate::memory_report::messages_bytes;
         [
             messages_bytes(self.all.iter().map(|m| &**m)),
@@ -79,7 +79,7 @@ impl MessageList {
     /// The views kept as built: how many, their messages and bytes (records
     /// not shared with the view on show), and what their conversation maps
     /// add on top.
-    pub fn kept_view_stats(&self) -> (usize, (usize, usize), usize) {
+    pub(crate) fn kept_view_stats(&self) -> (usize, (usize, usize), usize) {
         use crate::memory_report::message_bytes;
         let mut seen = std::collections::HashSet::new();
         for m in &self.all {
@@ -122,8 +122,6 @@ impl MessageList {
         (self.views.len(), (n, bytes), maps)
     }
 
-    /// The source changed: its conversations are to be worked out again,
-    /// and an answer still on its way from a background thread is stale.
     /// What a rebuild reads besides the messages, as one number: a kept view
     /// is shown again only under the settings it was built with.
     fn rows_signature(&self) -> u64 {
@@ -213,7 +211,7 @@ impl MessageList {
     /// Whether the view `key` is kept with this content, under the
     /// settings the list has now: the app shows it with `SetView { restore }`
     /// rather than sending its messages.
-    pub fn has_view(&self, key: u64, fp: u64) -> bool {
+    pub(crate) fn has_view(&self, key: u64, fp: u64) -> bool {
         let sig = self.rows_signature();
         self.views
             .iter()
@@ -221,7 +219,7 @@ impl MessageList {
     }
 
     /// Why `has_view` said no, for the log.
-    pub fn view_miss(&self, key: u64, fp: u64) -> &'static str {
+    pub(crate) fn view_miss(&self, key: u64, fp: u64) -> &'static str {
         match self.views.iter().find(|v| v.key == key) {
             None => "never kept",
             Some(v) if v.fp != fp => "its mail changed",
@@ -231,7 +229,7 @@ impl MessageList {
     }
 
     /// The view the app named as on show, if any.
-    pub fn view_key(&self) -> Option<u64> {
+    pub(crate) fn view_key(&self) -> Option<u64> {
         self.view_key
     }
 

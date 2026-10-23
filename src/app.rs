@@ -10,7 +10,7 @@ use crate::ui::notifications::NotifyInput;
 use crate::ui::FOCUS_ANIM_MS;
 
 // The message list's opening width now comes from config (the remembered pane
-// width, #28); its floor lives with the pane in message_list.rs
+// width, #28); its floor lives with the pane in message_list/layout.rs
 // (LIST_MIN_WIDTH).
 
 relm4::new_action_group!(WindowActionGroup, "win");
@@ -142,7 +142,7 @@ relm4::new_stateless_action!(FindAction, WindowActionGroup, "find");
 relm4::new_stateless_action!(UndoAction, WindowActionGroup, "undo");
 relm4::new_stateless_action!(RedoAction, WindowActionGroup, "redo");
 
-#[relm4::component(pub)]
+#[relm4::component(pub(crate))]
 impl SimpleComponent for AppModel {
     type Init = ();
     type Input = AppMsg;

@@ -7,7 +7,7 @@ use super::privacy::load_privacy;
 
 /// The unified rows' unread-chip switches. A file from before the
 /// per-row switches carried one switch, for All Inboxes; it still counts.
-pub fn load_unified_chips() -> UnifiedChips {
+pub(crate) fn load_unified_chips() -> UnifiedChips {
     let p = load_privacy();
     let mut chips = p.unified_chips;
     chips.all_inboxes = chips.all_inboxes && p.unified_chip;
@@ -19,19 +19,19 @@ pub fn load_unified_chips() -> UnifiedChips {
 /// the accounts' own. Starred, Sent, Drafts and Archive are on until
 /// switched off; Trash and Junk (#369) are off until switched on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct UnifiedKinds {
+pub(crate) struct UnifiedKinds {
     #[serde(default = "default_on")]
-    pub starred: bool,
+    pub(crate) starred: bool,
     #[serde(default = "default_on")]
-    pub sent: bool,
+    pub(crate) sent: bool,
     #[serde(default = "default_on")]
-    pub drafts: bool,
+    pub(crate) drafts: bool,
     #[serde(default = "default_on")]
-    pub archive: bool,
+    pub(crate) archive: bool,
     #[serde(default)]
-    pub junk: bool,
+    pub(crate) junk: bool,
     #[serde(default)]
-    pub trash: bool,
+    pub(crate) trash: bool,
 }
 
 impl Default for UnifiedKinds {
@@ -51,19 +51,19 @@ impl Default for UnifiedKinds {
 /// (Settings → Sidebar → Unified → Unread counts). All on until switched
 /// off; Sent has no chip anywhere.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct UnifiedChips {
+pub(crate) struct UnifiedChips {
     #[serde(default = "default_on")]
-    pub all_inboxes: bool,
+    pub(crate) all_inboxes: bool,
     #[serde(default = "default_on")]
-    pub starred: bool,
+    pub(crate) starred: bool,
     #[serde(default = "default_on")]
-    pub drafts: bool,
+    pub(crate) drafts: bool,
     #[serde(default = "default_on")]
-    pub archive: bool,
+    pub(crate) archive: bool,
     #[serde(default = "default_on")]
-    pub junk: bool,
+    pub(crate) junk: bool,
     #[serde(default = "default_on")]
-    pub trash: bool,
+    pub(crate) trash: bool,
 }
 
 impl Default for UnifiedChips {
@@ -81,7 +81,7 @@ impl Default for UnifiedChips {
 
 impl UnifiedChips {
     /// Whether the row for `kind` shows its chip (Sent never does).
-    pub fn has(self, kind: crate::models::FolderKind) -> bool {
+    pub(crate) fn has(self, kind: crate::models::FolderKind) -> bool {
         use crate::models::FolderKind::*;
         match kind {
             Inbox => self.all_inboxes,
@@ -96,7 +96,7 @@ impl UnifiedChips {
 }
 
 impl UnifiedKinds {
-    pub const NONE: UnifiedKinds = UnifiedKinds {
+    pub(crate) const NONE: UnifiedKinds = UnifiedKinds {
         starred: false,
         sent: false,
         drafts: false,
@@ -107,7 +107,7 @@ impl UnifiedKinds {
 
     /// Whether the row for `kind` is on (Inbox and custom folders have none
     /// of their own here, so they are `false`).
-    pub fn has(self, kind: crate::models::FolderKind) -> bool {
+    pub(crate) fn has(self, kind: crate::models::FolderKind) -> bool {
         use crate::models::FolderKind::*;
         match kind {
             Starred => self.starred,
@@ -121,7 +121,7 @@ impl UnifiedKinds {
     }
 
     /// The kinds with a row, in sidebar order: an account's own order.
-    pub fn listed(self) -> Vec<crate::models::FolderKind> {
+    pub(crate) fn listed(self) -> Vec<crate::models::FolderKind> {
         use crate::models::FolderKind::*;
         [Starred, Sent, Drafts, Archive, Junk, Trash]
             .into_iter()
@@ -133,7 +133,7 @@ impl UnifiedKinds {
 /// Where a sidebar section (Filters, Tags, Favorites, Contacts) is drawn.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SectionPlacement {
+pub(crate) enum SectionPlacement {
     /// In the unified section, as older files have it. Only
     /// ever read: loading moves it (see `LegacySwitches`), and a file
     /// missing the key reads as this so that its old switch decides.
@@ -153,7 +153,7 @@ pub enum SectionPlacement {
 /// How Filters, Tags, Favorites and Contacts are drawn (Settings → Sidebar → Sections).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SectionStyle {
+pub(crate) enum SectionStyle {
     /// As the unified section's rows: a pill whose header opens the
     /// combined view, with a chevron on the right.
     #[default]
@@ -167,7 +167,7 @@ pub enum SectionStyle {
 impl SectionPlacement {
     /// Whether the section is in the sidebar's scrolling part, where it
     /// lists what it holds under its row.
-    pub fn shown(self) -> bool {
+    pub(crate) fn shown(self) -> bool {
         matches!(self, Self::AboveAccounts | Self::BelowAccounts)
     }
 }
@@ -175,7 +175,7 @@ impl SectionPlacement {
 /// What the main window shows at launch (#256).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum StartView {
+pub(crate) enum StartView {
     /// All Inboxes, or with that row hidden the first account's first
     /// folder.
     #[default]
@@ -192,7 +192,7 @@ pub enum StartView {
 /// their order whichever is chosen.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum FolderSort {
+pub(crate) enum FolderSort {
     /// By name, with the folders the user dragged kept where they were put.
     #[default]
     Custom,
@@ -205,14 +205,14 @@ pub enum FolderSort {
 }
 
 impl FolderSort {
-    pub const ALL: [FolderSort; 4] = [
+    pub(crate) const ALL: [FolderSort; 4] = [
         FolderSort::Custom,
         FolderSort::NameAsc,
         FolderSort::NameDesc,
         FolderSort::Path,
     ];
 
-    pub fn label(self) -> String {
+    pub(crate) fn label(self) -> String {
         match self {
             FolderSort::Custom => crate::i18n::i18n("Custom Order"),
             FolderSort::NameAsc => crate::i18n::i18n("Name (A to Z)"),
@@ -222,7 +222,7 @@ impl FolderSort {
     }
 
     /// Its place in [`FolderSort::ALL`], for combo rows.
-    pub fn index(self) -> u32 {
+    pub(crate) fn index(self) -> u32 {
         FolderSort::ALL.iter().position(|s| *s == self).unwrap_or(0) as u32
     }
 }
@@ -233,35 +233,35 @@ impl FolderSort {
 /// sidebar expands. Each item has its own switch under the master; all are
 /// on until switched off.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct RailFold {
+pub(crate) struct RailFold {
     /// The master switch: off, nothing folds for the rail.
     #[serde(default = "default_on")]
-    pub enabled: bool,
+    pub(crate) enabled: bool,
     /// Every account's folder list.
     #[serde(default = "default_on")]
-    pub accounts: bool,
+    pub(crate) accounts: bool,
     /// The per-account inbox list under All Inboxes.
     #[serde(default = "default_on")]
-    pub all_inboxes: bool,
+    pub(crate) all_inboxes: bool,
     /// The unified Starred / Sent / Drafts rows' account lists.
     #[serde(default = "default_on")]
-    pub starred: bool,
+    pub(crate) starred: bool,
     #[serde(default = "default_on")]
-    pub sent: bool,
+    pub(crate) sent: bool,
     #[serde(default = "default_on")]
-    pub drafts: bool,
+    pub(crate) drafts: bool,
     #[serde(default = "default_on")]
-    pub archive: bool,
+    pub(crate) archive: bool,
     #[serde(default = "default_on")]
-    pub junk: bool,
+    pub(crate) junk: bool,
     #[serde(default = "default_on")]
-    pub trash: bool,
+    pub(crate) trash: bool,
     /// The Filtered Folders section.
     #[serde(default = "default_on")]
-    pub filtered: bool,
+    pub(crate) filtered: bool,
     /// The Tags section.
     #[serde(default = "default_on")]
-    pub tags: bool,
+    pub(crate) tags: bool,
 }
 
 impl Default for RailFold {
@@ -284,13 +284,13 @@ impl Default for RailFold {
 
 impl RailFold {
     /// Whether the accounts fold for the rail.
-    pub fn folds_accounts(self) -> bool {
+    pub(crate) fn folds_accounts(self) -> bool {
         self.enabled && self.accounts
     }
 
     /// Whether the unified row for `kind` folds for the rail (Inbox is All
     /// Inboxes; only Starred, Sent and Drafts have rows besides it).
-    pub fn folds_kind(self, kind: crate::models::FolderKind) -> bool {
+    pub(crate) fn folds_kind(self, kind: crate::models::FolderKind) -> bool {
         use crate::models::FolderKind::*;
         self.enabled
             && match kind {
@@ -305,11 +305,11 @@ impl RailFold {
             }
     }
 
-    pub fn folds_filtered(self) -> bool {
+    pub(crate) fn folds_filtered(self) -> bool {
         self.enabled && self.filtered
     }
 
-    pub fn folds_tags(self) -> bool {
+    pub(crate) fn folds_tags(self) -> bool {
         self.enabled && self.tags
     }
 }

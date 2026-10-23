@@ -19,6 +19,9 @@ use gtk::{glib, subclass::prelude::*};
 const SPACING: i32 = 6;
 const ANIM_MS: u32 = 180;
 
+/// A chip size (width, height) that several zones read and write.
+type SharedSize = Rc<Cell<(i32, i32)>>;
+
 /// One slot of the row: a child or the gap.
 struct Slot {
     child: Option<gtk::Widget>,
@@ -32,21 +35,21 @@ mod imp {
     use super::*;
 
     #[derive(Default)]
-    pub struct ChipFlow {
+    pub(crate) struct ChipFlow {
         /// Where each child currently sits (content coordinates), eased
         /// towards its slot.
-        pub pos: RefCell<HashMap<gtk::Widget, (f64, f64)>>,
+        pub(super) pos: RefCell<HashMap<gtk::Widget, (f64, f64)>>,
         /// The slot each child was last sent towards.
-        pub target: RefCell<HashMap<gtk::Widget, (i32, i32)>>,
-        pub anims: RefCell<HashMap<gtk::Widget, adw::TimedAnimation>>,
+        pub(super) target: RefCell<HashMap<gtk::Widget, (i32, i32)>>,
+        pub(super) anims: RefCell<HashMap<gtk::Widget, adw::TimedAnimation>>,
         /// The slot index a dragged chip would take (a gap opens there).
-        pub gap: Cell<Option<usize>>,
+        pub(super) gap: Cell<Option<usize>>,
         /// The largest chip seen by any zone (shared), to size an empty
         /// zone by.
-        pub chip_size: RefCell<Option<Rc<Cell<(i32, i32)>>>>,
+        pub(super) chip_size: RefCell<Option<SharedSize>>,
         /// The size of the chip being dragged right now (shared; zero when
         /// none): the gap opens at exactly that size.
-        pub drag_size: RefCell<Option<Rc<Cell<(i32, i32)>>>>,
+        pub(super) drag_size: RefCell<Option<SharedSize>>,
     }
 
     #[glib::object_subclass]
@@ -103,7 +106,9 @@ mod imp {
             let slots = obj.slots(width, &chips);
             // Work out every move first, then start the animations with no
             // borrow held (their first tick may land before this returns).
-            let mut moves: Vec<(gtk::Widget, (f64, f64), (i32, i32))> = Vec::new();
+            // A child, where it is now and the slot it moves to.
+            type Move = (gtk::Widget, (f64, f64), (i32, i32));
+            let mut moves: Vec<Move> = Vec::new();
             {
                 let mut pos = self.pos.borrow_mut();
                 let mut target = self.target.borrow_mut();
@@ -144,7 +149,7 @@ mod imp {
 }
 
 glib::wrapper! {
-    pub struct ChipFlow(ObjectSubclass<imp::ChipFlow>)
+    pub(crate) struct ChipFlow(ObjectSubclass<imp::ChipFlow>)
         @extends gtk::Widget,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
@@ -156,14 +161,14 @@ impl Default for ChipFlow {
 }
 
 impl ChipFlow {
-    pub fn new(chip_size: Rc<Cell<(i32, i32)>>, drag_size: Rc<Cell<(i32, i32)>>) -> Self {
+    pub(crate) fn new(chip_size: SharedSize, drag_size: SharedSize) -> Self {
         let this = Self::default();
         *this.imp().chip_size.borrow_mut() = Some(chip_size);
         *this.imp().drag_size.borrow_mut() = Some(drag_size);
         this
     }
 
-    pub fn append(&self, child: &impl IsA<gtk::Widget>) {
+    pub(crate) fn append(&self, child: &impl IsA<gtk::Widget>) {
         child.set_parent(self);
         self.queue_resize();
     }
@@ -171,7 +176,7 @@ impl ChipFlow {
     /// Drop every chip (and the gap). Positions start afresh: the next
     /// chips appear in place rather than sliding from wherever the old
     /// ones were.
-    pub fn remove_all(&self) {
+    pub(crate) fn remove_all(&self) {
         let imp = self.imp();
         for (_, a) in imp.anims.borrow_mut().drain() {
             a.pause();
@@ -187,7 +192,7 @@ impl ChipFlow {
 
     /// Open the gap at `index` (None closes it). The chips slide to make
     /// or take the room.
-    pub fn set_gap(&self, index: Option<usize>) {
+    pub(super) fn set_gap(&self, index: Option<usize>) {
         let imp = self.imp();
         let index = index.map(|i| i.min(self.visible_children().len()));
         if imp.gap.get() != index {
@@ -200,7 +205,7 @@ impl ChipFlow {
     /// chips are heading (their slots with the current gap, not their
     /// mid-slide positions): every chip on a row above the point, or on
     /// its row with its middle left of it, comes before.
-    pub fn insertion_index(&self, x: f64, y: f64) -> usize {
+    pub(super) fn insertion_index(&self, x: f64, y: f64) -> usize {
         let chips = self.chip_sizes();
         let slots = self.slots(self.width().max(1), &chips);
         let mut index = 0;

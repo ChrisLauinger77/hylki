@@ -69,7 +69,7 @@ text:window.__hylkiBodyText?window.__hylkiBodyText():''})"#;
 
 impl Compose {
     /// Whether the body zooms in its present format; see [`ComposeInput::Zoom`].
-    pub fn zooms(&self) -> bool {
+    pub(crate) fn zooms(&self) -> bool {
         self.zoomable.get()
     }
 
@@ -93,7 +93,7 @@ impl Compose {
 
     /// The four formats as menu entries, the current one wearing a tick in
     /// place of its icon (as the OpenPGP toggles do).
-    pub(super) fn format_entries(&self, sender: &ComponentSender<Self>) -> Vec<MenuEntry> {
+    fn format_entries(&self, sender: &ComponentSender<Self>) -> Vec<MenuEntry> {
         [
             ComposeFormat::Rich,
             ComposeFormat::Markdown,

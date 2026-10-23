@@ -31,10 +31,10 @@ use eds_source::{MANAGER_IFACE, MANAGER_PATH};
 
 /// Fewer characters than this match too much of a large directory to be
 /// worth the round trip.
-pub const MIN_QUERY: usize = 3;
+pub(crate) const MIN_QUERY: usize = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Security {
+pub(crate) enum Security {
     StartTls,
     Ldaps,
     None,
@@ -57,7 +57,7 @@ impl Security {
         }
     }
 
-    pub fn default_port(self) -> u16 {
+    pub(crate) fn default_port(self) -> u16 {
         if self == Security::Ldaps {
             636
         } else {
@@ -71,7 +71,7 @@ impl Security {
 /// bare host, and resolving the whole URL as a name fails as "Not
 /// connected" (#307). Answers the host, and the encryption and port the
 /// text named, if any.
-pub fn parse_server(text: &str) -> (String, Option<Security>, Option<u16>) {
+pub(crate) fn parse_server(text: &str) -> (String, Option<Security>, Option<u16>) {
     let text = text.trim();
     let (security, rest) = match text.split_once("://") {
         Some((scheme, rest)) if scheme.eq_ignore_ascii_case("ldaps") => {
@@ -98,19 +98,19 @@ pub fn parse_server(text: &str) -> (String, Option<Security>, Option<u16>) {
 }
 
 #[derive(Debug, Clone)]
-pub struct Directory {
+pub(crate) struct Directory {
     /// The EDS source UID; empty for one not made yet.
-    pub uid: String,
-    pub name: String,
-    pub host: String,
-    pub port: u16,
-    pub security: Security,
-    pub base_dn: String,
+    pub(crate) uid: String,
+    pub(crate) name: String,
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) security: Security,
+    pub(crate) base_dn: String,
     /// Search the whole tree under the base, or only its first level.
-    pub subtree: bool,
+    pub(crate) subtree: bool,
     /// Who to sign in as; empty searches anonymously.
-    pub bind_dn: String,
-    pub enabled: bool,
+    pub(crate) bind_dn: String,
+    pub(crate) enabled: bool,
     /// The registry's object for the source, for writing and removing it.
     path: String,
     /// The source as EDS keeps it, so saving keeps the keys Hylki does not
@@ -119,7 +119,7 @@ pub struct Directory {
 }
 
 impl Directory {
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Directory {
             uid: String::new(),
             name: String::new(),
@@ -136,7 +136,7 @@ impl Directory {
     }
 
     /// The name shown in lists: the given one, or the server.
-    pub fn title(&self) -> String {
+    pub(crate) fn title(&self) -> String {
         if self.name.trim().is_empty() {
             self.host.clone()
         } else {
@@ -244,7 +244,7 @@ impl Directory {
 }
 
 /// Every LDAP directory EDS knows, Evolution's included, by name.
-pub fn list() -> Result<Vec<Directory>, String> {
+pub(crate) fn list() -> Result<Vec<Directory>, String> {
     let sources = crate::contacts::registry_sources().ok_or_else(not_available)?;
     let mut out: Vec<Directory> = sources
         .iter()
@@ -259,7 +259,7 @@ pub fn list() -> Result<Vec<Directory>, String> {
 
 /// Make or update a directory; a new password replaces the kept one, none
 /// keeps it. Answers the directory's UID.
-pub fn save(dir: &Directory, password: Option<&str>) -> Result<String, String> {
+pub(crate) fn save(dir: &Directory, password: Option<&str>) -> Result<String, String> {
     let conn = bus()?;
     let dest = registry()?;
     let mut dir = dir.clone();
@@ -297,13 +297,13 @@ fn move_security(dir: &mut Directory) {
 }
 
 /// Switch a directory on or off without touching the rest of it.
-pub fn set_enabled(dir: &Directory, enabled: bool) -> Result<(), String> {
+pub(crate) fn set_enabled(dir: &Directory, enabled: bool) -> Result<(), String> {
     let mut d = dir.clone();
     d.enabled = enabled;
     save(&d, None).map(|_| ())
 }
 
-pub fn remove(dir: &Directory) -> Result<(), String> {
+pub(crate) fn remove(dir: &Directory) -> Result<(), String> {
     let conn = bus()?;
     let dest = registry()?;
     remove_source(&conn, &dest, &dir.path)?;
@@ -315,7 +315,7 @@ pub fn remove(dir: &Directory) -> Result<(), String> {
 }
 
 /// Whether Hylki holds a password for the directory.
-pub fn has_password(dir: &Directory) -> bool {
+pub(crate) fn has_password(dir: &Directory) -> bool {
     crate::config::load_cloud_password(&dir.keyring_key()).is_some()
 }
 
@@ -600,7 +600,7 @@ fn enabled() -> Vec<Directory> {
 /// The directories that are switched on, as (UID, name), for the Contacts
 /// view's address book filter. Blocking, but only a registry call at most
 /// every [`LIST_FRESH`].
-pub fn enabled_names() -> Vec<(String, String)> {
+pub(crate) fn enabled_names() -> Vec<(String, String)> {
     enabled()
         .into_iter()
         .map(|d| (d.uid.clone(), d.title()))
@@ -620,7 +620,7 @@ fn failures() -> &'static Mutex<HashMap<String, Failure>> {
 
 /// Why the directory last failed to answer, until it answers again: for
 /// Settings to show beside it.
-pub fn last_error(uid: &str) -> Option<String> {
+pub(crate) fn last_error(uid: &str) -> Option<String> {
     failures()
         .lock()
         .ok()
@@ -666,14 +666,14 @@ fn directory_lock(uid: &str) -> Arc<Mutex<()>> {
 
 /// A directory that did not answer, and why, worded for the status bar.
 #[derive(Debug, Clone)]
-pub struct DirectoryFailure {
-    pub uid: String,
-    pub name: String,
-    pub message: String,
+pub(crate) struct DirectoryFailure {
+    pub(crate) uid: String,
+    pub(crate) name: String,
+    pub(crate) message: String,
 }
 
 impl DirectoryFailure {
-    pub fn text(&self) -> String {
+    pub(crate) fn text(&self) -> String {
         i18n_f(
             "{name} did not answer: {error}",
             &[("name", &self.name), ("error", &self.message)],
@@ -775,7 +775,7 @@ fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<DirectoryFailure>)
 /// The people whose name or address holds `typed`, or whose surname starts
 /// with it, from every directory that is switched on, for the composer; and the
 /// directories that failed. Blocking: call it off the main thread.
-pub fn search(typed: &str) -> (Vec<Suggestion>, Vec<DirectoryFailure>) {
+pub(crate) fn search(typed: &str) -> (Vec<Suggestion>, Vec<DirectoryFailure>) {
     let (found, failed) = lookup(typed);
     let suggestions = found
         .iter()
@@ -786,7 +786,7 @@ pub fn search(typed: &str) -> (Vec<Suggestion>, Vec<DirectoryFailure>) {
 
 /// The same people as whole entries, for the Contacts view, at most `limit`
 /// from each directory, each naming the directory it came from as its book.
-pub fn search_contacts(
+pub(crate) fn search_contacts(
     typed: &str,
     limit: usize,
 ) -> (Vec<crate::contacts::ContactDetails>, Vec<DirectoryFailure>) {
@@ -818,7 +818,7 @@ pub fn search_contacts(
 }
 
 /// Check a saved directory answers, signing in as it would for a search.
-pub fn check(dir: &Directory) -> Result<(), String> {
+pub(crate) fn check(dir: &Directory) -> Result<(), String> {
     let r = query_directory(dir, "(is \"email\" \"hylki-check@invalid\")").map(|_| ());
     match &r {
         Ok(()) => {

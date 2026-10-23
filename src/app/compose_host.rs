@@ -305,8 +305,7 @@ impl AppModel {
             host.window.destroy();
             return;
         }
-        if self.reader_compose.as_ref().is_some_and(|r| r.id == id) {
-            let r = self.reader_compose.take().unwrap();
+        if let Some(r) = self.reader_compose.take_if(|r| r.id == id) {
             match r.window {
                 Some(window) => {
                     window.set_content(None::<&gtk::Widget>);
@@ -389,7 +388,10 @@ impl AppModel {
     pub(super) fn init_compose_overlay(&self, widgets: &AppModelWidgets) {
         self.reader_compose_revealer.set_can_target(false);
         {
-            let pane = widgets.reader_bin.child().expect("reader pane");
+            let pane = widgets
+                .reader_bin
+                .child()
+                .expect("the view puts the reader pane in reader_bin");
             widgets.reader_bin.set_child(None::<&gtk::Widget>);
             // Split-reply slot (#86) above the reader; the full-cover
             // revealer stays an overlay above the whole assembly. A Paned

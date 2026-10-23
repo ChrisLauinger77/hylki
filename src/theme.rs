@@ -26,7 +26,7 @@ use crate::theme_palettes::THEMES;
 
 /// The stock GNOME look: no palette of our own, just libadwaita and the
 /// desktop's accent color. The default, and what "no theme" saves as.
-pub const SYSTEM_ID: &str = "system";
+pub(crate) const SYSTEM_ID: &str = "system";
 
 /// One palette — a theme's colors for a single appearance (light or dark).
 ///
@@ -36,62 +36,62 @@ pub const SYSTEM_ID: &str = "system";
 /// the upstream theme, and the next surface that needs a color should find
 /// it here rather than invent one.
 #[allow(dead_code)]
-pub struct Palette {
-    pub canvas: &'static str,
-    pub chrome: &'static str,
-    pub toolbar: &'static str,
-    pub toolbar_foreground: &'static str,
-    pub toolbar_border: &'static str,
-    pub toolbar_control: &'static str,
-    pub toolbar_control_foreground: &'static str,
-    pub toolbar_control_hover: &'static str,
-    pub surface: &'static str,
-    pub surface_raised: &'static str,
-    pub surface_overlay: &'static str,
-    pub text: &'static str,
-    pub text_muted: &'static str,
-    pub border: &'static str,
-    pub input: &'static str,
-    pub focus: &'static str,
-    pub accent: &'static str,
-    pub accent_foreground: &'static str,
-    pub secondary: &'static str,
-    pub secondary_foreground: &'static str,
-    pub muted: &'static str,
-    pub muted_foreground: &'static str,
-    pub placeholder: &'static str,
-    pub error: &'static str,
-    pub error_foreground: &'static str,
-    pub error_surface: &'static str,
-    pub warning: &'static str,
-    pub warning_foreground: &'static str,
-    pub warning_surface: &'static str,
-    pub accent_surface: &'static str,
-    pub accent_surface_foreground: &'static str,
-    pub message_surface: &'static str,
-    pub code_background: &'static str,
-    pub code_foreground: &'static str,
-    pub sidebar: &'static str,
-    pub sidebar_foreground: &'static str,
-    pub sidebar_muted_foreground: &'static str,
-    pub sidebar_control_surface: &'static str,
-    pub sidebar_row_hover: &'static str,
-    pub sidebar_row_active: &'static str,
-    pub sidebar_row_selected: &'static str,
-    pub sidebar_border: &'static str,
+pub(crate) struct Palette {
+    pub(crate) canvas: &'static str,
+    pub(crate) chrome: &'static str,
+    pub(crate) toolbar: &'static str,
+    pub(crate) toolbar_foreground: &'static str,
+    pub(crate) toolbar_border: &'static str,
+    pub(crate) toolbar_control: &'static str,
+    pub(crate) toolbar_control_foreground: &'static str,
+    pub(crate) toolbar_control_hover: &'static str,
+    pub(crate) surface: &'static str,
+    pub(crate) surface_raised: &'static str,
+    pub(crate) surface_overlay: &'static str,
+    pub(crate) text: &'static str,
+    pub(crate) text_muted: &'static str,
+    pub(crate) border: &'static str,
+    pub(crate) input: &'static str,
+    pub(crate) focus: &'static str,
+    pub(crate) accent: &'static str,
+    pub(crate) accent_foreground: &'static str,
+    pub(crate) secondary: &'static str,
+    pub(crate) secondary_foreground: &'static str,
+    pub(crate) muted: &'static str,
+    pub(crate) muted_foreground: &'static str,
+    pub(crate) placeholder: &'static str,
+    pub(crate) error: &'static str,
+    pub(crate) error_foreground: &'static str,
+    pub(crate) error_surface: &'static str,
+    pub(crate) warning: &'static str,
+    pub(crate) warning_foreground: &'static str,
+    pub(crate) warning_surface: &'static str,
+    pub(crate) accent_surface: &'static str,
+    pub(crate) accent_surface_foreground: &'static str,
+    pub(crate) message_surface: &'static str,
+    pub(crate) code_background: &'static str,
+    pub(crate) code_foreground: &'static str,
+    pub(crate) sidebar: &'static str,
+    pub(crate) sidebar_foreground: &'static str,
+    pub(crate) sidebar_muted_foreground: &'static str,
+    pub(crate) sidebar_control_surface: &'static str,
+    pub(crate) sidebar_row_hover: &'static str,
+    pub(crate) sidebar_row_active: &'static str,
+    pub(crate) sidebar_row_selected: &'static str,
+    pub(crate) sidebar_border: &'static str,
 }
 
 /// A theme: a name and its two palettes.
-pub struct Theme {
-    pub id: &'static str,
-    pub label: &'static str,
-    pub light: Palette,
-    pub dark: Palette,
+pub(crate) struct Theme {
+    pub(crate) id: &'static str,
+    pub(crate) label: &'static str,
+    pub(crate) light: Palette,
+    pub(crate) dark: Palette,
 }
 
 impl Theme {
     /// The palette for the appearance the app is in.
-    pub fn variant(&self, dark: bool) -> &Palette {
+    pub(crate) fn variant(&self, dark: bool) -> &Palette {
         if dark {
             &self.dark
         } else {
@@ -102,13 +102,13 @@ impl Theme {
 
 /// Every bundled theme, in picker order. The stock look is not in here: it
 /// is the absence of a theme, and the picker lists it first itself.
-pub fn catalog() -> &'static [Theme] {
+pub(crate) fn catalog() -> &'static [Theme] {
     THEMES
 }
 
 /// The theme with this id, or `None` for the stock look (and for an id from
 /// a newer version's catalogue, which falls back to it).
-pub fn find(id: &str) -> Option<&'static Theme> {
+fn find(id: &str) -> Option<&'static Theme> {
     if id.is_empty() || id == SYSTEM_ID {
         return None;
     }
@@ -133,7 +133,7 @@ thread_local! {
 /// scheme-dependent CSS and the reader read the theme's colors back on a
 /// light/dark flip, and GTK runs `notify::dark` handlers in the order they
 /// were connected.
-pub fn install(id: &str) {
+pub(crate) fn install(id: &str) {
     let provider = gtk::CssProvider::new();
     if let Some(display) = gtk::gdk::Display::default() {
         // Above the static stylesheet (APPLICATION) and the scheme-dependent
@@ -153,7 +153,7 @@ pub fn install(id: &str) {
 
 /// Switch to `id` (or [`SYSTEM_ID`] for the stock look) and tell everything
 /// that has colors baked into it.
-pub fn set(id: &str) {
+pub(crate) fn set(id: &str) {
     let changed = CURRENT.with(|c| {
         if *c.borrow() == id {
             return false;
@@ -169,12 +169,12 @@ pub fn set(id: &str) {
 }
 
 /// The active theme's id (`""` before `install`, [`SYSTEM_ID`] for stock).
-pub fn current() -> String {
+fn current() -> String {
     CURRENT.with(|c| c.borrow().clone())
 }
 
 /// The palette on screen for `dark`, or `None` under the stock look.
-pub fn palette(dark: bool) -> Option<&'static Palette> {
+fn palette(dark: bool) -> Option<&'static Palette> {
     find(&current()).map(|t| t.variant(dark))
 }
 
@@ -182,7 +182,7 @@ pub fn palette(dark: bool) -> Option<&'static Palette> {
 /// `false`, which is how a widget that has since been destroyed drops out.
 /// A light/dark flip does *not* call these — listeners for that already
 /// have libadwaita's own `notify::dark`.
-pub fn connect_changed(f: impl Fn() -> bool + 'static) {
+pub(crate) fn connect_changed(f: impl Fn() -> bool + 'static) {
     WATCHERS.with(|w| w.borrow_mut().push(Box::new(f)));
 }
 

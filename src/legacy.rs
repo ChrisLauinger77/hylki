@@ -21,23 +21,23 @@ use std::path::{Path, PathBuf};
 
 /// A name this app went by.
 #[derive(Debug)]
-pub struct Predecessor {
+pub(crate) struct Predecessor {
     /// Its Flatpak / desktop ID.
-    pub app_id: &'static str,
+    pub(crate) app_id: &'static str,
     /// The subdirectory it used under the XDG bases.
-    pub dir: &'static str,
+    dir: &'static str,
     /// Its Secret Service service name.
-    pub keyring_service: &'static str,
+    pub(crate) keyring_service: &'static str,
     /// Its GNOME Files extension file, installed on the host.
-    pub nautilus_file: &'static str,
+    nautilus_file: &'static str,
     /// The marker key in a launcher copy it wrote (see `app_icon`).
-    pub launcher_mark: &'static str,
+    launcher_mark: &'static str,
     /// What to call it.
-    pub name: &'static str,
+    pub(crate) name: &'static str,
 }
 
 /// Newest first, so the most recent data wins when more than one is found.
-pub const PREDECESSORS: &[Predecessor] = &[
+pub(crate) const PREDECESSORS: &[Predecessor] = &[
     Predecessor {
         app_id: "co.hyprlab.Vireo",
         dir: "vireo",
@@ -61,7 +61,7 @@ pub const PREDECESSORS: &[Predecessor] = &[
 static MIGRATED_FROM: std::sync::OnceLock<Option<&'static Predecessor>> =
     std::sync::OnceLock::new();
 
-pub fn migrated_from() -> Option<&'static Predecessor> {
+pub(crate) fn migrated_from() -> Option<&'static Predecessor> {
     MIGRATED_FROM.get().copied().flatten()
 }
 
@@ -81,7 +81,7 @@ fn bases() -> Vec<(&'static str, PathBuf)> {
 /// Bring an earlier install's directories across, once: for each base, the
 /// first predecessor with data there fills in `<base>/hylki` when it does
 /// not exist yet. Runs before anything reads its settings.
-pub fn migrate_dirs() {
+pub(crate) fn migrate_dirs() {
     let mut from: Option<&'static Predecessor> = None;
     let in_flatpak = crate::platform::is_flatpak();
     let home = dirs::home_dir();
@@ -191,7 +191,7 @@ fn predecessor_seen(pred: &Predecessor) -> bool {
 /// * Its per-user launcher copy and icon files (Settings → App icon) go
 ///   once its launch target is gone from a place this process can see,
 ///   so a predecessor still installed keeps the icon it was given.
-pub fn tidy_host() {
+pub(crate) fn tidy_host() {
     tidy_nautilus_extension();
     tidy_launchers();
 }
@@ -283,7 +283,7 @@ fn tidy_launchers() {
 /// The predecessor the desktop still opens `mailto:` links with, if any:
 /// read from the host's `mimeapps.list`. The sandbox cannot change that
 /// setting, so the user is pointed at Settings → Default Apps instead.
-pub fn default_mailer() -> Option<&'static Predecessor> {
+pub(crate) fn default_mailer() -> Option<&'static Predecessor> {
     let mut files = Vec::new();
     if let Some(home) = crate::platform::home() {
         files.push(home.join(".config/mimeapps.list"));
@@ -331,7 +331,7 @@ const OLD_MARKUP_NAMES: &[(&str, &str)] = &[
 /// what they are. Only tags and style sheets are touched: a message that
 /// merely mentions one of the names, such as a diff of this code, keeps its
 /// text.
-pub fn current_markup(html: String) -> String {
+pub(crate) fn current_markup(html: String) -> String {
     if !html.contains("vireo-") {
         return html;
     }

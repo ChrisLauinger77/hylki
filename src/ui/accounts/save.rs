@@ -64,33 +64,7 @@ impl AccountsWindow {
         // (GOA-driven) OAuth mechanism regardless of the Authentication combo.
         let editing_orig = self.editing.and_then(|i| self.accounts.get(i)).cloned();
         if let Some(orig) = &editing_orig {
-            account.enabled = orig.enabled;
-            // The one-time look for Exchange's non-mail folders
-            // (#239) stays done, or a folder brought back here
-            // would be hidden again at the next listing.
-            account.folders_seeded = orig.folders_seeded;
-            account.goa_id = orig.goa_id.clone();
-            account.goa_mail_disabled = orig.goa_mail_disabled;
-            account.goa_enabled_before_mail_disabled = orig.goa_enabled_before_mail_disabled;
-            if orig.goa_id.is_some() {
-                account.oauth = orig.oauth;
-                account.oauth_settings = orig.oauth_settings.clone();
-                // GNOME Online Accounts is the source of truth for these;
-                // Hylki keeps only what it owns (display name, signature,
-                // color, emoji, label).
-                account.email = orig.email.clone();
-                account.protocol = orig.protocol;
-                account.imap_host = orig.imap_host.clone();
-                account.imap_port = orig.imap_port;
-                account.smtp_host = orig.smtp_host.clone();
-                account.smtp_port = orig.smtp_port;
-                account.username = orig.username.clone();
-                account.password = orig.password.clone();
-                account.smtp_separate = orig.smtp_separate;
-                account.smtp_username = orig.smtp_username.clone();
-                account.smtp_password = orig.smtp_password.clone();
-                account.security = orig.security.clone();
-            }
+            keep_from_original(&mut account, orig);
         }
 
         // Only once Microsoft has approved the scopes; an account from
@@ -98,46 +72,10 @@ impl AccountsWindow {
         account.graph_directory &= account.goa_id.is_none() && self.directory_granted;
         account.graph_label_names &= account.goa_id.is_none() && self.labels_granted;
 
-        // Native account: authentication comes from the provider dropdown.
-        let is_oauth = provider_at(widgets.form.provider_row.selected()).is_oauth();
-        if account.goa_id.is_none() {
-            if is_oauth {
-                account.oauth = true;
-                account.oauth_settings = Some(self.oauth_settings_from_form(widgets));
-                if account.username.trim().is_empty() {
-                    account.username = account.email.clone();
-                }
-                // A fresh sign-in supplies a refresh token; otherwise keep
-                // the one already in the keyring (edit without re-signing).
-                if let Some(rt) = self.pending_oauth_refresh.clone() {
-                    account.oauth_refresh = rt;
-                }
-            } else {
-                account.oauth = false;
-                account.oauth_settings = None;
-            }
-        }
+        self.apply_form_auth(&mut account, widgets);
 
         // Validation.
-        let oauth_ready = if account.oauth && account.goa_id.is_none() {
-            let has_client = account
-                .oauth_settings
-                .as_ref()
-                .is_some_and(|s| !s.client_id.trim().is_empty());
-            let signed_in = self.pending_oauth_refresh.is_some()
-                || editing_orig.as_ref().is_some_and(|o| o.oauth);
-            if !has_client || !signed_in {
-                widgets.form.oauth_status.set_visible(true);
-                widgets.form.oauth_status.set_css_classes(&["error"]);
-                widgets
-                    .form
-                    .oauth_status
-                    .set_label(&i18n("Enter a client ID and sign in before saving"));
-            }
-            has_client && signed_in
-        } else {
-            true
-        };
+        let oauth_ready = self.check_oauth_ready(&account, editing_orig.as_ref(), widgets);
         // Saved before the keyring answered, or with the field left
         // as it was: the stored secrets stand. Not read yet, they
         // are waited for, and Save runs again once they are here.
@@ -186,6 +124,57 @@ impl AccountsWindow {
             account: Box::new(account),
         });
         widgets.nav.pop();
+    }
+
+    /// Native account: authentication comes from the provider dropdown.
+    fn apply_form_auth(&self, account: &mut AccountConfig, widgets: &AccountsWindowWidgets) {
+        let is_oauth = provider_at(widgets.form.provider_row.selected()).is_oauth();
+        if account.goa_id.is_none() {
+            if is_oauth {
+                account.oauth = true;
+                account.oauth_settings = Some(self.oauth_settings_from_form(widgets));
+                if account.username.trim().is_empty() {
+                    account.username = account.email.clone();
+                }
+                // A fresh sign-in supplies a refresh token; otherwise keep
+                // the one already in the keyring (edit without re-signing).
+                if let Some(rt) = self.pending_oauth_refresh.clone() {
+                    account.oauth_refresh = rt;
+                }
+            } else {
+                account.oauth = false;
+                account.oauth_settings = None;
+            }
+        }
+    }
+
+    /// Whether a native OAuth account can be saved: it has a client ID and
+    /// a sign-in (a fresh one, or the edited account's). When not, the form
+    /// says so.
+    fn check_oauth_ready(
+        &self,
+        account: &AccountConfig,
+        editing_orig: Option<&AccountConfig>,
+        widgets: &AccountsWindowWidgets,
+    ) -> bool {
+        if !(account.oauth && account.goa_id.is_none()) {
+            return true;
+        }
+        let has_client = account
+            .oauth_settings
+            .as_ref()
+            .is_some_and(|s| !s.client_id.trim().is_empty());
+        let signed_in =
+            self.pending_oauth_refresh.is_some() || editing_orig.is_some_and(|o| o.oauth);
+        if !has_client || !signed_in {
+            widgets.form.oauth_status.set_visible(true);
+            widgets.form.oauth_status.set_css_classes(&["error"]);
+            widgets
+                .form
+                .oauth_status
+                .set_label(&i18n("Enter a client ID and sign in before saving"));
+        }
+        has_client && signed_in
     }
 
     pub(super) fn on_remove_current(&mut self, sender: ComponentSender<Self>, root: &adw::Bin) {
@@ -244,5 +233,38 @@ impl AccountsWindow {
             }
         }
         widgets.nav.pop();
+    }
+}
+
+/// What an edit keeps from the account as it was: whether it is on, the
+/// one-time folder look, its GNOME Online Accounts link, and for an
+/// account from GNOME Online Accounts everything GNOME owns.
+fn keep_from_original(account: &mut AccountConfig, orig: &AccountConfig) {
+    account.enabled = orig.enabled;
+    // The one-time look for Exchange's non-mail folders
+    // (#239) stays done, or a folder brought back here
+    // would be hidden again at the next listing.
+    account.folders_seeded = orig.folders_seeded;
+    account.goa_id = orig.goa_id.clone();
+    account.goa_mail_disabled = orig.goa_mail_disabled;
+    account.goa_enabled_before_mail_disabled = orig.goa_enabled_before_mail_disabled;
+    if orig.goa_id.is_some() {
+        account.oauth = orig.oauth;
+        account.oauth_settings = orig.oauth_settings.clone();
+        // GNOME Online Accounts is the source of truth for these;
+        // Hylki keeps only what it owns (display name, signature,
+        // color, emoji, label).
+        account.email = orig.email.clone();
+        account.protocol = orig.protocol;
+        account.imap_host = orig.imap_host.clone();
+        account.imap_port = orig.imap_port;
+        account.smtp_host = orig.smtp_host.clone();
+        account.smtp_port = orig.smtp_port;
+        account.username = orig.username.clone();
+        account.password = orig.password.clone();
+        account.smtp_separate = orig.smtp_separate;
+        account.smtp_username = orig.smtp_username.clone();
+        account.smtp_password = orig.smtp_password.clone();
+        account.security = orig.security.clone();
     }
 }

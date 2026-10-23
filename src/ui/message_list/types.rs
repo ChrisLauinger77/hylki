@@ -12,7 +12,7 @@ use relm4::prelude::*;
 
 /// A bulk action applied to every selected message at once.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BulkAction {
+pub(crate) enum BulkAction {
     MarkRead,
     MarkUnread,
     Flag,
@@ -31,7 +31,7 @@ pub enum BulkAction {
 }
 
 #[derive(Debug)]
-pub enum MessageListInput {
+pub(crate) enum MessageListInput {
     /// The header's quick filters (#97, #441), with your contacts'
     /// addresses when "From Contacts" is among them.
     SetQuickFilters {
@@ -278,7 +278,7 @@ pub enum MessageListInput {
     /// the header button while open.
     CloseSearch,
     /// Showcase staging: open row N's actions palette (screenshot hook only —
-    /// see HYLKI_SHOWCASE_PALETTE in app.rs).
+    /// see HYLKI_SHOWCASE_PALETTE in app/showcase/list.rs).
     DebugOpenPalette(usize),
     /// Showcase only (HYLKI_SHOWCASE_SWIPE): drive row `index` through a full
     /// swipe and release, so the commit exit can be caught in stills — there
@@ -320,7 +320,6 @@ pub enum MessageListInput {
         forwarded: bool,
         on: bool,
     },
-    /// A message's keywords changed (a tag put on or taken off, #71).
     /// A message's keywords and Gmail labels changed (a tag put on or
     /// taken off, #374).
     SetKeywords {
@@ -336,7 +335,6 @@ pub enum MessageListInput {
         keyword: String,
         add: bool,
     },
-    /// Update a message's attachment indicator (e.g. clearing a false paperclip).
     /// A message's paperclip, found by where it lives: its own folder and
     /// UID, since a UID is unique only within its folder.
     SetHasAttachment {
@@ -415,13 +413,10 @@ pub enum MessageListInput {
 }
 
 #[derive(Debug)]
-pub enum MessageListOutput {
+pub(crate) enum MessageListOutput {
     /// The view the app asked to be shown as kept was not: send its
     /// messages.
     ViewMissed,
-    /// A message was selected. `thread` holds the whole conversation (newest
-    /// first) when the newest/head row was chosen, so the reader can show it as a
-    /// scrollable conversation; otherwise it's just `[message]`.
     /// A message was opened. `thread` is the conversation to render (just
     /// `message` when it is not one). `solo` marks the deliberate case: the user
     /// picked one reply *inside* a conversation shown in the list, and wants
@@ -439,7 +434,7 @@ pub enum MessageListOutput {
     /// Gmail's o or Enter opened a row (#392); `already_open` when it was
     /// the one already in the reader, so no new selection follows.
     OpenedByKey { already_open: bool },
-    /// The header-bar count changed — app.rs shows it.
+    /// The header-bar count changed — app/list_header.rs shows it.
     CountChanged(String),
     /// A row was double-clicked: open it in its own window. `thread` is the
     /// whole conversation when the row heads one (same shape as `Selected`),
@@ -531,14 +526,14 @@ pub enum MessageListOutput {
 /// the row the arrow reached, even when the app has not heard of it yet
 /// (#416).
 #[derive(Clone)]
-pub struct SelectionProbe {
+pub(crate) struct SelectionProbe {
     pub(super) selection: gtk::MultiSelection,
     pub(super) model: crate::ui::message_row::MessageModel,
 }
 
 impl SelectionProbe {
     /// Where each selected row's message sits, in list order.
-    pub fn slots(&self) -> Vec<Slot> {
+    pub(crate) fn slots(&self) -> Vec<Slot> {
         let set = self.selection.selection();
         let Some((iter, first)) = gtk::BitsetIter::init_first(&set) else {
             return Vec::new();

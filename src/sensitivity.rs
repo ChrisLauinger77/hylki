@@ -13,21 +13,21 @@ use crate::mail_header::unfold;
 
 /// The label a message carries.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct SensitivityLabel {
+pub(crate) struct SensitivityLabel {
     /// The name the organization gave it, as written in the header, or for
     /// the older header its value (`personal`, `private`,
     /// `company-confidential`). Empty when Purview left the name out.
-    pub name: String,
+    pub(crate) name: String,
     /// The Purview label's id; empty for the older header.
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub id: String,
+    pub(crate) id: String,
     /// The label's color as `#rrggbb`, and what the organization says it
     /// means: both from its list of labels (`graph_labels`), empty when
     /// that was not read.
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub color: String,
+    pub(crate) color: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub tooltip: String,
+    pub(crate) tooltip: String,
 }
 
 impl SensitivityLabel {
@@ -36,7 +36,7 @@ impl SensitivityLabel {
     }
 
     /// The pill's text.
-    pub fn short_label(&self) -> String {
+    pub(crate) fn short_label(&self) -> String {
         if self.purview() {
             return if self.name.is_empty() {
                 i18n("Labeled")
@@ -53,7 +53,7 @@ impl SensitivityLabel {
 
     /// The pill's tooltip: where the label comes from, and that nothing is
     /// enforced here.
-    pub fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         if !self.purview() {
             return i18n_f(
                 "The sender marked this message “{label}”.",
@@ -77,7 +77,7 @@ impl SensitivityLabel {
 }
 
 /// The label in a parsed message's top-level headers, if it has one.
-pub fn detect(parsed: &mail_parser::Message) -> Option<SensitivityLabel> {
+pub(crate) fn detect(parsed: &mail_parser::Message) -> Option<SensitivityLabel> {
     let raw = parsed.raw_message();
     let value = |name: &str| -> Option<String> {
         parsed

@@ -9,7 +9,7 @@ use super::CloudAccount;
 
 /// The piece size for an account behind Cloudflare: under the proxy's
 /// 100 MB request limit with room for the multipart framing.
-pub const CLOUDFLARE_CHUNK: u64 = 90 * 1000 * 1000;
+pub(super) const CLOUDFLARE_CHUNK: u64 = 90 * 1000 * 1000;
 
 /// The byte ranges an upload of `size` goes in, `chunk` at a time:
 /// (offset, length), the last one shorter. A zero-byte file is one

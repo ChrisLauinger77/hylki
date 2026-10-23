@@ -15,7 +15,7 @@ use relm4::prelude::*;
 
 impl Row {
     /// Fill the widgets from the bound message and the list's look.
-    pub fn refresh(&self) {
+    pub(crate) fn refresh(&self) {
         let Some(shared) = self.shared() else { return };
         let Some(data) = self.data() else { return };
         let look = shared.look.borrow().clone();
@@ -501,7 +501,6 @@ impl Row {
         }
     }
 
-    /// Show this many preview lines in place (Focus Mode).
     /// Lay the row's widgets out on one line or as the three-line card
     /// (#334). They are moved, not copied, and only when the layout
     /// changes: a row is recycled across messages but rarely across layouts.
@@ -599,7 +598,8 @@ impl Row {
         w.line.set_visible(columns.is_some());
     }
 
-    pub fn set_preview_lines(&self, lines: u32) {
+    /// Show this many preview lines in place (Focus Mode).
+    pub(crate) fn set_preview_lines(&self, lines: u32) {
         let lines = lines.clamp(1, 3);
         self.w.preview.set_wrap(lines > 1);
         self.w.preview.set_lines(lines as i32);

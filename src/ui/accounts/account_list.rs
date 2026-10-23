@@ -50,23 +50,6 @@ impl AccountsWindow {
         // and neither read as a column.
         let mark_widths = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
         let badge_widths = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
-        // A slot keeps its child at its natural size and centred; the size
-        // group holds the slot, not the child, so a logo is never stretched
-        // and a badge's pill still hugs its text.
-        let slot = |child: &gtk::Widget, group: &gtk::SizeGroup| {
-            let slot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-            slot.set_valign(gtk::Align::Center);
-            child.set_halign(gtk::Align::Center);
-            child.set_hexpand(true);
-            slot.append(child);
-            // The child expands to fill the slot so it lands centred — but an
-            // expanding child makes its parent expand too, and an expanding
-            // slot would take a share of the row's spare width and defeat the
-            // whole point. Pin the slot's own answer to "no".
-            slot.set_hexpand(false);
-            group.add_widget(&slot);
-            slot
-        };
         for (pos, acc) in self.accounts.iter().enumerate() {
             let row = gtk::ListBoxRow::new();
             row.set_activatable(true);
@@ -78,136 +61,21 @@ impl AccountsWindow {
             handle.add_css_class("dim-label");
             hbox.append(&handle);
 
-            // The account's circle, as the sidebar draws it: its color (or
-            // the palette accent it would get), and its picture, emoji or
-            // initials — the label first, then the name, then the address.
-            let account_id = pos as u32 + 1;
-            let color = acc
-                .color
-                .clone()
-                .unwrap_or_else(|| crate::worker::accent_for(account_id).to_string());
-            // Ringed as in the sidebar, a pixel off the disc.
-            css.push_str(&format!(
-                ".acct-list-color-{account_id} {{ background-color: {color}; \
-                 outline: 2px solid {color}; outline-offset: 1px; }}\n"
-            ));
-            let circle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-            circle.add_css_class("account-circle");
-            circle.add_css_class(&format!("acct-list-color-{account_id}"));
-            circle.set_valign(gtk::Align::Center);
-            circle.set_halign(gtk::Align::Center);
-            circle.set_hexpand(false);
-            circle.set_size_request(30, 30);
-            let shown = match acc.label.as_deref().map(str::trim) {
-                Some(l) if !l.is_empty() && l != acc.email => l.to_string(),
-                _ => display_name(acc),
-            };
-            let picture = acc
-                .avatar
-                .as_deref()
-                .and_then(crate::config::avatar_path)
-                .filter(|p| p.exists());
-            // The Gravatar this address asked for and has (#189) comes first,
-            // as in the sidebar circle and the editor preview.
-            let gravatar = acc
-                .gravatar
-                .then(|| crate::avatar::own_gravatar(&acc.email))
-                .flatten();
-            let glyph: gtk::Widget = match (&gravatar, &picture, acc.emoji.as_deref()) {
-                (Some(texture), ..) => {
-                    circle.set_overflow(gtk::Overflow::Hidden);
-                    crate::ui::initials::picture_from_texture(texture, 30).upcast()
-                }
-                (None, Some(path), _) => {
-                    circle.set_overflow(gtk::Overflow::Hidden);
-                    crate::ui::initials::avatar_picture(path, 30).upcast()
-                }
-                (None, None, Some(em)) if !em.is_empty() => {
-                    crate::ui::initials::glyph_picture(em, &color, 0.55, 30).upcast()
-                }
-                _ => crate::ui::initials::glyph_picture(
-                    &crate::ui::sidebar::account_initials(&shown, &acc.email),
-                    &color,
-                    0.47,
-                    30,
-                )
-                .upcast(),
-            };
-            circle.append(&glyph);
-            hbox.append(&circle);
+            hbox.append(&account_circle(acc, pos as u32 + 1, &mut css));
 
-            let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
-            vbox.set_hexpand(true);
-            vbox.set_valign(gtk::Align::Center);
-            // The nickname, as the sidebar names the account, over the
-            // address. With no nickname the address is the first line, and
-            // the second carries the sender name instead of repeating it,
-            // or nothing when there is no name either.
-            let title = acc.display_label();
-            let second = if title == acc.email {
-                acc.name.trim().to_string()
-            } else {
-                acc.email.clone()
-            };
-            let name = gtk::Label::new(Some(&title));
-            name.set_halign(gtk::Align::Start);
-            name.set_ellipsize(gtk::pango::EllipsizeMode::End);
-            name.add_css_class("account-name");
-            let email = gtk::Label::new(Some(&second));
-            email.set_halign(gtk::Align::Start);
-            email.set_ellipsize(gtk::pango::EllipsizeMode::End);
-            email.add_css_class("account-email");
-            email.set_visible(!second.is_empty());
-            vbox.append(&name);
-            vbox.append(&email);
-            hbox.append(&vbox);
+            hbox.append(&account_titles(acc));
 
             // The provider's mark, right of the name and address, named on
             // hover.
             let brand = brand_for_account(acc);
             let mark = crate::brand::mark(brand, 24, crate::brand::GENERIC_MAIL);
             mark.set_tooltip_text(Some(&provider_name(brand, acc)));
-            hbox.append(&slot(mark.upcast_ref(), &mark_widths));
+            hbox.append(&size_slot(mark.upcast_ref(), &mark_widths));
 
-            // Source badge: is this account from GNOME Online Accounts, or added
-            // directly in Hylki?
-            let from_goa = acc.goa_id.is_some();
-            let badge = gtk::Label::new(Some(
-                if from_goa { i18n("GOA") } else { i18n("Hylki") }.as_str(),
-            ));
-            badge.set_valign(gtk::Align::Center);
-            badge.add_css_class("account-source-badge");
-            if from_goa {
-                badge.add_css_class("goa");
-                badge.set_tooltip_text(Some(i18n("Imported GNOME Online Account").as_str()));
-            } else {
-                badge.set_tooltip_text(Some(i18n("Added directly in Hylki").as_str()));
-            }
-            hbox.append(&slot(badge.upcast_ref(), &badge_widths));
+            let badge = source_badge(acc);
+            hbox.append(&size_slot(badge.upcast_ref(), &badge_widths));
 
-            // Enable/disable toggle. Disabled accounts stay configured but don't
-            // sync or appear in the sidebar.
-            let toggle = gtk::Switch::new();
-            toggle.set_valign(gtk::Align::Center);
-            if acc.goa_mail_disabled {
-                toggle.set_tooltip_text(Some(&i18n(
-                    "Paused: Mail is switched off for this account in GNOME Settings",
-                )));
-                toggle.set_sensitive(false);
-            } else {
-                toggle.set_tooltip_text(Some(i18n("Enable this account").as_str()));
-            }
-            toggle.set_active(acc.enabled);
-            let ti = sender.input_sender().clone();
-            let tpos = pos;
-            toggle.connect_state_set(move |_, state| {
-                let _ = ti.send(AccountsInput::ToggleEnabled {
-                    index: tpos,
-                    enabled: state,
-                });
-                gtk::glib::Propagation::Proceed
-            });
-            hbox.append(&toggle);
+            hbox.append(&enable_switch(acc, pos, sender));
 
             let next = gtk::Image::from_icon_name("go-next-symbolic");
             next.add_css_class("dim-label");
@@ -215,30 +83,7 @@ impl AccountsWindow {
 
             row.set_child(Some(&hbox));
 
-            // Drag to reorder.
-            let drag = gtk::DragSource::new();
-            drag.set_actions(gtk::gdk::DragAction::MOVE);
-            let from = pos as u32;
-            drag.connect_prepare(move |_, _, _| {
-                Some(gtk::gdk::ContentProvider::for_value(&from.to_value()))
-            });
-            row.add_controller(drag);
-
-            let drop = gtk::DropTarget::new(gtk::glib::Type::U32, gtk::gdk::DragAction::MOVE);
-            let to = pos;
-            let input = sender.input_sender().clone();
-            drop.connect_drop(move |_, value, _, _| {
-                if let Ok(from) = value.get::<u32>() {
-                    let _ = input.send(AccountsInput::MoveRow {
-                        from: from as usize,
-                        to,
-                    });
-                    true
-                } else {
-                    false
-                }
-            });
-            row.add_controller(drop);
+            add_reorder(&row, pos, sender);
 
             list.append(&row);
         }
@@ -409,6 +254,187 @@ impl AccountsWindow {
         self.rebuild_goa_list(&widgets.accounts.goa_list, &sender);
         widgets.accounts.goa_group.set_visible(!self.goa.is_empty());
     }
+}
+
+/// A slot keeps its child at its natural size and centred; the size group
+/// holds the slot, not the child, so a logo is never stretched and a
+/// badge's pill still hugs its text.
+fn size_slot(child: &gtk::Widget, group: &gtk::SizeGroup) -> gtk::Box {
+    let slot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    slot.set_valign(gtk::Align::Center);
+    child.set_halign(gtk::Align::Center);
+    child.set_hexpand(true);
+    slot.append(child);
+    // The child expands to fill the slot so it lands centred — but an
+    // expanding child makes its parent expand too, and an expanding
+    // slot would take a share of the row's spare width and defeat the
+    // whole point. Pin the slot's own answer to "no".
+    slot.set_hexpand(false);
+    group.add_widget(&slot);
+    slot
+}
+
+/// The account's circle, as the sidebar draws it: its color (or the
+/// palette accent it would get), and its picture, emoji or initials — the
+/// label first, then the name, then the address. Its color rule goes into
+/// `css`.
+fn account_circle(acc: &AccountConfig, account_id: u32, css: &mut String) -> gtk::Box {
+    let color = acc
+        .color
+        .clone()
+        .unwrap_or_else(|| crate::worker::accent_for(account_id).to_string());
+    // Ringed as in the sidebar, a pixel off the disc.
+    css.push_str(&format!(
+        ".acct-list-color-{account_id} {{ background-color: {color}; \
+         outline: 2px solid {color}; outline-offset: 1px; }}\n"
+    ));
+    let circle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    circle.add_css_class("account-circle");
+    circle.add_css_class(&format!("acct-list-color-{account_id}"));
+    circle.set_valign(gtk::Align::Center);
+    circle.set_halign(gtk::Align::Center);
+    circle.set_hexpand(false);
+    circle.set_size_request(30, 30);
+    let shown = match acc.label.as_deref().map(str::trim) {
+        Some(l) if !l.is_empty() && l != acc.email => l.to_string(),
+        _ => display_name(acc),
+    };
+    let picture = acc
+        .avatar
+        .as_deref()
+        .and_then(crate::config::avatar_path)
+        .filter(|p| p.exists());
+    // The Gravatar this address asked for and has (#189) comes first,
+    // as in the sidebar circle and the editor preview.
+    let gravatar = acc
+        .gravatar
+        .then(|| crate::avatar::own_gravatar(&acc.email))
+        .flatten();
+    let glyph: gtk::Widget = match (&gravatar, &picture, acc.emoji.as_deref()) {
+        (Some(texture), ..) => {
+            circle.set_overflow(gtk::Overflow::Hidden);
+            crate::ui::initials::picture_from_texture(texture, 30).upcast()
+        }
+        (None, Some(path), _) => {
+            circle.set_overflow(gtk::Overflow::Hidden);
+            crate::ui::initials::avatar_picture(path, 30).upcast()
+        }
+        (None, None, Some(em)) if !em.is_empty() => {
+            crate::ui::initials::glyph_picture(em, &color, 0.55, 30).upcast()
+        }
+        _ => crate::ui::initials::glyph_picture(
+            &crate::ui::sidebar::account_initials(&shown, &acc.email),
+            &color,
+            0.47,
+            30,
+        )
+        .upcast(),
+    };
+    circle.append(&glyph);
+    circle
+}
+
+/// The nickname, as the sidebar names the account, over the address. With
+/// no nickname the address is the first line, and the second carries the
+/// sender name instead of repeating it, or nothing when there is no name
+/// either.
+fn account_titles(acc: &AccountConfig) -> gtk::Box {
+    let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    vbox.set_hexpand(true);
+    vbox.set_valign(gtk::Align::Center);
+    let title = acc.display_label();
+    let second = if title == acc.email {
+        acc.name.trim().to_string()
+    } else {
+        acc.email.clone()
+    };
+    let name = gtk::Label::new(Some(&title));
+    name.set_halign(gtk::Align::Start);
+    name.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    name.add_css_class("account-name");
+    let email = gtk::Label::new(Some(&second));
+    email.set_halign(gtk::Align::Start);
+    email.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    email.add_css_class("account-email");
+    email.set_visible(!second.is_empty());
+    vbox.append(&name);
+    vbox.append(&email);
+    vbox
+}
+
+/// Source badge: is this account from GNOME Online Accounts, or added
+/// directly in Hylki?
+fn source_badge(acc: &AccountConfig) -> gtk::Label {
+    let from_goa = acc.goa_id.is_some();
+    let badge = gtk::Label::new(Some(
+        if from_goa { i18n("GOA") } else { i18n("Hylki") }.as_str(),
+    ));
+    badge.set_valign(gtk::Align::Center);
+    badge.add_css_class("account-source-badge");
+    if from_goa {
+        badge.add_css_class("goa");
+        badge.set_tooltip_text(Some(i18n("Imported GNOME Online Account").as_str()));
+    } else {
+        badge.set_tooltip_text(Some(i18n("Added directly in Hylki").as_str()));
+    }
+    badge
+}
+
+/// Enable/disable toggle. Disabled accounts stay configured but don't sync
+/// or appear in the sidebar.
+fn enable_switch(
+    acc: &AccountConfig,
+    pos: usize,
+    sender: &ComponentSender<AccountsWindow>,
+) -> gtk::Switch {
+    let toggle = gtk::Switch::new();
+    toggle.set_valign(gtk::Align::Center);
+    if acc.goa_mail_disabled {
+        toggle.set_tooltip_text(Some(&i18n(
+            "Paused: Mail is switched off for this account in GNOME Settings",
+        )));
+        toggle.set_sensitive(false);
+    } else {
+        toggle.set_tooltip_text(Some(i18n("Enable this account").as_str()));
+    }
+    toggle.set_active(acc.enabled);
+    let ti = sender.input_sender().clone();
+    let tpos = pos;
+    toggle.connect_state_set(move |_, state| {
+        let _ = ti.send(AccountsInput::ToggleEnabled {
+            index: tpos,
+            enabled: state,
+        });
+        gtk::glib::Propagation::Proceed
+    });
+    toggle
+}
+
+/// Drag a row to reorder the accounts.
+fn add_reorder(row: &gtk::ListBoxRow, pos: usize, sender: &ComponentSender<AccountsWindow>) {
+    let drag = gtk::DragSource::new();
+    drag.set_actions(gtk::gdk::DragAction::MOVE);
+    let from = pos as u32;
+    drag.connect_prepare(move |_, _, _| {
+        Some(gtk::gdk::ContentProvider::for_value(&from.to_value()))
+    });
+    row.add_controller(drag);
+
+    let drop = gtk::DropTarget::new(gtk::glib::Type::U32, gtk::gdk::DragAction::MOVE);
+    let to = pos;
+    let input = sender.input_sender().clone();
+    drop.connect_drop(move |_, value, _, _| {
+        if let Ok(from) = value.get::<u32>() {
+            let _ = input.send(AccountsInput::MoveRow {
+                from: from as usize,
+                to,
+            });
+            true
+        } else {
+            false
+        }
+    });
+    row.add_controller(drop);
 }
 
 #[cfg(test)]

@@ -15,8 +15,6 @@ use super::widgets::{
 use super::*;
 
 impl Sidebar {
-    /// Re-apply the current selection after a rebuild; on first populate (no
-    /// prior selection) default to the unified row if shown, else the first folder.
     /// One row of the unified section — All Inboxes, Starred / Sent /
     /// Drafts, Filtered Folders or Tags — with its expandable list beneath:
     /// the header row selects the merged view, the caret opens the list

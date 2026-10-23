@@ -97,7 +97,7 @@ enum Method {
 }
 
 /// Check whether a raw RFC 822 message's From: address was forged.
-pub fn check_sender(raw: &[u8]) -> SenderCheck {
+pub(crate) fn check_sender(raw: &[u8]) -> SenderCheck {
     let evidence = gather(raw);
     judge(&evidence)
 }

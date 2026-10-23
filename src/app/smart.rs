@@ -23,10 +23,10 @@ pub(super) const SMART_VIEW_LIMIT: usize = 5000;
 /// on the main thread and taken to the one that reads the index.
 struct SmartContext {
     /// The tags' keywords, lower case.
-    pub(super) tags: Vec<String>,
+    tags: Vec<String>,
     /// The tags themselves, for the Gmail labels that stand for them (#374).
-    pub(super) tag_list: Vec<config::Tag>,
-    pub(super) contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
+    tag_list: Vec<config::Tag>,
+    contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
 }
 
 impl SmartContext {

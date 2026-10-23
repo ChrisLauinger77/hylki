@@ -324,7 +324,16 @@ impl AppModel {
     /// raise + open a specific message (new-mail alerts). Registered here rather
     /// than in `notify` because opening a message needs the app's channel.
     pub(super) fn install_notification_actions(&self, sender: &ComponentSender<Self>) {
-        use gtk::prelude::*;
+        self.install_present_actions(sender);
+        let ty = &*<(u32, u32, u32)>::static_variant_type();
+        self.install_open_message_action(sender, ty);
+        install_quiet_message_actions(sender, ty);
+        self.install_windowed_message_actions(sender, ty);
+    }
+
+    /// Present (a click on an alert) and the "message ready" alerts'
+    /// own present, which raises the composer too.
+    fn install_present_actions(&self, sender: &ComponentSender<Self>) {
         let app = relm4::main_application();
         let present = gtk::gio::SimpleAction::new(crate::notify::PRESENT_ACTION, None);
         let win = self.window.clone();
@@ -353,8 +362,15 @@ impl AppModel {
                 fsender.input(AppMsg::WindowInFront);
             }
         });
+    }
 
-        let ty = gtk::glib::VariantTy::new("(uuu)").unwrap();
+    /// A click on a new-mail alert: the window comes up on that message.
+    fn install_open_message_action(
+        &self,
+        sender: &ComponentSender<Self>,
+        ty: &gtk::glib::VariantTy,
+    ) {
+        let app = relm4::main_application();
         let open = gtk::gio::SimpleAction::new(crate::notify::OPEN_MESSAGE_ACTION, Some(ty));
         let win = self.window.clone();
         let osender = sender.clone();
@@ -371,57 +387,15 @@ impl AppModel {
             }
         });
         app.add_action(&open);
+    }
 
-        // Notification buttons (#38): act on the message where it lies,
-        // without presenting the window — that's their point.
-        for (name, mk) in [
-            (
-                crate::notify::MARK_READ_ACTION,
-                (&|account_id, folder_id, message_id| AppMsg::NotificationMarkRead {
-                    account_id,
-                    folder_id,
-                    message_id,
-                }) as &dyn Fn(u32, u32, u32) -> AppMsg,
-            ),
-            (
-                crate::notify::ARCHIVE_ACTION,
-                &|account_id, folder_id, message_id| AppMsg::NotificationArchive {
-                    account_id,
-                    folder_id,
-                    message_id,
-                },
-            ),
-            (
-                crate::notify::DELETE_ACTION,
-                &|account_id, folder_id, message_id| AppMsg::NotificationDelete {
-                    account_id,
-                    folder_id,
-                    message_id,
-                },
-            ),
-            (
-                crate::notify::SPAM_ACTION,
-                &|account_id, folder_id, message_id| AppMsg::NotificationSpam {
-                    account_id,
-                    folder_id,
-                    message_id,
-                },
-            ),
-        ] {
-            let act = gtk::gio::SimpleAction::new(name, Some(ty));
-            let asender = sender.clone();
-            act.connect_activate(move |_, param| {
-                // No window will spend the shell's launch token, so
-                // end the launch here, or the busy pointer stays up.
-                crate::startup::complete();
-                if let Some((account_id, folder_id, message_id)) =
-                    param.and_then(|v| v.get::<(u32, u32, u32)>())
-                {
-                    asender.input(mk(account_id, folder_id, message_id));
-                }
-            });
-            app.add_action(&act);
-        }
+    /// The alert buttons that need the window: Reply and Forward.
+    fn install_windowed_message_actions(
+        &self,
+        sender: &ComponentSender<Self>,
+        ty: &gtk::glib::VariantTy,
+    ) {
+        let app = relm4::main_application();
         // Reply and Forward (#244) need the window: the message opens
         // as a click on the notification would open it, and the
         // composer follows once its body is in.
@@ -470,5 +444,60 @@ impl AppModel {
         for a in &self.accounts {
             crate::notify::withdraw_mail(a.id);
         }
+    }
+}
+
+/// The alert buttons that act on the message where it lies.
+fn install_quiet_message_actions(sender: &ComponentSender<AppModel>, ty: &gtk::glib::VariantTy) {
+    let app = relm4::main_application();
+    // Notification buttons (#38): act on the message where it lies,
+    // without presenting the window — that's their point.
+    for (name, mk) in [
+        (
+            crate::notify::MARK_READ_ACTION,
+            (&|account_id, folder_id, message_id| AppMsg::NotificationMarkRead {
+                account_id,
+                folder_id,
+                message_id,
+            }) as &dyn Fn(u32, u32, u32) -> AppMsg,
+        ),
+        (
+            crate::notify::ARCHIVE_ACTION,
+            &|account_id, folder_id, message_id| AppMsg::NotificationArchive {
+                account_id,
+                folder_id,
+                message_id,
+            },
+        ),
+        (
+            crate::notify::DELETE_ACTION,
+            &|account_id, folder_id, message_id| AppMsg::NotificationDelete {
+                account_id,
+                folder_id,
+                message_id,
+            },
+        ),
+        (
+            crate::notify::SPAM_ACTION,
+            &|account_id, folder_id, message_id| AppMsg::NotificationSpam {
+                account_id,
+                folder_id,
+                message_id,
+            },
+        ),
+    ] {
+        let act = gtk::gio::SimpleAction::new(name, Some(ty));
+        let asender = sender.clone();
+        act.connect_activate(move |_, param| {
+            // No window will spend the shell's launch token, so
+            // end the launch here, or the busy pointer stays up.
+            crate::startup::complete();
+            if let Some((account_id, folder_id, message_id)) =
+                param.and_then(|v| v.get::<(u32, u32, u32)>())
+            {
+                asender.input(mk(account_id, folder_id, message_id));
+            }
+        });
+        app.add_action(&act);
     }
 }

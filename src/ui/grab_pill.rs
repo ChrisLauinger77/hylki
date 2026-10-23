@@ -16,7 +16,7 @@ use gtk::prelude::*;
 /// The pointer is tracked in ROOT coordinates: the pill rides a pane the drag
 /// itself resizes, so pill-local offsets would feed back into the resize and
 /// jitter (the console grip's trick).
-pub fn paned_grab_pill(
+pub(crate) fn paned_grab_pill(
     paned: &gtk::Paned,
     clamp: impl Fn(&gtk::Paned, i32) -> i32 + 'static,
 ) -> gtk::Box {
@@ -39,7 +39,7 @@ pub fn paned_grab_pill(
 /// visible bar is only 5px tall, far too small a target to press and release
 /// reliably, so the gestures live on the zone (the iOS home indicator does
 /// the same).
-pub fn pill_widget() -> gtk::Box {
+fn pill_widget() -> gtk::Box {
     let hit = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     hit.add_css_class("split-grab-hit");
     hit.set_size_request(120, 20);
@@ -56,7 +56,7 @@ pub fn pill_widget() -> gtk::Box {
 /// The pill stretched into a full-width edge zone: the bar stays centred,
 /// but the gestures answer anywhere along the pane's edge — the attachment
 /// drawer's whole seam clicks and drags, not just the bar.
-pub fn edge_pill_widget() -> gtk::Box {
+pub(super) fn edge_pill_widget() -> gtk::Box {
     let hit = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     hit.add_css_class("split-grab-hit");
     hit.set_height_request(24);
@@ -87,7 +87,7 @@ const DRAG_SLOP: i32 = 4;
 /// plus the pointer's travel) — the host decides what to do with it. Updates
 /// only start once the pointer has travelled past [`DRAG_SLOP`]; from then on
 /// they flow continuously, back inside the slop included.
-pub fn attach_drag(
+pub(super) fn attach_drag(
     pill: &gtk::Box,
     paned: &gtk::Paned,
     on_begin: impl Fn(i32) + 'static,

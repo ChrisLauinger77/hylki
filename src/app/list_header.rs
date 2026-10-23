@@ -25,8 +25,8 @@ const LIST_WIDE_OFF: i32 = 560;
 pub(super) struct ListHeaderWidgets {
     pub(super) revealers: Vec<gtk::Revealer>,
     pub(super) overflow: gtk::Revealer,
-    pub(super) filter: SortFilterPopover,
-    pub(super) sort: gtk::gio::SimpleAction,
+    filter: SortFilterPopover,
+    sort: gtk::gio::SimpleAction,
 }
 
 /// The orders the list header offers, by their keys in `SortOrder`. The
@@ -42,10 +42,10 @@ const SORT_ORDERS: [(&str, &str); 6] = [
 
 /// The list header's sort and filter button (#441): the sort orders in one
 /// column of its popover, the quick filters in the other.
-pub(super) struct SortFilterPopover {
-    pub(super) button: gtk::MenuButton,
-    pub(super) filters: Vec<(QuickFilter, gtk::CheckButton)>,
-    pub(super) clear: gtk::Button,
+struct SortFilterPopover {
+    button: gtk::MenuButton,
+    filters: Vec<(QuickFilter, gtk::CheckButton)>,
+    clear: gtk::Button,
 }
 
 impl SortFilterPopover {

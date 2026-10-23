@@ -20,8 +20,8 @@ pub(super) struct Line {
     /// nobody and cannot be selected. Moves when a contact before it is
     /// deleted.
     pub(super) idx: Cell<Option<usize>>,
-    pub(super) title: String,
-    pub(super) subtitle: String,
+    title: String,
+    subtitle: String,
     pub(super) kind: LineKind,
 }
 
@@ -277,8 +277,6 @@ impl ListRow {
     }
 }
 
-/// The list view's rows: made for the lines on screen and bound to each
-/// line scrolled to.
 /// What a contact row carries when dragged to the sidebar: the book and
 /// UID of each contact by its index (`None` for a group, or a card EDS
 /// has not named), and the indexes selected together, which go as one.
@@ -308,7 +306,7 @@ impl DragKeys {
 
 /// The contacts in a drag's text, by book and UID; `None` when it is not
 /// a drag of contacts (a message, a folder).
-pub fn dragged_contacts(payload: &str) -> Option<Vec<(String, String)>> {
+pub(crate) fn dragged_contacts(payload: &str) -> Option<Vec<(String, String)>> {
     let mut lines = payload.lines();
     (lines.next()? == DRAG_MARK).then(|| {
         lines
@@ -351,6 +349,8 @@ pub(super) fn is_member(g: &ContactDetails, m: &Member, p: &ContactDetails) -> b
                 .any(|e| e.value.eq_ignore_ascii_case(&m.email)))
 }
 
+/// The list view's rows: made for the lines on screen and bound to each
+/// line scrolled to.
 pub(super) fn row_factory(
     rows: &Rc<RefCell<HashMap<usize, Rc<ListRow>>>>,
     input: &relm4::Sender<ContactsPageInput>,
