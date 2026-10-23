@@ -7494,6 +7494,9 @@ msgstr ""
 "Exchange das Contas online: remova-a e adicione-a como uma conta IMAP ou "
 "Microsoft 365."
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Could not delete message: {e}"
 msgstr "Não foi possível eliminar a mensagem: {e}"
 

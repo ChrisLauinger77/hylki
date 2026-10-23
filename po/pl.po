@@ -7596,6 +7596,9 @@ msgid ""
 "Online Accounts: remove it and add it as an IMAP or Microsoft 365 account."
 msgstr ""
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Could not delete message: {e}"
 msgstr "Nie udało się usunąć wiadomości: {e}"
 

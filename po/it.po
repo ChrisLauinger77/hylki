@@ -7448,6 +7448,9 @@ msgstr ""
 "Questo account non ha server IMAP. Hylki non può usare gli account Exchange "
 "da Account online: rimuovilo e aggiungilo come account IMAP o Microsoft 365."
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Could not delete message: {e}"
 msgstr "Impossibile eliminare il messaggio: {e}"
 

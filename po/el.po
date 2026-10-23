@@ -7341,6 +7341,9 @@ msgstr ""
 "χρησιμοποιήσει λογαριασμούς Exchange από τους Διαδικτυακούς λογαριασμούς: "
 "αφαιρέστε τον και προσθέστε τον ως λογαριασμό IMAP ή Microsoft 365."
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Could not delete message: {e}"
 msgstr "Δεν ήταν δυνατή η διαγραφή του μηνύματος: {e}"
 

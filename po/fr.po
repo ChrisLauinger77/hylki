@@ -7406,6 +7406,9 @@ msgstr ""
 "Exchange depuis Comptes en ligne : supprimez-le et ajoutez-le en tant que "
 "compte IMAP ou Microsoft 365."
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Could not delete message: {e}"
 msgstr "Impossible de supprimer le message : {e}"
 

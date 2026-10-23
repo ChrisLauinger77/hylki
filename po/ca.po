@@ -7213,6 +7213,9 @@ msgstr ""
 "d'Exchange dels comptes en línia: elimina'l i afegeix-lo com a compte IMAP o "
 "Microsoft 365."
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Could not delete message: {e}"
 msgstr "No s'ha pogut suprimir el missatge: {e}"
 

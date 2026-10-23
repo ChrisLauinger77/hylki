@@ -7510,6 +7510,9 @@ msgstr ""
 "записи Exchange из сетевых учётных записей: удалите её и добавьте как "
 "учётную запись IMAP или Microsoft 365."
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Could not delete message: {e}"
 msgstr "Не удалось удалить сообщение: {e}"
 

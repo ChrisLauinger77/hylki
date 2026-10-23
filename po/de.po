@@ -7337,6 +7337,9 @@ msgstr ""
 "den Online-Konten verwenden: Das Konto entfernen und als IMAP- oder "
 "Microsoft-365-Konto hinzufügen."
 
+msgid "“{folder}” is left out of search: {reason}"
+msgstr ""
+
 msgid "Could not delete message: {e}"
 msgstr "Nachricht konnte nicht gelöscht werden: {e}"
 
