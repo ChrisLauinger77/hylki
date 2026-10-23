@@ -1,20 +1,21 @@
 //! The contact list: rebuilding it, decoding photos, a row's menu and the
 //! view of several selected contacts.
 
-use super::ContactsPageWidgets;
+use std::collections::HashMap;
+use std::rc::Rc;
+
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use std::collections::HashMap;
-use std::rc::Rc;
+use crate::contacts::ContactDetails;
+use crate::i18n::{i18n, i18n_f, ni18n_f};
+use crate::ui::context_menu::{show_context_menu, MenuEntry};
 
 use super::detail::{group_byline, member_for};
 use super::menus::BulkChoices;
 use super::rows::{avatar_for, group, is_member, line_photo_key, Line, LineKind};
 use super::types::{ContactScope, ContactSort, ContactsPage, ContactsPageInput, DIRECTORY};
-use crate::contacts::ContactDetails;
-use crate::i18n::{i18n, i18n_f, ni18n_f};
-use crate::ui::context_menu::{show_context_menu, MenuEntry};
+use super::ContactsPageWidgets;
 
 impl ContactsPage {
     /// Rebuild the list from `contacts` + `query` + `sort`, keep (or default)

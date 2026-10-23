@@ -1,16 +1,17 @@
 //! The group form's member list, and reading the contact form back.
 
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
+use crate::contacts::{ContactEdit, Labeled, Member};
+use crate::i18n::{i18n, i18n_f};
 
 use super::forms::{AddressForm, ValueRows};
 use super::rows::{flat_button, group};
 use super::types::ContactForm;
-use crate::contacts::{ContactEdit, Labeled, Member};
-use crate::i18n::{i18n, i18n_f};
 
 /// One of the people the group form offers for what is typed.
 #[derive(Clone)]

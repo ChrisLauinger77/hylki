@@ -2,16 +2,17 @@
 //! drag and drop of contacts, and the small widgets the cards are built
 //! from.
 
-use adw::prelude::*;
-use relm4::prelude::*;
-
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use super::types::{ContactsPageInput, DRAG_MARK};
+use adw::prelude::*;
+use relm4::prelude::*;
+
 use crate::contacts::{ContactDetails, Labeled, Member};
 use crate::i18n::i18n;
+
+use super::types::{ContactsPageInput, DRAG_MARK};
 
 /// One line of the contact list.
 pub(super) struct Line {

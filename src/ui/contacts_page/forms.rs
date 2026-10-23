@@ -1,15 +1,16 @@
 //! The contact form's parts: value rows with labels, postal addresses,
 //! the birthday and the photo.
 
-use adw::prelude::*;
-use relm4::prelude::*;
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::rows::{avatar_for, group};
+use adw::prelude::*;
+use relm4::prelude::*;
+
 use crate::contacts::ContactDetails;
 use crate::i18n::i18n;
+
+use super::rows::{avatar_for, group};
 
 /// The value rows of one kind (emails, phones…), each with its label menu
 /// when the kind has labels: `labels[i]` is what item `i` stands for, the

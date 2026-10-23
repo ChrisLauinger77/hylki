@@ -12,9 +12,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::contacts::{ContactDetails, ContactEdit, GroupEdit, GroupFormat, Member};
-use crate::i18n::{i18n, i18n_f, ni18n_f};
-use crate::ui::context_menu::show_context_menu;
+use crate::i18n::i18n;
 
 mod actions;
 mod detail;
@@ -25,17 +23,24 @@ mod menus;
 mod rows;
 mod types;
 
-use detail::member_for;
-use member_editor::collect_edit;
-use menus::{book_label_factory, confirm, matches_query, new_menu, FilterMenu};
-use rows::{is_member, row_factory, same_contacts, DragKeys};
+use menus::{book_label_factory, new_menu, FilterMenu};
+use rows::{row_factory, DragKeys};
 
 pub use menus::choose_vcf_files;
 pub use rows::dragged_contacts;
 pub use types::*;
 
+mod update_edit;
+mod update_groups;
+mod update_list;
+
 #[cfg(test)]
 mod tests;
+
+/// What a message handler leaves to `update_with_view`: `Continue` runs
+/// `update_view` after it, `Break` (a handler that returned early) skips it,
+/// as the early returns of the original single `match` did.
+type Flow = std::ops::ControlFlow<()>;
 
 #[relm4::component(pub)]
 impl Component for ContactsPage {
@@ -411,999 +416,113 @@ impl Component for ContactsPage {
         sender: ComponentSender<Self>,
         _root: &Self::Root,
     ) {
-        match message {
-            ContactsPageInput::SetLoading => {
-                self.loading = true;
-                if self.contacts.is_empty() && self.directories.is_empty() {
-                    widgets.page_stack.set_visible_child_name("none");
-                }
-                let s = sender.input_sender().clone();
-                std::thread::spawn(move || {
-                    let _ = s.send(ContactsPageInput::DirectoriesKnown(
-                        crate::directory::enabled_names(),
-                    ));
-                });
-            }
-
+        let flow = match message {
+            ContactsPageInput::SetLoading => self.on_set_loading(widgets, sender.clone()),
+            // A read that comes in while a form is open waits in `pending`
+            // until the form closes.
             ContactsPageInput::SetContacts(contacts) if self.editor.is_some() => {
                 self.pending = Some(contacts);
+                Flow::Continue(())
             }
-
-            ContactsPageInput::SetContacts(mut contacts) => {
-                self.pending = None;
-                // Drop tombstoned (locally deleted) entries the read still
-                // carries; a tombstone retires once a read comes back clean.
-                let incoming: std::collections::HashSet<(String, String)> = contacts
-                    .iter()
-                    .map(|c| (c.book_uid.clone(), c.eds_uid.clone()))
-                    .collect();
-                self.deleted.retain(|key| incoming.contains(key));
-                contacts.retain(|c| {
-                    !self
-                        .deleted
-                        .contains(&(c.book_uid.clone(), c.eds_uid.clone()))
-                });
-                // Every visit re-reads the books, and a sync behind it reads
-                // them again; unchanged, the list on screen stays (#477).
-                if !contacts.is_empty() && same_contacts(&self.contacts, &contacts) {
-                    // In the same order, so every index still holds: the
-                    // fresh cards (an edit patches them) without new rows.
-                    self.contacts = contacts;
-                    self.loading = false;
-                    // Their photos too, which the rows have as thumbnails.
-                    self.decode_photos(Default::default(), &sender);
-                    self.update_view(widgets, sender);
-                    return;
-                }
-                // Keep the same person selected across a refresh, by identity.
-                let on_hit = self.selected.filter(|&i| i >= DIRECTORY);
-                let keep = self
-                    .selected
-                    .and_then(|i| self.contacts.get(i))
-                    .map(|c| (c.name.clone(), c.primary_email().map(str::to_string)));
-                // And those selected together, the same way.
-                let identity = |c: &ContactDetails| {
-                    (
-                        c.book_uid.clone(),
-                        c.eds_uid.clone(),
-                        c.name.clone(),
-                        c.primary_email().map(str::to_string),
-                    )
-                };
-                let multi: Vec<_> = self
-                    .multi
-                    .iter()
-                    .filter_map(|&i| self.contacts.get(i))
-                    .map(identity)
-                    .collect();
-                self.multi = contacts
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, c)| multi.contains(&identity(c)))
-                    .map(|(i, _)| i)
-                    .collect();
-                self.items = self.items_for(&contacts);
-                self.contacts = contacts;
-                self.loading = false;
-                self.editor = None;
-                self.editing_target = None;
-                self.selected = keep
-                    .and_then(|(name, email)| {
-                        self.contacts.iter().position(|c| {
-                            c.name == name && c.primary_email().map(str::to_string) == email
-                        })
-                    })
-                    .or(on_hit);
-                // One just added from a directory is a contact now.
-                self.drop_known_hits();
-                if self.selected.is_some_and(|i| self.entry(i).is_none()) {
-                    self.selected = None;
-                }
-                self.refresh_book_filter();
-                self.rebuild(widgets, &sender);
+            ContactsPageInput::SetContacts(contacts) => {
+                self.on_set_contacts(widgets, sender.clone(), contacts)
             }
-
-            ContactsPageInput::Query(q) if q.to_lowercase() == self.query => {}
-
-            ContactsPageInput::Query(q) => {
-                self.query = q.to_lowercase();
-                self.directory_generation = self.directory_generation.wrapping_add(1);
-                let typed = q.trim().to_string();
-                if typed.chars().count() < crate::directory::MIN_QUERY {
-                    self.directory_hits.clear();
-                    self.directory_failures.clear();
-                } else {
-                    // What the directories found before narrows with the
-                    // search until they answer this one.
-                    let query = self.query.clone();
-                    self.directory_hits
-                        .retain(|c| matches_query(c, query.trim()));
-                    // Asked once the typing pauses, not per key.
-                    let generation = self.directory_generation;
-                    let s = sender.input_sender().clone();
-                    gtk::glib::timeout_add_local_once(
-                        std::time::Duration::from_millis(300),
-                        move || {
-                            let _ = s.send(ContactsPageInput::DirectoryLookup {
-                                generation,
-                                query: typed,
-                            });
-                        },
-                    );
-                }
-                if self.selected.is_some_and(|i| self.entry(i).is_none()) {
-                    self.selected = None;
-                }
-                self.rebuild(widgets, &sender);
-            }
-
-            ContactsPageInput::SetSearch(text) => {
-                self.search_open = true;
-                widgets.search.set_text(&text);
-            }
-
-            ContactsPageInput::FocusSearch => {
-                if self.search_pinned {
-                    widgets.search.grab_focus();
-                } else if self.search_open {
-                    sender.input(ContactsPageInput::CloseSearch);
-                } else if self
-                    .search_closed_at
-                    .is_none_or(|t| t.elapsed() > std::time::Duration::from_millis(300))
-                {
-                    self.search_open = true;
-                    // Once the revealer has mapped it.
-                    let entry = widgets.search.clone();
-                    gtk::glib::idle_add_local_once(move || {
-                        entry.grab_focus();
-                    });
-                }
-            }
-
-            ContactsPageInput::CloseSearch => {
-                let had_focus =
-                    widgets.search.has_focus() || widgets.search.focus_child().is_some();
-                if !self.search_pinned {
-                    self.search_open = false;
-                    self.search_closed_at = Some(std::time::Instant::now());
-                }
-                // A hidden search narrows nothing: its text goes.
-                let narrowed = !self.query.is_empty();
-                self.query.clear();
-                widgets.search.set_text("");
-                self.directory_generation = self.directory_generation.wrapping_add(1);
-                self.directory_hits.clear();
-                self.directory_failures.clear();
-                if narrowed {
-                    self.rebuild(widgets, &sender);
-                }
-                if had_focus {
-                    widgets.list.grab_focus();
-                }
-            }
-
-            ContactsPageInput::SetBookPicker(on) => {
-                if self.book_picker != on {
-                    self.book_picker = on;
-                    self.sync_book_picker(widgets);
-                }
-            }
-
-            ContactsPageInput::SetSearchPinned(on) => {
-                self.search_pinned = on;
-            }
-
+            ContactsPageInput::Query(q) if q.to_lowercase() == self.query => Flow::Continue(()),
+            ContactsPageInput::Query(q) => self.on_query(widgets, sender.clone(), q),
+            ContactsPageInput::SetSearch(text) => self.on_set_search(widgets, text),
+            ContactsPageInput::FocusSearch => self.on_focus_search(widgets, sender.clone()),
+            ContactsPageInput::CloseSearch => self.on_close_search(widgets, sender.clone()),
+            ContactsPageInput::SetBookPicker(on) => self.on_set_book_picker(widgets, on),
+            ContactsPageInput::SetSearchPinned(on) => self.on_set_search_pinned(on),
             ContactsPageInput::SetFilter(filter, on) => {
-                let filters = if on {
-                    self.filters | filter.bit()
-                } else {
-                    self.filters & !filter.bit()
-                };
-                if filters != self.filters {
-                    self.filters = filters;
-                    self.sync_filter_menu();
-                    self.rebuild(widgets, &sender);
-                }
+                self.on_set_filter(widgets, sender.clone(), filter, on)
             }
-
-            ContactsPageInput::ClearFilters => {
-                if self.filters != 0 {
-                    self.filters = 0;
-                    self.sync_filter_menu();
-                    self.rebuild(widgets, &sender);
-                }
-            }
-
+            ContactsPageInput::ClearFilters => self.on_clear_filters(widgets, sender.clone()),
             ContactsPageInput::SuggestionsLoaded(suggestions) => {
-                *self.suggestions.borrow_mut() = suggestions;
+                self.on_suggestions_loaded(suggestions)
             }
-
-            ContactsPageInput::PickBook(n) => {
-                let scope = match (n as usize)
-                    .checked_sub(1)
-                    .and_then(|i| self.filter_books.get(i))
-                {
-                    Some((uid, _)) => ContactScope::Book(uid.clone()),
-                    None => ContactScope::All,
-                };
-                sender.input(ContactsPageInput::SetScope(scope));
-            }
-
+            ContactsPageInput::PickBook(n) => self.on_pick_book(sender.clone(), n),
             ContactsPageInput::DirectoriesKnown(directories) => {
-                if directories == self.directories {
-                    return;
-                }
-                self.directories = directories;
-                self.refresh_book_filter();
-                self.publish_tree(&sender);
-                if !self.directories.is_empty() && self.contacts.is_empty() && !self.loading {
-                    widgets.page_stack.set_visible_child_name("browser");
-                }
+                self.on_directories_known(widgets, sender.clone(), directories)
             }
-
             ContactsPageInput::DirectoryLookup { generation, query } => {
-                if generation != self.directory_generation {
-                    return;
-                }
-                let s = sender.input_sender().clone();
-                std::thread::spawn(move || {
-                    let (hits, failed) = crate::directory::search_contacts(&query, DIRECTORY_LIMIT);
-                    let _ = s.send(ContactsPageInput::DirectoryResults {
-                        generation,
-                        hits,
-                        failed,
-                    });
-                });
+                self.on_directory_lookup(sender.clone(), generation, query)
             }
-
             ContactsPageInput::DirectoryResults {
                 generation,
                 hits,
                 failed,
-            } => {
-                if generation != self.directory_generation {
-                    return;
-                }
-                self.directory_failures = failed;
-                // The entry shown may be at another place in the new list.
-                let shown = self
-                    .selected
-                    .filter(|&i| i >= DIRECTORY)
-                    .and_then(|i| self.entry(i))
-                    .map(|c| (c.name.clone(), c.primary_email().map(str::to_string)));
-                self.directory_hits = hits;
-                self.drop_known_hits();
-                if let Some((name, email)) = shown {
-                    self.selected = self
-                        .directory_hits
-                        .iter()
-                        .position(|c| {
-                            c.name == name && c.primary_email().map(str::to_string) == email
-                        })
-                        .map(|i| DIRECTORY + i);
-                }
-                // An open editor stays as it is; the list catches up with
-                // the next change.
-                if self.editor.is_none() {
-                    self.rebuild(widgets, &sender);
-                }
-            }
-
+            } => self.on_directory_results(widgets, sender.clone(), generation, hits, failed),
             ContactsPageInput::AddDirectoryHit(idx) => {
-                let Some(c) = idx
-                    .checked_sub(DIRECTORY)
-                    .and_then(|i| self.directory_hits.get(i))
-                else {
-                    return;
-                };
-                // A card of its own, not the directory's, whose UID is the
-                // directory's name for the entry.
-                let edit = ContactEdit {
-                    name: c.name.clone(),
-                    nickname: c.nickname.clone(),
-                    org: c.org.clone(),
-                    title: c.title.clone(),
-                    note: c.note.clone(),
-                    emails: c.emails.clone(),
-                    phones: c.phones.clone(),
-                    urls: c.urls.clone(),
-                    addresses: c.postal.clone(),
-                    birthday: c.birthday_raw.clone(),
-                    photo: c.photo_bytes().map_or(
-                        crate::contacts::PhotoEdit::Keep,
-                        crate::contacts::PhotoEdit::Set,
-                    ),
-                };
-                let _ = sender.output(ContactsPageOutput::CreateContact {
-                    book_uid: None,
-                    vcard: crate::contacts::new_vcard(&edit),
-                });
+                self.on_add_directory_hit(sender.clone(), idx)
             }
-
-            ContactsPageInput::SetSort(sort) => {
-                if self.sort != sort {
-                    self.sort = sort;
-                    self.sync_filter_menu();
-                    self.rebuild(widgets, &sender);
-                }
-            }
-
-            ContactsPageInput::SetScope(scope) => {
-                if self.scope != scope {
-                    self.scope = scope;
-                    // Another list abandons an open editor and what was
-                    // selected in this one.
-                    self.editor = None;
-                    self.editing_target = None;
-                    self.selected = None;
-                    self.multi.clear();
-                    self.rebuild(widgets, &sender);
-                }
-            }
-
+            ContactsPageInput::SetSort(sort) => self.on_set_sort(widgets, sender.clone(), sort),
+            ContactsPageInput::SetScope(scope) => self.on_set_scope(widgets, sender.clone(), scope),
             ContactsPageInput::DropContacts { keys, on, moving } => {
-                let people: Vec<usize> = keys
-                    .iter()
-                    .filter_map(|(book, uid)| {
-                        self.contacts
-                            .iter()
-                            .position(|c| !c.is_group() && c.book_uid == *book && c.eds_uid == *uid)
-                    })
-                    .collect();
-                match on {
-                    DropOn::Book(to) if moving => {
-                        let keys: Vec<(String, String)> = people
-                            .iter()
-                            .map(|&i| &self.contacts[i])
-                            .filter(|c| self.can_move(c, &to))
-                            .map(|c| (c.book_uid.clone(), c.eds_uid.clone()))
-                            .collect();
-                        self.ask_move(widgets, &sender, keys, to, None);
-                    }
-                    // A copy leaves the contact where it was: no question.
-                    DropOn::Book(to) => {
-                        let writable = self.books.iter().any(|b| b.uid == to);
-                        let cards: Vec<String> = people
-                            .iter()
-                            .map(|&i| &self.contacts[i])
-                            .filter(|c| writable && c.book_uid != to)
-                            .map(crate::contacts::moved_vcard)
-                            .collect();
-                        if !cards.is_empty() {
-                            let _ = sender.output(ContactsPageOutput::CopyContacts { to, cards });
-                        }
-                    }
-                    DropOn::Group { book, uid } => {
-                        let Some(g) = self
-                            .contacts
-                            .iter()
-                            .position(|c| c.is_group() && c.book_uid == book && c.eds_uid == uid)
-                        else {
-                            return;
-                        };
-                        self.add_to_group(&sender, g, &people);
-                    }
-                }
+                self.on_drop_contacts(widgets, sender.clone(), keys, on, moving)
             }
-
-            ContactsPageInput::Tree(action) => {
-                let group = |book: &str, uid: &str| {
-                    self.contacts
-                        .iter()
-                        .position(|c| c.is_group() && c.book_uid == book && c.eds_uid == uid)
-                };
-                match action {
-                    TreeAction::NewContact(book) => {
-                        sender.input(ContactsPageInput::SetScope(ContactScope::Book(book)));
-                        sender.input(ContactsPageInput::NewContact);
-                    }
-                    TreeAction::NewGroup(book) => {
-                        sender.input(ContactsPageInput::SetScope(ContactScope::Book(book)));
-                        sender.input(ContactsPageInput::NewGroup);
-                    }
-                    TreeAction::EditGroup { book, uid } => {
-                        if let Some(idx) = group(&book, &uid) {
-                            sender.input(ContactsPageInput::SetScope(ContactScope::Group {
-                                book,
-                                uid,
-                            }));
-                            sender.input(ContactsPageInput::EditIndex(idx));
-                        }
-                    }
-                    TreeAction::DeleteGroup { book, uid } => {
-                        if let Some(idx) = group(&book, &uid) {
-                            sender.input(ContactsPageInput::DeleteRequest(idx));
-                        }
-                    }
-                    TreeAction::RenameBook(uid) => self.ask_book_name(widgets, &sender, uid),
-                    TreeAction::ComposeGroup { book, uid } => {
-                        if let Some(idx) = group(&book, &uid) {
-                            sender.input(ContactsPageInput::ComposeGroup(idx));
-                        }
-                    }
-                }
-            }
-
+            ContactsPageInput::Tree(action) => self.on_tree(widgets, sender.clone(), action),
             ContactsPageInput::RemoveFromGroup(people) => {
-                let ContactScope::Group { book, uid } = &self.scope else {
-                    return;
-                };
-                let Some(g) = self
-                    .contacts
-                    .iter()
-                    .find(|c| c.is_group() && c.book_uid == *book && c.eds_uid == *uid)
-                else {
-                    return;
-                };
-                let Some(format) = g.group else { return };
-                let gone: Vec<&ContactDetails> = people
-                    .iter()
-                    .filter_map(|&i| self.contacts.get(i))
-                    .collect();
-                let members: Vec<Member> = g
-                    .members
-                    .iter()
-                    .filter(|m| !gone.iter().any(|p| is_member(g, m, p)))
-                    .cloned()
-                    .collect();
-                if members.len() == g.members.len() {
-                    return;
-                }
-                let edit = GroupEdit {
-                    name: g.name.clone(),
-                    members,
-                    hide_addresses: g.hide_addresses,
-                    kept: g.hidden_members.clone(),
-                };
-                let _ = sender.output(ContactsPageOutput::SaveGroup {
-                    book_uid: g.book_uid.clone(),
-                    format,
-                    original: Some(g.raw_vcard.clone()),
-                    edit,
-                });
+                self.on_remove_from_group(sender.clone(), people)
             }
-
             ContactsPageInput::SelectionChanged => {
-                // Read as the selection is now: the change that sent this
-                // may have been followed by others.
-                let picked = self.picked_entries();
-                match picked.as_slice() {
-                    [] => {}
-                    [idx] => {
-                        let idx = *idx;
-                        if self.multi.is_empty()
-                            && self.selected == Some(idx)
-                            && (self.editor.is_none() || self.editing_target == Some(idx))
-                        {
-                            return;
-                        }
-                        // Moving away abandons an open editor.
-                        self.multi.clear();
-                        self.editor = None;
-                        self.editing_target = None;
-                        self.selected = Some(idx);
-                        self.render_detail(widgets, &sender);
-                    }
-                    many => {
-                        // A directory's entry is not a contact to act on.
-                        let keys: Vec<usize> = many
-                            .iter()
-                            .copied()
-                            .filter(|&i| i < self.contacts.len())
-                            .collect();
-                        if keys == self.multi && self.editor.is_none() {
-                            return;
-                        }
-                        self.multi = keys;
-                        self.editor = None;
-                        self.editing_target = None;
-                        self.selected = None;
-                        self.render_detail(widgets, &sender);
-                    }
-                }
+                self.on_selection_changed(widgets, sender.clone())
             }
-
-            ContactsPageInput::SelectFirst(n) => {
-                let entries: Vec<u32> = self
-                    .row_map
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, i)| i.is_some())
-                    .map(|(pos, _)| pos as u32)
-                    .take(n as usize)
-                    .collect();
-                self.selection.unselect_all();
-                for pos in entries {
-                    self.selection.select_item(pos, false);
-                }
-            }
-
-            ContactsPageInput::BulkAddToGroup(g) => {
-                let chosen = self.chosen();
-                self.add_to_group(&sender, g, &chosen);
-            }
-
+            ContactsPageInput::SelectFirst(n) => self.on_select_first(n),
+            ContactsPageInput::BulkAddToGroup(g) => self.on_bulk_add_to_group(sender.clone(), g),
             ContactsPageInput::BulkMoveRequest(to) => {
-                let keys: Vec<(String, String)> = self
-                    .movable(&to)
-                    .into_iter()
-                    .map(|i| {
-                        (
-                            self.contacts[i].book_uid.clone(),
-                            self.contacts[i].eds_uid.clone(),
-                        )
-                    })
-                    .collect();
-                self.ask_move(widgets, &sender, keys, to, None);
+                self.on_bulk_move_request(widgets, sender.clone(), to)
             }
-
             ContactsPageInput::MoveRequest { idx, to } => {
-                let Some(c) = self.contacts.get(idx).filter(|c| self.can_move(c, &to)) else {
-                    return;
-                };
-                let key = (c.book_uid.clone(), c.eds_uid.clone());
-                self.ask_move(widgets, &sender, vec![key], to, None);
+                self.on_move_request(widgets, sender.clone(), idx, to)
             }
-
             ContactsPageInput::EditMoveConfirmed { to, key, vcard } => {
-                self.forget(std::slice::from_ref(&key));
-                let _ = sender.output(ContactsPageOutput::MoveContacts {
-                    to,
-                    cards: vec![(key.0, key.1, vcard)],
-                });
-                self.editor = None;
-                self.editing_target = None;
-                self.rebuild(widgets, &sender);
+                self.on_edit_move_confirmed(widgets, sender.clone(), to, key, vcard)
             }
-
             ContactsPageInput::BulkMoveConfirmed { to, keys } => {
-                let cards: Vec<(String, String, String)> = keys
-                    .iter()
-                    .filter_map(|(book, uid)| {
-                        self.contacts
-                            .iter()
-                            .find(|c| c.book_uid == *book && c.eds_uid == *uid)
-                    })
-                    .map(|c| {
-                        (
-                            c.book_uid.clone(),
-                            c.eds_uid.clone(),
-                            crate::contacts::moved_vcard(c),
-                        )
-                    })
-                    .collect();
-                if cards.is_empty() {
-                    return;
-                }
-                // They leave their old books' lists now; the re-read after
-                // the move shows them in the new one.
-                self.forget(&keys);
-                let _ = sender.output(ContactsPageOutput::MoveContacts { to, cards });
-                self.rebuild(widgets, &sender);
+                self.on_bulk_move_confirmed(widgets, sender.clone(), to, keys)
             }
-
-            ContactsPageInput::WriteFailed => {
-                self.deleted.clear();
-            }
-
+            ContactsPageInput::WriteFailed => self.on_write_failed(),
             ContactsPageInput::BulkDeleteRequest => {
-                let chosen = self.chosen();
-                if chosen.is_empty() {
-                    return;
-                }
-                let keys: Vec<(String, String)> = chosen
-                    .iter()
-                    .map(|&i| {
-                        (
-                            self.contacts[i].book_uid.clone(),
-                            self.contacts[i].eds_uid.clone(),
-                        )
-                    })
-                    .collect();
-                let synced = chosen
-                    .iter()
-                    .any(|&i| self.synced(&self.contacts[i].book_uid));
-                let groups = chosen.iter().all(|&i| self.contacts[i].is_group());
-                let n = chosen.len() as u32;
-                let count = n.to_string();
-                let args = [("n", count.as_str())];
-                let (heading, body) = match (groups, synced) {
-                    (true, true) => (
-                        ni18n_f("Delete {n} Group?", "Delete {n} Groups?", n, &args),
-                        ni18n_f(
-                            "This will remove {n} group from your address books locally and on the server. The contacts are not removed.",
-                            "This will remove {n} groups from your address books locally and on the server. The contacts are not removed.",
-                            n,
-                            &args,
-                        ),
-                    ),
-                    (true, false) => (
-                        ni18n_f("Delete {n} Group?", "Delete {n} Groups?", n, &args),
-                        ni18n_f(
-                            "This will remove {n} group from your address book. The contacts are not removed.",
-                            "This will remove {n} groups from your address books. The contacts are not removed.",
-                            n,
-                            &args,
-                        ),
-                    ),
-                    (false, true) => (
-                        ni18n_f("Delete {n} Contact?", "Delete {n} Contacts?", n, &args),
-                        ni18n_f(
-                            "This will remove {n} contact from your address books locally and on the server.",
-                            "This will remove {n} contacts from your address books locally and on the server.",
-                            n,
-                            &args,
-                        ),
-                    ),
-                    (false, false) => (
-                        ni18n_f("Delete {n} Contact?", "Delete {n} Contacts?", n, &args),
-                        ni18n_f(
-                            "This will remove {n} contact from your address book.",
-                            "This will remove {n} contacts from your address books.",
-                            n,
-                            &args,
-                        ),
-                    ),
-                };
-                let s = sender.input_sender().clone();
-                confirm(widgets, &heading, &body, &i18n("Delete"), true, move || {
-                    let _ = s.send(ContactsPageInput::DeleteConfirmed(keys.clone()));
-                });
+                self.on_bulk_delete_request(widgets, sender.clone())
             }
-
-            ContactsPageInput::Compose(email) => {
-                let _ = sender.output(ContactsPageOutput::Compose(email));
-            }
-
-            ContactsPageInput::OpenUrl(url) => {
-                // Bare "example.org" URLs are common in vCards.
-                let full = if url.contains("://") {
-                    url
-                } else {
-                    format!("https://{url}")
-                };
-                crate::ui::launch::open_link(&full, None);
-            }
-
-            ContactsPageInput::Edit => {
-                if let Some(idx) = self.selected.filter(|&i| i < DIRECTORY) {
-                    self.edit(widgets, &sender, idx);
-                }
-            }
-
-            ContactsPageInput::EditIndex(idx) => {
-                if idx < self.contacts.len() {
-                    self.selected = Some(idx);
-                    self.select_row_for(idx);
-                    self.edit(widgets, &sender, idx);
-                }
-            }
-
-            ContactsPageInput::NewContact => {
-                self.new_form(widgets);
-                self.render_editor(widgets, &sender);
-            }
-
-            ContactsPageInput::NewGroup => {
-                self.new_form(widgets);
-                self.render_group_editor(widgets, &sender);
-            }
-
-            ContactsPageInput::ComposeGroup(idx) => {
-                let Some(g) = self
-                    .contacts
-                    .get(idx)
-                    .filter(|g| g.reachable().next().is_some())
-                else {
-                    return;
-                };
-                let field = g.members_field();
-                let _ = sender.output(if g.hide_addresses {
-                    ContactsPageOutput::ComposeBcc(field)
-                } else {
-                    ContactsPageOutput::Compose(field)
-                });
-            }
-
+            ContactsPageInput::Compose(email) => self.on_compose(sender.clone(), email),
+            ContactsPageInput::OpenUrl(url) => self.on_open_url(url),
+            ContactsPageInput::Edit => self.on_edit(widgets, sender.clone()),
+            ContactsPageInput::EditIndex(idx) => self.on_edit_index(widgets, sender.clone(), idx),
+            ContactsPageInput::NewContact => self.on_new_contact(widgets, sender.clone()),
+            ContactsPageInput::NewGroup => self.on_new_group(widgets, sender.clone()),
+            ContactsPageInput::ComposeGroup(idx) => self.on_compose_group(sender.clone(), idx),
             ContactsPageInput::AddToGroup { group, person } => {
-                let (Some(g), Some(p)) = (self.contacts.get(group), self.contacts.get(person))
-                else {
-                    return;
-                };
-                let Some(member) = member_for(g, p, true) else {
-                    return;
-                };
-                let mut members = g.members.clone();
-                members.push(member);
-                let edit = GroupEdit {
-                    name: g.name.clone(),
-                    members,
-                    hide_addresses: g.hide_addresses,
-                    kept: g.hidden_members.clone(),
-                };
-                let Some(format) = g.group else { return };
-                let _ = sender.output(ContactsPageOutput::SaveGroup {
-                    book_uid: g.book_uid.clone(),
-                    format,
-                    original: Some(g.raw_vcard.clone()),
-                    edit,
-                });
+                self.on_add_to_group(sender.clone(), group, person)
             }
-
-            ContactsPageInput::ImportContacts => {
-                let parent = relm4::main_application().active_window();
-                let s = sender.clone();
-                choose_vcf_files(parent.as_ref(), move |paths| {
-                    let _ = s.output(ContactsPageOutput::ImportContacts(paths));
-                });
-            }
-
-            ContactsPageInput::CancelEdit => {
-                self.editor = None;
-                self.editing_target = None;
-                if let Some(contacts) = self.pending.take() {
-                    sender.input(ContactsPageInput::SetContacts(contacts));
-                }
-                if self.contacts.is_empty() && self.directories.is_empty() {
-                    widgets.page_stack.set_visible_child_name("none");
-                }
-                self.render_detail(widgets, &sender);
-            }
-
-            ContactsPageInput::SaveEdit => {
-                let editor = match &self.editor {
-                    Some(Editor::Contact(form)) => form,
-                    Some(Editor::Group(form)) => {
-                        let mut edit = GroupEdit {
-                            name: form.name.text().trim().to_string(),
-                            members: form.members.borrow().clone(),
-                            hide_addresses: form.hide.is_active(),
-                            ..GroupEdit::default()
-                        };
-                        // A group is known by its name alone.
-                        if edit.name.is_empty() {
-                            form.name.add_css_class("error");
-                            form.name.grab_focus();
-                            return;
-                        }
-                        let picked = form
-                            .book
-                            .as_ref()
-                            .and_then(|row| form.books.get(row.selected() as usize))
-                            .cloned();
-                        let output = match self.editing_target.and_then(|i| self.contacts.get(i)) {
-                            // Saved in another book: made there, then removed
-                            // from its own.
-                            Some(g) if picked.as_ref().is_some_and(|b| b.uid != g.book_uid) => {
-                                let to = picked.unwrap_or_else(crate::contacts::local_book);
-                                let format = to.groups.unwrap_or(GroupFormat::Evolution);
-                                edit.members = self.members_for(
-                                    edit.members,
-                                    Some(&g.book_uid),
-                                    &to.uid,
-                                    format,
-                                );
-                                let key = (g.book_uid.clone(), g.eds_uid.clone());
-                                self.forget(&[key.clone()]);
-                                let _ = sender.output(ContactsPageOutput::MoveGroup {
-                                    from: key.0,
-                                    uid: key.1,
-                                    to: to.uid,
-                                    format,
-                                    edit,
-                                });
-                                self.editor = None;
-                                self.editing_target = None;
-                                self.rebuild(widgets, &sender);
-                                return;
-                            }
-                            Some(g) => {
-                                let format = g.group.unwrap_or(GroupFormat::Evolution);
-                                edit.members = self.members_for(
-                                    edit.members,
-                                    Some(&g.book_uid),
-                                    &g.book_uid,
-                                    format,
-                                );
-                                edit.kept = g.hidden_members.clone();
-                                ContactsPageOutput::SaveGroup {
-                                    book_uid: g.book_uid.clone(),
-                                    format,
-                                    original: Some(g.raw_vcard.clone()),
-                                    edit,
-                                }
-                            }
-                            None => {
-                                let book = picked.unwrap_or_else(crate::contacts::local_book);
-                                let format = book.groups.unwrap_or(GroupFormat::Evolution);
-                                edit.members =
-                                    self.members_for(edit.members, None, &book.uid, format);
-                                ContactsPageOutput::SaveGroup {
-                                    book_uid: book.uid,
-                                    format,
-                                    original: None,
-                                    edit,
-                                }
-                            }
-                        };
-                        let _ = sender.output(output);
-                        self.editor = None;
-                        self.editing_target = None;
-                        self.render_detail(widgets, &sender);
-                        return;
-                    }
-                    None => return,
-                };
-                let edit = collect_edit(editor);
-                // Anything at all is a contact; an empty form is nothing.
-                let empty = [
-                    &edit.name,
-                    &edit.nickname,
-                    &edit.org,
-                    &edit.title,
-                    &edit.note,
-                    &edit.birthday,
-                ]
-                .iter()
-                .all(|v| v.is_empty())
-                    && edit.emails.is_empty()
-                    && edit.phones.is_empty()
-                    && edit.urls.is_empty()
-                    && edit.addresses.is_empty()
-                    && !matches!(edit.photo, crate::contacts::PhotoEdit::Set(_));
-                if empty {
-                    return;
-                }
-                let picked = editor
-                    .book
-                    .as_ref()
-                    .and_then(|row| self.books.get(row.selected() as usize));
-                match self.editing_target.and_then(|i| self.contacts.get(i)) {
-                    // Saved in another book: moved there, with the edits,
-                    // once the move is confirmed. The form stays till then.
-                    Some(c) if picked.is_some_and(|b| b.uid != c.book_uid) => {
-                        let to = picked.map(|b| b.uid.clone()).unwrap_or_default();
-                        if !self.can_move(c, &to) {
-                            return;
-                        }
-                        let mut moved = c.clone();
-                        moved.raw_vcard = crate::contacts::patched_vcard(&c.raw_vcard, &edit);
-                        moved.photo = match &edit.photo {
-                            crate::contacts::PhotoEdit::Keep => c.photo_bytes(),
-                            crate::contacts::PhotoEdit::Remove => None,
-                            crate::contacts::PhotoEdit::Set(bytes) => Some(bytes.clone()),
-                        };
-                        moved.photo_key =
-                            moved.photo.as_deref().map_or(0, crate::contacts::photo_key);
-                        let vcard = crate::contacts::moved_vcard(&moved);
-                        let key = (c.book_uid.clone(), c.eds_uid.clone());
-                        self.ask_move(widgets, &sender, vec![key], to, Some(vcard));
-                        return;
-                    }
-                    Some(c) => {
-                        let vcard = crate::contacts::patched_vcard(&c.raw_vcard, &edit);
-                        let _ = sender.output(ContactsPageOutput::SaveContact {
-                            book_uid: c.book_uid.clone(),
-                            vcard,
-                        });
-                    }
-                    None => {
-                        let vcard = crate::contacts::new_vcard(&edit);
-                        let book_uid = editor
-                            .book
-                            .as_ref()
-                            .and_then(|row| self.books.get(row.selected() as usize))
-                            .map(|b| b.uid.clone());
-                        let _ =
-                            sender.output(ContactsPageOutput::CreateContact { book_uid, vcard });
-                    }
-                }
-                // The app re-reads EDS and pushes SetContacts; until then the
-                // card shows the pre-edit state rather than a half-saved one.
-                self.editor = None;
-                self.editing_target = None;
-                self.render_detail(widgets, &sender);
-            }
-
-            ContactsPageInput::OpenInGnome(idx) => {
-                if let Some(c) = self.contacts.get(idx) {
-                    crate::ui::contacts_browser::launch_gnome_contacts_for(&c.eds_uid);
-                }
-            }
-
-            ContactsPageInput::DeleteSelected => {
-                // Not while an editor is open: that contact is being changed.
-                if self.editor.is_some() {
-                    return;
-                }
-                if !self.multi.is_empty() {
-                    sender.input(ContactsPageInput::BulkDeleteRequest);
-                } else if let Some(idx) = self.selected {
-                    sender.input(ContactsPageInput::DeleteRequest(idx));
-                }
-            }
-
+            ContactsPageInput::ImportContacts => self.on_import_contacts(sender.clone()),
+            ContactsPageInput::CancelEdit => self.on_cancel_edit(widgets, sender.clone()),
+            ContactsPageInput::SaveEdit => self.on_save_edit(widgets, sender.clone()),
+            ContactsPageInput::OpenInGnome(idx) => self.on_open_in_gnome(idx),
+            ContactsPageInput::DeleteSelected => self.on_delete_selected(sender.clone()),
             ContactsPageInput::DeleteRequest(idx) => {
-                let Some(c) = self.contacts.get(idx) else {
-                    return;
-                };
-                let synced = self.synced(&c.book_uid);
-                let name = [("name", c.name.as_str())];
-                let (heading, body) = if c.is_group() {
-                    let body = if synced {
-                        i18n_f(
-                            "This will remove the group {name} from your address book locally and on the server. The contacts are not removed.",
-                            &name,
-                        )
-                    } else {
-                        i18n_f("This will remove the group {name} from your address book. The contacts are not removed.", &name)
-                    };
-                    (i18n("Delete Group?"), body)
-                } else {
-                    let body = if synced {
-                        i18n_f(
-                            "This will remove the contact {name} from your address book locally and on the server.",
-                            &name,
-                        )
-                    } else {
-                        i18n_f(
-                            "This will remove the contact {name} from your address book.",
-                            &name,
-                        )
-                    };
-                    (i18n("Delete Contact?"), body)
-                };
-                let s = sender.input_sender().clone();
-                let keys = vec![(c.book_uid.clone(), c.eds_uid.clone())];
-                confirm(widgets, &heading, &body, &i18n("Delete"), true, move || {
-                    let _ = s.send(ContactsPageInput::DeleteConfirmed(keys.clone()));
-                });
+                self.on_delete_request(widgets, sender.clone(), idx)
             }
-
-            ContactsPageInput::SetBooks(books) => {
-                self.books = books;
-                self.refresh_book_filter();
-                self.publish_tree(&sender);
-            }
-
-            ContactsPageInput::PhotosDecoded => {
-                for row in self.rows.borrow().values() {
-                    row.show_photo();
-                }
-                self.decoding
-                    .retain(|key| crate::avatar::photo_thumbnail(*key).is_none());
-            }
-
+            ContactsPageInput::SetBooks(books) => self.on_set_books(sender.clone(), books),
+            ContactsPageInput::PhotosDecoded => self.on_photos_decoded(),
             ContactsPageInput::RowMenu { idx, x, y } => {
-                let entries = self.row_menu(idx, &sender);
-                if !entries.is_empty() {
-                    show_context_menu(&widgets.list, x, y, entries);
-                }
+                self.on_row_menu(widgets, sender.clone(), idx, x, y)
             }
-
             ContactsPageInput::OpenPhoto { name, data } => {
-                let _ = sender.output(ContactsPageOutput::ShowPhoto { name, data });
+                self.on_open_photo(sender.clone(), name, data)
             }
-
             ContactsPageInput::DeleteConfirmed(keys) => {
-                let gone = self.forget(&keys);
-                if !gone.is_empty() {
-                    let _ = sender.output(ContactsPageOutput::DeleteContacts(gone));
-                }
-                // The entries leave the list right now; the EDS delete and
-                // the reconciling re-read follow behind.
-                self.editor = None;
-                self.editing_target = None;
-                self.rebuild(widgets, &sender);
+                self.on_delete_confirmed(widgets, sender.clone(), keys)
             }
+        };
+        if flow.is_continue() {
+            // Overriding `update_with_view` replaces the generated body that ran
+            // `update_view` after every message; without this the `#[watch]`
+            // bindings above (the "Loading Contacts…" / "No Contacts" face) only
+            // ever hold their `init` values, and an empty address book looked
+            // like a load that never finished.
+            self.update_view(widgets, sender);
         }
-        // Overriding `update_with_view` replaces the generated body that ran
-        // `update_view` after every message; without this the `#[watch]`
-        // bindings above (the "Loading Contacts…" / "No Contacts" face) only
-        // ever hold their `init` values, and an empty address book looked
-        // like a load that never finished.
-        self.update_view(widgets, sender);
     }
 }
-
-impl ContactsPage {}

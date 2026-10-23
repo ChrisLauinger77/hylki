@@ -2,11 +2,13 @@
 //! selected, ask before moving, and keep the sidebar's tree and the book
 //! picker in step.
 
-use super::ContactsPageWidgets;
+use std::collections::HashMap;
+
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use std::collections::HashMap;
+use crate::contacts::{ContactDetails, GroupEdit, GroupFormat, Member};
+use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 use super::detail::member_for;
 use super::menus::{confirm, matches_query};
@@ -15,8 +17,7 @@ use super::types::{
     ContactFilter, ContactScope, ContactTree, ContactsPage, ContactsPageInput, ContactsPageOutput,
     TreeBook, TreeGroup, DIRECTORY,
 };
-use crate::contacts::{ContactDetails, GroupEdit, GroupFormat, Member};
-use crate::i18n::{i18n, i18n_f, ni18n_f};
+use super::ContactsPageWidgets;
 
 impl ContactsPage {
     /// The entries held, their bytes (the floor: strings, vCards and photos)

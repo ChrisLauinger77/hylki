@@ -1,14 +1,15 @@
 //! The page's menus and small dialogs: sort and filter, bulk choices,
 //! confirmations, the "+" menu, the book picker's labels and file import.
 
-use super::ContactsPageWidgets;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use super::types::{ContactFilter, ContactSort, ContactsPage, ContactsPageInput};
 use crate::contacts::ContactDetails;
 use crate::i18n::{i18n, i18n_f, i18n_noop};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
+
+use super::types::{ContactFilter, ContactSort, ContactsPage, ContactsPageInput};
+use super::ContactsPageWidgets;
 
 /// The sort and filter button's popover, laid out as the message list's
 /// (#441): the orders in one column, the "Show only" filters in the other.

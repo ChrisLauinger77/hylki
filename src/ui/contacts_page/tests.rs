@@ -1,7 +1,8 @@
 //! Tests of the contact list.
 
-use super::same_contacts;
 use crate::contacts::ContactDetails;
+
+use super::rows::same_contacts;
 
 fn contact(vcard: &str) -> ContactDetails {
     ContactDetails {

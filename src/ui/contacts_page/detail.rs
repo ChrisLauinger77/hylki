@@ -1,11 +1,13 @@
 //! The detail pane: a contact's card, a group's card, and the editors.
 
-use super::ContactsPageWidgets;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
+use crate::contacts::{ContactDetails, GroupFormat, Labeled, Member};
+use crate::i18n::{i18n, i18n_f};
 
 use super::forms::{
     address_editor, editable_values, entry_row, photo_editor, BirthdayForm, EMAIL_LABELS,
@@ -17,8 +19,7 @@ use super::rows::{avatar_for, avatar_with, copy_button, flat_button, group, labe
 use super::types::{
     ContactForm, ContactsPage, ContactsPageInput, ContactsPageOutput, Editor, GroupForm, DIRECTORY,
 };
-use crate::contacts::{ContactDetails, GroupFormat, Labeled, Member};
-use crate::i18n::{i18n, i18n_f};
+use super::ContactsPageWidgets;
 
 /// A group's card: who is in it, and a message to them all.
 fn render_group_card(

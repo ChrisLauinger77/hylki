@@ -1,17 +1,18 @@
 //! The Contacts page's state and messages, and the types the sidebar's
 //! Contacts tree shares with it.
 
-use relm4::prelude::*;
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use relm4::prelude::*;
+
+use crate::contacts::{ContactDetails, GroupEdit, GroupFormat, Member};
+use crate::i18n::i18n;
+
 use super::forms::{AddressForm, BirthdayForm, ValueRows};
 use super::menus::FilterMenu;
 use super::rows::{DragKeys, ListRow};
-use crate::contacts::{ContactDetails, GroupEdit, GroupFormat, Member};
-use crate::i18n::i18n;
 
 /// Where the people found in the LDAP directories (#307) start in the
 /// index space `selected` and `row_map` share with `contacts`: an index this
