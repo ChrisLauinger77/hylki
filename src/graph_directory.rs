@@ -435,9 +435,7 @@ mod tests {
             email: email.into(),
             from_contacts: true,
             from_directory: true,
-            score: 0,
-            own: false,
-            group: None,
+            ..Default::default()
         }
     }
 

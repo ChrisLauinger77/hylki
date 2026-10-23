@@ -5,10 +5,7 @@ fn suggestion(name: &str, email: &str, score: u32) -> Suggestion {
         name: name.into(),
         email: email.into(),
         score,
-        from_contacts: false,
-        from_directory: false,
-        own: false,
-        group: None,
+        ..Default::default()
     }
 }
 

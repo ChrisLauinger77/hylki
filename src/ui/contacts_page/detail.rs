@@ -598,10 +598,7 @@ impl ContactsPage {
                         name: p.name.clone(),
                         email: e.value.clone(),
                         from_contacts: true,
-                        from_directory: false,
-                        score: 0,
-                        own: false,
-                        group: None,
+                        ..Default::default()
                     })
                 });
             self.suggestions.borrow_mut().extend(contacts);

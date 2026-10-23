@@ -428,10 +428,8 @@ impl AppModel {
                 name: if name.is_empty() { email.clone() } else { name },
                 own: own.contains(&email.to_lowercase()),
                 email,
-                from_contacts: false,
-                from_directory: false,
                 score: 1,
-                group: None,
+                ..Default::default()
             })
             .collect();
         if !fresh.is_empty() {
