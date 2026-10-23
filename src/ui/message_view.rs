@@ -10,6 +10,7 @@ use self::invite::invite_row_html;
 use self::page_fade::{PageFade, PendingLoad};
 use self::sender::{confirm_trust, fetch_sender_key};
 
+use self::bridge::{parse_bridge, Bridge};
 use self::chrome::{wear_class, ClassRules};
 use self::dark::{adapt_colors_for_dark, pin_color_scheme};
 use self::frame::{
@@ -38,6 +39,7 @@ use webkit6::prelude::WebViewExt;
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::models::Message;
 
+mod bridge;
 mod chrome;
 mod dark;
 mod folds;
@@ -934,310 +936,21 @@ impl Component for MessageView {
             });
         }
 
-        // Double-click on a conversation header → open that message's window.
+        // Everything the page posts to the `hylki` handler (see bridge.rs).
         if let Some(ucm) = model.webview.user_content_manager() {
             let open_sender = sender.clone();
-            ucm.connect_script_message_received(Some("hylki"), move |_ucm, value| {
-                // "verb:account:id" — the page only ever posts what this document
-                // put there, but it is still parsed strictly.
-                use crate::ui::message_list::RowAction;
-                let msg = value.to_str().to_string();
-                let mut parts = msg.splitn(4, ':');
-                let (Some(verb), Some(a), Some(i)) = (parts.next(), parts.next(), parts.next())
-                else {
-                    return;
-                };
-                let extra = parts.next();
-                let (Ok(account_id), Ok(id)) = (a.parse::<u32>(), i.parse::<u32>()) else {
-                    return;
-                };
-                match verb {
-                    // Every message frame has loaded and been sized: the layout
-                    // has settled, so there is something worth revealing.
-                    "ready" => open_sender.input_sender().emit(MessageViewInput::Rendered),
-                    "desel" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::ClearCards),
-                    "selall" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::SelectAllCards),
-                    // Ctrl+C over a body frame the engine would not copy from
-                    // itself: the selected text, for the clipboard.
-                    "copy" => {
-                        if let Some(text) = extra.filter(|t| !t.is_empty()) {
-                            if let Some(display) = gtk::gdk::Display::default() {
-                                display.clipboard().set_text(text);
-                            }
+            ucm.connect_script_message_received(
+                Some("hylki"),
+                move |_ucm, value| match parse_bridge(&value.to_str()) {
+                    Some(Bridge::Input(input)) => open_sender.input_sender().emit(input),
+                    Some(Bridge::Clipboard(text)) => {
+                        if let Some(display) = gtk::gdk::Display::default() {
+                            display.clipboard().set_text(&text);
                         }
                     }
-                    // An address was clicked (or "New Message" picked from its
-                    // little menu) — compose to it. `extra` is the bare address.
-                    "composeto" => {
-                        if let Some(addr) = extra.map(str::trim).filter(|a| !a.is_empty()) {
-                            open_sender
-                                .input_sender()
-                                .emit(MessageViewInput::ComposeTo(addr.to_string()));
-                        }
-                    }
-                    // "Add to Contacts" from the address menu.
-                    "addcontact" => {
-                        if let Some(addr) = extra.map(str::trim).filter(|a| !a.is_empty()) {
-                            open_sender
-                                .input_sender()
-                                .emit(MessageViewInput::AddContact(addr.to_string()));
-                        }
-                    }
-                    // "Copy Address" from the address menu.
-                    "copyaddr" => {
-                        if let Some(addr) = extra.map(str::trim).filter(|a| !a.is_empty()) {
-                            if let Some(display) = gtk::gdk::Display::default() {
-                                display.clipboard().set_text(addr);
-                            }
-                        }
-                    }
-                    // The header's verification seal was clicked; extra is
-                    // the seal's own rect plus the page's innerWidth. The
-                    // rect is in CSS pixels — under a GNOME text scaling
-                    // factor ≠ 1.0 WebKit zooms the page, so CSS pixels no
-                    // longer match widget pixels; innerWidth lets the
-                    // receiver recover the real ratio.
-                    "senderinfo" => {
-                        let nums: Vec<f64> = extra
-                            .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
-                            .unwrap_or_default();
-                        if let [x, y, w, h, vw] = nums[..] {
-                            open_sender
-                                .input_sender()
-                                .emit(MessageViewInput::SenderInfoAt {
-                                    account_id,
-                                    id,
-                                    rect: (x, y, w, h),
-                                    page_width: vw,
-                                });
-                        }
-                    }
-                    "sel" => {
-                        let mode = match extra {
-                            Some("t") => SelectMode::Toggle,
-                            Some("r") => SelectMode::Range,
-                            _ => SelectMode::Plain,
-                        };
-                        open_sender
-                            .input_sender()
-                            .emit(MessageViewInput::CardClicked {
-                                account_id,
-                                id,
-                                mode,
-                            });
-                    }
-                    "size" => {
-                        if let Some(Ok(height)) = extra.map(|h| h.parse::<u32>()) {
-                            open_sender
-                                .input_sender()
-                                .emit(MessageViewInput::FrameSized {
-                                    account_id,
-                                    id,
-                                    height,
-                                });
-                        }
-                    }
-                    "open" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::OpenHeader { account_id, id }),
-                    "seen" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::MarkSeen { account_id, id }),
-                    "unsub" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::Unsubscribe { account_id, id }),
-                    // A card's template banner (#360); `extra` is the button.
-                    "tpl" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::TemplateAction {
-                            account_id,
-                            id,
-                            edit: extra.map(str::trim) == Some("edit"),
-                        }),
-                    // A card's invitation banner (#223); `extra` is which
-                    // button was pressed.
-                    "invite" => {
-                        use crate::models::Rsvp;
-                        let action = match extra.map(str::trim) {
-                            Some("yes") => Some(InviteAction::Answer(Rsvp::Accepted)),
-                            Some("maybe") => Some(InviteAction::Answer(Rsvp::Tentative)),
-                            Some("no") => Some(InviteAction::Answer(Rsvp::Declined)),
-                            Some("cal") => Some(InviteAction::AddToCalendar),
-                            _ => None,
-                        };
-                        if let Some(action) = action {
-                            open_sender
-                                .input_sender()
-                                .emit(MessageViewInput::InviteAction {
-                                    account_id,
-                                    id,
-                                    action,
-                                });
-                        }
-                    }
-                    // A card's attachment chip (#213); `extra` is the index.
-                    "attopen" | "attsave" => {
-                        let index = extra
-                            .and_then(|x| x.trim().parse::<usize>().ok())
-                            .unwrap_or(0);
-                        open_sender
-                            .input_sender()
-                            .emit(MessageViewInput::AttachmentAction {
-                                account_id,
-                                id,
-                                index,
-                                save: verb == "attsave",
-                            });
-                    }
-                    "found" => {
-                        let (cur, total) = extra
-                            .and_then(|e| e.split_once(','))
-                            .and_then(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?)))
-                            .unwrap_or((0, 0));
-                        open_sender
-                            .input_sender()
-                            .emit(MessageViewInput::FindCounted {
-                                current: cur,
-                                total,
-                            });
-                    }
-                    "reply" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardAction {
-                            action: RowAction::Reply,
-                            account_id,
-                            id,
-                        }),
-                    "replyall" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardAction {
-                            action: RowAction::ReplyAll,
-                            account_id,
-                            id,
-                        }),
-                    "forward" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardAction {
-                            action: RowAction::Forward,
-                            account_id,
-                            id,
-                        }),
-                    "star" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardAction {
-                            action: RowAction::ToggleStar,
-                            account_id,
-                            id,
-                        }),
-                    "spam" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardAction {
-                            action: RowAction::Spam,
-                            account_id,
-                            id,
-                        }),
-                    "remote" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::ToggleRemote { account_id, id }),
-                    "archive" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardAction {
-                            action: RowAction::Archive,
-                            account_id,
-                            id,
-                        }),
-                    // The ⋯ acting as a menu: the button's bottom-left corner
-                    // and the page width, the same shape "moveto" sends.
-                    "cardmenu" => {
-                        let nums: Vec<f64> = extra
-                            .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
-                            .unwrap_or_default();
-                        if let [x, y, vw] = nums[..] {
-                            open_sender
-                                .input_sender()
-                                .emit(MessageViewInput::CardMenuFrom {
-                                    account_id,
-                                    id,
-                                    x,
-                                    y,
-                                    page_width: vw,
-                                });
-                        }
-                    }
-                    // Move to… on a card: extra is the button's bottom-centre
-                    // and the page width, in CSS pixels (see "senderinfo").
-                    "moveto" => {
-                        let nums: Vec<f64> = extra
-                            .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
-                            .unwrap_or_default();
-                        if let [x, y, vw] = nums[..] {
-                            open_sender
-                                .input_sender()
-                                .emit(MessageViewInput::CardMoveAt {
-                                    account_id,
-                                    id,
-                                    x,
-                                    y,
-                                    page_width: vw,
-                                });
-                        }
-                    }
-                    "delete" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardAction {
-                            action: RowAction::Delete,
-                            account_id,
-                            id,
-                        }),
-                    "toggleread" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardAction {
-                            action: RowAction::ToggleRead,
-                            account_id,
-                            id,
-                        }),
-                    // Translate on a card, or its banner's button (#327).
-                    "translate" | "tr" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::Translate { account_id, id }),
-                    // A header folded or opened its card (#326).
-                    "fold" => open_sender.input_sender().emit(MessageViewInput::Folded {
-                        account_id,
-                        id,
-                        folded: extra == Some("1"),
-                    }),
-                    "viewsource" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardAction {
-                            action: RowAction::ViewSource,
-                            account_id,
-                            id,
-                        }),
-                    "contact" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::CardContact { account_id, id }),
-                    "senderfmt" => open_sender
-                        .input_sender()
-                        .emit(MessageViewInput::ToggleSenderStyle { account_id, id }),
-                    // "scrollat:<aid>:<id>:<offset>" — the topmost visible card.
-                    "scrollat" => {
-                        if let Some(Ok(offset)) = extra.map(|o| o.parse::<u32>()) {
-                            open_sender
-                                .input_sender()
-                                .emit(MessageViewInput::ScrollAnchor {
-                                    account_id,
-                                    id,
-                                    offset,
-                                });
-                        }
-                    }
-                    _ => {}
-                }
-            });
+                    None => {}
+                },
+            );
         }
 
         // Re-render the body when the light/dark preference changes so unstyled
