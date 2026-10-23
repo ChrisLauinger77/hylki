@@ -2,6 +2,8 @@
 //! out of the document, and handed to the composer when they are not inline
 //! images.
 
+use super::AttachCallback;
+
 use super::{exec, js_escape};
 use adw::prelude::*;
 use webkit6::prelude::WebViewExt;
@@ -11,10 +13,7 @@ use webkit6::prelude::WebViewExt;
 /// host's callback (which adds it to the attachment list). The node is
 /// removed in the same script that reads it, so the demotion is atomic even
 /// if the same picture was pasted twice.
-pub(super) fn detach_ctx_image(
-    webview: &webkit6::WebView,
-    cb: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
-) {
+pub(super) fn detach_ctx_image(webview: &webkit6::WebView, cb: AttachCallback) {
     webview.evaluate_javascript(
         "(function(){var n=window.__hylkiCtxImg;\
           if(!n){var sel=getSelection();\
@@ -93,12 +92,7 @@ fn data_uri_to_temp_file(uri: &str) -> Option<std::path::PathBuf> {
 /// `clipboardData` and the bare path arrives as text. The formats are checked
 /// synchronously so an ordinary text paste is not delayed by a read that was
 /// always going to fail.
-pub(super) fn paste_into(
-    webview: &webkit6::WebView,
-    rich: bool,
-    cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
-    plain: bool,
-) {
+pub(super) fn paste_into(webview: &webkit6::WebView, rich: bool, cb: &AttachCallback, plain: bool) {
     if webview
         .clipboard()
         .formats()
@@ -151,7 +145,7 @@ pub(super) fn deliver_files(
     webview: &webkit6::WebView,
     files: &[gtk::gio::File],
     at: Option<(f64, f64)>,
-    cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
+    cb: &AttachCallback,
     inline: bool,
 ) -> bool {
     if !inline {
@@ -250,10 +244,7 @@ pub fn is_inline_image(path: &std::path::Path) -> bool {
 }
 
 /// Every dropped file straight onto the attachment list.
-pub(super) fn attach_all(
-    files: &[gtk::gio::File],
-    cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
-) -> bool {
+pub(super) fn attach_all(files: &[gtk::gio::File], cb: &AttachCallback) -> bool {
     let mut took = false;
     for path in files.iter().filter_map(|f| f.path()) {
         match cb.borrow().as_ref() {

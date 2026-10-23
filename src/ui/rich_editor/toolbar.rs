@@ -1,6 +1,8 @@
 //! The formatting toolbar: its buttons and menus, and the state it mirrors from
 //! the document.
 
+use super::AttachCallback;
+
 use super::super::tool_flow::ToolFlow;
 use super::colors::{color_glyph, color_menu};
 use super::files::deliver_files;
@@ -174,7 +176,7 @@ fn menu_items(
 pub(super) fn build_toolbar(
     webview: &webkit6::WebView,
     anchor: &gtk::Stack,
-    attach_cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
+    attach_cb: &AttachCallback,
     expanded: bool,
 ) -> (ToolFlow, ToolFlow, gtk::Box, ToolbarState) {
     // The formatting commands flow and wrap across the bar, and a host can
@@ -648,11 +650,7 @@ pub(super) fn build_toolbar(
 /// Choose pictures to put in the message at the caret (#358), the way a
 /// drop or a paste puts them there: a file too big to carry in the body,
 /// or not a picture, joins the attachments instead.
-fn pick_pictures(
-    webview: &webkit6::WebView,
-    anchor: &gtk::Button,
-    attach_cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
-) {
+fn pick_pictures(webview: &webkit6::WebView, anchor: &gtk::Button, attach_cb: &AttachCallback) {
     exec(webview, "window.__hylkiSave&&window.__hylkiSave()");
     let filter = gtk::FileFilter::new();
     filter.set_name(Some(&i18n("Pictures")));
