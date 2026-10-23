@@ -75,18 +75,17 @@ impl Sidebar {
         self.favorites_placement = favorites_placement;
         self.contacts_placement = contacts_placement;
         self.smart_folders = smart_folders;
-        // The open smart folder was deleted: fall back to the
-        // default view.
-        if let Sel::Smart(id) = &self.selected {
-            if !self.smart_folders.iter().any(|(i, _)| i == id) {
-                self.selected = Sel::None;
-            }
-        }
         self.unified_kinds = unified_kinds;
         self.show_accounts = show_accounts;
-        // Every Filtered Folders section's rows: the unified one's
-        // (narrowed by the app to the rules that opted in) and each
-        // account's own (every rule's destination).
+        self.fill_filtered_rows();
+        self.settle_selection();
+        self.rebuild(widgets, &sender);
+    }
+
+    /// Every Filtered Folders section's rows: the unified one's (narrowed
+    /// by the app to the rules that opted in) and each account's own
+    /// (every rule's destination).
+    fn fill_filtered_rows(&mut self) {
         self.filtered_rows.clear();
         self.filtered_rows
             .insert(Slot::Unified, self.unified_folders.clone());
@@ -100,6 +99,19 @@ impl Sidebar {
                 })
                 .collect();
             self.filtered_rows.insert(Slot::Account(s.account.id), rows);
+        }
+    }
+
+    /// The selection after new contents: a row that is gone falls back to
+    /// the default view, and a folder that left a section stays the open
+    /// folder, highlighted on its account's own row.
+    fn settle_selection(&mut self) {
+        // The open smart folder was deleted: fall back to the
+        // default view.
+        if let Sel::Smart(id) = &self.selected {
+            if !self.smart_folders.iter().any(|(i, _)| i == id) {
+                self.selected = Sel::None;
+            }
         }
         // The open tag was removed (or its account): fall back to
         // the default view.
@@ -143,13 +155,7 @@ impl Sidebar {
             _ => None,
         };
         if let Some((acc, kind)) = moved.filter(|(acc, _)| left_unified(*acc) == Some(true)) {
-            let path = self
-                .sections
-                .iter()
-                .find(|s| s.account.id == acc)
-                .and_then(|s| s.folders.iter().find(|f| f.kind == kind))
-                .map(|f| f.path.clone());
-            self.selected = path.map_or(Sel::None, |p| Sel::Folder(acc, p));
+            self.selected = self.own_folder_row(acc, kind);
         }
         if self.selected == Sel::UnifiedTags && !self.unified_tags_shown() {
             self.selected = Sel::None;
@@ -168,13 +174,7 @@ impl Sidebar {
         // account's own row.
         if let Sel::UnifiedKindRow(kind, acc) = self.selected.clone() {
             if !self.unified_kinds.has(kind) {
-                let path = self
-                    .sections
-                    .iter()
-                    .find(|s| s.account.id == acc)
-                    .and_then(|s| s.folders.iter().find(|f| f.kind == kind))
-                    .map(|f| f.path.clone());
-                self.selected = path.map_or(Sel::None, |p| Sel::Folder(acc, p));
+                self.selected = self.own_folder_row(acc, kind);
             }
         }
         // A folder taken out of Favorites is still the open folder.
@@ -211,7 +211,18 @@ impl Sidebar {
                 self.selected = Sel::Folder(*acc, path.clone());
             }
         }
-        self.rebuild(widgets, &sender);
+    }
+
+    /// The row of account `acc`'s own folder of `kind`, or nothing when it
+    /// has none.
+    fn own_folder_row(&self, acc: u32, kind: FolderKind) -> Sel {
+        let path = self
+            .sections
+            .iter()
+            .find(|s| s.account.id == acc)
+            .and_then(|s| s.folders.iter().find(|f| f.kind == kind))
+            .map(|f| f.path.clone());
+        path.map_or(Sel::None, |p| Sel::Folder(acc, p))
     }
 
     pub(super) fn on_set_contact_tree(

@@ -23,6 +23,62 @@ use crate::i18n::{i18n, ni18n_f};
 use crate::models::Message;
 use relm4::prelude::*;
 
+/// The wrapper's Content-Security-Policy and its one script (the frame
+/// sizer), under a nonce made for this render.
+fn wrapper_scripts() -> (String, String) {
+    // Defence in depth for the wrapper: the only script allowed to run is the
+    // one carrying this render's nonce, which is ours. Anything a message
+    // manages to smuggle into this document — an injected `<script>`, an
+    // `onerror=` handler — is refused by the engine even if the escaping
+    // above is ever wrong again.
+    //
+    // Deliberately *only* `script-src`/`object-src`/`base-uri`: no
+    // `default-src`. A wrapper policy is inherited by the `srcdoc` frames, so
+    // restricting images or styles here would silently re-block the remote
+    // content the user has chosen to load. Each frame carries its own
+    // `default-src 'none'` policy for that.
+    let nonce = crate::rng::nonce(24).ok();
+    let csp = match &nonce {
+        Some(n) => format!(
+            "<meta http-equiv=\"Content-Security-Policy\" content=\"\
+             script-src 'nonce-{n}'; object-src 'none'; base-uri 'none'\">"
+        ),
+        // No entropy, no nonce we can trust — allow no script at all. The
+        // iframes render at their default height instead of resizing, which
+        // is a visual degradation, not a security one.
+        None => "<meta http-equiv=\"Content-Security-Policy\" content=\"\
+                 script-src 'none'; object-src 'none'; base-uri 'none'\">"
+            .to_string(),
+    };
+    let sizer = match &nonce {
+        Some(n) => {
+            // The fold's tooltips, in the user's language.
+            let qt = serde_json::to_string(&[i18n("Show quoted text"), i18n("Hide quoted text")])
+                .unwrap_or_default()
+                .replace("</", "<\\/");
+            format!("<script nonce=\"{n}\">var vireoQT={qt};{SIZE_SCRIPT}</script>")
+        }
+        None => String::new(),
+    };
+    (csp, sizer)
+}
+
+/// The grounds (wrapper, conversation page, chrome) the document paints
+/// before the messages render: the live theme's when the reader set them
+/// (issue #62), the stock GNOME values otherwise (tests).
+fn grounds(dark: bool) -> (String, String, String) {
+    LIVE_GROUNDS
+        .with(|g| g.borrow().clone())
+        .unwrap_or_else(|| {
+            let (g, p, c) = if dark {
+                (GROUND.1, PAGE.1, CHROME.1)
+            } else {
+                (GROUND.0, PAGE.0, CHROME.0)
+            };
+            (g.to_string(), p.to_string(), c.to_string())
+        })
+}
+
 /// What every card of one document shares.
 #[derive(Clone, Copy)]
 struct Cards<'a> {
@@ -112,19 +168,8 @@ impl MessageView {
         // color reads too pale there.
         let toggle_color = if dark { "#ffffff" } else { "inherit" };
         // Paint the wrapper and the (still-loading) iframes in the theme color so
-        // there's no white flash before each message's content renders. The live
-        // theme's grounds when the reader set them (issue #62); the stock GNOME
-        // values otherwise (tests).
-        let (bg, deep, chrome) = LIVE_GROUNDS
-            .with(|g| g.borrow().clone())
-            .unwrap_or_else(|| {
-                let (g, p, c) = if dark {
-                    (GROUND.1, PAGE.1, CHROME.1)
-                } else {
-                    (GROUND.0, PAGE.0, CHROME.0)
-                };
-                (g.to_string(), p.to_string(), c.to_string())
-            });
+        // there's no white flash before each message's content renders.
+        let (bg, deep, chrome) = grounds(dark);
         // Each message card only reads as a card against a slightly deeper
         // ground than its own; a full-bleed single message sits on its own
         // ground — the chrome ground when it paints no background (see
@@ -139,41 +184,7 @@ impl MessageView {
         };
         let page = if carded { deep } else { single_ground };
         let body_class = if carded { " class=\"hylki-conv\"" } else { "" };
-        // Defence in depth for the wrapper: the only script allowed to run is the
-        // one carrying this render's nonce, which is ours. Anything a message
-        // manages to smuggle into this document — an injected `<script>`, an
-        // `onerror=` handler — is refused by the engine even if the escaping
-        // above is ever wrong again.
-        //
-        // Deliberately *only* `script-src`/`object-src`/`base-uri`: no
-        // `default-src`. A wrapper policy is inherited by the `srcdoc` frames, so
-        // restricting images or styles here would silently re-block the remote
-        // content the user has chosen to load. Each frame carries its own
-        // `default-src 'none'` policy for that.
-        let nonce = crate::rng::nonce(24).ok();
-        let csp = match &nonce {
-            Some(n) => format!(
-                "<meta http-equiv=\"Content-Security-Policy\" content=\"\
-                 script-src 'nonce-{n}'; object-src 'none'; base-uri 'none'\">"
-            ),
-            // No entropy, no nonce we can trust — allow no script at all. The
-            // iframes render at their default height instead of resizing, which
-            // is a visual degradation, not a security one.
-            None => "<meta http-equiv=\"Content-Security-Policy\" content=\"\
-                     script-src 'none'; object-src 'none'; base-uri 'none'\">"
-                .to_string(),
-        };
-        let sizer = match &nonce {
-            Some(n) => {
-                // The fold's tooltips, in the user's language.
-                let qt =
-                    serde_json::to_string(&[i18n("Show quoted text"), i18n("Hide quoted text")])
-                        .unwrap_or_default()
-                        .replace("</", "<\\/");
-                format!("<script nonce=\"{n}\">var vireoQT={qt};{SIZE_SCRIPT}</script>")
-            }
-            None => String::new(),
-        };
+        let (csp, sizer) = wrapper_scripts();
         // A single message that paints no background of its own (plain mail,
         // and much styled mail too — Apple Mail styles fonts and wrapping but
         // sets no background) takes the chrome ground for its *whole* frame,

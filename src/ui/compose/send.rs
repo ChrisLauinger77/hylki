@@ -446,61 +446,11 @@ impl Compose {
             widgets.to_row.add_css_class("error");
             return;
         }
-        // The composer closes on Send, so an address the message
-        // cannot go to is caught here, while it can still be fixed
-        // (#368). Invisible characters pasted along with an address
-        // are taken out first, where the user can see the result.
-        for row in [&widgets.to_row, &widgets.cc_row, &widgets.bcc_row] {
-            if let Some(clean) = crate::worker::clean_recipient_field(&row.text()) {
-                row.set_text(&clean);
-            }
-        }
-        if let Some(clean) = crate::worker::clean_recipient_field(&widgets.reply_to_row.text()) {
-            widgets.reply_to_row.set_text(&clean);
-        }
-        let rows: [(&gtk::Widget, String); 4] = [
-            (widgets.to_row.upcast_ref(), widgets.to_row.text()),
-            (widgets.cc_row.upcast_ref(), widgets.cc_row.text()),
-            (widgets.bcc_row.upcast_ref(), widgets.bcc_row.text()),
-            (
-                widgets.reply_to_row.upcast_ref(),
-                widgets.reply_to_row.text().to_string(),
-            ),
-        ];
-        if let Some((row, addr)) = rows
-            .iter()
-            .find_map(|(row, text)| crate::worker::invalid_recipient(text).map(|addr| (row, addr)))
-        {
-            row.add_css_class("error");
-            let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-            alert(
-                parent.as_ref(),
-                &i18n("Check the address"),
-                &i18n_f("“{addr}” is not an email address.", &[("addr", &addr)]),
-            );
+        if !recipients_ok(widgets) {
             return;
         }
         let to = widgets.to_row.text().trim().to_string();
-        // A file moved or deleted since it was attached (#340): the
-        // composer closes on Send, so this is the last moment the
-        // message can still be fixed rather than lost.
-        let missing: Vec<String> = self
-            .attachments
-            .iter()
-            .filter(|p| std::fs::File::open(p).is_err())
-            .map(|p| {
-                p.file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default()
-            })
-            .collect();
-        if !missing.is_empty() {
-            self.rebuild_attachments(&widgets.attach_box, sender);
-            let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
-            alert(parent.as_ref(), &i18n("An attachment is missing"), &i18n_f(
-                "Hylki cannot read {names}. It was moved or deleted after it was attached. Remove it, or attach it again from where it is now.",
-                &[("names", &missing.join(", "))],
-            ));
+        if !self.attachments_present(widgets, sender) {
             return;
         }
         let cc = widgets.cc_row.text().trim().to_string();
@@ -508,39 +458,8 @@ impl Compose {
         let reply_to = widgets.reply_to_row.text().trim().to_string();
         let subject = widgets.subject_row.text().to_string();
         let idx = widgets.from_row.selected() as usize;
-        // OpenPGP (#133): say what is missing before anything leaves.
-        // gpg answers on a worker thread, since a stale keyring lock
-        // makes it wait about ten seconds (#316); its answer sends
-        // again, and passes here when nothing has changed since.
-        if self.sign || self.encrypt {
-            let from = self.accounts.get(idx);
-            let from_email = from.map(|a| a.email.clone()).unwrap_or_default();
-            let key = from.and_then(|a| a.pgp_key.clone());
-            let encrypt = self.encrypt;
-            let fields = [to.clone(), cc.clone(), bcc.clone()];
-            let mut checked = vec![
-                from_email.clone(),
-                key.clone().unwrap_or_default(),
-                encrypt.to_string(),
-            ];
-            checked.extend(fields.iter().cloned());
-            if self.pgp_cleared.take().as_ref() != Some(&checked) {
-                if !self.pgp_checking {
-                    self.pgp_checking = true;
-                    let s = sender.clone();
-                    gtk::glib::spawn_future_local(async move {
-                        let result = gtk::gio::spawn_blocking(move || {
-                            let fields: Vec<&str> = fields.iter().map(String::as_str).collect();
-                            pgp_send_check(&from_email, key.as_deref(), &fields, encrypt)
-                        })
-                        .await
-                        .unwrap_or_else(|_| Err("task failed".into()));
-                        s.input_sender()
-                            .emit(ComposeInput::PgpChecked { checked, result });
-                    });
-                }
-                return;
-            }
+        if self.pgp_check_pending(idx, [&to, &cc, &bcc], sender) {
+            return;
         }
         let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
         let from_alias = match self.chosen_from(widgets) {
@@ -572,6 +491,82 @@ impl Compose {
                     from_alias: from_alias.clone(),
                 }));
         });
+    }
+
+    /// Whether every attached file can still be read. One moved or deleted
+    /// since it was attached (#340) is named, and the send stops: the
+    /// composer closes on Send, so this is the last moment the message can
+    /// still be fixed rather than lost.
+    fn attachments_present(
+        &mut self,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) -> bool {
+        let missing: Vec<String> = self
+            .attachments
+            .iter()
+            .filter(|p| std::fs::File::open(p).is_err())
+            .map(|p| {
+                p.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default()
+            })
+            .collect();
+        if !missing.is_empty() {
+            self.rebuild_attachments(&widgets.attach_box, sender);
+            let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
+            alert(parent.as_ref(), &i18n("An attachment is missing"), &i18n_f(
+                "Hylki cannot read {names}. It was moved or deleted after it was attached. Remove it, or attach it again from where it is now.",
+                &[("names", &missing.join(", "))],
+            ));
+            return false;
+        }
+        true
+    }
+
+    /// OpenPGP (#133): say what is missing before anything leaves. gpg
+    /// answers on a worker thread, since a stale keyring lock makes it wait
+    /// about ten seconds (#316); its answer sends again, and passes here
+    /// when nothing has changed since. True while that check is out, and
+    /// the send waits for it.
+    fn pgp_check_pending(
+        &mut self,
+        idx: usize,
+        fields: [&str; 3],
+        sender: &ComponentSender<Self>,
+    ) -> bool {
+        if !(self.sign || self.encrypt) {
+            return false;
+        }
+        let fields = fields.map(str::to_string);
+        let from = self.accounts.get(idx);
+        let from_email = from.map(|a| a.email.clone()).unwrap_or_default();
+        let key = from.and_then(|a| a.pgp_key.clone());
+        let encrypt = self.encrypt;
+        let mut checked = vec![
+            from_email.clone(),
+            key.clone().unwrap_or_default(),
+            encrypt.to_string(),
+        ];
+        checked.extend(fields.iter().cloned());
+        if self.pgp_cleared.take().as_ref() != Some(&checked) {
+            if !self.pgp_checking {
+                self.pgp_checking = true;
+                let s = sender.clone();
+                gtk::glib::spawn_future_local(async move {
+                    let result = gtk::gio::spawn_blocking(move || {
+                        let fields: Vec<&str> = fields.iter().map(String::as_str).collect();
+                        pgp_send_check(&from_email, key.as_deref(), &fields, encrypt)
+                    })
+                    .await
+                    .unwrap_or_else(|_| Err("task failed".into()));
+                    s.input_sender()
+                        .emit(ComposeInput::PgpChecked { checked, result });
+                });
+            }
+            return true;
+        }
+        false
     }
 
     /// Handles [`ComposeInput::SendBody`].
@@ -867,4 +862,42 @@ pub(super) fn start_autosave(sender: &ComponentSender<Compose>) {
         }
         gtk::glib::ControlFlow::Continue
     });
+}
+
+/// The recipient fields cleaned of invisible characters pasted along with
+/// an address, then checked: an address the message cannot go to is
+/// marked and explained, and the send stops. The composer closes on Send,
+/// so this is where it can still be fixed (#368).
+fn recipients_ok(widgets: &ComposeWidgets) -> bool {
+    for row in [&widgets.to_row, &widgets.cc_row, &widgets.bcc_row] {
+        if let Some(clean) = crate::worker::clean_recipient_field(&row.text()) {
+            row.set_text(&clean);
+        }
+    }
+    if let Some(clean) = crate::worker::clean_recipient_field(&widgets.reply_to_row.text()) {
+        widgets.reply_to_row.set_text(&clean);
+    }
+    let rows: [(&gtk::Widget, String); 4] = [
+        (widgets.to_row.upcast_ref(), widgets.to_row.text()),
+        (widgets.cc_row.upcast_ref(), widgets.cc_row.text()),
+        (widgets.bcc_row.upcast_ref(), widgets.bcc_row.text()),
+        (
+            widgets.reply_to_row.upcast_ref(),
+            widgets.reply_to_row.text().to_string(),
+        ),
+    ];
+    if let Some((row, addr)) = rows
+        .iter()
+        .find_map(|(row, text)| crate::worker::invalid_recipient(text).map(|addr| (row, addr)))
+    {
+        row.add_css_class("error");
+        let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
+        alert(
+            parent.as_ref(),
+            &i18n("Check the address"),
+            &i18n_f("“{addr}” is not an email address.", &[("addr", &addr)]),
+        );
+        return false;
+    }
+    true
 }
