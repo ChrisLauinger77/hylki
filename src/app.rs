@@ -18813,6 +18813,7 @@ impl AppModel {
             .build();
         win.set_content(Some(content));
         win.add_controller(palette_key(sender));
+        win.add_controller(crate::ui::close_key());
         let s = sender.input_sender().clone();
         win.connect_close_request(move |_| {
             let _ = s.send(AppMsg::ComposeCloseRequested(id));

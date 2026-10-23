@@ -64,6 +64,23 @@ pub fn show_refresh_offline(button: &gtk::Button, offline: bool) {
     }
 }
 
+/// Ctrl+W for a window of its own (Settings, a message, a composer). The
+/// application's Ctrl+W reaches only windows added to it, and these are not:
+/// added, they would take the main window's other keys too (zoom, Focus
+/// Mode). Capture phase, so a web view with the focus cannot swallow it; it
+/// runs the window's close, as its titlebar button does.
+pub fn close_key() -> gtk::ShortcutController {
+    use gtk::prelude::*;
+    let shortcuts = gtk::ShortcutController::new();
+    shortcuts.set_scope(gtk::ShortcutScope::Global);
+    shortcuts.set_propagation_phase(gtk::PropagationPhase::Capture);
+    shortcuts.add_shortcut(gtk::Shortcut::new(
+        gtk::ShortcutTrigger::parse_string("<Control>w"),
+        Some(gtk::NamedAction::new("window.close")),
+    ));
+    shortcuts
+}
+
 /// Run `close` when `entry` lost focus, was left empty, and focus did not
 /// move to another widget of its own row (the scope dropdown, a button, the
 /// popover a dropdown opens). The check waits for an idle turn because the

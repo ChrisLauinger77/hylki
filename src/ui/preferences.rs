@@ -4726,18 +4726,7 @@ impl Component for Preferences {
             root.upcast_ref(),
             &sender,
         ));
-        // The application's Ctrl+W only reaches windows added to it, and
-        // this one is not: added, it would take the main window's other
-        // keys too (zoom, Focus Mode). The titlebar's close, by key.
-        {
-            let shortcuts = gtk::ShortcutController::new();
-            shortcuts.set_scope(gtk::ShortcutScope::Global);
-            shortcuts.add_shortcut(gtk::Shortcut::new(
-                gtk::ShortcutTrigger::parse_string("<Control>w"),
-                Some(gtk::NamedAction::new("window.close")),
-            ));
-            root.add_controller(shortcuts);
-        }
+        root.add_controller(crate::ui::close_key());
         // HYLKI_SHOWCASE_SETTINGS_SEARCH=<text>[:<n>] types <text> into the
         // search 2 s after the window is built and, given <n>, picks the
         // n-th result at 4 s (#260).

@@ -534,6 +534,7 @@ impl Component for MessageWindow {
             });
             root.add_controller(keys);
         }
+        root.add_controller(crate::ui::close_key());
 
         model.render_body();
         model.sync_attachments();
