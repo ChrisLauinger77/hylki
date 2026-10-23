@@ -87,7 +87,7 @@ pub(crate) fn open_bytes(name: &str, data: &[u8], parent: Option<&gtk::Window>) 
 /// works, rather than leaving a click that does nothing.
 fn launch_failed_dialog(parent: Option<&gtk::Window>, error: &str) {
     let dialog = gtk::AlertDialog::builder()
-        .message(&i18n("The file could not be opened"))
+        .message(i18n("The file could not be opened"))
         // No Flatseal toggle can help here: portal access is not a
         // permission, and the failure is inside the portal's own launcher.
         // Offer the steps that actually work.

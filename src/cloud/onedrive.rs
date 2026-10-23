@@ -6,6 +6,9 @@ use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
 
+use super::http::{short_error, status_error, Wording};
+use super::{expiry, local_file, share_password, CloudAccount, LinkTerms, ShareResult};
+
 /// What the account's OneDrive plan lets a link carry (see
 /// [`super::probe_link_terms`]).
 pub(super) fn link_terms(account: &CloudAccount) -> Result<LinkTerms, String> {
@@ -21,9 +24,6 @@ pub(super) fn link_terms(account: &CloudAccount) -> Result<LinkTerms, String> {
     let total = v["quota"]["total"].as_u64().unwrap_or(0);
     Ok(onedrive_terms(drive_type, total))
 }
-
-use super::http::{short_error, status_error, Wording};
-use super::{expiry, local_file, share_password, CloudAccount, LinkTerms, ShareResult};
 
 fn onedrive_terms(drive_type: &str, quota_total: u64) -> LinkTerms {
     const FREE_CEILING: u64 = 16 * 1024 * 1024 * 1024;
@@ -110,6 +110,9 @@ const ONEDRIVE_SINGLE_LIMIT: u64 = 60 * 1024 * 1024;
 /// Session chunks must be multiples of 320 KiB.
 const ONEDRIVE_CHUNK: usize = 32 * 320 * 1024;
 
+// ureq 2's Error is what callers match on (`status_error`); one per
+// request, so its size costs nothing worth boxing it for.
+#[allow(clippy::result_large_err)]
 fn graph_json(
     req: ureq::Request,
     body: Option<&serde_json::Value>,

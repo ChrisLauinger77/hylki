@@ -282,6 +282,10 @@ fn settle() {
     PENDING.with(|p| p.borrow_mut().clear());
 }
 
+/// The probe's answer, taken by whichever comes first: the page finishing
+/// or the timeout.
+type PendingAnswer = Rc<RefCell<Option<Box<dyn FnOnce(bool)>>>>;
+
 /// Load the probe page in a web process of its own (a separate context
 /// shares nothing with the stuck ones) and report whether it finished in
 /// time. The process is ended either way.
@@ -292,8 +296,7 @@ fn probe(done: impl FnOnce(bool) + 'static) {
         .web_context(&webkit6::WebContext::new())
         .settings(&settings)
         .build();
-    let done: Rc<RefCell<Option<Box<dyn FnOnce(bool)>>>> =
-        Rc::new(RefCell::new(Some(Box::new(done))));
+    let done: PendingAnswer = Rc::new(RefCell::new(Some(Box::new(done))));
     {
         let done = done.clone();
         view.connect_load_changed(move |view, event| {

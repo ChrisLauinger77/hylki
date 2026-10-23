@@ -16,7 +16,7 @@ pub(super) fn candidate_urls(domain: &str) -> Vec<String> {
         (32, format!("https://{domain}/favicon.ico")),
         (32, format!("https://www.{domain}/favicon.ico")),
     ]);
-    found.sort_by(|a, b| b.0.cmp(&a.0));
+    found.sort_by_key(|(size, _)| std::cmp::Reverse(*size));
     let mut out: Vec<String> = Vec::new();
     for (_, url) in found {
         if !out.contains(&url) {

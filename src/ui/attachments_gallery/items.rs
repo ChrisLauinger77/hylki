@@ -262,7 +262,7 @@ impl AttachmentsGallery {
             return;
         };
         let dialog = gtk::FileDialog::builder()
-            .title(&i18n("Save Attachment"))
+            .title(i18n("Save Attachment"))
             .initial_name(&item.name)
             .modal(true)
             .build();

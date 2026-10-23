@@ -6,10 +6,10 @@ use relm4::ComponentSender;
 use crate::i18n::i18n;
 use crate::models::{ext_of, GalleryItem};
 
-use super::cell::deleting_over;
+use super::cell::{add_item_gestures, add_quick_actions, deleting_over};
 use super::labels::date_text;
 use super::{
-    icon_color_class, icon_for, thumbnail_texture, AttachmentsGallery, GalleryInput, Thumbnail,
+    icon_color_class, icon_for, thumbnail_texture, AttachmentsGallery, Thumbnail,
     TABLE_ACTIONS_WIDTH,
 };
 
@@ -94,27 +94,13 @@ pub(super) fn build_row(
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 2);
     actions.set_width_request(TABLE_ACTIONS_WIDTH);
     actions.set_halign(gtk::Align::End);
-    let act = |icon: &str, tip: &str| {
+    add_quick_actions(&actions, item, index, sender, |icon, tip| {
         let b = gtk::Button::from_icon_name(icon);
         b.add_css_class("flat");
         b.set_valign(gtk::Align::Center);
         b.set_tooltip_text(Some(tip));
         b
-    };
-    if item.data.is_some() {
-        let download = act("folder-download-symbolic", &i18n("Download"));
-        let s = sender.clone();
-        download.connect_clicked(move |_| s.input(GalleryInput::DownloadItem(index)));
-        actions.append(&download);
-        let open = act("document-open-symbolic", &i18n("Open"));
-        let s = sender.clone();
-        open.connect_clicked(move |_| s.input(GalleryInput::OpenItem(index)));
-        actions.append(&open);
-    }
-    let goto = act("mail-unread-symbolic", &i18n("Go to Message"));
-    let s = sender.clone();
-    goto.connect_clicked(move |_| s.input(GalleryInput::GoToItem(index)));
-    actions.append(&goto);
+    });
     if deleting {
         line.append(&deleting_over(&actions));
     } else {
@@ -133,21 +119,6 @@ pub(super) fn build_row(
 
     // The same gestures the grid cells carry: right-click for the context
     // menu, double-click to open externally (single click previews).
-    let right = gtk::GestureClick::new();
-    right.set_button(gtk::gdk::BUTTON_SECONDARY);
-    let s = sender.clone();
-    right.connect_pressed(move |_, _, x, y| {
-        s.input(GalleryInput::ContextMenu { index, x, y });
-    });
-    row.add_controller(right);
-    let dbl = gtk::GestureClick::new();
-    dbl.set_button(gtk::gdk::BUTTON_PRIMARY);
-    let s = sender.clone();
-    dbl.connect_pressed(move |_, n, _, _| {
-        if n == 2 {
-            s.input(GalleryInput::OpenExternal(index));
-        }
-    });
-    row.add_controller(dbl);
+    add_item_gestures(&row, index, sender);
     row
 }

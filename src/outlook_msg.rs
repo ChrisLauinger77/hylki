@@ -60,8 +60,10 @@ fn stream(file: &mut Cfb, path: &str) -> Option<Vec<u8>> {
 fn string(file: &mut Cfb, dir: &str, id: u16) -> Option<String> {
     if let Some(raw) = stream(file, &format!("{dir}/__substg1.0_{id:04X}001F")) {
         let units: Vec<u16> = raw
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes(*c))
             .collect();
         let s = String::from_utf16_lossy(&units);
         return Some(s.trim_end_matches('\0').to_string()).filter(|s| !s.is_empty());
@@ -86,7 +88,7 @@ fn fixed(file: &mut Cfb, dir: &str, header: usize) -> std::collections::HashMap<
     let Some(raw) = stream(file, &format!("{dir}/__properties_version1.0")) else {
         return out;
     };
-    for entry in raw.get(header..).unwrap_or_default().chunks_exact(16) {
+    for entry in raw.get(header..).unwrap_or_default().as_chunks::<16>().0 {
         let tag = u32::from_le_bytes([entry[0], entry[1], entry[2], entry[3]]);
         let value = u64::from_le_bytes(entry[8..16].try_into().unwrap_or_default());
         out.insert((tag >> 16) as u16, value);
@@ -401,7 +403,7 @@ mod tests {
     /// an inline picture.
     fn sample(transport: Option<&str>) -> Vec<u8> {
         let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
-        let mut put = |file: &mut cfb::CompoundFile<Cursor<Vec<u8>>>, path: &str, data: &[u8]| {
+        let put = |file: &mut cfb::CompoundFile<Cursor<Vec<u8>>>, path: &str, data: &[u8]| {
             file.create_stream(path).unwrap().write_all(data).unwrap();
         };
         put(

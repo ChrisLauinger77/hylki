@@ -502,7 +502,7 @@ fn initials_png(name: &str, email: &str, size: i32) -> Option<Vec<u8>> {
             .filter_map(|w| w.chars().next())
             .filter(|c| c.is_alphanumeric())
             .map(|c| c.to_uppercase().next().unwrap_or(c));
-        match (it.next(), it.last()) {
+        match (it.next(), it.next_back()) {
             (Some(a), Some(z)) => format!("{a}{z}"),
             (Some(a), None) => a.to_string(),
             _ => "?".to_string(),
@@ -639,15 +639,13 @@ fn argb_network_order(data: &[u8], width: usize, height: usize, stride: usize) -
     let mut out = Vec::with_capacity(width * height * 4);
     for y in 0..height {
         let row = &data[y * stride..y * stride + width * 4];
-        for px in row.chunks_exact(4) {
-            let native = u32::from_ne_bytes([px[0], px[1], px[2], px[3]]);
+        for px in row.as_chunks::<4>().0 {
+            let native = u32::from_ne_bytes(*px);
             let a = (native >> 24) & 0xff;
             let un = |c: u32| -> u8 {
-                if a == 0 {
-                    0
-                } else {
-                    ((c * 255 + a / 2) / a).min(255) as u8
-                }
+                (c * 255 + a / 2)
+                    .checked_div(a)
+                    .map_or(0, |v| v.min(255) as u8)
             };
             let r = un((native >> 16) & 0xff);
             let g = un((native >> 8) & 0xff);

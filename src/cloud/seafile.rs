@@ -179,10 +179,7 @@ fn multipart_upload<R: Read>(
             "--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n"
         ));
     }
-    let safe = name
-        .replace('\\', "_")
-        .replace('"', "_")
-        .replace(['\r', '\n'], " ");
+    let safe = name.replace(['\\', '"'], "_").replace(['\r', '\n'], " ");
     head.push_str(&format!(
         "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{safe}\"\r\nContent-Type: application/octet-stream\r\n\r\n"
     ));
@@ -268,10 +265,7 @@ pub(super) fn seafile_upload_and_share(
         // Content-Disposition naming the file the pieces belong to. The
         // file server keeps them until the last one lands, and only that
         // answer names the file.
-        let safe = name
-            .replace('\\', "_")
-            .replace('"', "_")
-            .replace(['\r', '\n'], " ");
+        let safe = name.replace(['\\', '"'], "_").replace(['\r', '\n'], " ");
         let mut last = serde_json::Value::Null;
         for (i, (offset, len)) in chunk_ranges(size, CLOUDFLARE_CHUNK).into_iter().enumerate() {
             let piece = file_slice(path, &name, offset, len)?;

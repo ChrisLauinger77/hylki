@@ -29,6 +29,59 @@ pub(super) fn build_cell(
     cell.set_halign(gtk::Align::Fill);
     cell.set_tooltip_text(Some(&format!("{} — {}", item.name, item.human_size())));
 
+    // Lock the thumbnail section to a 4:3 aspect ratio; its width tracks the
+    // (responsive) column width and the height follows, filling the cell.
+    let aspect = RatioBox::new(&thumbnail(item));
+    // Preferred column width (the footer slider's value) — the FlowBox packs at
+    // least 3 per row and adds more as the window widens.
+    aspect.set_width_request(width);
+    aspect.set_hexpand(true);
+
+    // Overlay quick-action buttons at the thumbnail's bottom-right corner; they
+    // fade in on hover (via CSS). Download and Open need the file's bytes cached;
+    // "Go to Message" always works, so it shows even for uncached attachments.
+    let thumb_overlay = gtk::Overlay::new();
+    thumb_overlay.set_child(Some(&aspect));
+
+    let actions = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    actions.set_halign(gtk::Align::End);
+    actions.set_valign(gtk::Align::End);
+    actions.set_margin_end(6);
+    actions.set_margin_bottom(6);
+    add_quick_actions(&actions, item, index, sender, |icon, tip| {
+        let b = gtk::Button::from_icon_name(icon);
+        b.add_css_class("gallery-open");
+        b.add_css_class("circular");
+        b.add_css_class("osd");
+        b.set_tooltip_text(Some(tip));
+        b
+    });
+    if deleting {
+        cell.add_css_class("attachment-deleting");
+        thumb_overlay.add_overlay(&deleting_veil(true));
+    } else {
+        thumb_overlay.add_overlay(&actions);
+    }
+
+    cell.append(&thumb_overlay);
+    append_cell_labels(&cell, item);
+
+    let child = gtk::FlowBoxChild::new();
+    child.set_child(Some(&cell));
+    // Nothing more to do with a file on its way off the server.
+    if deleting {
+        child.set_can_target(false);
+        return child.upcast();
+    }
+    // Single click keeps the FlowBox's built-in activation (which opens the
+    // preview).
+    add_item_gestures(&child, index, sender);
+    child.upcast()
+}
+
+/// A cell's picture: the thumbnail when it is ready, a spinner while a
+/// worker renders it (replaced in place when it lands), else the type icon.
+fn thumbnail(item: &GalleryItem) -> gtk::Box {
     let thumb_holder = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     thumb_holder.add_css_class("gallery-thumb");
     thumb_holder.set_halign(gtk::Align::Fill);
@@ -62,58 +115,12 @@ pub(super) fn build_cell(
             });
         }
     }
+    thumb_holder
+}
 
-    // Lock the thumbnail section to a 4:3 aspect ratio; its width tracks the
-    // (responsive) column width and the height follows, filling the cell.
-    let aspect = RatioBox::new(&thumb_holder);
-    // Preferred column width (the footer slider's value) — the FlowBox packs at
-    // least 3 per row and adds more as the window widens.
-    aspect.set_width_request(width);
-    aspect.set_hexpand(true);
-
-    // Overlay quick-action buttons at the thumbnail's bottom-right corner; they
-    // fade in on hover (via CSS). Download and Open need the file's bytes cached;
-    // "Go to Message" always works, so it shows even for uncached attachments.
-    let thumb_overlay = gtk::Overlay::new();
-    thumb_overlay.set_child(Some(&aspect));
-
-    let actions = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-    actions.set_halign(gtk::Align::End);
-    actions.set_valign(gtk::Align::End);
-    actions.set_margin_end(6);
-    actions.set_margin_bottom(6);
-    let action_btn = |icon: &str, tip: &str| {
-        let b = gtk::Button::from_icon_name(icon);
-        b.add_css_class("gallery-open");
-        b.add_css_class("circular");
-        b.add_css_class("osd");
-        b.set_tooltip_text(Some(tip));
-        b
-    };
-    if item.data.is_some() {
-        let download = action_btn("folder-download-symbolic", &i18n("Download"));
-        let s = sender.clone();
-        download.connect_clicked(move |_| s.input(GalleryInput::DownloadItem(index)));
-        actions.append(&download);
-
-        let open = action_btn("document-open-symbolic", &i18n("Open"));
-        let s = sender.clone();
-        open.connect_clicked(move |_| s.input(GalleryInput::OpenItem(index)));
-        actions.append(&open);
-    }
-    let goto = action_btn("mail-unread-symbolic", &i18n("Go to Message"));
-    let s = sender.clone();
-    goto.connect_clicked(move |_| s.input(GalleryInput::GoToItem(index)));
-    actions.append(&goto);
-    if deleting {
-        cell.add_css_class("attachment-deleting");
-        thumb_overlay.add_overlay(&deleting_veil(true));
-    } else {
-        thumb_overlay.add_overlay(&actions);
-    }
-
-    cell.append(&thumb_overlay);
-
+/// The text under a cell's picture: name, sender, subject, then folder,
+/// date and size on one line.
+fn append_cell_labels(cell: &gtk::Box, item: &GalleryItem) {
     let name = gtk::Label::new(Some(&item.name));
     name.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
     name.set_max_width_chars(18);
@@ -151,26 +158,50 @@ pub(super) fn build_cell(
     sub.add_css_class("gallery-size");
     sub.add_css_class("dim-label");
     cell.append(&sub);
+}
 
-    let child = gtk::FlowBoxChild::new();
-    child.set_child(Some(&cell));
-    // Nothing more to do with a file on its way off the server.
-    if deleting {
-        child.set_can_target(false);
-        return child.upcast();
+/// The quick actions a cell or a table row carries, in `actions`: Download
+/// and Open when the file's bytes are in hand, Go to Message always.
+/// `button` makes each one in the caller's style.
+pub(super) fn add_quick_actions(
+    actions: &gtk::Box,
+    item: &GalleryItem,
+    index: usize,
+    sender: &ComponentSender<AttachmentsGallery>,
+    button: impl Fn(&str, &str) -> gtk::Button,
+) {
+    if item.data.is_some() {
+        let download = button("folder-download-symbolic", &i18n("Download"));
+        let s = sender.clone();
+        download.connect_clicked(move |_| s.input(GalleryInput::DownloadItem(index)));
+        actions.append(&download);
+
+        let open = button("document-open-symbolic", &i18n("Open"));
+        let s = sender.clone();
+        open.connect_clicked(move |_| s.input(GalleryInput::OpenItem(index)));
+        actions.append(&open);
     }
+    let goto = button("mail-unread-symbolic", &i18n("Go to Message"));
+    let s = sender.clone();
+    goto.connect_clicked(move |_| s.input(GalleryInput::GoToItem(index)));
+    actions.append(&goto);
+}
 
-    // Right-click → context menu at the click point.
+/// The gestures a cell or a table row carries: right-click for the item's
+/// menu at the click point, double-click to open it in its own application.
+pub(super) fn add_item_gestures(
+    widget: &impl IsA<gtk::Widget>,
+    index: usize,
+    sender: &ComponentSender<AttachmentsGallery>,
+) {
     let right = gtk::GestureClick::new();
     right.set_button(gtk::gdk::BUTTON_SECONDARY);
     let s = sender.clone();
     right.connect_pressed(move |_, _, x, y| {
         s.input(GalleryInput::ContextMenu { index, x, y });
     });
-    child.add_controller(right);
+    widget.add_controller(right);
 
-    // Double-click (primary) → open externally. Single click keeps the FlowBox's
-    // built-in activation (which opens the preview).
     let dbl = gtk::GestureClick::new();
     dbl.set_button(gtk::gdk::BUTTON_PRIMARY);
     let s = sender.clone();
@@ -179,9 +210,7 @@ pub(super) fn build_cell(
             s.input(GalleryInput::OpenExternal(index));
         }
     });
-    child.add_controller(dbl);
-
-    child.upcast()
+    widget.add_controller(dbl);
 }
 
 /// The gallery's cover-cropped thumbnail picture for a ready texture.

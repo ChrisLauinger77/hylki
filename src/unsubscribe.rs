@@ -307,8 +307,8 @@ mod tests {
     use super::*;
     use crate::models::ReplyRoute;
 
-    /// Header unfolding, on the corpus shared with the other copy of
-    /// `unfold` (sensitivity.rs and unsubscribe.rs).
+    /// Header unfolding (`crate::mail_header::unfold`), on the corpus both
+    /// header readers were pinned with before their copies were merged.
     #[test]
     fn folded_header_values_become_one_line() {
         let corpus = [

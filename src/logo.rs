@@ -283,7 +283,7 @@ fn fetch_from(email: &str) -> Option<(Vec<u8>, String)> {
     let domain = domain_of(email)?;
     let img = img_path(&domain);
     let bimi = bimi_path(&domain);
-    let bimi_fresh = bimi.as_ref().is_some_and(|p| fresh(p));
+    let bimi_fresh = bimi.as_ref().is_some_and(fresh);
     // Offline or metered, only what is on disk answers, and no answer is
     // stored: a miss now says nothing about the domain (#442).
     let online = crate::power::fetches_ahead();

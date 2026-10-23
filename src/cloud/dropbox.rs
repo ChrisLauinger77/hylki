@@ -113,6 +113,9 @@ pub(super) fn dropbox_err(what: &str, e: ureq::Error) -> String {
 }
 
 /// One RPC-style call: JSON in, JSON out.
+// ureq 2's Error is what callers match on (`status_error`); one per
+// request, so its size costs nothing worth boxing it for.
+#[allow(clippy::result_large_err)]
 fn dropbox_rpc(
     access: &str,
     endpoint: &str,
@@ -144,6 +147,9 @@ pub(super) fn dropbox_whoami(access: &str) -> Result<(String, String), String> {
 }
 
 /// One content call: the argument in the header, bytes in the body.
+// ureq 2's Error is what callers match on (`status_error`); one per
+// request, so its size costs nothing worth boxing it for.
+#[allow(clippy::result_large_err)]
 fn dropbox_content(
     access: &str,
     endpoint: &str,
