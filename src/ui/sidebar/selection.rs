@@ -2,6 +2,7 @@
 //! it after a rebuild, and selecting rows on the app's behalf.
 
 use super::tree::{is_main_row, nests_in_inbox};
+use super::types::chevron_icon;
 use super::types::UnifiedRow;
 use super::*;
 
@@ -419,7 +420,7 @@ impl Sidebar {
         }
         rev.set_reveal_child(true);
         if let Some(ch) = self.chevrons.get(&id) {
-            ch.set_icon_name(Some("pan-down-symbolic"));
+            ch.set_icon_name(Some(chevron_icon(true)));
         }
         if self.collapsed {
             self.rail_open_accounts.insert(id, true);

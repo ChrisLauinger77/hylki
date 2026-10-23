@@ -6,6 +6,17 @@ use super::widgets::{style_badge, ROW_LEFT_INSET};
 use super::*;
 
 impl Sidebar {
+    /// Rebuild everything and select again what was selected.
+    pub(super) fn rebuild(&mut self, widgets: &SidebarWidgets, sender: &ComponentSender<Self>) {
+        self.rebuild_normal(
+            &widgets.pinned_box,
+            &widgets.normal_box,
+            &widgets.footer_box,
+            sender,
+        );
+        self.restore_selection();
+    }
+
     /// Rebuild the list: optional unified row, then per-account headers with
     /// animated folder revealers, and refresh the per-account color rules.
     pub(super) fn rebuild_normal(

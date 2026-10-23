@@ -4,6 +4,7 @@
 use super::dnd::{attach_folder_list_drop, folder_drag_source, folder_drop_target, with_drop_line};
 use super::menus::{attach_folder_context_menu, folder_sort_menu, show_sidebar_menu};
 use super::tree::{hidden_by_collapse, is_main_row, nests_in_inbox, path_is_under};
+use super::types::chevron_icon;
 use super::widgets::{
     account_gravatar, build_folder_row, filter_icon, heading_chevron, section_heading,
     with_unread_overlay, wrap_row_in_revealer, ROW_LEFT_INSET,
@@ -197,11 +198,7 @@ impl Sidebar {
         // leading (overlaid on the header's left edge, reserving no
         // layout space, like the All Inboxes row's) or classic trailing,
         // per Settings → Chevron placement.
-        let chevron = gtk::Image::from_icon_name(if folded {
-            "pan-end-symbolic"
-        } else {
-            "pan-down-symbolic"
-        });
+        let chevron = gtk::Image::from_icon_name(chevron_icon(!folded));
         chevron.set_valign(gtk::Align::Center);
         // A button of its own, as the unified rows' chevrons are: it
         // takes its click before the header does.
@@ -470,11 +467,7 @@ impl Sidebar {
         custom_list.set_selection_mode(gtk::SelectionMode::Single);
         custom_list.add_css_class("navigation-sidebar");
         let custom_revealer = gtk::Revealer::new();
-        let custom_chevron = gtk::Image::from_icon_name(if section.custom_expanded {
-            "pan-down-symbolic"
-        } else {
-            "pan-end-symbolic"
-        });
+        let custom_chevron = gtk::Image::from_icon_name(chevron_icon(section.custom_expanded));
         let mut folders_heading: Option<gtk::Widget> = None;
         if !custom.is_empty() {
             for folder in custom {

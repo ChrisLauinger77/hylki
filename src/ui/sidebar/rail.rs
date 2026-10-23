@@ -47,13 +47,7 @@ impl Sidebar {
         } else {
             // Accounts coming back slide in after the rebuild.
             self.reveal_accounts_late = animate && showing;
-            self.rebuild_normal(
-                &widgets.pinned_box,
-                &widgets.normal_box,
-                &widgets.footer_box,
-                &sender,
-            );
-            self.restore_selection();
+            self.rebuild(widgets, &sender);
         }
     }
 
@@ -62,13 +56,7 @@ impl Sidebar {
         widgets: &SidebarWidgets,
         sender: ComponentSender<Self>,
     ) {
-        self.rebuild_normal(
-            &widgets.pinned_box,
-            &widgets.normal_box,
-            &widgets.footer_box,
-            &sender,
-        );
-        self.restore_selection();
+        self.rebuild(widgets, &sender);
     }
 
     pub(super) fn on_set_collapsed(
@@ -85,13 +73,7 @@ impl Sidebar {
             self.collapsed = collapsed;
             self.rail_open.clear();
             self.rail_open_accounts.clear();
-            self.rebuild_normal(
-                &widgets.pinned_box,
-                &widgets.normal_box,
-                &widgets.footer_box,
-                &sender,
-            );
-            self.restore_selection();
+            self.rebuild(widgets, &sender);
         }
     }
 
@@ -103,13 +85,7 @@ impl Sidebar {
         self.collapsed = !self.collapsed;
         self.rail_open.clear();
         self.rail_open_accounts.clear();
-        self.rebuild_normal(
-            &widgets.pinned_box,
-            &widgets.normal_box,
-            &widgets.footer_box,
-            &sender,
-        );
-        self.restore_selection();
+        self.rebuild(widgets, &sender);
         let _ = sender.output(SidebarOutput::CollapsedChanged(self.collapsed));
     }
 }

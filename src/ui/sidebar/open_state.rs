@@ -461,11 +461,7 @@ impl Sidebar {
             let expanded = !rev.reveals_child();
             rev.set_reveal_child(expanded);
             if let Some(ch) = self.chevrons.get(&id) {
-                ch.set_icon_name(Some(if expanded {
-                    "pan-down-symbolic"
-                } else {
-                    "pan-end-symbolic"
-                }));
+                ch.set_icon_name(Some(chevron_icon(expanded)));
             }
             if rail_only {
                 self.rail_open_accounts.insert(id, expanded);
@@ -503,11 +499,7 @@ impl Sidebar {
             let expanded = !rev.reveals_child();
             rev.set_reveal_child(expanded);
             if let Some(ch) = self.custom_chevrons.get(&id) {
-                ch.set_icon_name(Some(if expanded {
-                    "pan-down-symbolic"
-                } else {
-                    "pan-end-symbolic"
-                }));
+                ch.set_icon_name(Some(chevron_icon(expanded)));
             }
             if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
                 s.custom_expanded = expanded;

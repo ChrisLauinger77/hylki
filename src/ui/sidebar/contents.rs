@@ -211,13 +211,7 @@ impl Sidebar {
                 self.selected = Sel::Folder(*acc, path.clone());
             }
         }
-        self.rebuild_normal(
-            &widgets.pinned_box,
-            &widgets.normal_box,
-            &widgets.footer_box,
-            &sender,
-        );
-        self.restore_selection();
+        self.rebuild(widgets, &sender);
     }
 
     pub(super) fn on_set_contact_tree(
@@ -267,13 +261,7 @@ impl Sidebar {
             if count == 0 && self.selected == Sel::Outbox {
                 self.selected = Sel::None;
             }
-            self.rebuild_normal(
-                &widgets.pinned_box,
-                &widgets.normal_box,
-                &widgets.footer_box,
-                &sender,
-            );
-            self.restore_selection();
+            self.rebuild(widgets, &sender);
         } else if let Some(list) = &self.outbox_list {
             if let Some(row) = list.row_at_index(0) {
                 if let Some(badge) = row.child().and_downcast::<gtk::Box>() {
@@ -405,13 +393,7 @@ impl Sidebar {
         if !show && self.selected == Sel::Attachments {
             self.selected = Sel::None;
         }
-        self.rebuild_normal(
-            &widgets.pinned_box,
-            &widgets.normal_box,
-            &widgets.footer_box,
-            &sender,
-        );
-        self.restore_selection();
+        self.rebuild(widgets, &sender);
     }
 
     pub(super) fn on_set_busy(&mut self, busy: bool) {
