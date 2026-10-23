@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Translations:** French (PR #519 by frenchy82) brought up to date.
+
+- **Fixed: a picked LDAP directory showed nobody** (#307, reported by
+  3v1n0). A person whose address was kept in any other book was dropped
+  from the directory's answer. Only the contacts the list shows now hide a
+  directory entry, and Add to Contacts is not offered for someone already
+  kept.
+
 - **Added: fullscreen** (#511). F11, or Fullscreen in the main menu, puts
   the main window fullscreen and back. Settings → System → Start fullscreen
   opens it that way at every start. Leaving fullscreen keeps the size and
