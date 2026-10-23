@@ -1,6 +1,8 @@
 //! Conversations across folders: member lookups, the per-thread counts
 //! and the backfills of References and Gmail labels.
 
+use std::collections::{HashMap, HashSet};
+
 use rusqlite::params;
 
 use crate::models::{FolderKind, Message, ThreadLatest, ThreadSummary};
@@ -162,98 +164,15 @@ impl Cache {
         account_id: u32,
         groups: &[(String, Vec<String>)],
     ) -> Vec<(String, ThreadSummary)> {
-        use std::collections::{HashMap, HashSet};
-
-        /// One matched message: what it is threaded by, and what it would
-        /// look like on a row.
-        struct Row {
-            folder_path: String,
-            message_id: String,
-            references: String,
-            latest: ThreadLatest,
-        }
-
-        // The union of every group's ids, deduped and capped: one scan for the
-        // page. A group whose ids all fall past the cap simply gets no answer,
-        // and the row keeps the count the list worked out for itself.
-        let mut seen: HashSet<&str> = HashSet::new();
-        let mut ids: Vec<&String> = Vec::new();
-        for (_, group) in groups {
-            for id in group {
-                if id.is_empty() || !seen.insert(id.as_str()) {
-                    continue;
-                }
-                ids.push(id);
-                if ids.len() == THREAD_COUNT_ID_LIMIT {
-                    break;
-                }
-            }
-            if ids.len() == THREAD_COUNT_ID_LIMIT {
-                break;
-            }
-        }
+        let ids = capped_thread_ids(groups);
         if ids.is_empty() || groups.is_empty() {
             return Vec::new();
         }
-
-        // Same matching as `messages_by_thread_ids`: the id itself, or the id
-        // as a whole token inside someone's References.
-        let run = || -> rusqlite::Result<Vec<Row>> {
-            let members = self.thread_member_rowids(account_id, &ids)?;
-            if members.is_empty() {
-                return Ok(Vec::new());
-            }
-            let sql = format!(
-                "SELECT folder_path, message_id, references_, from_name, from_addr, preview, date, ts \
-                 FROM messages WHERE rowid IN ({members}) ORDER BY ts DESC LIMIT ?1",
-                members = rowid_list(&members),
-            );
-            let mut stmt = self.conn.prepare(&sql)?;
-            let rows = stmt.query_map([THREAD_COUNT_ROW_LIMIT], |row| {
-                Ok(Row {
-                    folder_path: row.get(0)?,
-                    message_id: row.get(1)?,
-                    references: row.get(2)?,
-                    latest: ThreadLatest {
-                        from_name: row.get(3)?,
-                        from_addr: row.get(4)?,
-                        preview: row.get(5)?,
-                        date: row.get(6)?,
-                        timestamp: row.get(7)?,
-                    },
-                })
-            })?;
-            rows.collect()
-        };
-        let rows = run().unwrap_or_else(|e| {
-            tracing::warn!("cache thread_summaries failed: {e}");
-            Vec::new()
-        });
+        let rows = self.thread_rows(account_id, &ids);
         if rows.is_empty() {
             return Vec::new();
         }
-
-        // A conversation the reader won't show isn't one the badge should
-        // promise: deleted and spam copies are dropped here as they are in
-        // `related_from_cache`.
-        let folders = self.load_folders(account_id);
-        let hidden: HashSet<String> = folders
-            .iter()
-            .filter(|f| {
-                matches!(
-                    f.kind,
-                    FolderKind::Trash | FolderKind::Junk | FolderKind::Templates
-                )
-            })
-            .map(|f| f.path.clone())
-            .collect();
-        // Counted, but never the message a row is shown as: a draft is a
-        // reply you are still writing.
-        let unsent: HashSet<String> = folders
-            .iter()
-            .filter(|f| matches!(f.kind, FolderKind::Drafts))
-            .map(|f| f.path.clone())
-            .collect();
+        let (hidden, unsent) = self.uncounted_folders(account_id);
 
         // Which groups an id belongs to, so each row is placed by lookup
         // rather than by walking every group.
@@ -274,7 +193,7 @@ impl Cache {
         // display is its newest message and later ones are ignored.
         let mut latest: Vec<Option<&ThreadLatest>> = vec![None; groups.len()];
         for row in &rows {
-            let Row {
+            let ThreadRow {
                 folder_path,
                 message_id,
                 references,
@@ -326,6 +245,70 @@ impl Cache {
                 })
             })
             .collect()
+    }
+
+    /// The messages matching any of `ids`, newest first and capped: the
+    /// same matching as `messages_by_thread_ids`, the id itself or the id as
+    /// a whole token inside someone's References.
+    fn thread_rows(&self, account_id: u32, ids: &[&String]) -> Vec<ThreadRow> {
+        let run = || -> rusqlite::Result<Vec<ThreadRow>> {
+            let members = self.thread_member_rowids(account_id, ids)?;
+            if members.is_empty() {
+                return Ok(Vec::new());
+            }
+            let sql = format!(
+            "SELECT folder_path, message_id, references_, from_name, from_addr, preview, date, ts \
+             FROM messages WHERE rowid IN ({members}) ORDER BY ts DESC LIMIT ?1",
+            members = rowid_list(&members),
+        );
+            let mut stmt = self.conn.prepare(&sql)?;
+            let rows = stmt.query_map([THREAD_COUNT_ROW_LIMIT], |row| {
+                Ok(ThreadRow {
+                    folder_path: row.get(0)?,
+                    message_id: row.get(1)?,
+                    references: row.get(2)?,
+                    latest: ThreadLatest {
+                        from_name: row.get(3)?,
+                        from_addr: row.get(4)?,
+                        preview: row.get(5)?,
+                        date: row.get(6)?,
+                        timestamp: row.get(7)?,
+                    },
+                })
+            })?;
+            rows.collect()
+        };
+        run().unwrap_or_else(|e| {
+            tracing::warn!("cache thread_summaries failed: {e}");
+            Vec::new()
+        })
+    }
+
+    /// The folders whose mail a conversation count leaves out (Trash, Junk,
+    /// Templates), and those it counts but never shows a row as (Drafts).
+    fn uncounted_folders(&self, account_id: u32) -> (HashSet<String>, HashSet<String>) {
+        // A conversation the reader won't show isn't one the badge should
+        // promise: deleted and spam copies are dropped here as they are in
+        // `related_from_cache`.
+        let folders = self.load_folders(account_id);
+        let hidden: HashSet<String> = folders
+            .iter()
+            .filter(|f| {
+                matches!(
+                    f.kind,
+                    FolderKind::Trash | FolderKind::Junk | FolderKind::Templates
+                )
+            })
+            .map(|f| f.path.clone())
+            .collect();
+        // Counted, but never the message a row is shown as: a draft is a
+        // reply you are still writing.
+        let unsent: HashSet<String> = folders
+            .iter()
+            .filter(|f| matches!(f.kind, FolderKind::Drafts))
+            .map(|f| f.path.clone())
+            .collect();
+        (hidden, unsent)
     }
 
     /// The next chunk of *replies* whose threading references are still the
@@ -439,4 +422,37 @@ impl Cache {
             params![account_id, folder_path, next_uid, done as i64],
         );
     }
+}
+
+/// One message matched by [`Cache::thread_summaries`]: what it is threaded
+/// by, and what it would look like on a row.
+struct ThreadRow {
+    folder_path: String,
+    message_id: String,
+    references: String,
+    latest: ThreadLatest,
+}
+
+/// The union of every group's ids, deduped and capped, for one scan.
+fn capped_thread_ids(groups: &[(String, Vec<String>)]) -> Vec<&String> {
+    // The union of every group's ids, deduped and capped: one scan for the
+    // page. A group whose ids all fall past the cap simply gets no answer,
+    // and the row keeps the count the list worked out for itself.
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut ids: Vec<&String> = Vec::new();
+    for (_, group) in groups {
+        for id in group {
+            if id.is_empty() || !seen.insert(id.as_str()) {
+                continue;
+            }
+            ids.push(id);
+            if ids.len() == THREAD_COUNT_ID_LIMIT {
+                break;
+            }
+        }
+        if ids.len() == THREAD_COUNT_ID_LIMIT {
+            break;
+        }
+    }
+    ids
 }

@@ -461,32 +461,7 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
             "KIND" if value.eq_ignore_ascii_case("group") => {
                 c.group.get_or_insert(GroupFormat::Kind);
             }
-            "MEMBER" | "X-ADDRESSBOOKSERVER-MEMBER" => {
-                let lower = value.to_ascii_lowercase();
-                if lower.starts_with("mailto:") {
-                    let email = value[7..].trim().to_string();
-                    if email.contains('@')
-                        && !c
-                            .members
-                            .iter()
-                            .any(|m| m.email.eq_ignore_ascii_case(&email))
-                    {
-                        c.members.push(Member {
-                            email,
-                            line: line.to_string(),
-                            ..Member::default()
-                        });
-                    }
-                } else {
-                    let uid = if lower.starts_with("urn:uuid:") {
-                        &value[9..]
-                    } else {
-                        value.as_str()
-                    };
-                    c.member_refs
-                        .push((uid.trim().to_string(), line.to_string()));
-                }
-            }
+            "MEMBER" | "X-ADDRESSBOOKSERVER-MEMBER" => read_member(&mut c, &value, line),
             "UID" if c.eds_uid.is_empty() => c.eds_uid = value,
             "FN" => c.name = value,
             "NICKNAME" if c.nickname.is_empty() => c.nickname = value,
@@ -526,66 +501,108 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
                     c.urls.push(value);
                 }
             }
-            "ADR" => {
-                // pobox;extended;street;locality;region;postal-code;country.
-                let formatted = raw_value
-                    .split(';')
-                    .map(|p| unescape_vcard_text(p.trim()))
-                    .filter(|p| !p.is_empty())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                if !formatted.is_empty() && !c.addresses.iter().any(|a| a.value == formatted) {
-                    c.addresses.push(Labeled {
-                        label: vcard_type_label(&params),
-                        value: formatted,
-                    });
-                    c.postal.push(Postal::from_adr(
-                        vcard_type_label(&params),
-                        raw_value.trim(),
-                    ));
-                }
-            }
+            "ADR" => read_address(&mut c, raw_value, &params),
             _ => {}
         }
     }
     if c.group.is_some() {
-        // A group is known by its name: it has no address to fall back on.
-        if c.name.trim().is_empty() {
-            return None;
-        }
-        if c.group == Some(GroupFormat::Evolution) {
-            // Evolution's own default: a list with no say hides its addresses.
-            c.hide_addresses = show_addresses != Some(true);
-            for (line, params, value) in email_lines {
-                let Some((name, email)) = evolution_member(&params, &value) else {
-                    continue;
-                };
-                if !c
-                    .members
-                    .iter()
-                    .any(|m| m.email.eq_ignore_ascii_case(&email))
-                {
-                    c.members.push(Member {
-                        name,
-                        email,
-                        line,
-                        ..Member::default()
-                    });
-                }
-            }
-        } else {
-            // Other groups have no say of their own; Hylki writes
-            // Evolution's line into an Apple group to keep Send as Bcc.
-            c.hide_addresses = show_addresses == Some(false);
-        }
-        c.emails.clear();
-        return Some(c);
+        return finish_group(c, show_addresses, email_lines);
     }
     // A card with no name goes by what else it has, as an address book
     // lists it; one with nothing to go by is skipped.
     if c.name.trim().is_empty() {
         c.name = fallback_name(&c)?;
     }
+    Some(c)
+}
+
+/// A group member line (`MEMBER`, `X-ADDRESSBOOKSERVER-MEMBER`): an
+/// address, or a reference to a card by UID to be looked up later.
+fn read_member(c: &mut ContactDetails, value: &str, line: &str) {
+    let lower = value.to_ascii_lowercase();
+    if lower.starts_with("mailto:") {
+        let email = value[7..].trim().to_string();
+        if email.contains('@')
+            && !c
+                .members
+                .iter()
+                .any(|m| m.email.eq_ignore_ascii_case(&email))
+        {
+            c.members.push(Member {
+                email,
+                line: line.to_string(),
+                ..Member::default()
+            });
+        }
+    } else {
+        let uid = if lower.starts_with("urn:uuid:") {
+            &value[9..]
+        } else {
+            value
+        };
+        c.member_refs
+            .push((uid.trim().to_string(), line.to_string()));
+    }
+}
+
+/// An `ADR` line, as one line of text and in its parts, unless the card
+/// has it already.
+fn read_address(c: &mut ContactDetails, raw_value: &str, params: &[&str]) {
+    // pobox;extended;street;locality;region;postal-code;country.
+    let formatted = raw_value
+        .split(';')
+        .map(|p| unescape_vcard_text(p.trim()))
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ");
+    if !formatted.is_empty() && !c.addresses.iter().any(|a| a.value == formatted) {
+        c.addresses.push(Labeled {
+            label: vcard_type_label(params),
+            value: formatted,
+        });
+        c.postal
+            .push(Postal::from_adr(vcard_type_label(params), raw_value.trim()));
+    }
+}
+
+/// The rest of a group's card once every line is read: its members from
+/// Evolution's `EMAIL` lines, and whether mail to it goes in Bcc. A group
+/// with no name is no group.
+fn finish_group(
+    mut c: ContactDetails,
+    show_addresses: Option<bool>,
+    email_lines: Vec<(String, Vec<String>, String)>,
+) -> Option<ContactDetails> {
+    // A group is known by its name: it has no address to fall back on.
+    if c.name.trim().is_empty() {
+        return None;
+    }
+    if c.group == Some(GroupFormat::Evolution) {
+        // Evolution's own default: a list with no say hides its addresses.
+        c.hide_addresses = show_addresses != Some(true);
+        for (line, params, value) in email_lines {
+            let Some((name, email)) = evolution_member(&params, &value) else {
+                continue;
+            };
+            if !c
+                .members
+                .iter()
+                .any(|m| m.email.eq_ignore_ascii_case(&email))
+            {
+                c.members.push(Member {
+                    name,
+                    email,
+                    line,
+                    ..Member::default()
+                });
+            }
+        }
+    } else {
+        // Other groups have no say of their own; Hylki writes
+        // Evolution's line into an Apple group to keep Send as Bcc.
+        c.hide_addresses = show_addresses == Some(false);
+    }
+    c.emails.clear();
     Some(c)
 }
 
