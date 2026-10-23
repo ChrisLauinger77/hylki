@@ -7,7 +7,7 @@ use adw::prelude::*;
 
 use crate::i18n::{i18n, ni18n_f};
 use crate::ui::contacts_page::{
-    dragged_contacts, ContactScope, ContactTree, DropOn, TreeAction, TreeBook,
+    dragged_contacts, ContactScope, ContactTree, DropOn, TreeAction, TreeBook, TreeGroup,
 };
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::ui::sidebar::SidebarInput;
@@ -211,44 +211,7 @@ impl Ctx<'_> {
             drop_target(&r, DropOn::Book(book.uid.clone()), input);
         }
         if !book.directory {
-            let (s, uid, writable, groups) = (
-                input.clone(),
-                book.uid.clone(),
-                book.writable,
-                book.takes_groups,
-            );
-            menu_on(&r, move || {
-                let act = |action: TreeAction| {
-                    let s = s.clone();
-                    move || {
-                        let _ = s.send(SidebarInput::ContactTreeMenu(action.clone()));
-                    }
-                };
-                let mut sections = Vec::new();
-                if writable {
-                    let mut entries = vec![MenuEntry::new(
-                        i18n("New Contact"),
-                        act(TreeAction::NewContact(uid.clone())),
-                    )
-                    .icon("contact-new-symbolic")];
-                    if groups {
-                        entries.push(
-                            MenuEntry::new(
-                                i18n("New Group"),
-                                act(TreeAction::NewGroup(uid.clone())),
-                            )
-                            .icon("system-users-symbolic"),
-                        );
-                    }
-                    sections.push(entries);
-                }
-                sections.push(vec![MenuEntry::new(
-                    i18n("Rename…"),
-                    act(TreeAction::RenameBook(uid.clone())),
-                )
-                .icon("document-edit-symbolic")]);
-                sections
-            });
+            book_menu(&r, book, input);
         }
         list.append(&r);
         out.layout.push(slider(&r, under.clone(), folded));
@@ -258,82 +221,129 @@ impl Ctx<'_> {
         }
         under.push(key);
         for g in &book.groups {
-            let r = row(
-                &g.name,
-                "",
-                &g.name,
-                "system-users-symbolic",
-                Some(g.count),
-                None,
-                depth + 1,
-                false,
-                inset,
+            self.group(out, g, depth + 1, &under);
+        }
+    }
+
+    /// A group's row under its book, at `depth`, hidden while a node it is
+    /// `under` is folded.
+    fn group(&self, out: &mut Filled, g: &TreeGroup, depth: i32, under: &[String]) {
+        let (list, inset, folded, input) = (self.list, self.inset, self.folded, self.input);
+        let r = row(
+            &g.name,
+            "",
+            &g.name,
+            "system-users-symbolic",
+            Some(g.count),
+            None,
+            depth,
+            false,
+            inset,
+        );
+        if g.editable {
+            drop_target(
+                &r,
+                DropOn::Group {
+                    book: g.book.clone(),
+                    uid: g.uid.clone(),
+                },
+                input,
             );
-            if g.editable {
-                drop_target(
-                    &r,
-                    DropOn::Group {
-                        book: g.book.clone(),
-                        uid: g.uid.clone(),
-                    },
-                    input,
-                );
-            }
-            let (s, book, uid, editable, any) = (
-                input.clone(),
-                g.book.clone(),
-                g.uid.clone(),
-                g.editable,
-                g.count > 0,
-            );
-            menu_on(&r, move || {
-                let act = |action: TreeAction| {
-                    let s = s.clone();
-                    move || {
-                        let _ = s.send(SidebarInput::ContactTreeMenu(action.clone()));
-                    }
-                };
-                let (b, u) = (book.clone(), uid.clone());
-                let mut first = vec![MenuEntry::new(
-                    i18n("New Message"),
-                    act(TreeAction::ComposeGroup { book: b, uid: u }),
-                )
-                .icon("mail-message-new-symbolic")
-                .enabled(any)];
-                if !editable {
-                    return vec![first];
+        }
+        let (s, book, uid, editable, any) = (
+            input.clone(),
+            g.book.clone(),
+            g.uid.clone(),
+            g.editable,
+            g.count > 0,
+        );
+        menu_on(&r, move || {
+            let act = |action: TreeAction| {
+                let s = s.clone();
+                move || {
+                    let _ = s.send(SidebarInput::ContactTreeMenu(action.clone()));
                 }
-                first.push(
-                    MenuEntry::new(
-                        i18n("Edit Group"),
-                        act(TreeAction::EditGroup {
-                            book: book.clone(),
-                            uid: uid.clone(),
-                        }),
-                    )
-                    .icon("document-edit-symbolic"),
-                );
-                let delete = MenuEntry::new(
-                    i18n("Delete Group…"),
-                    act(TreeAction::DeleteGroup {
+            };
+            let (b, u) = (book.clone(), uid.clone());
+            let mut first = vec![MenuEntry::new(
+                i18n("New Message"),
+                act(TreeAction::ComposeGroup { book: b, uid: u }),
+            )
+            .icon("mail-message-new-symbolic")
+            .enabled(any)];
+            if !editable {
+                return vec![first];
+            }
+            first.push(
+                MenuEntry::new(
+                    i18n("Edit Group"),
+                    act(TreeAction::EditGroup {
                         book: book.clone(),
                         uid: uid.clone(),
                     }),
                 )
-                .icon("user-trash-symbolic");
-                vec![first, vec![delete]]
-            });
-            list.append(&r);
-            out.layout.push(slider(&r, under.clone(), folded));
-            out.rows.push((
-                ContactScope::Group {
-                    book: g.book.clone(),
-                    uid: g.uid.clone(),
-                },
-                r,
-            ));
-        }
+                .icon("document-edit-symbolic"),
+            );
+            let delete = MenuEntry::new(
+                i18n("Delete Group…"),
+                act(TreeAction::DeleteGroup {
+                    book: book.clone(),
+                    uid: uid.clone(),
+                }),
+            )
+            .icon("user-trash-symbolic");
+            vec![first, vec![delete]]
+        });
+        list.append(&r);
+        out.layout.push(slider(&r, under.to_vec(), folded));
+        out.rows.push((
+            ContactScope::Group {
+                book: g.book.clone(),
+                uid: g.uid.clone(),
+            },
+            r,
+        ));
     }
+}
+
+/// A book's menu: a new contact or group in it, when it takes them, and
+/// renaming it in Hylki.
+fn book_menu(r: &gtk::ListBoxRow, book: &TreeBook, input: &relm4::Sender<SidebarInput>) {
+    let (s, uid, writable, groups) = (
+        input.clone(),
+        book.uid.clone(),
+        book.writable,
+        book.takes_groups,
+    );
+    menu_on(r, move || {
+        let act = |action: TreeAction| {
+            let s = s.clone();
+            move || {
+                let _ = s.send(SidebarInput::ContactTreeMenu(action.clone()));
+            }
+        };
+        let mut sections = Vec::new();
+        if writable {
+            let mut entries = vec![MenuEntry::new(
+                i18n("New Contact"),
+                act(TreeAction::NewContact(uid.clone())),
+            )
+            .icon("contact-new-symbolic")];
+            if groups {
+                entries.push(
+                    MenuEntry::new(i18n("New Group"), act(TreeAction::NewGroup(uid.clone())))
+                        .icon("system-users-symbolic"),
+                );
+            }
+            sections.push(entries);
+        }
+        sections.push(vec![MenuEntry::new(
+            i18n("Rename…"),
+            act(TreeAction::RenameBook(uid.clone())),
+        )
+        .icon("document-edit-symbolic")]);
+        sections
+    });
 }
 
 /// The key that folds an account's books.
