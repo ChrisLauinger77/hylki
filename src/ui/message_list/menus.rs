@@ -9,6 +9,9 @@ use crate::ui::context_menu::{show_context_menu_popover, MenuEntry};
 use adw::prelude::*;
 use relm4::prelude::*;
 
+/// Makes one menu entry that sends the row's action for the clicked message.
+type MakeEntry<'a> = dyn Fn(RowAction, &str, &str) -> MenuEntry + 'a;
+
 impl MessageList {
     /// Build and pop up the right-click menu for `msg` at the click location.
     pub(super) fn show_context_menu(
@@ -34,15 +37,95 @@ impl MessageList {
             })
             .icon(icon)
         };
+        let mut flag_section = vec![self.star_entry(msg, sender, &item)];
+        let move_entry = self.move_entry(msg, x, y, sender);
+        flag_section.extend(self.read_entry(msg, sender, &item));
+        let tag_section = self.tag_section(msg, sender);
+        let sections = vec![
+            self.reply_section(&item),
+            flag_section,
+            tag_section,
+            self.move_section(move_entry, &item),
+            vec![
+                item(
+                    RowAction::AddContact,
+                    &i18n("Add Sender to Contacts"),
+                    "contact-new-symbolic",
+                ),
+                item(
+                    RowAction::CreateFilter,
+                    &i18n("Create Filter from Message…"),
+                    "filter-folder-symbolic",
+                ),
+            ],
+            vec![
+                item(RowAction::ViewSource, &i18n("View Source"), "code-symbolic"),
+                item(
+                    RowAction::SaveAsFile,
+                    &i18n("Save as File…"),
+                    "document-save-symbolic",
+                ),
+            ],
+        ];
 
-        // (computed early: the star entry needs it too)
+        self.popup_menu(x, y, None, sections);
+    }
+
+    /// Reply, Reply All, Forward and Edit as New; in Templates, the
+    /// template's two uses instead.
+    fn reply_section(&self, item: &MakeEntry<'_>) -> Vec<MenuEntry> {
+        if self.in_templates {
+            vec![
+                item(
+                    RowAction::EditAsNew,
+                    &i18n("Use Template"),
+                    "mail-message-new-symbolic",
+                ),
+                item(
+                    RowAction::EditTemplate,
+                    &i18n("Edit Template"),
+                    "document-edit-symbolic",
+                ),
+            ]
+        } else {
+            vec![
+                item(
+                    RowAction::Reply,
+                    &i18n("Reply"),
+                    "mail-reply-sender-symbolic",
+                ),
+                item(
+                    RowAction::ReplyAll,
+                    &i18n("Reply All"),
+                    "mail-reply-all-symbolic",
+                ),
+                item(
+                    RowAction::Forward,
+                    &i18n("Forward"),
+                    "mail-forward-symbolic",
+                ),
+                item(
+                    RowAction::EditAsNew,
+                    &i18n("Edit as New Message"),
+                    "document-edit-symbolic",
+                ),
+            ]
+        }
+    }
+
+    /// The star: a conversation row's acts on the whole thread, like its
+    /// read toggle.
+    fn star_entry(
+        &self,
+        msg: &Message,
+        sender: &ComponentSender<Self>,
+        item: &MakeEntry<'_>,
+    ) -> MenuEntry {
         let members_for_star = self.thread_members(msg);
         let star_is_head = members_for_star
             .first()
             .is_some_and(|h| (h.account_id, h.id) == (msg.account_id, msg.id));
-        let mut flag_section = vec![if star_is_head && members_for_star.len() > 1 {
-            // A conversation row's star acts on the whole thread, like its
-            // read toggle below.
+        if star_is_head && members_for_star.len() > 1 {
             let any = members_for_star.iter().any(|m| m.starred);
             let s = sender.clone();
             let members = members_for_star.clone();
@@ -76,40 +159,56 @@ impl MessageList {
             )
         } else {
             item(RowAction::ToggleStar, &i18n("Star"), "starred-symbolic")
-        }];
+        }
+    }
 
-        // A conversation row acts on the whole thread: its read entry marks
-        // every member, through the same bulk path as a multi-select, and the
-        // singular toggle is dropped (the row isn't a singular message).
-        // Expanded replies keep the singular toggle. Labels follow state, like
-        // the singular one: any unread member reads as an unread conversation.
+    /// Move To…: the clicked message, then (for a conversation row) the
+    /// rest of its members, at the click's point in the window so the
+    /// app can anchor the picker there.
+    fn move_entry(
+        &self,
+        msg: &Message,
+        x: f64,
+        y: f64,
+        sender: &ComponentSender<Self>,
+    ) -> MenuEntry {
+        let (messages, offer_whole) = self.move_to_messages(msg);
+        let (wx, wy) = self.window_point(x, y);
+        let s = sender.clone();
+        MenuEntry::new(i18n("Move To…"), move || {
+            let _ = s.output(MessageListOutput::MoveTo {
+                messages: messages.clone(),
+                offer_whole,
+                x: wx,
+                y: wy,
+            });
+        })
+        .icon("folder-symbolic")
+    }
+
+    /// The read toggle, if the row has one. A conversation row acts on the
+    /// whole thread: its read entry marks every member, through the same
+    /// bulk path as a multi-select, and the singular toggle is dropped (the
+    /// row isn't a singular message). Expanded replies keep the singular
+    /// toggle. Labels follow state, like the singular one: any unread member
+    /// reads as an unread conversation.
+    fn read_entry(
+        &self,
+        msg: &Message,
+        sender: &ComponentSender<Self>,
+        item: &MakeEntry<'_>,
+    ) -> Option<MenuEntry> {
         let members = self.thread_members(msg);
         let is_thread_head = members
             .first()
             .is_some_and(|h| (h.account_id, h.id) == (msg.account_id, msg.id));
-        // Move To…: the clicked message, then (for a conversation row) the
-        // rest of its members, at the click's point in the window so the
-        // app can anchor the picker there.
-        let move_entry = {
-            let (messages, offer_whole) = self.move_to_messages(msg);
-            let (wx, wy) = self.window_point(x, y);
-            let s = sender.clone();
-            MenuEntry::new(i18n("Move To…"), move || {
-                let _ = s.output(MessageListOutput::MoveTo {
-                    messages: messages.clone(),
-                    offer_whole,
-                    x: wx,
-                    y: wy,
-                });
-            })
-            .icon("folder-symbolic")
-        };
         if self.in_drafts {
             // A draft is neither read nor unread: no toggle to offer.
+            None
         } else if is_thread_head {
             let any_unread = members.iter().any(|m| m.unread);
             let s = sender.clone();
-            flag_section.push(
+            Some(
                 MenuEntry::new(
                     if any_unread {
                         i18n("Mark All as Read")
@@ -132,143 +231,82 @@ impl MessageList {
                 } else {
                     "mail-unread-symbolic"
                 }),
-            );
+            )
         } else if msg.unread {
-            flag_section.push(item(
+            Some(item(
                 RowAction::ToggleRead,
                 &i18n("Mark as Read"),
                 "hylki-mail-read-symbolic",
-            ));
+            ))
         } else {
-            flag_section.push(item(
+            Some(item(
                 RowAction::ToggleRead,
                 &i18n("Mark as Unread"),
                 "mail-unread-symbolic",
+            ))
+        }
+    }
+
+    /// Tags (#71): one toggle per tag, a filled swatch where the message
+    /// carries it, behind a "Tags" submenu so a long list never makes this
+    /// menu too tall. Absent until a tag exists.
+    fn tag_section(&self, msg: &Message, sender: &ComponentSender<Self>) -> Vec<MenuEntry> {
+        let tags = self.shared.tags.borrow().clone();
+        let s = sender.clone();
+        let m = msg.clone();
+        let entries = tag_menu_entries(&tags, msg, move |keyword, add| {
+            let _ = s.output(MessageListOutput::SetTag {
+                message: Box::new(m.clone()),
+                keyword,
+                add,
+            });
+        });
+        if entries.is_empty() {
+            Vec::new()
+        } else {
+            vec![MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("tag-outline-symbolic")]
+        }
+    }
+
+    /// Spam (or Not Spam in Junk), Move to Inbox where it applies, Move
+    /// To…, Archive and Delete.
+    fn move_section(&self, move_entry: MenuEntry, item: &MakeEntry<'_>) -> Vec<MenuEntry> {
+        let mut section = Vec::new();
+        // In Junk the way back is "Not Spam" (#168): the server is
+        // told, and the message returns to the Inbox. In Trash it
+        // is a plain move, with spam still on offer.
+        if self.in_junk {
+            section.push(item(
+                RowAction::NotSpam,
+                &i18n("Not Spam"),
+                "mail-mark-notjunk-symbolic",
+            ));
+        } else {
+            if self.restorable {
+                section.push(item(
+                    RowAction::MoveToInbox,
+                    &i18n("Move to Inbox"),
+                    "mail-inbox-symbolic",
+                ));
+            }
+            section.push(item(
+                RowAction::Spam,
+                &i18n("Mark as Spam"),
+                "mail-mark-junk-symbolic",
             ));
         }
-
-        // Tags (#71): one toggle per tag, a filled swatch where the message
-        // carries it, behind a "Tags" submenu so a long list never makes
-        // this menu too tall. Absent until a tag exists.
-        let tag_section = {
-            let tags = self.shared.tags.borrow().clone();
-            let s = sender.clone();
-            let m = msg.clone();
-            let entries = tag_menu_entries(&tags, msg, move |keyword, add| {
-                let _ = s.output(MessageListOutput::SetTag {
-                    message: Box::new(m.clone()),
-                    keyword,
-                    add,
-                });
-            });
-            if entries.is_empty() {
-                Vec::new()
-            } else {
-                vec![MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("tag-outline-symbolic")]
-            }
-        };
-
-        let sections = vec![
-            if self.in_templates {
-                vec![
-                    item(
-                        RowAction::EditAsNew,
-                        &i18n("Use Template"),
-                        "mail-message-new-symbolic",
-                    ),
-                    item(
-                        RowAction::EditTemplate,
-                        &i18n("Edit Template"),
-                        "document-edit-symbolic",
-                    ),
-                ]
-            } else {
-                vec![
-                    item(
-                        RowAction::Reply,
-                        &i18n("Reply"),
-                        "mail-reply-sender-symbolic",
-                    ),
-                    item(
-                        RowAction::ReplyAll,
-                        &i18n("Reply All"),
-                        "mail-reply-all-symbolic",
-                    ),
-                    item(
-                        RowAction::Forward,
-                        &i18n("Forward"),
-                        "mail-forward-symbolic",
-                    ),
-                    item(
-                        RowAction::EditAsNew,
-                        &i18n("Edit as New Message"),
-                        "document-edit-symbolic",
-                    ),
-                ]
-            },
-            flag_section,
-            tag_section,
-            {
-                let mut section = Vec::new();
-                // In Junk the way back is "Not Spam" (#168): the server is
-                // told, and the message returns to the Inbox. In Trash it
-                // is a plain move, with spam still on offer.
-                if self.in_junk {
-                    section.push(item(
-                        RowAction::NotSpam,
-                        &i18n("Not Spam"),
-                        "mail-mark-notjunk-symbolic",
-                    ));
-                } else {
-                    if self.restorable {
-                        section.push(item(
-                            RowAction::MoveToInbox,
-                            &i18n("Move to Inbox"),
-                            "mail-inbox-symbolic",
-                        ));
-                    }
-                    section.push(item(
-                        RowAction::Spam,
-                        &i18n("Mark as Spam"),
-                        "mail-mark-junk-symbolic",
-                    ));
-                }
-                section.push(move_entry);
-                section.push(item(
-                    RowAction::Archive,
-                    &i18n("Archive"),
-                    "mail-archive-symbolic",
-                ));
-                section.push(item(
-                    RowAction::Delete,
-                    &i18n("Delete"),
-                    "user-trash-symbolic",
-                ));
-                section
-            },
-            vec![
-                item(
-                    RowAction::AddContact,
-                    &i18n("Add Sender to Contacts"),
-                    "contact-new-symbolic",
-                ),
-                item(
-                    RowAction::CreateFilter,
-                    &i18n("Create Filter from Message…"),
-                    "filter-folder-symbolic",
-                ),
-            ],
-            vec![
-                item(RowAction::ViewSource, &i18n("View Source"), "code-symbolic"),
-                item(
-                    RowAction::SaveAsFile,
-                    &i18n("Save as File…"),
-                    "document-save-symbolic",
-                ),
-            ],
-        ];
-
-        self.popup_menu(x, y, None, sections);
+        section.push(move_entry);
+        section.push(item(
+            RowAction::Archive,
+            &i18n("Archive"),
+            "mail-archive-symbolic",
+        ));
+        section.push(item(
+            RowAction::Delete,
+            &i18n("Delete"),
+            "user-trash-symbolic",
+        ));
+        section
     }
 
     /// Open a menu on the list, keeping the list where it was scrolled. The

@@ -21,13 +21,29 @@ impl Row {
         let look = shared.look.borrow().clone();
         let msg = &data.msg;
         let meta = &data.meta;
-        let w = &self.w;
         self.arrange(look.single_line.then_some(&look.columns[..]));
-        let single = look.single_line;
-        // Whether a widget's column is on: a card shows what it always has.
-        let col = |c: ListColumn| !single || look.columns.contains(&c);
-
         self.sync_host_classes();
+        self.refresh_frame(&data, &look);
+        self.refresh_avatar(&data, &look);
+        let unread = msg.unread || meta.unread;
+        self.refresh_marks(&data, &look, unread);
+        if look.single_line {
+            self.fill_columns(&data, &look, &shared, unread);
+        }
+        self.refresh_date(&data, &look);
+        self.refresh_subject(&data, &look, &shared, unread);
+        self.refresh_preview(&data, &look);
+        self.refresh_swipe_state(&shared, &look);
+        self.sync_palette_buttons();
+        self.sync_swipe_strip();
+    }
+
+    /// The reveal, the thread rail and node, the actions line and the
+    /// content box's classes.
+    fn refresh_frame(&self, data: &RowData, look: &RowLook) {
+        let meta = &data.meta;
+        let w = &self.w;
+        let single = look.single_line;
         {
             let st = self.st.borrow();
             w.revealer
@@ -69,7 +85,12 @@ impl Row {
         w.content.set_css_classes(&content);
         w.content
             .set_size_request(if single { look.min_width } else { -1 }, -1);
+    }
 
+    /// The circle: its visibility, the account ring, and the face.
+    fn refresh_avatar(&self, data: &RowData, look: &RowLook) {
+        let msg = &data.msg;
+        let w = &self.w;
         // The circle.
         w.avatar_revealer.set_visible(look.avatars);
         let shown = self.st.borrow().avatar_shown;
@@ -86,28 +107,37 @@ impl Row {
             w.avatar.set_css_classes(&[]);
         }
         if look.avatars {
-            let email = self.face_email(&data, &look);
+            let email = self.face_email(data, look);
             let want = Some((email.clone(), look.face_gen));
             if self.st.borrow().face_for != want {
                 self.st.borrow_mut().face_for = want;
                 self.st.borrow_mut().avatar_texture = None;
-                self.load_face(&email, &look);
+                self.load_face(&email, look);
             }
         }
         // Only what changed: an avatar given its text again restyles and
         // lays out its initials, and a list switch fills two hundred rows.
-        let name = self.face_name(&data, &look);
+        let name = self.face_name(data, look);
         if w.avatar.text().as_deref() != Some(name.as_str()) {
             w.avatar.set_text(Some(&name));
         }
-        let image = self.avatar_image(&data, &look);
+        let image = self.avatar_image(data, look);
         if w.avatar.custom_image() != image {
             w.avatar.set_custom_image(image.as_ref());
         }
+    }
 
+    /// The unread dot, the sender, and the attachment, star and replied
+    /// marks.
+    fn refresh_marks(&self, data: &RowData, look: &RowLook, unread: bool) {
+        let msg = &data.msg;
+        let meta = &data.meta;
+        let w = &self.w;
+        let single = look.single_line;
+        // Whether a widget's column is on: a card shows what it always has.
+        let col = |c: ListColumn| !single || look.columns.contains(&c);
         // Faded rather than hidden: the slot is always reserved and only
         // the dot's ink changes, so text never jitters as mail is read.
-        let unread = msg.unread || meta.unread;
         w.dot.set_valign(if look.avatars || single {
             gtk::Align::Center
         } else {
@@ -127,7 +157,7 @@ impl Row {
         });
 
         w.name_col.set_visible(col(ListColumn::Sender));
-        w.name.set_label(&self.name_line(&data, &look));
+        w.name.set_label(&self.name_line(data, look));
         w.name.set_css_classes(if unread {
             &["message-sender", "unread"]
         } else {
@@ -167,9 +197,17 @@ impl Row {
             .set_tooltip_text(answered.then(|| i18n("Replied")).as_deref());
         w.forwarded
             .set_tooltip_text(forwarded.then(|| i18n("Forwarded")).as_deref());
-        if single {
-            self.fill_columns(&data, &look, &shared, unread);
-        }
+    }
+
+    /// The date column and its label, the column widths on one line, and
+    /// the conversation's count chip.
+    fn refresh_date(&self, data: &RowData, look: &RowLook) {
+        let msg = &data.msg;
+        let meta = &data.meta;
+        let w = &self.w;
+        let single = look.single_line;
+        // Whether a widget's column is on: a card shows what it always has.
+        let col = |c: ListColumn| !single || look.columns.contains(&c);
         w.date.set_visible(col(ListColumn::Date));
         w.date_col.set_visible(col(ListColumn::Date));
         if single {
@@ -182,7 +220,7 @@ impl Row {
                 (ListColumn::Due, &w.due_col),
                 (ListColumn::Date, &w.date_col),
             ] {
-                bin.set_width(column_width(&look, c));
+                bin.set_width(column_width(look, c));
             }
         }
         match (&meta.latest, &meta.latest_at) {
@@ -204,7 +242,16 @@ impl Row {
         } else {
             &["thread-toggle-icon"]
         });
+    }
 
+    /// The subject (with its text on one line) and where the tag pills sit.
+    fn refresh_subject(&self, data: &RowData, look: &RowLook, shared: &RowShared, unread: bool) {
+        let msg = &data.msg;
+        let meta = &data.meta;
+        let w = &self.w;
+        let single = look.single_line;
+        // Whether a widget's column is on: a card shows what it always has.
+        let col = |c: ListColumn| !single || look.columns.contains(&c);
         w.subject_line.set_visible(look.show_subject);
         // One line: the subject, then its text dimmed after it, in one label,
         // so the subject is cut only once the text has gone (#334).
@@ -233,7 +280,7 @@ impl Row {
         });
         w.tags_box.set_visible(col(ListColumn::Tags));
         w.tags_col.set_visible(single && col(ListColumn::Tags));
-        self.render_tags(msg, &shared, &look);
+        self.render_tags(msg, shared, look);
         if !single {
             let below = look.pills_below;
             let home = if below {
@@ -250,7 +297,14 @@ impl Row {
             w.pills_line
                 .set_visible(below && look.show_subject && w.tags_box.first_child().is_some());
         }
+    }
 
+    /// The preview line and its lock.
+    fn refresh_preview(&self, data: &RowData, look: &RowLook) {
+        let msg = &data.msg;
+        let meta = &data.meta;
+        let w = &self.w;
+        let single = look.single_line;
         let preview = meta.preview.as_deref().unwrap_or(&msg.preview);
         w.preview_line.set_visible(look.preview_lines > 0);
         w.lock
@@ -265,7 +319,11 @@ impl Row {
             w.preview.set_wrap(look.preview_lines > 1);
             w.preview.set_lines(look.preview_lines.max(1) as i32);
         }
+    }
 
+    /// Whether the row takes swipes now.
+    fn refresh_swipe_state(&self, shared: &RowShared, look: &RowLook) {
+        let w = &self.w;
         w.surface.set_sensitivity(shared.swipe_sensitivity.get());
         if let Some(t) = self.tracker.borrow().as_ref() {
             // A committing row takes no new gestures — it is on its way out.
@@ -277,8 +335,6 @@ impl Row {
                     && !self.st.borrow().swipe_committing,
             );
         }
-        self.sync_palette_buttons();
-        self.sync_swipe_strip();
     }
 
     /// The columns only a single line has (#334): each shown or not as the

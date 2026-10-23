@@ -17,6 +17,7 @@ use crate::ui::message_row::{RowData, RowShared};
 mod component;
 mod conversations;
 mod filters;
+mod init;
 mod layout;
 mod menus;
 mod nav;
