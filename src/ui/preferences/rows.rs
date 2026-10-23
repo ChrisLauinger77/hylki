@@ -231,3 +231,32 @@ impl Preferences {
             && (self.notification_buttons.get(button) || !self.notification_buttons.full())
     }
 }
+
+/// Settings never truncates. AdwComboRow's DEFAULT item factory builds
+/// the selected-value display with an ellipsizing label — and rebuilds
+/// it on every selection change, so fixing the widget after the fact
+/// doesn't stick ("Follow system" → "Follow s…"). Give every combo a
+/// plain factory whose labels never ellipsize; the short row titles
+/// yield the space instead.
+pub(super) fn no_truncate(row: &adw::ComboRow) {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, item| {
+        if let Some(item) = item.downcast_ref::<gtk::ListItem>() {
+            let label = gtk::Label::new(None);
+            label.set_xalign(0.0);
+            item.set_child(Some(&label));
+        }
+    });
+    factory.connect_bind(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        if let (Some(label), Some(s)) = (
+            item.child().and_downcast::<gtk::Label>(),
+            item.item().and_downcast::<gtk::StringObject>(),
+        ) {
+            label.set_label(&s.string());
+        }
+    });
+    row.set_factory(Some(&factory));
+}
