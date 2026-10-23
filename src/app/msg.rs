@@ -17,8 +17,8 @@ use crate::worker::OutgoingMessage;
 
 use super::attachments::AttachmentTarget;
 use super::hand_off::{FileHandOff, HandOffTarget};
-use super::keymap::{Shortcut, WindowCompose};
 use super::types::UnifiedView;
+use crate::ui::keymap::{Shortcut, WindowCompose};
 
 #[derive(Debug)]
 pub(crate) enum AppMsg {

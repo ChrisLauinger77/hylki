@@ -21,7 +21,6 @@ mod messages;
 mod probes;
 mod settings;
 
-pub(crate) use capture::showcase_capture;
 pub(super) use capture::showcase_pgp;
 use capture::{input_after, showcase_at, showcase_log_focus};
 

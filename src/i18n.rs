@@ -19,6 +19,17 @@ use gettextrs::LocaleCategory;
 
 const DOMAIN: &str = "hylki";
 
+/// The values of the locale variables that are set, in the order gettext
+/// consults them for messages: `LANGUAGE` (a list of languages) first when
+/// `with_language`, then `LC_ALL`, `LC_MESSAGES` and `LANG`. Read lazily, so
+/// a caller that stops at the first match reads no further.
+pub(crate) fn locale_env(with_language: bool) -> impl Iterator<Item = String> {
+    const VARS: [&str; 4] = ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"];
+    VARS[usize::from(!with_language)..]
+        .iter()
+        .filter_map(|k| std::env::var(k).ok())
+}
+
 /// Bind the text domain. Called once, first thing in `main`, before GTK
 /// (which would otherwise set the locale without our domain in place).
 pub fn init() {
@@ -44,9 +55,7 @@ pub fn init() {
         unsafe { gettextrs::setlocale(LocaleCategory::LcAll, "C.UTF-8") };
     }
     if !chosen.is_empty() {
-        let bare = ["LC_ALL", "LC_MESSAGES", "LANG"]
-            .iter()
-            .filter_map(|k| std::env::var(k).ok())
+        let bare = locale_env(false)
             .find(|v| !v.is_empty())
             .is_none_or(|v| v == "C" || v == "POSIX");
         if bare {
@@ -203,9 +212,7 @@ pub fn ui_is_rtl() -> bool {
     if !chosen.is_empty() {
         return is_rtl_locale(&chosen);
     }
-    ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"]
-        .iter()
-        .filter_map(|k| std::env::var(k).ok())
+    locale_env(true)
         .find(|v| !v.trim().is_empty())
         .is_some_and(|v| is_rtl_locale(&v))
 }

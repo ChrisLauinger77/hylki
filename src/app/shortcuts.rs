@@ -14,11 +14,12 @@ use crate::ui::message_list::{BulkAction, MessageListInput, RowAction};
 use crate::ui::message_view::MessageViewInput;
 
 use super::flags::read_label;
-use super::keymap::{
-    ctrl_shortcut_for, focus_in_compose, focus_is_text, focus_takes_keys, gmail_sequence,
-    gmail_shortcut_for, reader_keeps, shortcut_for, without_caps_lock, GoTarget, Shortcut,
-    WindowCompose,
+use crate::ui::keymap::{
+    focus_in_compose, focus_is_text, focus_takes_keys, gmail_sequence, gmail_shortcut_for,
+    reader_keeps, shortcut_for, without_caps_lock, GoTarget, Shortcut, WindowCompose,
 };
+
+use super::keymap::ctrl_shortcut_for;
 use super::model::AppModel;
 use super::msg::AppMsg;
 use super::types::UnifiedView;

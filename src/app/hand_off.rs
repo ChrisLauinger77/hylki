@@ -204,6 +204,7 @@ impl AppModel {
     }
 
     /// The "what should these files go into" dialog.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn ask_hand_off_action(&self, hand_off: FileHandOff, sender: &ComponentSender<Self>) {
         let n = hand_off.files.len() as u32;
         let names = hand_off_names(&hand_off.files);
@@ -318,6 +319,7 @@ impl AppModel {
 
     /// Over the size limit, with cloud storage set up: attach anyway, or
     /// upload and link, per the preference or a dialog.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn hand_off_size_check(
         &mut self,
         hand_off: FileHandOff,

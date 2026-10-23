@@ -2,6 +2,7 @@
 
 use super::emoji::emoji;
 use super::linkify::{find_urls, UrlKind};
+use crate::encoding::escape_html;
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 
 /// The dialect. Deliberately without smart punctuation (it would change the
@@ -26,11 +27,6 @@ pub fn to_html(src: &str) -> String {
     let mut html = String::with_capacity(src.len() * 3 / 2);
     pulldown_cmark::html::push_html(&mut html, events.into_iter());
     inline_styles(&html)
-}
-
-/// Escape text for an HTML attribute or body.
-fn esc(s: &str) -> String {
-    gtk::glib::markup_escape_text(s).into()
 }
 
 /// The three extended items pulldown-cmark leaves to the host, applied to
@@ -229,7 +225,7 @@ fn push_scripts(out: &mut Vec<Event<'static>>, text: &str, linkable: bool) {
         push_linkified(out, &rest[..at], linkable);
         let tag = if marker == '~' { "sub" } else { "sup" };
         out.push(Event::InlineHtml(
-            format!("<{tag}>{}</{tag}>", esc(&rest[at + 1..close])).into(),
+            format!("<{tag}>{}</{tag}>", escape_html(&rest[at + 1..close])).into(),
         ));
         rest = &rest[close + 1..];
     }
@@ -285,7 +281,12 @@ fn push_linkified(out: &mut Vec<Event<'static>>, text: &str, linkable: bool) {
             UrlKind::Mail => format!("mailto:{shown}"),
         };
         out.push(Event::InlineHtml(
-            format!("<a href=\"{}\">{}</a>", esc(&href), esc(shown)).into(),
+            format!(
+                "<a href=\"{}\">{}</a>",
+                escape_html(&href),
+                escape_html(shown)
+            )
+            .into(),
         ));
         last = end;
     }

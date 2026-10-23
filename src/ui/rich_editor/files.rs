@@ -62,7 +62,7 @@ fn data_uri_to_temp_file(uri: &str) -> Option<std::path::PathBuf> {
     if !mime.starts_with("image/") {
         return None;
     }
-    let data = crate::oauth::base64_decode(payload)?;
+    let data = crate::encoding::base64_decode(payload)?;
     let ext = match mime {
         "image/jpeg" => "jpg",
         "image/gif" => "gif",
@@ -205,7 +205,7 @@ fn read_image_for_insert(
 ) -> Option<(String, String)> {
     let mime = inline_mime(file)?;
     let data = std::fs::read(path).ok()?;
-    Some((crate::oauth::base64_encode(&data), mime))
+    Some((crate::encoding::base64_encode(&data), mime))
 }
 
 /// The MIME type of a picture that can go in the text, or `None`.

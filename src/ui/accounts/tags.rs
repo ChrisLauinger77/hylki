@@ -64,6 +64,7 @@ impl AccountsWindow {
     /// The tag finder's report: every keyword found that is not a tag here
     /// yet, each with a proposed name and color, ticked to be imported.
     /// "Import All" takes the lot; "Import Selected" only the ticked ones.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn show_tag_findings(
         &self,
         parent: Option<&gtk::Window>,
@@ -139,7 +140,7 @@ impl AccountsWindow {
             if let Ok(path) = std::env::var("HYLKI_SHOWCASE") {
                 let d = dialog.clone();
                 gtk::glib::timeout_add_seconds_local_once(2, move || {
-                    crate::app::showcase_capture(d.upcast_ref(), &path);
+                    crate::ui::showcase::showcase_capture(d.upcast_ref(), &path);
                 });
             }
         }

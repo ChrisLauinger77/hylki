@@ -9,7 +9,7 @@ use super::frame::{
     message_frame, CHROME, GROUND, LIVE_ATTS, LIVE_FOLDBAR, LIVE_FOLDED, LIVE_GROUNDS, LIVE_INVITE,
     LIVE_TAGS, LIVE_TEMPLATES, LIVE_TRANSLATE, LIVE_TRANSLATE_ON, LIVE_UNSUB, PAGE,
 };
-use super::html::{attr_escape, escape_text};
+use super::html::attr_escape;
 use super::invite::invite_row_html;
 use super::remote::has_remote_resources;
 use super::size_script::SIZE_SCRIPT;
@@ -18,6 +18,7 @@ use super::snippets::{
     recipients_html, tag_chips_html, template_row_html, unsub_row_html, FOLD_BAR_FACE,
 };
 use super::MessageView;
+use crate::encoding::escape_html;
 use crate::i18n::{i18n, ni18n_f};
 use crate::models::Message;
 use relm4::prelude::*;
@@ -291,7 +292,7 @@ fn card_avatar(m: &Message, dark: bool) -> String {
                     None => format!(
                         "<span class=\"hylki-ava\" style=\"background:{bg}\">{glyph}</span>",
                         bg = attr_escape(&face.color),
-                        glyph = escape_text(emoji),
+                        glyph = escape_html(emoji),
                     ),
                 })
             }
@@ -322,7 +323,7 @@ fn card_avatar(m: &Message, dark: bool) -> String {
             Some(uri) => format!("<img class=\"hylki-ava\" src=\"{uri}\" alt=\"\">"),
             None => format!(
                 "<span class=\"hylki-ava\" style=\"background:hsl({hue},52%,{l}%)\">{}</span>",
-                escape_text(&initial),
+                escape_html(&initial),
             ),
         }
     })
@@ -451,12 +452,12 @@ fn card_html(cards: &Cards<'_>, m: &Message, ava_html: &str, body: String) -> St
                 .map(|bar| bar.replace(FOLD_BAR_FACE, ava_html))
                 .unwrap_or_default()
         }),
-        // `escape_text`, not `attr_escape`: these land in element
+        // `escape_html`, not `attr_escape`: these land in element
         // text content, where `<` and `>` are structural. A `From:`
         // display name is attacker-controlled (and RFC 2047-decoded,
         // so any byte sequence can be delivered), and this document
         // is the trusted wrapper — not a sandboxed message frame.
-        from = escape_text(&m.from_name),
+        from = escape_html(&m.from_name),
         // The sender-authentication seal (#88): hidden until a
         // verdict arrives (SenderCheckFor patches it live), then
         // tinted by trust — Bazaar's fixed blue for a pass.
@@ -498,10 +499,10 @@ fn card_html(cards: &Cards<'_>, m: &Message, ava_html: &str, body: String) -> St
             format!(
                 "<span class=\"hylki-addr hylki-mail\" data-mail=\"{0}\" \
                      data-addr=\"&lt;{0}&gt;\">&lt;{0}&gt;</span>",
-                escape_text(&m.from_addr).replace('"', "&quot;")
+                escape_html(&m.from_addr).replace('"', "&quot;")
             )
         },
-        date = escape_text(&m.datetime_full()),
+        date = escape_html(&m.datetime_full()),
         // Everyone the message went to, tucked behind a small chip so
         // a card's header stays one line tall until asked. Escaped
         // like the sender: recipient headers are attacker-controlled.
@@ -531,7 +532,7 @@ fn card_html(cards: &Cards<'_>, m: &Message, ava_html: &str, body: String) -> St
         // Where this message was read from, when that isn't the
         // folder on screen — the reply you sent, pulled in from Sent.
         folder = match folder_labels.get(&(m.account_id, m.id)) {
-            Some(label) => format!("<span class=\"hylki-folder\">{}</span>", escape_text(label)),
+            Some(label) => format!("<span class=\"hylki-folder\">{}</span>", escape_html(label)),
             None => String::new(),
         },
         body = body,

@@ -46,7 +46,7 @@ pub(super) fn parse_mailto(uri: &str) -> Option<crate::ui::compose::ComposePrefi
     // `mailto://user@host` URL-style.
     let addr = addr.trim_start_matches('/');
     // `+` stays literal: plus-addressing (`user+tag@example.com`) is real.
-    let mut to = crate::percent::decode(addr, false);
+    let mut to = crate::encoding::percent::decode(addr, false);
     let (mut cc, mut bcc, mut subject, mut body) =
         (String::new(), String::new(), String::new(), String::new());
     let mut attachments: Vec<std::path::PathBuf> = Vec::new();
@@ -73,7 +73,7 @@ pub(super) fn parse_mailto(uri: &str) -> Option<crate::ui::compose::ComposePrefi
     }
     for pair in &pairs {
         let (k, raw) = pair.split_once('=').unwrap_or((pair, ""));
-        let v = crate::percent::decode(raw, false);
+        let v = crate::encoding::percent::decode(raw, false);
         match k.to_ascii_lowercase().as_str() {
             // A second `to` joins the address part, comma-separated.
             "to" if !v.is_empty() => {
@@ -154,7 +154,7 @@ fn parse_mid(uri: &str) -> Option<String> {
     // GLib normalizes a scheme it does not know to `mid:///…` on the way
     // through GFile (and decodes some of the escapes), so leading slashes
     // are not part of the id.
-    let decoded = crate::percent::decode(rest.trim_start_matches('/'), false);
+    let decoded = crate::encoding::percent::decode(rest.trim_start_matches('/'), false);
     // An optional `/content-id` follows the message-id. Slashes are legal
     // inside a message-id's left part (GitHub's have several), so only a
     // slash after the `@`, in the domain part, ends the id.

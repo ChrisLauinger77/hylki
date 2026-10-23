@@ -20,11 +20,9 @@ mod cell;
 mod items;
 mod labels;
 mod msg;
-mod open_file;
 mod ratio_box;
 mod scope;
 mod table;
-mod thumbnails;
 mod update;
 
 use cell::build_cell;
@@ -33,17 +31,14 @@ use labels::{caption, column_header, count_text, scan_text};
 use msg::key_of;
 pub use msg::{FileKey, GalleryInput, GalleryOutput, GalleryRequest};
 
-pub(crate) use open_file::open_bytes;
-pub use open_file::purge_attachment_dir;
+use crate::ui::attachment_io::open_bytes;
+use crate::ui::thumbnails::{
+    icon_color_class, icon_for, is_pdf_name, lightbox_pdf_texture, spawn_thumbnail_render,
+    texture_from, thumb_cache_key, thumbnail_spinner, thumbnail_texture, Thumbnail, PDF_PREVIEWS,
+};
 use ratio_box::RatioBox;
 pub use scope::{GalleryAccount, GalleryFolder};
 use table::build_row;
-pub(crate) use thumbnails::{
-    cache_stats, cached_pdf_preview, content_key, icon_color_class, icon_for, is_pdf_name,
-    lightbox_pdf_texture, pdf_page_texture, pdf_render_lock, spawn_thumbnail_render, texture_from,
-    thumbnail_spinner, thumbnail_texture, Thumbnail,
-};
-use thumbnails::{thumb_cache_key, PDF_PREVIEWS};
 
 /// Width of the table's trailing quick-actions column (three icon buttons);
 /// the header carries a spacer of the same width so the columns line up.

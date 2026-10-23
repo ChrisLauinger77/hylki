@@ -783,7 +783,7 @@ mod tests {
 
     #[test]
     fn secrets_are_needed_only_for_what_the_account_lacks() {
-        let blank = crate::ui::welcome::blank_account();
+        let blank = crate::config::blank_account();
         assert!(AccountSecrets::needed(&blank));
         let with_pw = AccountConfig {
             password: "pw".into(),
@@ -844,7 +844,7 @@ mod tests {
                     ..Default::default()
                 },
             ],
-            ..crate::ui::welcome::blank_account()
+            ..crate::config::blank_account()
         };
         secrets.apply(&mut acc);
         assert_eq!(acc.password, "own");

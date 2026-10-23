@@ -751,22 +751,4 @@ mod tests {
         assert!(is_event_target(&m, None, 2, 9));
         assert!(!is_event_target(&m, None, 2, 40));
     }
-
-    #[test]
-    fn thread_ids_collect_own_and_referenced_ids_once() {
-        let mut a = msg(1, 1, 10);
-        a.message_id = "root@x".into();
-        let mut b = msg(1, 1, 11);
-        b.message_id = "reply@x".into();
-        b.references = "root@x parent@x".into();
-        let ids = thread_ids(&[a, b]);
-        assert_eq!(ids, vec!["root@x", "reply@x", "parent@x"]);
-    }
-
-    #[test]
-    fn thread_ids_skips_messages_with_no_headers() {
-        // Nothing to search the cache by — better an empty list than a lookup
-        // that would match every message with an empty message_id.
-        assert!(thread_ids(&[msg(1, 1, 10)]).is_empty());
-    }
 }

@@ -79,7 +79,7 @@ impl AppModel {
             "" => "invite.ics".to_string(),
             s => format!("{}.ics", &s[..s.len().min(60)]),
         };
-        crate::ui::attachments_gallery::open_bytes(
+        crate::ui::attachment_io::open_bytes(
             &name,
             invite.ics.as_bytes(),
             Some(self.window.upcast_ref::<gtk::Window>()),

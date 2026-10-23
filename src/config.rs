@@ -144,21 +144,22 @@ pub fn write_private_file(path: &std::path::Path, contents: &str) -> std::io::Re
 }
 
 /// A file in Hylki's own config directory, `~/.config/hylki/`.
-fn config_file(name: &str) -> Option<PathBuf> {
+pub(crate) fn config_file(name: &str) -> Option<PathBuf> {
     Some(config_base()?.join("hylki").join(name))
 }
 
 /// A settings file parsed, or `None` when it is missing, unreadable or does
 /// not parse.
-fn read_toml<T: serde::de::DeserializeOwned>(path: Option<PathBuf>) -> Option<T> {
+pub(crate) fn read_toml<T: serde::de::DeserializeOwned>(path: Option<PathBuf>) -> Option<T> {
     let text = std::fs::read_to_string(path?).ok()?;
     toml::from_str(&text).ok()
 }
 
 /// Writes a settings file only its owner can read, logging a failure as
 /// "could not save `what`". `make_dir` creates the config directory first;
-/// filters.toml, smart_folders.toml and tags.toml are written without it.
-fn save_private_toml<T: serde::Serialize>(
+/// filters.toml, smart_folders.toml, tags.toml and cloud.toml are written
+/// without it.
+pub(crate) fn save_private_toml<T: serde::Serialize>(
     path: Option<PathBuf>,
     value: &T,
     what: &str,

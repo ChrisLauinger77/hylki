@@ -44,7 +44,6 @@ mod children;
 mod compose_host;
 mod compose_init;
 mod compose_open;
-mod confirm;
 mod consts;
 mod contacts;
 mod conversation;
@@ -74,6 +73,7 @@ mod msg;
 mod navigation;
 mod notifications;
 mod outbox;
+mod outgoing;
 mod palette;
 mod pending;
 mod picker;
@@ -85,7 +85,6 @@ mod prefs_general;
 mod prefs_list;
 mod prefs_reader;
 mod prefs_sidebar;
-mod quote;
 mod reader_select;
 mod reader_toolbar;
 mod release_notes;
@@ -120,15 +119,10 @@ mod window;
 mod workers;
 
 pub(crate) use accounts::finish_keyring_writes;
-pub(crate) use keymap::{
-    focus_is_text, focus_takes_keys, gmail_shortcut_for, reader_keeps, shortcut_for,
-    without_caps_lock, Shortcut,
-};
 pub(crate) use model::AppModel;
 pub(crate) use msg::AppMsg;
-pub(crate) use quote::{body_is_pre_wrap, message_text};
-pub(crate) use showcase::showcase_capture;
-pub(crate) use theme::desktop_icon_theme;
+// The worker reads `crate::app::message_text` (until the worker branch is merged).
+pub(crate) use crate::quote::message_text;
 pub(crate) use uri_queue::{
     is_message_file, queue_attach_files, queue_mailto, queue_message_file, queue_mid,
 };

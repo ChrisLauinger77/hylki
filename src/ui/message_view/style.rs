@@ -206,7 +206,7 @@ pub(super) fn auto_direction(doc: &str) -> String {
     } else {
         doc.to_string()
     };
-    let plain = if crate::app::body_is_pre_wrap(&doc) {
+    let plain = if crate::quote::body_is_pre_wrap(&doc) {
         "body,.hylki-plain"
     } else if lower.contains("hylki-plain") {
         ".hylki-plain"

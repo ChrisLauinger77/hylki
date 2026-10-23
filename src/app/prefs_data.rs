@@ -8,11 +8,11 @@ use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::ui::notifications::NotifyInput;
 use crate::ui::preferences::PrefOutput;
 
-use super::confirm::confirm_destructive;
 use super::contacts::{reload_contacts, sync_contact_books};
 use super::demo::demo_mode;
 use super::model::AppModel;
 use super::msg::AppMsg;
+use crate::ui::dialog::confirm_destructive;
 
 impl AppModel {
     /// Asks where to save, writes the file there with `write` and says in
@@ -221,6 +221,7 @@ impl AppModel {
     /// Second stage of ImportSettings: the chosen file, applied on a clean
     /// main-loop turn (working inside the chooser's completion callback froze
     /// the app when the confirmation dialog presented there).
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn import_settings_from(&self, path: std::path::PathBuf) {
         let outcome = std::fs::read_to_string(&path)
             .map_err(|e| e.to_string())

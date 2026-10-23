@@ -315,7 +315,7 @@ struct Footer {
 
 /// Copy the PDF at `raw` to `out` page by page, drawing the footer on each.
 fn stamp(raw: &Path, out: &Path, footer: &Footer, title: &str) -> Result<(), String> {
-    let _guard = crate::ui::attachments_gallery::pdf_render_lock();
+    let _guard = crate::ui::thumbnails::pdf_render_lock();
     let doc = poppler::Document::from_file(&gio::File::for_path(raw).uri(), None)
         .map_err(|e| e.to_string())?;
     let pages = doc.n_pages();
@@ -574,7 +574,7 @@ pub fn open(parent: &gtk::Window, html: &str, job_name: &str) {
 /// height on screen in logical pixels. Drawn at `scale` device pixels per logical one,
 /// so text is sharp on a high-density display.
 fn page_textures(path: &Path, scale: f64) -> Result<Vec<(gdk::Texture, f64, f64)>, String> {
-    let _guard = crate::ui::attachments_gallery::pdf_render_lock();
+    let _guard = crate::ui::thumbnails::pdf_render_lock();
     let doc = poppler::Document::from_file(&gio::File::for_path(path).uri(), None)
         .map_err(|e| e.to_string())?;
     // CSS pixels per point: a page shows at its printed size.

@@ -1,10 +1,36 @@
 //! Opening an attachment in another application: staging its bytes in a
 //! private directory and handing the file over, through GIO natively or
-//! through the OpenURI portal inside Flatpak.
+//! through the OpenURI portal inside Flatpak. And saving one where the user
+//! picks.
 
 use gtk::prelude::*;
 
 use crate::i18n::i18n;
+
+/// Ask where to save one attachment ("Save Attachment", the file's own name
+/// offered) and write it there. A place without a local path is passed over
+/// in silence, as it always was; a failed write goes to `on_error`, which
+/// each caller keeps as it had it (most drop it, the gallery logs it).
+pub(crate) fn save_attachment_as(
+    name: &str,
+    data: Vec<u8>,
+    parent: Option<&gtk::Window>,
+    on_error: impl FnOnce(std::io::Error) + 'static,
+) {
+    let dialog = gtk::FileDialog::builder()
+        .initial_name(name)
+        .title(i18n("Save Attachment"))
+        .build();
+    dialog.save(parent, gtk::gio::Cancellable::NONE, move |res| {
+        if let Ok(file) = res {
+            if let Some(path) = file.path() {
+                if let Err(e) = std::fs::write(path, &data) {
+                    on_error(e);
+                }
+            }
+        }
+    });
+}
 
 /// Write bytes to a temp file and open it in the default application.
 ///
@@ -56,7 +82,7 @@ pub(crate) fn open_bytes(name: &str, data: &[u8], parent: Option<&gtk::Window>) 
     // sandbox the portal is the only road out and GIO's launcher is the one
     // that can't work. So each side leads with the road that works for it
     // and keeps the other as the fallback.
-    if std::path::Path::new("/.flatpak-info").exists() {
+    if crate::platform::is_flatpak() {
         // Inside the sandbox the file was staged into the app's PRIVATE /tmp —
         // a path the host cannot read. Handing the portal a file:// URI string
         // therefore launches a handler pointed at a file that, host-side, does

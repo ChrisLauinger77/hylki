@@ -8,6 +8,7 @@ use crate::config;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::{FolderKind, Message};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
+use crate::ui::message_actions::MessageAction;
 use crate::ui::preferences::PrefInput;
 
 use super::model::AppModel;
@@ -185,6 +186,7 @@ impl AppModel {
         sender: &ComponentSender<Self>,
     ) -> Vec<Vec<MenuEntry>> {
         use config::ToolbarItem as T;
+        use MessageAction as A;
         let target = self.reply_target();
         let acts = target.is_some();
         let many = acts || self.many_selected();
@@ -201,136 +203,65 @@ impl AppModel {
         } else {
             vec![&self.reader_toolbar.right]
         };
+        let item = |action: MessageAction, msg: fn() -> AppMsg, enabled: bool| {
+            action_entry(sender, action.label(), action.icon(), msg, enabled)
+        };
         let mut sections = Vec::new();
         for group in groups {
             let mut section = Vec::new();
-            for item in group {
-                match item {
-                    T::Reply => section.push(action_entry(
-                        sender,
-                        i18n("Reply"),
-                        "mail-reply-sender",
-                        || AppMsg::Reply,
-                        acts,
-                    )),
-                    T::ReplyAll => section.push(action_entry(
-                        sender,
-                        i18n("Reply All"),
-                        "mail-reply-all",
-                        || AppMsg::ReplyAll,
-                        acts,
-                    )),
-                    T::Forward => section.push(action_entry(
-                        sender,
-                        i18n("Forward"),
-                        "mail-forward",
-                        || AppMsg::Forward,
-                        acts,
-                    )),
-                    T::Star => section.push(if starred {
-                        action_entry(
-                            sender,
-                            i18n("Remove Star"),
-                            "hylki-non-starred",
-                            || AppMsg::ToggleStar,
-                            many,
-                        )
-                    } else {
-                        action_entry(sender, i18n("Star"), "starred", || AppMsg::ToggleStar, many)
-                    }),
-                    T::Archive => section.push(action_entry(
-                        sender,
-                        i18n("Archive"),
-                        "mail-archive",
-                        || AppMsg::Archive,
+            for item_kind in group {
+                match item_kind {
+                    T::Reply => section.push(item(A::Reply, || AppMsg::Reply, acts)),
+                    T::ReplyAll => section.push(item(A::ReplyAll, || AppMsg::ReplyAll, acts)),
+                    T::Forward => section.push(item(A::Forward, || AppMsg::Forward, acts)),
+                    T::Star => section.push(item(
+                        if starred { A::RemoveStar } else { A::Star },
+                        || AppMsg::ToggleStar,
                         many,
                     )),
-                    T::Delete => section.push(action_entry(
-                        sender,
-                        i18n("Delete"),
-                        "user-trash",
-                        || AppMsg::Delete,
+                    T::Archive => section.push(item(A::Archive, || AppMsg::Archive, many)),
+                    T::Delete => section.push(item(A::Delete, || AppMsg::Delete, many)),
+                    T::Spam => section.push(item(
+                        if self.target_in_junk() {
+                            A::NotSpam
+                        } else {
+                            A::MarkSpam
+                        },
+                        || AppMsg::MarkSpam,
                         many,
                     )),
-                    T::Spam => section.push(if self.target_in_junk() {
-                        action_entry(
-                            sender,
-                            i18n("Not Spam"),
-                            "mail-mark-notjunk",
-                            || AppMsg::MarkSpam,
-                            many,
-                        )
-                    } else {
-                        action_entry(
-                            sender,
-                            i18n("Mark as Spam"),
-                            "mail-mark-junk",
-                            || AppMsg::MarkSpam,
-                            many,
-                        )
-                    }),
-                    T::ReadUnread => section.push(if target_unread {
-                        action_entry(
-                            sender,
-                            i18n("Mark as Read"),
-                            "hylki-mail-read",
-                            || AppMsg::ToggleReadCurrent,
-                            many,
-                        )
-                    } else {
-                        action_entry(
-                            sender,
-                            i18n("Mark as Unread"),
-                            "mail-unread",
-                            || AppMsg::ToggleReadCurrent,
-                            many,
-                        )
-                    }),
+                    T::ReadUnread => section.push(item(
+                        if target_unread {
+                            A::MarkRead
+                        } else {
+                            A::MarkUnread
+                        },
+                        || AppMsg::ToggleReadCurrent,
+                        many,
+                    )),
                     // Tags (#71), where there are any and something to tag —
                     // behind a submenu, as in the message list's menu.
                     T::Tags => {
                         if let Some(entries) = self.reader_tag_entries(sender) {
                             section.push(
-                                MenuEntry::submenu(i18n("Tags"), vec![entries])
+                                MenuEntry::submenu(A::Tags.label(), vec![entries])
                                     .icon("tag-outline-symbolic"),
                             );
                         }
                     }
                     T::MoveTo => {
                         if restorable {
-                            section.push(action_entry(
-                                sender,
-                                i18n("Move to Inbox"),
-                                "mail-inbox",
-                                || AppMsg::MoveToInbox,
-                                acts,
-                            ));
+                            section.push(item(A::MoveToInbox, || AppMsg::MoveToInbox, acts));
                         }
-                        section.push(action_entry(
-                            sender,
-                            i18n("Move To…"),
-                            "folder",
-                            || AppMsg::MoveToMenu,
-                            many,
-                        ));
+                        section.push(item(A::MoveTo, || AppMsg::MoveToMenu, many));
                     }
-                    T::Find => section.push(action_entry(
-                        sender,
-                        i18n("Find in Message"),
-                        "loupe-with-arrow",
-                        || AppMsg::OpenReaderFind,
-                        has_current,
-                    )),
+                    T::Find => section.push(item(A::Find, || AppMsg::OpenReaderFind, has_current)),
                     // View Source is deliberately absent: it lives in the
                     // message list's context menu only (the Outbox variant
                     // above keeps it — queued rows have no such menu).
-                    T::Print => section.push(action_entry(
-                        sender,
-                        i18n("Print Preview"),
-                        "printer",
-                        || AppMsg::PrintPreview,
-                        has_current,
-                    )),
+                    T::Print => {
+                        section.push(item(A::PrintPreview, || AppMsg::PrintPreview, has_current))
+                    }
                 }
             }
             if !section.is_empty() {

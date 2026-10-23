@@ -2,6 +2,10 @@
 //! splitting a line into name, parameters and value, TEXT escapes, and
 //! folding on the way out.
 
+// iCalendar's TEXT escapes are vCard's (crate::encoding).
+pub(super) use crate::encoding::escape_text_value as escape;
+use crate::encoding::unescape_text_value as unescape;
+
 /// One unfolded content line: `NAME;PARAM=VALUE:value`.
 #[derive(Debug, Default)]
 pub(super) struct Line {
@@ -114,42 +118,6 @@ fn unquote(value: &str) -> &str {
         .strip_prefix('"')
         .and_then(|v| v.strip_suffix('"'))
         .unwrap_or(value)
-}
-
-/// Undo iCalendar's text escapes: `\n` (and `\N`) is a line break, and a
-/// comma, semicolon or backslash in a value arrives with a backslash before
-/// it.
-fn unescape(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    let mut chars = value.chars();
-    while let Some(c) = chars.next() {
-        if c != '\\' {
-            out.push(c);
-            continue;
-        }
-        match chars.next() {
-            Some('n') | Some('N') => out.push('\n'),
-            Some(other) => out.push(other),
-            None => out.push('\\'),
-        }
-    }
-    out
-}
-
-/// Write a value back out with those escapes in place.
-pub(super) fn escape(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for c in value.chars() {
-        match c {
-            '\\' => out.push_str("\\\\"),
-            ';' => out.push_str("\\;"),
-            ',' => out.push_str("\\,"),
-            '\n' => out.push_str("\\n"),
-            '\r' => {}
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 /// Fold a content line at 75 octets, as RFC 5545 asks, breaking only

@@ -223,7 +223,7 @@ pub fn show_context_menu_popover(
                 gtk::glib::timeout_add_local_once(
                     std::time::Duration::from_millis(600),
                     move || {
-                        crate::app::showcase_capture(stack.upcast_ref(), &path);
+                        crate::ui::showcase::showcase_capture(stack.upcast_ref(), &path);
                     },
                 );
             });

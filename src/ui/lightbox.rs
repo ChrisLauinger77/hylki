@@ -300,34 +300,26 @@ impl Component for Lightbox {
             LightboxInput::OpenCurrent => {
                 if let Some(att) = self.items.get(self.pos) {
                     let window = root.root().and_downcast::<gtk::Window>();
-                    crate::ui::attachments_gallery::open_bytes(
-                        &att.name,
-                        &att.data,
-                        window.as_ref(),
-                    );
+                    crate::ui::attachment_io::open_bytes(&att.name, &att.data, window.as_ref());
                 }
             }
             LightboxInput::DownloadCurrent => {
                 if let Some(att) = self.items.get(self.pos).cloned() {
-                    let dialog = gtk::FileDialog::builder()
-                        .initial_name(&att.name)
-                        .title(i18n("Save Attachment"))
-                        .build();
                     let window = root.root().and_downcast::<gtk::Window>();
-                    dialog.save(window.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-                        if let Ok(file) = res {
-                            if let Some(path) = file.path() {
-                                let _ = std::fs::write(path, &att.data);
-                            }
-                        }
-                    });
+                    // A failed write is dropped.
+                    crate::ui::attachment_io::save_attachment_as(
+                        &att.name,
+                        att.data,
+                        window.as_ref(),
+                        |_| {},
+                    );
                 }
             }
             LightboxInput::Rendered(key) => {
                 let still_current = self
                     .items
                     .get(self.pos)
-                    .is_some_and(|a| crate::ui::attachments_gallery::content_key(&a.data) == key);
+                    .is_some_and(|a| crate::ui::thumbnails::content_key(&a.data) == key);
                 if still_current {
                     self.refresh(&sender);
                 }
@@ -463,24 +455,24 @@ impl Lightbox {
     /// spot; a PDF's page comes from the shared full-size cache or a worker
     /// render that circles back via [`LightboxInput::Rendered`].
     fn refresh(&mut self, sender: &ComponentSender<Self>) {
-        use crate::ui::attachments_gallery as gallery;
+        use crate::ui::thumbnails;
         self.texture = None;
         let Some(att) = self.items.get(self.pos) else {
             return;
         };
         if crate::models::is_image_name(&att.name) {
-            self.texture = gallery::texture_from(&att.data);
+            self.texture = thumbnails::texture_from(&att.data);
             return;
         }
         // A cache hit paints immediately (and, crucially, spawns nothing: a
         // hit that re-entered via Rendered would loop forever).
-        if let Some(tex) = gallery::cached_pdf_preview(&att.data) {
+        if let Some(tex) = thumbnails::cached_pdf_preview(&att.data) {
             self.texture = Some(tex);
             return;
         }
-        let key = gallery::content_key(&att.data);
+        let key = thumbnails::content_key(&att.data);
         let s = sender.input_sender().clone();
-        gallery::lightbox_pdf_texture(&att.data, move |_| {
+        thumbnails::lightbox_pdf_texture(&att.data, move |_| {
             let _ = s.send(LightboxInput::Rendered(key));
         });
     }

@@ -20,7 +20,7 @@ pub fn parse_mailto(uri: &str) -> Option<MailtoTarget> {
     };
     let mut to: Vec<String> = addr_part
         .split(',')
-        .map(|a| crate::percent::decode(a, false))
+        .map(|a| crate::encoding::percent::decode(a, false))
         .map(|a| a.trim().to_string())
         .filter(|a| a.contains('@'))
         .collect();
@@ -31,7 +31,7 @@ pub fn parse_mailto(uri: &str) -> Option<MailtoTarget> {
         let key = k.to_ascii_lowercase();
         // An address keeps its `+` (plus-addressing, `list+token@…`); only
         // the text fields read it as a space, as form-encoded links write it.
-        let v = crate::percent::decode(v, !matches!(key.as_str(), "to" | "cc"));
+        let v = crate::encoding::percent::decode(v, !matches!(key.as_str(), "to" | "cc"));
         match key.as_str() {
             "subject" => subject = v,
             "body" => body = v,

@@ -78,7 +78,7 @@ fn quoted(text: &str) -> String {
 fn people_url(typed: &str) -> String {
     format!(
         "{GRAPH}/me/people?$search={}&$top={TOP}&$select=displayName,scoredEmailAddresses",
-        crate::percent::encode(&quoted(typed))
+        crate::encoding::percent::encode(&quoted(typed))
     )
 }
 
@@ -92,7 +92,7 @@ fn users_url(typed: &str) -> String {
     );
     format!(
         "{GRAPH}/users?$search={}&$select=displayName,mail&$top={TOP}",
-        crate::percent::encode(&term)
+        crate::encoding::percent::encode(&term)
     )
 }
 
@@ -435,9 +435,7 @@ mod tests {
             email: email.into(),
             from_contacts: true,
             from_directory: true,
-            score: 0,
-            own: false,
-            group: None,
+            ..Default::default()
         }
     }
 
@@ -463,7 +461,7 @@ mod tests {
             .next()
             .unwrap();
         assert_eq!(
-            crate::percent::decode(term, false),
+            crate::encoding::percent::decode(term, false),
             r#""displayName:o'br&en" OR "mail:o'br&en""#
         );
         assert!(url.ends_with("&$select=displayName,mail&$top=10"), "{url}");
@@ -629,7 +627,7 @@ mod tests {
             protocol: Protocol::Graph,
             oauth: true,
             graph_directory: true,
-            ..crate::ui::welcome::blank_account()
+            ..crate::config::blank_account()
         };
         assert!(usable(&acc));
         assert!(!usable(&AccountConfig {

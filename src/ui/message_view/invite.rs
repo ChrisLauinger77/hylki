@@ -1,9 +1,10 @@
 //! A card's invitation banner (#223): the meeting, the answer given, and
 //! the buttons to give one.
 
-use super::html::{attr_escape, escape_text};
+use super::html::attr_escape;
 use super::snippets::inline_icon_svg;
 use super::MessageView;
+use crate::encoding::escape_html;
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::models::Message;
 
@@ -104,7 +105,7 @@ impl MessageView {
             if text.trim().is_empty() {
                 String::new()
             } else {
-                format!("<div class=\"hylki-inv-row\">{}</div>", escape_text(text))
+                format!("<div class=\"hylki-inv-row\">{}</div>", escape_html(text))
             }
         };
         // The heading: the meeting's name, and what this message does to it.
@@ -135,13 +136,13 @@ impl MessageView {
             } else {
                 ""
             },
-            title = escape_text(&title),
+            title = escape_html(&title),
             kind = if kind.is_empty() {
                 String::new()
             } else {
                 format!(
                     "<span class=\"hylki-inv-kind\">{}</span>",
-                    escape_text(&kind)
+                    escape_html(&kind)
                 )
             },
             when = row(&when),
@@ -150,7 +151,7 @@ impl MessageView {
             note = if note.is_empty() {
                 String::new()
             } else {
-                format!("<div class=\"hylki-inv-note\">{}</div>", escape_text(&note))
+                format!("<div class=\"hylki-inv-note\">{}</div>", escape_html(&note))
             },
             acts = if buttons.is_empty() {
                 String::new()
@@ -309,7 +310,7 @@ fn invite_buttons(
                 key.0,
                 key.1,
                 attr_escape(&title),
-                escape_text(&label),
+                escape_html(&label),
                 on = if answered.map(|(a, _)| a) == Some(rsvp) {
                     " on"
                 } else {
@@ -346,7 +347,7 @@ fn invite_buttons(
             key.0,
             key.1,
             attr_escape(&i18n("Opens the meeting in your calendar application")),
-            escape_text(&i18n("Add to Calendar")),
+            escape_html(&i18n("Add to Calendar")),
         ));
     }
     buttons

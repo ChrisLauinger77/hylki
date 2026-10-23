@@ -281,7 +281,7 @@ fn seafile_make_folders(
         dir.push_str(part);
         let url = format!(
             "{base}/api2/repos/{repo}/dir/?p={}",
-            crate::percent::encode_path(&dir)
+            crate::encoding::percent::encode_path(&dir)
         );
         let there = ureq::get(&url)
             .set("Authorization", authz)
@@ -312,7 +312,7 @@ fn seafile_upload_link(
 ) -> Result<String, String> {
     let link: serde_json::Value = ureq::get(&format!(
         "{base}/api2/repos/{repo}/upload-link/?p={}",
-        crate::percent::encode_path(parent)
+        crate::encoding::percent::encode_path(parent)
     ))
     .set("Authorization", authz)
     .timeout(Duration::from_secs(60))

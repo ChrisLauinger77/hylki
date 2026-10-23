@@ -23,10 +23,7 @@ pub use files::is_inline_image;
 use files::{deliver_files, paste_into};
 pub(crate) use fonts::{choose_family, compose_font_choices, preview_font, recent_font_css, SIZES};
 pub use signature::{signature_from_source, signature_to_html};
-pub use spelling::{
-    apply_spellcheck, installed_dictionaries, resolved_spell_languages, spell_language_names,
-    system_spell_languages,
-};
+pub use spelling::apply_spellcheck;
 
 /// A rich-text editor widget. Add `widget` to a container; read the content back
 /// with [`RichEditor::extract_html`] (asynchronous, since it queries the WebView).

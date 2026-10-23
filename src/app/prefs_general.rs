@@ -11,7 +11,8 @@ use crate::ui::preferences::PrefOutput;
 
 use super::attachments::prune_downloads;
 use super::model::AppModel;
-use super::theme::{apply_app_theme, apply_icon_theme, refresh_scheme_css};
+use super::theme::{apply_app_theme, refresh_scheme_css};
+use crate::icon_theme::apply_icon_theme;
 
 impl AppModel {
     /// Push the date and clock preference into the formatter and redraw whatever

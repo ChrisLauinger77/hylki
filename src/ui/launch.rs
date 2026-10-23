@@ -30,11 +30,6 @@ use gtk::glib::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Whether this process runs inside a Flatpak sandbox.
-pub fn in_flatpak() -> bool {
-    std::path::Path::new("/.flatpak-info").exists()
-}
-
 /// The stored choice that means "let the desktop's app chooser ask, every
 /// time" rather than naming one browser (#232).
 pub const ASK: &str = "ask";
@@ -123,7 +118,7 @@ pub fn open_link(uri: &str, parent: Option<&gtk::Window>) {
 /// The road out when no browser was chosen: the desktop's own default
 /// handler, GIO first outside the sandbox and the portal within it.
 fn default_open(uri: &str, parent: Option<gtk::Window>) {
-    if in_flatpak() {
+    if crate::platform::is_flatpak() {
         portal_open_uri(uri.to_string(), false, parent);
         return;
     }
@@ -176,7 +171,7 @@ fn portal_open_uri(uri: String, ask: bool, parent: Option<gtk::Window>) {
             // Outside the sandbox the portal is a convenience, not the only
             // road: an "Ask each time" that finds no portal still opens the
             // link, in the desktop's default handler.
-            if in_flatpak() {
+            if crate::platform::is_flatpak() {
                 link_failed_dialog(retry_parent.as_ref(), &e);
             } else {
                 default_open(&retry_uri, retry_parent.clone());

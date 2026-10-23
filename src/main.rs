@@ -17,10 +17,12 @@ mod contacts;
 mod datefmt;
 mod desktop;
 mod directory;
+mod encoding;
 mod goa;
 mod graph_directory;
 mod graph_labels;
 mod i18n;
+mod icon_theme;
 mod invite;
 mod launcher_badge;
 mod legacy;
@@ -35,12 +37,11 @@ mod mutf7;
 mod nautilus_ext;
 mod notify;
 mod oauth;
-mod outgoing;
 mod outlook_msg;
-mod percent;
 mod pgp;
 mod platform;
 mod power;
+mod quote;
 mod ram_cache;
 mod reader;
 mod rng;
@@ -52,7 +53,6 @@ mod text_scale;
 mod theme;
 mod theme_palettes;
 mod translate;
-mod tray;
 mod ui;
 mod unsubscribe;
 mod verify;
@@ -62,6 +62,8 @@ mod worker;
 use relm4::RelmApp;
 
 use crate::app::AppModel;
+// The worker reads `crate::percent` (until the worker branch is merged).
+use crate::encoding::percent;
 pub(crate) use crate::single_instance::primary_instance_running;
 use crate::single_instance::{relay_to_primary, UriKind};
 
@@ -145,7 +147,7 @@ fn main() {
     nautilus_ext::record_launcher();
     // Attachments the user opened in a previous session were decrypted to a temp
     // directory and left there. Clear it before anything else runs.
-    ui::attachments_gallery::purge_attachment_dir();
+    ui::attachment_io::purge_attachment_dir();
     register_resources();
     start_logo_probe();
 

@@ -14,8 +14,9 @@ use crate::ui::sidebar::{SidebarInit, StartTarget};
 use super::accounts::{forget_account_secrets, reconcile_goa, GoaReconcile};
 use super::demo::demo_mode;
 use super::palette::keyed_item;
-use super::theme::{install_scheme_css, register_icons};
+use super::theme::install_scheme_css;
 use super::{AppModel, AppMsg};
+use crate::icon_theme::register_icons;
 
 /// What the steps before the model read from disk and the environment.
 pub(super) struct Boot {

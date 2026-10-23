@@ -35,7 +35,7 @@ use relm4::prelude::*;
 use crate::config::{self, DrawerState};
 use crate::i18n::{i18n, ni18n_f};
 use crate::models::Attachment;
-use crate::ui::attachments_gallery::open_bytes;
+use crate::ui::attachment_io::open_bytes;
 
 mod actions;
 mod cells;

@@ -1,8 +1,9 @@
 //! Folded cards (#326): which cards open folded, and their bars.
 
-use super::html::{attr_escape, escape_text};
+use super::html::attr_escape;
 use super::snippets::{fold_bar_date, inline_icon_svg, FOLD_BAR_FACE};
 use super::MessageView;
+use crate::encoding::escape_html;
 use crate::i18n::i18n;
 use crate::models::Message;
 
@@ -81,7 +82,7 @@ impl MessageView {
             format!(
                 "<div class=\"hylki-fbar-prev\" style=\"-webkit-line-clamp:{}\">{}</div>",
                 self.fold_preview_lines,
-                escape_text(preview.trim()),
+                escape_html(preview.trim()),
             )
         } else {
             String::new()
@@ -94,8 +95,8 @@ impl MessageView {
             key.0,
             key.1,
             attr_escape(&i18n("Click to open this message")),
-            escape_text(from),
-            escape_text(&fold_bar_date(m)),
+            escape_html(from),
+            escape_html(&fold_bar_date(m)),
         )
     }
 

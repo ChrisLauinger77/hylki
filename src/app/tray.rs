@@ -14,9 +14,13 @@ use super::model::AppModel;
 use super::msg::AppMsg;
 use super::window::exit_now;
 
+mod indicator;
+
+pub(super) use indicator::TrayHandle;
+
 /// What identifies a tray mail list for change detection: the total, then
 /// each card.
-pub(super) fn tray_mail_key(mail: &crate::tray::TrayMailList) -> Vec<(u32, u32, String, String)> {
+pub(super) fn tray_mail_key(mail: &indicator::TrayMailList) -> Vec<(u32, u32, String, String)> {
     std::iter::once((u32::MAX, mail.unread, String::new(), String::new()))
         .chain(mail.items.iter().map(|m| {
             (
@@ -139,7 +143,7 @@ impl AppModel {
         let unified = self.unified_unread();
         let mail = self.tray_mail.then(|| self.tray_mail_list());
         *self.tray_mail_key.borrow_mut() = mail.as_ref().map(tray_mail_key);
-        self.tray = crate::tray::TrayHandle::start(
+        self.tray = indicator::TrayHandle::start(
             sender.input_sender().clone(),
             self.tray_icon,
             &crate::app_icon::tray_image(&self.app_icon),
@@ -160,6 +164,7 @@ impl AppModel {
     /// While a restart waits for the desktop to take the launcher in: a
     /// modal with a spinner, so the pause reads as progress rather than a
     /// stuck app. It has no way to close — the app quits from under it.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     fn show_restarting_dialog(&self) {
         let dialog = adw::MessageDialog::new(
             Some(&self.icon_dialog_parent()),
@@ -186,6 +191,7 @@ impl AppModel {
     /// own window icon, only switches once every window has closed: a
     /// restart. Offered, never forced, over whichever window the change
     /// came from.
+    #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
     pub(super) fn offer_restart_for_icon(&self, sender: &ComponentSender<Self>) {
         let dialog = adw::MessageDialog::new(
             Some(&self.icon_dialog_parent()),
@@ -226,13 +232,13 @@ impl AppModel {
     /// The newest unread messages across accounts' inboxes, as tray cards,
     /// with the inboxes' unread total (the cards may be fewer). Filter
     /// destinations are left out: the menu says it lists inboxes.
-    fn tray_mail_list(&self) -> crate::tray::TrayMailList {
+    fn tray_mail_list(&self) -> indicator::TrayMailList {
         let unread = self.inboxes_unread();
         let items = self.tray_mail_cards();
-        crate::tray::TrayMailList { items, unread }
+        indicator::TrayMailList { items, unread }
     }
 
-    fn tray_mail_cards(&self) -> Vec<crate::tray::TrayMail> {
+    fn tray_mail_cards(&self) -> Vec<indicator::TrayMail> {
         let several = self.accounts.len() > 1;
         let mut unread: Vec<(&Account, &Message)> = self
             .accounts
@@ -250,17 +256,17 @@ impl AppModel {
         unread.sort_by_key(|x| std::cmp::Reverse(x.1.timestamp));
         unread
             .into_iter()
-            .take(crate::tray::MAIL_LIMIT)
+            .take(indicator::MAIL_LIMIT)
             .map(|(a, m)| {
                 let sender = if m.from_name.trim().is_empty() {
                     m.from_addr.clone()
                 } else {
                     m.from_name.clone()
                 };
-                let mut heading = crate::tray::clip(&sender, 40);
+                let mut heading = indicator::clip(&sender, 40);
                 if several {
                     heading.push_str(" · ");
-                    heading.push_str(&crate::tray::clip(&a.label, 24));
+                    heading.push_str(&indicator::clip(&a.label, 24));
                 }
                 if !m.date.is_empty() {
                     heading.push_str(" · ");
@@ -270,14 +276,14 @@ impl AppModel {
                     crate::avatar::CacheLookup::Texture(t) => Some(t),
                     _ => None,
                 };
-                crate::tray::TrayMail {
+                indicator::TrayMail {
                     account_id: m.account_id,
                     folder_id: m.folder_id,
                     message_id: m.id,
                     heading,
-                    subject: crate::tray::clip(&m.subject, 60),
-                    preview: crate::tray::clip(&m.preview, 70),
-                    icon: crate::tray::sender_icon(&m.from_name, &m.from_addr, texture),
+                    subject: indicator::clip(&m.subject, 60),
+                    preview: indicator::clip(&m.preview, 70),
+                    icon: indicator::sender_icon(&m.from_name, &m.from_addr, texture),
                 }
             })
             .collect()

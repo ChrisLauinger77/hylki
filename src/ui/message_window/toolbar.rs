@@ -6,6 +6,7 @@ use super::MessageWindow;
 use crate::config::ToolbarItem;
 use crate::i18n::i18n;
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
+use crate::ui::message_actions::MessageAction;
 use adw::prelude::*;
 use relm4::prelude::*;
 
@@ -260,90 +261,72 @@ impl MessageWindow {
     /// The folded toolbar's ⋯ menu: the right group, in its own order, with
     /// the main window's labels and icons.
     pub(super) fn show_overflow_menu(&self, sender: &ComponentSender<Self>) {
-        let entry = |label: String, icon: &str, msg: fn() -> MessageWindowInput| {
+        use MessageAction as A;
+        let entry = |action: MessageAction, msg: fn() -> MessageWindowInput| {
             let s = sender.input_sender().clone();
-            MenuEntry::new(label, move || {
+            MenuEntry::new(action.label(), move || {
                 let _ = s.send(msg());
             })
-            .icon(format!("{icon}-symbolic"))
+            .icon(format!("{}-symbolic", action.icon()))
         };
         let mut section = Vec::new();
         for item in &self.toolbar.right {
             match item {
-                ToolbarItem::Reply => {
-                    section.push(entry(i18n("Reply"), "mail-reply-sender", || {
-                        MessageWindowInput::Reply
-                    }))
-                }
+                ToolbarItem::Reply => section.push(entry(A::Reply, || MessageWindowInput::Reply)),
                 ToolbarItem::ReplyAll => {
-                    section.push(entry(i18n("Reply All"), "mail-reply-all", || {
-                        MessageWindowInput::ReplyAll
-                    }))
+                    section.push(entry(A::ReplyAll, || MessageWindowInput::ReplyAll))
                 }
                 ToolbarItem::Forward => {
-                    section.push(entry(i18n("Forward"), "mail-forward", || {
-                        MessageWindowInput::Forward
-                    }))
+                    section.push(entry(A::Forward, || MessageWindowInput::Forward))
                 }
-                ToolbarItem::Star => section.push(if self.msg.starred {
-                    entry(i18n("Remove Star"), "hylki-non-starred", || {
-                        MessageWindowInput::ToggleStar
-                    })
-                } else {
-                    entry(i18n("Star"), "starred", || MessageWindowInput::ToggleStar)
-                }),
+                ToolbarItem::Star => section.push(entry(
+                    if self.msg.starred {
+                        A::RemoveStar
+                    } else {
+                        A::Star
+                    },
+                    || MessageWindowInput::ToggleStar,
+                )),
                 ToolbarItem::Archive => {
-                    section.push(entry(i18n("Archive"), "mail-archive", || {
-                        MessageWindowInput::Archive
-                    }))
+                    section.push(entry(A::Archive, || MessageWindowInput::Archive))
                 }
-                ToolbarItem::Delete => section.push(entry(i18n("Delete"), "user-trash", || {
-                    MessageWindowInput::Delete
-                })),
-                ToolbarItem::Spam => section.push(if self.in_junk {
-                    entry(i18n("Not Spam"), "mail-mark-notjunk", || {
-                        MessageWindowInput::Spam
-                    })
-                } else {
-                    entry(i18n("Mark as Spam"), "mail-mark-junk", || {
-                        MessageWindowInput::Spam
-                    })
-                }),
-                ToolbarItem::ReadUnread => section.push(if self.msg.unread {
-                    entry(i18n("Mark as Read"), "hylki-mail-read", || {
-                        MessageWindowInput::ToggleRead
-                    })
-                } else {
-                    entry(i18n("Mark as Unread"), "mail-unread", || {
-                        MessageWindowInput::ToggleRead
-                    })
-                }),
+                ToolbarItem::Delete => {
+                    section.push(entry(A::Delete, || MessageWindowInput::Delete))
+                }
+                ToolbarItem::Spam => section.push(entry(
+                    if self.in_junk {
+                        A::NotSpam
+                    } else {
+                        A::MarkSpam
+                    },
+                    || MessageWindowInput::Spam,
+                )),
+                ToolbarItem::ReadUnread => section.push(entry(
+                    if self.msg.unread {
+                        A::MarkRead
+                    } else {
+                        A::MarkUnread
+                    },
+                    || MessageWindowInput::ToggleRead,
+                )),
                 ToolbarItem::Tags => {
                     if !self.tags.is_empty() {
                         section.push(
-                            MenuEntry::submenu(i18n("Tags"), vec![self.tag_entries(sender)])
+                            MenuEntry::submenu(A::Tags.label(), vec![self.tag_entries(sender)])
                                 .icon("tag-outline-symbolic"),
                         );
                     }
                 }
                 ToolbarItem::MoveTo => {
                     if self.restorable {
-                        section.push(entry(i18n("Move to Inbox"), "mail-inbox", || {
-                            MessageWindowInput::MoveToInbox
-                        }));
+                        section.push(entry(A::MoveToInbox, || MessageWindowInput::MoveToInbox));
                     }
-                    section.push(entry(i18n("Move To…"), "folder", || {
-                        MessageWindowInput::MoveTo
-                    }));
+                    section.push(entry(A::MoveTo, || MessageWindowInput::MoveTo));
                 }
-                ToolbarItem::Find => {
-                    section.push(entry(i18n("Find in Message"), "loupe-with-arrow", || {
-                        MessageWindowInput::Find
-                    }))
+                ToolbarItem::Find => section.push(entry(A::Find, || MessageWindowInput::Find)),
+                ToolbarItem::Print => {
+                    section.push(entry(A::PrintPreview, || MessageWindowInput::PrintPreview))
                 }
-                ToolbarItem::Print => section.push(entry(i18n("Print Preview"), "printer", || {
-                    MessageWindowInput::PrintPreview
-                })),
             }
         }
         let b = &self.bar.overflow;

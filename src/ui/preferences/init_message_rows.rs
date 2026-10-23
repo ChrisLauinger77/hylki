@@ -413,15 +413,16 @@ impl Preferences {
             let spelling_group = widgets.composing.spelling_group.clone();
             let sender = sender.clone();
             gtk::glib::idle_add_local_full(gtk::glib::Priority::LOW, move || {
-                let dicts = crate::ui::rich_editor::installed_dictionaries();
-                let system = adw::SwitchRow::builder()
-                    .title(i18n("System language"))
-                    .subtitle(gtk::glib::markup_escape_text(
-                        &crate::ui::rich_editor::spell_language_names(
-                            &crate::ui::rich_editor::system_spell_languages(),
-                        ),
-                    ))
-                    .build();
+                let dicts = crate::spell::installed_dictionaries();
+                let system =
+                    adw::SwitchRow::builder()
+                        .title(i18n("System language"))
+                        .subtitle(gtk::glib::markup_escape_text(
+                            &crate::spell::spell_language_names(
+                                &crate::spell::system_spell_languages(),
+                            ),
+                        ))
+                        .build();
                 rows.expander.add_row(&system);
                 *rows.system.borrow_mut() = Some(system.clone());
                 for d in &dicts {

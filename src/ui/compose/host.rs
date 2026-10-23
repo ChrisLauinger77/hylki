@@ -82,16 +82,10 @@ pub(super) fn set_toggle_icon(btn: &gtk::Button, windowed: bool) {
     }
 }
 
-/// A message with only an OK button, over `parent`.
-pub(super) fn show_alert(parent: Option<&gtk::Window>, heading: &str, body: &str) {
-    let dialog = adw::MessageDialog::new(parent, Some(heading), Some(body));
-    dialog.add_response("ok", &i18n("OK"));
-    dialog.present();
-}
-
 /// Save the edited message, discard it, or go back to it. Escape answers
 /// Keep Editing, so a second press never discards what the first one asked
 /// about (#290).
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(super) fn confirm_discard_dialog(
     parent: Option<&gtk::Window>,
     template: bool,

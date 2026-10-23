@@ -7,7 +7,7 @@
 /// The body is untrusted mail, so it goes through the same sanitizer a
 /// forward has used since #52. A body that is plain text through and through
 /// keeps the escaped-text path.
-pub(super) fn quoted_original(attribution: &str, body: &str) -> String {
+pub(crate) fn quoted_original(attribution: &str, body: &str) -> String {
     if !body.contains('<') {
         return quote_block(attribution, &message_text(body));
     }
@@ -22,7 +22,7 @@ fn sanitized_body(body: &str) -> String {
 }
 
 /// Text escaped for HTML, its line ends as `<br>`.
-pub(super) fn escaped_lines(text: &str) -> String {
+pub(crate) fn escaped_lines(text: &str) -> String {
     gtk::glib::markup_escape_text(text).replace('\n', "<br>")
 }
 
@@ -65,7 +65,7 @@ fn quote_block_html(attribution: &str, inner_html: &str) -> String {
 /// A message's own content, ready to be edited rather than quoted: the HTML
 /// sanitized exactly as a forward's is (#52, it is the same untrusted mail),
 /// or the plain text escaped into it.
-pub(super) fn editable_copy_html(body: &str) -> String {
+pub(crate) fn editable_copy_html(body: &str) -> String {
     if body.contains('<') {
         sanitized_body(body)
     } else {
@@ -171,7 +171,7 @@ fn breaks(text: &str) -> String {
 /// document, or its `wrap_fragment` of text parts (with any pictures that
 /// came between them). A sender's HTML is never only these, and a body that
 /// merely uses `<pre>` is still HTML.
-pub(super) fn body_is_plain_text(body: &str) -> bool {
+pub(crate) fn body_is_plain_text(body: &str) -> bool {
     if !body.contains('<') {
         return !body.trim().is_empty();
     }

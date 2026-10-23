@@ -5,6 +5,10 @@ use std::path::PathBuf;
 
 use super::read::{cache_dir, data_dir};
 
+// vCard's TEXT escapes are iCalendar's (crate::encoding).
+pub(super) use crate::encoding::escape_text_value as escape_vcard_value;
+pub(crate) use crate::encoding::unescape_text_value as unescape_vcard_text;
+
 /// Extract the display name (`FN`) from a vCard, preserving its capitalisation.
 /// Handles line folding (a CRLF/LF followed by a space or tab continues the
 /// previous line) and the standard text escapes.
@@ -164,25 +168,6 @@ pub(super) fn confine_to_roots(path: &std::path::Path, roots: &[PathBuf]) -> Opt
         .then_some(path)
 }
 
-/// Unescape a vCard TEXT value: `\n`/`\N` → newline, `\,` → `,`, `\;` → `;`,
-/// `\\` → `\`.
-pub(crate) fn unescape_vcard_text(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c == '\\' {
-            match chars.next() {
-                Some('n') | Some('N') => out.push('\n'),
-                Some(other) => out.push(other),
-                None => out.push('\\'),
-            }
-        } else {
-            out.push(c);
-        }
-    }
-    out
-}
-
 /// `s` split at each `sep` not escaped with a backslash; the parts keep
 /// their escapes.
 pub(super) fn split_unescaped(s: &str, sep: char) -> Vec<&str> {
@@ -216,22 +201,6 @@ pub(super) fn is_group_vcard(vcard: &str) -> bool {
                 || name.eq_ignore_ascii_case("X-ADDRESSBOOKSERVER-KIND"))
                 && value.eq_ignore_ascii_case("group"))
     })
-}
-
-/// Escape a value for a vCard text property.
-pub(super) fn escape_vcard_value(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for ch in s.chars() {
-        match ch {
-            '\\' => out.push_str("\\\\"),
-            ',' => out.push_str("\\,"),
-            ';' => out.push_str("\\;"),
-            '\n' => out.push_str("\\n"),
-            '\r' => {}
-            other => out.push(other),
-        }
-    }
-    out
 }
 
 /// `line` put after a card's VERSION line (first, when it has none).

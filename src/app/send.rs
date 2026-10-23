@@ -68,7 +68,7 @@ impl AppModel {
     /// worker.
     fn queue_send(
         &mut self,
-        origin: crate::outgoing::Origin,
+        origin: super::outgoing::Origin,
         out: Box<OutgoingMessage>,
         sent_path: Option<String>,
         sender: &ComponentSender<Self>,
@@ -96,7 +96,7 @@ impl AppModel {
             .priority(adw::ToastPriority::High)
             .timeout(0)
             .build();
-        let o = crate::outgoing::Outgoing {
+        let o = super::outgoing::Outgoing {
             ticket,
             account_id,
             account,
@@ -293,7 +293,7 @@ impl AppModel {
             && self
                 .current
                 .as_ref()
-                .is_some_and(|m| m.id == crate::outgoing::row_id(ticket))
+                .is_some_and(|m| m.id == super::outgoing::row_id(ticket))
         {
             self.current = None;
             self.show_message(None, false);
@@ -302,7 +302,7 @@ impl AppModel {
         let prefill = unsent_prefill(*o.message);
         let free = self.reader_compose.is_none() && !self.showing_contacts && !self.showing_outbox;
         match o.origin {
-            crate::outgoing::Origin::Split(answering)
+            super::outgoing::Origin::Split(answering)
                 if free
                     && self
                         .current
@@ -312,7 +312,7 @@ impl AppModel {
             {
                 self.open_inline_reply(account_id, prefill, Some(answering), sender);
             }
-            crate::outgoing::Origin::Pane if free => {
+            super::outgoing::Origin::Pane if free => {
                 self.open_inline_reply(account_id, prefill, None, sender)
             }
             _ => self.open_compose(account_id, prefill, sender),
@@ -428,10 +428,8 @@ impl AppModel {
                 name: if name.is_empty() { email.clone() } else { name },
                 own: own.contains(&email.to_lowercase()),
                 email,
-                from_contacts: false,
-                from_directory: false,
                 score: 1,
-                group: None,
+                ..Default::default()
             })
             .collect();
         if !fresh.is_empty() {
@@ -463,10 +461,10 @@ impl AppModel {
         } else {
             let origin = match self.reader_compose.as_ref().filter(|r| r.id == from) {
                 Some(r) if r.window.is_none() => r.answering.map_or(
-                    crate::outgoing::Origin::Pane,
-                    crate::outgoing::Origin::Split,
+                    super::outgoing::Origin::Pane,
+                    super::outgoing::Origin::Split,
                 ),
-                _ => crate::outgoing::Origin::Window,
+                _ => super::outgoing::Origin::Window,
             };
             self.queue_send(origin, out, sent_path, &sender);
         }

@@ -690,7 +690,7 @@ fn showcase_toolbar_toggle(more: &gtk::ToggleButton) {
                             std::time::Duration::from_millis(t),
                             move || {
                                 if let Some(r) = root {
-                                    crate::app::showcase_capture(
+                                    crate::ui::showcase::showcase_capture(
                                         r.upcast_ref::<gtk::Widget>(),
                                         &path,
                                     );
@@ -733,6 +733,7 @@ fn pick_pictures(webview: &webkit6::WebView, anchor: &gtk::Button, attach_cb: &A
 }
 
 /// Prompt for a URL and turn the current selection into a link.
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 fn prompt_link(webview: &webkit6::WebView, anchor: &gtk::Button) {
     let parent = anchor.root().and_downcast::<gtk::Window>();
     let dialog = adw::MessageDialog::new(parent.as_ref(), Some(i18n("Insert Link").as_str()), None);

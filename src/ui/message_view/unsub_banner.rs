@@ -1,8 +1,9 @@
 //! A card's Unsubscribe banner: what it says, and patching it in place.
 
-use super::html::{attr_escape, escape_text};
+use super::html::attr_escape;
 use super::types::UnsubState;
 use super::MessageView;
+use crate::encoding::escape_html;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::Message;
 
@@ -31,7 +32,7 @@ impl MessageView {
                 key.0,
                 key.1,
                 attr_escape(title),
-                escape_text(label),
+                escape_html(label),
             )
         };
         let (text, btn) = match self.unsub_state.get(&key) {
@@ -81,7 +82,7 @@ impl MessageView {
         };
         format!(
             "<span class=\"hylki-unsub-text\">{}</span>{btn}",
-            escape_text(&text)
+            escape_html(&text)
         )
     }
 

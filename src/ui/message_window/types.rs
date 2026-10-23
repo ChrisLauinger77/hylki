@@ -1,9 +1,9 @@
 //! The pop-out reader's messages in and out, and what it is opened with.
 
-use crate::app::Shortcut;
 use crate::config::ReaderToolbar;
 use crate::models::{Attachment, Message};
 use crate::ui::attachment_drawer::AttachmentDrawerInput;
+use crate::ui::keymap::Shortcut;
 use crate::ui::message_list::RowAction;
 
 /// Everything needed to open a popout reader for one message.

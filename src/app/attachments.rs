@@ -9,31 +9,17 @@ use crate::config;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::Attachment;
 use crate::ui::attachment_drawer::AttachmentDrawerInput;
+use crate::ui::attachment_io::save_attachment_as;
 use crate::ui::attachments_gallery::GalleryInput;
 use crate::ui::message_list::MessageListInput;
 use crate::ui::message_view::MessageViewInput;
 use crate::ui::message_window::MessageWindowInput;
 use crate::worker::MailRequest;
 
-use super::confirm::confirm_destructive;
 use super::conversation::{body_key, BodyKey};
 use super::model::AppModel;
 use super::msg::AppMsg;
-
-/// Save one attachment via a file chooser (a card chip's save button, #213).
-fn save_attachment(att: Attachment, parent: Option<adw::ApplicationWindow>) {
-    let dialog = gtk::FileDialog::builder()
-        .initial_name(&att.name)
-        .title(i18n("Save Attachment"))
-        .build();
-    dialog.save(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-        if let Ok(file) = res {
-            if let Some(path) = file.path() {
-                let _ = std::fs::write(path, &att.data);
-            }
-        }
-    });
-}
+use crate::ui::dialog::confirm_destructive;
 
 /// Remove downloaded mail older than `days` (#394), off the main thread;
 /// 0 keeps it all.
@@ -354,7 +340,8 @@ impl AppModel {
                     return;
                 };
                 if save {
-                    save_attachment(att, Some(self.window.clone()));
+                    // A card chip's save button (#213); a failed write is dropped.
+                    save_attachment_as(&att.name, att.data, Some(self.window.upcast_ref()), |_| {});
                 } else if crate::ui::attachment_drawer::previewable(&att) {
                     // The lightbox pages through this message's previewable
                     // files, starting at the one clicked.
@@ -374,7 +361,7 @@ impl AppModel {
                         start,
                     });
                 } else {
-                    crate::ui::attachments_gallery::open_bytes(
+                    crate::ui::attachment_io::open_bytes(
                         &att.name,
                         &att.data,
                         Some(self.window.upcast_ref::<gtk::Window>()),

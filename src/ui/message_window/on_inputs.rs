@@ -7,8 +7,8 @@ use crate::models::{Attachment, Message};
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use super::content::save_attachment;
 use crate::config::ToolbarItem;
+use crate::ui::attachment_io::save_attachment_as;
 use crate::ui::lightbox::LightboxInput;
 use crate::ui::message_list::RowAction;
 use crate::ui::message_view::MessageViewInput;
@@ -140,7 +140,8 @@ impl MessageWindow {
             return;
         };
         if save {
-            save_attachment(att, root);
+            // A failed write is dropped.
+            save_attachment_as(&att.name, att.data, Some(root.upcast_ref()), |_| {});
         } else if crate::ui::attachment_drawer::previewable(&att) {
             // The lightbox pages through this message's previewable
             // files, starting at the one clicked.
@@ -153,11 +154,7 @@ impl MessageWindow {
                 .saturating_sub(1);
             self.lightbox.emit(LightboxInput::Show { items, start });
         } else {
-            crate::ui::attachments_gallery::open_bytes(
-                &att.name,
-                &att.data,
-                Some(root.upcast_ref()),
-            );
+            crate::ui::attachment_io::open_bytes(&att.name, &att.data, Some(root.upcast_ref()));
         }
     }
 

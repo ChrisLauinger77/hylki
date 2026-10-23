@@ -1,9 +1,9 @@
 //! A card's translation (#327): the banner, the subject it shows, and
 //! patching both in place.
 
-use super::html::escape_text;
 use super::types::TrState;
 use super::MessageView;
+use crate::encoding::escape_html;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::Message;
 
@@ -41,13 +41,13 @@ impl MessageView {
                 "<button type=\"button\" class=\"hylki-tr-btn\" data-key=\"{}:{}\">{}</button>",
                 key.0,
                 key.1,
-                escape_text(label),
+                escape_html(label),
             )
         };
         let line = |text: &str, btn: String| {
             format!(
                 "<span class=\"hylki-tr-text\">{}</span>{btn}",
-                escape_text(text)
+                escape_html(text)
             )
         };
         let name = crate::translate::language_name;

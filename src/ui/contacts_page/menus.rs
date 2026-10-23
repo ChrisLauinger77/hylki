@@ -163,6 +163,7 @@ impl BulkChoices {
 }
 
 /// Ask before doing something to contacts that cannot be taken back.
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(super) fn confirm(
     widgets: &ContactsPageWidgets,
     heading: &str,

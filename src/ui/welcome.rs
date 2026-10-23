@@ -11,8 +11,8 @@
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::config::AccountConfig;
 use crate::config::Protocol;
+use crate::config::{blank_account, AccountConfig};
 use crate::i18n::{i18n, i18n_f};
 use crate::ui::accounts::{Provider, PROVIDERS};
 use crate::worker::{self, ConnTest};
@@ -412,7 +412,7 @@ impl Component for Welcome {
                 gtk::glib::timeout_add_local_once(
                     std::time::Duration::from_millis(2000 + 700 * n as u64),
                     move || {
-                        crate::app::showcase_capture(win.upcast_ref(), &path);
+                        crate::ui::showcase::showcase_capture(win.upcast_ref(), &path);
                     },
                 );
             });
@@ -481,94 +481,5 @@ impl Welcome {
             i18n("Continue")
         };
         widgets.footer_next.set_label(&label);
-    }
-}
-
-/// A fully-defaulted account for the wizard's manual form to build on.
-pub(crate) fn blank_account() -> AccountConfig {
-    AccountConfig {
-        name: String::new(),
-        email: String::new(),
-        protocol: Default::default(),
-        imap_host: String::new(),
-        imap_port: 993,
-        smtp_host: String::new(),
-        smtp_port: 587,
-        username: String::new(),
-        password: String::new(),
-        smtp_separate: false,
-        jmap_token: false,
-        jmap_generic: false,
-        tls_accept_hostname_mismatch: false,
-        security: None,
-        smtp_username: String::new(),
-        smtp_password: String::new(),
-        color: None,
-        emoji: None,
-        avatar: None,
-        gravatar: false,
-        signature: None,
-        signature_html: false,
-        signatures: Vec::new(),
-        default_signature: None,
-        label: None,
-        aliases: Vec::new(),
-        enabled: true,
-        goa_id: None,
-        goa_mail_disabled: false,
-        goa_enabled_before_mail_disabled: true,
-        oauth: false,
-        oauth_settings: None,
-        oauth_refresh: String::new(),
-        push: None,
-        folder_roles: Default::default(),
-        hidden_folders: Vec::new(),
-        folders_seeded: false,
-        sent_copy_path: None,
-        server_saves_sent: false,
-        reply_copies: Default::default(),
-        empty_junk_days: 0,
-        empty_trash_days: 0,
-        clean_lists_days: 0,
-        pgp_key: None,
-        in_unified: true,
-        folder_sort: None,
-        sign_by_default: false,
-        plain_subject: false,
-        graph_directory: false,
-        graph_directory_only: false,
-        graph_label_names: false,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::blank_account;
-
-    #[test]
-    fn a_blank_account_has_the_form_defaults() {
-        let a = blank_account();
-        assert_eq!((a.imap_port, a.smtp_port), (993, 587));
-        assert_eq!(a.protocol, crate::config::Protocol::Imap);
-        assert!(a.enabled && a.in_unified && a.goa_enabled_before_mail_disabled);
-        assert!(!a.smtp_separate && !a.oauth && !a.gravatar && !a.server_saves_sent);
-        assert!(!a.jmap_token && !a.jmap_generic && !a.tls_accept_hostname_mismatch);
-        assert!(!a.sign_by_default && !a.plain_subject && !a.folders_seeded);
-        assert!(!a.graph_directory && !a.graph_directory_only && !a.graph_label_names);
-        assert!(!a.goa_mail_disabled && !a.signature_html);
-        assert!(a.name.is_empty() && a.email.is_empty() && a.username.is_empty());
-        assert!(a.imap_host.is_empty() && a.smtp_host.is_empty());
-        assert!(a.password.is_empty() && a.smtp_password.is_empty());
-        assert!(a.smtp_username.is_empty() && a.oauth_refresh.is_empty());
-        assert!(a.goa_id.is_none() && a.push.is_none() && a.security.is_none());
-        assert!(a.color.is_none() && a.emoji.is_none() && a.avatar.is_none());
-        assert!(a.signature.is_none() && a.default_signature.is_none());
-        assert!(a.label.is_none() && a.oauth_settings.is_none() && a.pgp_key.is_none());
-        assert!(a.sent_copy_path.is_none() && a.folder_sort.is_none());
-        assert!(a.signatures.is_empty() && a.aliases.is_empty() && a.hidden_folders.is_empty());
-        assert_eq!(
-            (a.empty_junk_days, a.empty_trash_days, a.clean_lists_days),
-            (0, 0, 0)
-        );
     }
 }

@@ -42,14 +42,14 @@ pub fn detect_product(base: &str) -> Option<String> {
 
 fn auth(account: &CloudAccount, password: &str) -> String {
     let raw = format!("{}:{}", account.user.trim(), password);
-    format!("Basic {}", crate::oauth::base64_encode(raw.as_bytes()))
+    format!("Basic {}", crate::encoding::base64_encode(raw.as_bytes()))
 }
 
 fn dav_root(account: &CloudAccount) -> String {
     format!(
         "{}/remote.php/dav/files/{}",
         account.base(),
-        crate::percent::encode(account.user.trim())
+        crate::encoding::percent::encode(account.user.trim())
     )
 }
 
@@ -96,16 +96,19 @@ pub(super) fn nextcloud_upload_and_share(
     // A name that is free.
     let mut remote = name.clone();
     let exists = |n: &str| {
-        ureq::head(&format!("{root}{dir}/{}", crate::percent::encode(n)))
-            .set("Authorization", &authz)
-            .call()
-            .is_ok()
+        ureq::head(&format!(
+            "{root}{dir}/{}",
+            crate::encoding::percent::encode(n)
+        ))
+        .set("Authorization", &authz)
+        .call()
+        .is_ok()
     };
     if exists(&remote) {
         remote = stamped_name(&name);
     }
 
-    let target = format!("{root}{dir}/{}", crate::percent::encode(&remote));
+    let target = format!("{root}{dir}/{}", crate::encoding::percent::encode(&remote));
     if account.cloudflare && size > CLOUDFLARE_CHUNK {
         chunked_upload(account, &authz, path, &name, size, &target, timeout)?;
     } else {
@@ -147,7 +150,7 @@ fn make_folders(root: &str, folder: &str, authz: &str) -> Result<String, String>
     let mut dir = String::new();
     for part in folder.split('/').filter(|p| !p.is_empty()) {
         dir.push('/');
-        dir.push_str(&crate::percent::encode(part));
+        dir.push_str(&crate::encoding::percent::encode(part));
         let r = ureq::request("MKCOL", &format!("{root}{dir}"))
             .set("Authorization", authz)
             .call();
@@ -176,7 +179,7 @@ fn chunked_upload(
     let upload = format!(
         "{}/remote.php/dav/uploads/{}/hylki-{}",
         account.base(),
-        crate::percent::encode(account.user.trim()),
+        crate::encoding::percent::encode(account.user.trim()),
         crate::rng::token(12).map_err(|e| e.to_string())?
     );
     ureq::request("MKCOL", &upload)

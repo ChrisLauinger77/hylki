@@ -14,11 +14,11 @@ use serde::Deserialize;
 
 use crate::config::OAuthSettings;
 
-mod encoding;
 mod flow;
 mod tokens;
 
-pub use encoding::{base64_decode, base64_encode};
+// The worker reads base64 through this path (until the worker branch is merged).
+pub use crate::encoding::{base64_decode, base64_encode};
 pub use flow::{microsoft_prompt, open_uri, run_flow, run_flow_as, Authorization};
 pub use tokens::{exchange_code, microsoft_whoami, refresh_access_token, refresh_access_token_as};
 
@@ -334,11 +334,7 @@ struct FileCreds {
 }
 
 fn creds_from_file(provider: &str) -> Option<(String, String)> {
-    let path = crate::config::config_base()?
-        .join("hylki")
-        .join("oauth.toml");
-    let text = std::fs::read_to_string(path).ok()?;
-    let file: OAuthFile = toml::from_str(&text).ok()?;
+    let file: OAuthFile = crate::config::read_toml(crate::config::config_file("oauth.toml"))?;
     let creds = match provider {
         "google" => file.google,
         "microsoft" => file.microsoft,

@@ -454,19 +454,19 @@ mod tests {
             AccountConfig {
                 email: "A@Example.org".into(),
                 imap_host: "imap.example.org".into(),
-                ..crate::ui::welcome::blank_account()
+                ..crate::config::blank_account()
             },
             // A broken import with neither an IMAP host nor Graph: offered again.
             AccountConfig {
                 email: "b@example.org".into(),
                 imap_host: "  ".into(),
-                ..crate::ui::welcome::blank_account()
+                ..crate::config::blank_account()
             },
             // Over Graph with no IMAP host: configured.
             AccountConfig {
                 email: "e@example.org".into(),
                 protocol: Protocol::Graph,
-                ..crate::ui::welcome::blank_account()
+                ..crate::config::blank_account()
             },
         ];
         let emails: Vec<String> = importable_of(listed, &configured)

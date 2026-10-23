@@ -304,23 +304,17 @@ impl SimpleComponent for CloudAccounts {
                     a.name.clone()
                 };
                 let parent = relm4::main_application().active_window();
-                let dialog = adw::MessageDialog::new(
-                    parent.as_ref(),
-                    Some(&i18n_f("Remove {name}?", &[("name", &name)])),
-                    Some(&i18n("Files already uploaded and links sent stay active on the provider's service.")),
-                );
-                dialog.add_response("cancel", &i18n("Cancel"));
-                dialog.add_response("remove", &i18n("Remove"));
-                dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
-                dialog.set_default_response(Some("cancel"));
-                dialog.set_close_response("cancel");
                 let s = sender.input_sender().clone();
-                dialog.connect_response(None, move |_, response| {
-                    if response == "remove" {
+                crate::ui::dialog::confirm_destructive(
+                    parent.as_ref(),
+                    &i18n_f("Remove {name}?", &[("name", &name)]),
+                    &i18n("Files already uploaded and links sent stay active on the provider's service."),
+                    "remove",
+                    &i18n("Remove"),
+                    move || {
                         let _ = s.send(CloudAccountsInput::Remove(i));
-                    }
-                });
-                dialog.present();
+                    },
+                );
             }
             CloudAccountsInput::Remove(i) => {
                 if i < self.accounts.len() {

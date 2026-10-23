@@ -6,9 +6,9 @@ use relm4::prelude::*;
 
 use crate::app::model::AppModel;
 use crate::app::msg::AppMsg;
-use crate::app::showcase::showcase_capture;
 use crate::i18n::i18n;
 use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::showcase::showcase_capture;
 use crate::ui::sidebar::CtxAction;
 
 use super::capture::input_after;
@@ -86,6 +86,7 @@ pub(super) fn stage_settings_go(sender: &ComponentSender<AppModel>) {
 /// HYLKI_SHOWCASE_ADD_CONTACT=<address> opens Add to Contacts
 /// for it at 6s and captures the dialog at 10s, beside the
 /// HYLKI_SHOWCASE file, so the books it offers can be checked.
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(super) fn stage_add_contact(sender: &ComponentSender<AppModel>) {
     if let Ok(addr) = std::env::var("HYLKI_SHOWCASE_ADD_CONTACT") {
         input_after(sender, 6, AppMsg::AddContactAddr(addr));
@@ -108,6 +109,7 @@ pub(super) fn stage_add_contact(sender: &ComponentSender<AppModel>) {
 /// HYLKI_SHOWCASE_DIALOG=save|discard|cancel answers whatever
 /// message dialog is on screen at 10s, captured first beside
 /// the HYLKI_SHOWCASE file.
+#[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
 pub(super) fn stage_dialog() {
     if let Ok(answer) = std::env::var("HYLKI_SHOWCASE_DIALOG") {
         gtk::glib::timeout_add_seconds_local_once(10, move || {

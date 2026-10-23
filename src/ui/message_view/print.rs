@@ -1,10 +1,11 @@
 //! The printed document (#16): every message inlined into one plain page
 //! under a header that exists only on paper.
 
-use super::html::{body_html, escape_text};
+use super::html::body_html;
 use super::remote::strip_remote;
 use super::style::{inject_csp, inject_reader_style, reader_style_css};
 use super::MessageView;
+use crate::encoding::escape_html;
 use crate::i18n::i18n;
 use crate::models::Message;
 
@@ -197,19 +198,19 @@ pub(super) fn print_document(
 /// Who sent one message of a printed conversation, and when.
 pub(super) fn print_message_header_html(m: &Message) -> String {
     let from = if m.from_addr.is_empty() {
-        escape_text(&m.from_name)
+        escape_html(&m.from_name)
     } else if m.from_name.trim().is_empty() {
-        escape_text(&m.from_addr)
+        escape_html(&m.from_addr)
     } else {
         format!(
             "{} &lt;{}&gt;",
-            escape_text(&m.from_name),
-            escape_text(&m.from_addr)
+            escape_html(&m.from_name),
+            escape_html(&m.from_addr)
         )
     };
     format!(
         "<div class=\"hylki-print-msghdr\">{from} — {date}</div>",
-        date = escape_text(&m.datetime_full())
+        date = escape_html(&m.datetime_full())
     )
 }
 
@@ -232,8 +233,8 @@ pub(super) fn print_header_html(message: Option<&Message>) -> String {
         }
         format!(
             "<div class=\"hylki-print-row\"><span class=\"hylki-print-label\">{}</span> {}</div>",
-            escape_text(label),
-            escape_text(value)
+            escape_html(label),
+            escape_html(value)
         )
     };
     let from = if m.from_addr.trim().is_empty() {
@@ -252,7 +253,7 @@ pub(super) fn print_header_html(message: Option<&Message>) -> String {
         "<div class=\"hylki-print-hdr\">\
            <div class=\"hylki-print-subject\">{subject}</div>{from}{to}{cc}{bcc}{date}\
          </div>",
-        subject = escape_text(&subject),
+        subject = escape_html(&subject),
         from = row(&i18n("From:"), &from),
         to = row(&i18n("To:"), &m.to),
         cc = row(&i18n("Cc:"), &m.cc),
