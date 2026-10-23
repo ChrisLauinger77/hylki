@@ -126,48 +126,7 @@ impl Sidebar {
             section.account.name.clone()
         };
 
-        let circle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        circle.add_css_class("account-circle");
-        circle.add_css_class(&format!("acct-color-{id}"));
-        // Ringed in the account's color, as the list's avatars are in
-        // All Inboxes: a picture covers the color the disc would show.
-        circle.add_css_class(&format!("acct-ring-{id}"));
-        circle.set_valign(gtk::Align::Center);
-        // Keep it a perfect circle: a fixed square that never stretches with
-        // the row. (Without this the glyph's hexpand propagates up and the
-        // circle widens into an oval whenever a name column sits beside it.)
-        circle.set_halign(gtk::Align::Center);
-        circle.set_hexpand(false);
-        circle.set_size_request(30, 30);
-        // Drawn ink-centred (see `ui::initials`), not a label: a lone
-        // letter or an emoji sits exactly in the middle of the disc.
-        // The account's own Gravatar leads when it asked for one and the
-        // address has one (#189); the picture and the emoji are what it
-        // falls back to.
-        let gravatar = account_gravatar(&section.account.email);
-        let glyph: gtk::Widget = match (&gravatar, &section.avatar, &section.emoji) {
-            (Some(texture), ..) => {
-                circle.set_overflow(gtk::Overflow::Hidden);
-                crate::ui::initials::picture_from_texture(texture, 30).upcast()
-            }
-            (None, Some(path), _) => {
-                // A picture fills the disc; the disc's rounded corners
-                // clip it into a circle.
-                circle.set_overflow(gtk::Overflow::Hidden);
-                crate::ui::initials::avatar_picture(path, 30).upcast()
-            }
-            (None, None, Some(em)) if !em.is_empty() => {
-                crate::ui::initials::glyph_picture(em, &section.color, 0.55, 30).upcast()
-            }
-            _ => crate::ui::initials::glyph_picture(
-                &account_initials(&name_str, &section.account.email),
-                &section.color,
-                0.47,
-                30,
-            )
-            .upcast(),
-        };
-        circle.append(&glyph);
+        let circle = account_circle(section, &name_str);
         // While this account's section is collapsed its Inbox row (and the
         // chip on it) is hidden inside the revealer, so surface the inbox
         // unread count on the avatar instead — mirroring how the collapsed
@@ -284,80 +243,8 @@ impl Sidebar {
             });
             header.add_controller(press);
         }
-        // Right-click an account: act on the account / its inbox.
-        let inbox_id = section
-            .folders
-            .iter()
-            .find(|f| f.kind == FolderKind::Inbox)
-            .map(|f| f.id);
-        let own_order = !section.folder_order.is_empty();
-        let click = gtk::GestureClick::new();
-        click.set_button(gtk::gdk::BUTTON_SECONDARY);
-        let cs = sender.clone();
-        let header_w = header.clone();
-        click.connect_pressed(move |_, _, x, y| {
-            let mut items: Vec<(&str, CtxAction)> = Vec::new();
-            if let Some(fid) = inbox_id {
-                items.push((
-                    i18n_noop("Mark Inbox as Read"),
-                    CtxAction::MarkFolderRead {
-                        account_id: id,
-                        folder_id: fid,
-                    },
-                ));
-                items.push((
-                    i18n_noop("Refresh"),
-                    CtxAction::RefreshFolder {
-                        account_id: id,
-                        folder_id: fid,
-                    },
-                ));
-            }
-            items.push((i18n_noop("New Folder…"), CtxAction::NewFolder(id)));
-            if own_order {
-                items.push((
-                    i18n_noop("Reset Folder Order"),
-                    CtxAction::ResetFolderOrder(id),
-                ));
-            }
-            items.push((
-                i18n_noop("Account Settings…"),
-                CtxAction::OpenAccountSettings(id),
-            ));
-            items.push((i18n_noop("Remove Account…"), CtxAction::RemoveAccount(id)));
-            show_sidebar_menu(&header_w, x, y, items, &cs);
-        });
-        header.add_controller(click);
-
-        // While dragging a message, hovering the account header for 500ms
-        // expands a collapsed account so its folders become drop targets.
-        let motion = gtk::DropControllerMotion::new();
-        let ms = sender.input_sender().clone();
-        let timer: std::rc::Rc<std::cell::RefCell<Option<gtk::glib::SourceId>>> =
-            std::rc::Rc::new(std::cell::RefCell::new(None));
-        let t_enter = timer.clone();
-        motion.connect_enter(move |_, _, _| {
-            if t_enter.borrow().is_some() {
-                return;
-            }
-            let ms = ms.clone();
-            let t = t_enter.clone();
-            let src = gtk::glib::timeout_add_local_once(
-                std::time::Duration::from_millis(500),
-                move || {
-                    *t.borrow_mut() = None;
-                    let _ = ms.send(SidebarInput::ExpandForDrop(id));
-                },
-            );
-            *t_enter.borrow_mut() = Some(src);
-        });
-        let t_leave = timer.clone();
-        motion.connect_leave(move |_| {
-            if let Some(src) = t_leave.borrow_mut().take() {
-                src.remove();
-            }
-        });
-        header.add_controller(motion);
+        attach_account_menu(&header, section, sender);
+        attach_drop_hover(&header, id, sender);
         // The first account sits 10px further below the unified block
         // above it (when there is one), so the two read as separate
         // groups (Jason, 2026-09-13).
@@ -726,4 +613,137 @@ impl Sidebar {
         );
         list_box
     }
+}
+
+/// The account's avatar disc (`name_str` gives its initials): its color,
+/// ringed, a fixed 30 px square, with the glyph drawn ink-centred (see `ui::initials`) rather than as a label.
+/// The account's own Gravatar leads when it asked for one and the address
+/// has one (#189); the picture and the emoji are what it falls back to.
+fn account_circle(section: &SectionData, name_str: &str) -> gtk::Box {
+    let id = section.account.id;
+    let circle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    circle.add_css_class("account-circle");
+    circle.add_css_class(&format!("acct-color-{id}"));
+    // Ringed in the account's color, as the list's avatars are in
+    // All Inboxes: a picture covers the color the disc would show.
+    circle.add_css_class(&format!("acct-ring-{id}"));
+    circle.set_valign(gtk::Align::Center);
+    // Keep it a perfect circle: a fixed square that never stretches with
+    // the row. (Without this the glyph's hexpand propagates up and the
+    // circle widens into an oval whenever a name column sits beside it.)
+    circle.set_halign(gtk::Align::Center);
+    circle.set_hexpand(false);
+    circle.set_size_request(30, 30);
+    // Drawn ink-centred (see `ui::initials`), not a label: a lone
+    // letter or an emoji sits exactly in the middle of the disc.
+    // The account's own Gravatar leads when it asked for one and the
+    // address has one (#189); the picture and the emoji are what it
+    // falls back to.
+    let gravatar = account_gravatar(&section.account.email);
+    let glyph: gtk::Widget = match (&gravatar, &section.avatar, &section.emoji) {
+        (Some(texture), ..) => {
+            circle.set_overflow(gtk::Overflow::Hidden);
+            crate::ui::initials::picture_from_texture(texture, 30).upcast()
+        }
+        (None, Some(path), _) => {
+            // A picture fills the disc; the disc's rounded corners
+            // clip it into a circle.
+            circle.set_overflow(gtk::Overflow::Hidden);
+            crate::ui::initials::avatar_picture(path, 30).upcast()
+        }
+        (None, None, Some(em)) if !em.is_empty() => {
+            crate::ui::initials::glyph_picture(em, &section.color, 0.55, 30).upcast()
+        }
+        _ => crate::ui::initials::glyph_picture(
+            &account_initials(name_str, &section.account.email),
+            &section.color,
+            0.47,
+            30,
+        )
+        .upcast(),
+    };
+    circle.append(&glyph);
+    circle
+}
+
+/// Right-click an account: act on the account / its inbox.
+fn attach_account_menu(
+    header: &gtk::Button,
+    section: &SectionData,
+    sender: &ComponentSender<Sidebar>,
+) {
+    let id = section.account.id;
+    let inbox_id = section
+        .folders
+        .iter()
+        .find(|f| f.kind == FolderKind::Inbox)
+        .map(|f| f.id);
+    let own_order = !section.folder_order.is_empty();
+    let click = gtk::GestureClick::new();
+    click.set_button(gtk::gdk::BUTTON_SECONDARY);
+    let cs = sender.clone();
+    let header_w = header.clone();
+    click.connect_pressed(move |_, _, x, y| {
+        let mut items: Vec<(&str, CtxAction)> = Vec::new();
+        if let Some(fid) = inbox_id {
+            items.push((
+                i18n_noop("Mark Inbox as Read"),
+                CtxAction::MarkFolderRead {
+                    account_id: id,
+                    folder_id: fid,
+                },
+            ));
+            items.push((
+                i18n_noop("Refresh"),
+                CtxAction::RefreshFolder {
+                    account_id: id,
+                    folder_id: fid,
+                },
+            ));
+        }
+        items.push((i18n_noop("New Folder…"), CtxAction::NewFolder(id)));
+        if own_order {
+            items.push((
+                i18n_noop("Reset Folder Order"),
+                CtxAction::ResetFolderOrder(id),
+            ));
+        }
+        items.push((
+            i18n_noop("Account Settings…"),
+            CtxAction::OpenAccountSettings(id),
+        ));
+        items.push((i18n_noop("Remove Account…"), CtxAction::RemoveAccount(id)));
+        show_sidebar_menu(&header_w, x, y, items, &cs);
+    });
+    header.add_controller(click);
+}
+
+/// While dragging a message, hovering the account header for 500ms
+/// expands a collapsed account so its folders become drop targets.
+fn attach_drop_hover(header: &gtk::Button, id: u32, sender: &ComponentSender<Sidebar>) {
+    let motion = gtk::DropControllerMotion::new();
+    let ms = sender.input_sender().clone();
+    let timer: std::rc::Rc<std::cell::RefCell<Option<gtk::glib::SourceId>>> =
+        std::rc::Rc::new(std::cell::RefCell::new(None));
+    let t_enter = timer.clone();
+    motion.connect_enter(move |_, _, _| {
+        if t_enter.borrow().is_some() {
+            return;
+        }
+        let ms = ms.clone();
+        let t = t_enter.clone();
+        let src =
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(500), move || {
+                *t.borrow_mut() = None;
+                let _ = ms.send(SidebarInput::ExpandForDrop(id));
+            });
+        *t_enter.borrow_mut() = Some(src);
+    });
+    let t_leave = timer.clone();
+    motion.connect_leave(move |_| {
+        if let Some(src) = t_leave.borrow_mut().take() {
+            src.remove();
+        }
+    });
+    header.add_controller(motion);
 }
