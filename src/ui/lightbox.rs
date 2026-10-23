@@ -311,7 +311,7 @@ impl Component for Lightbox {
                 if let Some(att) = self.items.get(self.pos).cloned() {
                     let dialog = gtk::FileDialog::builder()
                         .initial_name(&att.name)
-                        .title(&i18n("Save Attachment"))
+                        .title(i18n("Save Attachment"))
                         .build();
                     let window = root.root().and_downcast::<gtk::Window>();
                     dialog.save(window.as_ref(), gtk::gio::Cancellable::NONE, move |res| {

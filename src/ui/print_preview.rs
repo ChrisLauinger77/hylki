@@ -426,7 +426,7 @@ pub fn open(parent: &gtk::Window, html: &str, job_name: &str) {
     let win = adw::Window::builder()
         .transient_for(parent)
         .modal(false)
-        .title(&i18n("Print Preview"))
+        .title(i18n("Print Preview"))
         .default_width(900)
         .default_height(900)
         .build();
@@ -477,7 +477,7 @@ pub fn open(parent: &gtk::Window, html: &str, job_name: &str) {
 
     let header = adw::HeaderBar::new();
     let print_btn = gtk::Button::builder()
-        .label(&i18n("Print…"))
+        .label(i18n("Print…"))
         .css_classes(["suggested-action"])
         .build();
     {
@@ -491,7 +491,7 @@ pub fn open(parent: &gtk::Window, html: &str, job_name: &str) {
     header.pack_end(&print_btn);
 
     let save_btn = gtk::Button::builder()
-        .label(&i18n("Save as PDF…"))
+        .label(i18n("Save as PDF…"))
         .sensitive(false)
         .build();
     {
