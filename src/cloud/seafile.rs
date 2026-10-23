@@ -207,86 +207,19 @@ pub(super) fn seafile_upload_and_share(
     let base = account.base();
     let repo = seafile_library(account, &token)?;
 
-    // The folder inside the library, one segment at a time: the mkdir
-    // wants its parent to exist.
     let folder = account.folder.trim().trim_matches('/').to_string();
-    let mut dir = String::new();
-    for part in folder.split('/').filter(|p| !p.is_empty()) {
-        dir.push('/');
-        dir.push_str(part);
-        let url = format!(
-            "{base}/api2/repos/{repo}/dir/?p={}",
-            crate::percent::encode_path(&dir)
-        );
-        let there = ureq::get(&url)
-            .set("Authorization", &authz)
-            .timeout(Duration::from_secs(60))
-            .call();
-        match there {
-            Ok(_) => {}
-            Err(ureq::Error::Status(404, _)) => {
-                ureq::post(&url)
-                    .set("Authorization", &authz)
-                    .timeout(Duration::from_secs(60))
-                    .send_form(&[("operation", "mkdir")])
-                    .map_err(|e| seafile_err("Could not create the folder", e))?;
-            }
-            Err(e) => return Err(seafile_err("Could not look at the folder", e)),
-        }
-    }
+    let dir = seafile_make_folders(&base, &repo, &authz, &folder)?;
     let parent = if dir.is_empty() {
         "/".to_string()
     } else {
         dir.clone()
     };
 
-    // The upload goes to a one-off link from the file server.
-    let link: serde_json::Value = ureq::get(&format!(
-        "{base}/api2/repos/{repo}/upload-link/?p={}",
-        crate::percent::encode_path(&parent)
-    ))
-    .set("Authorization", &authz)
-    .timeout(Duration::from_secs(60))
-    .call()
-    .map_err(|e| seafile_err("Could not get an upload link", e))?
-    .into_json()
-    .map_err(|e| format!("Could not read the upload link: {e}"))?;
-    let link = link.as_str().unwrap_or("").to_string();
-    if link.is_empty() {
-        return Err("Could not get an upload link: the server gave none.".to_string());
-    }
-    let sep = if link.contains('?') { '&' } else { '?' };
-    let link = format!("{link}{sep}ret-json=1");
+    let link = seafile_upload_link(&base, &repo, &authz, &parent)?;
     // replace=0: a taken name gets a numbered one, reported back.
     let fields = [("parent_dir", parent.as_str()), ("replace", "0")];
     let uploaded: serde_json::Value = if account.cloudflare && size > CLOUDFLARE_CHUNK {
-        // Resumable upload: the same link takes the file in pieces, each a
-        // multipart post with Content-Range saying where it goes and
-        // Content-Disposition naming the file the pieces belong to. The
-        // file server keeps them until the last one lands, and only that
-        // answer names the file.
-        let safe = name.replace(['\\', '"'], "_").replace(['\r', '\n'], " ");
-        let mut last = serde_json::Value::Null;
-        for (i, (offset, len)) in chunk_ranges(size, CLOUDFLARE_CHUNK).into_iter().enumerate() {
-            let piece = file_slice(path, &name, offset, len)?;
-            let (ctype, body_len, body) = multipart_upload(&fields, &name, piece, len)?;
-            let end = (offset + len).saturating_sub(1);
-            last = ureq::post(&link)
-                .set("Authorization", &authz)
-                .set("Content-Type", &ctype)
-                .set("Content-Length", &body_len.to_string())
-                .set("Content-Range", &format!("bytes {offset}-{end}/{size}"))
-                .set(
-                    "Content-Disposition",
-                    &format!("attachment; filename=\"{safe}\""),
-                )
-                .timeout(Duration::from_secs(60 * 60))
-                .send(body)
-                .map_err(|e| seafile_err(&format!("Upload failed at piece {}", i + 1), e))?
-                .into_json()
-                .map_err(|e| format!("Upload failed: could not read the answer: {e}"))?;
-        }
-        last
+        seafile_resumable_upload(&link, &authz, &fields, path, &name, size)?
     } else {
         let file = std::fs::File::open(path).map_err(|e| format!("could not read {name}: {e}"))?;
         let (ctype, len, body) = multipart_upload(&fields, &name, file, size)?;
@@ -309,7 +242,6 @@ pub(super) fn seafile_upload_and_share(
         .unwrap_or(&name)
         .to_string();
 
-    // The share link.
     let file_path = if dir.is_empty() {
         format!("/{remote}")
     } else {
@@ -317,17 +249,142 @@ pub(super) fn seafile_upload_and_share(
     };
     let expires = expiry(account);
     let pw = share_password(account, fixed)?;
-    let days = account.expire_days.to_string();
-    let mut form: Vec<(&str, &str)> =
-        vec![("repo_id", repo.as_str()), ("path", file_path.as_str())];
-    if let Some(p) = &pw {
-        form.push(("password", p.as_str()));
+    let url = seafile_share_link(
+        account,
+        &authz,
+        &repo,
+        &file_path,
+        pw.as_deref(),
+        expires.is_some(),
+    )?;
+    Ok(ShareResult {
+        name: remote,
+        size,
+        url,
+        password: pw,
+        expires,
+    })
+}
+
+/// The folder inside the library, one segment at a time: the mkdir wants
+/// its parent to exist. Answers with its path in the library (empty for
+/// the library's root).
+fn seafile_make_folders(
+    base: &str,
+    repo: &str,
+    authz: &str,
+    folder: &str,
+) -> Result<String, String> {
+    let mut dir = String::new();
+    for part in folder.split('/').filter(|p| !p.is_empty()) {
+        dir.push('/');
+        dir.push_str(part);
+        let url = format!(
+            "{base}/api2/repos/{repo}/dir/?p={}",
+            crate::percent::encode_path(&dir)
+        );
+        let there = ureq::get(&url)
+            .set("Authorization", authz)
+            .timeout(Duration::from_secs(60))
+            .call();
+        match there {
+            Ok(_) => {}
+            Err(ureq::Error::Status(404, _)) => {
+                ureq::post(&url)
+                    .set("Authorization", authz)
+                    .timeout(Duration::from_secs(60))
+                    .send_form(&[("operation", "mkdir")])
+                    .map_err(|e| seafile_err("Could not create the folder", e))?;
+            }
+            Err(e) => return Err(seafile_err("Could not look at the folder", e)),
+        }
     }
-    if expires.is_some() {
+    Ok(dir)
+}
+
+/// The one-off link from the file server the upload goes to, asking for a
+/// JSON answer.
+fn seafile_upload_link(
+    base: &str,
+    repo: &str,
+    authz: &str,
+    parent: &str,
+) -> Result<String, String> {
+    let link: serde_json::Value = ureq::get(&format!(
+        "{base}/api2/repos/{repo}/upload-link/?p={}",
+        crate::percent::encode_path(parent)
+    ))
+    .set("Authorization", authz)
+    .timeout(Duration::from_secs(60))
+    .call()
+    .map_err(|e| seafile_err("Could not get an upload link", e))?
+    .into_json()
+    .map_err(|e| format!("Could not read the upload link: {e}"))?;
+    let link = link.as_str().unwrap_or("").to_string();
+    if link.is_empty() {
+        return Err("Could not get an upload link: the server gave none.".to_string());
+    }
+    let sep = if link.contains('?') { '&' } else { '?' };
+    Ok(format!("{link}{sep}ret-json=1"))
+}
+
+/// Resumable upload: the same link takes the file in pieces, each a
+/// multipart post with Content-Range saying where it goes and
+/// Content-Disposition naming the file the pieces belong to. The file
+/// server keeps them until the last one lands, and only that answer names
+/// the file.
+fn seafile_resumable_upload(
+    link: &str,
+    authz: &str,
+    fields: &[(&str, &str)],
+    path: &Path,
+    name: &str,
+    size: u64,
+) -> Result<serde_json::Value, String> {
+    let safe = name.replace(['\\', '"'], "_").replace(['\r', '\n'], " ");
+    let mut last = serde_json::Value::Null;
+    for (i, (offset, len)) in chunk_ranges(size, CLOUDFLARE_CHUNK).into_iter().enumerate() {
+        let piece = file_slice(path, name, offset, len)?;
+        let (ctype, body_len, body) = multipart_upload(fields, name, piece, len)?;
+        let end = (offset + len).saturating_sub(1);
+        last = ureq::post(link)
+            .set("Authorization", authz)
+            .set("Content-Type", &ctype)
+            .set("Content-Length", &body_len.to_string())
+            .set("Content-Range", &format!("bytes {offset}-{end}/{size}"))
+            .set(
+                "Content-Disposition",
+                &format!("attachment; filename=\"{safe}\""),
+            )
+            .timeout(Duration::from_secs(60 * 60))
+            .send(body)
+            .map_err(|e| seafile_err(&format!("Upload failed at piece {}", i + 1), e))?
+            .into_json()
+            .map_err(|e| format!("Upload failed: could not read the answer: {e}"))?;
+    }
+    Ok(last)
+}
+
+/// The share link to `file_path` in the library, with the password and
+/// the account's expiry when wanted.
+fn seafile_share_link(
+    account: &CloudAccount,
+    authz: &str,
+    repo: &str,
+    file_path: &str,
+    password: Option<&str>,
+    expires: bool,
+) -> Result<String, String> {
+    let days = account.expire_days.to_string();
+    let mut form: Vec<(&str, &str)> = vec![("repo_id", repo), ("path", file_path)];
+    if let Some(p) = password {
+        form.push(("password", p));
+    }
+    if expires {
         form.push(("expire_days", days.as_str()));
     }
-    let v: serde_json::Value = ureq::post(&format!("{base}/api/v2.1/share-links/"))
-        .set("Authorization", &authz)
+    let v: serde_json::Value = ureq::post(&format!("{}/api/v2.1/share-links/", account.base()))
+        .set("Authorization", authz)
         .timeout(Duration::from_secs(60))
         .send_form(&form)
         .map_err(|e| seafile_err("Uploaded, but could not create the share link", e))?
@@ -340,13 +397,7 @@ pub(super) fn seafile_upload_and_share(
             v["error_msg"].as_str().unwrap_or("no link in the answer")
         ));
     }
-    Ok(ShareResult {
-        name: remote,
-        size,
-        url,
-        password: pw,
-        expires,
-    })
+    Ok(url)
 }
 
 #[cfg(test)]

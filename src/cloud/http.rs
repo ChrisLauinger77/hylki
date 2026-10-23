@@ -25,6 +25,25 @@ pub(super) fn chunk_ranges(size: u64, chunk: u64) -> Vec<(u64, u64)> {
         .collect()
 }
 
+/// Read whole chunks off a file: `buf.len()` bytes, or what is left.
+pub(super) fn read_chunk(
+    file: &mut std::fs::File,
+    buf: &mut [u8],
+    name: &str,
+) -> Result<usize, String> {
+    let mut n = 0;
+    while n < buf.len() {
+        let r = file
+            .read(&mut buf[n..])
+            .map_err(|e| format!("could not read {name}: {e}"))?;
+        if r == 0 {
+            break;
+        }
+        n += r;
+    }
+    Ok(n)
+}
+
 /// A reader over one piece of the file on disk.
 pub(super) fn file_slice(
     path: &Path,

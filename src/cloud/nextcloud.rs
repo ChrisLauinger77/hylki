@@ -91,19 +91,7 @@ pub(super) fn nextcloud_upload_and_share(
     let authz = auth(account, password);
     let timeout = Duration::from_secs(60 * 60);
 
-    // The folder: MKCOL says 405 when it already exists, which is fine.
-    let mut dir = String::new();
-    for part in folder.split('/').filter(|p| !p.is_empty()) {
-        dir.push('/');
-        dir.push_str(&crate::percent::encode(part));
-        let r = ureq::request("MKCOL", &format!("{root}{dir}"))
-            .set("Authorization", &authz)
-            .call();
-        match r {
-            Ok(_) | Err(ureq::Error::Status(405, _)) => {}
-            Err(e) => return Err(http_err("Could not create the folder", e)),
-        }
-    }
+    let dir = make_folders(&root, &folder, &authz)?;
 
     // A name that is free.
     let mut remote = name.clone();
@@ -119,46 +107,7 @@ pub(super) fn nextcloud_upload_and_share(
 
     let target = format!("{root}{dir}/{}", crate::percent::encode(&remote));
     if account.cloudflare && size > CLOUDFLARE_CHUNK {
-        // Chunked upload (the "uploads" DAV endpoint): the pieces go into a
-        // one-off folder, numbered so they sort in order, and a MOVE of its
-        // `.file` has the server stitch them into the target. Nextcloud's
-        // v2 wants the target named on every request (Destination);
-        // ownCloud and OpenCloud ignore that header and work the same way.
-        let upload = format!(
-            "{}/remote.php/dav/uploads/{}/hylki-{}",
-            account.base(),
-            crate::percent::encode(account.user.trim()),
-            crate::rng::token(12).map_err(|e| e.to_string())?
-        );
-        ureq::request("MKCOL", &upload)
-            .set("Authorization", &authz)
-            .set("Destination", &target)
-            .timeout(Duration::from_secs(60))
-            .call()
-            .map_err(|e| http_err("Could not start the chunked upload", e))?;
-        for (i, (offset, len)) in chunk_ranges(size, CLOUDFLARE_CHUNK).into_iter().enumerate() {
-            let piece = file_slice(path, &name, offset, len)?;
-            ureq::put(&format!("{upload}/{:05}", i + 1))
-                .set("Authorization", &authz)
-                .set("Destination", &target)
-                .set("Content-Length", &len.to_string())
-                .set("Content-Type", "application/octet-stream")
-                .timeout(timeout)
-                .send(piece)
-                .map_err(|e| http_err(&format!("Upload failed at piece {}", i + 1), e))?;
-        }
-        ureq::request("MOVE", &format!("{upload}/.file"))
-            .set("Authorization", &authz)
-            .set("Destination", &target)
-            .set("OC-Total-Length", &size.to_string())
-            .timeout(timeout)
-            .call()
-            .map_err(|e| {
-                http_err(
-                    "Uploaded the pieces, but the server could not put them together",
-                    e,
-                )
-            })?;
+        chunked_upload(account, &authz, path, &name, size, &target, timeout)?;
     } else {
         let file = std::fs::File::open(path).map_err(|e| format!("could not read {name}: {e}"))?;
         ureq::put(&target)
@@ -173,27 +122,121 @@ pub(super) fn nextcloud_upload_and_share(
             })?;
     }
 
-    // The public link.
-    let share_path = format!("/{folder}/{remote}");
     let expires = expiry(account);
     let pw = share_password(account, fixed)?;
+    let url = share_link(
+        account,
+        &authz,
+        format!("/{folder}/{remote}"),
+        expires.as_deref(),
+        pw.as_deref(),
+    )?;
+    Ok(ShareResult {
+        name: remote,
+        size,
+        url,
+        password: pw,
+        expires,
+    })
+}
+
+/// Make each folder on the way to `folder` under the WebDAV `root`, and
+/// answer with its encoded path. MKCOL says 405 when one already exists,
+/// which is fine.
+fn make_folders(root: &str, folder: &str, authz: &str) -> Result<String, String> {
+    let mut dir = String::new();
+    for part in folder.split('/').filter(|p| !p.is_empty()) {
+        dir.push('/');
+        dir.push_str(&crate::percent::encode(part));
+        let r = ureq::request("MKCOL", &format!("{root}{dir}"))
+            .set("Authorization", authz)
+            .call();
+        match r {
+            Ok(_) | Err(ureq::Error::Status(405, _)) => {}
+            Err(e) => return Err(http_err("Could not create the folder", e)),
+        }
+    }
+    Ok(dir)
+}
+
+/// Chunked upload (the "uploads" DAV endpoint): the pieces go into a
+/// one-off folder, numbered so they sort in order, and a MOVE of its
+/// `.file` has the server stitch them into the target. Nextcloud's
+/// v2 wants the target named on every request (Destination);
+/// ownCloud and OpenCloud ignore that header and work the same way.
+fn chunked_upload(
+    account: &CloudAccount,
+    authz: &str,
+    path: &Path,
+    name: &str,
+    size: u64,
+    target: &str,
+    timeout: Duration,
+) -> Result<(), String> {
+    let upload = format!(
+        "{}/remote.php/dav/uploads/{}/hylki-{}",
+        account.base(),
+        crate::percent::encode(account.user.trim()),
+        crate::rng::token(12).map_err(|e| e.to_string())?
+    );
+    ureq::request("MKCOL", &upload)
+        .set("Authorization", authz)
+        .set("Destination", target)
+        .timeout(Duration::from_secs(60))
+        .call()
+        .map_err(|e| http_err("Could not start the chunked upload", e))?;
+    for (i, (offset, len)) in chunk_ranges(size, CLOUDFLARE_CHUNK).into_iter().enumerate() {
+        let piece = file_slice(path, name, offset, len)?;
+        ureq::put(&format!("{upload}/{:05}", i + 1))
+            .set("Authorization", authz)
+            .set("Destination", target)
+            .set("Content-Length", &len.to_string())
+            .set("Content-Type", "application/octet-stream")
+            .timeout(timeout)
+            .send(piece)
+            .map_err(|e| http_err(&format!("Upload failed at piece {}", i + 1), e))?;
+    }
+    ureq::request("MOVE", &format!("{upload}/.file"))
+        .set("Authorization", authz)
+        .set("Destination", target)
+        .set("OC-Total-Length", &size.to_string())
+        .timeout(timeout)
+        .call()
+        .map_err(|e| {
+            http_err(
+                "Uploaded the pieces, but the server could not put them together",
+                e,
+            )
+        })?;
+    Ok(())
+}
+
+/// The public link to the file at `share_path`, through the OCS
+/// files-sharing endpoint.
+fn share_link(
+    account: &CloudAccount,
+    authz: &str,
+    share_path: String,
+    expires: Option<&str>,
+    password: Option<&str>,
+) -> Result<String, String> {
     let mut form: Vec<(&str, String)> = vec![
         ("path", share_path),
         ("shareType", "3".to_string()),
         ("permissions", "1".to_string()),
     ];
-    if let Some(d) = &expires {
-        form.push(("expireDate", d.clone()));
+    if let Some(d) = expires {
+        form.push(("expireDate", d.to_string()));
     }
-    if let Some(p) = &pw {
-        form.push(("password", p.clone()));
+    if let Some(p) = password {
+        form.push(("password", p.to_string()));
     }
     let form_ref: Vec<(&str, &str)> = form.iter().map(|(k, v)| (*k, v.as_str())).collect();
     let v: serde_json::Value = ureq::post(&format!(
         "{}/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json",
         account.base()
     ))
-    .set("Authorization", &authz)
+    .set("Authorization", authz)
     .set("OCS-APIRequest", "true")
     .timeout(Duration::from_secs(60))
     .send_form(&form_ref)
@@ -209,13 +252,7 @@ pub(super) fn nextcloud_upload_and_share(
             "Uploaded, but the server made no share link: {msg}"
         ));
     }
-    Ok(ShareResult {
-        name: remote,
-        size,
-        url,
-        password: pw,
-        expires,
-    })
+    Ok(url)
 }
 
 /// `report-20260909-141500.pdf`: the name with the time in it, for when

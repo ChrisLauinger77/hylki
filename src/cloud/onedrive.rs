@@ -2,11 +2,10 @@
 //! hands out the token, Microsoft Graph takes the upload and makes the
 //! link.
 
-use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
 
-use super::http::{short_error, status_error, Wording};
+use super::http::{read_chunk, short_error, status_error, Wording};
 use super::{expiry, local_file, share_password, CloudAccount, LinkTerms, ShareResult};
 
 /// What the account's OneDrive plan lets a link carry (see
@@ -86,21 +85,6 @@ pub(super) fn api_message(body: &str) -> String {
         }
     }
     short_error(body)
-}
-
-/// Read whole chunks off a file: `buf.len()` bytes, or what is left.
-fn read_chunk(file: &mut std::fs::File, buf: &mut [u8], name: &str) -> Result<usize, String> {
-    let mut n = 0;
-    while n < buf.len() {
-        let r = file
-            .read(&mut buf[n..])
-            .map_err(|e| format!("could not read {name}: {e}"))?;
-        if r == 0 {
-            break;
-        }
-        n += r;
-    }
-    Ok(n)
 }
 
 const GRAPH: &str = "https://graph.microsoft.com/v1.0";
