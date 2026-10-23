@@ -1,6 +1,7 @@
 //! The wrapper document's script policy, remote detection and links.
 
 use super::*;
+use webkit6::prelude::WebViewExt;
 
 #[test]
 fn the_wrapper_only_runs_its_own_script() {
