@@ -3,12 +3,10 @@
 
 use super::types::MessageWindowOutput;
 use super::MessageWindow;
-use crate::i18n::i18n;
 use crate::models::{Attachment, Message};
 use crate::ui::attachment_drawer::AttachmentDrawerInput;
 use crate::ui::message_list::RowAction;
 use crate::ui::message_view::MessageViewInput;
-use adw::prelude::*;
 use relm4::prelude::*;
 
 impl MessageWindow {
@@ -68,21 +66,6 @@ impl MessageWindow {
         self.view.emit(MessageViewInput::SetCardAttachments(rows));
         self.fit_min_width();
     }
-}
-
-/// Save one attachment where the user picks.
-pub(super) fn save_attachment(att: Attachment, parent: &adw::Window) {
-    let dialog = gtk::FileDialog::builder()
-        .initial_name(&att.name)
-        .title(i18n("Save Attachment"))
-        .build();
-    dialog.save(Some(parent), gtk::gio::Cancellable::NONE, move |res| {
-        if let Ok(file) = res {
-            if let Some(path) = file.path() {
-                let _ = std::fs::write(path, &att.data);
-            }
-        }
-    });
 }
 
 /// The window/title text for a message (its subject, or a placeholder).

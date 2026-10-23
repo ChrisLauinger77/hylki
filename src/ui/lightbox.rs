@@ -305,18 +305,14 @@ impl Component for Lightbox {
             }
             LightboxInput::DownloadCurrent => {
                 if let Some(att) = self.items.get(self.pos).cloned() {
-                    let dialog = gtk::FileDialog::builder()
-                        .initial_name(&att.name)
-                        .title(i18n("Save Attachment"))
-                        .build();
                     let window = root.root().and_downcast::<gtk::Window>();
-                    dialog.save(window.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-                        if let Ok(file) = res {
-                            if let Some(path) = file.path() {
-                                let _ = std::fs::write(path, &att.data);
-                            }
-                        }
-                    });
+                    // A failed write is dropped.
+                    crate::ui::attachment_io::save_attachment_as(
+                        &att.name,
+                        att.data,
+                        window.as_ref(),
+                        |_| {},
+                    );
                 }
             }
             LightboxInput::Rendered(key) => {

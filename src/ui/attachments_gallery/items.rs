@@ -7,6 +7,7 @@ use relm4::ComponentSender;
 
 use crate::i18n::i18n;
 use crate::models::GalleryItem;
+use crate::ui::attachment_io::save_attachment_as;
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 
 use super::{
@@ -261,20 +262,9 @@ impl AttachmentsGallery {
             self.fetch_item(item, sender);
             return;
         };
-        let dialog = gtk::FileDialog::builder()
-            .title(i18n("Save Attachment"))
-            .initial_name(&item.name)
-            .modal(true)
-            .build();
         let parent = self.flow.root().and_downcast::<gtk::Window>();
-        dialog.save(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-            if let Ok(file) = res {
-                if let Some(path) = file.path() {
-                    if let Err(e) = std::fs::write(&path, &data) {
-                        tracing::warn!("could not save attachment: {e}");
-                    }
-                }
-            }
+        save_attachment_as(&item.name, data, parent.as_ref(), |e| {
+            tracing::warn!("could not save attachment: {e}");
         });
     }
 

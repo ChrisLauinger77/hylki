@@ -5,7 +5,7 @@ use super::cells::{build_cell, build_list_row, previewable};
 use super::{AttachmentDrawer, AttachmentDrawerInput, DrawerOutput};
 use crate::i18n::i18n;
 use crate::models::Attachment;
-use crate::ui::attachment_io::open_bytes;
+use crate::ui::attachment_io::{open_bytes, save_attachment_as};
 use crate::ui::attachments_gallery::fade_out;
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use adw::prelude::*;
@@ -75,24 +75,9 @@ impl AttachmentDrawer {
         self.items.get(*self.display_order.get(i)?)
     }
 
-    /// Save one attachment via a file chooser.
+    /// Save one attachment via a file chooser; a failed write is dropped.
     pub(super) fn save_attachment(&self, att: &Attachment) {
-        let dialog = gtk::FileDialog::builder()
-            .initial_name(&att.name)
-            .title(i18n("Save Attachment"))
-            .build();
-        let data = att.data.clone();
-        dialog.save(
-            self.window().as_ref(),
-            gtk::gio::Cancellable::NONE,
-            move |res| {
-                if let Ok(file) = res {
-                    if let Some(path) = file.path() {
-                        let _ = std::fs::write(path, &data);
-                    }
-                }
-            },
-        );
+        save_attachment_as(&att.name, att.data.clone(), self.window().as_ref(), |_| {});
     }
 
     /// Ask for a folder and write every attachment into it ("Save All").
