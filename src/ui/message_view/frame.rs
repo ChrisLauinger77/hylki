@@ -64,8 +64,7 @@ pub(super) const CHROME: (&str, &str) = ("#fafafa", "#242424");
 
 /// Each card's translation banner, and the translation (and whether it is
 /// a Reader View fragment) the card shows instead of its message.
-pub(super) type TranslationsShown =
-    std::collections::HashMap<(u32, u32), (String, Option<(String, bool)>)>;
+type TranslationsShown = std::collections::HashMap<(u32, u32), (String, Option<(String, bool)>)>;
 
 thread_local! {
     /// The grounds as resolved from the live libadwaita theme, refreshed by

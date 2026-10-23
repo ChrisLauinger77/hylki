@@ -9,12 +9,12 @@ use gtk::{gdk, glib};
 use crate::models::is_image_name;
 
 /// A `gdk::Texture` from raw image bytes, or `None` if the format isn't loadable.
-pub(crate) fn texture_from(data: &[u8]) -> Option<gdk::Texture> {
+pub(super) fn texture_from(data: &[u8]) -> Option<gdk::Texture> {
     gdk::Texture::from_bytes(&glib::Bytes::from(data)).ok()
 }
 
 /// What a grid cell can show for an attachment right now.
-pub(crate) enum Thumbnail {
+pub(super) enum Thumbnail {
     /// A texture is available immediately: a decoded image, or a PDF page
     /// already in the render cache.
     Ready(gdk::Texture),
@@ -152,18 +152,18 @@ mod texture_cache_tests {
 }
 
 /// Whether a filename names a PDF (by extension).
-pub(crate) fn is_pdf_name(name: &str) -> bool {
+pub(super) fn is_pdf_name(name: &str) -> bool {
     name.to_ascii_lowercase().ends_with(".pdf")
 }
 
 /// The content hash the thumbnail/preview caches key on — for callers that
 /// need to correlate an async render with the item it belongs to.
-pub(crate) fn content_key(data: &[u8]) -> u64 {
+pub(super) fn content_key(data: &[u8]) -> u64 {
     thumb_cache_key(data)
 }
 
 /// A full-size PDF page already in the preview cache, if any.
-pub(crate) fn cached_pdf_preview(data: &[u8]) -> Option<gdk::Texture> {
+pub(super) fn cached_pdf_preview(data: &[u8]) -> Option<gdk::Texture> {
     PDF_PREVIEWS
         .with(|c| c.borrow().get(&thumb_cache_key(data)).cloned())
         .flatten()
@@ -172,7 +172,7 @@ pub(crate) fn cached_pdf_preview(data: &[u8]) -> Option<gdk::Texture> {
 /// A lightbox-size render of a PDF's first page: handed to `on_done` on the
 /// main thread — at once from the cache, or after a worker renders it.
 /// Failures cache too, so a broken PDF is rendered at most once.
-pub(crate) fn lightbox_pdf_texture(
+pub(super) fn lightbox_pdf_texture(
     data: &[u8],
     on_done: impl FnOnce(Option<gdk::Texture>) + 'static,
 ) {
@@ -205,7 +205,7 @@ pub(super) fn thumb_cache_key(data: &[u8]) -> u64 {
 /// A grid-cell thumbnail for any attachment type that has one — a decoded
 /// image or a PDF's first page — answered from the render cache, or `Pending`
 /// until a worker produces it.
-pub(crate) fn thumbnail_texture(name: &str, data: &[u8]) -> Thumbnail {
+pub(super) fn thumbnail_texture(name: &str, data: &[u8]) -> Thumbnail {
     if !is_image_name(name) && !is_pdf_name(name) {
         return Thumbnail::Fallback;
     }
@@ -220,7 +220,7 @@ pub(crate) fn thumbnail_texture(name: &str, data: &[u8]) -> Thumbnail {
 /// the result to `on_done` back on it and record it in the cache either way.
 /// The GTK loop keeps running — cells show their spinner instead of the
 /// window freezing.
-pub(crate) fn spawn_thumbnail_render(
+pub(super) fn spawn_thumbnail_render(
     name: &str,
     data: Vec<u8>,
     on_done: impl FnOnce(Option<gdk::Texture>) + 'static,
@@ -246,7 +246,7 @@ pub(crate) fn spawn_thumbnail_render(
 }
 
 /// The centred spinner a cell shows while its PDF page renders.
-pub(crate) fn thumbnail_spinner() -> gtk::Spinner {
+pub(super) fn thumbnail_spinner() -> gtk::Spinner {
     let spinner = gtk::Spinner::new();
     spinner.set_spinning(true);
     spinner.set_width_request(28);
@@ -269,7 +269,7 @@ const PREVIEW_RENDER_WIDTH: f64 = 1600.0;
 /// thumbnail threads rendering concurrently crashed with heap corruption, one
 /// thread tearing down its Gfx (cmsCloseProfile) while the other still
 /// rendered. Printing (#359) renders with poppler too, on the main thread.
-pub(crate) fn pdf_render_lock() -> std::sync::MutexGuard<'static, ()> {
+pub(super) fn pdf_render_lock() -> std::sync::MutexGuard<'static, ()> {
     static PDF_RENDER: std::sync::Mutex<()> = std::sync::Mutex::new(());
     PDF_RENDER
         .lock()
@@ -279,7 +279,7 @@ pub(crate) fn pdf_render_lock() -> std::sync::MutexGuard<'static, ()> {
 /// Render a PDF's first page to a texture at `target_width`, by way of an
 /// in-memory PNG — the same route every other thumbnail here already goes
 /// through, so cropping, caching, and format all stay uniform.
-pub(crate) fn pdf_page_texture(data: &[u8], target_width: f64) -> Option<gdk::Texture> {
+pub(super) fn pdf_page_texture(data: &[u8], target_width: f64) -> Option<gdk::Texture> {
     let _guard = pdf_render_lock();
     let doc = poppler::Document::from_bytes(&glib::Bytes::from(data), None).ok()?;
     let page = doc.page(0)?;
@@ -311,7 +311,7 @@ pub(crate) fn pdf_page_texture(data: &[u8], target_width: f64) -> Option<gdk::Te
 }
 
 /// A symbolic icon name for a filename by extension.
-pub(crate) fn icon_for(name: &str) -> &'static str {
+pub(super) fn icon_for(name: &str) -> &'static str {
     let lower = name.to_ascii_lowercase();
     let ext = lower.rsplit('.').next().unwrap_or("");
     match ext {
@@ -333,7 +333,7 @@ pub(crate) fn icon_for(name: &str) -> &'static str {
 /// CSS class that tints a type icon by file kind: PDFs red, Word docs blue,
 /// spreadsheets green, and so on (see `styles.css`). Symbolic icons pick up the
 /// class's `color`, so an unthumbnailed attachment reads at a glance.
-pub(crate) fn icon_color_class(name: &str) -> &'static str {
+pub(super) fn icon_color_class(name: &str) -> &'static str {
     let lower = name.to_ascii_lowercase();
     let ext = lower.rsplit('.').next().unwrap_or("");
     match ext {

@@ -8,7 +8,7 @@ use super::*;
 /// own title and subtitle as shown, so a search works in the language the
 /// app is in.
 #[derive(Clone)]
-pub(super) struct SearchHit {
+struct SearchHit {
     pub(super) page: &'static str,
     title: String,
     /// Where it sits: the page, and the group or expander row around it.

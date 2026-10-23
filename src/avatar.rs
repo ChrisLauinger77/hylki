@@ -185,7 +185,7 @@ pub(crate) fn own_face(email: &str) -> Option<OwnFace> {
 
 /// Note that what the user's mailboxes show has changed (a Gravatar arrived,
 /// say), so cached renders are rebuilt.
-pub(crate) fn note_faces_changed() {
+fn note_faces_changed() {
     OWN_FACES_GENERATION.with(|g| g.set(g.get().wrapping_add(1)));
 }
 

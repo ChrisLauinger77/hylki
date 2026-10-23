@@ -37,11 +37,11 @@ use super::undo::UndoEntry;
 use super::{RedoAction, UndoAction};
 
 /// A pending tag change: (account, folder path, uid, lower-cased keyword).
-pub(super) type PendingTagKey = (u32, String, u32, String);
+type PendingTagKey = (u32, String, u32, String);
 
 /// One row of the tray's mail section: (account, message id, sender,
 /// subject).
-pub(super) type TrayMailRow = (u32, u32, String, String);
+type TrayMailRow = (u32, u32, String, String);
 
 /// The root component's state: the accounts and their workers, what the
 /// list and the reader show, the session caches, every setting the app

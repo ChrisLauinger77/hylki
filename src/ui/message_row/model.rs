@@ -28,7 +28,7 @@ glib::wrapper! {
         @implements gtk::gio::ListModel, gtk::SectionModel;
 }
 
-pub(super) mod item_imp {
+mod item_imp {
     use std::cell::RefCell;
     use std::rc::{Rc, Weak};
 
@@ -95,7 +95,7 @@ impl RowItem {
     }
 }
 
-pub(super) mod model_imp {
+mod model_imp {
     use std::cell::{Cell, RefCell};
     use std::collections::HashMap;
     use std::rc::Rc;
@@ -384,7 +384,7 @@ impl MessageModel {
     }
 
     /// New data for the row at `pos`, showing the same message.
-    pub(crate) fn set_row(&self, pos: usize, data: Rc<RowData>) {
+    fn set_row(&self, pos: usize, data: Rc<RowData>) {
         if self.put_row(pos, data) {
             self.resection();
         }

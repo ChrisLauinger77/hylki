@@ -53,11 +53,11 @@ pub(super) fn report_carddav(
 
 /// How long Settings waits on a directory's first answer. EDS sets no
 /// timeout of its own on the connection, and holds the book while it waits.
-pub(super) const CHECK_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
+const CHECK_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// [`directory::check`], given up on after `limit`; the check itself runs on
 /// to its end in the background.
-pub(super) fn check_within(dir: Directory, limit: std::time::Duration) -> Result<(), String> {
+fn check_within(dir: Directory, limit: std::time::Duration) -> Result<(), String> {
     let (tx, rx) = std::sync::mpsc::channel();
     let name = dir.title();
     std::thread::spawn(move || {

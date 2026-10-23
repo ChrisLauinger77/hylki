@@ -75,7 +75,7 @@ pub(crate) enum Importance {
 impl Importance {
     /// The value a header gives: `X-Priority: 1 (Highest)`, `Importance:
     /// high`, `Priority: urgent` and so on. Anything else is normal.
-    pub(crate) fn from_header(name: &str, value: &str) -> Importance {
+    pub(super) fn from_header(name: &str, value: &str) -> Importance {
         let value = value.trim().to_ascii_lowercase();
         if name.eq_ignore_ascii_case("x-priority") {
             return match value.chars().next() {
@@ -313,7 +313,7 @@ pub(crate) fn label_hue(name: &str) -> usize {
 
 /// Whether a Gmail label (as the server writes it, modified UTF-7) stands for
 /// a tag: named like its keyword, or like its name.
-pub(crate) fn label_names_tag(label: &str, tag: &crate::config::Tag) -> bool {
+fn label_names_tag(label: &str, tag: &crate::config::Tag) -> bool {
     tag.keyword.eq_ignore_ascii_case(label)
         || tag.name.eq_ignore_ascii_case(&crate::mutf7::decode(label))
 }

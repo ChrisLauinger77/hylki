@@ -14,7 +14,7 @@ use crate::i18n::{i18n, i18n_f};
 use crate::models::OutboxItem;
 use crate::worker::OutgoingMessage;
 
-pub(crate) struct Outgoing {
+pub(super) struct Outgoing {
     pub(crate) ticket: u64,
     pub(crate) account_id: u32,
     /// The account as configured when Send was pressed: quitting builds the
@@ -42,11 +42,11 @@ pub(crate) enum Origin {
     Window,
 }
 
-pub(crate) type OutgoingList = Rc<RefCell<Vec<Outgoing>>>;
+pub(super) type OutgoingList = Rc<RefCell<Vec<Outgoing>>>;
 
 /// The Outbox row id of a message on its way out. Counted down from the top
 /// of the range, where the database's own ids for queued messages never reach.
-pub(crate) fn row_id(ticket: u64) -> u32 {
+pub(super) fn row_id(ticket: u64) -> u32 {
     u32::MAX - ticket as u32
 }
 
@@ -108,7 +108,7 @@ impl Outgoing {
 /// due now, so the next launch sends it. The process exits right after, so
 /// this is the last chance. One already with its worker is past saving here,
 /// as it always was.
-pub(crate) fn park_held(list: &OutgoingList) {
+pub(super) fn park_held(list: &OutgoingList) {
     let Ok(list) = list.try_borrow() else { return };
     if !list.iter().any(|o| o.held) {
         return;

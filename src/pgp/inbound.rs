@@ -21,7 +21,7 @@ pub(crate) enum Shape {
 }
 
 impl Shape {
-    pub(crate) fn is_encrypted(&self) -> bool {
+    pub(super) fn is_encrypted(&self) -> bool {
         matches!(
             self,
             Shape::Encrypted { .. } | Shape::InlineEncrypted { .. }

@@ -17,7 +17,7 @@ use relm4::prelude::*;
 /// the expiry and the password, seeded from the account's settings and
 /// changeable for this upload alone.
 #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
-pub(super) fn cloud_upload_dialog(
+fn cloud_upload_dialog(
     parent: Option<&gtk::Window>,
     accounts: &[crate::cloud::CloudAccount],
     paths: Vec<std::path::PathBuf>,

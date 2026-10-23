@@ -83,7 +83,7 @@ enum Upsert {
 }
 
 /// An open `local_contacts.db`.
-pub(crate) struct Store {
+struct Store {
     conn: Connection,
 }
 
@@ -394,7 +394,7 @@ fn insert_uid(vcard: &str, uid: &str) -> String {
 /// blocks, each kept verbatim (with CRLF line ends). Returns the blocks and
 /// how many were cut short (a `BEGIN` with no `END`). Text between blocks is
 /// ignored. Continuation lines (folding) stay inside their block.
-pub(crate) fn split_vcards(text: &str) -> (Vec<String>, usize) {
+fn split_vcards(text: &str) -> (Vec<String>, usize) {
     let mut blocks = Vec::new();
     let mut truncated = 0;
     let mut current: Option<String> = None;

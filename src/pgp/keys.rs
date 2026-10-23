@@ -113,7 +113,7 @@ impl KeyInfo {
             .collect()
     }
 
-    pub(crate) fn matches_address(&self, addr: &str) -> bool {
+    pub(super) fn matches_address(&self, addr: &str) -> bool {
         let addr = addr.trim().to_ascii_lowercase();
         self.emails().contains(&addr)
     }

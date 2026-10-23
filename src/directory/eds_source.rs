@@ -11,8 +11,8 @@ use crate::i18n::i18n;
 pub(crate) const SOURCE_IFACE: &str = "org.gnome.evolution.dataserver.Source";
 const WRITABLE_IFACE: &str = "org.gnome.evolution.dataserver.Source.Writable";
 const REMOVABLE_IFACE: &str = "org.gnome.evolution.dataserver.Source.Removable";
-pub(crate) const MANAGER_PATH: &str = "/org/gnome/evolution/dataserver/SourceManager";
-pub(crate) const MANAGER_IFACE: &str = "org.gnome.evolution.dataserver.SourceManager";
+pub(super) const MANAGER_PATH: &str = "/org/gnome/evolution/dataserver/SourceManager";
+pub(super) const MANAGER_IFACE: &str = "org.gnome.evolution.dataserver.SourceManager";
 
 /// One session-bus connection for the process: EDS closes a book when the
 /// connection that opened it goes, so a connection per search would open

@@ -166,7 +166,7 @@ pub(crate) fn read_contacts() -> Vec<Contact> {
 /// Contacts" does not trust an address just because you once mailed it.
 /// `None` when any book could not be read: a filter then cannot tell a
 /// stranger from a contact whose book failed, and must match neither way.
-pub(crate) fn read_saved_contacts() -> Option<Vec<Contact>> {
+fn read_saved_contacts() -> Option<Vec<Contact>> {
     let (contacts, complete) = read_contacts_from(true);
     complete.then_some(contacts)
 }
@@ -425,7 +425,7 @@ pub(super) fn local_details() -> Vec<ContactDetails> {
 
 /// `book_uid_active` keyed off a book database's directory name, minus the
 /// auto-collected books when `saved_only` is set.
-pub(super) fn db_book_wanted(
+fn db_book_wanted(
     db: &std::path::Path,
     active: &Option<HashMap<String, String>>,
     saved_only: bool,

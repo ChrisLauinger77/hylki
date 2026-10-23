@@ -301,7 +301,7 @@ pub(crate) fn load_list_column_widths() -> std::collections::HashMap<ListColumn,
     list_column_widths_from(&load_privacy().list_column_widths)
 }
 
-pub(crate) fn list_column_widths_from(
+pub(super) fn list_column_widths_from(
     saved: &std::collections::BTreeMap<String, i32>,
 ) -> std::collections::HashMap<ListColumn, i32> {
     saved

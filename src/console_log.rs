@@ -85,7 +85,7 @@ pub(crate) fn stats() -> (usize, usize) {
 }
 
 /// Everything the console holds, oldest first.
-pub(crate) fn all_lines() -> Vec<String> {
+fn all_lines() -> Vec<String> {
     buffer().iter().map(|(_, l)| l.clone()).collect()
 }
 

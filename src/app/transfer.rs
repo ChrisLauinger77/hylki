@@ -20,7 +20,7 @@ use super::undo::{UndoEntry, UndoStep};
 /// folder, into the destination, and only then taken out of the source.
 pub(super) struct Transfer {
     pub(super) src_account: u32,
-    pub(super) src_folder: u32,
+    src_folder: u32,
     pub(super) src_path: String,
     pub(super) uid: u32,
     pub(super) dest_account: u32,
@@ -38,7 +38,7 @@ pub(super) struct Landed {
     pub(super) src_path: String,
     /// The source account's Trash, where the original now is; `None` when
     /// it was erased, which cannot be undone.
-    pub(super) src_trash: Option<String>,
+    src_trash: Option<String>,
     pub(super) dest_account: u32,
     pub(super) dest_path: String,
     pub(super) row: Message,
@@ -53,9 +53,9 @@ pub(super) struct TransferTally {
     /// The first failure's reason, for the report.
     pub(super) error: Option<String>,
     /// The receiving accounts, named in the report.
-    pub(super) dest_accounts: std::collections::BTreeSet<u32>,
+    dest_accounts: std::collections::BTreeSet<u32>,
     /// The folders mail went into, synced once everything has landed.
-    pub(super) dest_folders: std::collections::BTreeSet<(u32, String)>,
+    dest_folders: std::collections::BTreeSet<(u32, String)>,
     /// What has landed so far, recorded as one undo step at the end.
     pub(super) landed: Vec<Landed>,
 }

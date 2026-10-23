@@ -34,7 +34,7 @@ pub(super) struct ReaderToolbarWidgets {
     /// The row's cost with every action button gone (padding, spacing…).
     pub(super) base: i32,
     /// One action button's natural width.
-    pub(super) button_w: i32,
+    button_w: i32,
     /// The window controls' width (re-measured when the decoration layout
     /// changes).
     pub(super) controls: std::cell::Cell<i32>,

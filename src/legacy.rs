@@ -29,9 +29,9 @@ pub(crate) struct Predecessor {
     /// Its Secret Service service name.
     pub(crate) keyring_service: &'static str,
     /// Its GNOME Files extension file, installed on the host.
-    pub(crate) nautilus_file: &'static str,
+    nautilus_file: &'static str,
     /// The marker key in a launcher copy it wrote (see `app_icon`).
-    pub(crate) launcher_mark: &'static str,
+    launcher_mark: &'static str,
     /// What to call it.
     pub(crate) name: &'static str,
 }

@@ -52,7 +52,7 @@ pub(super) fn zoom_key(keyval: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> 
 /// address row or the subject. Those keep their own native undo; everything
 /// else in the composer answers to its history. The body is a WebView, not a
 /// `GtkEditable`, so it never matches here.
-pub(super) fn focus_is_entry(root: &impl IsA<gtk::Widget>) -> bool {
+fn focus_is_entry(root: &impl IsA<gtk::Widget>) -> bool {
     let mut node = root
         .as_ref()
         .root()

@@ -243,7 +243,7 @@ impl MessageView {
 #[derive(Debug, Clone, Copy)]
 struct BodyStamps {
     /// The conversation has had its open scroll: keep the reader's place.
-    pub(super) noscroll: bool,
+    noscroll: bool,
     /// The card and offset the reader was scrolled to, if saved.
     pub(super) anchor: Option<(u32, u32, u32)>,
     /// The saved place was in the gutter between cards.

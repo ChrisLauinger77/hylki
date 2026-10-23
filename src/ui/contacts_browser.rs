@@ -122,7 +122,7 @@ pub(crate) fn present(
 /// Open GNOME Contacts showing one contact. Best effort: outside a sandbox
 /// `gnome-contacts -i <uid>` selects the individual; the Flatpak D-Bus path
 /// can only raise the app.
-pub(crate) fn launch_gnome_contacts_for(uid: &str) {
+pub(super) fn launch_gnome_contacts_for(uid: &str) {
     if crate::platform::is_flatpak() || uid.is_empty() {
         launch_gnome_contacts();
         return;

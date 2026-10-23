@@ -424,7 +424,7 @@ pub(super) fn pretty_birthday(raw: &str) -> String {
 /// Parse the fields the Contacts view shows out of one vCard, its photo
 /// included. Returns `None` for contact lists and entries with neither a name
 /// nor an address.
-pub(crate) fn parse_vcard_details(vcard: &str) -> Option<ContactDetails> {
+pub(super) fn parse_vcard_details(vcard: &str) -> Option<ContactDetails> {
     let mut c = parse_vcard_fields(vcard)?;
     c.photo = vcard_photo(vcard);
     Some(c)
@@ -641,7 +641,7 @@ fn evolution_member(params: &[String], value: &str) -> Option<(String, String)> 
 /// that contact's name and first address, empty when they have none, in the
 /// group's own book). A member whose card is not there is not shown, but is
 /// kept.
-pub(crate) fn resolve_members(
+pub(super) fn resolve_members(
     c: &mut ContactDetails,
     lookup: impl Fn(&str) -> Option<(String, String)>,
 ) {

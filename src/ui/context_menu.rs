@@ -71,7 +71,7 @@ impl MenuEntry {
 
     /// A colored disc in the icon slot — `on` fills it, off draws a ring —
     /// for entries that toggle something with a color of its own (tags).
-    pub(crate) fn swatch(mut self, color: impl Into<String>, on: bool) -> Self {
+    pub(super) fn swatch(mut self, color: impl Into<String>, on: bool) -> Self {
         self.swatch = Some((color.into(), on));
         self
     }
@@ -131,7 +131,7 @@ pub(crate) fn show_context_menu_with_header(
 
 /// [`show_context_menu_with_header`], handing back the popover for a caller
 /// that needs to know when it closes.
-pub(crate) fn show_context_menu_popover(
+pub(super) fn show_context_menu_popover(
     parent: &impl IsA<gtk::Widget>,
     x: f64,
     y: f64,

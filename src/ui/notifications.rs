@@ -32,12 +32,12 @@ pub(crate) struct Notification {
 }
 
 /// One expandable card.
-pub(crate) struct NotificationCard {
+struct NotificationCard {
     note: Notification,
 }
 
 #[derive(Debug)]
-pub(crate) enum CardOutput {
+enum CardOutput {
     Dismiss(u32),
 }
 

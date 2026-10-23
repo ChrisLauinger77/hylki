@@ -19,7 +19,7 @@ mod flow_imp {
         pub(crate) marker: gtk::Box,
         /// The pill the marker stands before; the number of pills puts it
         /// after the last.
-        pub(crate) marker_at: Cell<Option<usize>>,
+        pub(super) marker_at: Cell<Option<usize>>,
     }
 
     #[glib::object_subclass]

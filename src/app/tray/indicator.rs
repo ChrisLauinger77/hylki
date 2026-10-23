@@ -68,7 +68,7 @@ pub(crate) struct TrayMailList {
 /// The app icon the tray shows: the one the dock shows (see
 /// `app_icon::tray_image`), passed in as image bytes (PNG, SVG or any
 /// format the loader reads) so a change follows live.
-pub(super) type AppIconPng<'a> = &'a [u8];
+type AppIconPng<'a> = &'a [u8];
 /// The app's symbolic icon (the opened envelope, drawn in black); its
 /// fill is swapped for the chosen color.
 const ENVELOPE_SVG: &str =
@@ -149,7 +149,7 @@ impl TrayHandle {
     }
 
     /// Replace the menu's message list; `None` drops the section.
-    pub(crate) fn set_mail(&self, mail: Option<TrayMailList>) {
+    pub(super) fn set_mail(&self, mail: Option<TrayMailList>) {
         self.handle.update(move |t| t.mail = mail);
     }
 

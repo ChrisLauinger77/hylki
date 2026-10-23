@@ -9,14 +9,14 @@ use crate::models::Message;
 
 /// One process in the tree, as `/proc` reports it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Proc {
+struct Proc {
     pub(crate) pid: u32,
     pub(crate) name: String,
     /// Resident set, in bytes.
-    pub(crate) rss: u64,
+    rss: u64,
     /// Proportional set size (shared pages divided among their sharers), in
     /// bytes. `None` when the kernel would not say.
-    pub(crate) pss: Option<u64>,
+    pss: Option<u64>,
     /// The anonymous (heap) part of the resident set, in bytes.
     pub(crate) heap: u64,
     pub(crate) threads: u32,
@@ -26,7 +26,7 @@ pub(crate) struct Proc {
 /// sandbox `/proc` shows only the sandbox, so the tree is exactly what a
 /// system monitor lists under "Hylki": the app, WebKit's web and network
 /// processes and their bwrap wrappers.
-pub(crate) fn process_tree() -> Vec<Proc> {
+fn process_tree() -> Vec<Proc> {
     let me = std::process::id();
     let Ok(dir) = std::fs::read_dir("/proc") else {
         return Vec::new();
@@ -202,7 +202,7 @@ extern "C" {
 /// and bytes in large blocks it mapped directly. Rust's allocations are
 /// glibc's too, so this is the whole heap. The difference between "live" and
 /// the resident heap is what a `malloc_trim` could return.
-pub(crate) fn allocator() -> Allocator {
+fn allocator() -> Allocator {
     // SAFETY: mallinfo2 takes nothing and returns a plain struct by value; it
     // exists in every glibc since 2.33, which every build target has.
     let m = unsafe { mallinfo2() };
@@ -214,9 +214,9 @@ pub(crate) fn allocator() -> Allocator {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Allocator {
+struct Allocator {
     pub(crate) live: usize,
-    pub(crate) held_free: usize,
+    held_free: usize,
     pub(crate) mapped: usize,
 }
 
@@ -339,7 +339,7 @@ pub(crate) fn release_web_view(view: &webkit6::WebView) {
 }
 
 /// The views still alive, as (role, count) pairs in first-created order.
-pub(crate) fn live_web_views() -> Vec<(&'static str, usize)> {
+fn live_web_views() -> Vec<(&'static str, usize)> {
     WEB_VIEWS.with(|v| {
         let mut v = v.borrow_mut();
         v.retain(|(_, w)| w.upgrade().is_some());

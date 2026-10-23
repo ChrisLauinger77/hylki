@@ -271,7 +271,7 @@ pub(crate) fn date_time(ts: i64) -> String {
 /// The day an event falls on, with its weekday: "Monday, 2 Nov 2026".
 /// An appointment is placed by its weekday more than by its date, which is
 /// why a calendar invitation names it and a message list does not.
-pub(crate) fn weekday_date(ts: i64) -> String {
+fn weekday_date(ts: i64) -> String {
     let Some(dt) = local(ts) else {
         return String::new();
     };

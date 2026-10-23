@@ -29,7 +29,7 @@ pub(crate) use spelling::apply_spellcheck;
 /// with [`RichEditor::extract_html`] (asynchronous, since it queries the WebView).
 /// Clones share the same underlying widgets (GObject references).
 #[derive(Clone)]
-pub(crate) struct RichEditor {
+pub(super) struct RichEditor {
     /// The toolbar + editor, ready to be placed in a container.
     pub(crate) widget: gtk::Box,
     webview: webkit6::WebView,
@@ -111,7 +111,7 @@ impl Drop for RichEditor {
 /// What a source-mode editor is holding. Rich text is the absence of
 /// both.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SourceKind {
+pub(super) enum SourceKind {
     Markdown,
     Html,
 }
@@ -151,7 +151,7 @@ impl RichEditor {
     /// "InsertParagraph", …). The widget API is the only route to them that
     /// reaches the page's own history — the same reason [`RichEditor::undo`]
     /// cannot go through `execCommand`.
-    pub(crate) fn editing_command(&self, command: &str) {
+    pub(super) fn editing_command(&self, command: &str) {
         self.webview.execute_editing_command(command);
     }
 
@@ -159,36 +159,36 @@ impl RichEditor {
     /// mirrored editor state, so it is a main-loop pass or two behind a
     /// command just issued — a host must treat "still true" right after
     /// [`RichEditor::undo`] as "ask again", not as a miscount.
-    pub(crate) fn can_undo(&self) -> bool {
+    pub(super) fn can_undo(&self) -> bool {
         self.text_history.get().0
     }
 
-    pub(crate) fn can_redo(&self) -> bool {
+    pub(super) fn can_redo(&self) -> bool {
         self.text_history.get().1
     }
 
     /// Called with `(can_undo, can_redo)` whenever the body's text history
     /// changes: an edit, a command, or a reload that drops it.
-    pub(crate) fn connect_history_changed(&self, f: impl Fn(bool, bool) + 'static) {
+    pub(super) fn connect_history_changed(&self, f: impl Fn(bool, bool) + 'static) {
         *self.history_cb.borrow_mut() = Some(Box::new(f));
     }
 
     /// Offer the Spelling Language submenu, and receive the setting it
     /// makes: the comma-separated language list, empty for the system
     /// language (#365).
-    pub(crate) fn connect_spell_languages(&self, f: impl Fn(String) + 'static) {
+    pub(super) fn connect_spell_languages(&self, f: impl Fn(String) + 'static) {
         *self.spell_langs_cb.borrow_mut() = Some(Box::new(f));
     }
 
     /// What "Send as Attachment Instead" does with the lifted image: the
     /// host receives the temp file's path and adds it to its attachments.
-    pub(crate) fn connect_send_as_attachment(&self, f: impl Fn(std::path::PathBuf) + 'static) {
+    pub(super) fn connect_send_as_attachment(&self, f: impl Fn(std::path::PathBuf) + 'static) {
         *self.attach_cb.borrow_mut() = Some(Box::new(f));
     }
 
     /// Replace the editor contents with `content` (HTML), in rich mode, or
     /// flattened to plain text when [`RichEditor::set_plain`] says so.
-    pub(crate) fn set_html(&self, content: &str) {
+    pub(super) fn set_html(&self, content: &str) {
         self.source.set(None);
         self.show_preview(None);
         crate::web_fonts::load_html(
@@ -201,7 +201,7 @@ impl RichEditor {
     /// Put the editor into source mode holding `text`: a monospace
     /// plain-text surface with no formatting toolbar, which the composer
     /// converts on the way out.
-    pub(crate) fn set_source(&self, kind: SourceKind, text: &str) {
+    pub(super) fn set_source(&self, kind: SourceKind, text: &str) {
         self.source.set(Some(kind));
         self.show_preview(None);
         crate::web_fonts::load_html(
@@ -214,17 +214,17 @@ impl RichEditor {
     /// Show the message as plain text from the next [`RichEditor::set_html`]
     /// on: the document flattens itself to the text that is sent, in the
     /// monospace font, and pastes and drops bring in text alone (#424).
-    pub(crate) fn set_plain(&self, on: bool) {
+    pub(super) fn set_plain(&self, on: bool) {
         self.plain.set(on);
     }
 
     /// The source language the editor is in, or `None` in rich mode.
-    pub(crate) fn source_kind(&self) -> Option<SourceKind> {
+    pub(super) fn source_kind(&self) -> Option<SourceKind> {
         self.source.get()
     }
 
     /// Read the source text back, exactly as typed.
-    pub(crate) fn extract_source(&self, cb: impl FnOnce(String) + 'static) {
+    pub(super) fn extract_source(&self, cb: impl FnOnce(String) + 'static) {
         self.eval(
             "window.__hylkiSourceText ? window.__hylkiSourceText() : ''",
             cb,
@@ -234,7 +234,7 @@ impl RichEditor {
     /// Show `html` rendered in place of the editor, or go back to editing.
     /// The preview is read-only and runs no scripts — it is a look at the
     /// message, not a second editor.
-    pub(crate) fn show_preview(&self, html: Option<&str>) {
+    pub(super) fn show_preview(&self, html: Option<&str>) {
         let Some(html) = html else {
             self.stack.set_visible_child_name("edit");
             return;
@@ -283,13 +283,13 @@ impl RichEditor {
 
     /// Run a JavaScript snippet against the editor document (e.g. to swap the
     /// signature block when the From account changes).
-    pub(crate) fn run_js(&self, js: &str) {
+    pub(super) fn run_js(&self, js: &str) {
         exec(&self.webview, js);
     }
 
     /// Run a snippet and hand back what it returns, as text ("" when it
     /// failed).
-    pub(crate) fn eval(&self, js: &str, cb: impl FnOnce(String) + 'static) {
+    pub(super) fn eval(&self, js: &str, cb: impl FnOnce(String) + 'static) {
         self.webview
             .evaluate_javascript(js, None, None, gtk::gio::Cancellable::NONE, move |res| {
                 cb(res.map(|v| v.to_str().to_string()).unwrap_or_default())
@@ -299,7 +299,7 @@ impl RichEditor {
     /// Whether keyboard focus is currently inside the editor's WebView — the
     /// guard a host's paste shortcut uses so it never hijacks Ctrl+V aimed at
     /// an address entry.
-    pub(crate) fn has_focus(&self) -> bool {
+    pub(super) fn has_focus(&self) -> bool {
         self.webview
             .root()
             .and_then(|r| r.focus())
@@ -311,7 +311,7 @@ impl RichEditor {
     /// Put the pictures among `paths` in the text at the caret, and hand
     /// the rest to the attachment list, as a drop on the text does. Before
     /// the document has loaded they wait for it.
-    pub(crate) fn insert_files(&self, paths: &[std::path::PathBuf]) {
+    pub(super) fn insert_files(&self, paths: &[std::path::PathBuf]) {
         if !self.loaded.get() {
             self.pending_files
                 .borrow_mut()
@@ -331,14 +331,14 @@ impl RichEditor {
     /// Paste the clipboard into the editor, keeping (`rich`) or stripping the
     /// clipboard's formatting for this one paste, whatever the standing
     /// preference says.
-    pub(crate) fn paste(&self, rich: bool) {
+    pub(super) fn paste(&self, rich: bool) {
         paste_into(&self.webview, rich, &self.attach_cb, self.plain.get());
     }
 
     /// Whether the body has been edited since it was loaded (async read of a JS
     /// flag set on the first `input` event). Used to avoid saving a pristine,
     /// quote-only reply to Drafts when the reader navigates away.
-    pub(crate) fn is_dirty(&self, cb: impl FnOnce(bool) + 'static) {
+    pub(super) fn is_dirty(&self, cb: impl FnOnce(bool) + 'static) {
         self.eval("String(!!window.__hylkiDirty)", move |v| cb(v == "true"));
     }
 
@@ -347,7 +347,7 @@ impl RichEditor {
     /// nowhere. The row itself stays, carrying whatever the host put at its
     /// end — a chooser that vanished with the buttons would be the one
     /// control needed to get them back.
-    pub(crate) fn set_formatting_visible(&self, on: bool) {
+    pub(super) fn set_formatting_visible(&self, on: bool) {
         self.toolbar_commands.set_tools_shown(on);
     }
 
@@ -365,17 +365,17 @@ impl RichEditor {
     /// Keep the text area at least `height` pixels tall, whatever the
     /// toolbar above it takes: a host with a fixed-size slot would
     /// otherwise lose text to a wrapped or expanded toolbar.
-    pub(crate) fn set_text_height(&self, height: i32) {
+    pub(super) fn set_text_height(&self, height: i32) {
         self.stack.set_height_request(height);
     }
 
     /// The far end of the formatting row, for a host's own controls.
-    pub(crate) fn toolbar_end(&self) -> &gtk::Box {
+    pub(super) fn toolbar_end(&self) -> &gtk::Box {
         &self.toolbar_end
     }
 
     /// Read the current body HTML asynchronously.
-    pub(crate) fn extract_html(&self, cb: impl FnOnce(String) + 'static) {
+    pub(super) fn extract_html(&self, cb: impl FnOnce(String) + 'static) {
         self.eval("window.__hylkiBodyHtml()", cb);
     }
 
@@ -383,7 +383,7 @@ impl RichEditor {
     /// This Size on Send" is recut to the size it is drawn at first. Drafts
     /// go through [`RichEditor::extract`], which never touches the pixels —
     /// a save must not cost quality.
-    pub(crate) fn extract_for_send(&self, cb: impl FnOnce(String, String) + 'static) {
+    pub(super) fn extract_for_send(&self, cb: impl FnOnce(String, String) + 'static) {
         self.read_body("window.__hylkiBodyHtmlForSend()", cb);
     }
 
@@ -418,7 +418,7 @@ fn split_body(json: &str) -> (String, String) {
 /// Whether a keystroke is an undo (`Some(false)`) or a redo (`Some(true)`).
 /// Ctrl+Y is bound alongside Ctrl+Shift+Z because both spellings are in wide
 /// use and the app's own history (#200) already answers to each.
-pub(crate) fn history_key(keyval: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> Option<bool> {
+pub(super) fn history_key(keyval: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> Option<bool> {
     if !state.contains(gtk::gdk::ModifierType::CONTROL_MASK) {
         return None;
     }
@@ -535,7 +535,7 @@ fn fade_in(webview: &webkit6::WebView) {
 }
 
 /// Escape a string for inclusion inside a single-quoted JavaScript string.
-pub(crate) fn js_escape(s: &str) -> String {
+pub(super) fn js_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {

@@ -60,7 +60,7 @@ pub(super) fn parse_text(json: &str, view: &graphene::Rect) -> Option<(graphene:
 /// One card as [`CARDS_JS`] reports it, in stage coordinates: its key, its
 /// box and header height `[x, y, width, height, head]`, and where its first
 /// line of text begins `(x, y, size)` when it has one.
-pub(super) type MeasuredCard = (String, [f32; 5], Option<(f32, f32, f32)>);
+type MeasuredCard = (String, [f32; 5], Option<(f32, f32, f32)>);
 
 /// What [`CARDS_JS`] reported, placed in stage coordinates given the web
 /// view's box there.

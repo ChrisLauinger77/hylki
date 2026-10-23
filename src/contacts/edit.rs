@@ -208,7 +208,7 @@ pub(crate) struct GroupEdit {
 /// Rewrite a stored Evolution list with the editor's values. A member who
 /// was already there keeps the line it was read from; one added here gets
 /// a line of the same shape as Evolution's.
-pub(crate) fn patched_group_vcard(original: &str, e: &GroupEdit) -> String {
+pub(super) fn patched_group_vcard(original: &str, e: &GroupEdit) -> String {
     const REPLACED: [&str; 7] = [
         "FN",
         "N",
@@ -553,7 +553,7 @@ pub(crate) fn move_contact(
 }
 
 /// Delete a contact (by its EDS UID) from its book.
-pub(crate) fn delete_contact(book_uid: &str, uid: &str) -> Result<(), String> {
+pub(super) fn delete_contact(book_uid: &str, uid: &str) -> Result<(), String> {
     if is_local_book(book_uid) {
         return write_local(crate::local_contacts::delete(uid));
     }

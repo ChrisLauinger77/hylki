@@ -181,7 +181,7 @@ const RTL_LANGUAGES: &[&str] = &[
 
 /// Whether a locale or LANGUAGE value ("fa_IR.UTF-8", "he:en", "ar")
 /// names a right-to-left language first.
-pub(crate) fn is_rtl_locale(value: &str) -> bool {
+fn is_rtl_locale(value: &str) -> bool {
     let first = value
         .split(':')
         .map(str::trim)

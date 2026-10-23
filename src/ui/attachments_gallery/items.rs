@@ -59,7 +59,7 @@ impl AttachmentsGallery {
     /// Whether the user has narrowed the view at all. Used only to choose
     /// between the two empty states, so an archive with no attachments in it
     /// doesn't tell the user to try a different search they never made.
-    pub(super) fn is_narrowed(&self) -> bool {
+    fn is_narrowed(&self) -> bool {
         !self.query.trim().is_empty() || self.type_filter != 0 || self.account_filter.is_some()
     }
 
@@ -89,12 +89,12 @@ impl AttachmentsGallery {
         self.request_page(offset, sender);
     }
 
-    pub(super) fn has_more(&self) -> bool {
+    fn has_more(&self) -> bool {
         (self.all_items.len() as u32) < self.total
     }
 
     /// The query as it stands, for the app to run against the cache.
-    pub(super) fn request_page(&mut self, offset: u32, sender: &ComponentSender<Self>) {
+    fn request_page(&mut self, offset: u32, sender: &ComponentSender<Self>) {
         self.loading_more = true;
         let folders: Vec<(u32, String)> = self
             .accounts
@@ -188,7 +188,7 @@ impl AttachmentsGallery {
         }
     }
 
-    pub(super) fn rebuild_grid(&mut self, sender: &ComponentSender<Self>) {
+    fn rebuild_grid(&mut self, sender: &ComponentSender<Self>) {
         // Remove existing cells; only FlowBoxChild children (not, say, a popover
         // that happens to be parented nearby).
         let mut child = self.flow.first_child();
@@ -213,7 +213,7 @@ impl AttachmentsGallery {
         }
     }
 
-    pub(super) fn rebuild_table(&mut self, sender: &ComponentSender<Self>) {
+    fn rebuild_table(&mut self, sender: &ComponentSender<Self>) {
         while let Some(row) = self.table.first_child() {
             self.table.remove(&row);
         }
@@ -243,7 +243,7 @@ impl AttachmentsGallery {
     }
 
     /// Ask the app to download the message this item belongs to.
-    pub(super) fn fetch_item(&self, item: &GalleryItem, sender: &ComponentSender<Self>) {
+    fn fetch_item(&self, item: &GalleryItem, sender: &ComponentSender<Self>) {
         let _ = sender.output(GalleryOutput::Fetch {
             account_id: item.account_id,
             folder_path: item.folder_path.clone(),

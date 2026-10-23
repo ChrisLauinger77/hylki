@@ -18,10 +18,10 @@ use serde::{Deserialize, Serialize};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// The ID of the Hylki book in the switches, and its book UID.
-pub(crate) const HYLKI: &str = crate::local_contacts::LOCAL_BOOK_UID;
+const HYLKI: &str = crate::local_contacts::LOCAL_BOOK_UID;
 /// The ID that stands for the EDS books on this computer, which no source
 /// of their own groups.
-pub(crate) const THIS_COMPUTER: &str = "eds-local";
+const THIS_COMPUTER: &str = "eds-local";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct SwitchFile {

@@ -47,15 +47,15 @@ mod imp {
         pub(crate) title: gtk::Label,
         pub(crate) flow: super::PillFlow,
         pub(crate) text: gtk::Text,
-        pub(crate) edit_icon: gtk::Image,
-        pub(crate) suffixes: gtk::Box,
+        pub(super) edit_icon: gtk::Image,
+        pub(super) suffixes: gtk::Box,
         /// The pills in order, each with the recipient it stands for as it
         /// goes into the field ("Name <address>").
         pub(crate) pills: RefCell<Vec<(gtk::Widget, String)>>,
         /// Set while the row rewrites its own text, so that is not taken
         /// for typing.
         pub(crate) busy: Cell<bool>,
-        pub(crate) focused: Cell<bool>,
+        pub(super) focused: Cell<bool>,
         /// Every recipient field of the composer, this one included, in
         /// order: a selection spans them, and a pill's menu moves to them.
         pub(crate) fields: RefCell<Vec<glib::WeakRef<super::RecipientRow>>>,
@@ -227,7 +227,7 @@ impl RecipientRow {
     }
 
     /// Add a recipient after the others, leaving what is being typed alone.
-    pub(crate) fn add_recipient(&self, recipient: &str) {
+    pub(super) fn add_recipient(&self, recipient: &str) {
         self.push(recipient);
         self.emit_changed();
     }
@@ -238,7 +238,7 @@ impl RecipientRow {
         imp.suffixes.set_visible(true);
     }
 
-    pub(crate) fn set_input_purpose(&self, purpose: gtk::InputPurpose) {
+    pub(super) fn set_input_purpose(&self, purpose: gtk::InputPurpose) {
         self.imp().text.set_input_purpose(purpose);
     }
 
@@ -261,7 +261,7 @@ impl RecipientRow {
 
     /// Every recipient field of the composer, this one among them, in
     /// order, for a selection to span and a pill's menu to move it to.
-    pub(crate) fn set_fields(&self, fields: &[&RecipientRow]) {
+    pub(super) fn set_fields(&self, fields: &[&RecipientRow]) {
         *self.imp().fields.borrow_mut() = fields.iter().map(|f| f.downgrade()).collect();
     }
 
@@ -282,7 +282,7 @@ impl RecipientRow {
 
     /// Called as a pill of this field starts (true) and ends (false) a
     /// drag.
-    pub(crate) fn connect_pill_drag<F: Fn(&Self, bool) + 'static>(
+    pub(super) fn connect_pill_drag<F: Fn(&Self, bool) + 'static>(
         &self,
         f: F,
     ) -> glib::SignalHandlerId {

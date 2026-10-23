@@ -67,7 +67,7 @@ pub(crate) enum RowAction {
 
 /// A full swipe (#swipe): also `AdwSwipeable`'s reported `distance`, the px
 /// one full drag (progress ±1.0) spans.
-pub(crate) const SWIPE_MAX: f64 = 120.0;
+pub(super) const SWIPE_MAX: f64 = 120.0;
 
 /// How far a thread member's node dot reaches past the start of the row's
 /// content box (`.thread-node`: 8px wide, pulled 5px out by its negative
@@ -87,7 +87,7 @@ const TAGS_COLUMN_PX: i32 = 90;
 /// The star's and the paperclip's size on a single line.
 const LINE_ICON_PX: i32 = 12;
 /// The replied column's width: its two arrows and the gap between them.
-pub(crate) const REPLIED_PX: i32 = 2 * LINE_ICON_PX + 2;
+pub(super) const REPLIED_PX: i32 = 2 * LINE_ICON_PX + 2;
 
 /// The width a single-line column takes until it is dragged to another
 /// (#334): negative for a date, which is as wide as its text.
@@ -103,7 +103,7 @@ pub(crate) fn default_width(column: ListColumn) -> i32 {
 
 /// Whether a column's width can be dragged: the ones of text and the tags,
 /// but not the subject, which takes the rest.
-pub(crate) fn resizable(column: ListColumn) -> bool {
+pub(super) fn resizable(column: ListColumn) -> bool {
     matches!(
         column,
         ListColumn::Sender
@@ -127,7 +127,7 @@ fn column_width(look: &RowLook, column: ListColumn) -> i32 {
 /// Distance past which the indicator reads as "armed" (full color) — purely
 /// a visual cue; `AdwSwipeTracker` makes the real commit decision on
 /// release, factoring in velocity too.
-pub(crate) const SWIPE_ARM: f64 = 72.0;
+pub(super) const SWIPE_ARM: f64 = 72.0;
 
 /// The commit exit (#swipe): a released swipe that cleared `SWIPE_ARM` flies
 /// the row off the side it was dragged to over this long, while the row's
@@ -143,7 +143,7 @@ const SWIPE_RESTORE_MS: u64 = 600;
 /// Every member of each conversation, keyed by its head's (account, id) —
 /// so a drag that starts on a conversation row carries the whole thread,
 /// as its Delete does (#171).
-pub(crate) type ThreadDragKeys = HashMap<(u32, u32), Vec<(u32, u32, u32, u32)>>;
+pub(super) type ThreadDragKeys = HashMap<(u32, u32), Vec<(u32, u32, u32, u32)>>;
 
 /// Where a message sits in the list: its account, folder and id. The id
 /// alone is a UID, which only means something inside one folder (#317).
@@ -155,11 +155,11 @@ pub(crate) struct RowMeta {
     /// Size of the conversation (thread heads only; 1 or 0 otherwise).
     pub(crate) count: usize,
     /// Whether the chip can open anything: the folder holds more of it.
-    pub(crate) expandable: bool,
+    pub(super) expandable: bool,
     /// A reply nested under a thread head — indented on the rail.
-    pub(crate) is_child: bool,
+    pub(super) is_child: bool,
     /// The last reply of its thread: the dotted rail stops at its node.
-    pub(crate) is_last: bool,
+    pub(super) is_last: bool,
     /// The head's conversation is opened out in the list.
     pub(crate) expanded: bool,
     /// The conversation key, on a head that can toggle.
@@ -171,7 +171,7 @@ pub(crate) struct RowMeta {
     pub(crate) latest: Option<String>,
     /// When that newest member arrived, and its date header, for a short
     /// date on a one-line row (#334).
-    pub(crate) latest_at: Option<(i64, String)>,
+    pub(super) latest_at: Option<(i64, String)>,
     /// Any message of the conversation is unread / starred (heads only).
     pub(crate) unread: bool,
     pub(crate) starred: bool,
@@ -184,7 +184,7 @@ pub(crate) struct RowMeta {
     pub(crate) people: Option<String>,
     /// The row's height is open. False only while a reply slides shut
     /// before it is taken out of the list.
-    pub(crate) revealed: bool,
+    pub(super) revealed: bool,
     /// A reply just put in by opening its conversation: it slides open the
     /// first time it is shown instead of simply appearing.
     pub(crate) appear: bool,

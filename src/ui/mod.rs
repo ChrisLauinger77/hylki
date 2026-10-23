@@ -3,23 +3,23 @@ pub(crate) mod attachment_drawer;
 pub(crate) mod attachment_io;
 pub(crate) mod attachments_gallery;
 pub(crate) mod carry_over;
-pub(crate) mod chip_flow;
-pub(crate) mod cloud_accounts;
-pub(crate) mod column_bin;
+mod chip_flow;
+mod cloud_accounts;
+mod column_bin;
 pub(crate) mod command_palette;
 pub(crate) mod compose;
 pub(crate) mod contact_sources;
-pub(crate) mod contact_tree;
+mod contact_tree;
 pub(crate) mod contacts_browser;
 pub(crate) mod contacts_page;
 pub(crate) mod context_menu;
 pub(crate) mod dialog;
 pub(crate) mod drop_zones;
 pub(crate) mod emoji;
-pub(crate) mod fade_label;
+mod fade_label;
 pub(crate) mod folder_picker;
 pub(crate) mod grab_pill;
-pub(crate) mod icon_picker;
+mod icon_picker;
 pub(crate) mod initials;
 pub(crate) mod keymap;
 pub(crate) mod launch;
@@ -30,20 +30,20 @@ pub(crate) mod message_row;
 pub(crate) mod message_view;
 pub(crate) mod message_window;
 pub(crate) mod notifications;
-pub(crate) mod pgp_keys;
+mod pgp_keys;
 pub(crate) mod preferences;
 pub(crate) mod print_preview;
-pub(crate) mod recipient_row;
+mod recipient_row;
 pub(crate) mod rich_editor;
 pub(crate) mod send_morph;
-pub(crate) mod sender_row;
+mod sender_row;
 pub(crate) mod showcase;
 pub(crate) mod sidebar;
-pub(crate) mod theme_picker;
+mod theme_picker;
 pub(crate) mod thumbnails;
-pub(crate) mod tool_flow;
-pub(crate) mod translation_page;
-pub(crate) mod web_signin;
+mod tool_flow;
+mod translation_page;
+mod web_signin;
 pub(crate) mod welcome;
 
 /// How long Focus Mode's parts take to slide and fade away (and back), in
@@ -92,7 +92,7 @@ pub(crate) fn close_key() -> gtk::ShortcutController {
 /// move to another widget of its own row (the scope dropdown, a button, the
 /// popover a dropdown opens). The check waits for an idle turn because the
 /// new focus widget is not set yet while the leave event runs.
-pub(crate) fn close_if_focus_left_row(entry: &gtk::SearchEntry, close: impl Fn() + 'static) {
+fn close_if_focus_left_row(entry: &gtk::SearchEntry, close: impl Fn() + 'static) {
     use gtk::prelude::*;
     if !entry.text().trim().is_empty() {
         return;
@@ -150,7 +150,7 @@ impl DisplayCss {
 ///
 /// A touchpad reports pixels in small bites, so those add up to a step
 /// rather than each being one: otherwise a short swipe ran the whole scale.
-pub(crate) fn ctrl_scroll_zoom(
+fn ctrl_scroll_zoom(
     zooms: impl Fn() -> bool + 'static,
     step: impl Fn(i8) + 'static,
 ) -> gtk::EventControllerScroll {

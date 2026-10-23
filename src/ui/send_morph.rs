@@ -86,12 +86,12 @@ pub(crate) struct After {
     /// Every card, in document order.
     pub(crate) cards: Vec<Card>,
     /// The reply's own card among them.
-    pub(crate) arrival: String,
+    pub(super) arrival: String,
 }
 
 /// Everything the frames are drawn from, worked out once when the motion
 /// starts.
-pub(crate) struct Scene {
+struct Scene {
     after: After,
     /// The reply's card, cut to what the web view shows of it.
     card: graphene::Rect,
@@ -132,16 +132,16 @@ mod imp {
     #[derive(Default)]
     pub(crate) struct SendMorph {
         pub(crate) before: RefCell<Option<Before>>,
-        pub(crate) scene: RefCell<Option<Scene>>,
+        pub(super) scene: RefCell<Option<Scene>>,
         /// The texture scale: device pixels per logical pixel.
         pub(crate) scale: Cell<f32>,
         /// Frame times (µs) the chrome fade and the motion started at; 0
         /// until the first frame after they were asked for.
-        pub(crate) chrome_start: Cell<i64>,
-        pub(crate) motion_start: Cell<i64>,
+        pub(super) chrome_start: Cell<i64>,
+        pub(super) motion_start: Cell<i64>,
         /// Frames the landed scene has been drawn at rest, before the clock
         /// starts.
-        pub(crate) rest_frames: Cell<u32>,
+        pub(super) rest_frames: Cell<u32>,
         pub(crate) now: Cell<i64>,
         pub(crate) tick: RefCell<Option<gtk::TickCallbackId>>,
         /// The stage's size when it went up: a resize mid-flight ends it.
@@ -150,8 +150,8 @@ mod imp {
         /// The composer's ground, which the stage shows where it stood.
         pub(crate) base: Cell<Option<gdk::RGBA>>,
         /// The composer without its editor card, and the editor card.
-        pub(crate) chrome_cut: RefCell<Option<Cut>>,
-        pub(crate) editor_cut: RefCell<Option<Cut>>,
+        pub(super) chrome_cut: RefCell<Option<Cut>>,
+        pub(super) editor_cut: RefCell<Option<Cut>>,
     }
 
     #[glib::object_subclass]
@@ -268,7 +268,7 @@ impl SendMorph {
     }
 
     /// Where the conversation's cards were when Send was pressed.
-    pub(crate) fn set_before_cards(&self, cards: Vec<Card>) {
+    fn set_before_cards(&self, cards: Vec<Card>) {
         if let Some(b) = self.imp().before.borrow_mut().as_mut() {
             b.cards = cards;
         }

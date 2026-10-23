@@ -40,7 +40,7 @@ pub(super) fn sig_source(kind: SourceKind, sig: &str, dashes: bool) -> String {
 impl Compose {
     /// The signature Insert Signature puts in: the one the message last
     /// had, if it is one of `account`'s, else its default, else its first.
-    pub(super) fn chosen_signature(&self, account: &ComposeAccount) -> String {
+    fn chosen_signature(&self, account: &ComposeAccount) -> String {
         if account
             .signatures
             .iter()
@@ -156,7 +156,7 @@ impl Compose {
     /// Insert Signature (#385): `sig` at the caret, or at the top or the
     /// end of the message. The message's own signature block moves rather
     /// than doubling; one inside a quote is the other person's and stays.
-    pub(super) fn insert_signature(&mut self, sig: String, place: SigPlace) {
+    fn insert_signature(&mut self, sig: String, place: SigPlace) {
         if sig.is_empty() {
             return;
         }

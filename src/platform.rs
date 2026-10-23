@@ -92,12 +92,12 @@ fn text_is_mint(text: &str) -> bool {
 }
 
 /// True on Linux Mint (matches `ID=linuxmint`, or Mint listed in `ID_LIKE`).
-pub(crate) fn is_linux_mint() -> bool {
+fn is_linux_mint() -> bool {
     text_is_mint(&os_release())
 }
 
 /// True when the current desktop session is Cinnamon (Mint's default).
-pub(crate) fn is_cinnamon() -> bool {
+fn is_cinnamon() -> bool {
     let has_cinnamon = |var: &str| {
         std::env::var(var)
             .map(|v| v.to_ascii_lowercase().contains("cinnamon"))

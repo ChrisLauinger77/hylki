@@ -120,7 +120,7 @@ pub(crate) fn preset(provider: &str) -> Option<Preset> {
 /// Asked for only when the account's directory switch is turned on, since a
 /// tenant that lets users approve mail access may still want an
 /// administrator for these.
-pub(crate) const MICROSOFT_DIRECTORY_SCOPES: [&str; 2] = [
+const MICROSOFT_DIRECTORY_SCOPES: [&str; 2] = [
     "https://graph.microsoft.com/People.Read",
     "https://graph.microsoft.com/User.ReadBasic.All",
 ];

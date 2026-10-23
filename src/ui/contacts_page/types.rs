@@ -106,7 +106,7 @@ pub(crate) enum TreeAction {
 
 /// The start of what a contact row carries when dragged, before a line of
 /// book and UID per contact.
-pub(crate) const DRAG_MARK: &str = "hylki-contacts";
+pub(super) const DRAG_MARK: &str = "hylki-contacts";
 
 /// The "Show only" filters of the sort and filter button, as the message
 /// list has for mail. They narrow the people; groups are not filtered.

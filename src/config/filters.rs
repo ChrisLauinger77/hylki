@@ -473,7 +473,7 @@ impl FilterRule {
     }
 
     /// The body alternatives this rule needs a server search for (#191).
-    pub(crate) fn body_needles(&self) -> Vec<String> {
+    pub(super) fn body_needles(&self) -> Vec<String> {
         self.conditions()
             .iter()
             .filter(|c| c.field == FilterField::Body)

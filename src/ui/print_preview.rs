@@ -67,7 +67,7 @@ fn options() -> PrintOptions {
 /// The settings come through `GtkPrintDialog`'s callback rather than WebKit's
 /// own `run_dialog`, which spins a nested main loop; polling a glib future
 /// inside one aborts the process.
-pub(crate) fn print_html(html: &str, job_name: &str, parent: Option<gtk::Window>) {
+pub(super) fn print_html(html: &str, job_name: &str, parent: Option<gtk::Window>) {
     let dialog = gtk::PrintDialog::new();
     dialog.set_title(&i18n("Print Message"));
     let settings = gtk::PrintSettings::new();

@@ -12,12 +12,12 @@ use crate::i18n::{i18n, i18n_f, ni18n_f};
 use crate::pgp::{self, Gpg, ImportSummary, KeyInfo};
 
 /// What the page needs at launch: the identities keys can be made for.
-pub(crate) struct PgpKeysInit {
+pub(super) struct PgpKeysInit {
     /// (name, address) per account and alias.
     pub(crate) identities: Vec<(String, String)>,
 }
 
-pub(crate) struct PgpKeys {
+pub(super) struct PgpKeys {
     identities: Vec<(String, String)>,
     own: Vec<KeyInfo>,
     others: Vec<KeyInfo>,

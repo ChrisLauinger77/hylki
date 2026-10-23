@@ -159,7 +159,7 @@ impl AttachmentDrawer {
     /// previewable attachments (images and PDFs), starting at `start`
     /// (attachments order). The overlay lives at the window level so it fills
     /// Hylki itself — a separate preview window meant double chrome.
-    pub(super) fn show_lightbox(&self, start: usize, sender: &ComponentSender<Self>) {
+    fn show_lightbox(&self, start: usize, sender: &ComponentSender<Self>) {
         let items: Vec<Attachment> = self
             .items
             .iter()

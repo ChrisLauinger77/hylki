@@ -17,13 +17,13 @@ use relm4::prelude::*;
 pub(super) const COMPOSE_MIN_WIDTH: i32 = 360;
 
 /// Fallback fold threshold when the toolbar could not be measured at init.
-pub(super) const COMPOSE_ACTIONS_BREAKPOINT: f64 = 620.0;
+const COMPOSE_ACTIONS_BREAKPOINT: f64 = 620.0;
 
 /// The width a header bar's rows need side by side: the natural widths of
 /// its centre box's children (start row, title, end row) summed — what the
 /// bar itself reports doubles the wider side to keep the title centred.
 /// `None` when the bar's insides are not the expected shape.
-pub(super) fn header_rows_width(header: &gtk::Widget) -> Option<i32> {
+fn header_rows_width(header: &gtk::Widget) -> Option<i32> {
     fn find_center_box(w: &gtk::Widget, depth: u32) -> Option<gtk::Widget> {
         if w.type_().name() == "GtkCenterBox" {
             return Some(w.clone());
@@ -86,7 +86,7 @@ pub(super) fn set_toggle_icon(btn: &gtk::Button, windowed: bool) {
 /// Keep Editing, so a second press never discards what the first one asked
 /// about (#290).
 #[allow(deprecated)] // adw::MessageDialog: AlertDialog would change how it looks
-pub(super) fn confirm_discard_dialog(
+fn confirm_discard_dialog(
     parent: Option<&gtk::Window>,
     template: bool,
     sender: relm4::Sender<ComposeInput>,

@@ -17,7 +17,7 @@ mod editor;
 use editor::build_editor;
 
 /// How a kind is named in the editor and the list.
-pub(crate) struct CloudAccounts {
+pub(super) struct CloudAccounts {
     accounts: Vec<CloudAccount>,
     /// Keyring keys of the servers already asked which product they are
     /// (accounts from before the picker told them apart), so a list
@@ -42,7 +42,7 @@ pub(crate) struct CloudAccounts {
 type SaveAction = Rc<RefCell<Option<Rc<dyn Fn() -> bool>>>>;
 
 #[derive(Debug)]
-pub(crate) enum CloudAccountsInput {
+pub(super) enum CloudAccountsInput {
     Add,
     /// The editor for a new account of that kind.
     AddOf(CloudKind),
@@ -82,7 +82,7 @@ pub(crate) enum CloudAccountsInput {
 }
 
 #[derive(Debug)]
-pub(crate) enum CloudAccountsOutput {
+pub(super) enum CloudAccountsOutput {
     /// The editor page is up (or gone): the settings window hides its
     /// shared header meanwhile and asks before moving on.
     EditorOpen(bool),

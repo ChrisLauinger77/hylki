@@ -7,7 +7,7 @@
 
 use crate::theme::{Palette, Theme};
 
-pub(crate) const ROSE: Theme = Theme {
+const ROSE: Theme = Theme {
     id: "rose",
     label: "Rose",
     light: Palette {
@@ -100,7 +100,7 @@ pub(crate) const ROSE: Theme = Theme {
     },
 };
 
-pub(crate) const FOREST: Theme = Theme {
+const FOREST: Theme = Theme {
     id: "forest",
     label: "Forest",
     light: Palette {
@@ -193,7 +193,7 @@ pub(crate) const FOREST: Theme = Theme {
     },
 };
 
-pub(crate) const TIDAL: Theme = Theme {
+const TIDAL: Theme = Theme {
     id: "tidal",
     label: "Tidal",
     light: Palette {
@@ -286,7 +286,7 @@ pub(crate) const TIDAL: Theme = Theme {
     },
 };
 
-pub(crate) const EARTH: Theme = Theme {
+const EARTH: Theme = Theme {
     id: "earth",
     label: "Earth",
     light: Palette {
@@ -379,7 +379,7 @@ pub(crate) const EARTH: Theme = Theme {
     },
 };
 
-pub(crate) const MIDNIGHT: Theme = Theme {
+const MIDNIGHT: Theme = Theme {
     id: "midnight",
     label: "Midnight",
     light: Palette {

@@ -16,10 +16,10 @@ use adw::prelude::*;
 use relm4::prelude::*;
 
 /// How often an edited message is saved to Drafts on its own (#340).
-pub(super) const AUTOSAVE_SECS: u32 = 30;
+const AUTOSAVE_SECS: u32 = 30;
 
 /// An identity's From as the composer writes it out: "Name <address>".
-pub(super) fn identity_display(a: &ComposeAccount) -> String {
+fn identity_display(a: &ComposeAccount) -> String {
     a.alias_from
         .clone()
         .unwrap_or_else(|| a.label.clone())
@@ -42,7 +42,7 @@ pub(super) fn same_from(a: &str, b: &str) -> bool {
 /// Whether an OpenPGP send can go ahead (#133): a key of the user's own
 /// for the From address (or the account's chosen key), and, to encrypt, a
 /// public key for every recipient. The message names the first gap.
-pub(super) fn pgp_send_check(
+fn pgp_send_check(
     from: &str,
     chosen_key: Option<&str>,
     fields: &[&str],
@@ -182,7 +182,7 @@ impl Compose {
     /// The From to put on the wire: the picked identity's (`None` for the
     /// account's own), or the one typed in (#347), which has to hold one
     /// address.
-    pub(super) fn chosen_from(&self, widgets: &ComposeWidgets) -> Result<Option<String>, String> {
+    fn chosen_from(&self, widgets: &ComposeWidgets) -> Result<Option<String>, String> {
         let idx = widgets.from_row.selected() as usize;
         let picked = self.accounts.get(idx).and_then(|a| a.alias_from.clone());
         if !self.custom_from {
@@ -246,7 +246,7 @@ impl Compose {
     /// text part — Markdown being, deliberately, plain text that reads as
     /// itself. Hand-written HTML is sanitized and gets a Markdown rendering
     /// as its text part. Plain text sends no HTML part at all (#180).
-    pub(super) fn outgoing_body(&self, body: String, text: String) -> (String, String) {
+    fn outgoing_body(&self, body: String, text: String) -> (String, String) {
         match self.format {
             ComposeFormat::Rich => (body, text),
             ComposeFormat::Plain => (String::new(), text),
@@ -264,7 +264,7 @@ impl Compose {
     /// The fields as a draft or the automatic save takes them, before the
     /// body is read. A draft can be saved without recipients, and keeps even
     /// a From still being typed: it is checked when the message is sent.
-    pub(super) fn draft_fields(&self, widgets: &ComposeWidgets) -> OutgoingFields {
+    fn draft_fields(&self, widgets: &ComposeWidgets) -> OutgoingFields {
         let to = widgets.to_row.text().trim().to_string();
         let cc = widgets.cc_row.text().trim().to_string();
         let bcc = widgets.bcc_row.text().trim().to_string();
@@ -291,7 +291,7 @@ impl Compose {
     /// The message to hand over: the body converted out of its composing
     /// format, the fields and the attachments, with the draft origin so a
     /// saved or sent draft replaces its predecessor.
-    pub(super) fn outgoing_message(&self, fields: OutgoingFields) -> OutgoingMessage {
+    fn outgoing_message(&self, fields: OutgoingFields) -> OutgoingMessage {
         let OutgoingFields {
             html,
             text,

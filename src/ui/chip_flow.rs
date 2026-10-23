@@ -41,7 +41,7 @@ mod imp {
         pub(crate) pos: RefCell<HashMap<gtk::Widget, (f64, f64)>>,
         /// The slot each child was last sent towards.
         pub(crate) target: RefCell<HashMap<gtk::Widget, (i32, i32)>>,
-        pub(crate) anims: RefCell<HashMap<gtk::Widget, adw::TimedAnimation>>,
+        pub(super) anims: RefCell<HashMap<gtk::Widget, adw::TimedAnimation>>,
         /// The slot index a dragged chip would take (a gap opens there).
         pub(crate) gap: Cell<Option<usize>>,
         /// The largest chip seen by any zone (shared), to size an empty
@@ -192,7 +192,7 @@ impl ChipFlow {
 
     /// Open the gap at `index` (None closes it). The chips slide to make
     /// or take the room.
-    pub(crate) fn set_gap(&self, index: Option<usize>) {
+    pub(super) fn set_gap(&self, index: Option<usize>) {
         let imp = self.imp();
         let index = index.map(|i| i.min(self.visible_children().len()));
         if imp.gap.get() != index {
@@ -205,7 +205,7 @@ impl ChipFlow {
     /// chips are heading (their slots with the current gap, not their
     /// mid-slide positions): every chip on a row above the point, or on
     /// its row with its middle left of it, comes before.
-    pub(crate) fn insertion_index(&self, x: f64, y: f64) -> usize {
+    pub(super) fn insertion_index(&self, x: f64, y: f64) -> usize {
         let chips = self.chip_sizes();
         let slots = self.slots(self.width().max(1), &chips);
         let mut index = 0;

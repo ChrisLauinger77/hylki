@@ -48,7 +48,7 @@ fn palette_index(text: &str) -> usize {
 
 /// The initials `adw::Avatar` would show for `text`: the first letter of
 /// the first word and of the last, uppercased; nothing for an empty name.
-pub(crate) fn initials_of(text: &str) -> String {
+fn initials_of(text: &str) -> String {
     let upper = text.trim().to_uppercase();
     let mut words = upper
         .split_whitespace()
@@ -161,7 +161,7 @@ impl InitialsPaintable {
     /// The circle for `name` (a sender's display name): its initials in the
     /// color libadwaita would give that name. `None` when there is no
     /// letter to show, so the avatar falls back to its silhouette.
-    pub(crate) fn for_name(name: &str) -> Option<Self> {
+    pub(super) fn for_name(name: &str) -> Option<Self> {
         let initials = initials_of(name);
         if initials.is_empty() {
             return None;
@@ -198,7 +198,7 @@ impl InitialsPaintable {
 /// on `bg_hex` (the circle's own ground, painted by its CSS), exactly
 /// `size` square — sized outright rather than expanding, since an expand
 /// flag would climb into the row and stretch it.
-pub(crate) fn glyph_picture(text: &str, bg_hex: &str, scale: f64, size: i32) -> gtk::Picture {
+pub(super) fn glyph_picture(text: &str, bg_hex: &str, scale: f64, size: i32) -> gtk::Picture {
     let fg = gdk::RGBA::parse(crate::color::readable_text(bg_hex)).unwrap_or(gdk::RGBA::WHITE);
     let picture = gtk::Picture::for_paintable(&InitialsPaintable::glyph(text, fg, scale));
     picture.set_content_fit(gtk::ContentFit::Fill);
@@ -219,7 +219,7 @@ thread_local! {
 
 /// The texture behind an account's avatar picture, by path and modification
 /// time: the sidebar rebuilds often and must not read the file each time.
-pub(crate) fn avatar_texture(path: &std::path::Path) -> Option<gdk::Texture> {
+pub(super) fn avatar_texture(path: &std::path::Path) -> Option<gdk::Texture> {
     let mtime = std::fs::metadata(path).and_then(|m| m.modified()).ok();
     let key = (path.to_path_buf(), mtime);
     AVATAR_TEXTURES.with(|c| {
@@ -237,7 +237,7 @@ pub(crate) fn avatar_texture(path: &std::path::Path) -> Option<gdk::Texture> {
 /// image at a fixed pixel size, not a picture: a picture's natural size is
 /// the texture's, and the disc (a box, whose size request is only a floor)
 /// would grow to it.
-pub(crate) fn avatar_picture(path: &std::path::Path, size: i32) -> gtk::Image {
+pub(super) fn avatar_picture(path: &std::path::Path, size: i32) -> gtk::Image {
     match avatar_texture(path) {
         Some(texture) => picture_from_texture(&texture, size),
         None => {
@@ -250,7 +250,7 @@ pub(crate) fn avatar_picture(path: &std::path::Path, size: i32) -> gtk::Image {
 
 /// The same, for a picture already in hand rather than on disk — an
 /// account's Gravatar (#189), fetched and decoded elsewhere.
-pub(crate) fn picture_from_texture(texture: &gdk::Texture, size: i32) -> gtk::Image {
+pub(super) fn picture_from_texture(texture: &gdk::Texture, size: i32) -> gtk::Image {
     let image = gtk::Image::from_paintable(Some(texture));
     image.set_pixel_size(size);
     image.set_halign(gtk::Align::Center);
@@ -272,7 +272,7 @@ thread_local! {
 /// 256px square, a conversation embeds one copy per card of yours, and none
 /// of that detail survives a 26px circle. Read through gdk-pixbuf rather than
 /// the window's renderer, so the document builder still needs no display.
-pub(crate) fn picture_data_uri(path: &std::path::Path, size: i32) -> Option<String> {
+pub(super) fn picture_data_uri(path: &std::path::Path, size: i32) -> Option<String> {
     // Twice the CSS size is what a HiDPI screen wants; a 300% screen would
     // want three, which is not worth the bytes on every other screen.
     let px = (size * 2).max(1);
@@ -323,7 +323,7 @@ pub(crate) fn cache_stats() -> (usize, u64, usize, usize) {
 /// pixels — rendered at the screen's scale, so it is as crisp as the
 /// document's own text. Drawn through the window's renderer; `None` before
 /// a window exists.
-pub(crate) fn png_data_uri(text: &str, bg: gdk::RGBA, size: i32) -> Option<String> {
+pub(super) fn png_data_uri(text: &str, bg: gdk::RGBA, size: i32) -> Option<String> {
     let key = (text.to_string(), bg.to_string(), size);
     if let Some(hit) = PNG_CACHE.with(|c| c.borrow().get(&key).cloned()) {
         return Some(hit);

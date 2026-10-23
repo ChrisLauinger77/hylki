@@ -87,7 +87,7 @@ fn loaded_at(marker: &std::path::Path) -> bool {
 /// Whether the nautilus-python bindings (the loader for Python extensions)
 /// are installed, judged by their library in the places distributions put
 /// it. `None` inside the Flatpak, which cannot see the host's /usr.
-pub(crate) fn loader_present() -> Option<bool> {
+fn loader_present() -> Option<bool> {
     if crate::platform::is_flatpak() {
         return None;
     }

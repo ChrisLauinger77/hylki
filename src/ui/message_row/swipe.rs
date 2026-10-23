@@ -70,7 +70,7 @@ impl SwipeSurface {
     }
 }
 
-pub(super) mod swipe_surface_imp {
+mod swipe_surface_imp {
     use std::cell::Cell;
 
     use adw::subclass::prelude::*;
@@ -78,7 +78,7 @@ pub(super) mod swipe_surface_imp {
     use gtk::prelude::*;
 
     pub(crate) struct SwipeSurface {
-        pub(crate) progress_px: Cell<f64>,
+        pub(super) progress_px: Cell<f64>,
         /// Trackpad sensitivity (see `super::SWIPE_MAX`). Never 0 — that
         /// would divide by zero in `distance`/`progress` — so this can't
         /// simply be `#[derive(Default)]`.

@@ -8,7 +8,7 @@ pub(super) struct AliasDialog {
     pub(super) window: adw::Window,
     pub(super) name_row: adw::EntryRow,
     pub(super) addr_row: adw::EntryRow,
-    pub(super) smtp_switch: adw::SwitchRow,
+    smtp_switch: adw::SwitchRow,
     pub(super) host_row: adw::EntryRow,
     pub(super) port_row: adw::EntryRow,
     pub(super) user_row: adw::EntryRow,

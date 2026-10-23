@@ -25,7 +25,7 @@ struct SmartContext {
     /// The tags' keywords, lower case.
     pub(super) tags: Vec<String>,
     /// The tags themselves, for the Gmail labels that stand for them (#374).
-    pub(super) tag_list: Vec<config::Tag>,
+    tag_list: Vec<config::Tag>,
     pub(super) contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
 }
 

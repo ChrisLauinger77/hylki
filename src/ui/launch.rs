@@ -32,7 +32,7 @@ use std::rc::Rc;
 
 /// The stored choice that means "let the desktop's app chooser ask, every
 /// time" rather than naming one browser (#232).
-pub(crate) const ASK: &str = "ask";
+pub(super) const ASK: &str = "ask";
 
 thread_local! {
     /// Settings → System → Links: empty for the desktop's default handler,
@@ -50,7 +50,7 @@ pub(crate) fn set_browser(choice: &str) {
 /// One browser the user can send links to: the desktop entry that launches
 /// it, and the name to show.
 #[derive(Debug, Clone)]
-pub(crate) struct Browser {
+pub(super) struct Browser {
     pub(crate) id: String,
     pub(crate) name: String,
 }
@@ -62,7 +62,7 @@ pub(crate) struct Browser {
 /// not visible there, and nothing in them could be run from inside anyway.
 /// Links then go out through the portal, which is what the "Ask each time"
 /// choice is for.
-pub(crate) fn browsers() -> Vec<Browser> {
+pub(super) fn browsers() -> Vec<Browser> {
     let mut found: Vec<Browser> = Vec::new();
     for info in gio::AppInfo::all_for_type("x-scheme-handler/https") {
         let Some(id) = info.id().map(|s| s.to_string()) else {
@@ -216,7 +216,7 @@ fn link_failed_dialog(parent: Option<&gtk::Window>, error: &str) {
 /// set up FIRST, on a path derived from our own `handle_token`, so a fast
 /// reply cannot race it. `params` builds the method's arguments once the
 /// token is known; `fd_list` carries the descriptors `OpenFile` passes.
-pub(crate) fn portal_request(
+pub(super) fn portal_request(
     method: &str,
     fd_list: Option<gio::UnixFDList>,
     params: impl FnOnce(&str) -> glib::Variant,

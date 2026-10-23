@@ -137,4 +137,4 @@ impl OutboxItem {
 
 /// Folder id for the Outbox's synthetic rows. Real folders are numbered from 1
 /// by the worker, so this can't collide.
-pub(crate) const OUTBOX_FOLDER_ID: u32 = u32::MAX;
+pub(super) const OUTBOX_FOLDER_ID: u32 = u32::MAX;

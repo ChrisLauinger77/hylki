@@ -14,7 +14,7 @@ use std::rc::Rc;
 /// own photo, their Gravatar, then the icon their domain publishes (#30), with
 /// the UI's colored initials as the implicit last resort.
 #[derive(Debug)]
-pub(super) enum FaceCmd {
+enum FaceCmd {
     /// The avatar tiers (contact photo, Gravatar) answered. `logo` carries the
     /// logo tier's answer when it was consulted in the same trip: found bytes,
     /// or a definitive miss to remember.
@@ -36,7 +36,7 @@ pub(super) enum FaceCmd {
 /// when they come up empty and `want_logo` says the switch is on. `generation`
 /// and `mode` come from [`crate::avatar::lookup`] and ride along so the result
 /// can be cached against the EDS state that was actually queried.
-pub(super) async fn find_face(
+async fn find_face(
     email: String,
     generation: u64,
     mode: crate::avatar::FetchMode,
@@ -61,7 +61,7 @@ pub(super) async fn find_face(
 }
 
 /// Fetch just the domain icon, off the main thread.
-pub(super) async fn find_logo(email: String) -> FaceCmd {
+async fn find_logo(email: String) -> FaceCmd {
     let lookup_email = email.clone();
     let bytes = tokio::task::spawn_blocking(move || crate::logo::fetch(&lookup_email))
         .await

@@ -39,7 +39,7 @@ pub(super) fn title(text: &str) -> gtk::Label {
     l
 }
 
-pub(super) fn tagline(text: &str) -> gtk::Label {
+fn tagline(text: &str) -> gtk::Label {
     let l = gtk::Label::new(Some(text));
     l.add_css_class("welcome-tagline");
     l.set_halign(gtk::Align::Center);
@@ -67,7 +67,7 @@ pub(super) fn pill(label: &str) -> gtk::Button {
 
 /// Fade-and-rise entrance for the hero page, staggered per widget. Runs on the
 /// window's first map (animations on unmapped widgets skip to the end).
-pub(super) fn entrance(widgets: &[gtk::Widget]) {
+fn entrance(widgets: &[gtk::Widget]) {
     for (i, w) in widgets.iter().cloned().enumerate() {
         w.set_opacity(0.0);
         // The rise is relative: each widget ends back on its OWN margin, so

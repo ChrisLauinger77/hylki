@@ -248,7 +248,7 @@ pub(crate) fn load_smtp_password(email: &str) -> Option<String> {
     load_key(&smtp_key(email))
 }
 
-pub(crate) fn store_alias_smtp_password(
+pub(super) fn store_alias_smtp_password(
     email: &str,
     alias_addr: &str,
     password: &str,

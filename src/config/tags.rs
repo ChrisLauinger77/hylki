@@ -29,7 +29,7 @@ pub(crate) const TAG_COLORS: &[&str] = &[
 
 impl Tag {
     /// The characters an IMAP keyword (an atom) may hold.
-    pub(crate) fn is_keyword_char(c: char) -> bool {
+    fn is_keyword_char(c: char) -> bool {
         c.is_ascii_graphic()
             && !matches!(
                 c,
@@ -119,7 +119,7 @@ impl Tag {
 /// The CSS class for a keyword's color: `tag-` plus the keyword lowercased,
 /// with every character a class name can't carry turned into its code so two
 /// keywords never share a class.
-pub(crate) fn tag_css_class(keyword: &str) -> String {
+pub(super) fn tag_css_class(keyword: &str) -> String {
     let mut out = String::from("tag-");
     for c in keyword.to_ascii_lowercase().chars() {
         if c.is_ascii_alphanumeric() {

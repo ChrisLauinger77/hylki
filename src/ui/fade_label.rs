@@ -25,7 +25,7 @@ mod imp {
         pub(crate) offset: Cell<f64>,
         /// The natural width asked of the parent at most: past it the text
         /// fades rather than widening its row.
-        pub(crate) max_natural: Cell<i32>,
+        pub(super) max_natural: Cell<i32>,
         pub(crate) anim: RefCell<Option<adw::TimedAnimation>>,
     }
 

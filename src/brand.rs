@@ -66,7 +66,7 @@ pub(crate) fn texture(id: &str, px: i32) -> Option<gtk::gdk::Texture> {
 
 /// The generic icons for a mark we do not have: a cloud for storage, an
 /// envelope for mail.
-pub(crate) const GENERIC_CLOUD: &str = "cloud-symbolic";
+const GENERIC_CLOUD: &str = "cloud-symbolic";
 pub(crate) const GENERIC_MAIL: &str = "mail-unread-symbolic";
 
 /// An image of the mark, `px` logical pixels square (decoded at twice
@@ -77,7 +77,7 @@ pub(crate) fn image(id: &str, px: i32) -> gtk::Image {
 }
 
 /// [`image`] with the symbolic icon to show for an id we have no mark for.
-pub(crate) fn image_or(id: &str, px: i32, fallback: &str) -> gtk::Image {
+fn image_or(id: &str, px: i32, fallback: &str) -> gtk::Image {
     let image = match texture(id, px * 2) {
         Some(t) => gtk::Image::from_paintable(Some(&t)),
         None => gtk::Image::from_icon_name(fallback),

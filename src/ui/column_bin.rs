@@ -80,14 +80,14 @@ impl ColumnBin {
     }
 
     /// Ask for `width` instead (see `width`): a column resized.
-    pub(crate) fn set_width(&self, width: i32) {
+    pub(super) fn set_width(&self, width: i32) {
         if self.imp().width.replace(width) != width {
             self.queue_resize();
         }
     }
 
     /// The width asked for, as set (not the width given).
-    pub(crate) fn asked_width(&self) -> i32 {
+    pub(super) fn asked_width(&self) -> i32 {
         self.imp().width.get()
     }
 

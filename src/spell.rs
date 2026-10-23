@@ -30,7 +30,7 @@ type RequestDict = unsafe extern "C" fn(*mut c_void, *const c_char) -> *mut c_vo
 type DictCheck = unsafe extern "C" fn(*mut c_void, *const c_char, isize) -> c_int;
 type DictAdd = unsafe extern "C" fn(*mut c_void, *const c_char, isize);
 
-pub(crate) struct SpellChecker {
+struct SpellChecker {
     dict: *mut c_void,
     check: DictCheck,
     add: DictAdd,
@@ -145,7 +145,7 @@ pub(crate) fn parse_languages(setting: &str) -> Vec<String> {
 }
 
 /// The setting as it is written back: "en_US, de_DE".
-pub(crate) fn join_languages(codes: &[String]) -> String {
+fn join_languages(codes: &[String]) -> String {
     codes.join(", ")
 }
 
@@ -181,11 +181,7 @@ pub(crate) fn toggle_language(setting: &str, code: &str, on: bool, system: &[Str
 /// a missing dictionary checks nothing. When nothing is left, any
 /// dictionary beats none. With no dictionaries visible at all the codes are
 /// passed on as they are.
-pub(crate) fn resolve_languages(
-    setting: &str,
-    locale: Option<String>,
-    dicts: &[String],
-) -> Vec<String> {
+fn resolve_languages(setting: &str, locale: Option<String>, dicts: &[String]) -> Vec<String> {
     let mut wanted = parse_languages(setting);
     if wanted.is_empty() {
         wanted.push(locale.unwrap_or_else(|| "en_US".to_string()));

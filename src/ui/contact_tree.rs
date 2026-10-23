@@ -18,14 +18,14 @@ pub(crate) struct Filled {
     pub(crate) rows: Vec<(ContactScope, gtk::ListBoxRow)>,
     pub(crate) layout: Vec<TreeRow>,
     /// Each foldable node's chevron, by its key.
-    pub(crate) chevrons: Vec<(String, gtk::Image)>,
+    pub(super) chevrons: Vec<(String, gtk::Image)>,
 }
 
 /// A row that hides while the account or book above it is folded, sliding
 /// as folder rows do.
-pub(crate) struct TreeRow {
+pub(super) struct TreeRow {
     pub(crate) row: gtk::ListBoxRow,
-    pub(crate) revealer: gtk::Revealer,
+    pub(super) revealer: gtk::Revealer,
     /// The keys of the nodes above it.
     pub(crate) under: Vec<String>,
 }

@@ -7,12 +7,12 @@ use relm4::prelude::*;
 use crate::i18n::i18n;
 
 /// An address on the allow list or the blocklist.
-pub(crate) struct SenderRow {
+pub(super) struct SenderRow {
     addr: String,
 }
 
 #[derive(Debug)]
-pub(crate) enum SenderRowOutput {
+pub(super) enum SenderRowOutput {
     /// The row's trash button: take this address off its list.
     Remove(String),
 }
