@@ -383,7 +383,7 @@ impl Preferences {
             // The learned-words list manages itself entirely in widget-land:
             // the rows call the spell module directly and rebuild in place.
             let exp = widgets.spell_words_row.clone();
-            let add = adw::EntryRow::builder().title(&i18n("Add a word")).build();
+            let add = adw::EntryRow::builder().title(i18n("Add a word")).build();
             add.set_show_apply_button(true);
             {
                 let exp = exp.clone();

@@ -25,7 +25,7 @@ fn folder_depth_follows_listed_ancestors() {
     // A Dovecot-style namespace: everything lives under "INBOX.", which is
     // not itself a custom folder — so "INBOX.Clients" is top-level and only
     // real sub-folders are indented.
-    let folders = vec![
+    let folders = [
         custom(1, "INBOX.Clients"),
         custom(2, "INBOX.Clients.Acme"),
         custom(3, "INBOX.Clients.Acme.Invoices"),
@@ -42,7 +42,7 @@ fn folder_depth_follows_listed_ancestors() {
 fn folder_depth_needs_a_delimiter_not_just_a_prefix() {
     // "ClientsB" merely shares a prefix with "Clients" — it is a sibling,
     // not a child.
-    let folders = vec![
+    let folders = [
         custom(1, "Clients"),
         custom(2, "ClientsB"),
         custom(3, "Clients/X"),

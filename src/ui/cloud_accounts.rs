@@ -35,8 +35,11 @@ pub struct CloudAccounts {
     /// What the editor's Save does, while one is up: reads the form and
     /// sends `Save` (or starts the sign-in that will); answers whether it
     /// accepted the form.
-    save_action: Rc<RefCell<Option<Rc<dyn Fn() -> bool>>>>,
+    save_action: SaveAction,
 }
+
+/// The open editor's Save (see `CloudAccounts::save_action`).
+type SaveAction = Rc<RefCell<Option<Rc<dyn Fn() -> bool>>>>;
 
 #[derive(Debug)]
 pub enum CloudAccountsInput {

@@ -36,7 +36,7 @@ impl Preferences {
 
     pub(super) fn on_choose_sound(&mut self, sender: ComponentSender<Self>, root: &adw::Window) {
         let dialog = gtk::FileDialog::builder()
-            .title(&i18n("Choose a Sound"))
+            .title(i18n("Choose a Sound"))
             .build();
         let filter = gtk::FileFilter::new();
         filter.set_name(Some(&i18n("Sounds")));

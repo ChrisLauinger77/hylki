@@ -218,9 +218,9 @@ pub(super) fn attach_folder_context_menu(
             let items = folder_menu_items(
                 id,
                 f,
-                filtered.iter().any(|p| *p == f.path),
+                filtered.contains(&f.path),
                 has_filters,
-                favorites.iter().any(|p| *p == f.path),
+                favorites.contains(&f.path),
             );
             show_sidebar_menu(&list_w, x, y, items, &cs);
         }
