@@ -171,6 +171,10 @@ pub(super) const ACCOUNT_TABLES: [&str; 11] = [
     "attachment_scan",
 ];
 
+/// The tables holding what was downloaded for one message, which are
+/// dropped together.
+pub(super) const DOWNLOADED_TABLES: [&str; 3] = ["bodies", "attachments", "attachments_checked"];
+
 /// Bump when the table layout changes; older rows are dropped on open.
 /// v8: bodies are re-rendered with clickable links, so cached bodies (which
 /// `LoadBody` serves without re-fetching) must be dropped and rebuilt on open.

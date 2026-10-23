@@ -3,8 +3,10 @@
 
 use rusqlite::params;
 
-use super::Cache;
 use crate::models::Attachment;
+
+use super::schema::DOWNLOADED_TABLES;
+use super::Cache;
 
 impl Cache {
     /// What downloaded mail takes up (#394), in bytes: the message bodies
@@ -30,7 +32,7 @@ impl Cache {
     pub fn remove_downloaded(&self, before: Option<i64>) -> rusqlite::Result<usize> {
         let tx = self.conn.unchecked_transaction()?;
         let mut removed = 0;
-        for table in ["bodies", "attachments", "attachments_checked"] {
+        for table in DOWNLOADED_TABLES {
             let n = match before {
                 None => tx.execute(&format!("DELETE FROM {table}"), [])?,
                 Some(ts) => tx.execute(

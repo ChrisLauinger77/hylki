@@ -9,6 +9,8 @@
 
 use rusqlite::Connection;
 
+use crate::models::Message;
+
 mod addresses;
 mod bodies;
 mod flags;
@@ -55,6 +57,60 @@ fn split_keywords(col: String) -> Vec<String> {
         }
     }
     out
+}
+
+/// The columns a [`Message`] is read from, in the order
+/// [`message_from_row`] expects them.
+fn message_columns() -> String {
+    format!(
+        "uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, \
+         recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, \
+         importance, due, gmail_labels, answered, forwarded, bcc"
+    )
+}
+
+/// A message read from a row selecting [`message_columns`], starting at
+/// column `first`. The body is never part of a summary row.
+fn message_from_row(
+    row: &rusqlite::Row,
+    first: usize,
+    account_id: u32,
+    folder_id: u32,
+) -> rusqlite::Result<Message> {
+    let col = |n: usize| first + n;
+    let uid: u32 = row.get(col(0))?;
+    let mut m = Message {
+        id: uid,
+        account_id,
+        folder_id,
+        uid,
+        from_name: row.get(col(1))?,
+        from_addr: row.get(col(2))?,
+        reply_to: row.get(col(14))?,
+        to: row.get(col(9))?,
+        cc: row.get(col(10))?,
+        bcc: row.get(col(21))?,
+        subject: row.get(col(3))?,
+        preview: row.get(col(13))?,
+        body: String::new(),
+        date: row.get(col(4))?,
+        timestamp: row.get(col(5))?,
+        unread: row.get(col(6))?,
+        starred: row.get(col(7))?,
+        answered: row.get(col(19))?,
+        forwarded: row.get(col(20))?,
+        keywords: split_keywords(row.get(col(15))?),
+        has_attachment: row.get(col(8))?,
+        message_id: row.get(col(11))?,
+        references: row.get(col(12))?,
+        importance: crate::models::Importance::from_i64(row.get(col(16))?),
+        due: row.get(col(17))?,
+        labels: split_labels(row.get(col(18))?),
+    };
+    // Rows written before NUL-scrubbing existed may still carry one; GTK
+    // labels abort on interior NULs.
+    m.scrub_nuls();
+    Ok(m)
 }
 
 /// Gmail labels as one column. A label can hold a space, so they are kept

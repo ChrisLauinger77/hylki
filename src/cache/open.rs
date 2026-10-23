@@ -5,7 +5,9 @@
 use rusqlite::{params, Connection};
 use std::time::Duration;
 
-use super::schema::{ACCOUNT_TABLES, LAYOUT_VERSION, RENDER_VERSION, SCHEMA, SCHEMA_VERSION};
+use super::schema::{
+    ACCOUNT_TABLES, DOWNLOADED_TABLES, LAYOUT_VERSION, RENDER_VERSION, SCHEMA, SCHEMA_VERSION,
+};
 use super::Cache;
 
 /// Narrow an existing path's permissions to `mode`, if it exists.
@@ -286,16 +288,7 @@ impl Cache {
             "ALTER TABLE sender_checks ADD COLUMN label TEXT NOT NULL DEFAULT ''",
             [],
         );
-        for table in ["bodies", "attachments", "attachments_checked"] {
-            let _ = conn.execute(
-                &format!(
-                    "DELETE FROM {table} WHERE EXISTS (SELECT 1 FROM sender_checks s \
-                     WHERE s.account_id = {table}.account_id AND s.folder_path = {table}.folder_path \
-                     AND s.uid = {table}.uid AND s.pgp != '')"
-                ),
-                [],
-            );
-        }
+        delete_downloaded_where_check(conn, "s.pgp != ''");
         // Previews cached by a build that showed MIME machinery or a tracking
         // link instead of the message: a multipart's boundary ("--b2=_cipk…") or
         // the rendered link a marketing mail opens with ("( https://…"). Clearing
@@ -393,16 +386,7 @@ impl Cache {
     /// body is never re-fetched on its own, and a check is only made at a
     /// fetch, so the pair goes together; verdicts of any other kind stay.
     pub(super) fn recheck_suspicious_senders(conn: &Connection) {
-        for table in ["bodies", "attachments", "attachments_checked"] {
-            let _ = conn.execute(
-                &format!(
-                    "DELETE FROM {table} WHERE EXISTS (SELECT 1 FROM sender_checks s \
-                     WHERE s.account_id = {table}.account_id AND s.folder_path = {table}.folder_path \
-                     AND s.uid = {table}.uid AND s.trust = 'suspicious')"
-                ),
-                [],
-            );
-        }
+        delete_downloaded_where_check(conn, "s.trust = 'suspicious'");
         let _ = conn.execute("DELETE FROM sender_checks WHERE trust = 'suspicious'", []);
     }
 
@@ -498,5 +482,21 @@ impl Cache {
                 params![account_id, &folder_path, uid],
             );
         }
+    }
+}
+
+/// Deletes what was downloaded for every message whose sender check
+/// matches `condition` (SQL over the check, aliased `s`). Errors are
+/// ignored, as for the rest of the upgrade.
+fn delete_downloaded_where_check(conn: &Connection, condition: &str) {
+    for table in DOWNLOADED_TABLES {
+        let _ = conn.execute(
+            &format!(
+                "DELETE FROM {table} WHERE EXISTS (SELECT 1 FROM sender_checks s \
+                 WHERE s.account_id = {table}.account_id AND s.folder_path = {table}.folder_path \
+                 AND s.uid = {table}.uid AND {condition})"
+            ),
+            [],
+        );
     }
 }

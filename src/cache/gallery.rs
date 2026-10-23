@@ -3,8 +3,9 @@
 
 use rusqlite::params;
 
-use super::Cache;
 use crate::models::GallerySort;
+
+use super::Cache;
 
 /// What the attachments gallery is asking for: the scope, the search and the
 /// ordering, all of which have to reach the database — the archive holds far

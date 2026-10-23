@@ -3,8 +3,9 @@
 
 use rusqlite::params;
 
-use super::{split_keywords, split_labels, Cache, KEYWORDS_COL};
 use crate::models::{FolderKind, Message, ThreadLatest, ThreadSummary};
+
+use super::{message_columns, message_from_row, Cache};
 
 /// Rowids written into a query as a literal list: they are integers, and a
 /// conversation can match more rows than a statement takes bound values.
@@ -112,45 +113,15 @@ impl Cache {
             if members.is_empty() {
                 return Ok(Vec::new());
             }
+            let cols = message_columns();
             let sql = format!(
-                "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
-                        has_attachment, recipients, cc, message_id, references_, preview, reply_to, {keywords}, importance, due, gmail_labels, answered, forwarded, bcc \
+                "SELECT folder_path, {cols} \
                  FROM messages WHERE rowid IN ({members}) ORDER BY ts DESC LIMIT ?1",
-                keywords = KEYWORDS_COL,
                 members = rowid_list(&members),
             );
             let mut stmt = self.conn.prepare(&sql)?;
             let rows = stmt.query_map([THREAD_MEMBER_LIMIT as i64], |row| {
-                let uid: u32 = row.get(1)?;
-                let mut m = Message {
-                    id: uid,
-                    account_id,
-                    folder_id: 0, // filled in by the caller, which knows the ids
-                    uid,
-                    from_name: row.get(2)?,
-                    from_addr: row.get(3)?,
-                    reply_to: row.get(15)?,
-                    to: row.get(10)?,
-                    cc: row.get(11)?,
-                    bcc: row.get(22)?,
-                    subject: row.get(4)?,
-                    preview: row.get(14)?,
-                    body: String::new(),
-                    date: row.get(5)?,
-                    timestamp: row.get(6)?,
-                    unread: row.get(7)?,
-                    starred: row.get(8)?,
-                    answered: row.get(20)?,
-                    forwarded: row.get(21)?,
-                    keywords: split_keywords(row.get(16)?),
-                    has_attachment: row.get(9)?,
-                    message_id: row.get(12)?,
-                    references: row.get(13)?,
-                    importance: crate::models::Importance::from_i64(row.get(17)?),
-                    due: row.get(18)?,
-                    labels: split_labels(row.get(19)?),
-                };
-                m.scrub_nuls();
+                let m = message_from_row(row, 1, account_id, 0)?;
                 Ok((row.get::<_, String>(0)?, m))
             })?;
             rows.collect()
@@ -407,14 +378,7 @@ impl Cache {
     /// below next, and whether the pass has finished. A folder never touched
     /// starts at the top (`u32::MAX`), so the first chunk is its newest mail.
     pub fn refs_repair_state(&self, account_id: u32, folder_path: &str) -> (u32, bool) {
-        self.conn
-            .query_row(
-                "SELECT next_uid, done FROM refs_repair \
-                 WHERE account_id = ?1 AND folder_path = ?2",
-                params![account_id, folder_path],
-                |row| Ok((row.get::<_, u32>(0)?, row.get::<_, i64>(1)? != 0)),
-            )
-            .unwrap_or((u32::MAX, false))
+        self.walk_state("refs_repair", account_id, folder_path)
     }
 
     pub fn set_refs_repair_state(
@@ -424,24 +388,13 @@ impl Cache {
         next_uid: u32,
         done: bool,
     ) {
-        let _ = self.conn.execute(
-            "INSERT INTO refs_repair (account_id, folder_path, next_uid, done) \
-             VALUES (?1, ?2, ?3, ?4) \
-             ON CONFLICT(account_id, folder_path) DO UPDATE SET next_uid = ?3, done = ?4",
-            params![account_id, folder_path, next_uid, done as i64],
-        );
+        self.set_walk_state("refs_repair", account_id, folder_path, next_uid, done);
     }
 
     /// How far down a folder the one-time Gmail label fill (#374) has walked,
     /// as [`Cache::refs_repair_state`] does for References.
     pub fn label_fill_state(&self, account_id: u32, folder_path: &str) -> (u32, bool) {
-        self.conn
-            .query_row(
-                "SELECT next_uid, done FROM label_fill WHERE account_id = ?1 AND folder_path = ?2",
-                params![account_id, folder_path],
-                |row| Ok((row.get::<_, u32>(0)?, row.get::<_, i64>(1)? != 0)),
-            )
-            .unwrap_or((u32::MAX, false))
+        self.walk_state("label_fill", account_id, folder_path)
     }
 
     pub fn set_label_fill_state(
@@ -451,10 +404,38 @@ impl Cache {
         next_uid: u32,
         done: bool,
     ) {
+        self.set_walk_state("label_fill", account_id, folder_path, next_uid, done);
+    }
+
+    /// Where a backfill walking down a folder stands, kept in `table`
+    /// (`refs_repair` or `label_fill`): the next UID to look at and whether
+    /// it is done. A folder not started yet starts from the top.
+    fn walk_state(&self, table: &str, account_id: u32, folder_path: &str) -> (u32, bool) {
+        self.conn
+            .query_row(
+                &format!(
+                    "SELECT next_uid, done FROM {table} WHERE account_id = ?1 AND folder_path = ?2"
+                ),
+                params![account_id, folder_path],
+                |row| Ok((row.get::<_, u32>(0)?, row.get::<_, i64>(1)? != 0)),
+            )
+            .unwrap_or((u32::MAX, false))
+    }
+
+    fn set_walk_state(
+        &self,
+        table: &str,
+        account_id: u32,
+        folder_path: &str,
+        next_uid: u32,
+        done: bool,
+    ) {
         let _ = self.conn.execute(
-            "INSERT INTO label_fill (account_id, folder_path, next_uid, done) \
-             VALUES (?1, ?2, ?3, ?4) \
-             ON CONFLICT(account_id, folder_path) DO UPDATE SET next_uid = ?3, done = ?4",
+            &format!(
+                "INSERT INTO {table} (account_id, folder_path, next_uid, done) \
+                 VALUES (?1, ?2, ?3, ?4) \
+                 ON CONFLICT(account_id, folder_path) DO UPDATE SET next_uid = ?3, done = ?4"
+            ),
             params![account_id, folder_path, next_uid, done as i64],
         );
     }

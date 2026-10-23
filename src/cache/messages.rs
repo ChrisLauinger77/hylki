@@ -1,10 +1,11 @@
 //! Folders and message summaries: listing, saving, the exact case of
 //! Message-IDs, UID bookkeeping and deletion.
 
-use rusqlite::params;
+use rusqlite::{params, Connection};
 
-use super::{join_labels, split_keywords, split_labels, Cache, KEYWORDS_COL};
 use crate::models::{Folder, FolderKind, Message};
+
+use super::{join_labels, message_columns, message_from_row, split_labels, Cache};
 
 /// Message-IDs are stored lowercased so a thread matches however a client
 /// spelt an id, but the wire is case-sensitive (RFC 5322): a reply whose
@@ -228,43 +229,13 @@ impl Cache {
         order: &str,
     ) -> Vec<Message> {
         let run = || -> rusqlite::Result<Vec<Message>> {
+            let cols = message_columns();
             let mut stmt = self.conn.prepare(&format!(
-                "SELECT uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels, answered, forwarded, bcc
+                "SELECT {cols}
                  FROM messages WHERE account_id = ?1 AND folder_path = ?2 {order}",
             ))?;
             let rows = stmt.query_map(params![account_id, folder_path], |row| {
-                let uid: u32 = row.get(0)?;
-                let mut m = Message {
-                    id: uid,
-                    account_id,
-                    folder_id,
-                    uid,
-                    from_name: row.get(1)?,
-                    from_addr: row.get(2)?,
-                    reply_to: row.get(14)?,
-                    to: row.get(9)?,
-                    cc: row.get(10)?,
-                    bcc: row.get(21)?,
-                    subject: row.get(3)?,
-                    preview: row.get(13)?,
-                    body: String::new(),
-                    date: row.get(4)?,
-                    timestamp: row.get(5)?,
-                    unread: row.get(6)?,
-                    starred: row.get(7)?,
-                    answered: row.get(19)?,
-                    forwarded: row.get(20)?,
-                    keywords: split_keywords(row.get(15)?),
-                    has_attachment: row.get(8)?,
-                    message_id: row.get(11)?,
-                    references: row.get(12)?,
-                    importance: crate::models::Importance::from_i64(row.get(16)?),
-                    due: row.get(17)?,
-                    labels: split_labels(row.get(18)?),
-                };
-                // Rows written before NUL-scrubbing existed may still carry
-                // one; GTK labels abort on interior NULs.
-                m.scrub_nuls();
+                let m = message_from_row(row, 0, account_id, folder_id)?;
                 Ok(m)
             })?;
             rows.collect()
@@ -322,17 +293,7 @@ impl Cache {
                 params![account_id, folder_path],
             )?;
             for m in messages {
-                tx.execute(
-                    "INSERT INTO messages
-                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, keywords, importance, due, gmail_labels, answered, forwarded, bcc)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
-                    params![
-                        account_id, folder_path, m.uid, m.from_name, m.from_addr, m.subject,
-                        m.date, m.timestamp, m.unread, m.starred, m.has_attachment, m.to, m.cc,
-                        m.message_id, m.references, m.preview, m.reply_to, m.keywords.join(" "),
-                        m.importance.to_i64(), m.due, join_labels(&m.labels), m.answered, m.forwarded, m.bcc
-                    ],
-                )?;
+                insert_message(&tx, INSERT_MESSAGE, account_id, folder_path, m)?;
             }
             tx.commit()
         };
@@ -361,44 +322,37 @@ impl Cache {
                     params![lower, exact],
                 )?;
             }
+            let upsert = format!(
+                "{INSERT_MESSAGE} \
+                 ON CONFLICT(account_id, folder_path, uid) DO UPDATE SET \
+                 from_name = excluded.from_name, \
+                 from_addr = excluded.from_addr, \
+                 subject = excluded.subject, \
+                 date = excluded.date, \
+                 ts = excluded.ts, \
+                 unread = excluded.unread, \
+                 starred = excluded.starred, \
+                 has_attachment = excluded.has_attachment, \
+                 recipients = excluded.recipients, \
+                 cc = excluded.cc, \
+                 message_id = excluded.message_id, \
+                 references_ = excluded.references_, \
+                 preview = CASE WHEN excluded.preview = '' THEN messages.preview ELSE excluded.preview END, \
+                 reply_to = excluded.reply_to, \
+                 keywords = excluded.keywords, \
+                 importance = excluded.importance, \
+                 due = excluded.due, \
+                 gmail_labels = excluded.gmail_labels, \
+                 answered = excluded.answered, \
+                 forwarded = excluded.forwarded, \
+                 bcc = excluded.bcc"
+            );
             for m in messages {
                 // Upsert rather than REPLACE so an empty preview cannot erase one
                 // already stored: the background backfill re-fetches summaries
                 // without asking for a body slice, and every message it touched
                 // lost its preview.
-                tx.execute(
-                    "INSERT INTO messages
-                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, keywords, importance, due, gmail_labels, answered, forwarded, bcc)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)
-                     ON CONFLICT(account_id, folder_path, uid) DO UPDATE SET
-                       from_name = excluded.from_name,
-                       from_addr = excluded.from_addr,
-                       subject = excluded.subject,
-                       date = excluded.date,
-                       ts = excluded.ts,
-                       unread = excluded.unread,
-                       starred = excluded.starred,
-                       has_attachment = excluded.has_attachment,
-                       recipients = excluded.recipients,
-                       cc = excluded.cc,
-                       message_id = excluded.message_id,
-                       references_ = excluded.references_,
-                       preview = CASE WHEN excluded.preview = '' THEN messages.preview ELSE excluded.preview END,
-                       reply_to = excluded.reply_to,
-                       keywords = excluded.keywords,
-                       importance = excluded.importance,
-                       due = excluded.due,
-                       gmail_labels = excluded.gmail_labels,
-                       answered = excluded.answered,
-                       forwarded = excluded.forwarded,
-                       bcc = excluded.bcc",
-                    params![
-                        account_id, folder_path, m.uid, m.from_name, m.from_addr, m.subject,
-                        m.date, m.timestamp, m.unread, m.starred, m.has_attachment, m.to, m.cc,
-                        m.message_id, m.references, m.preview, m.reply_to, m.keywords.join(" "),
-                        m.importance.to_i64(), m.due, join_labels(&m.labels), m.answered, m.forwarded, m.bcc
-                    ],
-                )?;
+                insert_message(&tx, &upsert, account_id, folder_path, m)?;
             }
             tx.commit()
         };
@@ -602,21 +556,62 @@ impl Cache {
     }
 
     pub fn delete_message(&self, account_id: u32, folder_path: &str, uid: u32) {
-        let _ = self.conn.execute(
-            "DELETE FROM messages WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
-            params![account_id, folder_path, uid],
-        );
-        let _ = self.conn.execute(
-            "DELETE FROM bodies WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
-            params![account_id, folder_path, uid],
-        );
-        let _ = self.conn.execute(
-            "DELETE FROM attachments WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
-            params![account_id, folder_path, uid],
-        );
-        let _ = self.conn.execute(
-            "DELETE FROM attachments_checked WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
-            params![account_id, folder_path, uid],
-        );
+        for table in ["messages", "bodies", "attachments", "attachments_checked"] {
+            let _ = self.conn.execute(
+                &format!(
+                    "DELETE FROM {table} WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3"
+                ),
+                params![account_id, folder_path, uid],
+            );
+        }
     }
+}
+
+/// Writes every summary column of a message, `?1` to `?24` in the order
+/// [`insert_message`] binds them.
+const INSERT_MESSAGE: &str = "INSERT INTO messages \
+     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
+     has_attachment, recipients, cc, message_id, references_, preview, reply_to, keywords, \
+     importance, due, gmail_labels, answered, forwarded, bcc) \
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, \
+     ?19, ?20, ?21, ?22, ?23, ?24)";
+
+/// Runs `sql`, an [`INSERT_MESSAGE`] (with or without a conflict clause),
+/// for one message.
+fn insert_message(
+    conn: &Connection,
+    sql: &str,
+    account_id: u32,
+    folder_path: &str,
+    m: &Message,
+) -> rusqlite::Result<usize> {
+    conn.execute(
+        sql,
+        params![
+            account_id,
+            folder_path,
+            m.uid,
+            m.from_name,
+            m.from_addr,
+            m.subject,
+            m.date,
+            m.timestamp,
+            m.unread,
+            m.starred,
+            m.has_attachment,
+            m.to,
+            m.cc,
+            m.message_id,
+            m.references,
+            m.preview,
+            m.reply_to,
+            m.keywords.join(" "),
+            m.importance.to_i64(),
+            m.due,
+            join_labels(&m.labels),
+            m.answered,
+            m.forwarded,
+            m.bcc
+        ],
+    )
 }

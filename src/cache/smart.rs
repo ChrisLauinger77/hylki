@@ -2,8 +2,9 @@
 
 use rusqlite::params;
 
-use super::{split_keywords, split_labels, Cache, KEYWORDS_COL, LABEL_SEP};
 use crate::models::Message;
+
+use super::{message_columns, message_from_row, Cache, KEYWORDS_COL, LABEL_SEP};
 
 /// Most messages one tag view lists per account; the list pages within it.
 const TAG_VIEW_LIMIT: i64 = 5000;
@@ -36,9 +37,9 @@ impl Cache {
                 .collect();
             marks.join(",")
         };
+        let cols = message_columns();
         let mut sql = format!(
-            "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
-                    has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels, answered, forwarded, bcc \
+            "SELECT folder_path, {cols} \
              FROM messages WHERE account_id = ?1"
         );
         if let Some(paths) = include {
@@ -68,36 +69,7 @@ impl Cache {
             let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
             let mut out = Vec::new();
             while let Some(row) = rows.next()? {
-                let uid: u32 = row.get(1)?;
-                let mut m = Message {
-                    id: uid,
-                    account_id,
-                    folder_id: 0, // filled in by the caller, which knows the ids
-                    uid,
-                    from_name: row.get(2)?,
-                    from_addr: row.get(3)?,
-                    reply_to: row.get(15)?,
-                    to: row.get(10)?,
-                    cc: row.get(11)?,
-                    bcc: row.get(22)?,
-                    subject: row.get(4)?,
-                    preview: row.get(14)?,
-                    body: String::new(),
-                    date: row.get(5)?,
-                    timestamp: row.get(6)?,
-                    unread: row.get(7)?,
-                    starred: row.get(8)?,
-                    answered: row.get(20)?,
-                    forwarded: row.get(21)?,
-                    keywords: split_keywords(row.get(16)?),
-                    has_attachment: row.get(9)?,
-                    message_id: row.get(12)?,
-                    references: row.get(13)?,
-                    importance: crate::models::Importance::from_i64(row.get(17)?),
-                    due: row.get(18)?,
-                    labels: split_labels(row.get(19)?),
-                };
-                m.scrub_nuls();
+                let m = message_from_row(row, 1, account_id, 0)?;
                 if keep(&m) {
                     out.push((row.get::<_, String>(0)?, m));
                     if out.len() >= limit {
@@ -133,9 +105,9 @@ impl Cache {
                 sep = LABEL_SEP
             )
         };
+        let cols = message_columns();
         let sql = format!(
-            "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
-                    has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels, answered, forwarded, bcc \
+            "SELECT folder_path, {cols} \
              FROM messages \
              WHERE account_id = ?1 AND (instr(' ' || lower({KEYWORDS_COL}) || ' ', ?2) > 0 \
                    OR (gmail_labels <> '' AND (instr(?4 || lower(gmail_labels) || ?4, ?5) > 0 \
@@ -154,36 +126,7 @@ impl Cache {
                     label(name)
                 ],
                 |row| {
-                    let uid: u32 = row.get(1)?;
-                    let mut m = Message {
-                        id: uid,
-                        account_id,
-                        folder_id: 0, // filled in by the caller, which knows the ids
-                        uid,
-                        from_name: row.get(2)?,
-                        from_addr: row.get(3)?,
-                        reply_to: row.get(15)?,
-                        to: row.get(10)?,
-                        cc: row.get(11)?,
-                        bcc: row.get(22)?,
-                        subject: row.get(4)?,
-                        preview: row.get(14)?,
-                        body: String::new(),
-                        date: row.get(5)?,
-                        timestamp: row.get(6)?,
-                        unread: row.get(7)?,
-                        starred: row.get(8)?,
-                        answered: row.get(20)?,
-                        forwarded: row.get(21)?,
-                        keywords: split_keywords(row.get(16)?),
-                        has_attachment: row.get(9)?,
-                        message_id: row.get(12)?,
-                        references: row.get(13)?,
-                        importance: crate::models::Importance::from_i64(row.get(17)?),
-                        due: row.get(18)?,
-                        labels: split_labels(row.get(19)?),
-                    };
-                    m.scrub_nuls();
+                    let m = message_from_row(row, 1, account_id, 0)?;
                     Ok((row.get::<_, String>(0)?, m))
                 },
             )?;

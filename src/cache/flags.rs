@@ -3,8 +3,9 @@
 
 use rusqlite::params;
 
-use super::{split_keywords, Cache, KEYWORDS_COL};
 use crate::models::Message;
+
+use super::{split_keywords, Cache, KEYWORDS_COL};
 
 impl Cache {
     pub fn set_unread(&self, account_id: u32, folder_path: &str, uid: u32, unread: bool) {
