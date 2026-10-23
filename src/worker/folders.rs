@@ -5,7 +5,7 @@
 use async_imap::types::NameAttribute;
 
 use crate::i18n::i18n;
-use crate::models::{FolderKind, Message};
+use crate::models::{Folder, FolderKind, Message};
 
 /// Whether a folder's sidebar chip counts every message rather than unread
 /// ones. Drafts: a draft is never unread, and the chip is there to say how
@@ -108,4 +108,72 @@ pub(super) fn display_name(path: &str, delimiter: Option<&str>) -> String {
     // never produces one inside an escaped run (that is why `,` stands in for
     // `/`), so the leaf is always a whole name (issue #1).
     crate::mutf7::decode(leaf)
+}
+
+/// Put a folder listing in the order Hylki keeps and number it 1..n:
+/// the essential folders first in [`folder_order`], the custom ones by
+/// their full path (case-insensitively), so sub-folders sit under their
+/// parents whatever order the server listed them in. Folder ids are
+/// positional and stored, so this order must not change.
+pub(super) fn number_folders<T>(
+    items: &mut [T],
+    folder: impl Fn(&T) -> &Folder,
+    folder_mut: impl Fn(&mut T) -> &mut Folder,
+) {
+    items.sort_by(|a, b| {
+        let (a, b) = (folder(a), folder(b));
+        folder_order(a.kind)
+            .cmp(&folder_order(b.kind))
+            .then_with(|| a.path.to_lowercase().cmp(&b.path.to_lowercase()))
+    });
+    for (i, f) in items.iter_mut().enumerate() {
+        folder_mut(f).id = i as u32 + 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn folder(path: &str, kind: FolderKind) -> Folder {
+        Folder {
+            id: 0,
+            account_id: 1,
+            name: path.to_string(),
+            path: path.to_string(),
+            kind,
+            unread: 0,
+        }
+    }
+
+    /// The ids are stored: roles first in their fixed order, then the
+    /// rest by lowercased path, numbered from 1.
+    #[test]
+    fn folders_are_numbered_roles_first_then_by_path() {
+        let mut list = vec![
+            folder("Work/b", FolderKind::Custom),
+            folder("Trash", FolderKind::Trash),
+            folder("archive2", FolderKind::Custom),
+            folder("INBOX", FolderKind::Inbox),
+            folder("Work", FolderKind::Custom),
+            folder("Sent", FolderKind::Sent),
+            folder("Drafts", FolderKind::Drafts),
+            folder("Work/A", FolderKind::Custom),
+        ];
+        number_folders(&mut list, |f| f, |f| f);
+        let got: Vec<(u32, &str)> = list.iter().map(|f| (f.id, f.path.as_str())).collect();
+        assert_eq!(
+            got,
+            [
+                (1, "INBOX"),
+                (2, "Drafts"),
+                (3, "Sent"),
+                (4, "Trash"),
+                (5, "archive2"),
+                (6, "Work"),
+                (7, "Work/A"),
+                (8, "Work/b"),
+            ]
+        );
+    }
 }

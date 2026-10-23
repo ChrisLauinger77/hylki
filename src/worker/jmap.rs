@@ -21,10 +21,9 @@
 
 use super::*;
 use crate::worker::auth::load_or_migrate_password;
+use crate::worker::index_queue::index_pause;
 use crate::worker::jmap::folders::refresh_jmap_folders;
-use crate::worker::jmap::index::{
-    jmap_backfill_pause, jmap_backfill_step, JmapState, JMAP_BACKFILL_BACKOFF,
-};
+use crate::worker::jmap::index::{jmap_backfill_step, JmapState, JMAP_BACKFILL_BACKOFF};
 use crate::worker::jmap::push::{jmap_poll_inbox, spawn_jmap_push};
 use crate::worker::jmap::send::emit_jmap_identities;
 use crate::worker::jmap::wire::{jmap_base_url, jmap_session};
@@ -187,7 +186,7 @@ impl<E: Fn(WorkerEvent)> JmapWorker<E> {
                     }
                     continue;
                 }
-                _ = jmap_backfill_pause(wait), if indexing => {
+                _ = index_pause(wait), if indexing => {
                     match jmap_session(account, state, &|_| {}).await {
                         Some(s) => jmap_backfill_step(&s, account_id, cache.as_ref(), state, emit).await,
                         None => state.backfill_wait = Some(std::time::Instant::now() + JMAP_BACKFILL_BACKOFF),

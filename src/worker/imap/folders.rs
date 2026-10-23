@@ -7,11 +7,11 @@ use futures::TryStreamExt;
 use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::models::{Folder, FolderKind, MailboxQuota};
-use crate::worker::folders::{classify_with_source, display_name};
+use crate::worker::folders::{classify_with_source, display_name, number_folders};
 use crate::worker::imap::sweep::selected_unseen;
 use crate::worker::imap::wire::{box_status, exam, imap_unquote};
 use crate::worker::imap::ImapSession;
-use crate::worker::{chip_counts_all, folder_order, WorkerEvent};
+use crate::worker::{chip_counts_all, WorkerEvent};
 
 /// The mailbox size out of a GETQUOTAROOT answer: the first quota with a
 /// STORAGE resource and a limit, whose figures are in units of 1024 octets.
@@ -109,14 +109,7 @@ pub(super) async fn list_folder_metadata(
     // their full hierarchical path (case-insensitively), so sub-folders sit
     // grouped under their parents in a stable, server-independent order rather
     // than in whatever order the server's LIST happened to return them.
-    folders.sort_by(|a, b| {
-        folder_order(a.kind)
-            .cmp(&folder_order(b.kind))
-            .then_with(|| a.path.to_lowercase().cmp(&b.path.to_lowercase()))
-    });
-    for (i, f) in folders.iter_mut().enumerate() {
-        f.id = i as u32 + 1;
-    }
+    number_folders(&mut folders, |f| f, |f| f);
     // Manual Special Folders assignments (#82) ride over the detection
     // before anything is counted: a folder assigned as Drafts must count
     // every draft, and the cached kind drives every later re-count (the

@@ -318,13 +318,6 @@ pub(super) async fn graph_sync_folder(
     Ok((c.load_messages(account_id, path, folder_id), !more))
 }
 
-/// Pause the background index after a failed step, until `wait`.
-pub(super) async fn backfill_pause(wait: Option<std::time::Instant>) {
-    if let Some(at) = wait {
-        tokio::time::sleep_until(tokio::time::Instant::from_std(at)).await;
-    }
-}
-
 /// One step of the background index (#429): one request for the folder at
 /// the front of the queue, a page of its ids or a run of its missing mail.
 /// The cache gains what came, and the list hears of it as an append; the

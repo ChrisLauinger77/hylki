@@ -12,7 +12,7 @@ use crate::worker::jmap::ops::{jmap_destroy_all, jmap_patch_message, IMPORT_REFU
 use crate::worker::jmap::wire::{
     args, call, jmap_call, jmap_upload, JmapSession, CAP_CORE, CAP_MAIL, CAP_SUBMISSION,
 };
-use crate::worker::outbox::{emit_outbox, raw_in_reply_to};
+use crate::worker::outbox::{due_outbox_items, emit_outbox, raw_in_reply_to};
 use crate::worker::{answered_copies, blocking, reply_copy_path, OutgoingMessage, WorkerEvent};
 
 /// How a refused EmailSubmission starts its error. Every `notCreated` type
@@ -329,15 +329,7 @@ pub(super) async fn jmap_flush_outbox(
     emit: &impl Fn(WorkerEvent),
 ) {
     let Some(cache) = cache else { return };
-    let now = crate::datefmt::now();
-    let items: Vec<crate::models::OutboxItem> = cache
-        .outbox_items(account_id)
-        .into_iter()
-        .filter(|item| match id {
-            Some(wanted) => wanted == item.id,
-            None => item.send_at.is_none_or(|t| t <= now),
-        })
-        .collect();
+    let items = due_outbox_items(cache, account_id, id);
     if items.is_empty() {
         return;
     }

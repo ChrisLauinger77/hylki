@@ -106,3 +106,10 @@ pub(super) trait IndexQueue {
         chip_count_of(kind, messages)
     }
 }
+
+/// Pause the background index after a failed step, until `wait`.
+pub(super) async fn index_pause(wait: Option<Instant>) {
+    if let Some(at) = wait {
+        tokio::time::sleep_until(tokio::time::Instant::from_std(at)).await;
+    }
+}

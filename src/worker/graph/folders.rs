@@ -5,10 +5,11 @@ use crate::cache::Cache;
 use crate::config::AccountConfig;
 use crate::i18n::i18n_f;
 use crate::models::{Folder, FolderKind};
+use crate::worker::folders::number_folders;
 use crate::worker::graph::chores::emit_graph_body_hits;
 use crate::worker::graph::http::{graph_get_json, graph_paged, graph_token, GRAPH_BASE};
 use crate::worker::graph::index::{graph_load_folder, GraphState};
-use crate::worker::{blocking, chip_counts_all, folder_order, WorkerEvent};
+use crate::worker::{blocking, chip_counts_all, WorkerEvent};
 
 /// One Graph mail folder, flattened out of the tree.
 pub(super) struct GraphFolder {
@@ -105,19 +106,7 @@ pub(super) fn graph_list_folders(
         });
     }
 
-    out.sort_by(|a, b| {
-        folder_order(a.folder.kind)
-            .cmp(&folder_order(b.folder.kind))
-            .then_with(|| {
-                a.folder
-                    .path
-                    .to_lowercase()
-                    .cmp(&b.folder.path.to_lowercase())
-            })
-    });
-    for (i, f) in out.iter_mut().enumerate() {
-        f.folder.id = i as u32 + 1;
-    }
+    number_folders(&mut out, |f| &f.folder, |f| &mut f.folder);
     // Manual Special Folders assignments (#82) over the well-known roles,
     // before the chips are counted — as the IMAP listing does.
     let mut folders: Vec<Folder> = out.iter().map(|f| f.folder.clone()).collect();

@@ -14,9 +14,10 @@
 use super::*;
 use crate::worker::graph::folders::{graph_poll_inbox, refresh_graph_folders};
 use crate::worker::graph::http::graph_token;
-use crate::worker::graph::index::{backfill_pause, graph_backfill_step, GraphState};
+use crate::worker::graph::index::{graph_backfill_step, GraphState};
 use crate::worker::graph::ops::graph_fetch_raw;
 use crate::worker::graph::send::graph_flush_outbox;
+use crate::worker::index_queue::index_pause;
 
 mod chores;
 mod folders;
@@ -153,7 +154,7 @@ impl<E: Fn(WorkerEvent)> GraphWorker<E> {
                     graph_poll_inbox(account_id, &self.account, self.cache.as_ref(), &mut self.state, emit).await;
                     continue;
                 }
-                _ = backfill_pause(wait), if indexing => {
+                _ = index_pause(wait), if indexing => {
                     graph_backfill_step(&self.account, account_id, self.cache.as_ref(), &mut self.state, emit).await;
                     continue;
                 }

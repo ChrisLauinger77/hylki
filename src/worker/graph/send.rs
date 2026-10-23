@@ -10,7 +10,7 @@ use crate::worker::graph::http::{graph_post_mime, graph_token, GRAPH_BASE};
 use crate::worker::graph::index::GraphState;
 use crate::worker::graph::messages::{ICON_INDEX, LAST_VERB};
 use crate::worker::graph::ops::graph_patch_message;
-use crate::worker::outbox::{emit_outbox, raw_in_reply_to};
+use crate::worker::outbox::{due_outbox_items, emit_outbox, raw_in_reply_to};
 use crate::worker::{answered_copies, blocking, offline_text, OutgoingMessage, WorkerEvent};
 
 /// Send over Graph: `sendMail` takes the same raw MIME `build_email` produces
@@ -80,15 +80,7 @@ pub(super) async fn graph_flush_outbox(
     emit: &impl Fn(WorkerEvent),
 ) {
     let Some(cache) = cache else { return };
-    let now = crate::datefmt::now();
-    let items: Vec<crate::models::OutboxItem> = cache
-        .outbox_items(account_id)
-        .into_iter()
-        .filter(|item| match id {
-            Some(wanted) => wanted == item.id,
-            None => item.send_at.is_none_or(|t| t <= now),
-        })
-        .collect();
+    let items = due_outbox_items(cache, account_id, id);
     if items.is_empty() {
         return;
     }

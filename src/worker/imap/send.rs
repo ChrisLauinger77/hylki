@@ -16,7 +16,7 @@ use crate::worker::imap::wire::{
 };
 use crate::worker::imap::ImapSession;
 use crate::worker::outbox::{
-    current_sent_copy_path, emit_outbox, outbox_envelope, raw_in_reply_to,
+    current_sent_copy_path, due_outbox_items, emit_outbox, outbox_envelope, raw_in_reply_to,
 };
 use crate::worker::smtp::send_raw_smtp;
 use crate::worker::{answered_copies, reply_copy_path, WorkerEvent};
@@ -95,17 +95,7 @@ pub(in crate::worker) async fn flush_outbox(
     loud: bool,
 ) {
     let Some(cache) = cache else { return };
-    // A scheduled message waits for its time; asking for it by id (Send Now,
-    // or the app's clock) sends it regardless.
-    let now = crate::datefmt::now();
-    let items: Vec<crate::models::OutboxItem> = cache
-        .outbox_items(account_id)
-        .into_iter()
-        .filter(|item| match id {
-            Some(wanted) => wanted == item.id,
-            None => item.send_at.is_none_or(|t| t <= now),
-        })
-        .collect();
+    let items = due_outbox_items(cache, account_id, id);
     if items.is_empty() {
         return;
     }

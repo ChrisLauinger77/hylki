@@ -271,13 +271,6 @@ pub(super) async fn jmap_sync_folder(
     Ok((c.load_messages(account_id, path, folder_id), !more))
 }
 
-/// Pause the background index after a failed step, until `wait`.
-pub(super) async fn jmap_backfill_pause(wait: Option<std::time::Instant>) {
-    if let Some(at) = wait {
-        tokio::time::sleep_until(tokio::time::Instant::from_std(at)).await;
-    }
-}
-
 /// One step of the background index (#429): one request for the folder at
 /// the front of the queue, a page of its ids or a chunk of its missing
 /// mail, as on the Graph path. A failure leaves the job where it is and

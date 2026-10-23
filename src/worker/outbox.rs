@@ -372,3 +372,22 @@ pub(super) fn outbox_envelope(
     }
     lettre::address::Envelope::new(from, to).ok()
 }
+
+/// The queued messages a flush sends. A scheduled message waits for its
+/// time; asking for it by id (Send Now, or the app's clock) sends it
+/// regardless.
+pub(super) fn due_outbox_items(
+    cache: &Cache,
+    account_id: u32,
+    id: Option<u32>,
+) -> Vec<crate::models::OutboxItem> {
+    let now = crate::datefmt::now();
+    cache
+        .outbox_items(account_id)
+        .into_iter()
+        .filter(|item| match id {
+            Some(wanted) => wanted == item.id,
+            None => item.send_at.is_none_or(|t| t <= now),
+        })
+        .collect()
+}

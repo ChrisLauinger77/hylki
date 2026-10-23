@@ -6,9 +6,10 @@ use std::collections::{BTreeMap, HashMap};
 use crate::cache::Cache;
 use crate::i18n::i18n_f;
 use crate::models::{Folder, FolderKind};
+use crate::worker::folders::number_folders;
 use crate::worker::jmap::index::JmapState;
 use crate::worker::jmap::wire::{args, call, jmap_call, JmapSession, CAP_CORE, CAP_MAIL};
-use crate::worker::{blocking, chip_counts_all, folder_order, WorkerEvent};
+use crate::worker::{blocking, chip_counts_all, WorkerEvent};
 
 /// One mailbox, flattened out of the tree.
 pub(super) struct JmapFolder {
@@ -101,19 +102,7 @@ pub(super) fn jmap_list_folders(
             },
         });
     }
-    out.sort_by(|a, b| {
-        folder_order(a.folder.kind)
-            .cmp(&folder_order(b.folder.kind))
-            .then_with(|| {
-                a.folder
-                    .path
-                    .to_lowercase()
-                    .cmp(&b.folder.path.to_lowercase())
-            })
-    });
-    for (i, f) in out.iter_mut().enumerate() {
-        f.folder.id = i as u32 + 1;
-    }
+    number_folders(&mut out, |f| &f.folder, |f| &mut f.folder);
     // Manual Special Folders assignments (#82) over the server's roles,
     // before the chips are counted, as the IMAP listing does.
     let mut folders: Vec<Folder> = out.iter().map(|f| f.folder.clone()).collect();
