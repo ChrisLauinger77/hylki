@@ -227,11 +227,7 @@ fn from_service_code(raw: &str) -> String {
 // ─── Settings file and key ────────────────────────────────────────────────
 
 fn path() -> Option<PathBuf> {
-    Some(
-        crate::config::config_base()?
-            .join("hylki")
-            .join("translation.toml"),
-    )
+    crate::config::config_file("translation.toml")
 }
 
 /// Bumped on every save, so an open reader can tell its offer is stale.
@@ -242,15 +238,11 @@ pub fn generation() -> u64 {
 }
 
 pub fn load() -> Settings {
-    let Some(path) = path() else {
-        return Settings::default();
-    };
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return Settings::default();
-    };
-    toml::from_str(&text).unwrap_or_default()
+    crate::config::read_toml(path()).unwrap_or_default()
 }
 
+/// Written as config's private files are, but not through its helper: a
+/// failure to serialize logs "could not save", not "could not serialize".
 pub fn save(settings: &Settings) {
     let Some(path) = path() else { return };
     match toml::to_string_pretty(settings) {

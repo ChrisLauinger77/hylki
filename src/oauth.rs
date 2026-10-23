@@ -334,11 +334,7 @@ struct FileCreds {
 }
 
 fn creds_from_file(provider: &str) -> Option<(String, String)> {
-    let path = crate::config::config_base()?
-        .join("hylki")
-        .join("oauth.toml");
-    let text = std::fs::read_to_string(path).ok()?;
-    let file: OAuthFile = toml::from_str(&text).ok()?;
+    let file: OAuthFile = crate::config::read_toml(crate::config::config_file("oauth.toml"))?;
     let creds = match provider {
         "google" => file.google,
         "microsoft" => file.microsoft,

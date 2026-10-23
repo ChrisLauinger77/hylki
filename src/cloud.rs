@@ -47,21 +47,11 @@ struct CloudFile {
 }
 
 fn path() -> Option<PathBuf> {
-    Some(
-        crate::config::config_base()?
-            .join("hylki")
-            .join("cloud.toml"),
-    )
+    crate::config::config_file("cloud.toml")
 }
 
 pub fn load_accounts() -> Vec<CloudAccount> {
-    let Some(path) = path() else {
-        return Vec::new();
-    };
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return Vec::new();
-    };
-    toml::from_str::<CloudFile>(&text)
+    crate::config::read_toml::<CloudFile>(path())
         .map(|f| f.accounts)
         .unwrap_or_default()
 }
@@ -72,18 +62,10 @@ pub fn load_enabled_accounts() -> Vec<CloudAccount> {
 }
 
 pub fn save_accounts(accounts: &[CloudAccount]) {
-    let Some(path) = path() else { return };
     let file = CloudFile {
         accounts: accounts.to_vec(),
     };
-    match toml::to_string_pretty(&file) {
-        Ok(toml) => {
-            if let Err(e) = crate::config::write_private_file(&path, &toml) {
-                tracing::warn!("could not save cloud accounts: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("could not serialize cloud accounts: {e}"),
-    }
+    crate::config::save_private_toml(path(), &file, "cloud accounts", false);
 }
 
 /// What an upload produced: the public link and what it was made with.
