@@ -7,6 +7,7 @@ use futures::TryStreamExt;
 use super::*;
 use crate::worker::compose::build::build_draft;
 use crate::worker::ids::normalize_msgid;
+use crate::worker::imap::backfill::{run_one_backfill, Backfill};
 use crate::worker::imap::bodies::load_raw;
 use crate::worker::imap::connect::connect;
 use crate::worker::imap::folders::list_folders;
@@ -572,6 +573,72 @@ fn live_rename_moves_subscriptions() {
         println!("subscribed: {subscribed:?}");
         assert!(subscribed.contains(&new) && subscribed.contains(&new_sub));
         assert!(!subscribed.contains(&old) && !subscribed.contains(&sub));
+    });
+}
+
+/// A folder the server lists but will not open (#512): Dovecot lists a
+/// Sieve script's symlink as a folder and answers its SELECT with NO
+/// [SERVERBUG]. The background index leaves it out after one try, on the
+/// same session, instead of asking again in a loop.
+/// `IMAP_LIVE=host,port,user,password IMAP_LIVE_REFUSED=dovecot.sieve
+/// cargo test --bin hylki worker::imap::live_tests::live_backfill_leaves_refused_folder
+/// -- --ignored`
+#[test]
+#[ignore]
+fn live_backfill_leaves_refused_folder() {
+    let (Ok(spec), Ok(path)) = (
+        std::env::var("IMAP_LIVE"),
+        std::env::var("IMAP_LIVE_REFUSED"),
+    ) else {
+        return;
+    };
+    let p: Vec<&str> = spec.splitn(4, ',').collect();
+    let account = AccountConfig {
+        imap_host: p[0].into(),
+        imap_port: p[1].parse().expect("port"),
+        username: p[2].into(),
+        password: p[3].into(),
+        security: Some(crate::config::ServerSecurity {
+            imap_starttls: false,
+            imap_accept_invalid_certs: true,
+            ..Default::default()
+        }),
+        ..sample_account()
+    };
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.block_on(async {
+        let mut session = Some(connect(&account).await.expect("connect"));
+        let mut queue = std::collections::VecDeque::from([Backfill {
+            folder_id: 7,
+            path,
+            remaining: None,
+            gallery: false,
+            failures: 0,
+        }]);
+        let done = std::cell::Cell::new(false);
+        let emit = |ev: WorkerEvent| {
+            if matches!(ev, WorkerEvent::BackfillDone { folder_id: 7 }) {
+                done.set(true);
+            }
+        };
+        let mut use_envelope = true;
+        run_one_backfill(
+            &mut queue,
+            &mut session,
+            &account,
+            1,
+            None,
+            &mut std::collections::VecDeque::new(),
+            &mut use_envelope,
+            &emit,
+        )
+        .await;
+        assert!(queue.is_empty(), "the refused folder was queued again");
+        assert!(done.get(), "the list was not told the folder is done");
+        assert!(session.is_some(), "the sound session was dropped");
     });
 }
 

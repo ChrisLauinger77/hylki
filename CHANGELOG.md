@@ -7,6 +7,15 @@
   none longer than 1,360 lines. Behaviour is unchanged, and 204 new tests pin
   it. The unused `relm4-components` dependency is gone.
 
+- **Fixed: a folder the server would not open kept the CPU busy** (#512,
+  reported by valqk). The background index put the folder back in its queue
+  after every failed SELECT and tried again at once, logging in afresh each
+  time: hundreds of tries a minute, for good. Dovecot lists a Sieve script's
+  symlink as a folder (`dovecot.sieve`) and answers its SELECT with NO
+  [SERVERBUG], which is how it showed. A folder the server refuses is now
+  left out of the index for the session after one try, and one that fails
+  for any other reason after three tries in a row.
+
 ## 1.45.1 — 2026-10-22
 
 A folder with a backslash in its name opens, typing in the search field no

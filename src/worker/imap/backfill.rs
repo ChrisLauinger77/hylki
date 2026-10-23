@@ -9,7 +9,7 @@ use crate::config::AccountConfig;
 use crate::models::Message;
 use crate::worker::ids::merge_msgids;
 use crate::worker::imap::connect::connect;
-use crate::worker::imap::fetch_mode::{is_parse_error, step_fetch_mode};
+use crate::worker::imap::fetch_mode::{compact_parse_error, is_parse_error, step_fetch_mode};
 use crate::worker::imap::gmail::read_gmail_labels;
 use crate::worker::imap::prefetch::queue_attachment_prefetch;
 use crate::worker::imap::summary::{build_summary, references_of, summary_from_headers};
@@ -110,6 +110,44 @@ pub(in crate::worker) struct Backfill {
     /// Whether this folder feeds the attachments gallery (not Trash/Junk/Drafts);
     /// if so, its backfilled messages' attachments are prefetched too.
     pub(in crate::worker) gallery: bool,
+    /// Steps that failed in a row while connected; at [`BACKFILL_TRIES`] the
+    /// folder is left out of the index for the session.
+    pub(in crate::worker) failures: u32,
+}
+
+/// How many failed steps in a row a folder's background index takes before
+/// it is given up for the session. Nothing waits between the tries (the
+/// idle ladder climbs again at once), so without a limit a folder the
+/// server always fails on is asked about in a tight loop (#512).
+const BACKFILL_TRIES: u32 = 3;
+
+/// Whether the server turned the command down on a sound connection (NO or
+/// BAD): the folder, not the link, is the problem, and a fresh login gets
+/// the same answer. Dovecot lists a Sieve script's symlink as a folder and
+/// answers every SELECT of it with NO [SERVERBUG] (#512).
+fn refused(e: &async_imap::error::Error) -> bool {
+    matches!(
+        e,
+        async_imap::error::Error::No(_) | async_imap::error::Error::Bad(_)
+    )
+}
+
+/// Leave a folder out of the background index for the session: the list
+/// stops promising more of it, and the log says why once.
+fn give_up_backfill(
+    job: &Backfill,
+    account_id: u32,
+    e: &async_imap::error::Error,
+    emit: &impl Fn(WorkerEvent),
+) {
+    tracing::warn!(
+        "background index: leaving {} out on account {account_id}: {}",
+        job.path,
+        compact_parse_error(&e.to_string())
+    );
+    emit(WorkerEvent::BackfillDone {
+        folder_id: job.folder_id,
+    });
 }
 
 // select! may receive a reader before polling the job at all. In that case
@@ -210,14 +248,24 @@ pub(super) async fn run_one_backfill(
         Some(rem) => rem,
         None => match backfill_worklist(&mut s, account_id, &job.path, cache).await {
             Ok(rem) => rem,
+            Err(e) if refused(&e) => {
+                give_up_backfill(&job, account_id, &e, emit);
+                *session = Some(s);
+                return;
+            }
             Err(_) => match connect(account).await {
                 Ok(fresh) => {
                     s = fresh;
                     match backfill_worklist(&mut s, account_id, &job.path, cache).await {
                         Ok(rem) => rem,
-                        Err(_) => {
+                        Err(e) => {
                             *session = Some(s);
-                            queue.push_back(job);
+                            job.failures += 1;
+                            if refused(&e) || job.failures >= BACKFILL_TRIES {
+                                give_up_backfill(&job, account_id, &e, emit);
+                            } else {
+                                queue.push_back(job);
+                            }
                             return;
                         }
                     }
@@ -253,6 +301,7 @@ pub(super) async fn run_one_backfill(
     .await
     {
         Ok(msgs) => {
+            job.failures = 0;
             if let Some(c) = cache {
                 c.upsert_messages(account_id, &job.path, &msgs);
             }
@@ -271,17 +320,29 @@ pub(super) async fn run_one_backfill(
             // Put the chunk back and reconnect; a parse error means the server
             // answers this way of asking with something unreadable (iCloud's
             // ENVELOPE, Mailfence with the preview items, #226) — move down
-            // the same ladder the first load uses.
+            // the same ladder the first load uses. A step down the ladder is
+            // a new way of asking, not a failed try.
             for uid in chunk.into_iter().rev() {
                 rem.insert(0, uid);
             }
-            if is_parse_error(&e) {
-                step_fetch_mode(account_id, use_envelope);
+            if !(is_parse_error(&e) && step_fetch_mode(account_id, use_envelope)) {
+                job.failures += 1;
             }
-            if let Ok(fresh) = connect(account).await {
+            let gave_up = job.failures >= BACKFILL_TRIES;
+            if gave_up {
+                give_up_backfill(&job, account_id, &e, emit);
+            }
+            // A refusal leaves the connection sound; anything else may have
+            // left it mid-reply.
+            if refused(&e) {
+                *session = Some(s);
+            } else if let Ok(fresh) = connect(account).await {
                 *session = Some(fresh);
             }
             // else: session stays None; the main loop reconnects on next request.
+            if gave_up {
+                return;
+            }
         }
     }
 
