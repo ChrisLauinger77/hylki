@@ -468,7 +468,7 @@ pub(crate) struct AppModel {
     pub(super) app_icon: String,
     /// A restart is on its way (Restart Now clicked, settle timer running).
     pub(super) restart_pending: bool,
-    pub(super) tray: Option<crate::tray::TrayHandle>,
+    pub(super) tray: Option<super::tray::TrayHandle>,
     /// What the tray menu last listed (account, id, sender, subject; `None`
     /// for no section), so an unchanged list isn't re-sent over D-Bus on
     /// every unread-count push.

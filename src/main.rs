@@ -53,7 +53,6 @@ mod text_scale;
 mod theme;
 mod theme_palettes;
 mod translate;
-mod tray;
 mod ui;
 mod unsubscribe;
 mod verify;

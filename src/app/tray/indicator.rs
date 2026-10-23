@@ -72,7 +72,7 @@ pub type AppIconPng<'a> = &'a [u8];
 /// The app's symbolic icon (the opened envelope, drawn in black); its
 /// fill is swapped for the chosen color.
 const ENVELOPE_SVG: &str =
-    include_str!("../data/icons/hicolor/symbolic/apps/co.hyprlab.Hylki-symbolic.svg");
+    include_str!("../../../data/icons/hicolor/symbolic/apps/co.hyprlab.Hylki-symbolic.svg");
 /// Panels ask for different sizes; a set covers them without upscaling blur.
 const SIZES: [i32; 6] = [16, 22, 24, 32, 48, 64];
 /// Symbolic icons, when the file is read as one, are painted mid-grey on no
