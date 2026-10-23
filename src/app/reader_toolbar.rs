@@ -2,6 +2,7 @@
 //! overflow menu when the window is narrow, and the menu itself.
 
 use super::*;
+use crate::ui::context_menu::{show_context_menu, MenuEntry};
 
 /// Fallback threshold for folding the reader header's right-hand actions
 /// into the overflow menu. Normally the threshold is *measured* at startup from the
@@ -26,6 +27,22 @@ pub(super) struct ReaderToolbarWidgets {
     /// The window controls' width (re-measured when the decoration layout
     /// changes).
     pub(super) controls: std::cell::Cell<i32>,
+}
+
+/// A menu entry that sends `msg` to the app, built afresh on each click.
+fn action_entry(
+    sender: &ComponentSender<AppModel>,
+    label: String,
+    icon: &str,
+    msg: impl Fn() -> AppMsg + 'static,
+    enabled: bool,
+) -> crate::ui::context_menu::MenuEntry {
+    let s = sender.input_sender().clone();
+    crate::ui::context_menu::MenuEntry::new(label, move || {
+        let _ = s.send(msg());
+    })
+    .icon(format!("{icon}-symbolic"))
+    .enabled(enabled)
 }
 
 impl AppModel {
@@ -80,201 +97,237 @@ impl AppModel {
     /// toolbar (Tags, Read/Unread, Spam, Move To, Find, Print), same icons,
     /// enabled under the same conditions. The left group never folds.
     pub(super) fn show_reader_overflow_menu(&self, sender: &ComponentSender<Self>) {
-        use crate::ui::context_menu::{show_context_menu, MenuEntry};
-
-        // One entry per action, each with its own clone of the input sender.
-        macro_rules! entry {
-            ($label:expr, $icon:expr, $msg:expr, $enabled:expr) => {{
-                let s = sender.input_sender().clone();
-                MenuEntry::new($label, move || {
-                    let _ = s.send($msg);
-                })
-                .icon(concat!($icon, "-symbolic"))
-                .enabled($enabled)
-            }};
-        }
-
         let has_current = self.current.is_some();
         let focus = self.focus.active(config::FocusPart::ReaderToolbar);
         let sections = if self.showing_outbox {
-            // The Outbox's own buttons (Edit, Send, Send all, Delete) sit in
-            // the always-visible left group; only View Source is left to
-            // fold here (queued rows have no context menu to carry it) —
-            // unless Focus Mode folded that group too.
-            let mut sections = Vec::new();
-            if focus {
-                let many = has_current || self.many_selected();
-                sections.push(vec![
-                    entry!(
-                        i18n("Edit this message"),
-                        "document-edit",
-                        AppMsg::EditCurrentOutbox,
-                        has_current
-                    ),
-                    entry!(
-                        i18n("Try to send this message now"),
-                        "mail-send",
-                        AppMsg::SendCurrentOutbox,
-                        has_current
-                    ),
-                    entry!(i18n("Send all"), "mail-send", AppMsg::RetryAllOutbox, true),
-                    entry!(i18n("Delete"), "user-trash", AppMsg::Delete, many),
-                ]);
-            }
-            sections.push(vec![entry!(
-                i18n("View Source"),
-                "code",
-                AppMsg::ViewSource,
-                has_current
-            )]);
-            sections
+            self.outbox_overflow_sections(has_current, focus, sender)
         } else {
-            // Only the right group folds in here, in its own order; the left
-            // group stays on the bar at every width. Per-message actions act
-            // on the reply target: the open message, or — in a conversation —
-            // the one highlighted card. With none (or several) highlighted
-            // they grey out.
-            use config::ToolbarItem as T;
-            let target = self.reply_target();
-            let acts = target.is_some();
-            let many = acts || self.many_selected();
-            let starred = target.as_ref().is_some_and(|m| m.starred);
-            let target_unread = target.as_ref().is_some_and(|m| m.unread);
-            let restorable = target.as_ref().is_some_and(|m| {
-                self.folder_kind(m.account_id, m.folder_id)
-                    .is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk))
-            });
-            // Focus Mode folds the left group in as well, as a section of
-            // its own ahead of the right group.
-            let groups: Vec<&[T]> = if focus {
-                vec![&self.reader_toolbar.left, &self.reader_toolbar.right]
-            } else {
-                vec![&self.reader_toolbar.right]
-            };
-            let mut sections = Vec::new();
-            for group in groups {
-                let mut section = Vec::new();
-                for item in group {
-                    match item {
-                        T::Reply => section.push(entry!(
-                            i18n("Reply"),
-                            "mail-reply-sender",
-                            AppMsg::Reply,
-                            acts
-                        )),
-                        T::ReplyAll => section.push(entry!(
-                            i18n("Reply All"),
-                            "mail-reply-all",
-                            AppMsg::ReplyAll,
-                            acts
-                        )),
-                        T::Forward => section.push(entry!(
-                            i18n("Forward"),
-                            "mail-forward",
-                            AppMsg::Forward,
-                            acts
-                        )),
-                        T::Star => section.push(if starred {
-                            entry!(
-                                i18n("Remove Star"),
-                                "hylki-non-starred",
-                                AppMsg::ToggleStar,
-                                many
-                            )
-                        } else {
-                            entry!(i18n("Star"), "starred", AppMsg::ToggleStar, many)
-                        }),
-                        T::Archive => section.push(entry!(
-                            i18n("Archive"),
-                            "mail-archive",
-                            AppMsg::Archive,
-                            many
-                        )),
-                        T::Delete => {
-                            section.push(entry!(i18n("Delete"), "user-trash", AppMsg::Delete, many))
-                        }
-                        T::Spam => section.push(if self.target_in_junk() {
-                            entry!(
-                                i18n("Not Spam"),
-                                "mail-mark-notjunk",
-                                AppMsg::MarkSpam,
-                                many
-                            )
-                        } else {
-                            entry!(
-                                i18n("Mark as Spam"),
-                                "mail-mark-junk",
-                                AppMsg::MarkSpam,
-                                many
-                            )
-                        }),
-                        T::ReadUnread => section.push(if target_unread {
-                            entry!(
-                                i18n("Mark as Read"),
-                                "hylki-mail-read",
-                                AppMsg::ToggleReadCurrent,
-                                many
-                            )
-                        } else {
-                            entry!(
-                                i18n("Mark as Unread"),
-                                "mail-unread",
-                                AppMsg::ToggleReadCurrent,
-                                many
-                            )
-                        }),
-                        // Tags (#71), where there are any and something to tag —
-                        // behind a submenu, as in the message list's menu.
-                        T::Tags => {
-                            if let Some(entries) = self.reader_tag_entries(sender) {
-                                section.push(
-                                    MenuEntry::submenu(i18n("Tags"), vec![entries])
-                                        .icon("tag-outline-symbolic"),
-                                );
-                            }
-                        }
-                        T::MoveTo => {
-                            if restorable {
-                                section.push(entry!(
-                                    i18n("Move to Inbox"),
-                                    "mail-inbox",
-                                    AppMsg::MoveToInbox,
-                                    acts
-                                ));
-                            }
-                            section.push(entry!(
-                                i18n("Move To…"),
-                                "folder",
-                                AppMsg::MoveToMenu,
-                                many
-                            ));
-                        }
-                        T::Find => section.push(entry!(
-                            i18n("Find in Message"),
-                            "loupe-with-arrow",
-                            AppMsg::OpenReaderFind,
-                            has_current
-                        )),
-                        // View Source is deliberately absent: it lives in the
-                        // message list's context menu only (the Outbox variant
-                        // above keeps it — queued rows have no such menu).
-                        T::Print => section.push(entry!(
-                            i18n("Print Preview"),
-                            "printer",
-                            AppMsg::PrintPreview,
-                            has_current
-                        )),
-                    }
-                }
-                if !section.is_empty() {
-                    sections.push(section);
-                }
-            }
-            sections
+            self.toolbar_overflow_sections(has_current, focus, sender)
         };
 
         let btn = &self.reader_overflow_btn;
         show_context_menu(btn, (btn.width() / 2) as f64, btn.height() as f64, sections);
+    }
+
+    /// The Outbox's overflow: its own buttons (Edit, Send, Send all,
+    /// Delete) sit in the always-visible left group; only View Source is
+    /// left to fold here (queued rows have no context menu to carry it),
+    /// unless Focus Mode folded that group too.
+    fn outbox_overflow_sections(
+        &self,
+        has_current: bool,
+        focus: bool,
+        sender: &ComponentSender<Self>,
+    ) -> Vec<Vec<MenuEntry>> {
+        let mut sections = Vec::new();
+        if focus {
+            let many = has_current || self.many_selected();
+            sections.push(vec![
+                action_entry(
+                    sender,
+                    i18n("Edit this message"),
+                    "document-edit",
+                    || AppMsg::EditCurrentOutbox,
+                    has_current,
+                ),
+                action_entry(
+                    sender,
+                    i18n("Try to send this message now"),
+                    "mail-send",
+                    || AppMsg::SendCurrentOutbox,
+                    has_current,
+                ),
+                action_entry(
+                    sender,
+                    i18n("Send all"),
+                    "mail-send",
+                    || AppMsg::RetryAllOutbox,
+                    true,
+                ),
+                action_entry(
+                    sender,
+                    i18n("Delete"),
+                    "user-trash",
+                    || AppMsg::Delete,
+                    many,
+                ),
+            ]);
+        }
+        sections.push(vec![action_entry(
+            sender,
+            i18n("View Source"),
+            "code",
+            || AppMsg::ViewSource,
+            has_current,
+        )]);
+        sections
+    }
+
+    /// The reader toolbar's overflow: the right group, in its own order;
+    /// the left group stays on the bar at every width. Per-message actions
+    /// act on the reply target: the open message, or, in a conversation,
+    /// the one highlighted card. With none (or several) highlighted they
+    /// grey out.
+    fn toolbar_overflow_sections(
+        &self,
+        has_current: bool,
+        focus: bool,
+        sender: &ComponentSender<Self>,
+    ) -> Vec<Vec<MenuEntry>> {
+        use config::ToolbarItem as T;
+        let target = self.reply_target();
+        let acts = target.is_some();
+        let many = acts || self.many_selected();
+        let starred = target.as_ref().is_some_and(|m| m.starred);
+        let target_unread = target.as_ref().is_some_and(|m| m.unread);
+        let restorable = target.as_ref().is_some_and(|m| {
+            self.folder_kind(m.account_id, m.folder_id)
+                .is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk))
+        });
+        // Focus Mode folds the left group in as well, as a section of
+        // its own ahead of the right group.
+        let groups: Vec<&[T]> = if focus {
+            vec![&self.reader_toolbar.left, &self.reader_toolbar.right]
+        } else {
+            vec![&self.reader_toolbar.right]
+        };
+        let mut sections = Vec::new();
+        for group in groups {
+            let mut section = Vec::new();
+            for item in group {
+                match item {
+                    T::Reply => section.push(action_entry(
+                        sender,
+                        i18n("Reply"),
+                        "mail-reply-sender",
+                        || AppMsg::Reply,
+                        acts,
+                    )),
+                    T::ReplyAll => section.push(action_entry(
+                        sender,
+                        i18n("Reply All"),
+                        "mail-reply-all",
+                        || AppMsg::ReplyAll,
+                        acts,
+                    )),
+                    T::Forward => section.push(action_entry(
+                        sender,
+                        i18n("Forward"),
+                        "mail-forward",
+                        || AppMsg::Forward,
+                        acts,
+                    )),
+                    T::Star => section.push(if starred {
+                        action_entry(
+                            sender,
+                            i18n("Remove Star"),
+                            "hylki-non-starred",
+                            || AppMsg::ToggleStar,
+                            many,
+                        )
+                    } else {
+                        action_entry(sender, i18n("Star"), "starred", || AppMsg::ToggleStar, many)
+                    }),
+                    T::Archive => section.push(action_entry(
+                        sender,
+                        i18n("Archive"),
+                        "mail-archive",
+                        || AppMsg::Archive,
+                        many,
+                    )),
+                    T::Delete => section.push(action_entry(
+                        sender,
+                        i18n("Delete"),
+                        "user-trash",
+                        || AppMsg::Delete,
+                        many,
+                    )),
+                    T::Spam => section.push(if self.target_in_junk() {
+                        action_entry(
+                            sender,
+                            i18n("Not Spam"),
+                            "mail-mark-notjunk",
+                            || AppMsg::MarkSpam,
+                            many,
+                        )
+                    } else {
+                        action_entry(
+                            sender,
+                            i18n("Mark as Spam"),
+                            "mail-mark-junk",
+                            || AppMsg::MarkSpam,
+                            many,
+                        )
+                    }),
+                    T::ReadUnread => section.push(if target_unread {
+                        action_entry(
+                            sender,
+                            i18n("Mark as Read"),
+                            "hylki-mail-read",
+                            || AppMsg::ToggleReadCurrent,
+                            many,
+                        )
+                    } else {
+                        action_entry(
+                            sender,
+                            i18n("Mark as Unread"),
+                            "mail-unread",
+                            || AppMsg::ToggleReadCurrent,
+                            many,
+                        )
+                    }),
+                    // Tags (#71), where there are any and something to tag —
+                    // behind a submenu, as in the message list's menu.
+                    T::Tags => {
+                        if let Some(entries) = self.reader_tag_entries(sender) {
+                            section.push(
+                                MenuEntry::submenu(i18n("Tags"), vec![entries])
+                                    .icon("tag-outline-symbolic"),
+                            );
+                        }
+                    }
+                    T::MoveTo => {
+                        if restorable {
+                            section.push(action_entry(
+                                sender,
+                                i18n("Move to Inbox"),
+                                "mail-inbox",
+                                || AppMsg::MoveToInbox,
+                                acts,
+                            ));
+                        }
+                        section.push(action_entry(
+                            sender,
+                            i18n("Move To…"),
+                            "folder",
+                            || AppMsg::MoveToMenu,
+                            many,
+                        ));
+                    }
+                    T::Find => section.push(action_entry(
+                        sender,
+                        i18n("Find in Message"),
+                        "loupe-with-arrow",
+                        || AppMsg::OpenReaderFind,
+                        has_current,
+                    )),
+                    // View Source is deliberately absent: it lives in the
+                    // message list's context menu only (the Outbox variant
+                    // above keeps it — queued rows have no such menu).
+                    T::Print => section.push(action_entry(
+                        sender,
+                        i18n("Print Preview"),
+                        "printer",
+                        || AppMsg::PrintPreview,
+                        has_current,
+                    )),
+                }
+            }
+            if !section.is_empty() {
+                sections.push(section);
+            }
+        }
+        sections
     }
 
     /// Whether the reader header shows `item` right now: it must be in the
