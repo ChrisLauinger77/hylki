@@ -15,6 +15,14 @@ pub(super) struct PopOut {
 }
 
 impl AppModel {
+    /// Sends every popped-out reader window the message `msg` builds, one
+    /// built per window.
+    pub(super) fn popouts_emit(&self, msg: impl Fn() -> MessageWindowInput) {
+        for p in self.popouts.values() {
+            p.controller.emit(msg());
+        }
+    }
+
     /// Present a read-only window showing raw message source (monospace).
     pub(super) fn show_source_window(&self, text: &str) {
         let buffer = gtk::TextBuffer::new(None);

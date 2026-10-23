@@ -89,13 +89,7 @@ impl AppModel {
         let folder_id =
             worker::reply_copy_path(account, account_id, self.cache.as_ref(), &out.in_reply_to)
                 .or_else(|| self.sent_copy_path(account_id))
-                .and_then(|p| {
-                    self.folders
-                        .get(&account_id)?
-                        .iter()
-                        .find(|f| f.path == p)
-                        .map(|f| f.id)
-                })
+                .and_then(|p| self.folder_by_path(account_id, &p).map(|f| f.id))
                 .or_else(|| {
                     self.folder_of_kind(account_id, FolderKind::Sent)
                         .map(|f| f.id)

@@ -54,11 +54,9 @@ impl AppModel {
         if demo_mode() {
             return true;
         }
-        self.config
-            .get(account_id.saturating_sub(1) as usize)
-            .is_some_and(|c| {
-                c.enabled && matches!(c.protocol, config::Protocol::Imap | config::Protocol::Jmap)
-            })
+        self.saved_account_config(account_id).is_some_and(|c| {
+            c.enabled && matches!(c.protocol, config::Protocol::Imap | config::Protocol::Jmap)
+        })
     }
 
     /// What the Move To picker lists: `own` account's folders less
@@ -273,11 +271,7 @@ impl AppModel {
                     ("error", tally.error.as_deref().unwrap_or("")),
                 ],
             );
-            self.notifications.emit(NotifyInput::Push {
-                text,
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(text);
         }
     }
 
@@ -419,11 +413,7 @@ impl AppModel {
             let cached = self.find_cached_message(aid, id);
             let src = match &cached {
                 Some(m) => self.resolve_folder_path(m),
-                None => self
-                    .folders
-                    .get(&aid)
-                    .and_then(|fs| fs.iter().find(|f| f.id == fid))
-                    .map(|f| f.path.clone()),
+                None => self.folder_path(aid, fid),
             };
             let Some(src) = src else { continue };
             if src == dest {
@@ -440,17 +430,13 @@ impl AppModel {
             removed_ids.push(id);
         }
         if foreign > 0 {
-            self.notifications.emit(NotifyInput::Push {
-                text: if foreign == 1 {
-                    i18n("One message stayed put: this account can't take mail from another")
-                } else {
-                    i18n_f(
-                        "{foreign} messages stayed put: this account can't take mail from another",
-                        &[("foreign", &foreign.to_string())],
-                    )
-                },
-                error: true,
-                connectivity: false,
+            self.notice_error(if foreign == 1 {
+                i18n("One message stayed put: this account can't take mail from another")
+            } else {
+                i18n_f(
+                    "{foreign} messages stayed put: this account can't take mail from another",
+                    &[("foreign", &foreign.to_string())],
+                )
             });
         }
         if removed_ids.is_empty() {
@@ -480,11 +466,8 @@ impl AppModel {
                 if let Some(name) = self.pending_saves.remove(&token) {
                     match raw {
                         Ok(raw) => self.save_message_file(name, raw),
-                        Err(e) => self.notifications.emit(NotifyInput::Push {
-                            text: i18n_f("Could not save the message: {e}", &[("e", &e)]),
-                            error: true,
-                            connectivity: false,
-                        }),
+                        Err(e) => self
+                            .notice_error(i18n_f("Could not save the message: {e}", &[("e", &e)])),
                     }
                     return;
                 }

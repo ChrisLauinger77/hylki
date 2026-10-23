@@ -111,11 +111,25 @@ pub(super) fn kind_label(kind: FolderKind) -> String {
 }
 
 impl AppModel {
+    /// One of an account's folders, by id.
+    pub(super) fn folder_by_id(&self, account_id: u32, folder_id: u32) -> Option<&Folder> {
+        self.folders
+            .get(&account_id)?
+            .iter()
+            .find(|f| f.id == folder_id)
+    }
+
+    /// One of an account's folders, by path.
+    pub(super) fn folder_by_path(&self, account_id: u32, path: &str) -> Option<&Folder> {
+        self.folders
+            .get(&account_id)?
+            .iter()
+            .find(|f| f.path == path)
+    }
+
     /// The path of one of an account's folders, by id.
     pub(super) fn folder_path(&self, account_id: u32, folder_id: u32) -> Option<String> {
-        self.folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+        self.folder_by_id(account_id, folder_id)
             .map(|f| f.path.clone())
     }
 
@@ -126,11 +140,7 @@ impl AppModel {
 
     /// The kind of a folder by id, if known.
     pub(super) fn folder_kind(&self, account_id: u32, folder_id: u32) -> Option<FolderKind> {
-        self.folders
-            .get(&account_id)?
-            .iter()
-            .find(|f| f.id == folder_id)
-            .map(|f| f.kind)
+        self.folder_by_id(account_id, folder_id).map(|f| f.kind)
     }
 
     /// The Drafts folder a draft of `account_id` is saved to: the existing
@@ -212,11 +222,10 @@ impl AppModel {
         }
         let hidden = cfg.hidden_folders.clone();
         if let Err(e) = config::save(&self.config) {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n_f("Could not save account: {e}", &[("e", &(e).to_string())]),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n_f(
+                "Could not save account: {e}",
+                &[("e", &(e).to_string())],
+            ));
         }
         if self.selected.as_ref().is_some_and(|s| {
             s.account_id == account_id && crate::models::folder_is_hidden(&s.path, None, &hidden)
@@ -456,11 +465,7 @@ impl AppModel {
             }
         });
         if let Some(moved) = followed {
-            let id = self
-                .folders
-                .get(&account_id)
-                .and_then(|fs| fs.iter().find(|f| f.path == moved))
-                .map(|f| f.id);
+            let id = self.folder_by_path(account_id, &moved).map(|f| f.id);
             if let (Some(sel), Some(id)) = (self.selected.as_mut(), id) {
                 sel.path = moved.clone();
                 sel.folder_id = id;
@@ -586,11 +591,7 @@ impl AppModel {
 
     /// The IMAP folder path a message lives in (its account's folder by id).
     pub(super) fn resolve_folder_path(&self, m: &Message) -> Option<String> {
-        self.folders
-            .get(&m.account_id)?
-            .iter()
-            .find(|f| f.id == m.folder_id)
-            .map(|f| f.path.clone())
+        self.folder_path(m.account_id, m.folder_id)
     }
 
     /// An account's Inbox folder, if known.
@@ -602,9 +603,7 @@ impl AppModel {
     /// account editor if it still exists, else the Sent folder. `None` when
     /// the account has neither — the message is sent without a copy.
     pub(super) fn sent_copy_path(&self, account_id: u32) -> Option<String> {
-        let cfg = self
-            .effective_config()
-            .get(account_id.saturating_sub(1) as usize);
+        let cfg = self.account_config(account_id);
         // The server files its own copy: appending a second one is what makes
         // a Gmail account show every sent message twice.
         if cfg.is_some_and(|c| c.server_saves_sent) {

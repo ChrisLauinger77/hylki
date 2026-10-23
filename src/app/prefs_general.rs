@@ -90,11 +90,7 @@ impl AppModel {
                 // change is saved and announced.
                 if config::load_renderer() != renderer {
                     config::save_renderer(&renderer);
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("The renderer applies the next time Hylki starts."),
-                        error: false,
-                        connectivity: false,
-                    });
+                    self.notice(i18n("The renderer applies the next time Hylki starts."));
                 }
             }
 
@@ -103,11 +99,7 @@ impl AppModel {
                 // change is saved and announced.
                 if config::load_language() != code {
                     config::save_language(&code);
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("The language applies the next time Hylki starts."),
-                        error: false,
-                        connectivity: false,
-                    });
+                    self.notice(i18n("The language applies the next time Hylki starts."));
                 }
             }
 

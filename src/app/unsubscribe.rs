@@ -48,10 +48,7 @@ impl AppModel {
         let map = self.unsubscribed_map();
         self.message_view
             .emit(MessageViewInput::SetUnsubscribed(map.clone()));
-        for p in self.popouts.values() {
-            p.controller
-                .emit(MessageWindowInput::SetUnsubscribed(map.clone()));
-        }
+        self.popouts_emit(|| MessageWindowInput::SetUnsubscribed(map.clone()));
     }
 
     /// The identity an unsubscribe mail leaves under: the alias the message
@@ -59,8 +56,7 @@ impl AppModel {
     /// address it writes to), else the account itself. Returns the send-as
     /// alias for the wire (`None` for the account) and the bare address.
     pub(super) fn unsubscribe_from(&self, message: &Message) -> (Option<String>, String) {
-        let cfg = self.effective_config();
-        let Some(cfg) = cfg.get(message.account_id.saturating_sub(1) as usize) else {
+        let Some(cfg) = self.account_config(message.account_id) else {
             return (None, String::new());
         };
         let recipients: Vec<String> = [&message.to, &message.cc]
@@ -385,20 +381,14 @@ impl AppModel {
                     Ok(left) => {
                         if left {
                             self.record_unsubscribed(&message);
-                            self.notifications.emit(NotifyInput::Push {
-                                text: i18n_f(
-                                    "Unsubscribed from {name}.",
-                                    &[("name", &sender_label(&message))],
-                                ),
-                                error: false,
-                                connectivity: false,
-                            });
+                            self.notice(i18n_f(
+                                "Unsubscribed from {name}.",
+                                &[("name", &sender_label(&message))],
+                            ));
                         } else {
-                            self.notifications.emit(NotifyInput::Push {
-                                text: i18n("The list's unsubscribe page is open in your browser."),
-                                error: false,
-                                connectivity: false,
-                            });
+                            self.notice(i18n(
+                                "The list's unsubscribe page is open in your browser.",
+                            ));
                         }
                         self.push_unsubscribe_state(key, None);
                     }

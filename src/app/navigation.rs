@@ -313,11 +313,7 @@ impl AppModel {
             )));
         self.message_list.emit(MessageListInput::SetColorize(false));
         // A Sent folder's rows all come from you — name the recipients (#27).
-        let is_sent = self
-            .folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-            .is_some_and(|f| f.kind == FolderKind::Sent);
+        let is_sent = self.folder_kind(account_id, folder_id) == Some(FolderKind::Sent);
         self.message_list
             .emit(MessageListInput::SetShowRecipient(is_sent));
         // Trash and Junk offer the way back to the Inbox (#138); Junk's is

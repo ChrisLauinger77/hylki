@@ -338,14 +338,10 @@ impl AppModel {
                 Err(e) => {
                     tracing::warn!("restart helper failed: {e}");
                     self.restart_pending = false;
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n(
-                            "Couldn't restart automatically — quit and reopen Hylki \
+                    self.notice_error(i18n(
+                        "Couldn't restart automatically — quit and reopen Hylki \
                                to finish switching the icon.",
-                        ),
-                        error: true,
-                        connectivity: false,
-                    });
+                    ));
                 }
             },
 

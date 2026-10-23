@@ -90,12 +90,7 @@ impl AppModel {
         );
         let mut marked = Vec::new();
         for (path, uid, forwarded) in copies {
-            let Some(fid) = self
-                .folders
-                .get(&account_id)
-                .and_then(|fs| fs.iter().find(|f| f.path == path))
-                .map(|f| f.id)
-            else {
+            let Some(fid) = self.folder_by_path(account_id, &path).map(|f| f.id) else {
                 continue;
             };
             let (answered, was_forwarded) = self

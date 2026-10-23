@@ -104,11 +104,7 @@ impl AppModel {
         sender: &ComponentSender<Self>,
     ) {
         if books.is_empty() || email.trim().is_empty() {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n("No address book available to add contacts"),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n("No address book available to add contacts"));
             return;
         }
 
@@ -389,11 +385,10 @@ impl AppModel {
 
             AppMsg::RenameBook { uid, name } => {
                 if let Err(e) = crate::contact_sources::set_name(&uid, name.as_deref()) {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n_f("Could not rename the address book: {e}", &[("e", &e)]),
-                        error: true,
-                        connectivity: false,
-                    });
+                    self.notice_error(i18n_f(
+                        "Could not rename the address book: {e}",
+                        &[("e", &e)],
+                    ));
                 }
                 // Every name of the book is read again with the books.
                 reload_contacts(&sender, 0);
@@ -445,11 +440,10 @@ impl AppModel {
                 if let Some(e) = err {
                     // What was taken off the list may still be there.
                     self.contacts_page.emit(ContactsPageInput::WriteFailed);
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n_f("Could not update contact: {e}", &[("e", &(e).to_string())]),
-                        error: true,
-                        connectivity: false,
-                    });
+                    self.notice_error(i18n_f(
+                        "Could not update contact: {e}",
+                        &[("e", &(e).to_string())],
+                    ));
                 }
                 // Success or not, re-read so the card shows what EDS holds.
                 // A short pause lets EDS flush the write to its SQLite cache
@@ -484,14 +478,10 @@ impl AppModel {
                 }
                 if let Ok(o) = &result {
                     if !o.failed_files.is_empty() {
-                        self.notifications.emit(NotifyInput::Push {
-                            text: i18n_f(
-                                "Could not read: {files}",
-                                &[("files", &o.failed_files.join("; "))],
-                            ),
-                            error: true,
-                            connectivity: false,
-                        });
+                        self.notice_error(i18n_f(
+                            "Could not read: {files}",
+                            &[("files", &o.failed_files.join("; "))],
+                        ));
                     }
                 }
                 reload_contacts(&sender, 0);

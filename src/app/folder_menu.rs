@@ -88,14 +88,10 @@ impl AppModel {
             .get(&account_id)
             .is_some_and(|fs| fs.iter().any(|f| f.path == new_path))
         {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n_f(
-                    "A folder named {new_name} is already there.",
-                    &[("new_name", &format!("{new_name:?}"))],
-                ),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n_f(
+                "A folder named {new_name} is already there.",
+                &[("new_name", &format!("{new_name:?}"))],
+            ));
             return;
         }
         self.apply_folder_rename(account_id, path, new_path, Some(i18n("Rename Folder")));
@@ -245,12 +241,7 @@ impl AppModel {
                     account_id,
                     folder_id,
                 } => {
-                    if let Some(path) = self
-                        .folders
-                        .get(&account_id)
-                        .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-                        .map(|f| f.path.clone())
-                    {
+                    if let Some(path) = self.folder_path(account_id, folder_id) {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
                 }

@@ -185,8 +185,7 @@ impl AppModel {
             .accounts
             .iter()
             .filter(|a| {
-                self.config
-                    .get(a.id.saturating_sub(1) as usize)
+                self.saved_account_config(a.id)
                     .is_some_and(|c| c.protocol == config::Protocol::Graph)
             })
             .map(|a| a.id)

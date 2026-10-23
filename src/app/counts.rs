@@ -76,11 +76,7 @@ impl AppModel {
             .filter_map(|key| {
                 let (email, path) = key.split_once('\t')?;
                 let account = self.accounts.iter().find(|a| a.email == email)?;
-                let f = self
-                    .folders
-                    .get(&account.id)?
-                    .iter()
-                    .find(|f| f.path == path)?;
+                let f = self.folder_by_path(account.id, path)?;
                 let mut folder = f.clone();
                 folder.unread = self.folder_unread_of(f);
                 Some(UnifiedFolderRef {
@@ -203,9 +199,7 @@ impl AppModel {
     /// Whether an account's mail is merged into the unified section (#267).
     /// An account with no config (never the case outside a test) is in.
     pub(super) fn in_unified(&self, account_id: u32) -> bool {
-        self.effective_config()
-            .get(account_id.saturating_sub(1) as usize)
-            .is_none_or(|c| c.in_unified)
+        self.account_config(account_id).is_none_or(|c| c.in_unified)
     }
 
     /// Counts set aside while marks or moves were on their way (#333, #336):
@@ -284,9 +278,7 @@ impl AppModel {
             .collect();
         if let Some(path) = self.sent_copy_path(account_id) {
             let copy = self
-                .folders
-                .get(&account_id)
-                .and_then(|fs| fs.iter().find(|f| f.path == path))
+                .folder_by_path(account_id, &path)
                 .map(|f| (f.id, f.path.clone()));
             if let Some(copy) = copy {
                 if !targets.iter().any(|(id, _)| *id == copy.0) {

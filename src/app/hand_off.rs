@@ -141,11 +141,7 @@ impl AppModel {
                     ("names", &names.join(", ")),
                 ],
             );
-            self.notifications.emit(NotifyInput::Push {
-                text,
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(text);
         }
         gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(900), move || {
             // Any window of ours in front will do: the composer, the main

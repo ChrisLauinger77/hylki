@@ -71,9 +71,7 @@ impl AppModel {
         let trash = folders
             .and_then(|fs| fs.iter().find(|f| f.kind == FolderKind::Trash))
             .map(|f| f.path.clone());
-        let src = folders
-            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-            .map(|f| f.path.clone());
+        let src = self.folder_path(account_id, folder_id);
         let mut kept = Vec::with_capacity(messages.len());
         for m in messages {
             if self.is_blacklisted(&m.from_addr) {
@@ -158,9 +156,7 @@ impl AppModel {
         // told apart from one whose matches needed nothing done (#201).
         let mut per_rule = vec![0usize; rules.len()];
         let folders = self.folders.get(&account_id);
-        let src = folders
-            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-            .map(|f| f.path.clone());
+        let src = self.folder_path(account_id, folder_id);
         let known = |path: &str| folders.is_some_and(|fs| fs.iter().any(|f| f.path == path));
         let pending = self
             .filter_moved
@@ -177,12 +173,9 @@ impl AppModel {
         // the exception: everything in it is your own mail, so running rules
         // over it (#198) plainly means to act on exactly that. Replies filed
         // beside what they answer (#468) can be in any folder.
-        let files_replies = self
-            .effective_config()
-            .get(account_id.saturating_sub(1) as usize)
-            .is_some_and(|c| {
-                c.reply_copies != crate::config::ReplyCopies::WithSent && !c.server_saves_sent
-            });
+        let files_replies = self.account_config(account_id).is_some_and(|c| {
+            c.reply_copies != crate::config::ReplyCopies::WithSent && !c.server_saves_sent
+        });
         let diverted = (files_replies
             || self.sent_copy_path(account_id).as_deref() == src.as_deref())
             && self

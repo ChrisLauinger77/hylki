@@ -112,11 +112,7 @@ impl AppModel {
         let targets = self.filter_run_targets(targets);
         if targets.is_empty() {
             self.set_filters_applying(false);
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n("No filters to apply here yet"),
-                error: false,
-                connectivity: false,
-            });
+            self.notice(i18n("No filters to apply here yet"));
             return;
         }
         tracing::info!(
@@ -140,11 +136,7 @@ impl AppModel {
         }
         self.update_filter_run_dialog();
         for (account_id, folder_id) in targets {
-            let path = self
-                .folders
-                .get(&account_id)
-                .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-                .map(|f| f.path.clone());
+            let path = self.folder_path(account_id, folder_id);
             match path {
                 Some(path) => {
                     self.send_to(account_id, MailRequest::LoadMessages { folder_id, path })
@@ -409,11 +401,7 @@ impl AppModel {
             }
             None => {
                 tracing::info!("filter: manual run reported in the status bar");
-                self.notifications.emit(NotifyInput::Push {
-                    text,
-                    error: false,
-                    connectivity: false,
-                });
+                self.notice(text);
             }
         }
         if end {

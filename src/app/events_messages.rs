@@ -138,9 +138,7 @@ impl AppModel {
                             // Read/Archive would look for it.
                             (_, Some((m, dest_path))) => {
                                 let dest_id = self
-                                    .folders
-                                    .get(&account_id)
-                                    .and_then(|fs| fs.iter().find(|f| &f.path == dest_path))
+                                    .folder_by_path(account_id, dest_path)
                                     .map_or(folder_id, |f| f.id);
                                 self.announce_new_mail(
                                     account_id,
@@ -401,11 +399,7 @@ impl AppModel {
                 // A conversation member the cache still listed turned out to
                 // be gone from the server (#257): take it out of the open
                 // conversation rather than show it as a blank card.
-                let folder = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.path == path))
-                    .map(|f| f.id);
+                let folder = self.folder_by_path(account_id, &path).map(|f| f.id);
                 if let Some(fid) = folder {
                     if let Some(msgs) = self.message_cache.get_mut(&(account_id, fid)) {
                         msgs.retain(|m| m.uid != uid);
@@ -454,12 +448,7 @@ impl AppModel {
                     .as_ref()
                     .is_some_and(|sel| sel.account_id == account_id && sel.folder_id == folder_id);
                 if showing || self.unified {
-                    if let Some(path) = self
-                        .folders
-                        .get(&account_id)
-                        .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-                        .map(|f| f.path.clone())
-                    {
+                    if let Some(path) = self.folder_path(account_id, folder_id) {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
                 }

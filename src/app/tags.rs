@@ -414,10 +414,7 @@ impl AppModel {
                     .emit(MessageListInput::SetTags(self.tags.clone()));
                 self.message_view
                     .emit(MessageViewInput::SetTags(self.tags.clone()));
-                for p in self.popouts.values() {
-                    p.controller
-                        .emit(MessageWindowInput::SetTags(self.tags.clone()));
-                }
+                self.popouts_emit(|| MessageWindowInput::SetTags(self.tags.clone()));
                 // The sidebar lists the tags; a removed one that was the open
                 // view falls back to All Inboxes there (SetContents).
                 self.rebuild_sidebar();

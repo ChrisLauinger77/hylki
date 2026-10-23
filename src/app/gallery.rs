@@ -186,12 +186,7 @@ impl AppModel {
                 self.leave_gallery();
                 self.showing_contacts = false;
                 self.showing_outbox = false;
-                if let Some(folder) = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.path == folder_path))
-                    .cloned()
-                {
+                if let Some(folder) = self.folder_by_path(account_id, &folder_path).cloned() {
                     self.select_folder(
                         account_id,
                         folder.id,

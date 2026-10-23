@@ -26,6 +26,24 @@ pub(super) fn notified_message(
 }
 
 impl AppModel {
+    /// Shows a passing message in the status bar.
+    pub(super) fn notice(&self, text: String) {
+        self.notifications.emit(NotifyInput::Push {
+            text,
+            error: false,
+            connectivity: false,
+        });
+    }
+
+    /// Shows an error in the status bar, kept as a card in its panel.
+    pub(super) fn notice_error(&self, text: String) {
+        self.notifications.emit(NotifyInput::Push {
+            text,
+            error: true,
+            connectivity: false,
+        });
+    }
+
     /// Tell the person about new Inbox mail: the notification, with its
     /// sound, while the window is in the background or closed; the sound
     /// alone while it is in front, when Settings asks for that (#337).
@@ -67,11 +85,7 @@ impl AppModel {
     pub(super) fn on_notifications(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
         match msg {
             AppMsg::Notice(text) => {
-                self.notifications.emit(NotifyInput::Push {
-                    text,
-                    error: false,
-                    connectivity: false,
-                });
+                self.notice(text);
             }
 
             AppMsg::OpenMessageFromNotification {
@@ -88,9 +102,7 @@ impl AppModel {
                     self.unified_inboxes_shown()
                 );
                 if let Some((name, path, kind)) = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+                    .folder_by_id(account_id, folder_id)
                     .map(|f| (f.name.clone(), f.path.clone(), f.kind))
                 {
                     // Ask for the body before anything else goes to the
@@ -272,11 +284,7 @@ impl AppModel {
             }
 
             AppMsg::DirectoryError(text) => {
-                self.notifications.emit(NotifyInput::Push {
-                    text,
-                    error: true,
-                    connectivity: false,
-                });
+                self.notice_error(text);
             }
 
             AppMsg::NotifyCount(n) => self.notify_count = n,

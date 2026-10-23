@@ -165,11 +165,7 @@ impl AppModel {
     ) -> Vec<Message> {
         let mut out: Vec<Message> = Vec::new();
         for (account_id, path, mut m) in rows {
-            let Some(f) = self
-                .folders
-                .get(&account_id)
-                .and_then(|fs| fs.iter().find(|f| f.path == path))
-            else {
+            let Some(f) = self.folder_by_path(account_id, &path) else {
                 continue;
             };
             m.folder_id = f.id;

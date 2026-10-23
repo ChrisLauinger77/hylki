@@ -250,11 +250,7 @@ impl AppModel {
                         alert.present();
                     }
                     Err(e) => {
-                        self.notifications.emit(NotifyInput::Push {
-                            text: i18n_f("Import failed: {e}", &[("e", &(e).to_string())]),
-                            error: true,
-                            connectivity: false,
-                        });
+                        self.notice_error(i18n_f("Import failed: {e}", &[("e", &(e).to_string())]));
                     }
                 }
             }

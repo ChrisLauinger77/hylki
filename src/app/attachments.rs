@@ -120,12 +120,7 @@ impl AppModel {
         path: &str,
         message_id: u32,
     ) -> Option<BodyKey> {
-        let fid = self
-            .folders
-            .get(&account_id)?
-            .iter()
-            .find(|f| f.path == path)?
-            .id;
+        let fid = self.folder_by_path(account_id, path)?.id;
         let uid = self
             .related_ids
             .iter()
@@ -506,11 +501,7 @@ impl AppModel {
                 let members = self.conversation_members();
                 self.thread_cache
                     .retain(|_, members| !members.iter().any(|m| (m.account_id, m.id) == key));
-                let folder = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.path == path))
-                    .map(|f| f.id);
+                let folder = self.folder_by_path(account_id, &path).map(|f| f.id);
                 if let Some(fid) = folder {
                     self.body_cache.remove(&(account_id, fid, uid));
                 }

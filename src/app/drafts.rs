@@ -208,11 +208,7 @@ impl AppModel {
             AppMsg::SaveDraftMessage(out) => {
                 let account_id = out.from_account_id;
                 let Some((folder_id, path)) = self.drafts_target(account_id) else {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("No Drafts folder available for this account"),
-                        error: true,
-                        connectivity: false,
-                    });
+                    self.notice_error(i18n("No Drafts folder available for this account"));
                     return;
                 };
                 self.send_to(
@@ -239,11 +235,7 @@ impl AppModel {
                     .map(|o| (o.folder_id, o.path.clone()))
                     .or_else(|| self.templates_target(account_id));
                 let Some((folder_id, path)) = target else {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("No Templates folder available for this account"),
-                        error: true,
-                        connectivity: false,
-                    });
+                    self.notice_error(i18n("No Templates folder available for this account"));
                     return;
                 };
                 self.send_to(

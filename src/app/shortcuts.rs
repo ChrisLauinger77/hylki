@@ -13,11 +13,7 @@ impl AppModel {
         // Checking rows with none checked: say why the key did nothing
         // (#392).
         if self.checked == Some(0) && action.acts_on_selection() {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n("Select a conversation first."),
-                error: false,
-                connectivity: false,
-            });
+            self.notice(i18n("Select a conversation first."));
             return;
         }
         match action {
@@ -442,11 +438,7 @@ impl AppModel {
                 let preview = matches!(msg, AppMsg::PrintPreview);
                 tracing::info!(preview, open = self.current.is_some(), "print requested");
                 if self.current.is_none() {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("Open a message first, then print it."),
-                        error: false,
-                        connectivity: false,
-                    });
+                    self.notice(i18n("Open a message first, then print it."));
                     return;
                 }
                 self.message_view.emit(if preview {

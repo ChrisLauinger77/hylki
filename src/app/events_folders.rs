@@ -231,11 +231,7 @@ impl AppModel {
                 uid,
                 forwarded,
             } => {
-                let fid = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.path == path))
-                    .map(|f| f.id);
+                let fid = self.folder_by_path(account_id, &path).map(|f| f.id);
                 if let Some(fid) = fid {
                     self.show_answered(account_id, fid, uid, forwarded, true);
                 }
@@ -282,11 +278,7 @@ impl AppModel {
                 // Resolve against the current list; a path the app no longer
                 // knows (folder deleted/renamed under a live watcher) is
                 // dropped rather than guessed at.
-                let id = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.path == path))
-                    .map(|f| f.id);
+                let id = self.folder_by_path(account_id, &path).map(|f| f.id);
                 if self.pending_seen_in(account_id, &path)
                     || self.pending_moves_in(account_id, &path)
                 {

@@ -305,14 +305,10 @@ impl AppModel {
             Ok(raw) => raw,
             Err(e) => {
                 tracing::warn!("open {}: {e}", path.display());
-                self.notifications.emit(NotifyInput::Push {
-                    text: i18n_f(
-                        "Could not open {file}: {e}",
-                        &[("file", &path.display().to_string()), ("e", &e.to_string())],
-                    ),
-                    error: true,
-                    connectivity: false,
-                });
+                self.notice_error(i18n_f(
+                    "Could not open {file}: {e}",
+                    &[("file", &path.display().to_string()), ("e", &e.to_string())],
+                ));
                 return;
             }
         };
@@ -376,11 +372,10 @@ impl AppModel {
                     return;
                 }
                 if self.workers.is_empty() {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n_f("No message with the ID {id} was found", &[("id", &id)]),
-                        error: true,
-                        connectivity: false,
-                    });
+                    self.notice_error(i18n_f(
+                        "No message with the ID {id} was found",
+                        &[("id", &id)],
+                    ));
                     return;
                 }
                 self.mid_searches.insert(id.clone(), self.workers.len());
@@ -415,14 +410,10 @@ impl AppModel {
                 if *remaining == 0 {
                     tracing::info!("mid: {message_id} not found on any account");
                     self.mid_searches.remove(&message_id);
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n_f(
-                            "No message with the ID {id} was found",
-                            &[("id", &message_id)],
-                        ),
-                        error: true,
-                        connectivity: false,
-                    });
+                    self.notice_error(i18n_f(
+                        "No message with the ID {id} was found",
+                        &[("id", &message_id)],
+                    ));
                 }
             }
             _ => unreachable!("not routed to on_uri_queue"),

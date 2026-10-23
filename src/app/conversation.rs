@@ -272,12 +272,7 @@ impl AppModel {
             .iter()
             .filter(|m| Some(m.folder_id) != shown_folder)
             .filter_map(|m| {
-                let name = self
-                    .folders
-                    .get(&m.account_id)?
-                    .iter()
-                    .find(|f| f.id == m.folder_id)
-                    .map(|f| f.name.clone())?;
+                let name = self.folder_by_id(m.account_id, m.folder_id)?.name.clone();
                 Some(((m.account_id, m.id), name))
             })
             .collect()

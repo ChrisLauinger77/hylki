@@ -63,9 +63,7 @@ impl AppModel {
     }
 
     pub(super) fn pending_seen_in_folder(&self, account_id: u32, folder_id: u32) -> bool {
-        self.folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+        self.folder_by_id(account_id, folder_id)
             .is_some_and(|f| self.pending_seen_in(account_id, &f.path))
     }
 
@@ -77,12 +75,7 @@ impl AppModel {
         folder_id: u32,
         mut messages: Vec<Message>,
     ) -> Vec<Message> {
-        let Some(path) = self
-            .folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-            .map(|f| f.path.clone())
-        else {
+        let Some(path) = self.folder_path(account_id, folder_id) else {
             return messages;
         };
         if !self.pending_seen_in(account_id, &path) {
@@ -115,12 +108,7 @@ impl AppModel {
         {
             return messages;
         }
-        let Some(path) = self
-            .folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-            .map(|f| f.path.clone())
-        else {
+        let Some(path) = self.folder_path(account_id, folder_id) else {
             return messages;
         };
         for ((a, p, uid, _), (on, _, kw)) in &self.pending_tags {

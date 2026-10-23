@@ -94,9 +94,7 @@ impl AppModel {
 
     /// The folder order an account chose for itself, if any.
     pub(super) fn own_folder_sort(&self, account_id: u32) -> Option<config::FolderSort> {
-        self.effective_config()
-            .get(account_id.saturating_sub(1) as usize)
-            .and_then(|c| c.folder_sort)
+        self.account_config(account_id).and_then(|c| c.folder_sort)
     }
 
     /// How an account's custom folders are sorted: its own choice, or
@@ -151,11 +149,7 @@ impl AppModel {
             config::save(&self.config).map_err(|e| e.to_string())
         };
         if let Err(e) = saved {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n_f("Could not save account: {e}", &[("e", &e)]),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n_f("Could not save account: {e}", &[("e", &e)]));
         }
         if let Some(acc) = &self.accounts_win {
             acc.emit(crate::ui::accounts::AccountsInput::SetFolderSort { email, sort });

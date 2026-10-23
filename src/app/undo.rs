@@ -204,10 +204,7 @@ impl AppModel {
     /// the named actions where the destination has a role, "Move to X"
     /// otherwise.
     pub(super) fn move_label(&self, account_id: u32, dest: &str) -> String {
-        let folder = self
-            .folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| f.path == dest));
+        let folder = self.folder_by_path(account_id, dest);
         match folder.map(|f| f.kind) {
             Some(FolderKind::Trash) => i18n("Delete"),
             Some(FolderKind::Archive) => i18n("Archive"),
@@ -389,12 +386,7 @@ impl AppModel {
         // when it is returning them, and where it will take them from when it
         // is not.
         let here = if entry.rows_return { to } else { from };
-        let Some(folder_id) = self
-            .folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| &f.path == here))
-            .map(|f| f.id)
-        else {
+        let Some(folder_id) = self.folder_by_path(account_id, here).map(|f| f.id) else {
             return;
         };
         if !entry.rows_return {
@@ -488,12 +480,7 @@ impl AppModel {
                 to,
                 message_ids,
             } => {
-                let Some(dest_folder_id) = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| &f.path == to))
-                    .map(|f| f.id)
-                else {
+                let Some(dest_folder_id) = self.folder_by_path(account_id, to).map(|f| f.id) else {
                     tracing::info!("undo: {to:?} is no longer there, dropping the step");
                     return false;
                 };

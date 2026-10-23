@@ -25,8 +25,7 @@ impl AppModel {
 
     /// Resolved avatar/accent color for an account (custom, else auto accent).
     pub(super) fn account_color(&self, account_id: u32) -> String {
-        self.effective_config()
-            .get(account_id.saturating_sub(1) as usize)
+        self.account_config(account_id)
             .and_then(|c| c.color.clone())
             .or_else(|| {
                 self.accounts
@@ -64,11 +63,24 @@ impl AppModel {
         }
     }
 
+    /// An account's settings by id (an account's id is its place in the
+    /// config plus one), the demo's stand-ins included. Id 0 reads the
+    /// first account.
+    pub(super) fn account_config(&self, account_id: u32) -> Option<&AccountConfig> {
+        self.effective_config()
+            .get(account_id.saturating_sub(1) as usize)
+    }
+
+    /// An account's saved settings by id, never the demo's stand-ins. Id 0
+    /// reads the first account.
+    pub(super) fn saved_account_config(&self, account_id: u32) -> Option<&AccountConfig> {
+        self.config.get(account_id.saturating_sub(1) as usize)
+    }
+
     /// An account's avatar picture (#162), when one is set and its file is
     /// still there.
     pub(super) fn account_avatar(&self, account_id: u32) -> Option<std::path::PathBuf> {
-        self.effective_config()
-            .get(account_id.saturating_sub(1) as usize)
+        self.account_config(account_id)
             .and_then(|c| c.avatar.as_deref())
             .and_then(config::avatar_path)
     }
@@ -77,8 +89,7 @@ impl AppModel {
     pub(super) fn account_emoji(&self, account_id: u32) -> Option<String> {
         // In demo mode the sample accounts' emoji come from the stand-in
         // configs, which the Accounts panel can edit.
-        self.effective_config()
-            .get(account_id.saturating_sub(1) as usize)
+        self.account_config(account_id)
             .and_then(|c| c.emoji.clone())
     }
 
@@ -124,9 +135,7 @@ impl AppModel {
         self.message_list
             .emit(MessageListInput::ContactPhotosChanged);
         self.message_view.emit(MessageViewInput::FacesChanged);
-        for p in self.popouts.values() {
-            p.controller.emit(MessageWindowInput::FacesChanged);
-        }
+        self.popouts_emit(|| MessageWindowInput::FacesChanged);
     }
 
     /// Look up the Gravatars the accounts asked for (#189), one request per
@@ -173,8 +182,7 @@ impl AppModel {
                 None
             }
         };
-        self.config
-            .get(account_id.saturating_sub(1) as usize)
+        self.saved_account_config(account_id)
             .and_then(|c| pick(&c.name, &c.email))
             .or_else(|| {
                 self.accounts
@@ -206,10 +214,7 @@ impl AppModel {
     /// Every address this account sends as: its own, plus its send-as
     /// aliases (#34). Lower-cased comparison is the caller's job.
     pub(super) fn own_identities(&self, account_id: u32) -> Vec<String> {
-        let Some(cfg) = self
-            .effective_config()
-            .get(account_id.saturating_sub(1) as usize)
-        else {
+        let Some(cfg) = self.account_config(account_id) else {
             return self.email_of(account_id).into_iter().collect();
         };
         std::iter::once(cfg.email.clone())

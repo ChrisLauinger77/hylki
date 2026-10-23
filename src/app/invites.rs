@@ -54,11 +54,7 @@ impl AppModel {
     /// this is.
     fn open_invite_in_calendar(&self, invite: &crate::models::Invite) {
         if invite.ics.is_empty() {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n("This message carries no calendar file to open."),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n("This message carries no calendar file to open."));
             return;
         }
         // Named for the meeting so the calendar's import dialog says what it
@@ -92,11 +88,7 @@ impl AppModel {
         rsvp: crate::models::Rsvp,
     ) {
         let Some(organizer) = invite.organizer.as_ref().map(|o| o.email.clone()) else {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n("This invitation names no organiser to answer."),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n("This invitation names no organiser to answer."));
             return;
         };
         let (from_alias, name, address) = self.invite_identity(message, invite);
@@ -164,14 +156,10 @@ impl AppModel {
             },
         );
         self.record_invite_answer(invite, rsvp);
-        self.notifications.emit(NotifyInput::Push {
-            text: match rsvp {
-                crate::models::Rsvp::Accepted => i18n("Your answer has been sent: accepted."),
-                crate::models::Rsvp::Tentative => i18n("Your answer has been sent: maybe."),
-                crate::models::Rsvp::Declined => i18n("Your answer has been sent: declined."),
-            },
-            error: false,
-            connectivity: false,
+        self.notice(match rsvp {
+            crate::models::Rsvp::Accepted => i18n("Your answer has been sent: accepted."),
+            crate::models::Rsvp::Tentative => i18n("Your answer has been sent: maybe."),
+            crate::models::Rsvp::Declined => i18n("Your answer has been sent: declined."),
         });
     }
 
@@ -186,8 +174,7 @@ impl AppModel {
         message: &Message,
         invite: &crate::models::Invite,
     ) -> (Option<String>, String, String) {
-        let cfg = self.effective_config();
-        let Some(cfg) = cfg.get(message.account_id.saturating_sub(1) as usize) else {
+        let Some(cfg) = self.account_config(message.account_id) else {
             return (None, String::new(), String::new());
         };
         let invited: Vec<String> = invite
@@ -241,10 +228,7 @@ impl AppModel {
         let map = self.invite_answers_map();
         self.message_view
             .emit(MessageViewInput::SetInviteAnswers(map.clone()));
-        for p in self.popouts.values() {
-            p.controller
-                .emit(MessageWindowInput::SetInviteAnswers(map.clone()));
-        }
+        self.popouts_emit(|| MessageWindowInput::SetInviteAnswers(map.clone()));
     }
 
     /// The messages the router sends here (see `AppModel::route`).

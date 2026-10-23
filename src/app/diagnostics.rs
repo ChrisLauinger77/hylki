@@ -218,11 +218,9 @@ impl AppModel {
                 if self.console_mode {
                     self.notifications.emit(NotifyInput::ShowConsole);
                 } else {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("Enable Console mode in Settings → System & Appearance"),
-                        error: false,
-                        connectivity: false,
-                    });
+                    self.notice(i18n(
+                        "Enable Console mode in Settings → System & Appearance",
+                    ));
                 }
             }
 

@@ -162,14 +162,10 @@ impl AppModel {
             return;
         }
         let Some(dest) = self.folder_path_for(m.account_id, kind) else {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n_f(
-                    "No {v1} folder available",
-                    &[("v1", &(kind_label(kind)).to_string())],
-                ),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n_f(
+                "No {v1} folder available",
+                &[("v1", &(kind_label(kind)).to_string())],
+            ));
             return;
         };
         self.move_to_path(m, dest);
@@ -203,11 +199,7 @@ impl AppModel {
             return;
         };
         let Some(dest) = self.folder_path_for(m.account_id, FolderKind::Junk) else {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n("No Junk folder available for this account"),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n("No Junk folder available for this account"));
             return;
         };
         self.push_undo_move(m.account_id, &dest, &src, vec![m.clone()]);
@@ -229,11 +221,7 @@ impl AppModel {
             return;
         };
         let Some(dest) = self.folder_path_for(m.account_id, FolderKind::Inbox) else {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n("No Inbox folder available for this account"),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n("No Inbox folder available for this account"));
             return;
         };
         self.push_undo_move_as(m.account_id, i18n("Not Spam"), &dest, &src, vec![m.clone()]);
@@ -251,12 +239,7 @@ impl AppModel {
     /// Mark every message in a folder as read: update server, caches, badges,
     /// and the displayed list.
     pub(super) fn mark_folder_read(&mut self, account_id: u32, folder_id: u32) {
-        let Some(path) = self
-            .folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-            .map(|f| f.path.clone())
-        else {
+        let Some(path) = self.folder_path(account_id, folder_id) else {
             return;
         };
         // Optimistic in-memory update so the UI reacts instantly.
@@ -342,14 +325,10 @@ impl AppModel {
             removed_ids.push(m.id);
         }
         if missing_dest {
-            self.notifications.emit(NotifyInput::Push {
-                text: i18n_f(
-                    "No {v1} folder available for some messages",
-                    &[("v1", &(kind_label(kind)).to_string())],
-                ),
-                error: true,
-                connectivity: false,
-            });
+            self.notice_error(i18n_f(
+                "No {v1} folder available for some messages",
+                &[("v1", &(kind_label(kind)).to_string())],
+            ));
         }
         self.bulk_pending += groups.len();
         if !groups.is_empty() {
@@ -390,18 +369,16 @@ impl AppModel {
     /// Whether the account is Gmail, where every folder but the Inbox, Trash
     /// and Spam is a label.
     pub(super) fn gmail_labels(&self, account_id: u32) -> bool {
-        self.config
-            .get(account_id.saturating_sub(1) as usize)
-            .is_some_and(|c| {
-                c.protocol == config::Protocol::Imap
-                    && crate::worker::has_gmail_labels(
-                        c,
-                        self.folders
-                            .get(&account_id)
-                            .map(Vec::as_slice)
-                            .unwrap_or(&[]),
-                    )
-            })
+        self.saved_account_config(account_id).is_some_and(|c| {
+            c.protocol == config::Protocol::Imap
+                && crate::worker::has_gmail_labels(
+                    c,
+                    self.folders
+                        .get(&account_id)
+                        .map(Vec::as_slice)
+                        .unwrap_or(&[]),
+                )
+        })
     }
 
     /// Whether archiving `m` takes it out of the Inbox rather than out of

@@ -10,9 +10,7 @@ impl AppModel {
         }
         self.zoom = zoom;
         self.message_view.emit(MessageViewInput::SetZoom(zoom));
-        for p in self.popouts.values() {
-            p.controller.emit(MessageWindowInput::SetZoom(zoom));
-        }
+        self.popouts_emit(|| MessageWindowInput::SetZoom(zoom));
     }
 
     /// What Reader View does on each open: Focus Mode's "on" while it holds,
@@ -60,10 +58,7 @@ impl AppModel {
         let style = self.reader_style();
         self.message_view
             .emit(MessageViewInput::SetReaderStyle(style.clone()));
-        for p in self.popouts.values() {
-            p.controller
-                .emit(MessageWindowInput::SetReaderStyle(style.clone()));
-        }
+        self.popouts_emit(|| MessageWindowInput::SetReaderStyle(style.clone()));
     }
 
     /// Tell the reader how card actions should show (⋯ toggle / auto on
@@ -84,10 +79,9 @@ impl AppModel {
                     self.reader_toolbar = layout;
                     config::save_reader_toolbar(&self.reader_toolbar);
                     self.relayout_reader_toolbar();
-                    for p in self.popouts.values() {
-                        p.controller
-                            .emit(MessageWindowInput::SetToolbar(self.reader_toolbar.clone()));
-                    }
+                    self.popouts_emit(|| {
+                        MessageWindowInput::SetToolbar(self.reader_toolbar.clone())
+                    });
                     // Not while the inline composer covers the header: that
                     // path hides the ⋯ by hand and restores it on close.
                     if !self
@@ -111,10 +105,7 @@ impl AppModel {
                 if pref!(self.show_spoof_banner = on) {
                     self.message_view
                         .emit(MessageViewInput::SetSpoofBannerShown(on));
-                    for p in self.popouts.values() {
-                        p.controller
-                            .emit(MessageWindowInput::SetSpoofBannerShown(on));
-                    }
+                    self.popouts_emit(|| MessageWindowInput::SetSpoofBannerShown(on));
                 }
             }
 
@@ -208,10 +199,7 @@ impl AppModel {
                 if pref!(self.card_attachments = on) {
                     self.message_view
                         .emit(MessageViewInput::SetCardAttachmentsShown(on));
-                    for p in self.popouts.values() {
-                        p.controller
-                            .emit(MessageWindowInput::SetCardAttachmentsShown(on));
-                    }
+                    self.popouts_emit(|| MessageWindowInput::SetCardAttachmentsShown(on));
                 }
             }
             PrefOutput::SetAttachmentDrawer(on) => {
@@ -219,10 +207,7 @@ impl AppModel {
                     self.sync_attachment_drawer();
                     self.message_view
                         .emit(MessageViewInput::SetAttachmentDrawer(on));
-                    for p in self.popouts.values() {
-                        p.controller
-                            .emit(MessageWindowInput::SetAttachmentDrawer(on));
-                    }
+                    self.popouts_emit(|| MessageWindowInput::SetAttachmentDrawer(on));
                 }
             }
             PrefOutput::SetReaderDefault(policy) => {
@@ -231,18 +216,13 @@ impl AppModel {
                     let policy = self.effective_reader_default();
                     self.message_view
                         .emit(MessageViewInput::SetReaderDefault(policy));
-                    for p in self.popouts.values() {
-                        p.controller
-                            .emit(MessageWindowInput::SetReaderDefault(policy));
-                    }
+                    self.popouts_emit(|| MessageWindowInput::SetReaderDefault(policy));
                 }
             }
             PrefOutput::SetPgpLabels(on) => {
                 if pref!(self.pgp_labels = on) {
                     self.message_view.emit(MessageViewInput::SetPgpLabels(on));
-                    for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetPgpLabels(on));
-                    }
+                    self.popouts_emit(|| MessageWindowInput::SetPgpLabels(on));
                 }
             }
             PrefOutput::SetSingleMessageCard(on) => {
@@ -279,9 +259,7 @@ impl AppModel {
                     // Message content only — the reader and any popped-out windows.
                     self.message_view
                         .emit(MessageViewInput::SetContentTheme(dark));
-                    for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetContentTheme(dark));
-                    }
+                    self.popouts_emit(|| MessageWindowInput::SetContentTheme(dark));
                 }
             }
             PrefOutput::SetOverrideFonts(on) => {
@@ -320,9 +298,7 @@ impl AppModel {
                 if pref!(self.zoom_default = zoom) {
                     self.message_view
                         .emit(MessageViewInput::SetZoomDefault(zoom));
-                    for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetZoomDefault(zoom));
-                    }
+                    self.popouts_emit(|| MessageWindowInput::SetZoomDefault(zoom));
                 }
                 // The setting is also what the user wants to see now.
                 self.set_zoom(zoom);
@@ -342,28 +318,20 @@ impl AppModel {
                 // can differ from the saved state — and a switch flipped in
                 // one of them must land there regardless.
                 self.message_view.emit(MessageViewInput::SetReaderMode(on));
-                for p in self.popouts.values() {
-                    p.controller.emit(MessageWindowInput::SetReaderMode(on));
-                }
+                self.popouts_emit(|| MessageWindowInput::SetReaderMode(on));
             }
             AppMsg::SetReaderSwitchShown(on) => {
                 if pref!(self.reader_switch = on) {
                     self.message_view
                         .emit(MessageViewInput::SetReaderSwitchShown(on));
-                    for p in self.popouts.values() {
-                        p.controller
-                            .emit(MessageWindowInput::SetReaderSwitchShown(on));
-                    }
+                    self.popouts_emit(|| MessageWindowInput::SetReaderSwitchShown(on));
                 }
             }
             AppMsg::SetThemeSwitchShown(on) => {
                 if pref!(self.theme_switch = on) {
                     self.message_view
                         .emit(MessageViewInput::SetThemeSwitchShown(on));
-                    for p in self.popouts.values() {
-                        p.controller
-                            .emit(MessageWindowInput::SetThemeSwitchShown(on));
-                    }
+                    self.popouts_emit(|| MessageWindowInput::SetThemeSwitchShown(on));
                 }
             }
 

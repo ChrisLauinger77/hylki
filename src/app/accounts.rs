@@ -443,11 +443,10 @@ impl AppModel {
                             self.reload_unified_views(open_unified, &sender);
                         }
                     }
-                    Err(e) => self.notifications.emit(NotifyInput::Push {
-                        text: i18n_f("Could not save account: {e}", &[("e", &(e).to_string())]),
-                        error: true,
-                        connectivity: false,
-                    }),
+                    Err(e) => self.notice_error(i18n_f(
+                        "Could not save account: {e}",
+                        &[("e", &(e).to_string())],
+                    )),
                 }
             }
 
@@ -460,14 +459,10 @@ impl AppModel {
                     if slot.enabled != enabled {
                         slot.enabled = enabled;
                         if let Err(e) = config::save(&self.config) {
-                            self.notifications.emit(NotifyInput::Push {
-                                text: i18n_f(
-                                    "Could not save account: {e}",
-                                    &[("e", &(e).to_string())],
-                                ),
-                                error: true,
-                                connectivity: false,
-                            });
+                            self.notice_error(i18n_f(
+                                "Could not save account: {e}",
+                                &[("e", &(e).to_string())],
+                            ));
                         }
                         // Respawn workers so the account starts/stops syncing.
                         self.reconnect_all(&sender);
@@ -525,11 +520,10 @@ impl AppModel {
                 }
                 match config::save(&self.config) {
                     Ok(()) => self.reconnect_all(&sender),
-                    Err(e) => self.notifications.emit(NotifyInput::Push {
-                        text: i18n_f("Could not import account: {e}", &[("e", &(e).to_string())]),
-                        error: true,
-                        connectivity: false,
-                    }),
+                    Err(e) => self.notice_error(i18n_f(
+                        "Could not import account: {e}",
+                        &[("e", &(e).to_string())],
+                    )),
                 }
             }
 
