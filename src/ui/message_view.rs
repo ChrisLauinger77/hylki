@@ -51,6 +51,12 @@ mod invite;
 mod links;
 mod look;
 mod menu;
+mod on_card_actions;
+mod on_cards;
+mod on_find;
+mod on_prefs;
+mod on_services;
+mod on_show;
 mod page_fade;
 mod print;
 mod remote;
@@ -308,33 +314,6 @@ pub struct MessageView {
     /// Full URL of the link under the pointer, shown in a corner overlay so a
     /// link's real destination is visible before it is clicked.
     link_preview: gtk::Label,
-}
-
-impl MessageView {
-    /// Reader View on or off, re-rendering what is on screen if it changed.
-    fn set_reader_mode(&mut self, on: bool) {
-        if self.reader_mode == on {
-            return;
-        }
-        self.reader_mode = on;
-        // A frame measures differently in each view; the heights remembered
-        // for the other one would only make the cards lurch on the way to
-        // their real size.
-        self.frame_heights.clear();
-        if self.current.is_some() && !self.loading {
-            self.render();
-        }
-    }
-
-    /// Run one of the in-message find engine's calls (#103), logging failures.
-    fn eval_find(&self, js: &str) {
-        self.webview
-            .evaluate_javascript(js, None, None, None::<&gtk::gio::Cancellable>, |r| {
-                if let Err(e) = r {
-                    tracing::warn!("find js failed: {e}");
-                }
-            });
-    }
 }
 
 #[relm4::component(pub)]
@@ -1028,286 +1007,59 @@ impl Component for MessageView {
                 folder_labels,
                 instant,
                 sent,
-            } => {
-                let shown = primary.map(|p| *p).or_else(|| thread.first().cloned());
-                // A new message: the previous message's verdict must not linger
-                // on screen while this one's is still being fetched.
-                let same_message = self
-                    .current
-                    .as_ref()
-                    .zip(shown.as_ref())
-                    .is_some_and(|(a, b)| a.id == b.id && a.account_id == b.account_id);
-                if !same_message {
-                    self.sender_check = None;
-                    self.member_checks.clear();
-                    self.unsub_state.clear();
-                }
-                // A card taken out of the conversation on screen, deleted or
-                // moved, can leave another message heading it. What remains
-                // is the same document, read on from where it was.
-                let card_left = !same_message
-                    && thread.len() < self.thread.len()
-                    && thread.iter().all(|m| {
-                        self.thread
-                            .iter()
-                            .any(|t| (t.account_id, t.id) == (m.account_id, m.id))
-                    });
-                // What was done to a card (translated, folded) holds while it
-                // stays in the conversation on screen: stepping to another of
-                // its messages must not undo it. The message stepped to opens.
-                let stays = |k: &(u32, u32)| thread.iter().any(|m| (m.account_id, m.id) == *k);
-                self.translations.retain(|k, _| stays(k));
-                self.folds.retain(|k, _| stays(k));
-                if !same_message && !card_left {
-                    if let Some(key) = shown.as_ref().map(|s| (s.account_id, s.id)) {
-                        if self.thread.iter().any(|m| (m.account_id, m.id) == key) {
-                            self.folds.insert(key, false);
-                        }
-                    }
-                }
-                self.link_preview.set_visible(false);
-                self.current = shown;
-                // A fresh open: anything the user marked unread earlier can be
-                // read by scrolling again — and the first render may auto-scroll
-                // to the unread mark again.
-                if !same_message && !card_left {
-                    self.no_autoread.clear();
-                    self.did_autoscroll = false;
-                    self.saved_anchor = None;
-                    self.scroll_owed = false;
-                    // A per-message Reader View default (Settings) resets
-                    // the view for each conversation opened; the switch can
-                    // still flip this one.
-                    if let Some(on) = self.reader_default.starts_on() {
-                        self.set_reader_mode(on);
-                    }
-                }
-                self.thread = thread;
-                self.folder_labels = folder_labels;
-                self.sent = sent;
-                self.account_name = account_name;
-                self.loading = loading;
-                self.instant = instant;
-                if let Some(color) = &account_color {
-                    let class = format!(
-                        "chip-{}",
-                        color
-                            .chars()
-                            .filter(|c| c.is_ascii_alphanumeric())
-                            .collect::<String>()
-                    );
-                    self.chip_rules.set(vec![(
-                        format!(".hylki-account-chip.{class}"),
-                        format!(
-                            "background-color: {}; color: {color};",
-                            crate::color::pale(color, 0.18)
-                        ),
-                    )]);
-                    if let Some(chip) = &self.account_chip {
-                        wear_class(chip, "chip-", &class);
-                    }
-                }
-                self.remote_allowed = allow_remote;
-                let has_remote = self.thread.iter().any(|m| has_remote_resources(&m.body));
-                self.blocked = has_remote && !allow_remote;
-                // Repaint the cover for what is arriving, even when the spinner
-                // is about to be shown instead of a document: the whole point is
-                // that the spinner already sits on the right color.
-                self.apply_webview_bg(self.effective_dark());
-                // While loading, the spinner page is shown; rendering the (empty)
-                // body would just flash blank, so wait for the real body.
-                if !self.loading {
-                    self.render();
-                    // Stepping to another message of the same conversation
-                    // repaints nothing, but that message must open (#326).
-                    self.patch_folds();
-                }
-            }
-            MessageViewInput::LoadRemoteOnce => {
-                // Tell the app as well, so the choice survives the next repaint
-                // and the reader menu stops offering to do what is already done.
-                if let Some(m) = &self.current {
-                    let _ = sender.output(MessageViewOutput::SetRemote {
-                        account_id: m.account_id,
-                        id: m.id,
-                        show: true,
-                    });
-                }
-                self.remote_allowed = true;
-                self.blocked = false;
-                self.render();
-            }
+            } => self.on_show(
+                thread,
+                allow_remote,
+                account_name,
+                account_color,
+                loading,
+                primary,
+                folder_labels,
+                instant,
+                sent,
+            ),
+            MessageViewInput::LoadRemoteOnce => self.on_load_remote_once(&sender),
             MessageViewInput::ToggleRemote { account_id, id } => {
-                let show = !self.remote_allowed;
-                self.remote_allowed = show;
-                self.blocked = !show && self.thread.iter().any(|m| has_remote_resources(&m.body));
-                let _ = sender.output(MessageViewOutput::SetRemote {
-                    account_id,
-                    id,
-                    show,
-                });
-                // The app records it and re-shows the message; that render is
-                // free (the fingerprint already matches), so paint now.
-                self.render();
+                self.on_toggle_remote(account_id, id, &sender)
             }
-            MessageViewInput::AllowSenderAlways => {
-                if let Some(m) = &self.current {
-                    let _ = sender.output(MessageViewOutput::AllowSender(m.from_addr.clone()));
-                }
-                self.remote_allowed = true;
-                self.blocked = false;
-                self.render();
-            }
-            MessageViewInput::Print => {
-                crate::ui::print_preview::print_html(
-                    &self.print_document_html(),
-                    &sanitize_filename(&self.job_name()),
-                    self.webview.root().and_downcast::<gtk::Window>(),
-                );
-            }
-
-            MessageViewInput::PrintPreview => {
-                // Shown inside Hylki rather than exported to a PDF and handed to
-                // whatever the desktop opens PDFs with: that route is a temporary
-                // file, a URI, the document portal and an external viewer, each
-                // able to fail without saying anything — and it did.
-                // A pop-out reader's window is not an application window,
-                // and asking for one there showed nothing (#359).
-                let Some(parent) = self.webview.root().and_downcast::<gtk::Window>() else {
-                    tracing::warn!("no window to attach the preview to");
-                    return;
-                };
-                crate::ui::print_preview::open(
-                    &parent,
-                    &self.print_document_html(),
-                    &sanitize_filename(&self.job_name()),
-                );
-            }
-
+            MessageViewInput::AllowSenderAlways => self.on_allow_sender_always(&sender),
+            MessageViewInput::Print => self.on_print(),
+            MessageViewInput::PrintPreview => self.on_print_preview(),
             MessageViewInput::FacesChanged => self.render(),
 
-            MessageViewInput::ThemeChanged => {
-                let dark = self.effective_dark();
-                self.apply_webview_bg(dark);
-                if self.current.is_some() && !self.loading {
-                    self.render();
-                }
-            }
+            MessageViewInput::ThemeChanged => self.on_theme_changed(),
             MessageViewInput::SetAlwaysShowRecipients(on) => {
                 self.always_show_recipients = on;
             }
-            MessageViewInput::SetFoldMessages(fold) => {
-                if self.fold_messages != fold {
-                    self.fold_messages = fold;
-                    self.folds.clear();
-                    self.render();
-                }
-            }
-            MessageViewInput::SetFoldLook { preview_lines } => {
-                let preview_lines = preview_lines.min(3);
-                if self.fold_preview_lines != preview_lines {
-                    self.fold_preview_lines = preview_lines;
-                    self.render();
-                }
-            }
+            MessageViewInput::SetFoldMessages(fold) => self.on_set_fold_messages(fold),
+            MessageViewInput::SetFoldLook { preview_lines } => self.on_set_fold_look(preview_lines),
             MessageViewInput::Folded {
                 account_id,
                 id,
                 folded,
-            } => {
-                self.folds.insert((account_id, id), folded);
-            }
-            MessageViewInput::Mapped => {
-                if std::mem::take(&mut self.painted_hidden)
-                    && self.current.is_some()
-                    && !self.loading
-                {
-                    self.shown_fingerprint = None;
-                    self.render();
-                }
-            }
+            } => self.on_folded(account_id, id, folded),
+            MessageViewInput::Mapped => self.on_mapped(),
             MessageViewInput::SetChecked {
                 count,
                 conversations,
             } => self.checked = (count, conversations),
-            MessageViewInput::FoldAll(folded) => {
-                for m in &self.thread {
-                    self.folds.insert((m.account_id, m.id), folded);
-                }
-                self.patch_folds();
-            }
+            MessageViewInput::FoldAll(folded) => self.on_fold_all(folded),
             MessageViewInput::SetSingleMessageCard(on) => {
                 self.single_message_card = on;
             }
-            MessageViewInput::SetPgpLabels(on) => {
-                self.pgp_labels = on;
-                let js = format!(
-                    "document.body&&document.body.toggleAttribute('data-hylki-pgpicons',{})",
-                    !on
-                );
-                self.webview.evaluate_javascript(
-                    &js,
-                    None,
-                    None,
-                    None::<&gtk::gio::Cancellable>,
-                    |_| {},
-                );
-            }
-            MessageViewInput::SetCardAttachments(map) => {
-                self.card_atts = map;
-                let keys: Vec<(u32, u32)> =
-                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
-                self.patch_card_atts(&keys);
-            }
-            MessageViewInput::SetCardAttachmentsShown(on) => {
-                if self.card_atts_shown != on {
-                    self.card_atts_shown = on;
-                    if self.current.is_some() && !self.loading {
-                        self.render();
-                    }
-                }
-            }
-            MessageViewInput::SetAttachmentDrawer(on) => {
-                if self.drawer_on != on {
-                    self.drawer_on = on;
-                    if self.current.is_some() && !self.loading {
-                        self.render();
-                    }
-                }
-            }
+            MessageViewInput::SetPgpLabels(on) => self.on_set_pgp_labels(on),
+            MessageViewInput::SetCardAttachments(map) => self.on_set_card_attachments(map),
+            MessageViewInput::SetCardAttachmentsShown(on) => self.on_set_card_attachments_shown(on),
+            MessageViewInput::SetAttachmentDrawer(on) => self.on_set_attachment_drawer(on),
             MessageViewInput::ScrollToAttachments { account_id, id } => {
-                // The row when it has chips, else the card itself; centred,
-                // with the row flashed so the eye lands on it.
-                let js = format!(
-                    "(function(){{\
-                     var d=document.querySelector('.hylki-atts[data-key=\"{account_id}:{id}\"]');\
-                     var s=document.querySelector('.hylki-msg[data-key=\"{account_id}:{id}\"]');\
-                     var t=(d&&d.children.length)?d:s;if(!t)return;\
-                     t.scrollIntoView({{behavior:'smooth',block:'center'}});\
-                     if(d){{d.classList.remove('flash');void d.offsetWidth;d.classList.add('flash');\
-                     setTimeout(function(){{d.classList.remove('flash');}},1300);}}}})()"
-                );
-                self.webview.evaluate_javascript(
-                    &js,
-                    None,
-                    None,
-                    None::<&gtk::gio::Cancellable>,
-                    |_| {},
-                );
+                self.on_scroll_to_attachments(account_id, id)
             }
             MessageViewInput::AttachmentAction {
                 account_id,
                 id,
                 index,
                 save,
-            } => {
-                let _ = sender.output(MessageViewOutput::AttachmentAction {
-                    account_id,
-                    id,
-                    index,
-                    save,
-                });
-            }
+            } => self.on_attachment_action(account_id, id, index, save, &sender),
             MessageViewInput::SetBannerShown(show) => {
                 self.show_banner = show;
             }
@@ -1317,90 +1069,25 @@ impl Component for MessageView {
             MessageViewInput::SetUnderSplit(under) => {
                 self.under_split = under;
             }
-            MessageViewInput::SetContentTheme(o) => {
-                if self.content_dark != o {
-                    self.content_dark = o;
-                    let dark = self.effective_dark();
-                    self.apply_webview_bg(dark);
-                    if self.current.is_some() && !self.loading {
-                        self.render();
-                    }
-                }
-            }
-            MessageViewInput::SetReaderStyle(style) => {
-                if self.reader_style != style {
-                    self.reader_style = style;
-                    if self.current.is_some() && !self.loading {
-                        self.render();
-                    }
-                }
-            }
+            MessageViewInput::SetContentTheme(o) => self.on_set_content_theme(o),
+            MessageViewInput::SetReaderStyle(style) => self.on_set_reader_style(style),
             MessageViewInput::SetReaderMode(on) => {
                 self.set_reader_mode(on);
             }
-            MessageViewInput::SetMessageFlipped(on) => {
-                if self.message_flipped() == on {
-                    return;
-                }
-                let Some(key) = self.current.as_ref().map(|m| (m.account_id, m.id)) else {
-                    return;
-                };
-                // Off forgets the choice: the message follows the theme again.
-                if on {
-                    self.theme_picks.insert(key, !self.theme_dark());
-                } else {
-                    self.theme_picks.remove(&key);
-                }
-                let dark = self.effective_dark();
-                self.apply_webview_bg(dark);
-                if !self.loading {
-                    self.render();
-                }
-            }
+            MessageViewInput::SetMessageFlipped(on) => self.on_set_message_flipped(on),
             MessageViewInput::SetZoomDefault(percent) => {
                 self.zoom_default = percent;
             }
-            MessageViewInput::SetZoom(percent) => {
-                if self.zoom != percent {
-                    self.zoom = percent;
-                    // The frames remeasure at the new size; the heights
-                    // remembered for the old one would only make them lurch.
-                    self.frame_heights.clear();
-                    if self.current.is_some() && !self.loading {
-                        let js = format!(
-                            "if(window.vfZoom)window.vfZoom({});",
-                            percent as f64 / 100.0
-                        );
-                        self.webview.evaluate_javascript(
-                            &js,
-                            None,
-                            None,
-                            None::<&gtk::gio::Cancellable>,
-                            |_| {},
-                        );
-                    }
-                }
-            }
+            MessageViewInput::SetZoom(percent) => self.on_set_zoom(percent),
             MessageViewInput::SetReaderSwitchShown(on) => {
                 self.reader_switch_shown = on;
             }
             MessageViewInput::SetThemeSwitchShown(on) => {
                 self.theme_switch_shown = on;
             }
-            MessageViewInput::SetReaderDefault(policy) => {
-                self.reader_default = policy;
-                if let Some(on) = policy.starts_on() {
-                    self.set_reader_mode(on);
-                }
-            }
+            MessageViewInput::SetReaderDefault(policy) => self.on_set_reader_default(policy),
             MessageViewInput::ToggleSenderStyle { account_id, id } => {
-                let key = (account_id, id);
-                if !self.sender_style.remove(&key) {
-                    self.sender_style.insert(key);
-                }
-                if self.current.is_some() && !self.loading {
-                    self.render();
-                }
+                self.on_toggle_sender_style(account_id, id)
             }
             MessageViewInput::SetSenderCheck(check) => {
                 self.sender_check = Some(*check);
@@ -1410,600 +1097,89 @@ impl Component for MessageView {
                 account_id,
                 id,
                 check,
-            } => {
-                self.member_checks.insert((account_id, id), *check);
-                if self.webview_ready {
-                    self.patch_verify_badge(account_id, id);
-                    self.patch_unsub(account_id, id);
-                    self.patch_invite(account_id, id);
-                }
-            }
-            MessageViewInput::SetUnsubscribed(lists) => {
-                self.unsubscribed = lists;
-                let keys: Vec<(u32, u32)> =
-                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
-                for (account_id, id) in keys {
-                    self.patch_unsub(account_id, id);
-                }
-            }
+            } => self.on_sender_check_for(account_id, id, check),
+            MessageViewInput::SetUnsubscribed(lists) => self.on_set_unsubscribed(lists),
             MessageViewInput::Translate { account_id, id } => {
-                let key = (account_id, id);
-                match self.translations.get(&key).cloned() {
-                    Some(TrState::Working) => {}
-                    Some(TrState::Shown(t)) => {
-                        self.translations.insert(key, TrState::Original(t));
-                        self.render();
-                    }
-                    Some(TrState::Original(t)) => {
-                        self.translations.insert(key, TrState::Shown(t));
-                        self.render();
-                    }
-                    None | Some(TrState::Failed(_)) => {
-                        let Some(m) = self
-                            .thread
-                            .iter()
-                            .find(|m| (m.account_id, m.id) == key)
-                            .cloned()
-                        else {
-                            return;
-                        };
-                        let settings = crate::translate::load();
-                        let refused = if self.encrypted(key) {
-                            Some(i18n("Encrypted messages are not sent for translation."))
-                        } else if !settings.enabled() {
-                            Some(i18n(
-                                "Choose a translation service in Settings → Translation first.",
-                            ))
-                        } else if m.body.trim().is_empty() {
-                            Some(i18n("The message has not loaded yet."))
-                        } else {
-                            None
-                        };
-                        if let Some(why) = refused {
-                            self.translations.insert(key, TrState::Failed(why));
-                            self.patch_translate(account_id, id);
-                            return;
-                        }
-                        let cache = crate::translate::cache_key(
-                            account_id,
-                            if m.message_id.is_empty() {
-                                &m.body
-                            } else {
-                                &m.message_id
-                            },
-                            &settings,
-                        );
-                        // Already translated this session: no second request.
-                        if let Some(t) = crate::translate::cached(&cache) {
-                            self.translations.insert(key, TrState::Shown(t));
-                            self.render();
-                            return;
-                        }
-                        self.translations.insert(key, TrState::Working);
-                        self.patch_translate(account_id, id);
-                        let input = sender.input_sender().clone();
-                        std::thread::spawn(move || {
-                            let api_key =
-                                crate::translate::load_key(settings.service).unwrap_or_default();
-                            let result = crate::translate::translate(
-                                &settings, &api_key, &m.body, &m.subject, &cache,
-                            );
-                            input.emit(MessageViewInput::Translated {
-                                account_id,
-                                id,
-                                result,
-                            });
-                        });
-                    }
-                }
+                self.on_translate(account_id, id, &sender)
             }
             MessageViewInput::Translated {
                 account_id,
                 id,
                 result,
-            } => {
-                let key = (account_id, id);
-                // The reader moved on to another message meanwhile.
-                if self.translations.get(&key) != Some(&TrState::Working) {
-                    return;
-                }
-                match result {
-                    Ok(t) => {
-                        self.translations.insert(key, TrState::Shown(t));
-                        self.render();
-                    }
-                    Err(why) => {
-                        tracing::warn!("translation failed: {why}");
-                        self.translations.insert(key, TrState::Failed(why));
-                        self.patch_translate(account_id, id);
-                    }
-                }
-            }
+            } => self.on_translated(account_id, id, result),
             MessageViewInput::Unsubscribe { account_id, id } => {
-                let info = self
-                    .member_checks
-                    .get(&(account_id, id))
-                    .and_then(|c| c.unsubscribe.clone());
-                let message = self
-                    .thread
-                    .iter()
-                    .find(|m| m.account_id == account_id && m.id == id)
-                    .cloned();
-                if let (Some(info), Some(message)) = (info, message) {
-                    let _ = sender.output(MessageViewOutput::Unsubscribe {
-                        message: Box::new(message),
-                        info: Box::new(info),
-                    });
-                }
+                self.on_unsubscribe(account_id, id, &sender)
             }
             MessageViewInput::UnsubscribeState {
                 account_id,
                 id,
                 state,
-            } => {
-                match state {
-                    Some(s) => {
-                        self.unsub_state.insert((account_id, id), s);
-                    }
-                    None => {
-                        self.unsub_state.remove(&(account_id, id));
-                    }
-                }
-                self.patch_unsub(account_id, id);
-            }
-            MessageViewInput::SetIdentities(identities) => {
-                if self.identities == identities {
-                    return;
-                }
-                self.identities = identities;
-                let keys: Vec<(u32, u32)> =
-                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
-                for (account_id, id) in keys {
-                    self.patch_invite(account_id, id);
-                }
-            }
-            MessageViewInput::SetInviteAnswers(answers) => {
-                self.invite_answers = answers;
-                let keys: Vec<(u32, u32)> =
-                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
-                for (account_id, id) in keys {
-                    self.patch_invite(account_id, id);
-                }
-            }
+            } => self.on_unsubscribe_state(account_id, id, state),
+            MessageViewInput::SetIdentities(identities) => self.on_set_identities(identities),
+            MessageViewInput::SetInviteAnswers(answers) => self.on_set_invite_answers(answers),
             MessageViewInput::InviteAction {
                 account_id,
                 id,
                 action,
-            } => {
-                let invite = self
-                    .member_checks
-                    .get(&(account_id, id))
-                    .and_then(|c| c.invite.clone());
-                let message = self
-                    .thread
-                    .iter()
-                    .find(|m| m.account_id == account_id && m.id == id)
-                    .cloned();
-                if let (Some(invite), Some(message)) = (invite, message) {
-                    let _ = sender.output(MessageViewOutput::InviteAction {
-                        message: Box::new(message),
-                        invite,
-                        action,
-                    });
-                }
-            }
-
+            } => self.on_invite_action(account_id, id, action, &sender),
             MessageViewInput::SenderInfoAt {
                 account_id,
                 id,
                 rect,
                 page_width,
-            } => {
-                self.show_sender_popover(account_id, id, rect, page_width, &sender);
-            }
+            } => self.on_sender_info_at(account_id, id, rect, page_width, &sender),
             MessageViewInput::PgpFetchKey { account_id, id } => {
-                let Some(pgp) = self
-                    .member_checks
-                    .get(&(account_id, id))
-                    .and_then(|c| c.pgp.clone())
-                else {
-                    return;
-                };
-                let input = sender.input_sender().clone();
-                sender.oneshot_command(async move {
-                    let result = tokio::task::spawn_blocking(move || fetch_sender_key(&pgp))
-                        .await
-                        .unwrap_or_else(|_| Err("task failed".into()));
-                    let _ = input.send(MessageViewInput::PgpDone {
-                        account_id,
-                        id,
-                        result,
-                    });
-                });
+                self.on_pgp_fetch_key(account_id, id, &sender)
             }
             MessageViewInput::PgpTrustKey { account_id, id } => {
-                let Some(pgp) = self
-                    .member_checks
-                    .get(&(account_id, id))
-                    .and_then(|c| c.pgp.clone())
-                else {
-                    return;
-                };
-                let crate::models::PgpSignature::Good { signer, key_id, .. } = &pgp.signature
-                else {
-                    return;
-                };
-                // gpg on a worker thread: a stale keyring lock makes it
-                // wait about ten seconds (#316).
-                let signer = signer.clone();
-                let key_id = key_id.clone();
-                let parent = self.webview.root().and_downcast::<gtk::Window>();
-                let s = sender.clone();
-                gtk::glib::spawn_future_local(async move {
-                    let key = gtk::gio::spawn_blocking(move || {
-                        crate::pgp::key_by_fingerprint(&crate::pgp::Gpg::system(), &key_id)
-                    })
-                    .await
-                    .ok()
-                    .flatten();
-                    let Some(key) = key else {
-                        let _ = s.output(MessageViewOutput::Notice(i18n(
-                            "That key is no longer in your keyring.",
-                        )));
-                        return;
-                    };
-                    confirm_trust(parent.as_ref(), &signer, &key, s, account_id, id);
-                });
+                self.on_pgp_trust_key(account_id, id, &sender)
             }
             MessageViewInput::PgpTrustConfirmed {
                 account_id,
                 id,
                 fingerprint,
-            } => {
-                let input = sender.input_sender().clone();
-                sender.oneshot_command(async move {
-                    let result = tokio::task::spawn_blocking(move || crate::pgp::trust_key(&crate::pgp::Gpg::system(), &fingerprint, None))
-                        .await
-                        .unwrap_or_else(|_| Err("task failed".into()))
-                        .map(|()| i18n("Key trusted."))
-                        .map_err(|e| {
-                            if e.contains("secret key") || e.contains("default") {
-                                i18n("Generate a key of your own first (Settings, OpenPGP): trusting a key means signing it with yours.")
-                            } else {
-                                e
-                            }
-                        });
-                    let _ = input.send(MessageViewInput::PgpDone { account_id, id, result });
-                });
-            }
+            } => self.on_pgp_trust_confirmed(account_id, id, fingerprint, &sender),
             MessageViewInput::PgpDone {
                 account_id,
                 id,
                 result,
-            } => match result {
-                Ok(text) => {
-                    let _ = sender.output(MessageViewOutput::Notice(text));
-                    if let Some(m) = self
-                        .thread
-                        .iter()
-                        .find(|m| m.account_id == account_id && m.id == id)
-                    {
-                        let _ = sender.output(MessageViewOutput::ReloadBody(Box::new(m.clone())));
-                    }
-                }
-                Err(e) => {
-                    let _ = sender.output(MessageViewOutput::Notice(e));
-                }
-            },
-
-            MessageViewInput::Rendered => {
-                self.webview_ready = true;
-                // Verdicts that arrived while the document was still loading.
-                for (aid, id) in self.member_checks.keys().copied().collect::<Vec<_>>() {
-                    self.patch_verify_badge(aid, id);
-                    self.patch_unsub(aid, id);
-                    self.patch_invite(aid, id);
-                }
-                // Likewise attachments (#213): the document was built from
-                // what was known when the render was queued.
-                let keys: Vec<(u32, u32)> =
-                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
-                self.patch_card_atts(&keys);
-            }
+            } => self.on_pgp_done(account_id, id, result, &sender),
+            MessageViewInput::Rendered => self.on_rendered(),
             MessageViewInput::SuppressAutoRead { account_id, id } => {
-                self.no_autoread.insert((account_id, id));
-                for m in self.thread.iter_mut() {
-                    if m.account_id == account_id && m.id == id {
-                        m.unread = true;
-                    }
-                }
-                // Put the card's dot back in place — reloading the document
-                // for one mark made every card visibly resettle (the same
-                // blip ClearDot avoids in the other direction).
-                let js = format!(
-                    "(function(){{\
-                     var s=document.querySelector('.hylki-msg[data-key=\"{account_id}:{id}\"]');\
-                     if(s)s.classList.add('unread');\
-                     var h=document.querySelector('.hylki-msg-hdr[data-key=\"{account_id}:{id}\"]');\
-                     if(!h||h.querySelector('.hylki-dot'))return;\
-                     var d=document.createElement('span');d.className='hylki-dot';\
-                     d.setAttribute('data-key','{account_id}:{id}');\
-                     var f=h.querySelector('.hylki-from');\
-                     if(f)f.parentNode.insertBefore(d,f);else h.appendChild(d);}})()"
-                );
-                self.webview.evaluate_javascript(
-                    &js,
-                    None,
-                    None,
-                    None::<&gtk::gio::Cancellable>,
-                    |r| {
-                        if let Err(e) = r {
-                            tracing::warn!("unread-dot patch failed: {e}");
-                        }
-                    },
-                );
+                self.on_suppress_auto_read(account_id, id)
             }
-            MessageViewInput::ClearCards => {
-                if !self.selected_cards.is_empty() {
-                    self.selected_cards.clear();
-                    self.apply_card_selection();
-                    let _ = sender.output(MessageViewOutput::SelectCards(Vec::new()));
-                }
-            }
+            MessageViewInput::ClearCards => self.on_clear_cards(&sender),
             MessageViewInput::CardClicked {
                 account_id,
                 id,
                 mode,
-            } => {
-                // Only meaningful in a conversation: a lone message is already
-                // the selection.
-                if self.thread.len() <= 1 {
-                    return;
-                }
-                let key = (account_id, id);
-                let order: Vec<(u32, u32)> =
-                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
-                let mut keys = match mode {
-                    SelectMode::Plain => vec![key],
-                    SelectMode::Toggle => {
-                        let mut k = self.selected_cards.clone();
-                        if let Some(pos) = k.iter().position(|x| *x == key) {
-                            k.remove(pos);
-                        } else {
-                            k.push(key);
-                        }
-                        k
-                    }
-                    SelectMode::Range => {
-                        // From the first thing already selected to this one, in
-                        // the order the conversation is shown.
-                        let anchor = self
-                            .selected_cards
-                            .first()
-                            .and_then(|a| order.iter().position(|x| x == a))
-                            .unwrap_or_else(|| order.iter().position(|x| *x == key).unwrap_or(0));
-                        let here = order.iter().position(|x| *x == key).unwrap_or(anchor);
-                        let (lo, hi) = (anchor.min(here), anchor.max(here));
-                        order[lo..=hi].to_vec()
-                    }
-                };
-                keys.retain(|k| order.contains(k));
-                self.selected_cards = keys.clone();
-                self.apply_card_selection();
-                let _ = sender.output(MessageViewOutput::SelectCards(keys));
-            }
-            MessageViewInput::CopySelection => {
-                // Copying from a body frame focuses the frame and then the
-                // page, and a page focusing itself takes GTK focus: Ctrl+C
-                // pressed in the message list left the keyboard in the
-                // reader (#274). The script has run by the time its result
-                // comes back, so hand focus back to where it was then.
-                let before = self.webview.root().and_then(|r| r.focus());
-                let webview = self.webview.clone();
-                self.webview.evaluate_javascript(
-                    "window.__hylkiCopySel && window.__hylkiCopySel()",
-                    None,
-                    None,
-                    gtk::gio::Cancellable::NONE,
-                    move |_| {
-                        let Some(before) = before else { return };
-                        let now = webview.root().and_then(|r| r.focus());
-                        let taken = now.is_some_and(|f| {
-                            f == *webview.upcast_ref::<gtk::Widget>() || f.is_ancestor(&webview)
-                        });
-                        if taken && before != *webview.upcast_ref::<gtk::Widget>() {
-                            before.grab_focus();
-                        }
-                    },
-                );
-            }
-            MessageViewInput::SelectAllCards => {
-                if self.thread.len() <= 1 {
-                    return;
-                }
-                let keys: Vec<(u32, u32)> =
-                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
-                if self.selected_cards != keys {
-                    self.selected_cards = keys.clone();
-                    self.apply_card_selection();
-                    let _ = sender.output(MessageViewOutput::SelectCards(keys));
-                }
-            }
-            MessageViewInput::StepCard(delta) => {
-                // A lone message has nothing to step through: the app moves
-                // along the list instead.
-                if self.thread.len() <= 1 {
-                    return;
-                }
-                let order: Vec<(u32, u32)> =
-                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
-                let from = match self.selected_cards.as_slice() {
-                    [key] => order.iter().position(|k| k == key),
-                    _ => None,
-                };
-                let last = order.len() as i64 - 1;
-                let next = match from {
-                    Some(i) => (i as i64 + i64::from(delta)).clamp(0, last) as usize,
-                    // No card picked yet: the first press lands where reading
-                    // starts, the first message unread or open, not one past
-                    // the conversation's first (#392).
-                    None => {
-                        let folded = self.folded_cards();
-                        self.thread
-                            .iter()
-                            .position(|m| m.unread || !folded.contains(&(m.account_id, m.id)))
-                            .unwrap_or(if delta > 0 { 0 } else { last as usize })
-                    }
-                };
-                let key = order[next];
-                if self.folded_cards().contains(&key) {
-                    self.folds.insert(key, false);
-                    self.patch_folds();
-                }
-                self.selected_cards = vec![key];
-                self.apply_card_selection();
-                let _ = sender.output(MessageViewOutput::SelectCards(vec![key]));
-                let js = format!(
-                    "(function(){{var s=document.querySelector('.hylki-msg[data-key=\"{}:{}\"]');\
-                     if(s)s.scrollIntoView({{behavior:'smooth',block:'start'}});}})()",
-                    key.0, key.1
-                );
-                self.webview.evaluate_javascript(
-                    &js,
-                    None,
-                    None,
-                    None::<&gtk::gio::Cancellable>,
-                    |_| {},
-                );
-            }
-            MessageViewInput::FocusBody => {
-                if self.current.is_some() {
-                    match &self.loading_page {
-                        Some(page) if self.body_page() == "loading" => {
-                            page.grab_focus();
-                            self.focus_held.set(true);
-                        }
-                        _ => {
-                            self.webview.grab_focus();
-                        }
-                    }
-                }
-            }
+            } => self.on_card_clicked(account_id, id, mode, &sender),
+            MessageViewInput::CopySelection => self.on_copy_selection(),
+            MessageViewInput::SelectAllCards => self.on_select_all_cards(&sender),
+            MessageViewInput::StepCard(delta) => self.on_step_card(delta, &sender),
+            MessageViewInput::FocusBody => self.on_focus_body(),
             MessageViewInput::ComposeTo(addr) => {
                 let _ = sender.output(MessageViewOutput::ComposeTo(addr));
             }
             MessageViewInput::AddContact(addr) => {
                 let _ = sender.output(MessageViewOutput::AddContactAddr(addr));
             }
-            MessageViewInput::SetSelectedCards(keys) => {
-                // The list mirrors every selection change here — including the
-                // plain single "this row is open" state that comes with merely
-                // opening a message or thread, which must not outline anything.
-                // A lone mirrored key is therefore dropped: the accent border
-                // appears only for a deliberate selection — a card header
-                // clicked in the reader (CardClicked, which never routes
-                // through here), or a multi-selection made in the list.
-                let keys = if keys.len() == 1 { Vec::new() } else { keys };
-                if self.selected_cards != keys {
-                    self.selected_cards = keys;
-                    self.apply_card_selection();
-                }
-            }
+            MessageViewInput::SetSelectedCards(keys) => self.on_set_selected_cards(keys),
             MessageViewInput::FrameSized {
                 account_id,
                 id,
                 height,
-            } => {
-                // A few hundred numbers at most, and only for messages actually
-                // opened; the store is trimmed rather than allowed to creep.
-                if self.frame_heights.len() > 512 {
-                    self.frame_heights.clear();
-                }
-                self.frame_heights.insert((account_id, id), height);
-            }
+            } => self.on_frame_sized(account_id, id, height),
             MessageViewInput::MarkSeen { account_id, id } => {
-                // A deliberate unread mark stands until the conversation is
-                // reopened — the viewport observer must not undo it.
-                if self.no_autoread.contains(&(account_id, id)) {
-                    return;
-                }
-                // A card read while open stays open: folding the read ones
-                // is for when the conversation is drawn, not under the
-                // reader's eyes the next time the folds are patched.
-                let key = (account_id, id);
-                if !self.folded_cards().contains(&key) {
-                    self.folds.entry(key).or_insert(false);
-                }
-                // Keep the local copy in step so a later re-render doesn't put
-                // the mark back on a message already read.
-                let mut found = false;
-                for m in self.thread.iter_mut() {
-                    if m.account_id == account_id && m.id == id && m.unread {
-                        m.unread = false;
-                        found = true;
-                    }
-                }
-                if found {
-                    let _ = sender.output(MessageViewOutput::MarkSeen { account_id, id });
-                }
+                self.on_mark_seen(account_id, id, &sender)
             }
             MessageViewInput::CardAction {
                 action,
                 account_id,
                 id,
-            } => {
-                if let Some(m) = self
-                    .thread
-                    .iter()
-                    .find(|m| m.account_id == account_id && m.id == id)
-                {
-                    let _ = sender.output(MessageViewOutput::CardAction {
-                        action,
-                        message: Box::new(m.clone()),
-                    });
-                }
-            }
+            } => self.on_card_action(action, account_id, id, &sender),
             MessageViewInput::CardMenuAt { key, x, y, hit } => {
-                // Unnamed (the page did not answer): the message on screen
-                // when there is one, else the conversation's first, so a
-                // right-click never ends without a menu.
-                let m = key
-                    .and_then(|(a, i)| self.thread.iter().find(|m| m.account_id == a && m.id == i))
-                    .or_else(|| self.thread.first());
-                let Some(m) = m.cloned() else { return };
-                let mut hit = hit;
-                let key = (m.account_id, m.id);
-                if crate::translate::load().enabled() && !self.encrypted(key) {
-                    let label = match self.translations.get(&key) {
-                        Some(TrState::Shown(_)) => i18n("Show Original"),
-                        Some(TrState::Original(_)) => i18n("Show Translation"),
-                        _ => i18n("Translate"),
-                    };
-                    hit.translate = Some(TranslateEntry {
-                        label,
-                        reader: sender.input_sender().clone(),
-                    });
-                }
-                if self.thread.len() > 1 {
-                    let folded = self.folded_cards();
-                    hit.folds = Some((
-                        !folded.is_empty(),
-                        folded.len() < self.thread.len(),
-                        sender.input_sender().clone(),
-                    ));
-                }
-                let point = self.webview.root().and_then(|root| {
-                    let root: gtk::Widget = root.upcast();
-                    self.webview
-                        .compute_point(&root, &gtk::graphene::Point::new(x as f32, y as f32))
-                });
-                let (wx, wy) = point.map_or((x, y), |p| (p.x() as f64, p.y() as f64));
-                let _ = sender.output(MessageViewOutput::CardMenu {
-                    message: Box::new(m),
-                    x: wx,
-                    y: wy,
-                    hit,
-                });
+                self.on_card_menu_at(key, x, y, hit, &sender)
             }
             MessageViewInput::CardMenuFrom {
                 account_id,
@@ -2011,365 +1187,65 @@ impl Component for MessageView {
                 x,
                 y,
                 page_width,
-            } => {
-                // CSS pixels → widget pixels (the page may be zoomed); from
-                // there it is the same menu the right-click path opens.
-                let ratio = self.webview.width() as f64 / page_width.max(1.0);
-                sender.input_sender().emit(MessageViewInput::CardMenuAt {
-                    key: Some((account_id, id)),
-                    x: x * ratio,
-                    y: y * ratio,
-                    hit: MenuHit::default(),
-                });
-            }
+            } => self.on_card_menu_from(account_id, id, x, y, page_width, &sender),
             MessageViewInput::CardMoveAt {
                 account_id,
                 id,
                 x,
                 y,
                 page_width,
-            } => {
-                let Some(m) = self
-                    .thread
-                    .iter()
-                    .find(|m| m.account_id == account_id && m.id == id)
-                    .cloned()
-                else {
-                    return;
-                };
-                // CSS pixels → widget pixels (the page may be zoomed), then
-                // → window.
-                let ratio = self.webview.width() as f64 / page_width.max(1.0);
-                let (vx, vy) = (x * ratio, y * ratio);
-                let point = self.webview.root().and_then(|root| {
-                    let root: gtk::Widget = root.upcast();
-                    self.webview
-                        .compute_point(&root, &gtk::graphene::Point::new(vx as f32, vy as f32))
-                });
-                let (wx, wy) = point.map_or((vx, vy), |p| (p.x() as f64, p.y() as f64));
-                let _ = sender.output(MessageViewOutput::CardMoveTo {
-                    message: Box::new(m),
-                    x: wx,
-                    y: wy,
-                });
-            }
+            } => self.on_card_move_at(account_id, id, x, y, page_width, &sender),
             MessageViewInput::SetCardActionsMode {
                 hover_toggle,
                 hover_auto,
-            } => {
-                if self.card_actions_hover != hover_toggle || self.card_actions_auto != hover_auto {
-                    self.card_actions_hover = hover_toggle;
-                    self.card_actions_auto = hover_auto;
-                    if self.current.is_some() && !self.loading {
-                        self.render();
-                    }
-                }
-            }
-            MessageViewInput::SetPaletteCollapse(secs) => {
-                if self.palette_collapse_secs != secs {
-                    self.palette_collapse_secs = secs;
-                    if self.current.is_some() && !self.loading {
-                        self.render();
-                    }
-                }
-            }
-            MessageViewInput::SetCardPaletteMenu(on) => {
-                if self.card_palette_menu != on {
-                    self.card_palette_menu = on;
-                    if self.current.is_some() && !self.loading {
-                        self.render();
-                    }
-                }
-            }
-            MessageViewInput::ClearDot { account_id, id } => {
-                for m in self.thread.iter_mut() {
-                    if m.account_id == account_id && m.id == id {
-                        m.unread = false;
-                    }
-                }
-                let js = format!(
-                    "(function(){{\
-                     var d=document.querySelector('.hylki-dot[data-key=\"{account_id}:{id}\"]');\
-                     if(d)d.remove();\
-                     var s=document.querySelector('.hylki-msg[data-key=\"{account_id}:{id}\"]');\
-                     if(s)s.classList.remove('unread');}})()"
-                );
-                self.webview.evaluate_javascript(
-                    &js,
-                    None,
-                    None,
-                    None::<&gtk::gio::Cancellable>,
-                    |r| {
-                        if let Err(e) = r {
-                            tracing::warn!("clear-dot patch failed: {e}");
-                        }
-                    },
-                );
-            }
-            MessageViewInput::SetReadMark(policy) => {
-                if self.read_mark != policy {
-                    self.read_mark = policy;
-                    if self.current.is_some() && !self.loading {
-                        self.render();
-                    }
-                }
-            }
-            MessageViewInput::OpenFind => {
-                // The toolbar button toggles: a second press collapses the bar.
-                if self.find_open {
-                    sender.input_sender().emit(MessageViewInput::CloseFind);
-                    return;
-                }
-                if self
-                    .find_closed_at
-                    .take()
-                    .is_some_and(|t| t.elapsed() < std::time::Duration::from_millis(300))
-                {
-                    return;
-                }
-                self.find_open = true;
-                if let Some(entry) = self.find_entry.clone() {
-                    gtk::glib::idle_add_local_once(move || {
-                        entry.grab_focus();
-                    });
-                }
-            }
-            MessageViewInput::CloseFind => {
-                self.find_open = false;
-                self.find_closed_at = Some(std::time::Instant::now());
-                self.find_matches = None;
-                if let Some(entry) = &self.find_entry {
-                    entry.set_text("");
-                }
-                self.eval_find("hylkiFindClear()");
-            }
-            MessageViewInput::FindChanged(text) => {
-                let text = text.trim();
-                if text.is_empty() {
-                    self.find_matches = None;
-                    self.eval_find("hylkiFindClear()");
-                    return;
-                }
-                // Into a JS single-quoted string: backslashes and quotes only.
-                let quoted = text.replace('\\', "\\\\").replace('\'', "\\'");
-                self.eval_find(&format!("hylkiFind('{quoted}')"));
-            }
+            } => self.on_set_card_actions_mode(hover_toggle, hover_auto),
+            MessageViewInput::SetPaletteCollapse(secs) => self.on_set_palette_collapse(secs),
+            MessageViewInput::SetCardPaletteMenu(on) => self.on_set_card_palette_menu(on),
+            MessageViewInput::ClearDot { account_id, id } => self.on_clear_dot(account_id, id),
+            MessageViewInput::SetReadMark(policy) => self.on_set_read_mark(policy),
+            MessageViewInput::OpenFind => self.on_open_find(&sender),
+            MessageViewInput::CloseFind => self.on_close_find(),
+            MessageViewInput::FindChanged(text) => self.on_find_changed(text),
             MessageViewInput::FindNext => self.eval_find("hylkiFindStep(1)"),
             MessageViewInput::FindPrev => self.eval_find("hylkiFindStep(-1)"),
             MessageViewInput::FindCounted { current, total } => {
                 self.find_matches = Some((current, total));
             }
-            MessageViewInput::SetTags(tags) => {
-                if self.tags != tags {
-                    self.tags = tags;
-                    *self.header_tags_rendered.borrow_mut() = None;
-                    if !self.thread.is_empty() {
-                        // The chips are baked into the document: draw it again.
-                        self.shown_fingerprint = None;
-                        self.render();
-                    }
-                }
-            }
+            MessageViewInput::SetTags(tags) => self.on_set_tags(tags),
             MessageViewInput::SetCardKeywords {
                 account_id,
                 id,
                 keywords,
                 labels,
-            } => {
-                for m in self.thread.iter_mut() {
-                    if m.account_id == account_id && m.id == id {
-                        m.keywords = keywords.clone();
-                        m.labels = labels.clone();
-                    }
-                }
-                if let Some(c) = self.current.as_mut() {
-                    if c.account_id == account_id && c.id == id {
-                        c.keywords = keywords.clone();
-                        c.labels = labels.clone();
-                    }
-                }
-                let chips = tag_chips_html(&self.tags, &keywords, &labels);
-                let js = format!(
-                    "(function(){{\
-                     var t=document.querySelector('.hylki-tags[data-key=\"{account_id}:{id}\"]');\
-                     if(t)t.innerHTML={chips};}})()",
-                    chips = serde_json::to_string(&chips).unwrap_or_else(|_| "''".into()),
-                );
-                self.webview.evaluate_javascript(
-                    &js,
-                    None,
-                    None,
-                    None::<&gtk::gio::Cancellable>,
-                    |r| {
-                        if let Err(e) = r {
-                            tracing::warn!("card tag patch failed: {e}");
-                        }
-                    },
-                );
-            }
+            } => self.on_set_card_keywords(account_id, id, keywords, labels),
             MessageViewInput::SetCardStar {
                 account_id,
                 id,
                 starred,
-            } => {
-                for m in self.thread.iter_mut() {
-                    if m.account_id == account_id && m.id == id {
-                        m.starred = starred;
-                    }
-                }
-                let js = format!(
-                    "(function(){{\
-                     var b=document.querySelector('.hylki-act[data-act=\"star\"][data-key=\"{account_id}:{id}\"]');\
-                     if(b)b.classList.{}('on');}})()",
-                    if starred { "add" } else { "remove" },
-                );
-                self.webview.evaluate_javascript(
-                    &js,
-                    None,
-                    None,
-                    None::<&gtk::gio::Cancellable>,
-                    |r| {
-                        if let Err(e) = r {
-                            tracing::warn!("card star patch failed: {e}");
-                        }
-                    },
-                );
-            }
-            MessageViewInput::FocusCard { account_id, id } => {
-                let webview = self.webview.clone();
-                let gen = self.focus_gen.clone();
-                gen.set(gen.get() + 1);
-                let my_gen = gen.get();
-                // Let the split's 300ms slide finish first — scrolling while
-                // the viewport is still shrinking lands somewhere else.
-                gtk::glib::timeout_add_local_once(
-                    std::time::Duration::from_millis(380),
-                    move || {
-                        if gen.get() != my_gen {
-                            // A BlurCard beat us here: the reply was cancelled
-                            // before the slide finished. Adding the outline
-                            // now would strand it.
-                            return;
-                        }
-                        let js = format!(
-                            "(function(){{\
-                             if(!document.body.classList.contains('hylki-conv'))return;\
-                             var s=document.querySelector('.hylki-msg[data-key=\"{account_id}:{id}\"]');\
-                             if(!s)return;\
-                             document.querySelectorAll('.hylki-msg.selected').forEach(function(e){{e.classList.remove('selected');}});\
-                             s.classList.add('selected');\
-                             s.style.scrollMarginTop='14px';\
-                             s.scrollIntoView({{behavior:'smooth',block:'start'}});}})()"
-                        );
-                        webview.evaluate_javascript(
-                            &js,
-                            None,
-                            None,
-                            None::<&gtk::gio::Cancellable>,
-                            |r| {
-                                if let Err(e) = r {
-                                    tracing::warn!("focus-card scroll failed: {e}");
-                                }
-                            },
-                        );
-                    },
-                );
-            }
-            MessageViewInput::BlurCard => {
-                self.focus_gen.set(self.focus_gen.get() + 1);
-                self.webview.evaluate_javascript(
-                    "(function(){document.querySelectorAll('.hylki-msg.selected')\
-                     .forEach(function(e){e.classList.remove('selected');});})()",
-                    None,
-                    None,
-                    None::<&gtk::gio::Cancellable>,
-                    |r| {
-                        if let Err(e) = r {
-                            tracing::warn!("card blur failed: {e}");
-                        }
-                    },
-                );
-                // Cards the list still has selected keep their outline.
-                self.apply_card_selection();
-            }
+            } => self.on_set_card_star(account_id, id, starred),
+            MessageViewInput::FocusCard { account_id, id } => self.on_focus_card(account_id, id),
+            MessageViewInput::BlurCard => self.on_blur_card(),
             MessageViewInput::ScrollAnchor {
                 account_id,
                 id,
                 offset,
-            } => {
-                self.saved_anchor = Some((account_id, id, offset));
-                self.anchor_gutter = false;
-            }
-            MessageViewInput::PinArrival { account_id, id } => {
-                self.saved_anchor = Some((account_id, id, 0));
-                self.anchor_gutter = true;
-                // The anchor rides only on a document that keeps its place.
-                self.did_autoscroll = true;
-                self.skip_fade = true;
-            }
+            } => self.on_scroll_anchor(account_id, id, offset),
+            MessageViewInput::PinArrival { account_id, id } => self.on_pin_arrival(account_id, id),
             MessageViewInput::SetDraftsView(on) => {
                 self.drafts_view = on;
             }
-            MessageViewInput::SetTemplateFolders(folders) => {
-                if self.template_folders != folders {
-                    let shown = |set: &std::collections::HashSet<(u32, u32)>| {
-                        self.thread
-                            .iter()
-                            .any(|m| set.contains(&(m.account_id, m.folder_id)))
-                    };
-                    let redraw = shown(&self.template_folders) || shown(&folders);
-                    self.template_folders = folders;
-                    if redraw {
-                        self.render();
-                    }
-                }
-            }
+            MessageViewInput::SetTemplateFolders(folders) => self.on_set_template_folders(folders),
             MessageViewInput::TemplateAction {
                 account_id,
                 id,
                 edit,
-            } => {
-                let message = self
-                    .thread
-                    .iter()
-                    .find(|m| m.account_id == account_id && m.id == id)
-                    .cloned();
-                if let Some(message) = message {
-                    use crate::ui::message_list::RowAction;
-                    let action = if edit {
-                        RowAction::EditTemplate
-                    } else {
-                        RowAction::EditAsNew
-                    };
-                    let _ = sender.output(MessageViewOutput::CardAction {
-                        action,
-                        message: Box::new(message),
-                    });
-                }
-            }
-            MessageViewInput::HoldPlace { account_id, id } => {
-                if self.saved_anchor.is_none() {
-                    self.saved_anchor = Some((account_id, id, 0));
-                    self.anchor_gutter = true;
-                }
-            }
+            } => self.on_template_action(account_id, id, edit, &sender),
+            MessageViewInput::HoldPlace { account_id, id } => self.on_hold_place(account_id, id),
             MessageViewInput::CardContact { account_id, id } => {
-                if let Some(m) = self
-                    .thread
-                    .iter()
-                    .find(|m| m.account_id == account_id && m.id == id)
-                {
-                    let _ = sender.output(MessageViewOutput::ContactSender(Box::new(m.clone())));
-                }
+                self.on_card_contact(account_id, id, &sender)
             }
             MessageViewInput::OpenHeader { account_id, id } => {
-                if let Some(m) = self
-                    .thread
-                    .iter()
-                    .find(|m| m.account_id == account_id && m.id == id)
-                {
-                    let _ = sender.output(MessageViewOutput::OpenWindow(Box::new(m.clone())));
-                }
+                self.on_open_header(account_id, id, &sender)
             }
         }
     }
