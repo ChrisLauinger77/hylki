@@ -1,11 +1,14 @@
 //! Text encodings the app writes and reads: base64 (with the lenient
-//! decoder mail needs) and percent-encoding. One home for each, so every
+//! decoder mail needs), percent-encoding, the HTML text escape, and the
+//! iCalendar and vCard TEXT escapes. One home for each, so every
 //! module encodes the same way.
 
 mod base64;
 pub mod percent;
+mod text_value;
 
 pub use self::base64::{base64_decode, base64_encode};
+pub use text_value::{escape_text_value, unescape_text_value};
 
 /// Text escaped for HTML, for element content and quoted attribute values
 /// alike: `&`, `<`, `>`, `'` and `"` become entities, as do the C0 and C1
