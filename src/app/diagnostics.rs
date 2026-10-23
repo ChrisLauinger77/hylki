@@ -1,6 +1,41 @@
 //! Diagnostics: the memory report in the exported log.
 
 use super::*;
+use crate::memory_report::{human_bytes, human_count, messages_bytes};
+
+/// "N messages, size" for a count and the bytes they hold.
+fn count((n, b): (usize, usize)) -> String {
+    format!("{} messages, {}", human_count(n), human_bytes(b as u64))
+}
+
+/// The heading, uptime, the process tree and who holds the heap.
+fn memory_processes(out: &mut String) {
+    out.push_str("== Memory ==\n");
+    if let Some(up) = crate::memory_report::uptime() {
+        out.push_str(&format!(
+            "Running for {}\n",
+            crate::memory_report::human_duration(up)
+        ));
+    }
+    out.push_str("Processes:\n");
+    for line in crate::memory_report::process_lines() {
+        out.push_str(&line);
+        out.push('\n');
+    }
+    for line in crate::memory_report::web_view_lines() {
+        out.push_str(&line);
+        out.push('\n');
+    }
+    let (rust_live, rust_peak) = crate::memory_report::rust_heap();
+    let (sql_live, sql_peak) = crate::memory_report::sqlite_heap();
+    out.push_str(&format!(
+        "  of which Rust code holds {} (peak {}); SQLite holds {} (peak {}); the rest is GTK, WebKit, the graphics driver and other libraries\n",
+        human_bytes(rust_live as u64),
+        human_bytes(rust_peak as u64),
+        human_bytes(sql_live),
+        human_bytes(sql_peak)
+    ));
+}
 
 impl AppModel {
     /// The memory section of an exported log: the process tree as the
@@ -10,36 +45,16 @@ impl AppModel {
     /// report answers itself: a big index on a big mailbox is the accepted
     /// cost of keeping everything in RAM; a big cache is something to fix.
     pub(super) fn memory_report(&self) -> String {
-        use crate::memory_report::{human_bytes, human_count, messages_bytes};
-        let count = |(n, b): (usize, usize)| {
-            format!("{} messages, {}", human_count(n), human_bytes(b as u64))
-        };
         let mut out = String::new();
-        out.push_str("== Memory ==\n");
-        if let Some(up) = crate::memory_report::uptime() {
-            out.push_str(&format!(
-                "Running for {}\n",
-                crate::memory_report::human_duration(up)
-            ));
-        }
-        out.push_str("Processes:\n");
-        for line in crate::memory_report::process_lines() {
-            out.push_str(&line);
-            out.push('\n');
-        }
-        for line in crate::memory_report::web_view_lines() {
-            out.push_str(&line);
-            out.push('\n');
-        }
-        let (rust_live, rust_peak) = crate::memory_report::rust_heap();
-        let (sql_live, sql_peak) = crate::memory_report::sqlite_heap();
-        out.push_str(&format!(
-            "  of which Rust code holds {} (peak {}); SQLite holds {} (peak {}); the rest is GTK, WebKit, the graphics driver and other libraries\n",
-            human_bytes(rust_live as u64),
-            human_bytes(rust_peak as u64),
-            human_bytes(sql_live),
-            human_bytes(sql_peak)
-        ));
+        memory_processes(&mut out);
+        self.memory_graphics(&mut out);
+        self.memory_mail_index(&mut out);
+        self.memory_session_caches(&mut out);
+        out
+    }
+
+    /// What GTK draws with and which driver libraries are mapped.
+    fn memory_graphics(&self, out: &mut String) {
         // What GTK draws with. A software renderer path (lavapipe, llvmpipe)
         // runs LLVM inside this process: hundreds of megabytes of heap on a
         // VM or a machine whose GPU driver GTK could not use.
@@ -71,7 +86,10 @@ impl AppModel {
                 _ => "",
             }
         ));
+    }
 
+    /// The mail index: what follows the mailbox's size.
+    fn memory_mail_index(&self, out: &mut String) {
         out.push_str("Mail index (follows the mailbox size, kept in RAM by design):\n");
         let folders = self.message_cache.len();
         let index = messages_bytes(self.message_cache.values().flatten());
@@ -107,7 +125,10 @@ impl AppModel {
             count(kept),
             human_bytes(maps as u64)
         ));
+    }
 
+    /// The session caches: what follows use.
+    fn memory_session_caches(&self, out: &mut String) {
         out.push_str("Session caches (follow use; each is bounded unless noted):\n");
         out.push_str(&format!(
             "  bodies: {} entries, {} of {} budget\n",
@@ -208,7 +229,6 @@ impl AppModel {
             human_count(lines),
             human_bytes(line_bytes as u64)
         ));
-        out
     }
 
     /// The messages the router sends here (see `AppModel::route`).
