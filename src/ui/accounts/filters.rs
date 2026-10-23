@@ -1,16 +1,7 @@
 //! Filter rules (#47): the list on the Filters page and the rule editor.
 
+use super::condition_editor::{form_scaffold, CondAdder, CondControls, CondRows};
 use super::*;
-
-/// One condition of the filter editor (#192): its own titled group with a
-/// remove button in the header, holding the Where, Match and Text rows.
-struct CondRows {
-    group: adw::PreferencesGroup,
-    remove: gtk::Button,
-    field: adw::ComboRow,
-    matcher: adw::ComboRow,
-    value: adw::EntryRow,
-}
 
 impl AccountsWindow {
     /// Human labels for the filter enums, shared by rows and the dialog.
@@ -178,22 +169,7 @@ impl AccountsWindow {
             (i18n("Add Filter"), i18n("Add Filter"))
         };
 
-        // The page: groups stacked the way an AdwPreferencesPage stacks
-        // them, in a box of our own so condition groups can slot in
-        // between the fixed ones.
-        let page_box = gtk::Box::new(gtk::Orientation::Vertical, 24);
-        page_box.set_margin_top(24);
-        page_box.set_margin_bottom(24);
-        page_box.set_margin_start(12);
-        page_box.set_margin_end(12);
-        let clamp = adw::Clamp::new();
-        clamp.set_maximum_size(600);
-        clamp.set_tightening_threshold(400);
-        clamp.set_child(Some(&page_box));
-        let scrolled = gtk::ScrolledWindow::new();
-        scrolled.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-        scrolled.set_vexpand(true);
-        scrolled.set_child(Some(&clamp));
+        let (page_box, scrolled) = form_scaffold();
 
         let account_group = adw::PreferencesGroup::new();
         // A name of your own for the rule (#197): what the filters list
@@ -236,23 +212,8 @@ impl AccountsWindow {
             let field_names = field_names.clone();
             let match_names = match_names.clone();
             move |init: Option<&crate::config::FilterCondition>| -> CondRows {
-                let group = adw::PreferencesGroup::new();
-                let remove = gtk::Button::from_icon_name("user-trash-symbolic");
-                remove.add_css_class("flat");
-                remove.set_valign(gtk::Align::Center);
-                remove.set_tooltip_text(Some(i18n("Remove condition").as_str()));
-                group.set_header_suffix(Some(&remove));
-                let field = adw::ComboRow::new();
-                field.set_title(&i18n("Where"));
-                let refs: Vec<&str> = field_names.iter().map(|s| s.as_str()).collect();
-                field.set_model(Some(&gtk::StringList::new(&refs)));
-                let matcher = adw::ComboRow::new();
-                matcher.set_title(&i18n("Match"));
-                matcher.set_subtitle(&i18n("Separate alternatives with commas."));
-                let refs: Vec<&str> = match_names.iter().map(|s| s.as_str()).collect();
-                matcher.set_model(Some(&gtk::StringList::new(&refs)));
-                let value = adw::EntryRow::new();
-                value.set_title(&i18n("Text to match"));
+                let rows = CondRows::new(&field_names, &match_names);
+                let (field, matcher, value) = (&rows.field, &rows.matcher, &rows.value);
                 if let Some(c) = init {
                     if let Some(i) = FilterField::ALL.iter().position(|f| *f == c.field) {
                         field.set_selected(i as u32);
@@ -289,137 +250,35 @@ impl AccountsWindow {
                         });
                     }
                 };
-                explain(&field);
+                explain(field);
                 field.connect_selected_notify(explain);
-                group.add(&field);
-                group.add(&matcher);
-                group.add(&value);
-                CondRows {
-                    group,
-                    remove,
-                    field,
-                    matcher,
-                    value,
-                }
+                rows.add_rows();
+                rows
             }
         };
 
-        let add_group = adw::PreferencesGroup::new();
-        let add_row = adw::ActionRow::new();
-        add_row.set_title(&i18n("Add Condition"));
-        add_row.set_activatable(true);
-        add_row.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
-        // All or any (#192); only shown once there is a second condition.
-        let combine_row = adw::ComboRow::new();
-        combine_row.set_title(&i18n("Condition matching"));
-        combine_row.set_model(Some(&gtk::StringList::new(&[
-            i18n("All must match").as_str(),
-            i18n("Any one may match").as_str(),
-        ])));
-        add_group.add(&add_row);
-        // In a group of its own, below Add Condition; hidden with its row.
-        let combine_group = adw::PreferencesGroup::new();
-        combine_group.add(&combine_row);
-        combine_group.set_visible(false);
-
-        // Number the groups, title the later Where rows after the combining
-        // rule ("And where" / "Or where"), and show the remove buttons and
-        // the chooser once there is more than one condition.
-        let relabel = {
-            let conds = conds.clone();
-            let combine_row = combine_row.clone();
-            let combine_group = combine_group.clone();
-            move || {
-                let conds = conds.borrow();
-                let any = combine_row.selected() == 1;
-                let several = conds.len() > 1;
-                for (i, c) in conds.iter().enumerate() {
-                    c.group
-                        .set_title(&i18n_f("Condition {n}", &[("n", &(i + 1).to_string())]));
-                    c.field.set_title(&if i == 0 {
-                        i18n("Where")
-                    } else if any {
-                        i18n("Or where")
-                    } else {
-                        i18n("And where")
-                    });
-                    c.remove.set_visible(several);
-                }
-                combine_group.set_visible(several);
-            }
-        };
-        {
-            let relabel = relabel.clone();
-            combine_row.connect_selected_notify(move |_| relabel());
-        }
-        // Add a condition group below the ones there are, above the Add
-        // Condition group.
+        // Add Condition, and all or any (#192): the chooser is only shown
+        // once there is a second condition.
+        let controls = CondControls::new();
+        let relabel = controls.relabeller(&conds);
+        let CondControls {
+            add_group,
+            add_row,
+            combine_row,
+            combine_group,
+        } = controls;
         let add_cond = {
-            let conds = conds.clone();
-            let page_box = page_box.clone();
-            let account_group = account_group.clone();
-            let relabel = relabel.clone();
-            let make_cond = make_cond.clone();
-            let form_save = self.form_save.clone();
-            let nav = nav.clone();
-            let changed = changed.clone();
-            move |init: Option<&crate::config::FilterCondition>| {
-                let c = make_cond(init);
-                {
-                    let changed = changed.clone();
-                    c.value.connect_changed(move |_| changed());
-                }
-                {
-                    let changed = changed.clone();
-                    c.field.connect_selected_notify(move |_| changed());
-                }
-                let after: gtk::Widget = conds
-                    .borrow()
-                    .last()
-                    .map(|last| last.group.clone().upcast())
-                    .unwrap_or_else(|| account_group.clone().upcast());
-                page_box.insert_child_after(&c.group, Some(&after));
-                {
-                    let conds = conds.clone();
-                    let page_box = page_box.clone();
-                    let relabel = relabel.clone();
-                    let changed = changed.clone();
-                    let group = c.group.clone();
-                    c.remove.connect_clicked(move |_| {
-                        let gone = {
-                            let mut conds = conds.borrow_mut();
-                            if conds.len() < 2 {
-                                return;
-                            }
-                            conds
-                                .iter()
-                                .position(|c| c.group == group)
-                                .map(|i| conds.remove(i))
-                        };
-                        if let Some(gone) = gone {
-                            page_box.remove(&gone.group);
-                            relabel();
-                            changed();
-                        }
-                    });
-                }
-                // Enter in the text saves, as in every form page; the save
-                // closure is looked up when pressed, so a condition added
-                // before the page is up gets it too.
-                {
-                    let form_save = form_save.clone();
-                    let nav = nav.clone();
-                    c.value.connect_entry_activated(move |_| {
-                        let saved = form_save.borrow().as_ref().is_some_and(|save| save());
-                        if saved {
-                            nav.pop();
-                        }
-                    });
-                }
-                conds.borrow_mut().push(c);
-                relabel();
-                changed();
-            }
+            let adder = std::rc::Rc::new(CondAdder {
+                conds: conds.clone(),
+                page_box: page_box.clone(),
+                anchor: account_group.clone().upcast(),
+                make: make_cond.clone(),
+                relabel,
+                form_save: self.form_save.clone(),
+                nav: nav.clone(),
+                changed: Some(changed.clone()),
+            });
+            move |init: Option<&crate::config::FilterCondition>| adder.add(init)
         };
         {
             let add_cond = add_cond.clone();

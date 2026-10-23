@@ -1,16 +1,19 @@
 //! Smart folders (#417): saved searches, their list and their editor.
 
+use super::condition_editor::{form_scaffold, CondAdder, CondControls, CondRows};
 use super::*;
 
-/// One condition of the smart folder editor (#417): the filter editor's
-/// rows, and a tag chooser for Tagged.
+/// A smart-folder condition: the shared rows, and the tag a Tagged
+/// condition looks for.
 struct SmartCondRows {
-    group: adw::PreferencesGroup,
-    remove: gtk::Button,
-    field: adw::ComboRow,
-    matcher: adw::ComboRow,
-    value: adw::EntryRow,
+    rows: CondRows,
     tag: adw::ComboRow,
+}
+
+impl AsRef<CondRows> for SmartCondRows {
+    fn as_ref(&self) -> &CondRows {
+        &self.rows
+    }
 }
 
 impl AccountsWindow {
@@ -101,19 +104,7 @@ impl AccountsWindow {
         };
         let emails: Vec<String> = self.accounts.iter().map(|a| a.email.clone()).collect();
 
-        let page_box = gtk::Box::new(gtk::Orientation::Vertical, 24);
-        page_box.set_margin_top(24);
-        page_box.set_margin_bottom(24);
-        page_box.set_margin_start(12);
-        page_box.set_margin_end(12);
-        let clamp = adw::Clamp::new();
-        clamp.set_maximum_size(600);
-        clamp.set_tightening_threshold(400);
-        clamp.set_child(Some(&page_box));
-        let scrolled = gtk::ScrolledWindow::new();
-        scrolled.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-        scrolled.set_vexpand(true);
-        scrolled.set_child(Some(&clamp));
+        let (page_box, scrolled) = form_scaffold();
 
         let where_group = adw::PreferencesGroup::new();
         let name_row = adw::EntryRow::new();
@@ -161,23 +152,8 @@ impl AccountsWindow {
         let make_cond = {
             let tags = tags.clone();
             move |init: Option<&SmartCondition>| -> SmartCondRows {
-                let group = adw::PreferencesGroup::new();
-                let remove = gtk::Button::from_icon_name("user-trash-symbolic");
-                remove.add_css_class("flat");
-                remove.set_valign(gtk::Align::Center);
-                remove.set_tooltip_text(Some(i18n("Remove condition").as_str()));
-                group.set_header_suffix(Some(&remove));
-                let field = adw::ComboRow::new();
-                field.set_title(&i18n("Where"));
-                let refs: Vec<&str> = field_names.iter().map(|s| s.as_str()).collect();
-                field.set_model(Some(&gtk::StringList::new(&refs)));
-                let matcher = adw::ComboRow::new();
-                matcher.set_title(&i18n("Match"));
-                matcher.set_subtitle(&i18n("Separate alternatives with commas."));
-                let refs: Vec<&str> = match_names.iter().map(|s| s.as_str()).collect();
-                matcher.set_model(Some(&gtk::StringList::new(&refs)));
-                let value = adw::EntryRow::new();
-                value.set_title(&i18n("Text to match"));
+                let rows = CondRows::new(&field_names, &match_names);
+                let (field, matcher, value) = (&rows.field, &rows.matcher, &rows.value);
                 let tag = adw::ComboRow::new();
                 tag.set_title(&i18n("Tag"));
                 let refs: Vec<&str> = tag_names.iter().map(|s| s.as_str()).collect();
@@ -227,116 +203,34 @@ impl AccountsWindow {
                         });
                     }
                 };
-                explain(&field);
+                explain(field);
                 field.connect_selected_notify(explain);
-                group.add(&field);
-                group.add(&matcher);
-                group.add(&value);
-                group.add(&tag);
-                SmartCondRows {
-                    group,
-                    remove,
-                    field,
-                    matcher,
-                    value,
-                    tag,
-                }
+                rows.add_rows();
+                rows.group.add(&tag);
+                SmartCondRows { rows, tag }
             }
         };
 
-        let add_group = adw::PreferencesGroup::new();
-        let add_row = adw::ActionRow::new();
-        add_row.set_title(&i18n("Add Condition"));
-        add_row.set_activatable(true);
-        add_row.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
-        add_group.add(&add_row);
-        let combine_row = adw::ComboRow::new();
-        combine_row.set_title(&i18n("Condition matching"));
-        combine_row.set_model(Some(&gtk::StringList::new(&[
-            i18n("All must match").as_str(),
-            i18n("Any one may match").as_str(),
-        ])));
-        let combine_group = adw::PreferencesGroup::new();
-        combine_group.add(&combine_row);
-        combine_group.set_visible(false);
-
-        let relabel = {
-            let (conds, combine_row, combine_group) =
-                (conds.clone(), combine_row.clone(), combine_group.clone());
-            move || {
-                let conds = conds.borrow();
-                let any = combine_row.selected() == 1;
-                let several = conds.len() > 1;
-                for (i, c) in conds.iter().enumerate() {
-                    c.group
-                        .set_title(&i18n_f("Condition {n}", &[("n", &(i + 1).to_string())]));
-                    c.field.set_title(&if i == 0 {
-                        i18n("Where")
-                    } else if any {
-                        i18n("Or where")
-                    } else {
-                        i18n("And where")
-                    });
-                    c.remove.set_visible(several);
-                }
-                combine_group.set_visible(several);
-            }
-        };
-        {
-            let relabel = relabel.clone();
-            combine_row.connect_selected_notify(move |_| relabel());
-        }
+        let controls = CondControls::new();
+        let relabel = controls.relabeller(&conds);
+        let CondControls {
+            add_group,
+            add_row,
+            combine_row,
+            combine_group,
+        } = controls;
         let add_cond = {
-            let (conds, page_box, where_group, relabel) = (
-                conds.clone(),
-                page_box.clone(),
-                where_group.clone(),
-                relabel.clone(),
-            );
-            let (form_save, nav) = (self.form_save.clone(), nav.clone());
-            move |init: Option<&SmartCondition>| {
-                let c = make_cond(init);
-                let after: gtk::Widget = conds
-                    .borrow()
-                    .last()
-                    .map(|last| last.group.clone().upcast())
-                    .unwrap_or_else(|| where_group.clone().upcast());
-                page_box.insert_child_after(&c.group, Some(&after));
-                {
-                    let (conds, page_box, relabel, group) = (
-                        conds.clone(),
-                        page_box.clone(),
-                        relabel.clone(),
-                        c.group.clone(),
-                    );
-                    c.remove.connect_clicked(move |_| {
-                        let gone = {
-                            let mut conds = conds.borrow_mut();
-                            if conds.len() < 2 {
-                                return;
-                            }
-                            conds
-                                .iter()
-                                .position(|c| c.group == group)
-                                .map(|i| conds.remove(i))
-                        };
-                        if let Some(gone) = gone {
-                            page_box.remove(&gone.group);
-                            relabel();
-                        }
-                    });
-                }
-                {
-                    let (form_save, nav) = (form_save.clone(), nav.clone());
-                    c.value.connect_entry_activated(move |_| {
-                        if form_save.borrow().as_ref().is_some_and(|save| save()) {
-                            nav.pop();
-                        }
-                    });
-                }
-                conds.borrow_mut().push(c);
-                relabel();
-            }
+            let adder = std::rc::Rc::new(CondAdder {
+                conds: conds.clone(),
+                page_box: page_box.clone(),
+                anchor: where_group.clone().upcast(),
+                make: make_cond,
+                relabel,
+                form_save: self.form_save.clone(),
+                nav: nav.clone(),
+                changed: None::<fn()>,
+            });
+            move |init: Option<&SmartCondition>| adder.add(init)
         };
         {
             let add_cond = add_cond.clone();
@@ -392,8 +286,8 @@ impl AccountsWindow {
                     .borrow()
                     .iter()
                     .filter_map(|c| {
-                        let field =
-                            SmartField::ALL[c.field.selected() as usize % SmartField::ALL.len()];
+                        let field = SmartField::ALL
+                            [c.rows.field.selected() as usize % SmartField::ALL.len()];
                         let value = if field == SmartField::Tagged {
                             match c.tag.selected() {
                                 0 => String::new(),
@@ -403,7 +297,7 @@ impl AccountsWindow {
                                     .unwrap_or_default(),
                             }
                         } else if field.takes_text() {
-                            let v = c.value.text().trim().to_string();
+                            let v = c.rows.value.text().trim().to_string();
                             if v.is_empty() {
                                 return None;
                             }
@@ -414,7 +308,7 @@ impl AccountsWindow {
                         Some(SmartCondition {
                             field,
                             matcher: FilterMatch::ALL
-                                [c.matcher.selected() as usize % FilterMatch::ALL.len()],
+                                [c.rows.matcher.selected() as usize % FilterMatch::ALL.len()],
                             value,
                         })
                     })

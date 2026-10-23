@@ -18,6 +18,7 @@ use crate::worker::{self, ConnTest};
 
 mod account_list;
 mod aliases;
+mod condition_editor;
 mod editor;
 mod fields;
 mod filters;
