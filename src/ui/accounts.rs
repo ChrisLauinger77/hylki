@@ -19,17 +19,21 @@ use crate::worker::{self, ConnTest};
 mod account_list;
 mod aliases;
 mod editor;
+mod fields;
 mod filters;
 mod form;
 mod form_page;
 mod messages;
+mod navigation;
 mod oauth;
 mod providers;
+mod save;
+mod senders;
 mod signatures;
 mod smart_folders;
 mod tags;
 
-use account_list::{importable_goa_accounts, importable_of};
+use account_list::importable_goa_accounts;
 use aliases::AliasDialog;
 pub use editor::AccountSecrets;
 pub(crate) use form::non_ellipsizing_factory;
@@ -41,10 +45,8 @@ use form::{
 };
 pub use messages::{AccountsCmd, AccountsInit, AccountsInput, AccountsOutput, TagProposal};
 pub(crate) use oauth::open_online_accounts;
-use oauth::sign_in;
 use providers::provider_at;
 pub(crate) use providers::{brand_for_goa, provider_factory, Provider, PROVIDERS};
-use signatures::signature_label;
 
 const DEFAULT_COLOR: &str = "#3584e4";
 
@@ -1590,1331 +1592,117 @@ impl Component for AccountsWindow {
             AccountsInput::ShowPage(id) => {
                 widgets.list_stack.set_visible_child_name(&id);
             }
-            AccountsInput::RefreshGoa => {
-                // Off the main thread: GOA answers over D-Bus, and a busy
-                // goa-daemon is slow to.
-                widgets.goa_refresh_btn.set_sensitive(false);
-                sender.oneshot_command(async move {
-                    let listed = tokio::task::spawn_blocking(crate::goa::list_mail_accounts)
-                        .await
-                        .unwrap_or_default();
-                    AccountsCmd::GoaListed(listed)
-                });
-            }
-            AccountsInput::CloseEditor => {
-                if widgets
-                    .nav
-                    .visible_page()
-                    .and_then(|p| p.tag())
-                    .is_some_and(|t| t == "editor" || t == "filter" || t == "tag")
-                {
-                    widgets.nav.pop();
-                }
-            }
-            AccountsInput::ReleaseSignatureEditor => {
-                let editing = widgets
-                    .nav
-                    .visible_page()
-                    .and_then(|p| p.tag())
-                    .is_some_and(|t| t == "editor");
-                if !editing {
-                    if let Some(editor) = self.sig_editor.take() {
-                        // Kept for the next editor, which takes it in.
-                        editor.toolbar_end().remove(&self.sig_source_btn);
-                        widgets.sig_holder.remove(&editor.widget);
-                    }
-                }
-            }
+            AccountsInput::RefreshGoa => self.on_refresh_goa(widgets, sender),
+            AccountsInput::CloseEditor => self.on_close_editor(widgets),
+            AccountsInput::ReleaseSignatureEditor => self.on_release_signature_editor(widgets),
             AccountsInput::DebugEditLabel(text) => widgets.label_row.set_text(&text),
-            AccountsInput::DebugProvider(label) => {
-                if let Some(i) = PROVIDERS.iter().position(|p| p.label == label) {
-                    widgets.provider_row.set_selected(i as u32);
-                }
-            }
-
-            AccountsInput::LeaveRequest(page) => {
-                match widgets.nav.visible_page().and_then(|p| p.tag()).as_deref() {
-                    // The account editor knows what it was opened with, so it
-                    // can tell an edited form from an untouched one. The
-                    // signature lives in a WebView and only answers when
-                    // asked, so that answer arrives separately.
-                    Some("editor") => {
-                        if self.editor_touched(widgets) {
-                            sender.input_sender().emit(AccountsInput::LeaveVerdict {
-                                page,
-                                touched: true,
-                            });
-                        } else {
-                            let s = sender.clone();
-                            self.sig_editor(widgets).is_dirty(move |touched| {
-                                s.input_sender()
-                                    .emit(AccountsInput::LeaveVerdict { page, touched });
-                            });
-                        }
-                    }
-                    // Nothing records what a filter or a tag was opened with,
-                    // so those are always worth asking about.
-                    Some("filter") | Some("tag") => {
-                        sender.input_sender().emit(AccountsInput::LeaveVerdict {
-                            page,
-                            touched: true,
-                        })
-                    }
-                    _ => sender.input_sender().emit(AccountsInput::LeaveVerdict {
-                        page,
-                        touched: false,
-                    }),
-                }
-            }
-
+            AccountsInput::DebugProvider(label) => self.on_debug_provider(label, widgets),
+            AccountsInput::LeaveRequest(page) => self.on_leave_request(page, widgets, sender),
             AccountsInput::LeaveVerdict { page, touched } => {
-                if touched {
-                    let _ = sender.output(AccountsOutput::LeaveNeedsPrompt(page));
-                    return;
-                }
-                // Nothing to lose: close the editor and let the window move on.
-                sender.input_sender().emit(AccountsInput::CloseEditor);
-                let _ = sender.output(AccountsOutput::LeftEditor(page));
+                self.on_leave_verdict(page, touched, sender)
             }
-
-            AccountsInput::SaveOpenPage => {
-                match widgets.nav.visible_page().and_then(|p| p.tag()).as_deref() {
-                    Some("editor") => sender.input_sender().emit(AccountsInput::Save),
-                    Some("filter") | Some("tag") => {
-                        let saved = self.form_save.borrow().as_ref().is_some_and(|f| f());
-                        if saved {
-                            widgets.nav.pop();
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            AccountsInput::SearchFilters(text) => {
-                *self.filters_query.borrow_mut() = text.to_lowercase();
-                widgets.filters_list.invalidate_filter();
-            }
-            AccountsInput::SearchSenders(text) => {
-                *self.senders_query.borrow_mut() = text.to_lowercase();
-                self.senders.widget().invalidate_filter();
-                self.blacklist.widget().invalidate_filter();
-            }
-            AccountsInput::AddAccount => {
-                self.editing = None;
-                self.new_editor_session();
-                self.emoji = None;
-                self.avatar = None;
-                widgets.gravatar_row.set_active(false);
-                self.picture_mode = false;
-                widgets.mode_glyph_btn.set_active(true);
-                self.label_synced = String::new();
-                self.pending_oauth_refresh = None;
-                self.directory_granted = false;
-                self.directory_on = false;
-                self.labels_granted = false;
-                self.labels_on = false;
-                self.close_alias_dialog();
-                self.alias_edits.clear();
-                self.server_identities.clear();
-                self.rebuild_alias_list(&widgets.aliases_list, &sender);
-                clear_editor(widgets);
-                self.show_push_row(widgets);
-                self.populate_folder_combos(widgets, None);
-                set_connection_editable(widgets, true);
-                widgets.goa_banner.set_visible(false);
-                widgets.keyring_note.set_visible(true);
-                self.apply_provider(widgets);
-                self.load_signatures(widgets, Vec::new(), None);
-                widgets.color_btn.set_rgba(&parse_color(DEFAULT_COLOR));
-                self.refresh_preview(widgets);
-                widgets.remove_btn.set_visible(false);
-                // A prior GOA edit may have hidden the provider picker.
-                widgets.provider_row.set_visible(true);
-                self.editor_seed = Some(self.editor_fingerprint(widgets));
-                mount_editor(widgets);
-                widgets.nav.push_by_tag("editor");
-            }
-
+            AccountsInput::SaveOpenPage => self.on_save_open_page(widgets, sender),
+            AccountsInput::SearchFilters(text) => self.on_search_filters(text, widgets),
+            AccountsInput::SearchSenders(text) => self.on_search_senders(text),
+            AccountsInput::AddAccount => self.on_add_account(widgets, sender),
             AccountsInput::EditAccountByEmail(email) => {
-                let Some(i) = self.accounts.iter().position(|a| a.email == email) else {
-                    return;
-                };
-                let editor_up = widgets
-                    .nav
-                    .visible_page()
-                    .and_then(|p| p.tag())
-                    .is_some_and(|tag| tag == "editor");
-                if editor_up {
-                    if self.editing == Some(i) {
-                        return;
-                    }
-                    // Another account's editor is up: back to the list first,
-                    // since a page can't be pushed while it is in the stack.
-                    widgets.nav.pop();
-                }
-                sender.input_sender().emit(AccountsInput::EditAccount(i));
+                self.on_edit_account_by_email(email, widgets, sender)
             }
-
-            AccountsInput::EditAccount(i) => {
-                let Some(acc) = self.accounts.get(i).cloned() else {
-                    return;
-                };
-                self.editing = Some(i);
-                self.new_editor_session();
-                self.pending_oauth_refresh = None;
-                self.directory_granted = acc.goa_id.is_none()
-                    && acc.oauth
-                    && acc
-                        .oauth_settings
-                        .as_ref()
-                        .is_some_and(|s| crate::oauth::has_directory_scopes(&s.scopes));
-                // On without the scopes would only be refused.
-                self.directory_on = acc.graph_directory && self.directory_granted;
-                widgets.graph_directory_row.set_active(self.directory_on);
-                widgets
-                    .directory_only_row
-                    .set_active(acc.graph_directory_only);
-                self.labels_granted = acc.goa_id.is_none()
-                    && acc.oauth
-                    && acc.oauth_settings.as_ref().is_some_and(|s| {
-                        crate::oauth::has_scopes(&s.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES)
-                    });
-                self.labels_on = acc.graph_label_names && self.labels_granted;
-                widgets.graph_labels_row.set_active(self.labels_on);
-                self.close_alias_dialog();
-                self.alias_edits = acc.aliases.clone();
-                self.server_identities.clear();
-                self.rebuild_alias_list(&widgets.aliases_list, &sender);
-                self.hidden_edits = acc.hidden_folders.clone();
-                self.rebuild_hidden_list(widgets, &sender);
-                fill_editor(widgets, &acc);
-                self.show_push_row(widgets);
-                // Hidden until this account's server answers; a page opened
-                // before it must not show the last account's figure.
-                show_quota(widgets, None);
-                let _ = sender.output(AccountsOutput::WantQuota(acc.email.clone()));
-                let _ = sender.output(AccountsOutput::WantIdentities(acc.email.clone()));
-                // The secrets come from the keyring now, off the main thread,
-                // and land in the fields when they arrive (Save waits for
-                // them should it come first).
-                if AccountSecrets::needed(&acc) {
-                    self.read_secrets(&acc, &sender);
-                }
-                self.populate_folder_combos(widgets, Some(&acc));
-                self.apply_provider(widgets);
-                // Label mirrors the email until customized.
-                self.label_synced = acc.email.clone();
-                let (signatures, default) = acc.signature_set();
-                self.load_signatures(widgets, signatures, default);
-                widgets
-                    .color_btn
-                    .set_rgba(&parse_color(acc.color.as_deref().unwrap_or(DEFAULT_COLOR)));
-                self.emoji = acc.emoji.clone();
-                self.avatar = acc.avatar.clone();
-                widgets.gravatar_row.set_active(acc.gravatar);
-                self.picture_mode = acc.avatar.is_some();
-                if self.picture_mode {
-                    widgets.mode_picture_btn.set_active(true);
-                } else {
-                    widgets.mode_glyph_btn.set_active(true);
-                }
-                self.refresh_preview(widgets);
-                // GOA accounts: no "Remove" (it lives in the system) — offer an
-                // enable/disable toggle and a shortcut to Online Accounts instead.
-                let is_goa = acc.goa_id.is_some();
-                set_connection_editable(widgets, !is_goa);
-                widgets.goa_banner.set_visible(is_goa);
-                widgets.keyring_note.set_visible(!is_goa);
-                // GOA accounts get the same Remove flow — it removes the account
-                // from Hylki only (back to the import list); GNOME keeps it.
-                widgets.remove_btn.set_visible(true);
-                // GNOME owns a GOA account's connection outright, so the server
-                // and credential section isn't shown at all — only what Hylki
-                // owns (name, label, color, signature, aliases) plus the email
-                // for identification. `apply_provider` re-shows what applies the
-                // next time a native account or the add-form opens the editor.
-                widgets.provider_row.set_visible(!is_goa);
-                if is_goa {
-                    for w in [
-                        widgets.protocol_row.upcast_ref::<gtk::Widget>(),
-                        widgets.host_row.upcast_ref(),
-                        widgets.port_row.upcast_ref(),
-                        widgets.smtp_row.upcast_ref(),
-                        widgets.smtp_port_row.upcast_ref(),
-                        widgets.user_row.upcast_ref(),
-                        widgets.pass_row.upcast_ref(),
-                        widgets.smtp_separate_row.upcast_ref(),
-                        widgets.tls_mismatch_row.upcast_ref(),
-                        widgets.smtp_user_row.upcast_ref(),
-                        widgets.smtp_pass_row.upcast_ref(),
-                        widgets.test_btn.upcast_ref(),
-                        widgets.oauth_signin_btn.upcast_ref(),
-                        widgets.oauth_status.upcast_ref(),
-                        widgets.goa_hint.upcast_ref(),
-                    ] {
-                        w.set_visible(false);
-                    }
-                    // The Google/Microsoft "use GNOME" guidance hid these; a GOA
-                    // account edits its display fields right here.
-                    widgets.name_row.set_visible(true);
-                    widgets.email_row.set_visible(true);
-                }
-                widgets.goa_enabled_row.set_active(acc.enabled);
-                // While Mail is switched off in GNOME Settings the account is
-                // paused from there, not from here — say so where the toggle is.
-                widgets
-                    .goa_enabled_row
-                    .set_sensitive(!acc.goa_mail_disabled);
-                widgets.goa_enabled_row.set_subtitle(if acc.goa_mail_disabled {
-                    "Paused: Mail is switched off for this account in GNOME Settings \u{2192} Online Accounts."
-                } else {
-                    "Switching this off returns the account to the import list — it \
-                     stays in GNOME Online Accounts."
-                });
-                self.editor_seed = Some(self.editor_fingerprint(widgets));
-                mount_editor(widgets);
-                widgets.nav.push_by_tag("editor");
-            }
-
-            AccountsInput::EmailChanged => {
-                let email = trimmed(&widgets.email_row);
-                let label = widgets.label_row.text().to_string();
-                // Mirror while the label is still tracking the email (or empty);
-                // once the user types a custom label, stop.
-                if label.is_empty() || label == self.label_synced {
-                    widgets.label_row.set_text(&email);
-                }
-                self.label_synced = email;
-            }
-
-            AccountsInput::MoveRow { from, to } => {
-                if from < self.accounts.len() {
-                    let acc = self.accounts.remove(from);
-                    let to = to.min(self.accounts.len());
-                    self.accounts.insert(to, acc);
-                    self.rebuild_account_list(&widgets.accounts_list, &sender);
-                    let emails = self.accounts.iter().map(|a| a.email.clone()).collect();
-                    let _ = sender.output(AccountsOutput::Reordered(emails));
-                }
-            }
-
+            AccountsInput::EditAccount(i) => self.on_edit_account(i, widgets, sender),
+            AccountsInput::EmailChanged => self.on_email_changed(widgets),
+            AccountsInput::MoveRow { from, to } => self.on_move_row(from, to, widgets, sender),
             AccountsInput::ToggleEnabled { index, enabled } => {
-                // A GNOME Online Account switched off here isn't paused — it is
-                // un-imported: it drops out of Hylki (the config entry and its
-                // stored copies go) and returns to the "GNOME Online Accounts"
-                // list below, ready to import again. The account itself stays
-                // in GNOME untouched.
-                if !enabled && self.accounts.get(index).is_some_and(|a| a.goa_id.is_some()) {
-                    self.unimport_goa(index, widgets, &sender);
-                    return;
-                }
-                if let Some(acc) = self.accounts.get_mut(index) {
-                    if acc.enabled != enabled {
-                        acc.enabled = enabled;
-                        let email = acc.email.clone();
-                        let _ = sender.output(AccountsOutput::EnabledChanged { email, enabled });
-                    }
-                }
+                self.on_toggle_enabled(index, enabled, widgets, sender)
             }
-
             AccountsInput::ToggleCurrentEnabled(enabled) => {
-                if let Some(i) = self.editing {
-                    // Same un-import semantics as the list toggle; the editor
-                    // page closes since its account is no longer in Hylki.
-                    if !enabled && self.accounts.get(i).is_some_and(|a| a.goa_id.is_some()) {
-                        self.unimport_goa(i, widgets, &sender);
-                        widgets.nav.pop();
-                        return;
-                    }
-                    if let Some(acc) = self.accounts.get_mut(i) {
-                        if acc.enabled != enabled {
-                            acc.enabled = enabled;
-                            let email = acc.email.clone();
-                            let _ =
-                                sender.output(AccountsOutput::EnabledChanged { email, enabled });
-                            self.rebuild_account_list(&widgets.accounts_list, &sender);
-                        }
-                    }
-                }
+                self.on_toggle_current_enabled(enabled, widgets, sender)
             }
-
-            AccountsInput::ImportGoa(index) => {
-                if let Some(g) = self.goa.get(index).cloned() {
-                    // Password-based providers: pull the password now. OAuth
-                    // providers: authenticate with a GOA token at connect time.
-                    // Either way the worker asks GOA again when it connects, so an
-                    // account still works if this read comes back empty.
-                    let (password, oauth) = if g.password_based {
-                        (
-                            crate::goa::mail_passwords(&g.id).0.unwrap_or_default(),
-                            false,
-                        )
-                    } else {
-                        (String::new(), true)
-                    };
-                    let account = g.to_config(password, oauth);
-                    self.goa.remove(index);
-                    self.accounts.push(account.clone());
-                    self.rebuild_account_list(&widgets.accounts_list, &sender);
-                    self.rebuild_goa_list(&widgets.goa_list, &sender);
-                    widgets.goa_group.set_visible(!self.goa.is_empty());
-                    let _ = sender.output(AccountsOutput::ImportGoa(Box::new(account)));
-                }
-            }
-
-            AccountsInput::SetEmoji(text) => {
-                self.emoji = Some(text);
-                self.refresh_preview(widgets);
-            }
-
-            AccountsInput::ClearGlyph => {
-                if self.picture_mode {
-                    self.avatar = None;
-                } else {
-                    self.emoji = None;
-                }
-                self.refresh_preview(widgets);
-            }
-
-            AccountsInput::SetServerSavesSent(on) => {
-                widgets.folder_sent_copy_row.set_sensitive(!on);
-                widgets.reply_copies_row.set_sensitive(!on);
-            }
-
+            AccountsInput::ImportGoa(index) => self.on_import_goa(index, widgets, sender),
+            AccountsInput::SetEmoji(text) => self.on_set_emoji(text, widgets),
+            AccountsInput::ClearGlyph => self.on_clear_glyph(widgets),
+            AccountsInput::SetServerSavesSent(on) => self.on_set_server_saves_sent(on, widgets),
             AccountsInput::SetFolderSort { email, sort } => {
-                if let Some(i) = self.accounts.iter().position(|a| a.email == email) {
-                    self.accounts[i].folder_sort = sort;
-                    if self.editing == Some(i) {
-                        widgets
-                            .folder_sort_row
-                            .set_selected(sort.map_or(0, |s| s.index() + 1));
-                    }
-                }
+                self.on_set_folder_sort(email, sort, widgets)
             }
-
-            AccountsInput::SetOwnGravatar(on) => {
-                // Look it up as soon as it is asked for, so the preview can
-                // answer rather than waiting for the account to be saved.
-                let address = trimmed(&widgets.email_row);
-                if on && !address.is_empty() && crate::avatar::wants_own_gravatar(&address) {
-                    sender.oneshot_command(async move {
-                        let outcome = tokio::task::spawn_blocking({
-                            let address = address.clone();
-                            move || crate::avatar::fetch_own_gravatar(&address)
-                        })
-                        .await
-                        .unwrap_or(crate::avatar::FetchOutcome::Retry);
-                        AccountsCmd::OwnGravatar {
-                            email: address,
-                            outcome,
-                        }
-                    });
-                }
-                self.refresh_preview(widgets);
-            }
-
-            AccountsInput::SetPictureMode(on) => {
-                if self.picture_mode != on {
-                    self.picture_mode = on;
-                    self.refresh_preview(widgets);
-                }
-            }
-
+            AccountsInput::SetOwnGravatar(on) => self.on_set_own_gravatar(on, widgets, sender),
+            AccountsInput::SetPictureMode(on) => self.on_set_picture_mode(on, widgets),
             AccountsInput::RefreshPreview => self.refresh_preview(widgets),
-
-            AccountsInput::PickAvatar => {
-                let dialog = gtk::FileDialog::builder()
-                    .title(&i18n("Choose a Picture"))
-                    .build();
-                let filter = gtk::FileFilter::new();
-                filter.set_name(Some(&i18n("Images")));
-                filter.add_pixbuf_formats();
-                let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
-                filters.append(&filter);
-                dialog.set_filters(Some(&filters));
-                dialog.set_default_filter(Some(&filter));
-                // The panel is a Bin inside the Settings window; the
-                // dialog wants that window.
-                let parent = root.root().and_then(|r| r.downcast::<gtk::Window>().ok());
-                let s = sender.clone();
-                dialog.open(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-                    let Ok(file) = res else { return };
-                    let Some(path) = file.path() else { return };
-                    match import_avatar_file(&path) {
-                        Ok(name) => s.input_sender().emit(AccountsInput::SetAvatar(name)),
-                        Err(e) => tracing::warn!("could not import avatar {}: {e}", path.display()),
-                    }
-                });
-            }
-
-            AccountsInput::SetAvatar(name) => {
-                self.avatar = Some(name);
-                self.refresh_preview(widgets);
-            }
-
-            AccountsInput::TestConnection => {
-                let account = read_account(widgets, self.saved_emoji(), self.saved_avatar());
-                widgets.test_btn.set_sensitive(false);
-                widgets.test_result.set_visible(true);
-                widgets.test_result.set_css_classes(&["dim-label"]);
-                widgets.test_result.set_label(&i18n("Testing…"));
-                sender.oneshot_command(async move {
-                    let r = tokio::task::spawn_blocking(move || {
-                        worker::test_connection_blocking(account)
-                    })
-                    .await
-                    .unwrap_or_else(|_| ConnTest {
-                        incoming: Err("test could not run".into()),
-                        smtp: Err("test could not run".into()),
-                    });
-                    AccountsCmd::Test(r)
-                });
-            }
-
-            AccountsInput::ProtocolChanged => {
-                apply_protocol(widgets);
-                self.show_push_row(widgets);
-                self.refresh_provider_mark(widgets);
-            }
-            AccountsInput::ProviderChanged => {
-                // Editing a GOA account: the provider dropdown is hidden and the
-                // connection section deliberately not shown — but filling the
-                // editor sets the dropdown, whose notify lands here right after
-                // EditAccount and would undo that. GNOME owns those fields;
-                // leave them hidden.
-                let editing_goa = self
-                    .editing
-                    .and_then(|i| self.accounts.get(i))
-                    .is_some_and(|a| a.goa_id.is_some());
-                if !editing_goa {
-                    self.apply_provider(widgets);
-                }
-                self.show_push_row(widgets);
-            }
-
-            AccountsInput::OAuthSignIn => {
-                let settings = self.oauth_settings_from_form(widgets);
-                if settings.client_id.trim().is_empty()
-                    || settings.auth_url.is_empty()
-                    || settings.token_url.is_empty()
-                {
-                    widgets.oauth_status.set_visible(true);
-                    widgets.oauth_status.set_css_classes(&["error"]);
-                    widgets.oauth_status.set_label(&i18n(
-                        "Enter a client ID (and endpoints for a custom provider) first",
-                    ));
-                    return;
-                }
-                widgets.oauth_signin_btn.set_sensitive(false);
-                widgets.oauth_status.set_visible(true);
-                widgets.oauth_status.set_css_classes(&["dim-label"]);
-                let in_window = !settings.redirect_uri.trim().is_empty();
-                widgets.oauth_status.set_label(&if in_window {
-                    i18n("Complete the sign-in in the window that opened.")
-                } else {
-                    i18n("Opening browser… complete sign-in there.")
-                });
-                // The address typed so far names the identity broker's
-                // account, where one is in charge of sign-ins.
-                let user =
-                    Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
-                sign_in(root, &sender, settings, user, false, AccountsCmd::OAuth);
-            }
-
+            AccountsInput::PickAvatar => self.on_pick_avatar(sender, root),
+            AccountsInput::SetAvatar(name) => self.on_set_avatar(name, widgets),
+            AccountsInput::TestConnection => self.on_test_connection(widgets, sender),
+            AccountsInput::ProtocolChanged => self.on_protocol_changed(widgets),
+            AccountsInput::ProviderChanged => self.on_provider_changed(widgets),
+            AccountsInput::OAuthSignIn => self.on_oauth_sign_in(widgets, sender, root),
             AccountsInput::SetGraphDirectory(on) => {
-                if on == self.directory_on {
-                    return;
-                }
-                self.directory_on = on;
-                widgets.graph_status.set_visible(false);
-                // Turning it off keeps the scopes: they cost nothing, and
-                // turning it on again then asks nothing.
-                if !on || self.directory_granted {
-                    return;
-                }
-                let mut settings = self.oauth_settings_from_form(widgets);
-                if settings.client_id.trim().is_empty()
-                    || !settings.token_url.contains("microsoftonline")
-                {
-                    return;
-                }
-                settings.scopes = crate::oauth::with_directory_scopes(&settings.scopes);
-                widgets.graph_directory_row.set_sensitive(false);
-                widgets.oauth_signin_btn.set_sensitive(false);
-                widgets.graph_status.set_visible(true);
-                widgets.graph_status.set_css_classes(&["dim-label"]);
-                widgets
-                    .graph_status
-                    .set_label(&if settings.redirect_uri.trim().is_empty() {
-                        i18n("Opening browser… approve access to the directory there.")
-                    } else {
-                        i18n("Approve access to the directory in the window that opened.")
-                    });
-                // Straight to the account being edited: Microsoft then asks
-                // only for what it has not approved yet.
-                let user =
-                    Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
-                sign_in(
-                    root,
-                    &sender,
-                    settings,
-                    user,
-                    true,
-                    AccountsCmd::DirectoryConsent,
-                );
+                self.on_set_graph_directory(on, widgets, sender, root)
             }
-
             AccountsInput::SetGraphLabels(on) => {
-                if on == self.labels_on {
-                    return;
-                }
-                self.labels_on = on;
-                widgets.graph_status.set_visible(false);
-                // Off keeps the scope, as the directory's does.
-                if !on || self.labels_granted {
-                    return;
-                }
-                let mut settings = self.oauth_settings_from_form(widgets);
-                if settings.client_id.trim().is_empty()
-                    || !settings.token_url.contains("microsoftonline")
-                {
-                    return;
-                }
-                settings.scopes = crate::oauth::with_scopes(
-                    &settings.scopes,
-                    &crate::oauth::MICROSOFT_LABEL_SCOPES,
-                );
-                widgets.graph_labels_row.set_sensitive(false);
-                widgets.oauth_signin_btn.set_sensitive(false);
-                widgets.graph_status.set_visible(true);
-                widgets.graph_status.set_css_classes(&["dim-label"]);
-                widgets
-                    .graph_status
-                    .set_label(&if settings.redirect_uri.trim().is_empty() {
-                        i18n("Opening browser… approve access to the sensitivity labels there.")
-                    } else {
-                        i18n("Approve access to the sensitivity labels in the window that opened.")
-                    });
-                let user =
-                    Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
-                sign_in(
-                    root,
-                    &sender,
-                    settings,
-                    user,
-                    true,
-                    AccountsCmd::LabelsConsent,
-                );
+                self.on_set_graph_labels(on, widgets, sender, root)
             }
-
             AccountsInput::OpenOnlineAccounts => open_online_accounts(),
-
-            AccountsInput::Save => {
-                // Pull the signature HTML out of the editor first (async), then
-                // finish saving in SaveWithSig.
-                let s = sender.clone();
-                self.read_signature(widgets, move |html| {
-                    s.input_sender().emit(AccountsInput::SaveWithSig(html))
-                });
-            }
-
-            AccountsInput::SetFolderChoices(map) => {
-                self.folders_by_email = map;
-            }
-
+            AccountsInput::Save => self.on_save(widgets, sender),
+            AccountsInput::SetFolderChoices(map) => self.on_set_folder_choices(map),
             AccountsInput::SignatureSourceToggle => {
-                if self.sig_reading {
-                    return;
-                }
-                // The view loads a new document either way, which forgets
-                // that the old one was edited.
-                let s = sender.clone();
-                self.sig_editor(widgets).is_dirty(move |dirty| {
-                    s.input_sender().emit(AccountsInput::SigTextTouched(dirty))
-                });
-                let s = sender.clone();
-                if self.sig_editor(widgets).source_kind().is_some() {
-                    self.sig_editor(widgets).extract_source(move |text| {
-                        s.input_sender().emit(AccountsInput::SignatureToRich(text))
-                    });
-                } else {
-                    self.sig_editor(widgets).extract_html(move |html| {
-                        s.input_sender()
-                            .emit(AccountsInput::SignatureToSource(html))
-                    });
-                }
+                self.on_signature_source_toggle(widgets, sender)
             }
-            AccountsInput::SignatureToSource(html) => {
-                self.sig_editor(widgets)
-                    .set_source(rich_editor::SourceKind::Html, &html);
-                self.sync_source_button(widgets);
+            AccountsInput::SignatureToSource(html) => self.on_signature_to_source(html, widgets),
+            AccountsInput::SignatureToRich(text) => self.on_signature_to_rich(text, widgets),
+            AccountsInput::SignatureImport => self.on_signature_import(sender, root),
+            AccountsInput::SignatureImportFile(path) => {
+                self.on_signature_import_file(path, widgets, root)
             }
-            AccountsInput::SignatureToRich(text) => {
-                self.sig_editor(widgets)
-                    .set_html(&rich_editor::signature_from_source(&text, None));
-                self.sync_source_button(widgets);
-            }
-            AccountsInput::SignatureImport => {
-                let dialog = gtk::FileDialog::new();
-                dialog.set_title(&i18n("Import Signature"));
-                let filter = gtk::FileFilter::new();
-                filter.set_name(Some(&i18n("HTML and text files")));
-                filter.add_mime_type("text/html");
-                filter.add_mime_type("text/plain");
-                filter.add_suffix("html");
-                filter.add_suffix("htm");
-                filter.add_suffix("txt");
-                let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
-                filters.append(&filter);
-                dialog.set_filters(Some(&filters));
-                dialog.set_default_filter(Some(&filter));
-                let parent = root.root().and_downcast::<gtk::Window>();
-                let s = sender.input_sender().clone();
-                dialog.open(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
-                    if let Some(path) = res.ok().and_then(|f| f.path()) {
-                        let _ = s.send(AccountsInput::SignatureImportFile(path));
-                    }
-                });
-            }
-            AccountsInput::SignatureImportFile(path) => match std::fs::read(&path) {
-                Ok(bytes) => {
-                    let text = String::from_utf8_lossy(&bytes);
-                    self.sig_editor(widgets)
-                        .set_html(&rich_editor::signature_from_source(&text, path.parent()));
-                    self.sync_source_button(widgets);
-                }
-                Err(e) => {
-                    let host = root.root().and_downcast::<gtk::Window>();
-                    let dialog = adw::MessageDialog::new(
-                        host.as_ref(),
-                        Some(i18n("Could Not Read the File").as_str()),
-                        Some(&format!("{}\n{e}", path.display())),
-                    );
-                    dialog.add_response("ok", &i18n("OK"));
-                    dialog.present();
-                }
-            },
-
-            AccountsInput::SigShow => {
-                let pick = widgets.sig_choice_row.selected() as usize;
-                if self.sig_reading || pick == self.sig_shown || pick >= self.sig_edits.len() {
-                    return;
-                }
-                self.read_back_signature(widgets, &sender, false);
-            }
-            AccountsInput::SigAdd => {
-                if !self.sig_reading {
-                    self.read_back_signature(widgets, &sender, true);
-                }
-            }
-            AccountsInput::SigDelete => {
-                if self.sig_reading || self.sig_edits.len() < 2 {
-                    return;
-                }
-                let gone = self.sig_shown;
-                self.sig_edits.remove(gone);
-                self.sig_default = match self.sig_default {
-                    Some(d) if d == gone => None,
-                    Some(d) if d > gone => Some(d - 1),
-                    d => d,
-                };
-                self.sig_touched = true;
-                self.show_signature(widgets, gone.saturating_sub(1));
-            }
-            AccountsInput::SigRename => {
-                let name = widgets.sig_name_row.text().to_string();
-                let shown = self.sig_shown;
-                let Some(sig) = self.sig_edits.get_mut(shown) else {
-                    return;
-                };
-                if sig.name == name {
-                    return;
-                }
-                sig.name = name;
-                self.sig_touched = true;
-                // Setting the model's entry moves the chooser off it; its
-                // notify finds it back on the shown one and does nothing.
-                let label = signature_label(&self.sig_edits, shown);
-                if let Some(list) = widgets
-                    .sig_choice_row
-                    .model()
-                    .and_downcast::<gtk::StringList>()
-                {
-                    list.splice(shown as u32, 1, &[label.as_str()]);
-                    widgets.sig_choice_row.set_selected(shown as u32);
-                }
-            }
-            AccountsInput::SigDefault => {
-                let on = widgets.sig_default_row.is_active();
-                let shown = Some(self.sig_shown);
-                let default = match (on, self.sig_default == shown) {
-                    (true, false) => shown,
-                    (false, true) => None,
-                    _ => return,
-                };
-                self.sig_default = default;
-                self.sig_touched = true;
-            }
+            AccountsInput::SigShow => self.on_sig_show(widgets, sender),
+            AccountsInput::SigAdd => self.on_sig_add(widgets, sender),
+            AccountsInput::SigDelete => self.on_sig_delete(widgets),
+            AccountsInput::SigRename => self.on_sig_rename(widgets),
+            AccountsInput::SigDefault => self.on_sig_default(widgets),
             AccountsInput::SigTextTouched(dirty) => self.sig_touched |= dirty,
-            AccountsInput::SigStored { html, add } => {
-                self.sig_reading = false;
-                if let Some(shown) = self.sig_edits.get_mut(self.sig_shown) {
-                    shown.html = html;
-                }
-                let next = if add {
-                    let n = self.sig_edits.len() + 1;
-                    self.sig_edits.push(NamedSignature {
-                        name: i18n_f("Signature {n}", &[("n", &n.to_string())]),
-                        html: String::new(),
-                    });
-                    self.sig_touched = true;
-                    self.sig_edits.len() - 1
-                } else {
-                    widgets.sig_choice_row.selected() as usize
-                };
-                self.show_signature(widgets, next.min(self.sig_edits.len().saturating_sub(1)));
-                if add {
-                    widgets.sig_name_row.grab_focus();
-                }
-            }
-
+            AccountsInput::SigStored { html, add } => self.on_sig_stored(html, add, widgets),
             AccountsInput::SaveWithSig(sig_html) => {
-                widgets.host_row.remove_css_class("error");
-                let mut account = read_account(widgets, self.saved_emoji(), self.saved_avatar());
-                account.aliases = self.alias_edits.clone();
-                account.hidden_folders = self.hidden_edits.clone();
-                account.folder_roles = self.read_folder_roles(widgets);
-                account.sent_copy_path = self.read_sent_copy_path(widgets);
-                account.server_saves_sent = widgets.server_saves_row.is_active();
-                if let Some(shown) = self.sig_edits.get_mut(self.sig_shown) {
-                    shown.html = sig_html;
-                }
-                let (signatures, default) = self.saved_signatures();
-                account.set_signatures(signatures, default);
-
-                // Editing preserves the enabled state; GOA accounts keep their
-                // (GOA-driven) OAuth mechanism regardless of the Authentication combo.
-                let editing_orig = self.editing.and_then(|i| self.accounts.get(i)).cloned();
-                if let Some(orig) = &editing_orig {
-                    account.enabled = orig.enabled;
-                    // The one-time look for Exchange's non-mail folders
-                    // (#239) stays done, or a folder brought back here
-                    // would be hidden again at the next listing.
-                    account.folders_seeded = orig.folders_seeded;
-                    account.goa_id = orig.goa_id.clone();
-                    account.goa_mail_disabled = orig.goa_mail_disabled;
-                    account.goa_enabled_before_mail_disabled =
-                        orig.goa_enabled_before_mail_disabled;
-                    if orig.goa_id.is_some() {
-                        account.oauth = orig.oauth;
-                        account.oauth_settings = orig.oauth_settings.clone();
-                        // GNOME Online Accounts is the source of truth for these;
-                        // Hylki keeps only what it owns (display name, signature,
-                        // color, emoji, label).
-                        account.email = orig.email.clone();
-                        account.protocol = orig.protocol;
-                        account.imap_host = orig.imap_host.clone();
-                        account.imap_port = orig.imap_port;
-                        account.smtp_host = orig.smtp_host.clone();
-                        account.smtp_port = orig.smtp_port;
-                        account.username = orig.username.clone();
-                        account.password = orig.password.clone();
-                        account.smtp_separate = orig.smtp_separate;
-                        account.smtp_username = orig.smtp_username.clone();
-                        account.smtp_password = orig.smtp_password.clone();
-                        account.security = orig.security.clone();
-                    }
-                }
-
-                // Only once Microsoft has approved the scopes; an account from
-                // GNOME Online Accounts cannot have them.
-                account.graph_directory &= account.goa_id.is_none() && self.directory_granted;
-                account.graph_label_names &= account.goa_id.is_none() && self.labels_granted;
-
-                // Native account: authentication comes from the provider dropdown.
-                let is_oauth = provider_at(widgets.provider_row.selected()).is_oauth();
-                if account.goa_id.is_none() {
-                    if is_oauth {
-                        account.oauth = true;
-                        account.oauth_settings = Some(self.oauth_settings_from_form(widgets));
-                        if account.username.trim().is_empty() {
-                            account.username = account.email.clone();
-                        }
-                        // A fresh sign-in supplies a refresh token; otherwise keep
-                        // the one already in the keyring (edit without re-signing).
-                        if let Some(rt) = self.pending_oauth_refresh.clone() {
-                            account.oauth_refresh = rt;
-                        }
-                    } else {
-                        account.oauth = false;
-                        account.oauth_settings = None;
-                    }
-                }
-
-                // Validation.
-                let oauth_ready = if account.oauth && account.goa_id.is_none() {
-                    let has_client = account
-                        .oauth_settings
-                        .as_ref()
-                        .is_some_and(|s| !s.client_id.trim().is_empty());
-                    let signed_in = self.pending_oauth_refresh.is_some()
-                        || editing_orig.as_ref().is_some_and(|o| o.oauth);
-                    if !has_client || !signed_in {
-                        widgets.oauth_status.set_visible(true);
-                        widgets.oauth_status.set_css_classes(&["error"]);
-                        widgets
-                            .oauth_status
-                            .set_label(&i18n("Enter a client ID and sign in before saving"));
-                    }
-                    has_client && signed_in
-                } else {
-                    true
-                };
-                // Saved before the keyring answered, or with the field left
-                // as it was: the stored secrets stand. Not read yet, they
-                // are waited for, and Save runs again once they are here.
-                if AccountSecrets::needed(&account) {
-                    match &self.editor_secrets {
-                        Some(secrets) => secrets.apply(&mut account),
-                        None => {
-                            if !self.secrets_reading {
-                                self.read_secrets(&account, &sender);
-                            }
-                            self.save_waiting = true;
-                            return;
-                        }
-                    }
-                }
-                let password_ok = account.oauth || !account.password.is_empty();
-                // A GOA account's connection fields were all restored from the
-                // original above (GNOME owns them; a Graph account rightly has
-                // no IMAP host at all) — validating them would only block the
-                // fields Hylki does own: label, signature, color, aliases.
-                let is_goa_edit = account.goa_id.is_some();
-                if !is_goa_edit
-                    && (account.imap_host.is_empty()
-                        || account.username.is_empty()
-                        || !password_ok
-                        || !oauth_ready
-                        || (account.smtp_separate
-                            && (account.smtp_username.is_empty()
-                                || account.smtp_password.is_empty())))
-                {
-                    widgets.host_row.add_css_class("error");
-                    return;
-                }
-                self.pending_oauth_refresh = None;
-
-                let original_email = self
-                    .editing
-                    .and_then(|i| self.accounts.get(i))
-                    .map(|a| a.email.clone());
-                match self.editing {
-                    Some(i) if i < self.accounts.len() => self.accounts[i] = account.clone(),
-                    _ => self.accounts.push(account.clone()),
-                }
-                self.rebuild_account_list(&widgets.accounts_list, &sender);
-                let _ = sender.output(AccountsOutput::Saved {
-                    original_email,
-                    account: Box::new(account),
-                });
-                widgets.nav.pop();
+                self.on_save_with_sig(sig_html, widgets, sender)
             }
-
-            AccountsInput::RemoveCurrent => {
-                // Confirm before this destructive, keyring-clearing action.
-                let Some(i) = self.editing else { return };
-                let Some(account) = self.accounts.get(i) else {
-                    return;
-                };
-                let name = if account.name.trim().is_empty() {
-                    account.email.clone()
-                } else {
-                    account.name.clone()
-                };
-                let body = if account.goa_id.is_some() {
-                    format!(
-                        "Remove {name} from Hylki? It stays in GNOME Online Accounts \
-                         and can be imported again from the list below. Mail on the \
-                         server is not affected."
-                    )
-                } else {
-                    format!(
-                        "Remove {name} from Hylki? Its saved password is deleted from \
-                         the keyring. Mail on the server is not affected."
-                    )
-                };
-                // The panel is embedded — dialogs parent to whatever window
-                // it currently sits in (the combined settings window).
-                let host = root.root().and_downcast::<gtk::Window>();
-                let dialog = adw::MessageDialog::new(
-                    host.as_ref(),
-                    Some(i18n("Remove Account?").as_str()),
-                    Some(&body),
-                );
-                dialog.add_response("cancel", &i18n("Cancel"));
-                dialog.add_response("remove", &i18n("Remove"));
-                dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
-                dialog.set_default_response(Some("cancel"));
-                dialog.set_close_response("cancel");
-                let s = sender.clone();
-                dialog.connect_response(None, move |_, resp| {
-                    if resp == "remove" {
-                        s.input_sender().emit(AccountsInput::ConfirmRemove);
-                    }
-                });
-                dialog.present();
-            }
-            AccountsInput::ConfirmRemove => {
-                if let Some(i) = self.editing {
-                    if i < self.accounts.len() {
-                        let email = self.accounts[i].email.clone();
-                        self.accounts.remove(i);
-                        self.rebuild_account_list(&widgets.accounts_list, &sender);
-                        let _ = sender.output(AccountsOutput::Removed { email });
-                        // A removed GOA import returns to the list below (and a
-                        // repaired-away broken entry re-offers its GOA account).
-                        self.goa = importable_goa_accounts(&self.accounts);
-                        self.rebuild_goa_list(&widgets.goa_list, &sender);
-                        widgets.goa_group.set_visible(!self.goa.is_empty());
-                    }
-                }
-                widgets.nav.pop();
-            }
-
-            AccountsInput::AliasAdd => {
-                self.alias_editing = None;
-                let jmap = form_protocol(widgets) == Protocol::Jmap;
-                self.open_alias_dialog(root, &AliasConfig::default(), jmap, &sender);
-            }
-
-            AccountsInput::AliasEdit(i) => {
-                let Some(alias) = self.alias_edits.get(i).cloned() else {
-                    return;
-                };
-                self.alias_editing = Some(i);
-                let jmap = form_protocol(widgets) == Protocol::Jmap;
-                self.open_alias_dialog(root, &alias, jmap, &sender);
-            }
-
-            AccountsInput::UnhideFolder(i) => {
-                if i < self.hidden_edits.len() {
-                    self.hidden_edits.remove(i);
-                    self.rebuild_hidden_list(widgets, &sender);
-                }
-            }
-            AccountsInput::AliasRemove(i) => {
-                if i < self.alias_edits.len() {
-                    // The keyring entry (if the alias had its own SMTP) is
-                    // dropped on Save, when the removal actually takes effect.
-                    self.alias_edits.remove(i);
-                    self.rebuild_alias_list(&widgets.aliases_list, &sender);
-                }
-            }
-
-            AccountsInput::AliasDialogSave => {
-                let Some(d) = self.alias_dialog.as_ref() else {
-                    return;
-                };
-                for row in [&d.addr_row, &d.host_row, &d.user_row] {
-                    row.remove_css_class("error");
-                }
-                d.pass_row.remove_css_class("error");
-
-                let name = trimmed(&d.name_row);
-                let addr = trimmed(&d.addr_row);
-                let own_smtp = d.smtp_switch.is_active();
-                let host = trimmed(&d.host_row);
-                let port: u16 = trimmed(&d.port_row).parse().unwrap_or(587);
-                let user = trimmed(&d.user_row);
-                let pass = d.pass_row.text().to_string();
-
-                // The address must look like one, and must not shadow the
-                // account's own address or another alias — the send path picks
-                // an alias's transport by matching the From address, so a
-                // duplicate would make "which server sends this?" ambiguous.
-                let account_email = trimmed(&widgets.email_row);
-                let duplicate = addr.eq_ignore_ascii_case(&account_email)
-                    || self.alias_edits.iter().enumerate().any(|(i, a)| {
-                        Some(i) != self.alias_editing && a.address().eq_ignore_ascii_case(&addr)
-                    });
-                let mut bad = false;
-                if addr.is_empty() || !addr.contains('@') || duplicate {
-                    d.addr_row.add_css_class("error");
-                    bad = true;
-                }
-                if own_smtp {
-                    if host.is_empty() {
-                        d.host_row.add_css_class("error");
-                        bad = true;
-                    }
-                    if user.is_empty() {
-                        d.user_row.add_css_class("error");
-                        bad = true;
-                    }
-                    if pass.is_empty() {
-                        d.pass_row.add_css_class("error");
-                        bad = true;
-                    }
-                }
-                if bad {
-                    return;
-                }
-
-                let alias = AliasConfig {
-                    identity: if name.is_empty() {
-                        addr.clone()
-                    } else {
-                        format!("{name} <{addr}>")
-                    },
-                    smtp_host: if own_smtp { host } else { String::new() },
-                    smtp_port: port,
-                    smtp_username: if own_smtp { user } else { String::new() },
-                    smtp_password: if own_smtp { pass } else { String::new() },
-                };
-                match self.alias_editing {
-                    Some(i) if i < self.alias_edits.len() => self.alias_edits[i] = alias,
-                    _ => self.alias_edits.push(alias),
-                }
-                self.alias_editing = None;
-                self.close_alias_dialog();
-                self.rebuild_alias_list(&widgets.aliases_list, &sender);
-            }
-
-            AccountsInput::AliasDialogTest => {
-                let Some(d) = self.alias_dialog.as_ref() else {
-                    return;
-                };
-                let alias = AliasConfig {
-                    identity: trimmed(&d.addr_row),
-                    smtp_host: trimmed(&d.host_row),
-                    smtp_port: trimmed(&d.port_row).parse().unwrap_or(587),
-                    smtp_username: trimmed(&d.user_row),
-                    smtp_password: d.pass_row.text().to_string(),
-                };
-                let email = trimmed(&widgets.email_row);
-                d.test_btn.set_sensitive(false);
-                d.test_result.set_visible(true);
-                d.test_result.set_css_classes(&["dim-label"]);
-                d.test_result.set_label(&i18n("Testing…"));
-                sender.oneshot_command(async move {
-                    let r = tokio::task::spawn_blocking(move || {
-                        worker::test_alias_smtp_blocking(email, alias)
-                    })
-                    .await
-                    .unwrap_or_else(|_| Err("test could not run".into()));
-                    AccountsCmd::AliasTested(r)
-                });
-            }
-
-            AccountsInput::AliasDialogClosed => {
-                // The notification is queued behind the close, so by the time it
-                // arrives a replacement dialog may already be open — only clear
-                // state when the dialog we track is really the one that closed.
-                if self
-                    .alias_dialog
-                    .as_ref()
-                    .is_none_or(|d| !d.window.is_visible())
-                {
-                    self.alias_dialog = None;
-                    self.alias_editing = None;
-                }
-            }
-
-            AccountsInput::AddSenderText(text) => {
-                let addr = text.trim().to_lowercase();
-                if !addr.is_empty() && !self.sender_addrs.contains(&addr) {
-                    self.sender_addrs.push(addr.clone());
-                    self.senders.guard().push_back(addr.clone());
-                    self.senders.widget().set_visible(true);
-                    let _ = sender.output(AccountsOutput::AddSender(addr));
-                }
-            }
-            AccountsInput::RemoveSenderRow(addr) => {
-                if let Some(pos) = self.sender_addrs.iter().position(|a| *a == addr) {
-                    self.sender_addrs.remove(pos);
-                    self.senders.guard().remove(pos);
-                    self.senders
-                        .widget()
-                        .set_visible(!self.sender_addrs.is_empty());
-                    let _ = sender.output(AccountsOutput::RemoveSender(addr));
-                }
-            }
-            AccountsInput::AddBlacklistText(text) => {
-                let addr = text.trim().to_lowercase();
-                if !addr.is_empty() && !self.blacklist_addrs.contains(&addr) {
-                    self.blacklist_addrs.push(addr.clone());
-                    self.blacklist.guard().push_back(addr.clone());
-                    self.blacklist.widget().set_visible(true);
-                    let _ = sender.output(AccountsOutput::AddBlacklist(addr));
-                }
-            }
-            AccountsInput::RemoveBlacklistRow(addr) => {
-                if let Some(pos) = self.blacklist_addrs.iter().position(|a| *a == addr) {
-                    self.blacklist_addrs.remove(pos);
-                    self.blacklist.guard().remove(pos);
-                    self.blacklist
-                        .widget()
-                        .set_visible(!self.blacklist_addrs.is_empty());
-                    let _ = sender.output(AccountsOutput::RemoveBlacklist(addr));
-                }
-            }
-            AccountsInput::AddFilter => {
-                self.open_filter_page(&widgets.nav, &sender, None, None);
-            }
-            AccountsInput::AddFilterFrom(rule) => {
-                self.open_filter_page(&widgets.nav, &sender, None, Some(rule));
-            }
-            AccountsInput::ApplyFilters => {
-                if !self.filters_applying {
-                    self.set_filters_applying(true);
-                    let _ = sender.output(AccountsOutput::ApplyFilters);
-                }
-            }
+            AccountsInput::RemoveCurrent => self.on_remove_current(sender, root),
+            AccountsInput::ConfirmRemove => self.on_confirm_remove(widgets, sender),
+            AccountsInput::AliasAdd => self.on_alias_add(widgets, sender, root),
+            AccountsInput::AliasEdit(i) => self.on_alias_edit(i, widgets, sender, root),
+            AccountsInput::UnhideFolder(i) => self.on_unhide_folder(i, widgets, sender),
+            AccountsInput::AliasRemove(i) => self.on_alias_remove(i, widgets, sender),
+            AccountsInput::AliasDialogSave => self.on_alias_dialog_save(widgets, sender),
+            AccountsInput::AliasDialogTest => self.on_alias_dialog_test(widgets, sender),
+            AccountsInput::AliasDialogClosed => self.on_alias_dialog_closed(),
+            AccountsInput::AddSenderText(text) => self.on_add_sender_text(text, sender),
+            AccountsInput::RemoveSenderRow(addr) => self.on_remove_sender_row(addr, sender),
+            AccountsInput::AddBlacklistText(text) => self.on_add_blacklist_text(text, sender),
+            AccountsInput::RemoveBlacklistRow(addr) => self.on_remove_blacklist_row(addr, sender),
+            AccountsInput::AddFilter => self.on_add_filter(widgets, sender),
+            AccountsInput::AddFilterFrom(rule) => self.on_add_filter_from(rule, widgets, sender),
+            AccountsInput::ApplyFilters => self.on_apply_filters(sender),
             AccountsInput::FiltersApplying(on) => self.set_filters_applying(on),
-            AccountsInput::EditFilter(i) => {
-                if let Some(rule) = self.filter_rules.get(i).cloned() {
-                    self.open_filter_page(&widgets.nav, &sender, Some((i, rule)), None);
-                }
-            }
-            AccountsInput::FilterEdited(i, rule) => {
-                if let Some(slot) = self.filter_rules.get_mut(i) {
-                    if *slot != rule {
-                        *slot = rule;
-                        self.rebuild_filter_rows(&sender);
-                        let _ =
-                            sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
-                    }
-                }
-            }
-            AccountsInput::RemoveFilter(i) => {
-                if i < self.filter_rules.len() {
-                    self.filter_rules.remove(i);
-                    self.rebuild_filter_rows(&sender);
-                    let _ = sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
-                }
-            }
-            AccountsInput::FilterAdded(rule) => {
-                self.filter_rules.push(rule);
-                self.rebuild_filter_rows(&sender);
-                let _ = sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
-            }
+            AccountsInput::EditFilter(i) => self.on_edit_filter(i, widgets, sender),
+            AccountsInput::FilterEdited(i, rule) => self.on_filter_edited(i, rule, sender),
+            AccountsInput::RemoveFilter(i) => self.on_remove_filter(i, sender),
+            AccountsInput::FilterAdded(rule) => self.on_filter_added(rule, sender),
             AccountsInput::AddSmartFolder => self.open_smart_page(&widgets.nav, &sender, None),
-            AccountsInput::EditSmartFolder(i) => {
-                if let Some(f) = self.smart_folders.get(i).cloned() {
-                    self.open_smart_page(&widgets.nav, &sender, Some((i, f)));
-                }
-            }
-            AccountsInput::RemoveSmartFolder(i) => {
-                if i < self.smart_folders.len() {
-                    self.smart_folders.remove(i);
-                    self.rebuild_smart_rows(&sender);
-                    let _ =
-                        sender.output(AccountsOutput::SetSmartFolders(self.smart_folders.clone()));
-                }
-            }
+            AccountsInput::EditSmartFolder(i) => self.on_edit_smart_folder(i, widgets, sender),
+            AccountsInput::RemoveSmartFolder(i) => self.on_remove_smart_folder(i, sender),
             AccountsInput::SmartFolderSaved(at, folder) => {
-                match at.filter(|i| *i < self.smart_folders.len()) {
-                    Some(i) => self.smart_folders[i] = folder,
-                    None => self.smart_folders.push(folder),
-                }
-                self.rebuild_smart_rows(&sender);
-                let _ = sender.output(AccountsOutput::SetSmartFolders(self.smart_folders.clone()));
+                self.on_smart_folder_saved(at, folder, sender)
             }
-            AccountsInput::SetSmartFolders(folders) => {
-                if folders != self.smart_folders {
-                    self.smart_folders = folders;
-                    self.rebuild_smart_rows(&sender);
-                }
-            }
+            AccountsInput::SetSmartFolders(folders) => self.on_set_smart_folders(folders, sender),
             AccountsInput::AddTag => self.open_tag_page(&widgets.nav, &sender, None),
-            AccountsInput::EditTag(i) => {
-                if let Some(tag) = self.tags.get(i).cloned() {
-                    self.open_tag_page(&widgets.nav, &sender, Some((i, tag)));
-                }
-            }
-            AccountsInput::RemoveTag(i) => {
-                if i < self.tags.len() {
-                    self.tags.remove(i);
-                    self.rebuild_tag_rows(&sender);
-                    // The rules name tags by keyword; a rule whose tag is gone
-                    // shows the bare keyword until it is edited.
-                    self.rebuild_filter_rows(&sender);
-                    let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
-                }
-            }
-            AccountsInput::MoveTag { from, to } => {
-                if from < self.tags.len() && from != to {
-                    let tag = self.tags.remove(from);
-                    let to = to.min(self.tags.len());
-                    self.tags.insert(to, tag);
-                    self.rebuild_tag_rows(&sender);
-                    let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
-                }
-            }
-            AccountsInput::TagAdded(tag) => {
-                self.tags.push(tag);
-                self.rebuild_tag_rows(&sender);
-                let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
-            }
-            AccountsInput::TagEdited(i, tag) => {
-                if let Some(slot) = self.tags.get_mut(i) {
-                    if *slot != tag {
-                        *slot = tag;
-                        self.rebuild_tag_rows(&sender);
-                        self.rebuild_filter_rows(&sender);
-                        let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
-                    }
-                }
-            }
-            AccountsInput::FindTags => {
-                if !self.tag_scanning {
-                    self.set_tag_scanning(true);
-                    let _ = sender.output(AccountsOutput::FindTags);
-                }
-            }
+            AccountsInput::EditTag(i) => self.on_edit_tag(i, widgets, sender),
+            AccountsInput::RemoveTag(i) => self.on_remove_tag(i, sender),
+            AccountsInput::MoveTag { from, to } => self.on_move_tag(from, to, sender),
+            AccountsInput::TagAdded(tag) => self.on_tag_added(tag, sender),
+            AccountsInput::TagEdited(i, tag) => self.on_tag_edited(i, tag, sender),
+            AccountsInput::FindTags => self.on_find_tags(sender),
             AccountsInput::ServerIdentities { email, identities } => {
-                let open = self
-                    .editing
-                    .and_then(|i| self.accounts.get(i))
-                    .is_some_and(|a| a.email.eq_ignore_ascii_case(&email));
-                if open && self.server_identities != identities {
-                    self.server_identities = identities;
-                    self.rebuild_alias_list(&widgets.aliases_list, &sender);
-                }
+                self.on_server_identities(email, identities, widgets, sender)
             }
-            AccountsInput::Quota { email, quota } => {
-                let open = self
-                    .editing
-                    .and_then(|i| self.accounts.get(i))
-                    .is_some_and(|a| a.email.eq_ignore_ascii_case(&email));
-                if open {
-                    show_quota(widgets, quota);
-                }
-            }
+            AccountsInput::Quota { email, quota } => self.on_quota(email, quota, widgets),
             AccountsInput::TagScanning(on) => self.set_tag_scanning(on),
-            AccountsInput::TagFindings(found) => {
-                self.set_tag_scanning(false);
-                let parent = root.root().and_downcast::<gtk::Window>();
-                self.show_tag_findings(parent.as_ref(), found, &sender);
-            }
-            AccountsInput::ImportTags(tags) => {
-                let mut added = 0;
-                for t in tags {
-                    if !self
-                        .tags
-                        .iter()
-                        .any(|x| x.keyword.eq_ignore_ascii_case(&t.keyword))
-                    {
-                        self.tags.push(t);
-                        added += 1;
-                    }
-                }
-                if added > 0 {
-                    self.rebuild_tag_rows(&sender);
-                    self.rebuild_filter_rows(&sender);
-                    let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
-                }
-            }
+            AccountsInput::TagFindings(found) => self.on_tag_findings(found, sender, root),
+            AccountsInput::ImportTags(tags) => self.on_import_tags(tags, sender),
         }
     }
 
@@ -2927,204 +1715,17 @@ impl Component for AccountsWindow {
     ) {
         match result {
             AccountsCmd::OwnGravatar { email, outcome } => {
-                // Cached for every other circle in the app as well; the
-                // preview only redraws while that address is still in the
-                // editor, and the accounts list redraws its circles so one
-                // that landed after the list was built shows there too.
-                let found = crate::avatar::cache_own_gravatar(&email, outcome);
-                if found && trimmed(&widgets.email_row).eq_ignore_ascii_case(&email) {
-                    self.refresh_preview(widgets);
-                }
-                if found {
-                    self.rebuild_account_list(&widgets.accounts_list, &sender);
-                }
+                self.on_own_gravatar_fetched(email, outcome, widgets, sender)
             }
-
-            AccountsCmd::GoaListed(listed) => {
-                widgets.goa_refresh_btn.set_sensitive(true);
-                self.goa = importable_of(listed, &self.accounts);
-                self.rebuild_goa_list(&widgets.goa_list, &sender);
-                widgets.goa_group.set_visible(!self.goa.is_empty());
-            }
-
+            AccountsCmd::GoaListed(listed) => self.on_goa_listed(listed, widgets, sender),
             AccountsCmd::Secrets(session, secrets) => {
-                if session != self.editor_session {
-                    return;
-                }
-                self.secrets_reading = false;
-                self.editor_secrets = Some(secrets.clone());
-                let editor_up = widgets
-                    .nav
-                    .visible_page()
-                    .and_then(|p| p.tag())
-                    .is_some_and(|tag| tag == "editor");
-                // Queued, so it runs once the fields below are filled.
-                if std::mem::take(&mut self.save_waiting) && editor_up {
-                    sender.input_sender().emit(AccountsInput::Save);
-                }
-                // Still editing that account: fill in what the user hasn't
-                // typed over meanwhile.
-                let Some(i) = self.editing else { return };
-                if self
-                    .accounts
-                    .get(i)
-                    .is_none_or(|a| a.email != secrets.email)
-                {
-                    return;
-                }
-                // The passwords arrive after the editor opened, so they would
-                // read as an edit the user never made. Re-take the seed below
-                // when nothing has actually been typed yet.
-                let untouched = !self.editor_touched(widgets);
-                if let Some(acc) = self.accounts.get_mut(i) {
-                    secrets.apply(acc);
-                }
-                if widgets.pass_row.text().is_empty() {
-                    widgets.pass_row.set_text(&secrets.password);
-                }
-                if widgets.smtp_pass_row.text().is_empty() {
-                    widgets.smtp_pass_row.set_text(&secrets.smtp_password);
-                }
-                for al in self.alias_edits.iter_mut() {
-                    if al.smtp_password.is_empty() {
-                        if let Some((_, pw)) =
-                            secrets.aliases.iter().find(|(a, _)| *a == al.address())
-                        {
-                            al.smtp_password = pw.clone();
-                        }
-                    }
-                }
-                if untouched {
-                    self.editor_seed = Some(self.editor_fingerprint(widgets));
-                }
+                self.on_secrets_read(session, secrets, widgets, sender)
             }
-            AccountsCmd::Test(result) => {
-                let line = |label: &str, r: &Result<(), String>| {
-                    match r {
-                    Ok(()) => format!("✓ {label}: connected"),
-                    Err(e) if crate::worker::is_hostname_mismatch(e) => format!(
-                        "✗ {label}: {e}\n   {}",
-                        i18n("The certificate is for another name. If this server is the right one, turn on “Accept a certificate for another name” above and test again.")
-                    ),
-                    Err(e) => format!("✗ {label}: {e}"),
-                }
-                };
-                let protocol = form_protocol(widgets);
-                let incoming_label = match protocol {
-                    Protocol::Pop3 => "POP3",
-                    Protocol::Jmap => "JMAP",
-                    _ => "IMAP",
-                };
-                // A JMAP account sends through the server: no SMTP line.
-                let text = if protocol == Protocol::Jmap {
-                    line(incoming_label, &result.incoming)
-                } else {
-                    format!(
-                        "{}\n{}",
-                        line(incoming_label, &result.incoming),
-                        line("SMTP", &result.smtp),
-                    )
-                };
-                let class = if result.incoming.is_ok() && result.smtp.is_ok() {
-                    "success"
-                } else {
-                    "error"
-                };
-                widgets.test_result.set_label(&text);
-                widgets.test_result.set_css_classes(&[class]);
-                widgets.test_btn.set_sensitive(true);
-            }
-            AccountsCmd::OAuth(result) => {
-                widgets.oauth_signin_btn.set_sensitive(true);
-                widgets.oauth_status.set_visible(true);
-                match result {
-                    Ok((refresh, who)) => {
-                        self.pending_oauth_refresh = Some(refresh);
-                        if let Some((name, address)) = who {
-                            if !address.is_empty() {
-                                widgets.email_row.set_text(&address);
-                            }
-                            if !name.is_empty() && widgets.name_row.text().trim().is_empty() {
-                                widgets.name_row.set_text(&name);
-                            }
-                        }
-                        widgets.oauth_status.set_css_classes(&["success"]);
-                        widgets
-                            .oauth_status
-                            .set_label(&i18n("✓ Signed in. Save the account to finish."));
-                    }
-                    Err(e) => {
-                        widgets.oauth_status.set_css_classes(&["error"]);
-                        widgets
-                            .oauth_status
-                            .set_label(&i18n_f("Sign-in failed: {e}", &[("e", &(e).to_string())]));
-                    }
-                }
-            }
-            AccountsCmd::DirectoryConsent(result) => {
-                widgets.graph_directory_row.set_sensitive(true);
-                widgets.oauth_signin_btn.set_sensitive(true);
-                widgets.graph_status.set_visible(true);
-                match self.take_consent(widgets, result) {
-                    Ok(()) => {
-                        self.directory_granted = true;
-                        widgets.graph_status.set_css_classes(&["success"]);
-                        widgets.graph_status.set_label(&i18n(
-                            "Access to the directory approved. Save the account to finish.",
-                        ));
-                    }
-                    Err(e) => {
-                        self.directory_on = false;
-                        widgets.graph_directory_row.set_active(false);
-                        widgets.graph_status.set_css_classes(&["error"]);
-                        widgets.graph_status.set_label(&i18n_f(
-                            "Access to the directory was not approved: {e}",
-                            &[("e", &e)],
-                        ));
-                    }
-                }
-            }
-            AccountsCmd::LabelsConsent(result) => {
-                widgets.graph_labels_row.set_sensitive(true);
-                widgets.oauth_signin_btn.set_sensitive(true);
-                widgets.graph_status.set_visible(true);
-                match self.take_consent(widgets, result) {
-                    Ok(()) => {
-                        self.labels_granted = true;
-                        widgets.graph_status.set_css_classes(&["success"]);
-                        widgets
-                            .graph_status
-                            .set_label(&i18n("Access to the sensitivity labels approved. Save the account to finish."));
-                    }
-                    Err(e) => {
-                        self.labels_on = false;
-                        widgets.graph_labels_row.set_active(false);
-                        widgets.graph_status.set_css_classes(&["error"]);
-                        widgets.graph_status.set_label(&i18n_f(
-                            "Access to the sensitivity labels was not approved: {e}",
-                            &[("e", &e)],
-                        ));
-                    }
-                }
-            }
-            AccountsCmd::AliasTested(result) => {
-                let Some(d) = self.alias_dialog.as_ref() else {
-                    return;
-                };
-                d.test_btn.set_sensitive(true);
-                d.test_result.set_visible(true);
-                match result {
-                    Ok(()) => {
-                        d.test_result.set_css_classes(&["success"]);
-                        d.test_result.set_label(&i18n("✓ SMTP: connected"));
-                    }
-                    Err(e) => {
-                        d.test_result.set_css_classes(&["error"]);
-                        d.test_result
-                            .set_label(&i18n_f("✗ SMTP: {e}", &[("e", &(e).to_string())]));
-                    }
-                }
-            }
+            AccountsCmd::Test(result) => self.on_connection_tested(result, widgets),
+            AccountsCmd::OAuth(result) => self.on_signed_in(result, widgets),
+            AccountsCmd::DirectoryConsent(result) => self.on_directory_consent(result, widgets),
+            AccountsCmd::LabelsConsent(result) => self.on_labels_consent(result, widgets),
+            AccountsCmd::AliasTested(result) => self.on_alias_tested(result),
         }
     }
 }

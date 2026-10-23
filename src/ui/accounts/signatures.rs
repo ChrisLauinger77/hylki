@@ -5,7 +5,7 @@ use super::*;
 
 /// What signature `i` is called in the chooser and the composer: its name,
 /// or its place in the list when it has none.
-pub(super) fn signature_label(signatures: &[NamedSignature], i: usize) -> String {
+fn signature_label(signatures: &[NamedSignature], i: usize) -> String {
     match signatures.get(i).map(|s| s.name.trim()) {
         Some(name) if !name.is_empty() => name.to_string(),
         _ => i18n_f("Signature {n}", &[("n", &(i + 1).to_string())]),
@@ -50,7 +50,7 @@ impl AccountsWindow {
     /// Set "Edit HTML" and the formatting tools to the mode the signature
     /// editor is in: as source the tools would go nowhere, and the button
     /// goes back to the rendered signature.
-    pub(super) fn sync_source_button(&mut self, widgets: &AccountsWindowWidgets) {
+    fn sync_source_button(&mut self, widgets: &AccountsWindowWidgets) {
         let source = self.sig_editor(widgets).source_kind().is_some();
         self.sig_editor(widgets).set_formatting_visible(!source);
         self.sig_source_btn.set_label(&if source {
@@ -101,7 +101,7 @@ impl AccountsWindow {
 
     /// Show signature `i` in the editor and set the rows above it to it.
     /// Their notifies arrive after this and find nothing changed.
-    pub(super) fn show_signature(&mut self, widgets: &AccountsWindowWidgets, i: usize) {
+    fn show_signature(&mut self, widgets: &AccountsWindowWidgets, i: usize) {
         self.sig_shown = i;
         let html = self
             .sig_edits
@@ -135,7 +135,7 @@ impl AccountsWindow {
     /// Read the shown signature's text back out of the editor before
     /// another is shown (`add` makes a new one); the answer is
     /// [`AccountsInput::SigStored`].
-    pub(super) fn read_back_signature(
+    fn read_back_signature(
         &mut self,
         widgets: &AccountsWindowWidgets,
         sender: &ComponentSender<Self>,
@@ -170,6 +170,210 @@ impl AccountsWindow {
             });
         }
         (kept, default)
+    }
+}
+
+impl AccountsWindow {
+    pub(super) fn on_release_signature_editor(&mut self, widgets: &AccountsWindowWidgets) {
+        let editing = widgets
+            .nav
+            .visible_page()
+            .and_then(|p| p.tag())
+            .is_some_and(|t| t == "editor");
+        if !editing {
+            if let Some(editor) = self.sig_editor.take() {
+                // Kept for the next editor, which takes it in.
+                editor.toolbar_end().remove(&self.sig_source_btn);
+                widgets.sig_holder.remove(&editor.widget);
+            }
+        }
+    }
+
+    pub(super) fn on_signature_source_toggle(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if self.sig_reading {
+            return;
+        }
+        // The view loads a new document either way, which forgets
+        // that the old one was edited.
+        let s = sender.clone();
+        self.sig_editor(widgets)
+            .is_dirty(move |dirty| s.input_sender().emit(AccountsInput::SigTextTouched(dirty)));
+        let s = sender.clone();
+        if self.sig_editor(widgets).source_kind().is_some() {
+            self.sig_editor(widgets).extract_source(move |text| {
+                s.input_sender().emit(AccountsInput::SignatureToRich(text))
+            });
+        } else {
+            self.sig_editor(widgets).extract_html(move |html| {
+                s.input_sender()
+                    .emit(AccountsInput::SignatureToSource(html))
+            });
+        }
+    }
+
+    pub(super) fn on_signature_to_source(&mut self, html: String, widgets: &AccountsWindowWidgets) {
+        self.sig_editor(widgets)
+            .set_source(rich_editor::SourceKind::Html, &html);
+        self.sync_source_button(widgets);
+    }
+
+    pub(super) fn on_signature_to_rich(&mut self, text: String, widgets: &AccountsWindowWidgets) {
+        self.sig_editor(widgets)
+            .set_html(&rich_editor::signature_from_source(&text, None));
+        self.sync_source_button(widgets);
+    }
+
+    pub(super) fn on_signature_import(&mut self, sender: ComponentSender<Self>, root: &adw::Bin) {
+        let dialog = gtk::FileDialog::new();
+        dialog.set_title(&i18n("Import Signature"));
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&i18n("HTML and text files")));
+        filter.add_mime_type("text/html");
+        filter.add_mime_type("text/plain");
+        filter.add_suffix("html");
+        filter.add_suffix("htm");
+        filter.add_suffix("txt");
+        let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        dialog.set_filters(Some(&filters));
+        dialog.set_default_filter(Some(&filter));
+        let parent = root.root().and_downcast::<gtk::Window>();
+        let s = sender.input_sender().clone();
+        dialog.open(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
+            if let Some(path) = res.ok().and_then(|f| f.path()) {
+                let _ = s.send(AccountsInput::SignatureImportFile(path));
+            }
+        });
+    }
+
+    pub(super) fn on_signature_import_file(
+        &mut self,
+        path: std::path::PathBuf,
+        widgets: &AccountsWindowWidgets,
+        root: &adw::Bin,
+    ) {
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                let text = String::from_utf8_lossy(&bytes);
+                self.sig_editor(widgets)
+                    .set_html(&rich_editor::signature_from_source(&text, path.parent()));
+                self.sync_source_button(widgets);
+            }
+            Err(e) => {
+                let host = root.root().and_downcast::<gtk::Window>();
+                let dialog = adw::MessageDialog::new(
+                    host.as_ref(),
+                    Some(i18n("Could Not Read the File").as_str()),
+                    Some(&format!("{}\n{e}", path.display())),
+                );
+                dialog.add_response("ok", &i18n("OK"));
+                dialog.present();
+            }
+        }
+    }
+
+    pub(super) fn on_sig_show(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        let pick = widgets.sig_choice_row.selected() as usize;
+        if self.sig_reading || pick == self.sig_shown || pick >= self.sig_edits.len() {
+            return;
+        }
+        self.read_back_signature(widgets, &sender, false);
+    }
+
+    pub(super) fn on_sig_add(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if !self.sig_reading {
+            self.read_back_signature(widgets, &sender, true);
+        }
+    }
+
+    pub(super) fn on_sig_delete(&mut self, widgets: &AccountsWindowWidgets) {
+        if self.sig_reading || self.sig_edits.len() < 2 {
+            return;
+        }
+        let gone = self.sig_shown;
+        self.sig_edits.remove(gone);
+        self.sig_default = match self.sig_default {
+            Some(d) if d == gone => None,
+            Some(d) if d > gone => Some(d - 1),
+            d => d,
+        };
+        self.sig_touched = true;
+        self.show_signature(widgets, gone.saturating_sub(1));
+    }
+
+    pub(super) fn on_sig_rename(&mut self, widgets: &AccountsWindowWidgets) {
+        let name = widgets.sig_name_row.text().to_string();
+        let shown = self.sig_shown;
+        let Some(sig) = self.sig_edits.get_mut(shown) else {
+            return;
+        };
+        if sig.name == name {
+            return;
+        }
+        sig.name = name;
+        self.sig_touched = true;
+        // Setting the model's entry moves the chooser off it; its
+        // notify finds it back on the shown one and does nothing.
+        let label = signature_label(&self.sig_edits, shown);
+        if let Some(list) = widgets
+            .sig_choice_row
+            .model()
+            .and_downcast::<gtk::StringList>()
+        {
+            list.splice(shown as u32, 1, &[label.as_str()]);
+            widgets.sig_choice_row.set_selected(shown as u32);
+        }
+    }
+
+    pub(super) fn on_sig_default(&mut self, widgets: &AccountsWindowWidgets) {
+        let on = widgets.sig_default_row.is_active();
+        let shown = Some(self.sig_shown);
+        let default = match (on, self.sig_default == shown) {
+            (true, false) => shown,
+            (false, true) => None,
+            _ => return,
+        };
+        self.sig_default = default;
+        self.sig_touched = true;
+    }
+
+    pub(super) fn on_sig_stored(
+        &mut self,
+        html: String,
+        add: bool,
+        widgets: &AccountsWindowWidgets,
+    ) {
+        self.sig_reading = false;
+        if let Some(shown) = self.sig_edits.get_mut(self.sig_shown) {
+            shown.html = html;
+        }
+        let next = if add {
+            let n = self.sig_edits.len() + 1;
+            self.sig_edits.push(NamedSignature {
+                name: i18n_f("Signature {n}", &[("n", &n.to_string())]),
+                html: String::new(),
+            });
+            self.sig_touched = true;
+            self.sig_edits.len() - 1
+        } else {
+            widgets.sig_choice_row.selected() as usize
+        };
+        self.show_signature(widgets, next.min(self.sig_edits.len().saturating_sub(1)));
+        if add {
+            widgets.sig_name_row.grab_focus();
+        }
     }
 }
 

@@ -81,7 +81,7 @@ impl AccountsWindow {
     /// Fill the editor's Special Folders combos (#82) for `acc` (None = a new
     /// account, whose folders aren't known yet): "Automatic" plus the account's
     /// live folder list, with any saved assignment selected.
-    pub(super) fn populate_folder_combos(
+    fn populate_folder_combos(
         &mut self,
         widgets: &AccountsWindowWidgets,
         acc: Option<&AccountConfig>,
@@ -273,7 +273,7 @@ impl AccountsWindow {
 
     /// A fresh editor: answers from the keyring for the last one no longer
     /// apply.
-    pub(super) fn new_editor_session(&mut self) {
+    fn new_editor_session(&mut self) {
         self.editor_session += 1;
         self.editor_secrets = None;
         self.secrets_reading = false;
@@ -428,7 +428,7 @@ impl AccountsWindow {
     /// Everything an account editor holds, as one comparable string: what
     /// Save would write, less the signature — that lives in a WebView and
     /// answers only asynchronously (`RichEditor::is_dirty` covers it).
-    pub(super) fn editor_fingerprint(&self, widgets: &AccountsWindowWidgets) -> String {
+    fn editor_fingerprint(&self, widgets: &AccountsWindowWidgets) -> String {
         let account = read_account(widgets, self.saved_emoji(), self.saved_avatar());
         format!(
             "{account:?}|{:?}|{:?}|{:?}|{:?}|{}|{}|{}",
@@ -505,6 +505,255 @@ impl AccountsWindow {
         widgets.picture_row.set_visible(self.picture_mode);
         widgets.emoji_clear_btn.set_visible(emoji.is_some());
         widgets.avatar_clear_btn.set_visible(picture.is_some());
+    }
+}
+
+impl AccountsWindow {
+    pub(super) fn on_add_account(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        self.editing = None;
+        self.new_editor_session();
+        self.emoji = None;
+        self.avatar = None;
+        widgets.gravatar_row.set_active(false);
+        self.picture_mode = false;
+        widgets.mode_glyph_btn.set_active(true);
+        self.label_synced = String::new();
+        self.pending_oauth_refresh = None;
+        self.directory_granted = false;
+        self.directory_on = false;
+        self.labels_granted = false;
+        self.labels_on = false;
+        self.close_alias_dialog();
+        self.alias_edits.clear();
+        self.server_identities.clear();
+        self.rebuild_alias_list(&widgets.aliases_list, &sender);
+        clear_editor(widgets);
+        self.show_push_row(widgets);
+        self.populate_folder_combos(widgets, None);
+        set_connection_editable(widgets, true);
+        widgets.goa_banner.set_visible(false);
+        widgets.keyring_note.set_visible(true);
+        self.apply_provider(widgets);
+        self.load_signatures(widgets, Vec::new(), None);
+        widgets.color_btn.set_rgba(&parse_color(DEFAULT_COLOR));
+        self.refresh_preview(widgets);
+        widgets.remove_btn.set_visible(false);
+        // A prior GOA edit may have hidden the provider picker.
+        widgets.provider_row.set_visible(true);
+        self.editor_seed = Some(self.editor_fingerprint(widgets));
+        mount_editor(widgets);
+        widgets.nav.push_by_tag("editor");
+    }
+
+    pub(super) fn on_edit_account_by_email(
+        &mut self,
+        email: String,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        let Some(i) = self.accounts.iter().position(|a| a.email == email) else {
+            return;
+        };
+        let editor_up = widgets
+            .nav
+            .visible_page()
+            .and_then(|p| p.tag())
+            .is_some_and(|tag| tag == "editor");
+        if editor_up {
+            if self.editing == Some(i) {
+                return;
+            }
+            // Another account's editor is up: back to the list first,
+            // since a page can't be pushed while it is in the stack.
+            widgets.nav.pop();
+        }
+        sender.input_sender().emit(AccountsInput::EditAccount(i));
+    }
+
+    pub(super) fn on_edit_account(
+        &mut self,
+        i: usize,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        let Some(acc) = self.accounts.get(i).cloned() else {
+            return;
+        };
+        self.editing = Some(i);
+        self.new_editor_session();
+        self.pending_oauth_refresh = None;
+        self.directory_granted = acc.goa_id.is_none()
+            && acc.oauth
+            && acc
+                .oauth_settings
+                .as_ref()
+                .is_some_and(|s| crate::oauth::has_directory_scopes(&s.scopes));
+        // On without the scopes would only be refused.
+        self.directory_on = acc.graph_directory && self.directory_granted;
+        widgets.graph_directory_row.set_active(self.directory_on);
+        widgets
+            .directory_only_row
+            .set_active(acc.graph_directory_only);
+        self.labels_granted = acc.goa_id.is_none()
+            && acc.oauth
+            && acc.oauth_settings.as_ref().is_some_and(|s| {
+                crate::oauth::has_scopes(&s.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES)
+            });
+        self.labels_on = acc.graph_label_names && self.labels_granted;
+        widgets.graph_labels_row.set_active(self.labels_on);
+        self.close_alias_dialog();
+        self.alias_edits = acc.aliases.clone();
+        self.server_identities.clear();
+        self.rebuild_alias_list(&widgets.aliases_list, &sender);
+        self.hidden_edits = acc.hidden_folders.clone();
+        self.rebuild_hidden_list(widgets, &sender);
+        fill_editor(widgets, &acc);
+        self.show_push_row(widgets);
+        // Hidden until this account's server answers; a page opened
+        // before it must not show the last account's figure.
+        show_quota(widgets, None);
+        let _ = sender.output(AccountsOutput::WantQuota(acc.email.clone()));
+        let _ = sender.output(AccountsOutput::WantIdentities(acc.email.clone()));
+        // The secrets come from the keyring now, off the main thread,
+        // and land in the fields when they arrive (Save waits for
+        // them should it come first).
+        if AccountSecrets::needed(&acc) {
+            self.read_secrets(&acc, &sender);
+        }
+        self.populate_folder_combos(widgets, Some(&acc));
+        self.apply_provider(widgets);
+        // Label mirrors the email until customized.
+        self.label_synced = acc.email.clone();
+        let (signatures, default) = acc.signature_set();
+        self.load_signatures(widgets, signatures, default);
+        widgets
+            .color_btn
+            .set_rgba(&parse_color(acc.color.as_deref().unwrap_or(DEFAULT_COLOR)));
+        self.emoji = acc.emoji.clone();
+        self.avatar = acc.avatar.clone();
+        widgets.gravatar_row.set_active(acc.gravatar);
+        self.picture_mode = acc.avatar.is_some();
+        if self.picture_mode {
+            widgets.mode_picture_btn.set_active(true);
+        } else {
+            widgets.mode_glyph_btn.set_active(true);
+        }
+        self.refresh_preview(widgets);
+        // GOA accounts: no "Remove" (it lives in the system) — offer an
+        // enable/disable toggle and a shortcut to Online Accounts instead.
+        let is_goa = acc.goa_id.is_some();
+        set_connection_editable(widgets, !is_goa);
+        widgets.goa_banner.set_visible(is_goa);
+        widgets.keyring_note.set_visible(!is_goa);
+        // GOA accounts get the same Remove flow — it removes the account
+        // from Hylki only (back to the import list); GNOME keeps it.
+        widgets.remove_btn.set_visible(true);
+        // GNOME owns a GOA account's connection outright, so the server
+        // and credential section isn't shown at all — only what Hylki
+        // owns (name, label, color, signature, aliases) plus the email
+        // for identification. `apply_provider` re-shows what applies the
+        // next time a native account or the add-form opens the editor.
+        widgets.provider_row.set_visible(!is_goa);
+        if is_goa {
+            for w in [
+                widgets.protocol_row.upcast_ref::<gtk::Widget>(),
+                widgets.host_row.upcast_ref(),
+                widgets.port_row.upcast_ref(),
+                widgets.smtp_row.upcast_ref(),
+                widgets.smtp_port_row.upcast_ref(),
+                widgets.user_row.upcast_ref(),
+                widgets.pass_row.upcast_ref(),
+                widgets.smtp_separate_row.upcast_ref(),
+                widgets.tls_mismatch_row.upcast_ref(),
+                widgets.smtp_user_row.upcast_ref(),
+                widgets.smtp_pass_row.upcast_ref(),
+                widgets.test_btn.upcast_ref(),
+                widgets.oauth_signin_btn.upcast_ref(),
+                widgets.oauth_status.upcast_ref(),
+                widgets.goa_hint.upcast_ref(),
+            ] {
+                w.set_visible(false);
+            }
+            // The Google/Microsoft "use GNOME" guidance hid these; a GOA
+            // account edits its display fields right here.
+            widgets.name_row.set_visible(true);
+            widgets.email_row.set_visible(true);
+        }
+        widgets.goa_enabled_row.set_active(acc.enabled);
+        // While Mail is switched off in GNOME Settings the account is
+        // paused from there, not from here — say so where the toggle is.
+        widgets
+            .goa_enabled_row
+            .set_sensitive(!acc.goa_mail_disabled);
+        widgets.goa_enabled_row.set_subtitle(if acc.goa_mail_disabled {
+            "Paused: Mail is switched off for this account in GNOME Settings \u{2192} Online Accounts."
+        } else {
+            "Switching this off returns the account to the import list — it \
+             stays in GNOME Online Accounts."
+        });
+        self.editor_seed = Some(self.editor_fingerprint(widgets));
+        mount_editor(widgets);
+        widgets.nav.push_by_tag("editor");
+    }
+
+    pub(super) fn on_secrets_read(
+        &mut self,
+        session: u64,
+        secrets: AccountSecrets,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if session != self.editor_session {
+            return;
+        }
+        self.secrets_reading = false;
+        self.editor_secrets = Some(secrets.clone());
+        let editor_up = widgets
+            .nav
+            .visible_page()
+            .and_then(|p| p.tag())
+            .is_some_and(|tag| tag == "editor");
+        // Queued, so it runs once the fields below are filled.
+        if std::mem::take(&mut self.save_waiting) && editor_up {
+            sender.input_sender().emit(AccountsInput::Save);
+        }
+        // Still editing that account: fill in what the user hasn't
+        // typed over meanwhile.
+        let Some(i) = self.editing else { return };
+        if self
+            .accounts
+            .get(i)
+            .is_none_or(|a| a.email != secrets.email)
+        {
+            return;
+        }
+        // The passwords arrive after the editor opened, so they would
+        // read as an edit the user never made. Re-take the seed below
+        // when nothing has actually been typed yet.
+        let untouched = !self.editor_touched(widgets);
+        if let Some(acc) = self.accounts.get_mut(i) {
+            secrets.apply(acc);
+        }
+        if widgets.pass_row.text().is_empty() {
+            widgets.pass_row.set_text(&secrets.password);
+        }
+        if widgets.smtp_pass_row.text().is_empty() {
+            widgets.smtp_pass_row.set_text(&secrets.smtp_password);
+        }
+        for al in self.alias_edits.iter_mut() {
+            if al.smtp_password.is_empty() {
+                if let Some((_, pw)) = secrets.aliases.iter().find(|(a, _)| *a == al.address()) {
+                    al.smtp_password = pw.clone();
+                }
+            }
+        }
+        if untouched {
+            self.editor_seed = Some(self.editor_fingerprint(widgets));
+        }
     }
 }
 

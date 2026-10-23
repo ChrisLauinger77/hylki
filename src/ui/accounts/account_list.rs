@@ -17,7 +17,7 @@ pub(super) fn importable_goa_accounts(
 }
 
 /// The importable ones among `listed` (see [`importable_goa_accounts`]).
-pub(super) fn importable_of(
+fn importable_of(
     listed: Vec<crate::goa::GoaMailAccount>,
     configured: &[AccountConfig],
 ) -> Vec<crate::goa::GoaMailAccount> {
@@ -307,6 +307,107 @@ impl AccountsWindow {
             row.add_suffix(&toggle);
             list.append(&row);
         }
+    }
+}
+
+impl AccountsWindow {
+    pub(super) fn on_refresh_goa(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        // Off the main thread: GOA answers over D-Bus, and a busy
+        // goa-daemon is slow to.
+        widgets.goa_refresh_btn.set_sensitive(false);
+        sender.oneshot_command(async move {
+            let listed = tokio::task::spawn_blocking(crate::goa::list_mail_accounts)
+                .await
+                .unwrap_or_default();
+            AccountsCmd::GoaListed(listed)
+        });
+    }
+
+    pub(super) fn on_move_row(
+        &mut self,
+        from: usize,
+        to: usize,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if from < self.accounts.len() {
+            let acc = self.accounts.remove(from);
+            let to = to.min(self.accounts.len());
+            self.accounts.insert(to, acc);
+            self.rebuild_account_list(&widgets.accounts_list, &sender);
+            let emails = self.accounts.iter().map(|a| a.email.clone()).collect();
+            let _ = sender.output(AccountsOutput::Reordered(emails));
+        }
+    }
+
+    pub(super) fn on_toggle_enabled(
+        &mut self,
+        index: usize,
+        enabled: bool,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        // A GNOME Online Account switched off here isn't paused — it is
+        // un-imported: it drops out of Hylki (the config entry and its
+        // stored copies go) and returns to the "GNOME Online Accounts"
+        // list below, ready to import again. The account itself stays
+        // in GNOME untouched.
+        if !enabled && self.accounts.get(index).is_some_and(|a| a.goa_id.is_some()) {
+            self.unimport_goa(index, widgets, &sender);
+            return;
+        }
+        if let Some(acc) = self.accounts.get_mut(index) {
+            if acc.enabled != enabled {
+                acc.enabled = enabled;
+                let email = acc.email.clone();
+                let _ = sender.output(AccountsOutput::EnabledChanged { email, enabled });
+            }
+        }
+    }
+
+    pub(super) fn on_import_goa(
+        &mut self,
+        index: usize,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if let Some(g) = self.goa.get(index).cloned() {
+            // Password-based providers: pull the password now. OAuth
+            // providers: authenticate with a GOA token at connect time.
+            // Either way the worker asks GOA again when it connects, so an
+            // account still works if this read comes back empty.
+            let (password, oauth) = if g.password_based {
+                (
+                    crate::goa::mail_passwords(&g.id).0.unwrap_or_default(),
+                    false,
+                )
+            } else {
+                (String::new(), true)
+            };
+            let account = g.to_config(password, oauth);
+            self.goa.remove(index);
+            self.accounts.push(account.clone());
+            self.rebuild_account_list(&widgets.accounts_list, &sender);
+            self.rebuild_goa_list(&widgets.goa_list, &sender);
+            widgets.goa_group.set_visible(!self.goa.is_empty());
+            let _ = sender.output(AccountsOutput::ImportGoa(Box::new(account)));
+        }
+    }
+
+    pub(super) fn on_goa_listed(
+        &mut self,
+        listed: Vec<crate::goa::GoaMailAccount>,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        widgets.goa_refresh_btn.set_sensitive(true);
+        self.goa = importable_of(listed, &self.accounts);
+        self.rebuild_goa_list(&widgets.goa_list, &sender);
+        widgets.goa_group.set_visible(!self.goa.is_empty());
     }
 }
 

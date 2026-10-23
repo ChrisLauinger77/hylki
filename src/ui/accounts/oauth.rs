@@ -9,7 +9,7 @@ use super::*;
 /// cannot listen on (#329), otherwise in the browser. `user` is the address
 /// typed, which picks the identity broker's account and, with `hint`, the
 /// account Microsoft signs in (#410). The answer comes back through `wrap`.
-pub(super) fn sign_in(
+fn sign_in(
     root: &adw::Bin,
     sender: &ComponentSender<AccountsWindow>,
     settings: OAuthSettings,
@@ -102,7 +102,7 @@ impl AccountsWindow {
     /// A sign-in that asked for more scopes (#410, #411) finished: its
     /// refresh token is the one to save, and a new account takes its
     /// address and name from it.
-    pub(super) fn take_consent(
+    fn take_consent(
         &mut self,
         widgets: &AccountsWindowWidgets,
         result: Result<(String, Option<(String, String)>), String>,
@@ -185,6 +185,219 @@ impl AccountsWindow {
                 client_secret: widgets.oauth_secret_row.text().to_string(),
                 scopes: trimmed(&widgets.oauth_scope_row),
                 redirect_uri: String::new(),
+            }
+        }
+    }
+}
+
+impl AccountsWindow {
+    pub(super) fn on_oauth_sign_in(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+        root: &adw::Bin,
+    ) {
+        let settings = self.oauth_settings_from_form(widgets);
+        if settings.client_id.trim().is_empty()
+            || settings.auth_url.is_empty()
+            || settings.token_url.is_empty()
+        {
+            widgets.oauth_status.set_visible(true);
+            widgets.oauth_status.set_css_classes(&["error"]);
+            widgets.oauth_status.set_label(&i18n(
+                "Enter a client ID (and endpoints for a custom provider) first",
+            ));
+            return;
+        }
+        widgets.oauth_signin_btn.set_sensitive(false);
+        widgets.oauth_status.set_visible(true);
+        widgets.oauth_status.set_css_classes(&["dim-label"]);
+        let in_window = !settings.redirect_uri.trim().is_empty();
+        widgets.oauth_status.set_label(&if in_window {
+            i18n("Complete the sign-in in the window that opened.")
+        } else {
+            i18n("Opening browser… complete sign-in there.")
+        });
+        // The address typed so far names the identity broker's
+        // account, where one is in charge of sign-ins.
+        let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+        sign_in(root, &sender, settings, user, false, AccountsCmd::OAuth);
+    }
+
+    pub(super) fn on_set_graph_directory(
+        &mut self,
+        on: bool,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+        root: &adw::Bin,
+    ) {
+        if on == self.directory_on {
+            return;
+        }
+        self.directory_on = on;
+        widgets.graph_status.set_visible(false);
+        // Turning it off keeps the scopes: they cost nothing, and
+        // turning it on again then asks nothing.
+        if !on || self.directory_granted {
+            return;
+        }
+        let mut settings = self.oauth_settings_from_form(widgets);
+        if settings.client_id.trim().is_empty() || !settings.token_url.contains("microsoftonline") {
+            return;
+        }
+        settings.scopes = crate::oauth::with_directory_scopes(&settings.scopes);
+        widgets.graph_directory_row.set_sensitive(false);
+        widgets.oauth_signin_btn.set_sensitive(false);
+        widgets.graph_status.set_visible(true);
+        widgets.graph_status.set_css_classes(&["dim-label"]);
+        widgets
+            .graph_status
+            .set_label(&if settings.redirect_uri.trim().is_empty() {
+                i18n("Opening browser… approve access to the directory there.")
+            } else {
+                i18n("Approve access to the directory in the window that opened.")
+            });
+        // Straight to the account being edited: Microsoft then asks
+        // only for what it has not approved yet.
+        let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+        sign_in(
+            root,
+            &sender,
+            settings,
+            user,
+            true,
+            AccountsCmd::DirectoryConsent,
+        );
+    }
+
+    pub(super) fn on_set_graph_labels(
+        &mut self,
+        on: bool,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+        root: &adw::Bin,
+    ) {
+        if on == self.labels_on {
+            return;
+        }
+        self.labels_on = on;
+        widgets.graph_status.set_visible(false);
+        // Off keeps the scope, as the directory's does.
+        if !on || self.labels_granted {
+            return;
+        }
+        let mut settings = self.oauth_settings_from_form(widgets);
+        if settings.client_id.trim().is_empty() || !settings.token_url.contains("microsoftonline") {
+            return;
+        }
+        settings.scopes =
+            crate::oauth::with_scopes(&settings.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES);
+        widgets.graph_labels_row.set_sensitive(false);
+        widgets.oauth_signin_btn.set_sensitive(false);
+        widgets.graph_status.set_visible(true);
+        widgets.graph_status.set_css_classes(&["dim-label"]);
+        widgets
+            .graph_status
+            .set_label(&if settings.redirect_uri.trim().is_empty() {
+                i18n("Opening browser… approve access to the sensitivity labels there.")
+            } else {
+                i18n("Approve access to the sensitivity labels in the window that opened.")
+            });
+        let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+        sign_in(
+            root,
+            &sender,
+            settings,
+            user,
+            true,
+            AccountsCmd::LabelsConsent,
+        );
+    }
+
+    pub(super) fn on_signed_in(
+        &mut self,
+        result: Result<(String, Option<(String, String)>), String>,
+        widgets: &AccountsWindowWidgets,
+    ) {
+        widgets.oauth_signin_btn.set_sensitive(true);
+        widgets.oauth_status.set_visible(true);
+        match result {
+            Ok((refresh, who)) => {
+                self.pending_oauth_refresh = Some(refresh);
+                if let Some((name, address)) = who {
+                    if !address.is_empty() {
+                        widgets.email_row.set_text(&address);
+                    }
+                    if !name.is_empty() && widgets.name_row.text().trim().is_empty() {
+                        widgets.name_row.set_text(&name);
+                    }
+                }
+                widgets.oauth_status.set_css_classes(&["success"]);
+                widgets
+                    .oauth_status
+                    .set_label(&i18n("✓ Signed in. Save the account to finish."));
+            }
+            Err(e) => {
+                widgets.oauth_status.set_css_classes(&["error"]);
+                widgets
+                    .oauth_status
+                    .set_label(&i18n_f("Sign-in failed: {e}", &[("e", &(e).to_string())]));
+            }
+        }
+    }
+
+    pub(super) fn on_directory_consent(
+        &mut self,
+        result: Result<(String, Option<(String, String)>), String>,
+        widgets: &AccountsWindowWidgets,
+    ) {
+        widgets.graph_directory_row.set_sensitive(true);
+        widgets.oauth_signin_btn.set_sensitive(true);
+        widgets.graph_status.set_visible(true);
+        match self.take_consent(widgets, result) {
+            Ok(()) => {
+                self.directory_granted = true;
+                widgets.graph_status.set_css_classes(&["success"]);
+                widgets.graph_status.set_label(&i18n(
+                    "Access to the directory approved. Save the account to finish.",
+                ));
+            }
+            Err(e) => {
+                self.directory_on = false;
+                widgets.graph_directory_row.set_active(false);
+                widgets.graph_status.set_css_classes(&["error"]);
+                widgets.graph_status.set_label(&i18n_f(
+                    "Access to the directory was not approved: {e}",
+                    &[("e", &e)],
+                ));
+            }
+        }
+    }
+
+    pub(super) fn on_labels_consent(
+        &mut self,
+        result: Result<(String, Option<(String, String)>), String>,
+        widgets: &AccountsWindowWidgets,
+    ) {
+        widgets.graph_labels_row.set_sensitive(true);
+        widgets.oauth_signin_btn.set_sensitive(true);
+        widgets.graph_status.set_visible(true);
+        match self.take_consent(widgets, result) {
+            Ok(()) => {
+                self.labels_granted = true;
+                widgets.graph_status.set_css_classes(&["success"]);
+                widgets.graph_status.set_label(&i18n(
+                    "Access to the sensitivity labels approved. Save the account to finish.",
+                ));
+            }
+            Err(e) => {
+                self.labels_on = false;
+                widgets.graph_labels_row.set_active(false);
+                widgets.graph_status.set_css_classes(&["error"]);
+                widgets.graph_status.set_label(&i18n_f(
+                    "Access to the sensitivity labels was not approved: {e}",
+                    &[("e", &e)],
+                ));
             }
         }
     }

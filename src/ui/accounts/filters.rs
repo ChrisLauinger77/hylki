@@ -160,7 +160,7 @@ impl AccountsWindow {
     /// button in its header; Add Condition and the all/any chooser; and
     /// "Then", what a match does. With `edit`, it opens on that existing
     /// rule (prefilled, "Save") and replaces it in place; otherwise it adds.
-    pub(super) fn open_filter_page(
+    fn open_filter_page(
         &self,
         nav: &adw::NavigationView,
         sender: &ComponentSender<Self>,
@@ -678,5 +678,80 @@ impl AccountsWindow {
             }
         }));
         changed();
+    }
+}
+
+impl AccountsWindow {
+    pub(super) fn on_search_filters(&mut self, text: String, widgets: &AccountsWindowWidgets) {
+        *self.filters_query.borrow_mut() = text.to_lowercase();
+        widgets.filters_list.invalidate_filter();
+    }
+
+    pub(super) fn on_add_filter(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        self.open_filter_page(&widgets.nav, &sender, None, None);
+    }
+
+    pub(super) fn on_add_filter_from(
+        &mut self,
+        rule: crate::config::FilterRule,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        self.open_filter_page(&widgets.nav, &sender, None, Some(rule));
+    }
+
+    pub(super) fn on_apply_filters(&mut self, sender: ComponentSender<Self>) {
+        if !self.filters_applying {
+            self.set_filters_applying(true);
+            let _ = sender.output(AccountsOutput::ApplyFilters);
+        }
+    }
+
+    pub(super) fn on_edit_filter(
+        &mut self,
+        i: usize,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if let Some(rule) = self.filter_rules.get(i).cloned() {
+            self.open_filter_page(&widgets.nav, &sender, Some((i, rule)), None);
+        }
+    }
+
+    pub(super) fn on_filter_edited(
+        &mut self,
+        i: usize,
+        rule: crate::config::FilterRule,
+        sender: ComponentSender<Self>,
+    ) {
+        if let Some(slot) = self.filter_rules.get_mut(i) {
+            if *slot != rule {
+                *slot = rule;
+                self.rebuild_filter_rows(&sender);
+                let _ = sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
+            }
+        }
+    }
+
+    pub(super) fn on_remove_filter(&mut self, i: usize, sender: ComponentSender<Self>) {
+        if i < self.filter_rules.len() {
+            self.filter_rules.remove(i);
+            self.rebuild_filter_rows(&sender);
+            let _ = sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
+        }
+    }
+
+    pub(super) fn on_filter_added(
+        &mut self,
+        rule: crate::config::FilterRule,
+        sender: ComponentSender<Self>,
+    ) {
+        self.filter_rules.push(rule);
+        self.rebuild_filter_rows(&sender);
+        let _ = sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
     }
 }

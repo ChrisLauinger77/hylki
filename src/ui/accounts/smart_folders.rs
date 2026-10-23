@@ -445,3 +445,49 @@ impl AccountsWindow {
         );
     }
 }
+
+impl AccountsWindow {
+    pub(super) fn on_edit_smart_folder(
+        &mut self,
+        i: usize,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if let Some(f) = self.smart_folders.get(i).cloned() {
+            self.open_smart_page(&widgets.nav, &sender, Some((i, f)));
+        }
+    }
+
+    pub(super) fn on_remove_smart_folder(&mut self, i: usize, sender: ComponentSender<Self>) {
+        if i < self.smart_folders.len() {
+            self.smart_folders.remove(i);
+            self.rebuild_smart_rows(&sender);
+            let _ = sender.output(AccountsOutput::SetSmartFolders(self.smart_folders.clone()));
+        }
+    }
+
+    pub(super) fn on_smart_folder_saved(
+        &mut self,
+        at: Option<usize>,
+        folder: crate::config::SmartFolder,
+        sender: ComponentSender<Self>,
+    ) {
+        match at.filter(|i| *i < self.smart_folders.len()) {
+            Some(i) => self.smart_folders[i] = folder,
+            None => self.smart_folders.push(folder),
+        }
+        self.rebuild_smart_rows(&sender);
+        let _ = sender.output(AccountsOutput::SetSmartFolders(self.smart_folders.clone()));
+    }
+
+    pub(super) fn on_set_smart_folders(
+        &mut self,
+        folders: Vec<crate::config::SmartFolder>,
+        sender: ComponentSender<Self>,
+    ) {
+        if folders != self.smart_folders {
+            self.smart_folders = folders;
+            self.rebuild_smart_rows(&sender);
+        }
+    }
+}

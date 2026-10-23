@@ -133,7 +133,7 @@ impl AccountsWindow {
     /// Open the modal alias editor (#34), prefilled from `alias`. A JMAP
     /// account's server sends every message itself (#346), so its aliases
     /// have no SMTP server of their own to set.
-    pub(super) fn open_alias_dialog(
+    fn open_alias_dialog(
         &mut self,
         root: &adw::Bin,
         alias: &AliasConfig,
@@ -286,5 +286,194 @@ impl AccountsWindow {
             test_btn,
             test_result,
         });
+    }
+}
+
+impl AccountsWindow {
+    pub(super) fn on_alias_add(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+        root: &adw::Bin,
+    ) {
+        self.alias_editing = None;
+        let jmap = form_protocol(widgets) == Protocol::Jmap;
+        self.open_alias_dialog(root, &AliasConfig::default(), jmap, &sender);
+    }
+
+    pub(super) fn on_alias_edit(
+        &mut self,
+        i: usize,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+        root: &adw::Bin,
+    ) {
+        let Some(alias) = self.alias_edits.get(i).cloned() else {
+            return;
+        };
+        self.alias_editing = Some(i);
+        let jmap = form_protocol(widgets) == Protocol::Jmap;
+        self.open_alias_dialog(root, &alias, jmap, &sender);
+    }
+
+    pub(super) fn on_unhide_folder(
+        &mut self,
+        i: usize,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if i < self.hidden_edits.len() {
+            self.hidden_edits.remove(i);
+            self.rebuild_hidden_list(widgets, &sender);
+        }
+    }
+
+    pub(super) fn on_alias_remove(
+        &mut self,
+        i: usize,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if i < self.alias_edits.len() {
+            // The keyring entry (if the alias had its own SMTP) is
+            // dropped on Save, when the removal actually takes effect.
+            self.alias_edits.remove(i);
+            self.rebuild_alias_list(&widgets.aliases_list, &sender);
+        }
+    }
+
+    pub(super) fn on_alias_dialog_save(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        let Some(d) = self.alias_dialog.as_ref() else {
+            return;
+        };
+        for row in [&d.addr_row, &d.host_row, &d.user_row] {
+            row.remove_css_class("error");
+        }
+        d.pass_row.remove_css_class("error");
+
+        let name = trimmed(&d.name_row);
+        let addr = trimmed(&d.addr_row);
+        let own_smtp = d.smtp_switch.is_active();
+        let host = trimmed(&d.host_row);
+        let port: u16 = trimmed(&d.port_row).parse().unwrap_or(587);
+        let user = trimmed(&d.user_row);
+        let pass = d.pass_row.text().to_string();
+
+        // The address must look like one, and must not shadow the
+        // account's own address or another alias — the send path picks
+        // an alias's transport by matching the From address, so a
+        // duplicate would make "which server sends this?" ambiguous.
+        let account_email = trimmed(&widgets.email_row);
+        let duplicate = addr.eq_ignore_ascii_case(&account_email)
+            || self.alias_edits.iter().enumerate().any(|(i, a)| {
+                Some(i) != self.alias_editing && a.address().eq_ignore_ascii_case(&addr)
+            });
+        let mut bad = false;
+        if addr.is_empty() || !addr.contains('@') || duplicate {
+            d.addr_row.add_css_class("error");
+            bad = true;
+        }
+        if own_smtp {
+            if host.is_empty() {
+                d.host_row.add_css_class("error");
+                bad = true;
+            }
+            if user.is_empty() {
+                d.user_row.add_css_class("error");
+                bad = true;
+            }
+            if pass.is_empty() {
+                d.pass_row.add_css_class("error");
+                bad = true;
+            }
+        }
+        if bad {
+            return;
+        }
+
+        let alias = AliasConfig {
+            identity: if name.is_empty() {
+                addr.clone()
+            } else {
+                format!("{name} <{addr}>")
+            },
+            smtp_host: if own_smtp { host } else { String::new() },
+            smtp_port: port,
+            smtp_username: if own_smtp { user } else { String::new() },
+            smtp_password: if own_smtp { pass } else { String::new() },
+        };
+        match self.alias_editing {
+            Some(i) if i < self.alias_edits.len() => self.alias_edits[i] = alias,
+            _ => self.alias_edits.push(alias),
+        }
+        self.alias_editing = None;
+        self.close_alias_dialog();
+        self.rebuild_alias_list(&widgets.aliases_list, &sender);
+    }
+
+    pub(super) fn on_alias_dialog_test(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        let Some(d) = self.alias_dialog.as_ref() else {
+            return;
+        };
+        let alias = AliasConfig {
+            identity: trimmed(&d.addr_row),
+            smtp_host: trimmed(&d.host_row),
+            smtp_port: trimmed(&d.port_row).parse().unwrap_or(587),
+            smtp_username: trimmed(&d.user_row),
+            smtp_password: d.pass_row.text().to_string(),
+        };
+        let email = trimmed(&widgets.email_row);
+        d.test_btn.set_sensitive(false);
+        d.test_result.set_visible(true);
+        d.test_result.set_css_classes(&["dim-label"]);
+        d.test_result.set_label(&i18n("Testing…"));
+        sender.oneshot_command(async move {
+            let r =
+                tokio::task::spawn_blocking(move || worker::test_alias_smtp_blocking(email, alias))
+                    .await
+                    .unwrap_or_else(|_| Err("test could not run".into()));
+            AccountsCmd::AliasTested(r)
+        });
+    }
+
+    pub(super) fn on_alias_dialog_closed(&mut self) {
+        // The notification is queued behind the close, so by the time it
+        // arrives a replacement dialog may already be open — only clear
+        // state when the dialog we track is really the one that closed.
+        if self
+            .alias_dialog
+            .as_ref()
+            .is_none_or(|d| !d.window.is_visible())
+        {
+            self.alias_dialog = None;
+            self.alias_editing = None;
+        }
+    }
+
+    pub(super) fn on_alias_tested(&mut self, result: Result<(), String>) {
+        let Some(d) = self.alias_dialog.as_ref() else {
+            return;
+        };
+        d.test_btn.set_sensitive(true);
+        d.test_result.set_visible(true);
+        match result {
+            Ok(()) => {
+                d.test_result.set_css_classes(&["success"]);
+                d.test_result.set_label(&i18n("✓ SMTP: connected"));
+            }
+            Err(e) => {
+                d.test_result.set_css_classes(&["error"]);
+                d.test_result
+                    .set_label(&i18n_f("✗ SMTP: {e}", &[("e", &(e).to_string())]));
+            }
+        }
     }
 }

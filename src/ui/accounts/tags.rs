@@ -64,7 +64,7 @@ impl AccountsWindow {
     /// The tag finder's report: every keyword found that is not a tag here
     /// yet, each with a proposed name and color, ticked to be imported.
     /// "Import All" takes the lot; "Import Selected" only the ticked ones.
-    pub(super) fn show_tag_findings(
+    fn show_tag_findings(
         &self,
         parent: Option<&gtk::Window>,
         found: Vec<TagProposal>,
@@ -457,6 +457,103 @@ impl AccountsWindow {
             });
             true
         });
+    }
+}
+
+impl AccountsWindow {
+    pub(super) fn on_edit_tag(
+        &mut self,
+        i: usize,
+        widgets: &AccountsWindowWidgets,
+        sender: ComponentSender<Self>,
+    ) {
+        if let Some(tag) = self.tags.get(i).cloned() {
+            self.open_tag_page(&widgets.nav, &sender, Some((i, tag)));
+        }
+    }
+
+    pub(super) fn on_remove_tag(&mut self, i: usize, sender: ComponentSender<Self>) {
+        if i < self.tags.len() {
+            self.tags.remove(i);
+            self.rebuild_tag_rows(&sender);
+            // The rules name tags by keyword; a rule whose tag is gone
+            // shows the bare keyword until it is edited.
+            self.rebuild_filter_rows(&sender);
+            let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
+        }
+    }
+
+    pub(super) fn on_move_tag(&mut self, from: usize, to: usize, sender: ComponentSender<Self>) {
+        if from < self.tags.len() && from != to {
+            let tag = self.tags.remove(from);
+            let to = to.min(self.tags.len());
+            self.tags.insert(to, tag);
+            self.rebuild_tag_rows(&sender);
+            let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
+        }
+    }
+
+    pub(super) fn on_tag_added(&mut self, tag: crate::config::Tag, sender: ComponentSender<Self>) {
+        self.tags.push(tag);
+        self.rebuild_tag_rows(&sender);
+        let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
+    }
+
+    pub(super) fn on_tag_edited(
+        &mut self,
+        i: usize,
+        tag: crate::config::Tag,
+        sender: ComponentSender<Self>,
+    ) {
+        if let Some(slot) = self.tags.get_mut(i) {
+            if *slot != tag {
+                *slot = tag;
+                self.rebuild_tag_rows(&sender);
+                self.rebuild_filter_rows(&sender);
+                let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
+            }
+        }
+    }
+
+    pub(super) fn on_find_tags(&mut self, sender: ComponentSender<Self>) {
+        if !self.tag_scanning {
+            self.set_tag_scanning(true);
+            let _ = sender.output(AccountsOutput::FindTags);
+        }
+    }
+
+    pub(super) fn on_tag_findings(
+        &mut self,
+        found: Vec<TagProposal>,
+        sender: ComponentSender<Self>,
+        root: &adw::Bin,
+    ) {
+        self.set_tag_scanning(false);
+        let parent = root.root().and_downcast::<gtk::Window>();
+        self.show_tag_findings(parent.as_ref(), found, &sender);
+    }
+
+    pub(super) fn on_import_tags(
+        &mut self,
+        tags: Vec<crate::config::Tag>,
+        sender: ComponentSender<Self>,
+    ) {
+        let mut added = 0;
+        for t in tags {
+            if !self
+                .tags
+                .iter()
+                .any(|x| x.keyword.eq_ignore_ascii_case(&t.keyword))
+            {
+                self.tags.push(t);
+                added += 1;
+            }
+        }
+        if added > 0 {
+            self.rebuild_tag_rows(&sender);
+            self.rebuild_filter_rows(&sender);
+            let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
+        }
     }
 }
 
