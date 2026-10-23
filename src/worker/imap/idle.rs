@@ -187,11 +187,9 @@ static SYNCED_UID_NEXT: std::sync::LazyLock<
 > = std::sync::LazyLock::new(Default::default);
 
 pub(super) fn note_synced_uid_next(account_id: u32, path: &str, uid_next: Option<u32>) {
-    if let Some(next) = uid_next {
-        SYNCED_UID_NEXT
-            .lock()
-            .unwrap()
-            .insert((account_id, path.to_string()), next);
+    // A poisoned lock is skipped, as the worker's other session maps are.
+    if let (Some(next), Ok(mut synced)) = (uid_next, SYNCED_UID_NEXT.lock()) {
+        synced.insert((account_id, path.to_string()), next);
     }
 }
 
@@ -200,9 +198,8 @@ pub(super) fn note_synced_uid_next(account_id: u32, path: &str, uid_next: Option
 fn missed_new_mail(account_id: u32, path: &str, uid_next: Option<u32>) -> bool {
     let seen = SYNCED_UID_NEXT
         .lock()
-        .unwrap()
-        .get(&(account_id, path.to_string()))
-        .copied();
+        .ok()
+        .and_then(|synced| synced.get(&(account_id, path.to_string())).copied());
     matches!((seen, uid_next), (Some(seen), Some(now)) if now > seen)
 }
 

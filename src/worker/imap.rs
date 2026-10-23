@@ -187,6 +187,14 @@ impl After {
     }
 }
 
+/// The session a request handler works on: `dispatch` runs a handler only
+/// after `ensure_session` found or made one.
+fn ensured(session: &mut Option<ImapSession>) -> &mut ImapSession {
+    session
+        .as_mut()
+        .expect("ensure_session gave the request a session")
+}
+
 /// One IMAP account's worker: the main connection, the work queued for when
 /// it is idle, and the bookkeeping that spaces the chores out.
 struct ImapWorker<E> {

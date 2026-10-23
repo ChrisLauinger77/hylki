@@ -4,7 +4,7 @@
 use async_imap::types::{Fetch, Flag};
 use futures::TryStreamExt;
 
-use super::{After, Emit, ImapWorker};
+use super::{ensured, After, Emit, ImapWorker};
 use crate::cache::Cache;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::{KeywordFinding, SenderCheck};
@@ -352,7 +352,7 @@ impl<E: Emit> ImapWorker<E> {
         // whose header index lags (see UndoMove below) are the reason
         // the cache is asked first; this is the fallback for a message
         // Hylki has never listed.
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         let mut hit: Option<(String, u32)> = None;
         match list_folders(
             account_id,
@@ -412,7 +412,7 @@ impl<E: Emit> ImapWorker<E> {
             });
             return After::Skip;
         }
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         if sel(sess, folder_path.as_str()).await.is_err() {
             return After::Skip;
         }
@@ -510,7 +510,7 @@ impl<E: Emit> ImapWorker<E> {
         // KEYWORD search per candidate says how many messages carry
         // it (some servers list every keyword ever defined, so an
         // unused one is dropped here).
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         let mut found: Vec<KeywordFinding> = Vec::new();
         match list_folders(
             account_id,
@@ -577,7 +577,7 @@ impl<E: Emit> ImapWorker<E> {
         let emit = &self.emit;
         // RFC 2087/9208: the quota root the inbox belongs to is the
         // account's own, and its STORAGE resource is the mailbox size.
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         let offered = sess
             .capabilities()
             .await
@@ -604,7 +604,7 @@ impl<E: Emit> ImapWorker<E> {
         let cache = &self.cache;
         let session = &mut self.session;
         let emit = &self.emit;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         let paths = refresh_keywords(account_id, sess, cache.as_ref(), &keywords).await;
         emit(WorkerEvent::KeywordsSynced { paths });
         After::Done

@@ -5,7 +5,7 @@
 use async_imap::types::Fetch;
 use futures::TryStreamExt;
 
-use super::{After, Emit, ImapWorker};
+use super::{ensured, After, Emit, ImapWorker};
 use crate::i18n::{i18n, i18n_f};
 use crate::worker::imap::folders::refresh_folders;
 use crate::worker::imap::gmail::{
@@ -31,7 +31,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         if let Err(e) = store_flag(sess, &path, uid, "\\Seen", seen).await {
             emit(WorkerEvent::error(i18n_f(
                 "Could not update message: {e}",
@@ -52,7 +52,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         if let Err(e) = store_flag(sess, &path, uid, "\\Flagged", flagged).await {
             emit(WorkerEvent::error(i18n_f(
                 "Could not change the star: {e}",
@@ -81,7 +81,7 @@ impl<E: Emit> ImapWorker<E> {
         let folder_refresh_due = &mut self.folder_refresh_due;
         let local_tags_noticed = &mut self.local_tags_noticed;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         let stored = store_keyword(sess, &path, uid, &keyword, add).await;
         // On Gmail a tag is a label too (#374), so Gmail's own apps
         // show it; the keyword stays for other IMAP clients.
@@ -144,7 +144,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         match mark_all_read(sess, &path).await {
             Ok(()) => {
                 if let Some(c) = cache.as_ref() {
@@ -174,7 +174,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         match mark_spam(sess, &path, uid, &dest).await {
             Ok(created) => {
                 if let Some(c) = cache.as_ref() {
@@ -204,7 +204,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         match mark_ham(sess, &path, &[uid], &dest).await {
             Ok(created) => {
                 if let Some(c) = cache.as_ref() {
@@ -238,7 +238,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         match mark_ham(sess, &path, &uids, &dest).await {
             Ok(created) => {
                 if let Some(c) = cache.as_ref() {
@@ -273,7 +273,7 @@ impl<E: Emit> ImapWorker<E> {
     ) -> After {
         let session = &mut self.session;
         let emit = &self.emit;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         let flags = import_flags(seen, flagged);
         let result = append_msg(sess, &path, flags.as_deref(), &raw)
             .await
@@ -371,7 +371,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         match move_message(sess, &path, uid, &dest).await {
             Ok(created) => {
                 if let Some(c) = cache.as_ref() {
@@ -406,7 +406,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         match move_messages(sess, &path, &uids, &dest).await {
             Ok(created) => {
                 if let Some(c) = cache.as_ref() {
@@ -455,7 +455,7 @@ impl<E: Emit> ImapWorker<E> {
         let mut uids: Vec<u32> = Vec::new();
         let mut failed: Option<String> = None;
         {
-            let sess = session.as_mut().unwrap();
+            let sess = ensured(session);
             let mut exists = 0u32;
             match sel(sess, &path).await {
                 Err(e) => failed = Some(e.to_string()),
@@ -565,7 +565,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         // Gmail only takes a label off mail expunged outside Trash,
         // so the mail would sit on in All Mail (#471).
         let trash = gmail_trash(cache.as_ref(), account_id, account).filter(|t| *t != path);
@@ -604,7 +604,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         let found = match sel(sess, &path).await {
             Ok(_) => search_uids(sess, "ALL").await,
             Err(e) => Err(e),
@@ -652,7 +652,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         match create_folder(sess, &path).await {
             Ok(()) => refresh_folders(account_id, account, sess, cache.as_ref(), emit).await,
             Err(e) => {
@@ -674,7 +674,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         match rename_folder(sess, &old_path, &new_path).await {
             Ok(()) => refresh_folders(account_id, account, sess, cache.as_ref(), emit).await,
             Err(e) => {
@@ -696,7 +696,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         account.hidden_folders = paths;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         refresh_folders(account_id, account, sess, cache.as_ref(), emit).await;
         After::Done
     }
@@ -709,7 +709,7 @@ impl<E: Emit> ImapWorker<E> {
         let session = &mut self.session;
         let emit = &self.emit;
         let mut lost = false;
-        let sess = session.as_mut().unwrap();
+        let sess = ensured(session);
         match delete_folder(sess, &path, trash.as_deref()).await {
             Ok(()) => refresh_folders(account_id, account, sess, cache.as_ref(), emit).await,
             Err(e) => {

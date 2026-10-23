@@ -193,8 +193,9 @@ fn build_message(
         }
         let mut related = MultiPart::related().multipart(alt);
         for img in images {
-            let ct = ContentType::parse(&img.mime)
-                .unwrap_or_else(|_| ContentType::parse("application/octet-stream").unwrap());
+            let ct = ContentType::parse(&img.mime).unwrap_or_else(|_| {
+                ContentType::parse("application/octet-stream").expect("static content type")
+            });
             let part = match img.name {
                 Some(name) => Attachment::new_inline_with_name(img.cid, name),
                 None => Attachment::new_inline(img.cid),
