@@ -1,6 +1,11 @@
 //! Applying composing settings.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::ui::preferences::{PrefInput, PrefOutput};
+
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 impl AppModel {
     /// The messages the router sends here (see `AppModel::route`).

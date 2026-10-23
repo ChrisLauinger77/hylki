@@ -1,7 +1,18 @@
 //! The unified Starred view for accounts that star by flag rather than by
 //! folder.
 
-use super::*;
+use std::collections::HashMap;
+
+use relm4::prelude::*;
+
+use crate::config;
+use crate::models::{FolderKind, Message};
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::smart::SMART_VIEW_LIMIT;
+use super::types::UnifiedView;
 
 impl AppModel {
     /// The accounts in the unified section that keep a star as a flag on

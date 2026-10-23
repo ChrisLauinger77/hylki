@@ -1,6 +1,14 @@
 //! Moving and tagging from menus and keys.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::models::FolderKind;
+use crate::ui::message_list::{BulkAction, MessageListInput};
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::undo::FlagKind;
 
 impl AppModel {
     /// The messages the router sends here (see `AppModel::route`).

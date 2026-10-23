@@ -1,7 +1,16 @@
 //! The sidebar's icon rail and the peek that slides the full sidebar over
 //! the list.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::ui::sidebar::SidebarInput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::sidebar::set_sidebar_header_compact;
+use super::AppModelWidgets;
 
 pub(super) const SIDEBAR_RAIL_WIDTH: f64 = 80.0;
 

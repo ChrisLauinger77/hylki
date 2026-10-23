@@ -1,7 +1,18 @@
 //! Showcase hooks for the list, the reader and the sidebar: opening rows,
 //! menus and palettes, swipes, the gallery, the rail and the peek panel.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::app::model::AppModel;
+use crate::app::msg::AppMsg;
+use crate::app::showcase::showcase_capture;
+use crate::app::AppModelWidgets;
+use crate::models::FolderKind;
+use crate::ui::attachments_gallery::GalleryInput;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::sidebar::SidebarInput;
 
 impl AppModel {
     /// HYLKI_SHOWCASE_HEIGHTS=1 logs the allocated height of the

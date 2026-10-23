@@ -1,7 +1,14 @@
 //! Diagnostics: the memory report in the exported log.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::i18n::i18n;
 use crate::memory_report::{human_bytes, human_count, messages_bytes};
+use crate::ui::notifications::NotifyInput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// "N messages, size" for a count and the bytes they hold.
 fn count((n, b): (usize, usize)) -> String {

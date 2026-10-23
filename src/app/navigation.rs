@@ -1,6 +1,20 @@
 //! Opening a folder or a unified view in the list.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::models::{FolderKind, Message};
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::sidebar::SidebarInput;
+use crate::worker::MailRequest;
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::search::default_scope;
+use super::types::{SelectedFolder, UnifiedView};
+use super::unified::LIST_NEWEST;
 
 /// Reads folders not seen since launch whole from the on-disk index, off
 /// the main thread: an Archive is tens of thousands of rows.

@@ -1,6 +1,24 @@
 //! Attachments: saving them to disk, and pruning old downloads.
 
-use super::*;
+use std::collections::{HashMap, HashSet};
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f};
+use crate::models::Attachment;
+use crate::ui::attachment_drawer::AttachmentDrawerInput;
+use crate::ui::attachments_gallery::GalleryInput;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::message_window::MessageWindowInput;
+use crate::worker::MailRequest;
+
+use super::confirm::confirm_destructive;
+use super::conversation::{body_key, BodyKey};
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// Save one attachment via a file chooser (a card chip's save button, #213).
 fn save_attachment(att: Attachment, parent: Option<adw::ApplicationWindow>) {

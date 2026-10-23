@@ -1,7 +1,19 @@
 //! Selecting a message: what the reader shows, read marks, and the
 //! conversation it belongs to.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::models::{thread_ids, Message, ThreadSummary};
+use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::message_list::{MessageListInput, QuickFilters};
+use crate::ui::message_view::MessageViewInput;
+use crate::worker::MailRequest;
+
+use super::conversation::{body_key, THREAD_BODY_WAIT};
+use super::hand_off::HandOffFiles;
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// What the reader shows, as a selection compares it with what it is to
 /// show: account, Message-ID, body, unread, star and keywords.

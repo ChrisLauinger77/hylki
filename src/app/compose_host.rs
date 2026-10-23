@@ -1,6 +1,17 @@
 //! Where composers live: their own windows, or the reader's split pane.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::ui::compose::{Compose, ComposeInput, ComposePrefill};
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::split_reply::{set_split_shrink, split_reply_height};
+use super::AppModelWidgets;
 
 /// A standalone compose window (New Message, compose-to, edit-draft, or a
 /// popped-out reply) and its component. Both refs must stay alive: the window

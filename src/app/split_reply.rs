@@ -1,6 +1,14 @@
 //! The split reply: a composer under the reader on a Paned.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::ui::compose::{ComposeInput, ComposePrefill};
+use crate::ui::message_view::MessageViewInput;
+
+use super::compose_host::ReaderCompose;
+use super::model::AppModel;
 
 /// The split reply's own height on its Paned: the divider position above
 /// the reader, and what the position leaves of the pane beneath it, where

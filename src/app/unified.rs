@@ -1,7 +1,17 @@
 //! The unified views (All Inboxes, Starred, Favorites ...): one list merged
 //! from many folders, rebuilt only when what it holds changed.
 
-use super::*;
+use std::collections::{HashMap, HashSet};
+
+use relm4::prelude::*;
+
+use crate::models::{FolderKind, Message};
+use crate::ui::message_list::MessageListInput;
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::types::UnifiedView;
 
 /// A unified view, and the account it is narrowed to, as one number: the
 /// key the message list keeps it under.

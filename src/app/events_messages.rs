@@ -1,7 +1,19 @@
 //! Worker events about message lists: a folder's messages, more of them,
 //! and messages gone.
 
-use super::*;
+use std::collections::{HashMap, HashSet};
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::models::{FolderKind, Message};
+use crate::ui::message_list::MessageListInput;
+use crate::ui::notifications::NotifyInput;
+use crate::worker::MailRequest;
+
+use super::conversation::{body_key, next_after_vanish};
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 impl AppModel {
     /// The messages the router sends here (see `AppModel::route`).

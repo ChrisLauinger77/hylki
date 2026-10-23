@@ -1,6 +1,18 @@
 //! The tray icon and its menu, and the launcher badge.
 
-use super::*;
+use std::collections::HashSet;
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::i18n;
+use crate::models::{Account, Message};
+use crate::ui::sidebar::SidebarInput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::window::exit_now;
 
 /// What identifies a tray mail list for change detection: the total, then
 /// each card.

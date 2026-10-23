@@ -1,7 +1,17 @@
 //! The message list's header: its Focus Mode fold, the sort and filter
 //! popover, and the wide/narrow switch.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f, i18n_noop};
+use crate::ui::message_list::{MessageListInput, QuickFilter, QuickFilters};
+use crate::ui::message_view::MessageViewInput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::AppModelWidgets;
 
 /// How wide the list pane has to be dragged before Automatic lays the list
 /// out on one line, and how far back before it returns to cards (#334).

@@ -1,6 +1,15 @@
 //! Applying message list settings.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::preferences::PrefOutput;
+use crate::ui::sidebar::SidebarInput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 impl AppModel {
     /// The settings changes the router sends here (see `AppModel::route`).

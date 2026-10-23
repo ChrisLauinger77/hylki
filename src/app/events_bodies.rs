@@ -1,7 +1,18 @@
 //! Worker events about one message: its body, source, attachments and
 //! sender check.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::models::{Attachment, Message};
+use crate::ui::attachments_gallery::GalleryInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::message_window::MessageWindowInput;
+use crate::worker::MailRequest;
+
+use super::conversation::{body_key, is_event_target, BodyKey};
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::prefill::reply_prefill;
 
 impl AppModel {
     /// The messages the router sends here (see `AppModel::route`).

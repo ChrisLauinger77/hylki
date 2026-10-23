@@ -1,6 +1,16 @@
 //! The attachments gallery: listing every attachment across folders.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::i18n::i18n;
+use crate::models::FolderKind;
+use crate::ui::attachments_gallery::{GalleryAccount, GalleryFolder, GalleryInput};
+use crate::ui::message_list::MessageListInput;
+use crate::worker::MailRequest;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::AppModelWidgets;
 
 /// Largest cached attachment whose bytes ride along with a gallery page, so a
 /// thumbnail or preview is instant. Anything bigger is fetched when opened.

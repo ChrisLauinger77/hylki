@@ -1,6 +1,20 @@
 //! Desktop notifications for new mail and what their buttons do.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::models::{Folder, FolderKind, Message};
+use crate::ui::message_list::MessageListInput;
+use crate::ui::notifications::NotifyInput;
+use crate::worker::MailRequest;
+
+use super::demo::demo_mode;
+use super::flags::read_label;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::prefill::reply_prefill;
+use super::types::UnifiedView;
+use super::undo::FlagKind;
 
 /// Resolve a notification's `(account_id, folder_id, message_id)` to the full
 /// cached [`Message`] (#38): the notified message may not be in the current

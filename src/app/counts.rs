@@ -1,7 +1,11 @@
 //! Unread counts: which folders count toward an account's total, and
 //! keeping the counted folders' lists in step with their counts.
 
-use super::*;
+use crate::models::{Folder, FolderKind};
+use crate::ui::sidebar::UnifiedFolderRef;
+use crate::worker::MailRequest;
+
+use super::model::AppModel;
 
 impl AppModel {
     /// The folders an account's own "Filtered Folders" section lists: the

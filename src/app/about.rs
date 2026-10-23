@@ -1,6 +1,14 @@
 //! The About window and the people it thanks.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::i18n;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::release_notes::release_notes_page;
 
 /// The contributors and translators shown in the About window's thanks lists.
 /// Both come from the repository's metafiles, read in at build time: one

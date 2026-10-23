@@ -1,7 +1,19 @@
 //! Worker events about folders: listings, unread counts, and marks the
 //! server has settled.
 
-use super::*;
+use std::collections::HashMap;
+
+use relm4::prelude::*;
+
+use crate::config;
+use crate::models::Folder;
+use crate::ui::notifications::NotifyInput;
+use crate::worker::MailRequest;
+
+use super::folders::{apply_folder_roles, merged_unread, same_folder_list};
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::pending::{PENDING_MOVE_MAX, PENDING_SEEN_MAX, PENDING_TAG_SETTLED};
 
 impl AppModel {
     /// The messages the router sends here (see `AppModel::route`).

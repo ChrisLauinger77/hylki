@@ -1,8 +1,18 @@
 //! The reader header's action buttons: their order, folding into the
 //! overflow menu when the window is narrow, and the menu itself.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f};
+use crate::models::{FolderKind, Message};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
+use crate::ui::preferences::PrefInput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::AppModelWidgets;
 
 /// Fallback threshold for folding the reader header's right-hand actions
 /// into the overflow menu. Normally the threshold is *measured* at startup from the

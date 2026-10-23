@@ -1,6 +1,18 @@
 //! Contacts: the address books, syncing them, and importing vCards.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::i18n::{i18n, i18n_f, ni18n_f};
+use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::notifications::NotifyInput;
+use crate::ui::preferences::PrefInput;
+use crate::ui::sidebar::SidebarInput;
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// Sync the address books that sync with a server, after `delay_ms` and
 /// off the main thread, and read the contacts again if any did (#408).

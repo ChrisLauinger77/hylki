@@ -1,13 +1,17 @@
 //! The search pool: every indexed folder's mail merged into one list for a
 //! search across folders and accounts, one copy of each mail.
 
-use super::*;
-
 use std::collections::HashMap;
 
-use super::conversation::same_mail;
+use relm4::prelude::*;
+
 use crate::models::{FolderKind, Message};
-use crate::ui::message_list::SearchScope;
+use crate::ui::message_list::{MessageListInput, SearchScope};
+
+use super::conversation::same_mail;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::types::FolderMessages;
 
 /// Flatten every folder's indexed messages into one pool for cross-folder search.
 ///

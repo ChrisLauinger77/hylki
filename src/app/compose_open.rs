@@ -1,7 +1,23 @@
 //! Opening a composer on a draft, a reply, a forward or an edited copy,
 //! fetching the original's body first when it is not cached.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::models::{FolderKind, Message};
+use crate::ui::compose::{ComposeInput, ComposePrefill};
+use crate::worker::MailRequest;
+
+use super::conversation::body_key;
+use super::hand_off::{FileHandOff, HandOffFiles};
+use super::keymap::WindowCompose;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::prefill::{
+    first_recipient, forward_prefill, reply_all_prefill, reply_prefill, reply_subject,
+    stage_attachments,
+};
+use super::quote::editable_copy_html;
+use super::uri_queue::parse_mailto;
 
 impl AppModel {
     /// Where a just-saved draft is, by its Message-ID, among the Drafts

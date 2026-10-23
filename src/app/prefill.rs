@@ -1,9 +1,10 @@
 //! What a composer opens with when it answers, forwards or resumes a message:
 //! recipients, subject, threading headers and the quoted original.
 
-use super::quote::{body_is_plain_text, escaped_lines, quoted_original};
 use crate::models::Message;
 use crate::ui::compose::ComposePrefill;
+
+use super::quote::{body_is_plain_text, escaped_lines, quoted_original};
 
 /// A reply's subject: the original's, with one "Re:" in front.
 pub(super) fn reply_subject(subject: &str) -> String {

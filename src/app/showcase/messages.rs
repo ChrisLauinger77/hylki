@@ -1,7 +1,15 @@
 //! The showcase's own messages, which stage what a timer cannot reach from
 //! outside the model.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::app::model::AppModel;
+use crate::app::msg::AppMsg;
+use crate::models::FolderKind;
+use crate::ui::attachments_gallery::GalleryInput;
+use crate::ui::compose::ComposeInput;
+use crate::ui::preferences::PrefInput;
 
 impl AppModel {
     /// The messages the router sends here (see `AppModel::route`).

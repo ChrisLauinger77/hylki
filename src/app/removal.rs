@@ -1,7 +1,24 @@
 //! Taking mail out of a folder: archive, delete, spam, purge, and the
 //! optimistic cleanup of the list and caches that goes with it.
 
-use super::*;
+use std::collections::{HashMap, HashSet};
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f, ni18n_f};
+use crate::models::{FolderKind, Message};
+use crate::ui::message_list::{BulkAction, MessageListInput};
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::notifications::NotifyInput;
+use crate::worker::MailRequest;
+
+use super::confirm::confirm_destructive;
+use super::conversation::body_key;
+use super::folders::kind_label;
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 impl AppModel {
     /// Whether a message already lives in its account's Trash — where "delete"

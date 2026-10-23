@@ -1,7 +1,20 @@
 //! Folder lists: special-folder roles, where sent copies go, unread counts
 //! across a re-listing, and keys that follow a renamed folder.
 
-use super::*;
+use std::collections::HashMap;
+
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f};
+use crate::models::{Folder, FolderKind, Message};
+use crate::ui::notifications::NotifyInput;
+use crate::ui::sidebar::SidebarInput;
+use crate::worker::MailRequest;
+
+use super::model::AppModel;
+use super::sidebar::folder_key;
+use super::undo::UndoStep;
 
 /// Apply an account's manual special-folder assignments (#82) over the
 /// auto-detected kinds (see [`crate::models::assign_folder_roles`]), then

@@ -1,7 +1,14 @@
 //! What the sidebar lists: accounts, their folders in the chosen order,
 //! and the folder choices the account editor offers.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::config::{self, AccountConfig};
+use crate::models::Folder;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::sidebar::{SectionData, SidebarInput};
+
+use super::model::AppModel;
 
 impl AppModel {
     /// The Special Folders choices per account email (#82): every folder of

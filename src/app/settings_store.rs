@@ -1,6 +1,14 @@
 //! Saving the app's settings to disk.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::sidebar::SidebarInput;
+
+use super::model::AppModel;
 
 impl AppModel {
     /// Persist all app settings together.

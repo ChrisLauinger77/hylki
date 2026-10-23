@@ -1,7 +1,21 @@
 //! Message actions from the toolbar, the cards and the list rows: star,
 //! archive, delete, spam and bulk actions.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::models::{FolderKind, Message};
+use crate::ui::message_list::{BulkAction, MessageListInput, RowAction};
+use crate::ui::notifications::NotifyInput;
+use crate::worker::MailRequest;
+
+use super::flags::{read_label, star_label};
+use super::hand_off::HandOffFiles;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::prefill::{reply_all_prefill, reply_prefill};
+use super::undo::FlagKind;
+use super::uri_queue::eml_file_name;
 
 impl AppModel {
     /// The messages the router sends here (see `AppModel::route`).

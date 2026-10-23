@@ -1,9 +1,24 @@
 //! The root component's model as it starts: every field's first value,
 //! from what the boot steps read and the children they launched.
 
+use std::collections::{HashMap, HashSet};
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::i18n;
+use crate::models::FolderKind;
+use crate::ui::message_list::QuickFilters;
+
 use super::boot::{Boot, MainMenu};
 use super::children::Children;
-use super::*;
+use super::consts::{ATTACHMENT_CACHE_BUDGET, BODY_CACHE_BUDGET};
+use super::demo::{demo_account_configs_saved, demo_filters, demo_mode, demo_tags};
+use super::list_header::LIST_WIDE_ON;
+use super::model::AppModel;
+use super::transfer::TransferTally;
+use super::types::UnifiedView;
 
 impl AppModel {
     /// Builds the model. Several fields read their own settings file here,

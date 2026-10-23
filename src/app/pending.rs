@@ -1,7 +1,9 @@
 //! Changes made on screen before the server confirms them (read marks, tags,
 //! moves), and how long each is trusted over what a sync reports.
 
-use super::*;
+use crate::models::Message;
+
+use super::model::AppModel;
 
 /// How long a read/unread change sent to a worker keeps overriding what the
 /// server reports for its message and folder, should the worker's

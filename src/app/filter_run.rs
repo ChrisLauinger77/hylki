@@ -1,7 +1,15 @@
 //! A manual Apply Filters run (#198) over chosen folders, its progress
 //! dialog and its report.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::i18n::{i18n, i18n_f, ni18n_f};
+use crate::ui::notifications::NotifyInput;
+use crate::worker::MailRequest;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// How long a manual "Apply Filters" run (#198) waits for the folders it asked
 /// for before reporting on whatever came back. A folder that is offline, or

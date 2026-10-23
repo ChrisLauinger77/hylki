@@ -1,18 +1,17 @@
 //! Root component: the application window, three-pane adaptive layout, and the
 //! routing between the sidebar, list, reader, and the per-account mail workers.
 
-use std::collections::{HashMap, HashSet};
-
 use adw::prelude::*;
-use relm4::actions::{AccelsPlus, RelmAction, RelmActionGroup};
 use relm4::prelude::*;
-use tokio::sync::mpsc::UnboundedSender;
+
+use crate::config;
+use crate::i18n::i18n;
+use crate::ui::notifications::NotifyInput;
+use crate::ui::FOCUS_ANIM_MS;
 
 // The message list's opening width now comes from config (the remembered pane
 // width, #28); its floor lives with the pane in message_list.rs
 // (LIST_MIN_WIDTH).
-
-use crate::ui::FOCUS_ANIM_MS;
 
 relm4::new_action_group!(WindowActionGroup, "win");
 relm4::new_stateless_action!(AccountsAction, WindowActionGroup, "accounts");
@@ -121,61 +120,27 @@ mod window;
 mod workers;
 
 pub(crate) use accounts::finish_keyring_writes;
-use attachments::{prune_downloads, schedule_download_prune};
-use boot::{build_main_menu, Boot};
-use children::Children;
-use compose_host::ReaderCompose;
-use confirm::confirm_destructive;
-use consts::{ATTACHMENT_CACHE_BUDGET, BODY_CACHE_BUDGET, READER_MIN_WIDTH};
-use contacts::{reload_contacts, start_contacts_sync, sync_contact_books};
-use conversation::{
-    body_key, is_event_target, next_after_vanish, BodyKey, CARRIED_BODY_LIMIT, THREAD_BODY_WAIT,
-};
-use demo::{demo_account_configs_saved, demo_filters, demo_mode, demo_tags};
-use diagnostics::start_heap_trim;
-use filter_run::FolderTally;
-use flags::{read_label, sender_label, star_label};
-use folders::{apply_folder_roles, kind_label, merged_unread, same_folder_list};
-use hand_off::{FileHandOff, HandOffFiles};
-use keymap::{ctrl_shortcut_for, focus_in_compose, gmail_sequence, GoTarget, WindowCompose};
 pub(crate) use keymap::{
     focus_is_text, focus_takes_keys, gmail_shortcut_for, reader_keeps, shortcut_for,
     without_caps_lock, Shortcut,
 };
-use list_header::LIST_WIDE_ON;
 pub(crate) use model::AppModel;
 pub(crate) use msg::AppMsg;
-use palette::palette_key;
-use pending::{PENDING_MOVE_MAX, PENDING_SEEN_MAX, PENDING_TAG_MAX, PENDING_TAG_SETTLED};
-use picker::show_message_picker;
-use prefill::{
-    first_recipient, forward_prefill, reply_all_prefill, reply_prefill, reply_subject,
-    stage_attachments, unsent_prefill,
-};
-use quote::editable_copy_html;
 pub(crate) use quote::{body_is_pre_wrap, message_text};
-use release_notes::release_notes_page;
-use search::default_scope;
-use send::machine_message;
 pub(crate) use showcase::showcase_capture;
-use showcase::showcase_pgp;
-use sidebar::{folder_key, set_sidebar_header_compact};
-use sidebar_peek::SIDEBAR_RAIL_WIDTH;
-use smart::SMART_VIEW_LIMIT;
-use split_reply::{set_split_shrink, split_reply_height};
 pub(crate) use theme::desktop_icon_theme;
-use theme::{
-    apply_app_theme, apply_icon_theme, follow_motion_setting, motion_wanted, refresh_scheme_css,
-    WIZARD_HOLDS_LIGHT,
-};
-use transfer::TransferTally;
-use types::{FolderMessages, SelectedFolder, UnifiedView};
-use undo::{FlagChange, FlagKind, FlagRef, UndoEntry, UndoStep};
-use unified::LIST_NEWEST;
-use uri_queue::{eml_file_name, parse_mailto, FILE_FOLDER};
 pub(crate) use uri_queue::{
     is_message_file, queue_attach_files, queue_mailto, queue_message_file, queue_mid,
 };
+
+use attachments::schedule_download_prune;
+use boot::{build_main_menu, Boot};
+use children::Children;
+use consts::READER_MIN_WIDTH;
+use contacts::start_contacts_sync;
+use diagnostics::start_heap_trim;
+use palette::palette_key;
+use theme::{apply_app_theme, follow_motion_setting};
 use window::{exit_now, install_window_actions, save_window_geometry};
 use workers::watch_system_events;
 
@@ -184,29 +149,6 @@ relm4::new_stateless_action!(ConsoleAction, WindowActionGroup, "console");
 relm4::new_stateless_action!(FindAction, WindowActionGroup, "find");
 relm4::new_stateless_action!(UndoAction, WindowActionGroup, "undo");
 relm4::new_stateless_action!(RedoAction, WindowActionGroup, "redo");
-
-use crate::config::{self, AccountConfig};
-use crate::models::{
-    thread_ids, Account, Attachment, Folder, FolderKind, KeywordFinding, Message, ThreadSummary,
-};
-use crate::ui::accounts::{AccountsOutput, AccountsWindow};
-use crate::ui::attachments_gallery::{GalleryAccount, GalleryFolder, GalleryInput};
-use crate::ui::compose::{Compose, ComposeInit, ComposeInput, ComposeOutput, ComposePrefill};
-use crate::ui::message_list::{
-    BulkAction, MessageListInput, QuickFilter, QuickFilters, RowAction, SearchScope,
-};
-
-use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
-use crate::ui::attachment_drawer::AttachmentDrawerInput;
-use crate::ui::contacts_page::ContactsPageInput;
-use crate::ui::message_view::{MessageViewInput, UnsubState};
-use crate::ui::message_window::{
-    MessageWindow, MessageWindowInit, MessageWindowInput, MessageWindowOutput,
-};
-use crate::ui::notifications::NotifyInput;
-use crate::ui::preferences::{PrefInit, PrefInput, PrefOutput, Preferences};
-use crate::ui::sidebar::{CtxAction, SectionData, SidebarInput, UnifiedFolderRef};
-use crate::worker::{self, MailRequest, OutgoingMessage, WorkerEvent};
 
 #[relm4::component(pub)]
 impl SimpleComponent for AppModel {

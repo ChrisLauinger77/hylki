@@ -1,12 +1,21 @@
 //! Setting up a composer: the From identities it offers and which one it opens
 //! with.
 
-use super::*;
-
 use std::collections::HashMap;
 
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
 use crate::config::{split_identity, AccountConfig};
+use crate::i18n::i18n;
+use crate::ui::compose::{Compose, ComposeInit, ComposeOutput};
 use crate::ui::compose::{ComposeAccount, ComposePrefill};
+use crate::ui::preferences::PrefOutput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::palette::palette_key;
 
 /// Selectable "from" identities, in display order: each account, then
 /// one entry per send-as alias it defines (#34) — same transport and

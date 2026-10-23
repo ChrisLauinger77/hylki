@@ -1,6 +1,21 @@
 //! Drafts and templates: their folders, and the pickers that choose one.
 
-use super::*;
+use std::collections::HashSet;
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::i18n::i18n;
+use crate::models::{Folder, FolderKind, Message};
+use crate::ui::compose::ComposeInput;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::worker::MailRequest;
+
+use super::hand_off::FileHandOff;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::picker::show_message_picker;
 
 impl AppModel {
     /// New Message from Template (#360): every template the app knows, to

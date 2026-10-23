@@ -1,6 +1,19 @@
 //! The main window: its size and breakpoints, and the app and window actions.
 
-use super::*;
+use adw::prelude::*;
+use relm4::actions::{AccelsPlus, RelmAction, RelmActionGroup};
+use relm4::prelude::*;
+
+use crate::config;
+
+use super::accounts::finish_keyring_writes;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::{
+    AboutAction, AccountsAction, AppModelWidgets, ConsoleAction, FindAction, PreferencesAction,
+    PrintAction, PrintPreviewAction, RedoAction, ShortcutsAction, StatusBarAction, UndoAction,
+    WindowActionGroup,
+};
 
 /// Saves the window's size and maximized state. Only the geometry: on
 /// Wayland the compositor owns placement and the monitor. A maximized

@@ -1,6 +1,15 @@
 //! The Outbox: queued and scheduled mail, shown as a folder of its own.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::ui::compose::ComposePrefill;
+use crate::ui::message_list::{MessageListInput, SearchScope};
+use crate::ui::sidebar::SidebarInput;
+use crate::worker::MailRequest;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::prefill::{first_recipient, stage_attachments, unsent_prefill};
 
 impl AppModel {
     /// Push the merged queue to the Outbox view and the sidebar's badge. Oldest

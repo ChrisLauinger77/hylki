@@ -2,8 +2,15 @@
 //! mid: links, .eml files and files to attach. Each is queued until the app
 //! can take it, then sent on as an AppMsg.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
 
+use crate::i18n::{i18n, i18n_f};
+use crate::ui::notifications::NotifyInput;
+use crate::worker::MailRequest;
+
+use super::conversation::body_key;
+use super::model::AppModel;
 use super::AppMsg;
 
 /// Hands `item` to the running component as `msg(item)`, or parks it in

@@ -1,6 +1,17 @@
 //! The Settings window and its accounts panel.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config::{self, AccountConfig};
+use crate::i18n::i18n;
+use crate::ui::accounts::{AccountsOutput, AccountsWindow};
+use crate::ui::preferences::{PrefInit, PrefInput, PrefOutput, Preferences};
+
+use super::confirm::confirm_destructive;
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// What the Settings window reports, as the message it means here.
 fn prefs_output_msg(out: PrefOutput) -> AppMsg {

@@ -1,6 +1,23 @@
 //! The mail workers: one per account, and their events turned into AppMsg.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+use tokio::sync::mpsc::UnboundedSender;
+
+use crate::config::AccountConfig;
+use crate::models::FolderKind;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::notifications::NotifyInput;
+use crate::ui::sidebar::SidebarInput;
+use crate::worker::{self, MailRequest, WorkerEvent};
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::sidebar::set_sidebar_header_compact;
+use super::sidebar_peek::SIDEBAR_RAIL_WIDTH;
+use super::AppModelWidgets;
 
 fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
     match event {
@@ -766,6 +783,7 @@ pub(super) fn watch_system_events(sender: &ComponentSender<AppModel>) {
 mod tests {
     use super::*;
     use crate::app::children::sidebar_output_msg;
+    use crate::app::types::UnifiedView;
     use crate::ui::sidebar::SidebarOutput;
 
     #[test]

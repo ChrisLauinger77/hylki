@@ -1,6 +1,21 @@
 //! Messages opened in their own window.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::i18n;
+use crate::models::{Attachment, FolderKind, Message};
+use crate::ui::message_window::{
+    MessageWindow, MessageWindowInit, MessageWindowInput, MessageWindowOutput,
+};
+use crate::worker::MailRequest;
+
+use super::conversation::{body_key, BodyKey};
+use super::hand_off::HandOffFiles;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::uri_queue::FILE_FOLDER;
 
 /// A message displayed in its own top-level window (double-click to pop out).
 pub(super) struct PopOut {

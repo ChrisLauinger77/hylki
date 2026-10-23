@@ -1,6 +1,12 @@
 //! Applying sidebar settings.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::preferences::{PrefInput, PrefOutput};
+
+use super::model::AppModel;
 
 impl AppModel {
     /// The settings changes the router sends here (see `AppModel::route`).

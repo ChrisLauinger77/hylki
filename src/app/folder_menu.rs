@@ -1,6 +1,18 @@
 //! The folder context menu's dialogs: new, rename, delete, empty.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::i18n::{i18n, i18n_f};
+use crate::models::FolderKind;
+use crate::ui::sidebar::CtxAction;
+use crate::worker::MailRequest;
+
+use super::confirm::confirm_destructive;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::sidebar::folder_key;
+use super::undo::UndoStep;
 
 impl AppModel {
     /// Prompt for a new custom folder name and create it under `account_id`.

@@ -7,7 +7,12 @@
 //! child module for what it stages, called in the order the hooks were
 //! always armed (timers due at the same second fire in that order).
 
-use super::*;
+use relm4::prelude::*;
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::AppModelWidgets;
 
 mod capture;
 mod compose;

@@ -1,7 +1,17 @@
 //! Showcase hooks for the windows over the main one: shortcuts, Settings
 //! and the account editor, Add to Contacts, message dialogs and Contacts.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::app::model::AppModel;
+use crate::app::msg::AppMsg;
+use crate::app::showcase::showcase_capture;
+use crate::i18n::i18n;
+use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::sidebar::CtxAction;
+
+use super::capture::input_after;
 
 /// HYLKI_SHOWCASE_SHORTCUTS=<height> opens the shortcut list at
 /// 4 s, that tall, so all of it fits a capture (with

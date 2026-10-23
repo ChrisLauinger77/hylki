@@ -1,6 +1,17 @@
 //! Applying reader settings: zoom, Reader View, font and color overrides.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::message_window::MessageWindowInput;
+use crate::ui::preferences::PrefOutput;
+use crate::worker::MailRequest;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 impl AppModel {
     /// The session's message zoom: every reader on screen follows.

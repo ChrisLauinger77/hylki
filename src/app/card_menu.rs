@@ -1,7 +1,16 @@
 //! The right-click menu of a message card in the reader.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::i18n::i18n;
+use crate::models::{FolderKind, Message};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
+use crate::ui::message_list::RowAction;
+use crate::ui::message_window::MessageWindowInput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// One entry of a card's menu that does what a list row's action does.
 ///

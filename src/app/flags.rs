@@ -1,7 +1,19 @@
 //! Star, read and tag state: changing it on the server and showing the change
 //! before the server confirms it.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::i18n::i18n;
+use crate::models::Message;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::message_window::MessageWindowInput;
+use crate::worker::MailRequest;
+
+use super::conversation::body_key;
+use super::model::AppModel;
+use super::pending::PENDING_TAG_MAX;
+use super::undo::FlagKind;
 
 /// What the Undo menu calls a star change.
 pub(super) fn star_label(starred: bool) -> String {

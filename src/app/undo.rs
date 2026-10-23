@@ -1,9 +1,21 @@
 //! Undo and redo (#200): the steps recorded for each action and applying
 //! them, instantly on screen when the action was recent.
 
-use super::*;
+use std::collections::HashMap;
 
-use crate::models::Message;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::i18n::{i18n, i18n_f};
+use crate::models::{FolderKind, Message};
+use crate::ui::compose::ComposeInput;
+use crate::ui::message_list::MessageListInput;
+use crate::worker::MailRequest;
+
+use super::compose_host::ReaderCompose;
+use super::conversation::{body_key, CARRIED_BODY_LIMIT};
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// Which flag a recorded change touched (#200).
 #[derive(Clone, Debug, PartialEq)]

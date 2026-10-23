@@ -1,6 +1,24 @@
 //! One-click unsubscribe (RFC 2369/8058): the banner state and acting on it.
 
-use super::*;
+use std::collections::HashMap;
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f, ni18n_f};
+use crate::models::{FolderKind, Message};
+use crate::ui::message_view::{MessageViewInput, UnsubState};
+use crate::ui::message_window::MessageWindowInput;
+
+use super::conversation::body_key;
+use super::demo::demo_mode;
+use super::flags::sender_label;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::prefill::first_recipient;
+use super::send::machine_message;
+use super::showcase::showcase_capture;
 
 impl AppModel {
     /// The lists left, as the readers take them: key → when.

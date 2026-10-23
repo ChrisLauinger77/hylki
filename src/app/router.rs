@@ -4,7 +4,13 @@
 //! the delete-attachment question, and the catch-all for settings) are
 //! kept here.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::ui::preferences::PrefOutput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 impl AppModel {
     /// Hand `msg` to the module that handles it.

@@ -1,6 +1,20 @@
 //! Meeting invitations (#223): answering them and adding them to a calendar.
 
-use super::*;
+use std::collections::HashMap;
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f};
+use crate::models::Message;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::message_window::MessageWindowInput;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::prefill::first_recipient;
+use super::send::machine_message;
 
 impl AppModel {
     /// The addresses each account answers to: its own and every send-as

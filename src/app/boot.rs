@@ -6,15 +6,16 @@
 use adw::prelude::*;
 use relm4::ComponentSender;
 
+use crate::config::{self, AccountConfig};
+use crate::i18n::i18n;
+use crate::ui::preferences::PrefOutput;
+use crate::ui::sidebar::{SidebarInit, StartTarget};
+
 use super::accounts::{forget_account_secrets, reconcile_goa, GoaReconcile};
 use super::demo::demo_mode;
 use super::palette::keyed_item;
 use super::theme::{install_scheme_css, register_icons};
 use super::{AppModel, AppMsg};
-use crate::config::{self, AccountConfig};
-use crate::i18n::i18n;
-use crate::ui::preferences::PrefOutput;
-use crate::ui::sidebar::{SidebarInit, StartTarget};
 
 /// What the steps before the model read from disk and the environment.
 pub(super) struct Boot {

@@ -1,6 +1,20 @@
 //! Moving and copying mail between accounts.
 
-use super::*;
+use std::collections::HashMap;
+
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f, ni18n_f};
+use crate::models::{FolderKind, Message};
+use crate::ui::message_list::MessageListInput;
+use crate::ui::notifications::NotifyInput;
+use crate::worker::MailRequest;
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::undo::{UndoEntry, UndoStep};
 
 /// One message being moved to another account (#265): copied out of its
 /// folder, into the destination, and only then taken out of the source.

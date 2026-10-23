@@ -1,7 +1,16 @@
 //! The sidebar: its outputs, its header in rail mode, and the state it keeps
 //! (collapsed accounts, folder order, sizes).
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::i18n_f;
+use crate::models::{Account, Folder, FolderKind};
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// Trim the sidebar header in the icon-only rail so it no longer forces a minimum
 /// width wider than the rail: hide the (redundant) window-control buttons and tag

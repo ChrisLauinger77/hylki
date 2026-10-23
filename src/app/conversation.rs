@@ -1,7 +1,18 @@
 //! Assembling a conversation for the reader: which members to show, which
 //! bodies to fetch, and how worker answers find the message they are about.
 
-use super::*;
+use std::collections::{HashMap, HashSet};
+
+use relm4::prelude::*;
+
+use crate::models::{thread_ids, FolderKind, Message};
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::worker::MailRequest;
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::showcase::showcase_pgp;
 
 /// Whether two rows are the same mail stored twice, rather than two messages.
 ///

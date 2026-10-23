@@ -1,7 +1,13 @@
 //! Message filters: which rules match a message, and running them over a
 //! folder as it syncs.
 
-use super::*;
+use crate::config;
+use crate::models::{FolderKind, Message};
+use crate::worker::MailRequest;
+
+use super::filter_run::FolderTally;
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// The rules among `rules` that match `m`, as indexes in order. The list
 /// rarely carries a body (the demo's does); the preview is what a sync

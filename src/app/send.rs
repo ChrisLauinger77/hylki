@@ -1,7 +1,20 @@
 //! Sending: the undo-send delay, handing a message to its worker, and the
 //! answered marks shown before the server has them.
 
-use super::*;
+use std::collections::HashSet;
+
+use relm4::prelude::*;
+
+use crate::i18n::i18n;
+use crate::models::Message;
+use crate::ui::compose::ComposeInput;
+use crate::ui::message_list::MessageListInput;
+use crate::worker::{MailRequest, OutgoingMessage};
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::prefill::unsent_prefill;
+use super::theme::motion_wanted;
 
 /// A message the app writes itself (an answer to an invitation, an
 /// unsubscribe request): plain text, nothing attached, signed or quoted.

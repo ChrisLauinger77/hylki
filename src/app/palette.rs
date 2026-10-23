@@ -1,10 +1,16 @@
 //! The keyboard help: the command palette's key, menu entries that show their
 //! keys, and the shortcut tables the shortcuts window lists.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
 
+use crate::i18n::{i18n, i18n_noop};
+use crate::models::FolderKind;
+use crate::ui::preferences::PrefOutput;
+use crate::ui::sidebar::CtxAction;
+
+use super::types::UnifiedView;
 use super::{AppModel, AppMsg};
-use crate::i18n::i18n_noop;
 
 /// Ctrl+K opens the command palette (#399) wherever the keyboard is, a
 /// composer included: in the capture phase, ahead of a focused editor that

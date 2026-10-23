@@ -1,6 +1,17 @@
 //! Applying general and appearance settings.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::i18n;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::notifications::NotifyInput;
+use crate::ui::preferences::PrefOutput;
+
+use super::attachments::prune_downloads;
+use super::model::AppModel;
+use super::theme::{apply_app_theme, apply_icon_theme, refresh_scheme_css};
 
 impl AppModel {
     /// Push the date and clock preference into the formatter and redraw whatever

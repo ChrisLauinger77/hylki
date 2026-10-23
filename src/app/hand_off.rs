@@ -1,7 +1,24 @@
 //! Files handed to the app (Files' Send with Hylki, a mailto with attach=, a
 //! drop on the window): which composer they go to, and how.
 
-use super::*;
+use std::collections::HashSet;
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f, ni18n_f};
+use crate::models::Message;
+use crate::ui::compose::{ComposeInput, ComposePrefill};
+use crate::ui::preferences::PrefInput;
+use crate::worker::MailRequest;
+
+use super::conversation::body_key;
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::picker::show_message_picker;
+use super::prefill::reply_prefill;
+use super::AppModelWidgets;
 
 /// The handed-in files' names, joined, for a dialog.
 pub(super) fn hand_off_names(files: &[std::path::PathBuf]) -> String {

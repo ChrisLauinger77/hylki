@@ -1,6 +1,18 @@
 //! Tags: their colors, the tag views, and the tag finder.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::models::{FolderKind, KeywordFinding, Message};
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::message_window::MessageWindowInput;
+use crate::ui::preferences::PrefInput;
+use crate::worker::MailRequest;
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// A running tag-finder scan (see `AppMsg::FindTags`).
 pub(super) struct TagScan {

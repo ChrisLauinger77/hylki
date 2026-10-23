@@ -3,7 +3,15 @@
 //! messages, switching to an Inbox, list search and the new-mail
 //! notification.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::app::model::AppModel;
+use crate::app::msg::AppMsg;
+use crate::models::FolderKind;
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+
+use super::capture::{input_after, showcase_at};
 
 /// HYLKI_SHOWCASE_MEMORY=/path.txt writes the exported log (memory
 /// section included) there after HYLKI_SHOWCASE_MEMORY_AT seconds

@@ -1,7 +1,16 @@
 //! Accounts as the interface shows them: names, colors, faces and the
 //! addresses they send from.
 
-use super::*;
+use relm4::prelude::*;
+
+use crate::config::{self, AccountConfig};
+use crate::ui::message_list::MessageListInput;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::message_window::MessageWindowInput;
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 impl AppModel {
     /// The account to act on by default: the selected folder's account,

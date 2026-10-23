@@ -1,6 +1,15 @@
 //! Focus Mode: the chrome that slides away, and back.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::message_window::MessageWindowInput;
+use crate::ui::preferences::PrefInput;
+use crate::ui::sidebar::SidebarInput;
+
+use super::model::AppModel;
 
 /// Slide a Focus Mode revealer's content away (and fade it, through the
 /// `away` class's opacity transition) or bring it back.

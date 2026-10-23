@@ -4,9 +4,10 @@
 
 use adw::prelude::*;
 
-use super::AppMsg;
 use crate::models::FolderKind;
 use crate::ui::message_list::CheckFilter;
+
+use super::AppMsg;
 
 /// One single-key shortcut. Gmail-compatible where Gmail and the request agree
 /// (issue #5); where they differ, the request wins — `a` archives here, rather

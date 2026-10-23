@@ -1,7 +1,16 @@
 //! A reply sent from the split pane turning into its card in the
 //! conversation, and the card standing in until the Sent copy arrives.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::models::{FolderKind, Message};
+use crate::ui::message_view::MessageViewInput;
+use crate::worker::{self, OutgoingMessage};
+
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::prefill::first_recipient;
 
 /// A reply on its way from the split pane into its conversation: its card,
 /// the composer it was written in, and the conversation it answers.

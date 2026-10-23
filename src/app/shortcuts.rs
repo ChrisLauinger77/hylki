@@ -1,6 +1,28 @@
 //! Running a keyboard shortcut in the main window or a pop-out.
 
-use super::*;
+use std::collections::HashMap;
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::i18n;
+use crate::models::{FolderKind, Message};
+use crate::ui::compose::ComposeInput;
+use crate::ui::contacts_page::ContactsPageInput;
+use crate::ui::message_list::{BulkAction, MessageListInput, RowAction};
+use crate::ui::message_view::MessageViewInput;
+
+use super::flags::read_label;
+use super::keymap::{
+    ctrl_shortcut_for, focus_in_compose, focus_is_text, focus_takes_keys, gmail_sequence,
+    gmail_shortcut_for, reader_keeps, shortcut_for, without_caps_lock, GoTarget, Shortcut,
+    WindowCompose,
+};
+use super::model::AppModel;
+use super::msg::AppMsg;
+use super::types::UnifiedView;
+use super::undo::{FlagChange, FlagKind, FlagRef, UndoStep};
 
 impl AppModel {
     /// Carry out a single-key shortcut.

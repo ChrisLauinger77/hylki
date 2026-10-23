@@ -1,7 +1,14 @@
 //! Which messages an action applies to: the open one, the list's
 //! selection, or the conversation.
 
-use super::*;
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::models::{FolderKind, Message};
+use crate::ui::message_list::MessageListInput;
+use crate::worker::MailRequest;
+
+use super::model::AppModel;
 
 impl AppModel {
     /// The message the toolbar's per-message actions act on: the open message

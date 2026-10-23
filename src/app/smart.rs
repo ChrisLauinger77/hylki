@@ -1,6 +1,20 @@
 //! Smart folders (#417): saved searches over the index, shown as folders.
 
-use super::*;
+use std::collections::HashMap;
+
+use adw::prelude::*;
+use relm4::prelude::*;
+
+use crate::config;
+use crate::i18n::{i18n, i18n_f};
+use crate::models::{FolderKind, Message};
+use crate::ui::message_list::{MessageListInput, SearchScope};
+use crate::ui::message_view::MessageViewInput;
+use crate::ui::sidebar::SidebarInput;
+
+use super::demo::demo_mode;
+use super::model::AppModel;
+use super::msg::AppMsg;
 
 /// Most messages one smart folder (#417) lists per account.
 pub(super) const SMART_VIEW_LIMIT: usize = 5000;
