@@ -29,6 +29,7 @@ mod oauth;
 mod providers;
 mod save;
 mod senders;
+mod setup;
 mod signatures;
 mod smart_folders;
 mod tags;
@@ -38,17 +39,20 @@ use aliases::AliasDialog;
 pub use editor::AccountSecrets;
 pub(crate) use form::non_ellipsizing_factory;
 use form::{
-    age_labels, apply_protocol, auto_empty_labels, clear_editor, fill_editor, form_protocol,
-    import_avatar_file, left_justify_wrapping_labels, mount_editor, parse_color, read_account,
-    row_matches, set_connection_editable, show_quota, trimmed, wrap_subtitle, CLEAN_LISTS_DAYS,
-    REPLY_COPIES_HINT, SENT_COPY_HINT,
+    apply_protocol, clear_editor, fill_editor, form_protocol, import_avatar_file, mount_editor,
+    parse_color, read_account, set_connection_editable, show_quota, trimmed, REPLY_COPIES_HINT,
+    SENT_COPY_HINT,
 };
 pub use messages::{AccountsCmd, AccountsInit, AccountsInput, AccountsOutput, TagProposal};
 pub(crate) use oauth::open_online_accounts;
 use providers::provider_at;
 pub(crate) use providers::{brand_for_goa, provider_factory, Provider, PROVIDERS};
+use setup::{connect_editor_open, fill_editor_choices, prepare_editor_page};
 
 const DEFAULT_COLOR: &str = "#3584e4";
+
+/// The open form page's Save (see `AccountsWindow::form_save`).
+type FormSave = std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn() -> bool>>>>;
 
 pub struct AccountsWindow {
     /// Accounts in display order.
@@ -69,7 +73,7 @@ pub struct AccountsWindow {
     /// The open filter or tag page's Save: reads the form and hands the
     /// result back, true when it went through (the page then pops). The
     /// settings window's leave-editor prompt saves through it too.
-    form_save: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn() -> bool>>>>,
+    form_save: FormSave,
     /// The senders page's search text, shared by both lists.
     senders_query: std::rc::Rc<std::cell::RefCell<String>>,
     /// Tags (#71), managed on this tab too — the rules' "Tag with" names them.
@@ -1289,98 +1293,7 @@ impl Component for AccountsWindow {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let t_init = std::time::Instant::now();
-        let goa = importable_goa_accounts(&init.accounts);
-        let sig_source_btn = gtk::Button::with_label(&i18n("Edit HTML"));
-        sig_source_btn.add_css_class("flat");
-        sig_source_btn.set_valign(gtk::Align::Center);
-        sig_source_btn.set_tooltip_text(Some(&i18n("Edit the signature's HTML source")));
-        {
-            let s = sender.input_sender().clone();
-            sig_source_btn.connect_clicked(move |_| {
-                let _ = s.send(AccountsInput::SignatureSourceToggle);
-            });
-        }
-
-        let senders = relm4::factory::FactoryVecDeque::builder()
-            .launch(gtk::ListBox::new())
-            .forward(sender.input_sender(), |out| match out {
-                SenderRowOutput::Remove(addr) => AccountsInput::RemoveSenderRow(addr),
-            });
-        let blacklist = relm4::factory::FactoryVecDeque::builder()
-            .launch(gtk::ListBox::new())
-            .forward(sender.input_sender(), |out| match out {
-                SenderRowOutput::Remove(addr) => AccountsInput::RemoveBlacklistRow(addr),
-            });
-
-        let mut model = AccountsWindow {
-            accounts: init.accounts,
-            editing: None,
-            emoji: None,
-            avatar: None,
-            preview_css: gtk::CssProvider::new(),
-            list_css: gtk::CssProvider::new(),
-            picture_mode: false,
-            editor_seed: None,
-            sig_editor: None,
-            sig_source_btn,
-            sig_edits: Vec::new(),
-            sig_shown: 0,
-            sig_default: None,
-            sig_touched: false,
-            sig_reading: false,
-            label_synced: String::new(),
-            goa,
-            pending_oauth_refresh: None,
-            editor_session: 0,
-            editor_secrets: None,
-            secrets_reading: false,
-            save_waiting: false,
-            directory_granted: false,
-            directory_on: false,
-            labels_granted: false,
-            labels_on: false,
-            alias_edits: Vec::new(),
-            server_identities: Vec::new(),
-            hidden_edits: Vec::new(),
-            alias_editing: None,
-            alias_dialog: None,
-            folders_by_email: std::collections::HashMap::new(),
-            folder_paths: Vec::new(),
-            sent_copy_paths: Vec::new(),
-            senders,
-            sender_addrs: Vec::new(),
-            blacklist,
-            blacklist_addrs: Vec::new(),
-            filter_rules: init.filters,
-            filters_list: None,
-            filters_query: Default::default(),
-            form_save: Default::default(),
-            senders_query: Default::default(),
-            tags: init.tags,
-            tags_list: None,
-            smart_folders: init.smart_folders,
-            smart_list: None,
-            find_tags_spinner: None,
-            apply_filters_spinner: None,
-            apply_filters_label: None,
-            filters_applying: false,
-            find_tags_label: None,
-            tag_scanning: false,
-        };
-        {
-            let mut guard = model.senders.guard();
-            for addr in &init.allowed_senders {
-                model.sender_addrs.push(addr.clone());
-                guard.push_back(addr.clone());
-            }
-        }
-        {
-            let mut guard = model.blacklist.guard();
-            for addr in &init.blacklist {
-                model.blacklist_addrs.push(addr.clone());
-                guard.push_back(addr.clone());
-            }
-        }
+        let mut model = AccountsWindow::new(init, &sender);
 
         let senders_box = model.senders.widget();
         let blacklist_box = model.blacklist.widget();
@@ -1389,190 +1302,15 @@ impl Component for AccountsWindow {
         senders_box.set_visible(!model.sender_addrs.is_empty());
         blacklist_box.set_visible(!model.blacklist_addrs.is_empty());
         let widgets = view_output!();
-        // Narrowing to the directory means nothing without it.
-        widgets
-            .graph_directory_row
-            .bind_property("active", &widgets.directory_only_row, "sensitive")
-            .sync_create()
-            .build();
-        // Long enough for the hint, short enough that the combo's own value
-        // is not what gets shortened instead.
-        wrap_subtitle(&widgets.folder_sent_copy_row, 34);
-        wrap_subtitle(&widgets.reply_copies_row, 30);
-        // Left-justify the editor's wrapping labels (its group descriptions):
-        // libadwaita 1.9 renders a group description fill-justified when its
-        // text does not naturally fill the label's width, stretching the word
-        // gaps (most visible on Special Folders, whose description spans the
-        // full width). Single-line row labels are untouched.
-        left_justify_wrapping_labels(&widgets.editor_page.clone().upcast());
-        // The editor's sixty-odd rows stay out of the widget tree until an
-        // editor opens, so the Settings window's first layout skips them.
-        widgets.nav.remove(&widgets.editor_page);
-        {
-            // Leaving the editor page (however it was left) lets its
-            // signature view go; see ReleaseSignatureEditor.
-            let s = sender.clone();
-            widgets.nav.connect_popped(move |_, page| {
-                if page.tag().is_some_and(|t| t == "editor") {
-                    s.input_sender().emit(AccountsInput::ReleaseSignatureEditor);
-                }
-            });
-        }
+        prepare_editor_page(&widgets, &sender);
         tracing::debug!(
             "settings window: accounts view built in {:?}",
             t_init.elapsed()
         );
-        model.filters_list = Some(widgets.filters_list.clone());
-        {
-            let q = model.filters_query.clone();
-            widgets
-                .filters_list
-                .set_filter_func(move |row| row_matches(row, &q.borrow()));
-            let q = model.senders_query.clone();
-            senders_box.set_filter_func(move |row| row_matches(row, &q.borrow()));
-            let q = model.senders_query.clone();
-            blacklist_box.set_filter_func(move |row| row_matches(row, &q.borrow()));
-        }
-        model.rebuild_filter_rows(&sender);
-        model.tags_list = Some(widgets.tags_list.clone());
-        model.find_tags_spinner = Some(widgets.find_tags_spinner.clone());
-        model.apply_filters_spinner = Some(widgets.apply_filters_spinner.clone());
-        model.apply_filters_label = Some(widgets.apply_filters_label.clone());
-        model.find_tags_label = Some(widgets.find_tags_label.clone());
-        model.rebuild_tag_rows(&sender);
-        model.smart_list = Some(widgets.smart_list.clone());
-        model.rebuild_smart_rows(&sender);
-        let t_list = std::time::Instant::now();
-        model.rebuild_account_list(&widgets.accounts_list, &sender);
-        tracing::debug!(
-            "settings window: accounts list built in {:?}",
-            t_list.elapsed()
-        );
-        model.rebuild_goa_list(&widgets.goa_list, &sender);
-        widgets.goa_group.set_visible(!model.goa.is_empty());
-        widgets
-            .protocol_row
-            .set_model(Some(&gtk::StringList::new(&["IMAP", "POP3"])));
-
-        // The Provider dropdown picks both the sign-in method and (for known
-        // providers) the servers. The default popup ellipsizes items; a factory
-        // whose labels don't lets the list widen to the full option text.
-        let provider_labels: Vec<&str> = PROVIDERS.iter().map(|p| p.label).collect();
-        widgets
-            .provider_row
-            .set_model(Some(&gtk::StringList::new(&provider_labels)));
-        widgets.provider_row.set_factory(Some(&provider_factory()));
-
-        // Push override choices mirror AccountConfig::push (None / Some(true)
-        // / Some(false), in that order).
-        widgets.push_row.set_model(Some(&gtk::StringList::new(&[
-            i18n("Follow Settings").as_str(),
-            i18n("On").as_str(),
-            i18n("Off").as_str(),
-        ])));
-        widgets
-            .push_row
-            .set_list_factory(Some(&non_ellipsizing_factory()));
-        let sort_labels: Vec<String> = std::iter::once(i18n("Follow Settings"))
-            .chain(crate::config::FolderSort::ALL.iter().map(|s| s.label()))
-            .collect();
-        let sort_labels: Vec<&str> = sort_labels.iter().map(String::as_str).collect();
-        widgets
-            .folder_sort_row
-            .set_model(Some(&gtk::StringList::new(&sort_labels)));
-        widgets
-            .folder_sort_row
-            .set_list_factory(Some(&non_ellipsizing_factory()));
-        // The chosen value whole: "Follow Settings" cut to "Follow …" says nothing.
-        widgets
-            .folder_sort_row
-            .set_factory(Some(&non_ellipsizing_factory()));
-        let empty_labels = auto_empty_labels();
-        let empty_labels: Vec<&str> = empty_labels.iter().map(String::as_str).collect();
-        for row in [&widgets.empty_junk_row, &widgets.empty_trash_row] {
-            row.set_model(Some(&gtk::StringList::new(&empty_labels)));
-            row.set_list_factory(Some(&non_ellipsizing_factory()));
-        }
-        let list_labels = age_labels(CLEAN_LISTS_DAYS);
-        let list_labels: Vec<&str> = list_labels.iter().map(String::as_str).collect();
-        widgets
-            .clean_lists_row
-            .set_model(Some(&gtk::StringList::new(&list_labels)));
-        widgets
-            .clean_lists_row
-            .set_list_factory(Some(&non_ellipsizing_factory()));
-        let reply_labels: Vec<String> = crate::config::ReplyCopies::ALL
-            .iter()
-            .map(|c| c.label())
-            .collect();
-        let reply_labels: Vec<&str> = reply_labels.iter().map(String::as_str).collect();
-        widgets
-            .reply_copies_row
-            .set_model(Some(&gtk::StringList::new(&reply_labels)));
-        widgets
-            .reply_copies_row
-            .set_list_factory(Some(&non_ellipsizing_factory()));
-        widgets
-            .reply_copies_row
-            .set_factory(Some(&non_ellipsizing_factory()));
-
-        // Show the SMTP credential fields only when the toggle is on.
-        widgets
-            .smtp_separate_row
-            .bind_property("active", &widgets.smtp_user_row, "visible")
-            .sync_create()
-            .build();
-        widgets
-            .smtp_separate_row
-            .bind_property("active", &widgets.smtp_pass_row, "visible")
-            .sync_create()
-            .build();
-
-        // Auto-fill the label from the email as it's typed (until customized).
-        let es = sender.clone();
-        widgets
-            .email_row
-            .connect_changed(move |_| es.input_sender().emit(AccountsInput::EmailChanged));
-
-        // The preview circle follows the name, label and email (its
-        // initials) as they are typed; its color is a stylesheet.
-        if let Some(display) = gtk::gdk::Display::default() {
-            gtk::style_context_add_provider_for_display(
-                &display,
-                &model.preview_css,
-                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-            );
-            gtk::style_context_add_provider_for_display(
-                &display,
-                &model.list_css,
-                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-            );
-        }
-        for row in [&widgets.name_row, &widgets.label_row, &widgets.email_row] {
-            let s = sender.clone();
-            row.connect_changed(move |_| s.input_sender().emit(AccountsInput::RefreshPreview));
-        }
-
-        // Tell the combined settings window when the editor subpage is up —
-        // every way in or out (Save, back button, swipe) lands here.
-        {
-            let s = sender.output_sender().clone();
-            let form_save = model.form_save.clone();
-            widgets.nav.connect_visible_page_notify(move |nav| {
-                let tag = nav.visible_page().and_then(|p| p.tag());
-                let editor = match tag.as_deref() {
-                    Some("editor") => Some("accounts"),
-                    Some("filter") => Some("filters"),
-                    Some("tag") => Some("tags"),
-                    Some("smart") => Some("smart"),
-                    _ => None,
-                };
-                if !matches!(editor, Some("filters") | Some("tags") | Some("smart")) {
-                    form_save.borrow_mut().take();
-                }
-                let _ = s.send(AccountsOutput::EditorOpen(editor));
-            });
-        }
+        model.fill_lists(&widgets, &sender);
+        fill_editor_choices(&widgets);
+        model.connect_editor(&widgets, &sender);
+        connect_editor_open(&widgets, &sender, model.form_save.clone());
 
         tracing::debug!(
             "settings window: accounts panel init {:?}",
