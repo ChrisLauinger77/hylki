@@ -159,35 +159,37 @@ pub(super) fn read_account(
         Protocol::Jmap => 443,
         _ => 993,
     };
-    let jmap_token = protocol == Protocol::Jmap && widgets.jmap_token_row.is_active();
-    let jmap_generic = provider_at(widgets.provider_row.selected()).wizard_jmap_generic();
+    let jmap_token = protocol == Protocol::Jmap && widgets.form.jmap_token_row.is_active();
+    let jmap_generic = provider_at(widgets.form.provider_row.selected()).wizard_jmap_generic();
     AccountConfig {
-        name: trimmed(&widgets.name_row),
-        email: trimmed(&widgets.email_row),
+        name: trimmed(&widgets.form.name_row),
+        email: trimmed(&widgets.form.email_row),
         protocol,
-        imap_host: trimmed(&widgets.host_row),
-        imap_port: trimmed(&widgets.port_row).parse().unwrap_or(default_port),
-        smtp_host: trimmed(&widgets.smtp_row),
-        smtp_port: trimmed(&widgets.smtp_port_row).parse().unwrap_or(587),
+        imap_host: trimmed(&widgets.form.host_row),
+        imap_port: trimmed(&widgets.form.port_row)
+            .parse()
+            .unwrap_or(default_port),
+        smtp_host: trimmed(&widgets.form.smtp_row),
+        smtp_port: trimmed(&widgets.form.smtp_port_row).parse().unwrap_or(587),
         // A token sign-in asks for no username; the address stands in.
-        username: if jmap_token && trimmed(&widgets.user_row).is_empty() {
-            trimmed(&widgets.email_row)
+        username: if jmap_token && trimmed(&widgets.form.user_row).is_empty() {
+            trimmed(&widgets.form.email_row)
         } else {
-            trimmed(&widgets.user_row)
+            trimmed(&widgets.form.user_row)
         },
-        password: widgets.pass_row.text().to_string(),
-        smtp_separate: widgets.smtp_separate_row.is_active(),
+        password: widgets.form.pass_row.text().to_string(),
+        smtp_separate: widgets.form.smtp_separate_row.is_active(),
         jmap_token,
         jmap_generic,
-        tls_accept_hostname_mismatch: widgets.tls_mismatch_row.is_active(),
+        tls_accept_hostname_mismatch: widgets.form.tls_mismatch_row.is_active(),
         // GNOME Online Accounts' own, carried over from the account edited.
         security: None,
-        smtp_username: trimmed(&widgets.smtp_user_row),
-        smtp_password: widgets.smtp_pass_row.text().to_string(),
-        color: Some(crate::color::to_hex(&widgets.color_btn.rgba())),
+        smtp_username: trimmed(&widgets.form.smtp_user_row),
+        smtp_password: widgets.form.smtp_pass_row.text().to_string(),
+        color: Some(crate::color::to_hex(&widgets.form.color_btn.rgba())),
         emoji,
         avatar,
-        gravatar: widgets.gravatar_row.is_active(),
+        gravatar: widgets.form.gravatar_row.is_active(),
         // Filled in by SaveWithSig from the rich-text editor.
         signature: None,
         signature_html: true,
@@ -195,8 +197,8 @@ pub(super) fn read_account(
         default_signature: None,
         // Only store a custom label; blank or same-as-email falls back to email.
         label: {
-            let l = trimmed(&widgets.label_row);
-            let email = trimmed(&widgets.email_row);
+            let l = trimmed(&widgets.form.label_row);
+            let email = trimmed(&widgets.form.email_row);
             if l.is_empty() || l == email {
                 None
             } else {
@@ -213,7 +215,7 @@ pub(super) fn read_account(
         oauth: false,
         oauth_settings: None,
         oauth_refresh: String::new(),
-        push: match widgets.push_row.selected() {
+        push: match widgets.form.push_row.selected() {
             1 => Some(true),
             2 => Some(false),
             _ => None,
@@ -227,19 +229,19 @@ pub(super) fn read_account(
         sent_copy_path: None,
         server_saves_sent: false,
         reply_copies: crate::config::ReplyCopies::ALL
-            .get(widgets.reply_copies_row.selected() as usize)
+            .get(widgets.form.reply_copies_row.selected() as usize)
             .copied()
             .unwrap_or_default(),
         empty_junk_days: AUTO_EMPTY_DAYS
-            .get(widgets.empty_junk_row.selected() as usize)
+            .get(widgets.form.empty_junk_row.selected() as usize)
             .copied()
             .unwrap_or(0),
         empty_trash_days: AUTO_EMPTY_DAYS
-            .get(widgets.empty_trash_row.selected() as usize)
+            .get(widgets.form.empty_trash_row.selected() as usize)
             .copied()
             .unwrap_or(0),
         clean_lists_days: CLEAN_LISTS_DAYS
-            .get(widgets.clean_lists_row.selected() as usize)
+            .get(widgets.form.clean_lists_row.selected() as usize)
             .copied()
             .unwrap_or(0),
         // Row 0 is Automatic; the rest follow PGP_KEY_CHOICES. Until gpg
@@ -249,22 +251,25 @@ pub(super) fn read_account(
             if !c.loaded {
                 return c.chosen.clone();
             }
-            let sel = widgets.pgp_key_row.selected() as usize;
+            let sel = widgets.form.pgp_key_row.selected() as usize;
             sel.checked_sub(1)
                 .and_then(|i| c.fingerprints.get(i).cloned())
         }),
-        in_unified: widgets.in_unified_row.is_active(),
+        in_unified: widgets.form.in_unified_row.is_active(),
         // Row 0 follows Settings; the rest follow FolderSort::ALL.
         folder_sort: widgets
+            .form
             .folder_sort_row
             .selected()
             .checked_sub(1)
             .and_then(|i| crate::config::FolderSort::ALL.get(i as usize).copied()),
-        sign_by_default: widgets.sign_default_row.is_active(),
-        plain_subject: !widgets.hide_subject_row.is_active(),
-        graph_directory: protocol == Protocol::Graph && widgets.graph_directory_row.is_active(),
-        graph_directory_only: protocol == Protocol::Graph && widgets.directory_only_row.is_active(),
-        graph_label_names: protocol == Protocol::Graph && widgets.graph_labels_row.is_active(),
+        sign_by_default: widgets.form.sign_default_row.is_active(),
+        plain_subject: !widgets.form.hide_subject_row.is_active(),
+        graph_directory: protocol == Protocol::Graph
+            && widgets.form.graph_directory_row.is_active(),
+        graph_directory_only: protocol == Protocol::Graph
+            && widgets.form.directory_only_row.is_active(),
+        graph_label_names: protocol == Protocol::Graph && widgets.form.graph_labels_row.is_active(),
     }
 }
 
@@ -293,7 +298,7 @@ thread_local! {
 /// makes every call wait about ten seconds, which froze the window each
 /// time an editor opened (#316).
 fn fill_pgp_key_row(widgets: &AccountsWindowWidgets, chosen: Option<&str>) {
-    let row = widgets.pgp_key_row.clone();
+    let row = widgets.form.pgp_key_row.clone();
     row.set_model(Some(&gtk::StringList::new(&[&i18n("Automatic")])));
     row.set_list_factory(Some(&non_ellipsizing_factory()));
     row.set_selected(0);
@@ -422,15 +427,16 @@ pub(super) fn show_quota(
     quota: Option<crate::models::MailboxQuota>,
 ) {
     let Some(q) = quota else {
-        widgets.quota_group.set_visible(false);
+        widgets.form.quota_group.set_visible(false);
         return;
     };
     widgets
+        .form
         .quota_row
         .set_subtitle(&format!("{} \u{b7} {}", q.used_line(), q.free_line()));
     // GTK's own offsets mark a *low* value as the warning, which is a fuel
     // gauge's sense, not a mailbox's: here the warning is a full one.
-    let bar = &widgets.quota_bar;
+    let bar = &widgets.form.quota_bar;
     for name in [
         "low",
         "high",
@@ -445,62 +451,76 @@ pub(super) fn show_quota(
     bar.add_offset_value("quota-warn", 0.98);
     bar.add_offset_value("quota-full", 1.0);
     bar.set_value(q.fraction());
-    widgets.quota_group.set_visible(true);
+    widgets.form.quota_group.set_visible(true);
 }
 
 pub(super) fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
-    widgets.name_row.set_text(&acc.name);
-    widgets.email_row.set_text(&acc.email);
+    widgets.form.name_row.set_text(&acc.name);
+    widgets.form.email_row.set_text(&acc.email);
     // Reflect the account's provider in the dropdown (OAuth by endpoint, known
     // password providers by server, otherwise "IMAP/POP3 Account").
     widgets
+        .form
         .provider_row
         .set_selected(provider_index_for_account(acc));
     widgets
+        .form
         .protocol_row
         .set_selected(protocol_index(acc.protocol));
-    widgets.jmap_token_row.set_active(acc.jmap_token);
-    widgets.host_row.set_text(&acc.imap_host);
-    widgets.port_row.set_text(&acc.imap_port.to_string());
-    widgets.smtp_row.set_text(&acc.smtp_host);
-    widgets.smtp_port_row.set_text(&acc.smtp_port.to_string());
-    widgets.user_row.set_text(&acc.username);
-    widgets.pass_row.set_text(&acc.password);
-    widgets.smtp_separate_row.set_active(acc.smtp_separate);
+    widgets.form.jmap_token_row.set_active(acc.jmap_token);
+    widgets.form.host_row.set_text(&acc.imap_host);
+    widgets.form.port_row.set_text(&acc.imap_port.to_string());
+    widgets.form.smtp_row.set_text(&acc.smtp_host);
     widgets
+        .form
+        .smtp_port_row
+        .set_text(&acc.smtp_port.to_string());
+    widgets.form.user_row.set_text(&acc.username);
+    widgets.form.pass_row.set_text(&acc.password);
+    widgets.form.smtp_separate_row.set_active(acc.smtp_separate);
+    widgets
+        .form
         .tls_mismatch_row
         .set_active(acc.tls_accept_hostname_mismatch);
-    widgets.smtp_user_row.set_text(&acc.smtp_username);
-    widgets.smtp_pass_row.set_text(&acc.smtp_password);
-    widgets.push_row.set_selected(match acc.push {
+    widgets.form.smtp_user_row.set_text(&acc.smtp_username);
+    widgets.form.smtp_pass_row.set_text(&acc.smtp_password);
+    widgets.form.push_row.set_selected(match acc.push {
         None => 0,
         Some(true) => 1,
         Some(false) => 2,
     });
     widgets
+        .form
         .empty_junk_row
         .set_selected(auto_empty_index(acc.empty_junk_days));
     widgets
+        .form
         .empty_trash_row
         .set_selected(auto_empty_index(acc.empty_trash_days));
-    widgets.clean_lists_row.set_selected(
+    widgets.form.clean_lists_row.set_selected(
         CLEAN_LISTS_DAYS
             .iter()
             .position(|d| *d == acc.clean_lists_days)
             .unwrap_or(0) as u32,
     );
     fill_pgp_key_row(widgets, acc.pgp_key.as_deref());
-    widgets.in_unified_row.set_active(acc.in_unified);
+    widgets.form.in_unified_row.set_active(acc.in_unified);
     widgets
+        .form
         .folder_sort_row
         .set_selected(acc.folder_sort.map_or(0, |s| s.index() + 1));
-    widgets.sign_default_row.set_active(acc.sign_by_default);
-    widgets.hide_subject_row.set_active(!acc.plain_subject);
     widgets
+        .form
+        .sign_default_row
+        .set_active(acc.sign_by_default);
+    widgets.form.hide_subject_row.set_active(!acc.plain_subject);
+    widgets
+        .form
         .reply_copies_row
         .set_selected(acc.reply_copies.index());
     // Show the effective label (custom, or the email address).
     widgets
+        .form
         .label_row
         .set_text(acc.label.as_deref().unwrap_or(&acc.email));
 
@@ -511,37 +531,42 @@ pub(super) fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) 
         .then_some(acc.oauth_settings.as_ref())
         .flatten();
     widgets
+        .form
         .oauth_client_id_row
         .set_text(s.map(|s| s.client_id.as_str()).unwrap_or(""));
     widgets
+        .form
         .oauth_secret_row
         .set_text(s.map(|s| s.client_secret.as_str()).unwrap_or(""));
     widgets
+        .form
         .oauth_auth_url_row
         .set_text(s.map(|s| s.auth_url.as_str()).unwrap_or(""));
     widgets
+        .form
         .oauth_token_url_row
         .set_text(s.map(|s| s.token_url.as_str()).unwrap_or(""));
     widgets
+        .form
         .oauth_scope_row
         .set_text(s.map(|s| s.scopes.as_str()).unwrap_or(""));
     // What a Microsoft account was set up with beyond Hylki's own app (#329).
     let adv = s
         .map(crate::oauth::microsoft_advanced_of)
         .unwrap_or_default();
-    widgets.ms_client_row.set_text(&adv.0);
-    widgets.ms_tenant_row.set_text(&adv.1);
-    widgets.ms_scopes_row.set_text(&adv.2);
-    widgets.ms_redirect_row.set_text(&adv.3);
-    widgets.ms_advanced.set_expanded(
+    widgets.form.ms_client_row.set_text(&adv.0);
+    widgets.form.ms_tenant_row.set_text(&adv.1);
+    widgets.form.ms_scopes_row.set_text(&adv.2);
+    widgets.form.ms_redirect_row.set_text(&adv.3);
+    widgets.form.ms_advanced.set_expanded(
         !(adv.0.is_empty() && adv.1.is_empty() && adv.2.is_empty() && adv.3.is_empty()),
     );
-    widgets.oauth_status.set_visible(false);
-    widgets.oauth_signin_btn.set_sensitive(true);
+    widgets.form.oauth_status.set_visible(false);
+    widgets.form.oauth_signin_btn.set_sensitive(true);
 
     // Signature is loaded into the rich-text editor by the caller.
-    widgets.test_result.set_visible(false);
-    widgets.test_btn.set_sensitive(true);
+    widgets.form.test_result.set_visible(false);
+    widgets.form.test_btn.set_sensitive(true);
 }
 
 /// Grey out everything GNOME Online Accounts owns.
@@ -553,87 +578,87 @@ pub(super) fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) 
 /// name, signature, color, emoji and label.
 pub(super) fn set_connection_editable(widgets: &AccountsWindowWidgets, editable: bool) {
     for row in [
-        widgets.email_row.upcast_ref::<gtk::Widget>(),
-        widgets.host_row.upcast_ref(),
-        widgets.port_row.upcast_ref(),
-        widgets.smtp_row.upcast_ref(),
-        widgets.smtp_port_row.upcast_ref(),
-        widgets.user_row.upcast_ref(),
-        widgets.pass_row.upcast_ref(),
-        widgets.smtp_user_row.upcast_ref(),
-        widgets.smtp_pass_row.upcast_ref(),
+        widgets.form.email_row.upcast_ref::<gtk::Widget>(),
+        widgets.form.host_row.upcast_ref(),
+        widgets.form.port_row.upcast_ref(),
+        widgets.form.smtp_row.upcast_ref(),
+        widgets.form.smtp_port_row.upcast_ref(),
+        widgets.form.user_row.upcast_ref(),
+        widgets.form.pass_row.upcast_ref(),
+        widgets.form.smtp_user_row.upcast_ref(),
+        widgets.form.smtp_pass_row.upcast_ref(),
     ] {
         row.set_sensitive(editable);
     }
-    widgets.provider_row.set_sensitive(editable);
-    widgets.protocol_row.set_sensitive(editable);
-    widgets.smtp_separate_row.set_sensitive(editable);
-    widgets.tls_mismatch_row.set_sensitive(editable);
+    widgets.form.provider_row.set_sensitive(editable);
+    widgets.form.protocol_row.set_sensitive(editable);
+    widgets.form.smtp_separate_row.set_sensitive(editable);
+    widgets.form.tls_mismatch_row.set_sensitive(editable);
     // OAuth client details belong to a natively-added account; a GOA one gets its
     // tokens from the system.
     for row in [
-        widgets.oauth_client_id_row.upcast_ref::<gtk::Widget>(),
-        widgets.oauth_secret_row.upcast_ref(),
-        widgets.oauth_auth_url_row.upcast_ref(),
-        widgets.oauth_token_url_row.upcast_ref(),
-        widgets.oauth_scope_row.upcast_ref(),
-        widgets.ms_advanced.upcast_ref(),
+        widgets.form.oauth_client_id_row.upcast_ref::<gtk::Widget>(),
+        widgets.form.oauth_secret_row.upcast_ref(),
+        widgets.form.oauth_auth_url_row.upcast_ref(),
+        widgets.form.oauth_token_url_row.upcast_ref(),
+        widgets.form.oauth_scope_row.upcast_ref(),
+        widgets.form.ms_advanced.upcast_ref(),
     ] {
         row.set_sensitive(editable);
     }
-    widgets.oauth_signin_btn.set_sensitive(editable);
+    widgets.form.oauth_signin_btn.set_sensitive(editable);
     // Testing stays available: it is read-only, and confirming that the imported
     // settings actually connect is exactly what someone would want here.
 }
 
 pub(super) fn clear_editor(widgets: &AccountsWindowWidgets) {
-    widgets.name_row.set_text("");
-    widgets.email_row.set_text("");
-    widgets.provider_row.set_selected(manual_index());
-    widgets.protocol_row.set_selected(0);
-    widgets.jmap_token_row.set_active(false);
-    widgets.host_row.set_text("");
-    widgets.port_row.set_text("993");
-    widgets.smtp_row.set_text("");
-    widgets.smtp_port_row.set_text("587");
-    widgets.user_row.set_text("");
-    widgets.pass_row.set_text("");
-    widgets.smtp_separate_row.set_active(false);
-    widgets.tls_mismatch_row.set_active(false);
-    widgets.push_row.set_selected(0);
-    widgets.empty_junk_row.set_selected(0);
-    widgets.empty_trash_row.set_selected(0);
-    widgets.clean_lists_row.set_selected(0);
+    widgets.form.name_row.set_text("");
+    widgets.form.email_row.set_text("");
+    widgets.form.provider_row.set_selected(manual_index());
+    widgets.form.protocol_row.set_selected(0);
+    widgets.form.jmap_token_row.set_active(false);
+    widgets.form.host_row.set_text("");
+    widgets.form.port_row.set_text("993");
+    widgets.form.smtp_row.set_text("");
+    widgets.form.smtp_port_row.set_text("587");
+    widgets.form.user_row.set_text("");
+    widgets.form.pass_row.set_text("");
+    widgets.form.smtp_separate_row.set_active(false);
+    widgets.form.tls_mismatch_row.set_active(false);
+    widgets.form.push_row.set_selected(0);
+    widgets.form.empty_junk_row.set_selected(0);
+    widgets.form.empty_trash_row.set_selected(0);
+    widgets.form.clean_lists_row.set_selected(0);
     fill_pgp_key_row(widgets, None);
-    widgets.in_unified_row.set_active(true);
-    widgets.folder_sort_row.set_selected(0);
-    widgets.sign_default_row.set_active(false);
-    widgets.hide_subject_row.set_active(true);
-    widgets.reply_copies_row.set_selected(0);
-    widgets.graph_directory_row.set_active(false);
-    widgets.directory_only_row.set_active(false);
-    widgets.graph_status.set_visible(false);
-    widgets.graph_labels_row.set_active(false);
-    widgets.smtp_user_row.set_text("");
-    widgets.smtp_pass_row.set_text("");
-    widgets.label_row.set_text("");
-    widgets.oauth_client_id_row.set_text("");
-    widgets.oauth_secret_row.set_text("");
-    widgets.oauth_auth_url_row.set_text("");
-    widgets.oauth_token_url_row.set_text("");
-    widgets.oauth_scope_row.set_text("");
+    widgets.form.in_unified_row.set_active(true);
+    widgets.form.folder_sort_row.set_selected(0);
+    widgets.form.sign_default_row.set_active(false);
+    widgets.form.hide_subject_row.set_active(true);
+    widgets.form.reply_copies_row.set_selected(0);
+    widgets.form.graph_directory_row.set_active(false);
+    widgets.form.directory_only_row.set_active(false);
+    widgets.form.graph_status.set_visible(false);
+    widgets.form.graph_labels_row.set_active(false);
+    widgets.form.smtp_user_row.set_text("");
+    widgets.form.smtp_pass_row.set_text("");
+    widgets.form.label_row.set_text("");
+    widgets.form.oauth_client_id_row.set_text("");
+    widgets.form.oauth_secret_row.set_text("");
+    widgets.form.oauth_auth_url_row.set_text("");
+    widgets.form.oauth_token_url_row.set_text("");
+    widgets.form.oauth_scope_row.set_text("");
     for row in [
-        &widgets.ms_client_row,
-        &widgets.ms_tenant_row,
-        &widgets.ms_scopes_row,
-        &widgets.ms_redirect_row,
+        &widgets.form.ms_client_row,
+        &widgets.form.ms_tenant_row,
+        &widgets.form.ms_scopes_row,
+        &widgets.form.ms_redirect_row,
     ] {
         row.set_text("");
     }
-    widgets.ms_advanced.set_expanded(false);
-    widgets.oauth_status.set_visible(false);
-    widgets.test_result.set_visible(false);
-    widgets.test_btn.set_sensitive(true);
+    widgets.form.ms_advanced.set_expanded(false);
+    widgets.form.oauth_status.set_visible(false);
+    widgets.form.test_result.set_visible(false);
+    widgets.form.test_btn.set_sensitive(true);
 }
 
 pub(super) fn trimmed(row: &impl IsA<gtk::Editable>) -> String {
@@ -643,11 +668,11 @@ pub(super) fn trimmed(row: &impl IsA<gtk::Editable>) -> String {
 /// The protocol the form stands for: the provider's own for one that has
 /// one (the JMAP entries'), otherwise the Incoming Protocol row's.
 pub(super) fn form_protocol(widgets: &AccountsWindowWidgets) -> Protocol {
-    match provider_at(widgets.provider_row.selected()).kind {
+    match provider_at(widgets.form.provider_row.selected()).kind {
         ProviderKind::Jmap => Protocol::Jmap,
         // Hylki's own Microsoft sign-in asks for Graph, not IMAP (#329).
         ProviderKind::Microsoft => Protocol::Graph,
-        _ => protocol_at(widgets.protocol_row.selected()),
+        _ => protocol_at(widgets.form.protocol_row.selected()),
     }
 }
 
@@ -657,40 +682,48 @@ pub(super) fn form_protocol(widgets: &AccountsWindowWidgets) -> Protocol {
 pub(super) fn apply_protocol(widgets: &AccountsWindowWidgets) {
     let jmap = form_protocol(widgets) == Protocol::Jmap;
     // Only where the servers are shown at all (OAuth providers hide them).
-    let servers_shown = widgets.host_row.is_visible();
-    widgets.smtp_row.set_visible(servers_shown && !jmap);
-    widgets.smtp_port_row.set_visible(servers_shown && !jmap);
+    let servers_shown = widgets.form.host_row.is_visible();
+    widgets.form.smtp_row.set_visible(servers_shown && !jmap);
     widgets
+        .form
+        .smtp_port_row
+        .set_visible(servers_shown && !jmap);
+    widgets
+        .form
         .smtp_separate_row
-        .set_visible(widgets.protocol_row.is_visible() && !jmap);
+        .set_visible(widgets.form.protocol_row.is_visible() && !jmap);
     // JMAP runs over a different TLS stack (rustls), which offers no such waiver.
     widgets
+        .form
         .tls_mismatch_row
-        .set_visible(widgets.protocol_row.is_visible() && !jmap);
+        .set_visible(widgets.form.protocol_row.is_visible() && !jmap);
     // A token stands in for the username and password (#356); the rows
     // only change where the password is asked for at all.
-    let password_shown = widgets.pass_row.is_visible();
+    let password_shown = widgets.form.pass_row.is_visible();
     widgets
+        .form
         .jmap_token_row
         .set_visible(servers_shown && jmap && password_shown);
-    let token = jmap && widgets.jmap_token_row.is_active();
+    let token = jmap && widgets.form.jmap_token_row.is_active();
     if password_shown {
-        widgets.user_row.set_visible(!token);
-        widgets.pass_row.set_title(&if token {
+        widgets.form.user_row.set_visible(!token);
+        widgets.form.pass_row.set_title(&if token {
             i18n("API Token")
         } else {
             i18n("Password")
         });
     }
     if jmap {
-        widgets.smtp_separate_row.set_active(false);
+        widgets.form.smtp_separate_row.set_active(false);
         widgets
+            .form
             .host_row
             .set_title(&i18n("Server (host name or URL)"));
-        widgets.port_row.set_title(&i18n("Port (default 443)"));
+        widgets.form.port_row.set_title(&i18n("Port (default 443)"));
     } else {
-        widgets.host_row.set_title(&i18n("Incoming Server"));
+        widgets.form.host_row.set_title(&i18n("Incoming Server"));
         widgets
+            .form
             .port_row
             .set_title(&i18n("Port (IMAP 993 / POP3 995)"));
     }

@@ -117,10 +117,11 @@ impl AccountsWindow {
     ) {
         let senders_box = self.senders.widget().clone();
         let blacklist_box = self.blacklist.widget().clone();
-        self.filters_list = Some(widgets.filters_list.clone());
+        self.filters_list = Some(widgets.filters.filters_list.clone());
         {
             let q = self.filters_query.clone();
             widgets
+                .filters
                 .filters_list
                 .set_filter_func(move |row| row_matches(row, &q.borrow()));
             let q = self.senders_query.clone();
@@ -129,22 +130,22 @@ impl AccountsWindow {
             blacklist_box.set_filter_func(move |row| row_matches(row, &q.borrow()));
         }
         self.rebuild_filter_rows(sender);
-        self.tags_list = Some(widgets.tags_list.clone());
-        self.find_tags_spinner = Some(widgets.find_tags_spinner.clone());
-        self.apply_filters_spinner = Some(widgets.apply_filters_spinner.clone());
-        self.apply_filters_label = Some(widgets.apply_filters_label.clone());
-        self.find_tags_label = Some(widgets.find_tags_label.clone());
+        self.tags_list = Some(widgets.tags.tags_list.clone());
+        self.find_tags_spinner = Some(widgets.tags.find_tags_spinner.clone());
+        self.apply_filters_spinner = Some(widgets.filters.apply_filters_spinner.clone());
+        self.apply_filters_label = Some(widgets.filters.apply_filters_label.clone());
+        self.find_tags_label = Some(widgets.tags.find_tags_label.clone());
         self.rebuild_tag_rows(sender);
-        self.smart_list = Some(widgets.smart_list.clone());
+        self.smart_list = Some(widgets.smart.smart_list.clone());
         self.rebuild_smart_rows(sender);
         let t_list = std::time::Instant::now();
-        self.rebuild_account_list(&widgets.accounts_list, sender);
+        self.rebuild_account_list(&widgets.accounts.accounts_list, sender);
         tracing::debug!(
             "settings window: accounts list built in {:?}",
             t_list.elapsed()
         );
-        self.rebuild_goa_list(&widgets.goa_list, sender);
-        widgets.goa_group.set_visible(!self.goa.is_empty());
+        self.rebuild_goa_list(&widgets.accounts.goa_list, sender);
+        widgets.accounts.goa_group.set_visible(!self.goa.is_empty());
     }
 
     /// The editor's live preview and the rows that follow each other.
@@ -155,19 +156,22 @@ impl AccountsWindow {
     ) {
         // Show the SMTP credential fields only when the toggle is on.
         widgets
+            .form
             .smtp_separate_row
-            .bind_property("active", &widgets.smtp_user_row, "visible")
+            .bind_property("active", &widgets.form.smtp_user_row, "visible")
             .sync_create()
             .build();
         widgets
+            .form
             .smtp_separate_row
-            .bind_property("active", &widgets.smtp_pass_row, "visible")
+            .bind_property("active", &widgets.form.smtp_pass_row, "visible")
             .sync_create()
             .build();
 
         // Auto-fill the label from the email as it's typed (until customized).
         let es = sender.clone();
         widgets
+            .form
             .email_row
             .connect_changed(move |_| es.input_sender().emit(AccountsInput::EmailChanged));
 
@@ -185,7 +189,11 @@ impl AccountsWindow {
                 gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
             );
         }
-        for row in [&widgets.name_row, &widgets.label_row, &widgets.email_row] {
+        for row in [
+            &widgets.form.name_row,
+            &widgets.form.label_row,
+            &widgets.form.email_row,
+        ] {
             let s = sender.clone();
             row.connect_changed(move |_| s.input_sender().emit(AccountsInput::RefreshPreview));
         }
@@ -200,14 +208,15 @@ pub(super) fn prepare_editor_page(
 ) {
     // Narrowing to the directory means nothing without it.
     widgets
+        .form
         .graph_directory_row
-        .bind_property("active", &widgets.directory_only_row, "sensitive")
+        .bind_property("active", &widgets.form.directory_only_row, "sensitive")
         .sync_create()
         .build();
     // Long enough for the hint, short enough that the combo's own value
     // is not what gets shortened instead.
-    wrap_subtitle(&widgets.folder_sent_copy_row, 34);
-    wrap_subtitle(&widgets.reply_copies_row, 30);
+    wrap_subtitle(&widgets.form.folder_sent_copy_row, 34);
+    wrap_subtitle(&widgets.form.reply_copies_row, 30);
     // Left-justify the editor's wrapping labels (its group descriptions):
     // libadwaita 1.9 renders a group description fill-justified when its
     // text does not naturally fill the label's width, stretching the word
@@ -233,6 +242,7 @@ pub(super) fn prepare_editor_page(
 /// whole.
 pub(super) fn fill_editor_choices(widgets: &AccountsWindowWidgets) {
     widgets
+        .form
         .protocol_row
         .set_model(Some(&gtk::StringList::new(&["IMAP", "POP3"])));
 
@@ -241,18 +251,26 @@ pub(super) fn fill_editor_choices(widgets: &AccountsWindowWidgets) {
     // whose labels don't lets the list widen to the full option text.
     let provider_labels: Vec<&str> = PROVIDERS.iter().map(|p| p.label).collect();
     widgets
+        .form
         .provider_row
         .set_model(Some(&gtk::StringList::new(&provider_labels)));
-    widgets.provider_row.set_factory(Some(&provider_factory()));
+    widgets
+        .form
+        .provider_row
+        .set_factory(Some(&provider_factory()));
 
     // Push override choices mirror AccountConfig::push (None / Some(true)
     // / Some(false), in that order).
-    widgets.push_row.set_model(Some(&gtk::StringList::new(&[
-        i18n("Follow Settings").as_str(),
-        i18n("On").as_str(),
-        i18n("Off").as_str(),
-    ])));
     widgets
+        .form
+        .push_row
+        .set_model(Some(&gtk::StringList::new(&[
+            i18n("Follow Settings").as_str(),
+            i18n("On").as_str(),
+            i18n("Off").as_str(),
+        ])));
+    widgets
+        .form
         .push_row
         .set_list_factory(Some(&non_ellipsizing_factory()));
     let sort_labels: Vec<String> = std::iter::once(i18n("Follow Settings"))
@@ -260,27 +278,32 @@ pub(super) fn fill_editor_choices(widgets: &AccountsWindowWidgets) {
         .collect();
     let sort_labels: Vec<&str> = sort_labels.iter().map(String::as_str).collect();
     widgets
+        .form
         .folder_sort_row
         .set_model(Some(&gtk::StringList::new(&sort_labels)));
     widgets
+        .form
         .folder_sort_row
         .set_list_factory(Some(&non_ellipsizing_factory()));
     // The chosen value whole: "Follow Settings" cut to "Follow …" says nothing.
     widgets
+        .form
         .folder_sort_row
         .set_factory(Some(&non_ellipsizing_factory()));
     let empty_labels = auto_empty_labels();
     let empty_labels: Vec<&str> = empty_labels.iter().map(String::as_str).collect();
-    for row in [&widgets.empty_junk_row, &widgets.empty_trash_row] {
+    for row in [&widgets.form.empty_junk_row, &widgets.form.empty_trash_row] {
         row.set_model(Some(&gtk::StringList::new(&empty_labels)));
         row.set_list_factory(Some(&non_ellipsizing_factory()));
     }
     let list_labels = age_labels(CLEAN_LISTS_DAYS);
     let list_labels: Vec<&str> = list_labels.iter().map(String::as_str).collect();
     widgets
+        .form
         .clean_lists_row
         .set_model(Some(&gtk::StringList::new(&list_labels)));
     widgets
+        .form
         .clean_lists_row
         .set_list_factory(Some(&non_ellipsizing_factory()));
     let reply_labels: Vec<String> = crate::config::ReplyCopies::ALL
@@ -289,12 +312,15 @@ pub(super) fn fill_editor_choices(widgets: &AccountsWindowWidgets) {
         .collect();
     let reply_labels: Vec<&str> = reply_labels.iter().map(String::as_str).collect();
     widgets
+        .form
         .reply_copies_row
         .set_model(Some(&gtk::StringList::new(&reply_labels)));
     widgets
+        .form
         .reply_copies_row
         .set_list_factory(Some(&non_ellipsizing_factory()));
     widgets
+        .form
         .reply_copies_row
         .set_factory(Some(&non_ellipsizing_factory()));
 }

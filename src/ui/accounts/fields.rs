@@ -7,17 +7,17 @@ use super::*;
 impl AccountsWindow {
     pub(super) fn on_debug_provider(&mut self, label: String, widgets: &AccountsWindowWidgets) {
         if let Some(i) = PROVIDERS.iter().position(|p| p.label == label) {
-            widgets.provider_row.set_selected(i as u32);
+            widgets.form.provider_row.set_selected(i as u32);
         }
     }
 
     pub(super) fn on_email_changed(&mut self, widgets: &AccountsWindowWidgets) {
-        let email = trimmed(&widgets.email_row);
-        let label = widgets.label_row.text().to_string();
+        let email = trimmed(&widgets.form.email_row);
+        let label = widgets.form.label_row.text().to_string();
         // Mirror while the label is still tracking the email (or empty);
         // once the user types a custom label, stop.
         if label.is_empty() || label == self.label_synced {
-            widgets.label_row.set_text(&email);
+            widgets.form.label_row.set_text(&email);
         }
         self.label_synced = email;
     }
@@ -37,8 +37,8 @@ impl AccountsWindow {
     }
 
     pub(super) fn on_set_server_saves_sent(&mut self, on: bool, widgets: &AccountsWindowWidgets) {
-        widgets.folder_sent_copy_row.set_sensitive(!on);
-        widgets.reply_copies_row.set_sensitive(!on);
+        widgets.form.folder_sent_copy_row.set_sensitive(!on);
+        widgets.form.reply_copies_row.set_sensitive(!on);
     }
 
     pub(super) fn on_set_folder_sort(
@@ -51,6 +51,7 @@ impl AccountsWindow {
             self.accounts[i].folder_sort = sort;
             if self.editing == Some(i) {
                 widgets
+                    .form
                     .folder_sort_row
                     .set_selected(sort.map_or(0, |s| s.index() + 1));
             }
@@ -65,7 +66,7 @@ impl AccountsWindow {
     ) {
         // Look it up as soon as it is asked for, so the preview can
         // answer rather than waiting for the account to be saved.
-        let address = trimmed(&widgets.email_row);
+        let address = trimmed(&widgets.form.email_row);
         if on && !address.is_empty() && crate::avatar::wants_own_gravatar(&address) {
             sender.oneshot_command(async move {
                 let outcome = tokio::task::spawn_blocking({
@@ -126,10 +127,10 @@ impl AccountsWindow {
         sender: ComponentSender<Self>,
     ) {
         let account = read_account(widgets, self.saved_emoji(), self.saved_avatar());
-        widgets.test_btn.set_sensitive(false);
-        widgets.test_result.set_visible(true);
-        widgets.test_result.set_css_classes(&["dim-label"]);
-        widgets.test_result.set_label(&i18n("Testing…"));
+        widgets.form.test_btn.set_sensitive(false);
+        widgets.form.test_result.set_visible(true);
+        widgets.form.test_result.set_css_classes(&["dim-label"]);
+        widgets.form.test_result.set_label(&i18n("Testing…"));
         sender.oneshot_command(async move {
             let r = tokio::task::spawn_blocking(move || worker::test_connection_blocking(account))
                 .await
@@ -183,7 +184,7 @@ impl AccountsWindow {
             .is_some_and(|a| a.email.eq_ignore_ascii_case(&email));
         if open && self.server_identities != identities {
             self.server_identities = identities;
-            self.rebuild_alias_list(&widgets.aliases_list, &sender);
+            self.rebuild_alias_list(&widgets.form.aliases_list, &sender);
         }
     }
 
@@ -214,11 +215,11 @@ impl AccountsWindow {
         // editor, and the accounts list redraws its circles so one
         // that landed after the list was built shows there too.
         let found = crate::avatar::cache_own_gravatar(&email, outcome);
-        if found && trimmed(&widgets.email_row).eq_ignore_ascii_case(&email) {
+        if found && trimmed(&widgets.form.email_row).eq_ignore_ascii_case(&email) {
             self.refresh_preview(widgets);
         }
         if found {
-            self.rebuild_account_list(&widgets.accounts_list, &sender);
+            self.rebuild_account_list(&widgets.accounts.accounts_list, &sender);
         }
     }
 
@@ -258,8 +259,8 @@ impl AccountsWindow {
         } else {
             "error"
         };
-        widgets.test_result.set_label(&text);
-        widgets.test_result.set_css_classes(&[class]);
-        widgets.test_btn.set_sensitive(true);
+        widgets.form.test_result.set_label(&text);
+        widgets.form.test_result.set_css_classes(&[class]);
+        widgets.form.test_btn.set_sensitive(true);
     }
 }

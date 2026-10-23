@@ -103,12 +103,12 @@ impl AccountsWindow {
         labels.extend(choices.iter().map(|(_, display)| display.as_str()));
         self.folder_paths = choices.iter().map(|(path, _)| path.clone()).collect();
         for (role, row) in [
-            ("sent", &widgets.folder_sent_row),
-            ("drafts", &widgets.folder_drafts_row),
-            ("templates", &widgets.folder_templates_row),
-            ("trash", &widgets.folder_trash_row),
-            ("junk", &widgets.folder_junk_row),
-            ("archive", &widgets.folder_archive_row),
+            ("sent", &widgets.form.folder_sent_row),
+            ("drafts", &widgets.form.folder_drafts_row),
+            ("templates", &widgets.form.folder_templates_row),
+            ("trash", &widgets.form.folder_trash_row),
+            ("junk", &widgets.form.folder_junk_row),
+            ("archive", &widgets.form.folder_archive_row),
         ] {
             row.set_model(Some(&gtk::StringList::new(&labels)));
             row.set_list_factory(Some(&non_ellipsizing_factory()));
@@ -138,7 +138,7 @@ impl AccountsWindow {
         let mut labels: Vec<&str> = vec![disabled.as_str()];
         labels.extend(all.iter().map(|(_, display)| display.as_str()));
         self.sent_copy_paths = all.iter().map(|(path, _)| path.clone()).collect();
-        let row = &widgets.folder_sent_copy_row;
+        let row = &widgets.form.folder_sent_copy_row;
         row.set_model(Some(&gtk::StringList::new(&labels)));
         row.set_list_factory(Some(&non_ellipsizing_factory()));
         let selected = acc
@@ -160,10 +160,10 @@ impl AccountsWindow {
         };
         // The switch above may already have taken this row out of play.
         let server_saves = acc.is_some_and(|a| a.server_saves_sent);
-        widgets.server_saves_row.set_active(server_saves);
+        widgets.form.server_saves_row.set_active(server_saves);
         row.set_sensitive(unsupported.is_none() && !server_saves);
         row.set_subtitle(&unsupported.unwrap_or_else(|| i18n(SENT_COPY_HINT)));
-        widgets.reply_copies_row.set_sensitive(!server_saves);
+        widgets.form.reply_copies_row.set_sensitive(!server_saves);
     }
 
     /// The "Save a copy of sent mail in" combo's current choice: a folder path,
@@ -179,7 +179,7 @@ impl AccountsWindow {
                 .and_then(|i| self.accounts.get(i))
                 .and_then(|a| a.sent_copy_path.clone());
         }
-        let sel = widgets.folder_sent_copy_row.selected();
+        let sel = widgets.form.folder_sent_copy_row.selected();
         if sel == 0 {
             return None;
         }
@@ -194,12 +194,12 @@ impl AccountsWindow {
     ) -> std::collections::BTreeMap<String, String> {
         let mut roles = std::collections::BTreeMap::new();
         for (role, row) in [
-            ("sent", &widgets.folder_sent_row),
-            ("drafts", &widgets.folder_drafts_row),
-            ("templates", &widgets.folder_templates_row),
-            ("trash", &widgets.folder_trash_row),
-            ("junk", &widgets.folder_junk_row),
-            ("archive", &widgets.folder_archive_row),
+            ("sent", &widgets.form.folder_sent_row),
+            ("drafts", &widgets.form.folder_drafts_row),
+            ("templates", &widgets.form.folder_templates_row),
+            ("trash", &widgets.form.folder_trash_row),
+            ("junk", &widgets.form.folder_junk_row),
+            ("archive", &widgets.form.folder_archive_row),
         ] {
             let sel = row.selected();
             if sel > 0 {
@@ -215,7 +215,7 @@ impl AccountsWindow {
     /// account itself (its picker is hidden), otherwise the picker's, with
     /// a manual account's tile naming the protocol chosen below it.
     pub(super) fn refresh_provider_mark(&self, widgets: &AccountsWindowWidgets) {
-        let p = provider_at(widgets.provider_row.selected());
+        let p = provider_at(widgets.form.provider_row.selected());
         let editing_goa = self
             .editing
             .and_then(|i| self.accounts.get(i))
@@ -227,12 +227,14 @@ impl AccountsWindow {
                 p.brand
             }
         });
-        while let Some(child) = widgets.provider_mark.first_child() {
-            widgets.provider_mark.remove(&child);
+        while let Some(child) = widgets.form.provider_mark.first_child() {
+            widgets.form.provider_mark.remove(&child);
         }
-        widgets
-            .provider_mark
-            .append(&crate::brand::mark(brand, 56, crate::brand::GENERIC_MAIL));
+        widgets.form.provider_mark.append(&crate::brand::mark(
+            brand,
+            56,
+            crate::brand::GENERIC_MAIL,
+        ));
     }
 
     /// Push is IMAP IDLE or a JMAP event stream. Microsoft 365 polls and
@@ -245,14 +247,17 @@ impl AccountsWindow {
             _ => form_protocol(widgets),
         };
         widgets
+            .form
             .push_row
             .set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
         // The list-mail search is a server search for a header, which
         // Microsoft 365 does not offer and POP3 has no folders for.
         widgets
+            .form
             .clean_lists_row
             .set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
         widgets
+            .form
             .reply_copies_row
             .set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
         // GNOME Online Accounts asked Microsoft for its own scopes, and
@@ -261,10 +266,13 @@ impl AccountsWindow {
             .editing
             .and_then(|i| self.accounts.get(i))
             .is_some_and(|a| a.goa_id.is_some());
-        widgets.graph_group.set_visible(protocol == Protocol::Graph);
-        widgets.graph_directory_row.set_sensitive(!from_goa);
-        widgets.graph_labels_row.set_sensitive(!from_goa);
-        widgets.graph_group.set_description(Some(&if from_goa {
+        widgets
+            .form
+            .graph_group
+            .set_visible(protocol == Protocol::Graph);
+        widgets.form.graph_directory_row.set_sensitive(!from_goa);
+        widgets.form.graph_labels_row.set_sensitive(!from_goa);
+        widgets.form.graph_group.set_description(Some(&if from_goa {
             i18n("Only for an account added in Hylki with Microsoft 365 / Outlook as the provider, not from GNOME Online Accounts.")
         } else {
             i18n("Asks Microsoft for access. Some organizations need an administrator to approve it.")
@@ -305,7 +313,7 @@ impl AccountsWindow {
     /// for password providers, the OAuth sign-in for OAuth providers, and fill in
     /// the servers for known providers.
     pub(super) fn apply_provider(&self, widgets: &AccountsWindowWidgets) {
-        let p = provider_at(widgets.provider_row.selected());
+        let p = provider_at(widgets.form.provider_row.selected());
         self.refresh_provider_mark(widgets);
         let is_password = p.is_password();
         let is_oauth = p.is_oauth();
@@ -327,42 +335,47 @@ impl AccountsWindow {
         } else {
             i18n(p.hint)
         };
-        widgets.provider_row.set_subtitle(&hint);
+        widgets.form.provider_row.set_subtitle(&hint);
 
         // Server/credential fields (password or Custom-OAuth manual servers).
         // JMAP is the JMAP entries' own protocol, not a choice.
         widgets
+            .form
             .protocol_row
             .set_visible(is_password && p.kind != ProviderKind::Jmap);
-        widgets.host_row.set_visible(show_servers);
-        widgets.port_row.set_visible(show_servers);
-        widgets.smtp_row.set_visible(show_servers);
-        widgets.smtp_port_row.set_visible(show_servers);
-        widgets.user_row.set_visible(is_password);
-        widgets.pass_row.set_visible(is_password);
-        widgets.smtp_separate_row.set_visible(is_password);
-        widgets.tls_mismatch_row.set_visible(is_password);
-        widgets.test_btn.set_visible(is_password);
+        widgets.form.host_row.set_visible(show_servers);
+        widgets.form.port_row.set_visible(show_servers);
+        widgets.form.smtp_row.set_visible(show_servers);
+        widgets.form.smtp_port_row.set_visible(show_servers);
+        widgets.form.user_row.set_visible(is_password);
+        widgets.form.pass_row.set_visible(is_password);
+        widgets.form.smtp_separate_row.set_visible(is_password);
+        widgets.form.tls_mismatch_row.set_visible(is_password);
+        widgets.form.test_btn.set_visible(is_password);
         if is_oauth {
-            widgets.smtp_separate_row.set_active(false);
+            widgets.form.smtp_separate_row.set_active(false);
         }
 
         // OAuth: the user just signs in. Google with no client falls back to the
         // GNOME Online Accounts panel, which replaces the sign-in + identity fields.
-        widgets.name_row.set_visible(!needs_goa);
-        widgets.email_row.set_visible(!needs_goa);
-        widgets.goa_hint.set_visible(needs_goa);
-        widgets.oauth_signin_btn.set_visible(is_oauth && !needs_goa);
-        widgets.oauth_client_id_row.set_visible(is_custom);
-        widgets.oauth_secret_row.set_visible(is_custom);
-        widgets.oauth_auth_url_row.set_visible(is_custom);
-        widgets.oauth_token_url_row.set_visible(is_custom);
-        widgets.oauth_scope_row.set_visible(is_custom);
+        widgets.form.name_row.set_visible(!needs_goa);
+        widgets.form.email_row.set_visible(!needs_goa);
+        widgets.form.goa_hint.set_visible(needs_goa);
         widgets
+            .form
+            .oauth_signin_btn
+            .set_visible(is_oauth && !needs_goa);
+        widgets.form.oauth_client_id_row.set_visible(is_custom);
+        widgets.form.oauth_secret_row.set_visible(is_custom);
+        widgets.form.oauth_auth_url_row.set_visible(is_custom);
+        widgets.form.oauth_token_url_row.set_visible(is_custom);
+        widgets.form.oauth_scope_row.set_visible(is_custom);
+        widgets
+            .form
             .ms_advanced
             .set_visible(p.kind == ProviderKind::Microsoft && !needs_goa);
         if !is_oauth || needs_goa {
-            widgets.oauth_status.set_visible(false);
+            widgets.form.oauth_status.set_visible(false);
         }
 
         // Auto-fill IMAP/SMTP: known password providers from the preset table,
@@ -377,26 +390,26 @@ impl AccountsWindow {
             ProviderKind::Manual | ProviderKind::CustomOAuth | ProviderKind::Jmap => None,
         };
         if let Some((ih, ip, sh, sp)) = servers {
-            widgets.protocol_row.set_selected(0); // IMAP
-            widgets.host_row.set_text(ih);
-            widgets.port_row.set_text(&ip.to_string());
-            widgets.smtp_row.set_text(sh);
-            widgets.smtp_port_row.set_text(&sp.to_string());
+            widgets.form.protocol_row.set_selected(0); // IMAP
+            widgets.form.host_row.set_text(ih);
+            widgets.form.port_row.set_text(&ip.to_string());
+            widgets.form.smtp_row.set_text(sh);
+            widgets.form.smtp_port_row.set_text(&sp.to_string());
         }
         if p.kind == ProviderKind::Jmap {
             // Fastmail's session URL comes with its entry; the generic entry
             // leaves the server to the user, taking back a preset's address.
-            let host = widgets.host_row.text();
+            let host = widgets.form.host_row.text();
             if !p.imap_host.is_empty() {
-                widgets.host_row.set_text(p.imap_host);
+                widgets.form.host_row.set_text(p.imap_host);
             } else if PROVIDERS.iter().any(|q| {
                 q.kind == ProviderKind::Jmap && !q.imap_host.is_empty() && q.imap_host == host
             }) {
-                widgets.host_row.set_text("");
+                widgets.form.host_row.set_text("");
             }
-            widgets.port_row.set_text("443");
-            widgets.smtp_row.set_text("");
-            widgets.jmap_token_row.set_active(p.wizard_token());
+            widgets.form.port_row.set_text("443");
+            widgets.form.smtp_row.set_text("");
+            widgets.form.jmap_token_row.set_active(p.wizard_token());
         }
         apply_protocol(widgets);
     }
@@ -436,8 +449,8 @@ impl AccountsWindow {
             self.hidden_edits,
             self.read_folder_roles(widgets),
             self.read_sent_copy_path(widgets),
-            widgets.server_saves_row.is_active(),
-            widgets.provider_row.selected(),
+            widgets.form.server_saves_row.is_active(),
+            widgets.form.provider_row.selected(),
             self.pending_oauth_refresh.is_some(),
         )
     }
@@ -455,18 +468,18 @@ impl AccountsWindow {
     }
 
     pub(super) fn refresh_preview(&self, widgets: &AccountsWindowWidgets) {
-        let color = crate::color::to_hex(&widgets.color_btn.rgba());
+        let color = crate::color::to_hex(&widgets.form.color_btn.rgba());
         self.preview_css.load_from_string(&format!(
             ".account-preview-disc {{ background-color: {color}; outline: 3px solid {color}; outline-offset: 2px; }}"
         ));
-        let disc = &widgets.preview_disc;
+        let disc = &widgets.form.preview_disc;
         while let Some(child) = disc.first_child() {
             disc.remove(&child);
         }
         let initials = || {
-            let label = trimmed(&widgets.label_row);
-            let name = trimmed(&widgets.name_row);
-            let email = trimmed(&widgets.email_row);
+            let label = trimmed(&widgets.form.label_row);
+            let name = trimmed(&widgets.form.name_row);
+            let email = trimmed(&widgets.form.email_row);
             let shown = if !label.is_empty() && label != email {
                 label
             } else if name.is_empty() {
@@ -488,9 +501,10 @@ impl AccountsWindow {
         // The Gravatar this address has, when it was asked for and found
         // (#189) — the same order the sidebar circle and the cards use.
         let gravatar = widgets
+            .form
             .gravatar_row
             .is_active()
-            .then(|| crate::avatar::own_gravatar(&trimmed(&widgets.email_row)))
+            .then(|| crate::avatar::own_gravatar(&trimmed(&widgets.form.email_row)))
             .flatten();
         let glyph: gtk::Widget = match (&gravatar, &picture, &emoji) {
             (Some(texture), ..) => crate::ui::initials::picture_from_texture(texture, 72).upcast(),
@@ -501,10 +515,10 @@ impl AccountsWindow {
             _ => initials().upcast(),
         };
         disc.append(&glyph);
-        widgets.emoji_row.set_visible(!self.picture_mode);
-        widgets.picture_row.set_visible(self.picture_mode);
-        widgets.emoji_clear_btn.set_visible(emoji.is_some());
-        widgets.avatar_clear_btn.set_visible(picture.is_some());
+        widgets.form.emoji_row.set_visible(!self.picture_mode);
+        widgets.form.picture_row.set_visible(self.picture_mode);
+        widgets.form.emoji_clear_btn.set_visible(emoji.is_some());
+        widgets.form.avatar_clear_btn.set_visible(picture.is_some());
     }
 }
 
@@ -518,9 +532,9 @@ impl AccountsWindow {
         self.new_editor_session();
         self.emoji = None;
         self.avatar = None;
-        widgets.gravatar_row.set_active(false);
+        widgets.form.gravatar_row.set_active(false);
         self.picture_mode = false;
-        widgets.mode_glyph_btn.set_active(true);
+        widgets.form.mode_glyph_btn.set_active(true);
         self.label_synced = String::new();
         self.pending_oauth_refresh = None;
         self.directory_granted = false;
@@ -530,20 +544,20 @@ impl AccountsWindow {
         self.close_alias_dialog();
         self.alias_edits.clear();
         self.server_identities.clear();
-        self.rebuild_alias_list(&widgets.aliases_list, &sender);
+        self.rebuild_alias_list(&widgets.form.aliases_list, &sender);
         clear_editor(widgets);
         self.show_push_row(widgets);
         self.populate_folder_combos(widgets, None);
         set_connection_editable(widgets, true);
-        widgets.goa_banner.set_visible(false);
-        widgets.keyring_note.set_visible(true);
+        widgets.form.goa_banner.set_visible(false);
+        widgets.form.keyring_note.set_visible(true);
         self.apply_provider(widgets);
         self.load_signatures(widgets, Vec::new(), None);
-        widgets.color_btn.set_rgba(&parse_color(DEFAULT_COLOR));
+        widgets.form.color_btn.set_rgba(&parse_color(DEFAULT_COLOR));
         self.refresh_preview(widgets);
         widgets.remove_btn.set_visible(false);
         // A prior GOA edit may have hidden the provider picker.
-        widgets.provider_row.set_visible(true);
+        widgets.form.provider_row.set_visible(true);
         self.editor_seed = Some(self.editor_fingerprint(widgets));
         mount_editor(widgets);
         widgets.nav.push_by_tag("editor");
@@ -594,8 +608,12 @@ impl AccountsWindow {
                 .is_some_and(|s| crate::oauth::has_directory_scopes(&s.scopes));
         // On without the scopes would only be refused.
         self.directory_on = acc.graph_directory && self.directory_granted;
-        widgets.graph_directory_row.set_active(self.directory_on);
         widgets
+            .form
+            .graph_directory_row
+            .set_active(self.directory_on);
+        widgets
+            .form
             .directory_only_row
             .set_active(acc.graph_directory_only);
         self.labels_granted = acc.goa_id.is_none()
@@ -604,11 +622,11 @@ impl AccountsWindow {
                 crate::oauth::has_scopes(&s.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES)
             });
         self.labels_on = acc.graph_label_names && self.labels_granted;
-        widgets.graph_labels_row.set_active(self.labels_on);
+        widgets.form.graph_labels_row.set_active(self.labels_on);
         self.close_alias_dialog();
         self.alias_edits = acc.aliases.clone();
         self.server_identities.clear();
-        self.rebuild_alias_list(&widgets.aliases_list, &sender);
+        self.rebuild_alias_list(&widgets.form.aliases_list, &sender);
         self.hidden_edits = acc.hidden_folders.clone();
         self.rebuild_hidden_list(widgets, &sender);
         fill_editor(widgets, &acc);
@@ -631,24 +649,25 @@ impl AccountsWindow {
         let (signatures, default) = acc.signature_set();
         self.load_signatures(widgets, signatures, default);
         widgets
+            .form
             .color_btn
             .set_rgba(&parse_color(acc.color.as_deref().unwrap_or(DEFAULT_COLOR)));
         self.emoji = acc.emoji.clone();
         self.avatar = acc.avatar.clone();
-        widgets.gravatar_row.set_active(acc.gravatar);
+        widgets.form.gravatar_row.set_active(acc.gravatar);
         self.picture_mode = acc.avatar.is_some();
         if self.picture_mode {
-            widgets.mode_picture_btn.set_active(true);
+            widgets.form.mode_picture_btn.set_active(true);
         } else {
-            widgets.mode_glyph_btn.set_active(true);
+            widgets.form.mode_glyph_btn.set_active(true);
         }
         self.refresh_preview(widgets);
         // GOA accounts: no "Remove" (it lives in the system) — offer an
         // enable/disable toggle and a shortcut to Online Accounts instead.
         let is_goa = acc.goa_id.is_some();
         set_connection_editable(widgets, !is_goa);
-        widgets.goa_banner.set_visible(is_goa);
-        widgets.keyring_note.set_visible(!is_goa);
+        widgets.form.goa_banner.set_visible(is_goa);
+        widgets.form.keyring_note.set_visible(!is_goa);
         // GOA accounts get the same Remove flow — it removes the account
         // from Hylki only (back to the import list); GNOME keeps it.
         widgets.remove_btn.set_visible(true);
@@ -657,39 +676,40 @@ impl AccountsWindow {
         // owns (name, label, color, signature, aliases) plus the email
         // for identification. `apply_provider` re-shows what applies the
         // next time a native account or the add-form opens the editor.
-        widgets.provider_row.set_visible(!is_goa);
+        widgets.form.provider_row.set_visible(!is_goa);
         if is_goa {
             for w in [
-                widgets.protocol_row.upcast_ref::<gtk::Widget>(),
-                widgets.host_row.upcast_ref(),
-                widgets.port_row.upcast_ref(),
-                widgets.smtp_row.upcast_ref(),
-                widgets.smtp_port_row.upcast_ref(),
-                widgets.user_row.upcast_ref(),
-                widgets.pass_row.upcast_ref(),
-                widgets.smtp_separate_row.upcast_ref(),
-                widgets.tls_mismatch_row.upcast_ref(),
-                widgets.smtp_user_row.upcast_ref(),
-                widgets.smtp_pass_row.upcast_ref(),
-                widgets.test_btn.upcast_ref(),
-                widgets.oauth_signin_btn.upcast_ref(),
-                widgets.oauth_status.upcast_ref(),
-                widgets.goa_hint.upcast_ref(),
+                widgets.form.protocol_row.upcast_ref::<gtk::Widget>(),
+                widgets.form.host_row.upcast_ref(),
+                widgets.form.port_row.upcast_ref(),
+                widgets.form.smtp_row.upcast_ref(),
+                widgets.form.smtp_port_row.upcast_ref(),
+                widgets.form.user_row.upcast_ref(),
+                widgets.form.pass_row.upcast_ref(),
+                widgets.form.smtp_separate_row.upcast_ref(),
+                widgets.form.tls_mismatch_row.upcast_ref(),
+                widgets.form.smtp_user_row.upcast_ref(),
+                widgets.form.smtp_pass_row.upcast_ref(),
+                widgets.form.test_btn.upcast_ref(),
+                widgets.form.oauth_signin_btn.upcast_ref(),
+                widgets.form.oauth_status.upcast_ref(),
+                widgets.form.goa_hint.upcast_ref(),
             ] {
                 w.set_visible(false);
             }
             // The Google/Microsoft "use GNOME" guidance hid these; a GOA
             // account edits its display fields right here.
-            widgets.name_row.set_visible(true);
-            widgets.email_row.set_visible(true);
+            widgets.form.name_row.set_visible(true);
+            widgets.form.email_row.set_visible(true);
         }
-        widgets.goa_enabled_row.set_active(acc.enabled);
+        widgets.form.goa_enabled_row.set_active(acc.enabled);
         // While Mail is switched off in GNOME Settings the account is
         // paused from there, not from here — say so where the toggle is.
         widgets
+            .form
             .goa_enabled_row
             .set_sensitive(!acc.goa_mail_disabled);
-        widgets.goa_enabled_row.set_subtitle(if acc.goa_mail_disabled {
+        widgets.form.goa_enabled_row.set_subtitle(if acc.goa_mail_disabled {
             "Paused: Mail is switched off for this account in GNOME Settings \u{2192} Online Accounts."
         } else {
             "Switching this off returns the account to the import list — it \
@@ -738,11 +758,11 @@ impl AccountsWindow {
         if let Some(acc) = self.accounts.get_mut(i) {
             secrets.apply(acc);
         }
-        if widgets.pass_row.text().is_empty() {
-            widgets.pass_row.set_text(&secrets.password);
+        if widgets.form.pass_row.text().is_empty() {
+            widgets.form.pass_row.set_text(&secrets.password);
         }
-        if widgets.smtp_pass_row.text().is_empty() {
-            widgets.smtp_pass_row.set_text(&secrets.smtp_password);
+        if widgets.form.smtp_pass_row.text().is_empty() {
+            widgets.form.smtp_pass_row.set_text(&secrets.smtp_password);
         }
         for al in self.alias_edits.iter_mut() {
             if al.smtp_password.is_empty() {

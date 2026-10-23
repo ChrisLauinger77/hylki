@@ -543,7 +543,7 @@ impl AccountsWindow {
 impl AccountsWindow {
     pub(super) fn on_search_filters(&mut self, text: String, widgets: &AccountsWindowWidgets) {
         *self.filters_query.borrow_mut() = text.to_lowercase();
-        widgets.filters_list.invalidate_filter();
+        widgets.filters.filters_list.invalidate_filter();
     }
 
     pub(super) fn on_add_filter(

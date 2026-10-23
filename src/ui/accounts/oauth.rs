@@ -129,10 +129,10 @@ impl AccountsWindow {
         // A new account was signed in by this as well.
         if let Some((name, address)) = who {
             if !address.is_empty() {
-                widgets.email_row.set_text(&address);
+                widgets.form.email_row.set_text(&address);
             }
-            if !name.is_empty() && widgets.name_row.text().trim().is_empty() {
-                widgets.name_row.set_text(&name);
+            if !name.is_empty() && widgets.form.name_row.text().trim().is_empty() {
+                widgets.form.name_row.set_text(&name);
             }
         }
         Ok(())
@@ -144,7 +144,7 @@ impl AccountsWindow {
         &self,
         widgets: &AccountsWindowWidgets,
     ) -> OAuthSettings {
-        let provider = provider_at(widgets.provider_row.selected()).oauth_name();
+        let provider = provider_at(widgets.form.provider_row.selected()).oauth_name();
         if let Some(name) = provider {
             let p = crate::oauth::preset(name).unwrap();
             let (client_id, client_secret) = crate::oauth::provider_credentials(name);
@@ -159,10 +159,10 @@ impl AccountsWindow {
             if name == "microsoft" {
                 crate::oauth::microsoft_advanced(
                     &mut settings,
-                    &trimmed(&widgets.ms_client_row),
-                    &trimmed(&widgets.ms_tenant_row),
-                    &trimmed(&widgets.ms_scopes_row),
-                    &trimmed(&widgets.ms_redirect_row),
+                    &trimmed(&widgets.form.ms_client_row),
+                    &trimmed(&widgets.form.ms_tenant_row),
+                    &trimmed(&widgets.form.ms_scopes_row),
+                    &trimmed(&widgets.form.ms_redirect_row),
                 );
                 // Built from the preset, the scopes would lose the
                 // directory's at the next sign-in or refresh (#410).
@@ -179,11 +179,11 @@ impl AccountsWindow {
             settings
         } else {
             OAuthSettings {
-                auth_url: trimmed(&widgets.oauth_auth_url_row),
-                token_url: trimmed(&widgets.oauth_token_url_row),
-                client_id: trimmed(&widgets.oauth_client_id_row),
-                client_secret: widgets.oauth_secret_row.text().to_string(),
-                scopes: trimmed(&widgets.oauth_scope_row),
+                auth_url: trimmed(&widgets.form.oauth_auth_url_row),
+                token_url: trimmed(&widgets.form.oauth_token_url_row),
+                client_id: trimmed(&widgets.form.oauth_client_id_row),
+                client_secret: widgets.form.oauth_secret_row.text().to_string(),
+                scopes: trimmed(&widgets.form.oauth_scope_row),
                 redirect_uri: String::new(),
             }
         }
@@ -202,25 +202,25 @@ impl AccountsWindow {
             || settings.auth_url.is_empty()
             || settings.token_url.is_empty()
         {
-            widgets.oauth_status.set_visible(true);
-            widgets.oauth_status.set_css_classes(&["error"]);
-            widgets.oauth_status.set_label(&i18n(
+            widgets.form.oauth_status.set_visible(true);
+            widgets.form.oauth_status.set_css_classes(&["error"]);
+            widgets.form.oauth_status.set_label(&i18n(
                 "Enter a client ID (and endpoints for a custom provider) first",
             ));
             return;
         }
-        widgets.oauth_signin_btn.set_sensitive(false);
-        widgets.oauth_status.set_visible(true);
-        widgets.oauth_status.set_css_classes(&["dim-label"]);
+        widgets.form.oauth_signin_btn.set_sensitive(false);
+        widgets.form.oauth_status.set_visible(true);
+        widgets.form.oauth_status.set_css_classes(&["dim-label"]);
         let in_window = !settings.redirect_uri.trim().is_empty();
-        widgets.oauth_status.set_label(&if in_window {
+        widgets.form.oauth_status.set_label(&if in_window {
             i18n("Complete the sign-in in the window that opened.")
         } else {
             i18n("Opening browser… complete sign-in there.")
         });
         // The address typed so far names the identity broker's
         // account, where one is in charge of sign-ins.
-        let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+        let user = Some(widgets.form.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
         sign_in(root, &sender, settings, user, false, AccountsCmd::OAuth);
     }
 
@@ -235,7 +235,7 @@ impl AccountsWindow {
             return;
         }
         self.directory_on = on;
-        widgets.graph_status.set_visible(false);
+        widgets.form.graph_status.set_visible(false);
         // Turning it off keeps the scopes: they cost nothing, and
         // turning it on again then asks nothing.
         if !on || self.directory_granted {
@@ -246,11 +246,12 @@ impl AccountsWindow {
             return;
         }
         settings.scopes = crate::oauth::with_directory_scopes(&settings.scopes);
-        widgets.graph_directory_row.set_sensitive(false);
-        widgets.oauth_signin_btn.set_sensitive(false);
-        widgets.graph_status.set_visible(true);
-        widgets.graph_status.set_css_classes(&["dim-label"]);
+        widgets.form.graph_directory_row.set_sensitive(false);
+        widgets.form.oauth_signin_btn.set_sensitive(false);
+        widgets.form.graph_status.set_visible(true);
+        widgets.form.graph_status.set_css_classes(&["dim-label"]);
         widgets
+            .form
             .graph_status
             .set_label(&if settings.redirect_uri.trim().is_empty() {
                 i18n("Opening browser… approve access to the directory there.")
@@ -259,7 +260,7 @@ impl AccountsWindow {
             });
         // Straight to the account being edited: Microsoft then asks
         // only for what it has not approved yet.
-        let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+        let user = Some(widgets.form.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
         sign_in(
             root,
             &sender,
@@ -281,7 +282,7 @@ impl AccountsWindow {
             return;
         }
         self.labels_on = on;
-        widgets.graph_status.set_visible(false);
+        widgets.form.graph_status.set_visible(false);
         // Off keeps the scope, as the directory's does.
         if !on || self.labels_granted {
             return;
@@ -292,18 +293,19 @@ impl AccountsWindow {
         }
         settings.scopes =
             crate::oauth::with_scopes(&settings.scopes, &crate::oauth::MICROSOFT_LABEL_SCOPES);
-        widgets.graph_labels_row.set_sensitive(false);
-        widgets.oauth_signin_btn.set_sensitive(false);
-        widgets.graph_status.set_visible(true);
-        widgets.graph_status.set_css_classes(&["dim-label"]);
+        widgets.form.graph_labels_row.set_sensitive(false);
+        widgets.form.oauth_signin_btn.set_sensitive(false);
+        widgets.form.graph_status.set_visible(true);
+        widgets.form.graph_status.set_css_classes(&["dim-label"]);
         widgets
+            .form
             .graph_status
             .set_label(&if settings.redirect_uri.trim().is_empty() {
                 i18n("Opening browser… approve access to the sensitivity labels there.")
             } else {
                 i18n("Approve access to the sensitivity labels in the window that opened.")
             });
-        let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+        let user = Some(widgets.form.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
         sign_in(
             root,
             &sender,
@@ -319,27 +321,29 @@ impl AccountsWindow {
         result: Result<(String, Option<(String, String)>), String>,
         widgets: &AccountsWindowWidgets,
     ) {
-        widgets.oauth_signin_btn.set_sensitive(true);
-        widgets.oauth_status.set_visible(true);
+        widgets.form.oauth_signin_btn.set_sensitive(true);
+        widgets.form.oauth_status.set_visible(true);
         match result {
             Ok((refresh, who)) => {
                 self.pending_oauth_refresh = Some(refresh);
                 if let Some((name, address)) = who {
                     if !address.is_empty() {
-                        widgets.email_row.set_text(&address);
+                        widgets.form.email_row.set_text(&address);
                     }
-                    if !name.is_empty() && widgets.name_row.text().trim().is_empty() {
-                        widgets.name_row.set_text(&name);
+                    if !name.is_empty() && widgets.form.name_row.text().trim().is_empty() {
+                        widgets.form.name_row.set_text(&name);
                     }
                 }
-                widgets.oauth_status.set_css_classes(&["success"]);
+                widgets.form.oauth_status.set_css_classes(&["success"]);
                 widgets
+                    .form
                     .oauth_status
                     .set_label(&i18n("✓ Signed in. Save the account to finish."));
             }
             Err(e) => {
-                widgets.oauth_status.set_css_classes(&["error"]);
+                widgets.form.oauth_status.set_css_classes(&["error"]);
                 widgets
+                    .form
                     .oauth_status
                     .set_label(&i18n_f("Sign-in failed: {e}", &[("e", &(e).to_string())]));
             }
@@ -351,22 +355,22 @@ impl AccountsWindow {
         result: Result<(String, Option<(String, String)>), String>,
         widgets: &AccountsWindowWidgets,
     ) {
-        widgets.graph_directory_row.set_sensitive(true);
-        widgets.oauth_signin_btn.set_sensitive(true);
-        widgets.graph_status.set_visible(true);
+        widgets.form.graph_directory_row.set_sensitive(true);
+        widgets.form.oauth_signin_btn.set_sensitive(true);
+        widgets.form.graph_status.set_visible(true);
         match self.take_consent(widgets, result) {
             Ok(()) => {
                 self.directory_granted = true;
-                widgets.graph_status.set_css_classes(&["success"]);
-                widgets.graph_status.set_label(&i18n(
+                widgets.form.graph_status.set_css_classes(&["success"]);
+                widgets.form.graph_status.set_label(&i18n(
                     "Access to the directory approved. Save the account to finish.",
                 ));
             }
             Err(e) => {
                 self.directory_on = false;
-                widgets.graph_directory_row.set_active(false);
-                widgets.graph_status.set_css_classes(&["error"]);
-                widgets.graph_status.set_label(&i18n_f(
+                widgets.form.graph_directory_row.set_active(false);
+                widgets.form.graph_status.set_css_classes(&["error"]);
+                widgets.form.graph_status.set_label(&i18n_f(
                     "Access to the directory was not approved: {e}",
                     &[("e", &e)],
                 ));
@@ -379,22 +383,22 @@ impl AccountsWindow {
         result: Result<(String, Option<(String, String)>), String>,
         widgets: &AccountsWindowWidgets,
     ) {
-        widgets.graph_labels_row.set_sensitive(true);
-        widgets.oauth_signin_btn.set_sensitive(true);
-        widgets.graph_status.set_visible(true);
+        widgets.form.graph_labels_row.set_sensitive(true);
+        widgets.form.oauth_signin_btn.set_sensitive(true);
+        widgets.form.graph_status.set_visible(true);
         match self.take_consent(widgets, result) {
             Ok(()) => {
                 self.labels_granted = true;
-                widgets.graph_status.set_css_classes(&["success"]);
-                widgets.graph_status.set_label(&i18n(
+                widgets.form.graph_status.set_css_classes(&["success"]);
+                widgets.form.graph_status.set_label(&i18n(
                     "Access to the sensitivity labels approved. Save the account to finish.",
                 ));
             }
             Err(e) => {
                 self.labels_on = false;
-                widgets.graph_labels_row.set_active(false);
-                widgets.graph_status.set_css_classes(&["error"]);
-                widgets.graph_status.set_label(&i18n_f(
+                widgets.form.graph_labels_row.set_active(false);
+                widgets.form.graph_status.set_css_classes(&["error"]);
+                widgets.form.graph_status.set_label(&i18n_f(
                     "Access to the sensitivity labels was not approved: {e}",
                     &[("e", &e)],
                 ));

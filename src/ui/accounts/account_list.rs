@@ -262,9 +262,9 @@ impl AccountsWindow {
         let _ = sender.output(AccountsOutput::Removed { email });
         // Re-query GOA so the account's row reappears in the import list fresh.
         self.goa = importable_goa_accounts(&self.accounts);
-        self.rebuild_account_list(&widgets.accounts_list, sender);
-        self.rebuild_goa_list(&widgets.goa_list, sender);
-        widgets.goa_group.set_visible(!self.goa.is_empty());
+        self.rebuild_account_list(&widgets.accounts.accounts_list, sender);
+        self.rebuild_goa_list(&widgets.accounts.goa_list, sender);
+        widgets.accounts.goa_group.set_visible(!self.goa.is_empty());
     }
 
     /// Populate the "GNOME Online Accounts" list with importable mail accounts.
@@ -318,7 +318,7 @@ impl AccountsWindow {
     ) {
         // Off the main thread: GOA answers over D-Bus, and a busy
         // goa-daemon is slow to.
-        widgets.goa_refresh_btn.set_sensitive(false);
+        widgets.accounts.goa_refresh_btn.set_sensitive(false);
         sender.oneshot_command(async move {
             let listed = tokio::task::spawn_blocking(crate::goa::list_mail_accounts)
                 .await
@@ -338,7 +338,7 @@ impl AccountsWindow {
             let acc = self.accounts.remove(from);
             let to = to.min(self.accounts.len());
             self.accounts.insert(to, acc);
-            self.rebuild_account_list(&widgets.accounts_list, &sender);
+            self.rebuild_account_list(&widgets.accounts.accounts_list, &sender);
             let emails = self.accounts.iter().map(|a| a.email.clone()).collect();
             let _ = sender.output(AccountsOutput::Reordered(emails));
         }
@@ -391,9 +391,9 @@ impl AccountsWindow {
             let account = g.to_config(password, oauth);
             self.goa.remove(index);
             self.accounts.push(account.clone());
-            self.rebuild_account_list(&widgets.accounts_list, &sender);
-            self.rebuild_goa_list(&widgets.goa_list, &sender);
-            widgets.goa_group.set_visible(!self.goa.is_empty());
+            self.rebuild_account_list(&widgets.accounts.accounts_list, &sender);
+            self.rebuild_goa_list(&widgets.accounts.goa_list, &sender);
+            widgets.accounts.goa_group.set_visible(!self.goa.is_empty());
             let _ = sender.output(AccountsOutput::ImportGoa(Box::new(account)));
         }
     }
@@ -404,10 +404,10 @@ impl AccountsWindow {
         widgets: &AccountsWindowWidgets,
         sender: ComponentSender<Self>,
     ) {
-        widgets.goa_refresh_btn.set_sensitive(true);
+        widgets.accounts.goa_refresh_btn.set_sensitive(true);
         self.goa = importable_of(listed, &self.accounts);
-        self.rebuild_goa_list(&widgets.goa_list, &sender);
-        widgets.goa_group.set_visible(!self.goa.is_empty());
+        self.rebuild_goa_list(&widgets.accounts.goa_list, &sender);
+        widgets.accounts.goa_group.set_visible(!self.goa.is_empty());
     }
 }
 

@@ -1,7 +1,7 @@
 //! The settings window (#141): a category sidebar beside a stack of pages.
-//! Most pages are built here; Accounts (`ui/accounts.rs`), OpenPGP, Cloud
-//! Storage, Translation and Contacts are components of their own hosted in
-//! the stack.
+//! Most pages are built in `preferences/pages`; Accounts (`ui/accounts.rs`),
+//! OpenPGP, Cloud Storage, Translation and Contacts are components of their
+//! own hosted in the stack.
 
 use adw::prelude::*;
 use relm4::prelude::*;

@@ -22,7 +22,7 @@ impl AccountsWindow {
                     acc.enabled = enabled;
                     let email = acc.email.clone();
                     let _ = sender.output(AccountsOutput::EnabledChanged { email, enabled });
-                    self.rebuild_account_list(&widgets.accounts_list, &sender);
+                    self.rebuild_account_list(&widgets.accounts.accounts_list, &sender);
                 }
             }
         }
@@ -47,13 +47,13 @@ impl AccountsWindow {
         widgets: &AccountsWindowWidgets,
         sender: ComponentSender<Self>,
     ) {
-        widgets.host_row.remove_css_class("error");
+        widgets.form.host_row.remove_css_class("error");
         let mut account = read_account(widgets, self.saved_emoji(), self.saved_avatar());
         account.aliases = self.alias_edits.clone();
         account.hidden_folders = self.hidden_edits.clone();
         account.folder_roles = self.read_folder_roles(widgets);
         account.sent_copy_path = self.read_sent_copy_path(widgets);
-        account.server_saves_sent = widgets.server_saves_row.is_active();
+        account.server_saves_sent = widgets.form.server_saves_row.is_active();
         if let Some(shown) = self.sig_edits.get_mut(self.sig_shown) {
             shown.html = sig_html;
         }
@@ -99,7 +99,7 @@ impl AccountsWindow {
         account.graph_label_names &= account.goa_id.is_none() && self.labels_granted;
 
         // Native account: authentication comes from the provider dropdown.
-        let is_oauth = provider_at(widgets.provider_row.selected()).is_oauth();
+        let is_oauth = provider_at(widgets.form.provider_row.selected()).is_oauth();
         if account.goa_id.is_none() {
             if is_oauth {
                 account.oauth = true;
@@ -127,9 +127,10 @@ impl AccountsWindow {
             let signed_in = self.pending_oauth_refresh.is_some()
                 || editing_orig.as_ref().is_some_and(|o| o.oauth);
             if !has_client || !signed_in {
-                widgets.oauth_status.set_visible(true);
-                widgets.oauth_status.set_css_classes(&["error"]);
+                widgets.form.oauth_status.set_visible(true);
+                widgets.form.oauth_status.set_css_classes(&["error"]);
                 widgets
+                    .form
                     .oauth_status
                     .set_label(&i18n("Enter a client ID and sign in before saving"));
             }
@@ -166,7 +167,7 @@ impl AccountsWindow {
                 || (account.smtp_separate
                     && (account.smtp_username.is_empty() || account.smtp_password.is_empty())))
         {
-            widgets.host_row.add_css_class("error");
+            widgets.form.host_row.add_css_class("error");
             return;
         }
         self.pending_oauth_refresh = None;
@@ -179,7 +180,7 @@ impl AccountsWindow {
             Some(i) if i < self.accounts.len() => self.accounts[i] = account.clone(),
             _ => self.accounts.push(account.clone()),
         }
-        self.rebuild_account_list(&widgets.accounts_list, &sender);
+        self.rebuild_account_list(&widgets.accounts.accounts_list, &sender);
         let _ = sender.output(AccountsOutput::Saved {
             original_email,
             account: Box::new(account),
@@ -241,13 +242,13 @@ impl AccountsWindow {
             if i < self.accounts.len() {
                 let email = self.accounts[i].email.clone();
                 self.accounts.remove(i);
-                self.rebuild_account_list(&widgets.accounts_list, &sender);
+                self.rebuild_account_list(&widgets.accounts.accounts_list, &sender);
                 let _ = sender.output(AccountsOutput::Removed { email });
                 // A removed GOA import returns to the list below (and a
                 // repaired-away broken entry re-offers its GOA account).
                 self.goa = importable_goa_accounts(&self.accounts);
-                self.rebuild_goa_list(&widgets.goa_list, &sender);
-                widgets.goa_group.set_visible(!self.goa.is_empty());
+                self.rebuild_goa_list(&widgets.accounts.goa_list, &sender);
+                widgets.accounts.goa_group.set_visible(!self.goa.is_empty());
             }
         }
         widgets.nav.pop();

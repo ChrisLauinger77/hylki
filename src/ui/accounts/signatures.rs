@@ -41,7 +41,7 @@ impl AccountsWindow {
             // expanded to a second row; the panel grows instead.
             editor.set_text_height(130);
             editor.toolbar_end().append(&self.sig_source_btn);
-            widgets.sig_holder.append(&editor.widget);
+            widgets.form.sig_holder.append(&editor.widget);
             self.sig_editor = Some(editor);
         }
         self.sig_editor.as_ref().expect("created above")
@@ -115,21 +115,23 @@ impl AccountsWindow {
             .collect();
         let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
         widgets
+            .form
             .sig_choice_row
             .set_model(Some(&gtk::StringList::new(&labels)));
-        widgets.sig_choice_row.set_selected(i as u32);
-        widgets.sig_name_row.set_text(
+        widgets.form.sig_choice_row.set_selected(i as u32);
+        widgets.form.sig_name_row.set_text(
             self.sig_edits
                 .get(i)
                 .map(|s| s.name.as_str())
                 .unwrap_or_default(),
         );
         widgets
+            .form
             .sig_default_row
             .set_active(self.sig_default == Some(i));
         let several = self.sig_edits.len() > 1;
-        widgets.sig_choice_row.set_visible(several);
-        widgets.sig_name_row.set_visible(several);
+        widgets.form.sig_choice_row.set_visible(several);
+        widgets.form.sig_name_row.set_visible(several);
     }
 
     /// Read the shown signature's text back out of the editor before
@@ -184,7 +186,7 @@ impl AccountsWindow {
             if let Some(editor) = self.sig_editor.take() {
                 // Kept for the next editor, which takes it in.
                 editor.toolbar_end().remove(&self.sig_source_btn);
-                widgets.sig_holder.remove(&editor.widget);
+                widgets.form.sig_holder.remove(&editor.widget);
             }
         }
     }
@@ -281,7 +283,7 @@ impl AccountsWindow {
         widgets: &AccountsWindowWidgets,
         sender: ComponentSender<Self>,
     ) {
-        let pick = widgets.sig_choice_row.selected() as usize;
+        let pick = widgets.form.sig_choice_row.selected() as usize;
         if self.sig_reading || pick == self.sig_shown || pick >= self.sig_edits.len() {
             return;
         }
@@ -314,7 +316,7 @@ impl AccountsWindow {
     }
 
     pub(super) fn on_sig_rename(&mut self, widgets: &AccountsWindowWidgets) {
-        let name = widgets.sig_name_row.text().to_string();
+        let name = widgets.form.sig_name_row.text().to_string();
         let shown = self.sig_shown;
         let Some(sig) = self.sig_edits.get_mut(shown) else {
             return;
@@ -328,17 +330,18 @@ impl AccountsWindow {
         // notify finds it back on the shown one and does nothing.
         let label = signature_label(&self.sig_edits, shown);
         if let Some(list) = widgets
+            .form
             .sig_choice_row
             .model()
             .and_downcast::<gtk::StringList>()
         {
             list.splice(shown as u32, 1, &[label.as_str()]);
-            widgets.sig_choice_row.set_selected(shown as u32);
+            widgets.form.sig_choice_row.set_selected(shown as u32);
         }
     }
 
     pub(super) fn on_sig_default(&mut self, widgets: &AccountsWindowWidgets) {
-        let on = widgets.sig_default_row.is_active();
+        let on = widgets.form.sig_default_row.is_active();
         let shown = Some(self.sig_shown);
         let default = match (on, self.sig_default == shown) {
             (true, false) => shown,
@@ -368,11 +371,11 @@ impl AccountsWindow {
             self.sig_touched = true;
             self.sig_edits.len() - 1
         } else {
-            widgets.sig_choice_row.selected() as usize
+            widgets.form.sig_choice_row.selected() as usize
         };
         self.show_signature(widgets, next.min(self.sig_edits.len().saturating_sub(1)));
         if add {
-            widgets.sig_name_row.grab_focus();
+            widgets.form.sig_name_row.grab_focus();
         }
     }
 }
