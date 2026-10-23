@@ -121,7 +121,7 @@ pub(super) fn step_fetch_mode(account_id: u32, use_envelope: &mut bool) -> bool 
 /// as a byte array and as text: ten thousand numbers for one message's
 /// headers, filling the status bar (#226). The log keeps all of it (see
 /// `AppMsg::Error`); this is what the person sees instead.
-pub fn readable_error(text: &str) -> String {
+pub(crate) fn readable_error(text: &str) -> String {
     const MARK: &str = " during parsing of \"";
     let Some(start) = text.find("Error(Error { input: [") else {
         return text.to_string();

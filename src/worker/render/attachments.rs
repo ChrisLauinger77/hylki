@@ -17,7 +17,7 @@ pub(in crate::worker) const INLINE_ATTACHMENT_MIN: usize = 64 * 1024;
 
 /// The attachments of a raw message. Public so the Outbox can list a queued
 /// message's files without a fetch.
-pub fn extract_attachments_of(raw: &[u8]) -> Vec<crate::models::Attachment> {
+pub(crate) fn extract_attachments_of(raw: &[u8]) -> Vec<crate::models::Attachment> {
     extract_attachments(raw)
 }
 

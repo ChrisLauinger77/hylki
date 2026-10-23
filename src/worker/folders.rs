@@ -10,7 +10,7 @@ use crate::models::{Folder, FolderKind, Message};
 /// Whether a folder's sidebar chip counts every message rather than unread
 /// ones. Drafts: a draft is never unread, and the chip is there to say how
 /// many are waiting to be finished.
-pub fn chip_counts_all(kind: FolderKind) -> bool {
+pub(crate) fn chip_counts_all(kind: FolderKind) -> bool {
     kind == FolderKind::Drafts
 }
 

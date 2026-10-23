@@ -9,7 +9,7 @@ pub(crate) fn base64_encode(data: &[u8]) -> String {
 
 /// Standard base64 cut into lines of 76 characters (MIME's limit, RFC
 /// 2045), each line ended by `eol`, the last one too.
-pub fn base64_lines(data: &[u8], eol: &str) -> String {
+pub(crate) fn base64_lines(data: &[u8], eol: &str) -> String {
     const LINE: usize = 76;
     let encoded = base64_encode(data);
     let mut out = String::with_capacity(encoded.len() + (encoded.len() / LINE + 1) * eol.len());

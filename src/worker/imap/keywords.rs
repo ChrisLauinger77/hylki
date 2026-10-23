@@ -11,7 +11,7 @@ use crate::worker::imap::ImapSession;
 /// Keywords that are a server's or another client's bookkeeping, not tags a
 /// person set: left out of the tag finder's report. System flags (`\Seen`…)
 /// never reach here as keywords, but a leading backslash is rejected too.
-pub fn is_system_keyword(keyword: &str) -> bool {
+pub(crate) fn is_system_keyword(keyword: &str) -> bool {
     let k = keyword.to_ascii_lowercase();
     if k.starts_with('\\') {
         return true;

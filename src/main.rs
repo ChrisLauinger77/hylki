@@ -1,5 +1,9 @@
 //! Hylki — a clean, fast, GNOME-native email client built with Rust + relm4.
 
+// A binary crate exports nothing, so a bare `pub` only hides how far an item
+// really reaches; `pub(crate)` or narrower says it.
+#![warn(unreachable_pub)]
+
 mod app;
 mod app_icon;
 mod avatar;

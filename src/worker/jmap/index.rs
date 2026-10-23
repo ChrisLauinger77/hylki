@@ -38,7 +38,7 @@ pub(super) struct JmapState {
     /// Message uid (hashed JMAP id) → (JMAP id, blob id).
     pub(super) uids: HashMap<u32, (String, String)>,
     /// The Drafts folder's (folder id, path).
-    pub(super) drafts: Option<(u32, String)>,
+    drafts: Option<(u32, String)>,
     /// The Inbox's (folder id, path), for the new-mail poll.
     pub(super) inbox: Option<(u32, String)>,
     /// The Sent folder's (folder id, path).
@@ -51,7 +51,7 @@ pub(super) struct JmapState {
     /// at the front in progress.
     pub(super) backfill: std::collections::VecDeque<JmapBackfill>,
     /// When each folder's background index last finished, by path.
-    pub(super) listed: HashMap<String, std::time::Instant>,
+    listed: HashMap<String, std::time::Instant>,
     /// Message uid → JMAP id for mail an id listing named, whose blob id
     /// one `Email/get` gives when it is wanted.
     pub(super) listed_ids: HashMap<u32, String>,
@@ -64,12 +64,12 @@ pub(super) struct JmapState {
 /// The background index of one folder (#429): its id listing a page a
 /// step, then its missing mail a chunk a step.
 pub(super) struct JmapBackfill {
-    pub(super) path: String,
+    path: String,
     pub(super) phase: JmapBackfillPhase,
     /// Whether the list has already been told the folder's index is done.
-    pub(super) told: bool,
+    told: bool,
     /// Steps that failed in a row.
-    pub(super) failures: u32,
+    failures: u32,
 }
 
 pub(super) enum JmapBackfillPhase {

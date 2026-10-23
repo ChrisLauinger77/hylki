@@ -12,7 +12,7 @@ use crate::worker::smtp::SmtpError;
 /// brackets is not a separator. Nor is one in an unquoted name, which is what
 /// a pasted or hand-typed `Martin, Jason <j@x>` has: a piece with no `@` that
 /// runs into a `Name <addr>` is the front of that name.
-pub fn parse_recipients(s: &str) -> Vec<(String, String)> {
+pub(crate) fn parse_recipients(s: &str) -> Vec<(String, String)> {
     let mut pieces: Vec<String> = Vec::new();
     let mut cur = String::new();
     let (mut quoted, mut escaped, mut angle) = (false, false, false);
@@ -98,7 +98,7 @@ fn clean_address(raw: &str) -> String {
 
 /// The field with the invisible characters taken out of its addresses, when
 /// it had any: the composer shows the cleaned text before it sends.
-pub fn clean_recipient_field(field: &str) -> Option<String> {
+pub(crate) fn clean_recipient_field(field: &str) -> Option<String> {
     if !field
         .chars()
         .any(|c| is_invisible(c) || matches!(c, '\u{a0}' | '\u{2007}' | '\u{202f}'))
@@ -115,7 +115,7 @@ pub fn clean_recipient_field(field: &str) -> Option<String> {
 
 /// The first address in a recipient field that cannot be sent to, so the
 /// composer can say so while the message is still open.
-pub fn invalid_recipient(field: &str) -> Option<String> {
+pub(crate) fn invalid_recipient(field: &str) -> Option<String> {
     parse_recipients(field)
         .into_iter()
         .map(|(_, addr)| addr)
@@ -143,7 +143,7 @@ fn unquote_name(raw: &str) -> String {
 /// "Name <addr>" for a recipient field (the address alone when there is no
 /// name), quoting a name that has a comma or another character RFC 5322 keeps
 /// out of a bare name, so [`parse_recipients`] reads it back whole.
-pub fn format_recipient(name: &str, email: &str) -> String {
+pub(crate) fn format_recipient(name: &str, email: &str) -> String {
     let name = name.trim();
     if name.is_empty() || name == email {
         return email.to_string();

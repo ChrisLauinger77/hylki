@@ -8,9 +8,9 @@
 mod demo_cache;
 mod demo_mail;
 
-pub use demo_cache::seed_demo_cache;
+pub(crate) use demo_cache::seed_demo_cache;
 pub(crate) use demo_mail::demo_arrival;
-pub use demo_mail::demo_raw;
+pub(crate) use demo_mail::demo_raw;
 use demo_mail::sample_messages;
 
 use crate::models::{Account, Folder, FolderKind, Message, ThreadLatest, ThreadSummary};
@@ -23,7 +23,7 @@ pub(crate) trait MailBackend {
 }
 
 /// In-memory sample data provider for the offline demo.
-pub struct MockBackend {
+pub(crate) struct MockBackend {
     accounts: Vec<Account>,
     folders: Vec<Folder>,
     messages: Vec<Message>,
@@ -36,7 +36,7 @@ impl Default for MockBackend {
 }
 
 impl MockBackend {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let accounts = vec![
             Account {
                 id: 1,
@@ -140,7 +140,7 @@ impl MockBackend {
     }
 
     /// Look up a message by id across all folders (for body/source requests).
-    pub fn message(&self, id: u32) -> Option<Message> {
+    pub(crate) fn message(&self, id: u32) -> Option<Message> {
         self.messages.iter().find(|m| m.id == id).cloned()
     }
 
@@ -148,7 +148,7 @@ impl MockBackend {
     /// big each conversation is across the account's folders and which message
     /// moved it last, so a thread row in the demo reads as it would against a
     /// real mailbox.
-    pub fn thread_summaries(
+    pub(crate) fn thread_summaries(
         &self,
         account_id: u32,
         groups: &[(String, Vec<String>)],

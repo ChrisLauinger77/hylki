@@ -43,7 +43,7 @@ mod preview_fetch;
 mod retry;
 pub(super) mod send;
 mod setup;
-pub(super) mod stream;
+mod stream;
 mod strip_attachment;
 mod structure;
 mod summary;

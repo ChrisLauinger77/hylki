@@ -110,7 +110,7 @@ pub(super) fn jmap_wired<T>(what: &str, r: &Result<T, String>) {
     }
 }
 
-pub(super) fn agent() -> ureq::Agent {
+fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(20))
         .timeout_read(Duration::from_secs(60))

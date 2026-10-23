@@ -9,14 +9,14 @@ use crate::worker::preview::pgp_preview;
 
 /// The newest summaries a folder load lists, for a quick first paint; the
 /// background index fetches the rest of the folder (#429).
-pub(super) const JMAP_FIRST_PAGE: usize = 300;
+const JMAP_FIRST_PAGE: usize = 300;
 
 /// Ids asked for per page of a folder's id listing (the server may give
 /// fewer; the next page starts where this one ended).
 const JMAP_ID_PAGE: usize = 1000;
 
 /// The summary properties one listing asks `Email/get` for.
-pub(super) const EMAIL_PROPS: &[&str] = &[
+const EMAIL_PROPS: &[&str] = &[
     "id",
     "blobId",
     "threadId",
@@ -77,7 +77,7 @@ fn jmap_msgids(v: &serde_json::Value) -> Vec<String> {
 }
 
 /// A summary as the list shows it, with its JMAP id and blob id.
-pub(super) type ListedEmail = (Message, String, String);
+type ListedEmail = (Message, String, String);
 
 /// Map one `Email/get` summary to a [`Message`]. Returns the JMAP id and
 /// blob id too, so the caller can index them.
