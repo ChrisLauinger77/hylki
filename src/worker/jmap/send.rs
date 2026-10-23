@@ -12,7 +12,7 @@ use crate::worker::jmap::ops::{jmap_destroy_all, jmap_patch_message, IMPORT_REFU
 use crate::worker::jmap::wire::{
     args, call, jmap_call, jmap_upload, JmapSession, CAP_CORE, CAP_MAIL, CAP_SUBMISSION,
 };
-use crate::worker::outbox::{due_outbox_items, emit_outbox, raw_in_reply_to};
+use crate::worker::outbox::{due_outbox_items, emit_outbox, note_answered, raw_in_reply_to};
 use crate::worker::{answered_copies, blocking, reply_copy_path, OutgoingMessage, WorkerEvent};
 
 /// How a refused EmailSubmission starts its error. Every `notCreated` type
@@ -289,8 +289,6 @@ async fn jmap_index_sent_copy(
     }
 }
 
-/// The Outbox retry loop for JMAP accounts: same queue and bookkeeping as
-/// [`flush_outbox`], with `EmailSubmission` as the transport.
 /// [`super::mark_answered`] for JMAP: `$answered` or `$forwarded` (#454).
 pub(super) async fn jmap_mark_answered(
     s: &JmapSession,
@@ -308,17 +306,12 @@ pub(super) async fn jmap_mark_answered(
             "keywords/$answered"
         };
         jmap_patch_message(s, state, &path, uid, serde_json::json!({ keyword: true })).await;
-        if let Some(c) = cache {
-            c.set_answered(account_id, &path, uid, forwarded);
-        }
-        emit(WorkerEvent::Answered {
-            path,
-            uid,
-            forwarded,
-        });
+        note_answered(cache, account_id, path, uid, forwarded, emit);
     }
 }
 
+/// The Outbox retry loop for JMAP accounts: same queue and bookkeeping as
+/// [`flush_outbox`], with `EmailSubmission` as the transport.
 pub(super) async fn jmap_flush_outbox(
     s: &JmapSession,
     cache: Option<&Cache>,

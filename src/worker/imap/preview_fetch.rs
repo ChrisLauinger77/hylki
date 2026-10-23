@@ -19,9 +19,10 @@ use crate::worker::preview::{
 /// cost ~100 KB per sync in one user's log. An empty string is a message
 /// with no text to show at all — an encrypted one, a photo — which is then
 /// not asked about again either.
-static PREVIEW_RETRIED: std::sync::LazyLock<
-    std::sync::Mutex<std::collections::HashMap<(u32, u32, u32), String>>,
-> = std::sync::LazyLock::new(Default::default);
+static PREVIEW_RETRIED: std::sync::LazyLock<std::sync::Mutex<RetriedPreviews>> =
+    std::sync::LazyLock::new(Default::default);
+
+type RetriedPreviews = std::collections::HashMap<(u32, u32, u32), String>;
 
 /// The preview snippet from a fetch that asked for `BODY.PEEK[1]` together with
 /// `BODY.PEEK[1.MIME]`, the part's own headers, which say what the bytes are.
@@ -239,7 +240,7 @@ async fn retry_missing_previews_now(
     let refetched: Result<Vec<Fetch>, _> = async {
         fetch_uids(
             session,
-            uid_set(&uids),
+            uid_set(uids),
             format!("(UID BODY.PEEK[TEXT]<0.{PREVIEW_REPAIR_BYTES}> BODY.PEEK[1.MIME])"),
         )
         .await?

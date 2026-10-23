@@ -187,10 +187,10 @@ pub(super) fn graph_ids_url(base: &str, folder_graph_id: &str) -> String {
 
 /// One page of an id-only listing: (Graph id, `receivedDateTime`) pairs,
 /// and the link to the next page, if there is one.
-pub(super) fn graph_id_page(
-    token: &str,
-    url: &str,
-) -> Result<(Vec<(String, String)>, Option<String>), String> {
+type IdPage = (Vec<(String, String)>, Option<String>);
+
+/// Fetch one [`IdPage`].
+pub(super) fn graph_id_page(token: &str, url: &str) -> Result<IdPage, String> {
     let page = graph_get_json(token, url)?;
     let ids = page["value"]
         .as_array()
@@ -235,7 +235,7 @@ pub(super) fn graph_find_by_msgid(
     let url = format!(
         "{base}/me/mailFolders/{folder_graph_id}/messages\
          ?$filter=internetMessageId%20eq%20{}&$top=10&{GRAPH_MSG_SELECT}",
-        crate::percent::encode(&literal)
+        crate::encoding::percent::encode(&literal)
     );
     let items = graph_paged(token, &url, 10)?;
     Ok(items

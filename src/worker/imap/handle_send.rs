@@ -1,7 +1,7 @@
 //! The handlers for sending: Send Later, sending now (with the Sent copy
 //! and the draft it replaces), the Outbox, and saving drafts.
 
-use super::{After, Emit, ImapWorker};
+use super::{ensured, After, Emit, ImapWorker};
 use crate::i18n::{i18n, i18n_f};
 use crate::worker::compose::build::{build_draft, draft_message_id, restore_msgid_case};
 use crate::worker::drafts::{draft_not_saved, saving_text};
@@ -105,7 +105,7 @@ impl<E: Emit> ImapWorker<E> {
                 // as success even if this part fails.
                 let reply =
                     reply_copy_path(account, account_id, cache.as_ref(), &message.in_reply_to);
-                let sess = session.as_mut().unwrap();
+                let sess = ensured(session);
                 match file_sent_copy(sess, reply.as_deref(), sent_path.as_deref(), &raw).await {
                     Ok(Some(path)) => {
                         index_sent_copy(
@@ -130,6 +130,9 @@ impl<E: Emit> ImapWorker<E> {
                 if let Some(o) = message.draft_origin.clone() {
                     if o.account_id == account_id {
                         {
+                            // Not `ensured`: index_sent_copy above can leave
+                            // the session `None`, and this then panics (a
+                            // suspected bug kept as it is, B1 in the notes).
                             let sess = session.as_mut().unwrap();
                             let _ = delete_draft(sess, &o.path, o.uid).await;
                         }
@@ -237,7 +240,7 @@ impl<E: Emit> ImapWorker<E> {
                 let message_id = draft_message_id(&email);
                 let raw = email.formatted();
                 let append_res = {
-                    let sess = session.as_mut().unwrap();
+                    let sess = ensured(session);
                     let r = append_draft(sess, &path, &raw, template).await;
                     // Replace the previous version of this draft (same account).
                     if r.is_ok() {

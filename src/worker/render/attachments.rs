@@ -200,26 +200,6 @@ pub(in crate::worker) fn guess_mime(name: &str) -> String {
         .unwrap_or_else(|| "application/octet-stream".to_string())
 }
 
-#[cfg(test)]
-mod guess_mime_tests {
-    use super::guess_mime;
-
-    #[test]
-    fn types_attachments_by_suffix() {
-        assert_eq!(guess_mime("scan.PDF"), "application/pdf");
-        assert_eq!(guess_mime("photo.jpeg"), "image/jpeg");
-        assert_eq!(
-            guess_mime("report.docx"),
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        );
-        assert_eq!(
-            guess_mime("budget.xlsx"),
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        );
-        assert_eq!(guess_mime("blob.zzqx"), "application/octet-stream");
-    }
-}
-
 /// A filename extension for a MIME type, for parts that arrive unnamed. Only
 /// the types that actually turn up without a filename are worth listing; the
 /// rest get none, and show as a generic file.
@@ -241,5 +221,25 @@ pub(in crate::worker) fn mime_extension(ty: &str, subtype: &str) -> &'static str
         "webp" => ".webp",
         "tiff" => ".tif",
         _ => "",
+    }
+}
+
+#[cfg(test)]
+mod guess_mime_tests {
+    use super::guess_mime;
+
+    #[test]
+    fn types_attachments_by_suffix() {
+        assert_eq!(guess_mime("scan.PDF"), "application/pdf");
+        assert_eq!(guess_mime("photo.jpeg"), "image/jpeg");
+        assert_eq!(
+            guess_mime("report.docx"),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        assert_eq!(
+            guess_mime("budget.xlsx"),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+        assert_eq!(guess_mime("blob.zzqx"), "application/octet-stream");
     }
 }

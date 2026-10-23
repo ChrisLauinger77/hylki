@@ -139,14 +139,14 @@ fn decode_base64_prefix(body: &[u8]) -> Vec<u8> {
     // Only whole 4-character groups can be decoded; the tail of a truncated
     // fetch is dropped rather than turned into noise.
     let usable = &clean[..clean.len() - clean.len() % 4];
-    crate::oauth::base64_decode(usable).unwrap_or_default()
+    crate::encoding::base64_decode(usable).unwrap_or_default()
 }
 
 /// Tidy decoded body text into the single line the list shows.
 pub(super) fn finish_preview(decoded: String) -> String {
     // An HTML part becomes readable text; a plain part passes through.
     let plain = if decoded.contains('<') && decoded.contains('>') {
-        crate::app::message_text(&decoded)
+        crate::quote::message_text(&decoded)
     } else {
         decoded
     };
@@ -489,7 +489,7 @@ mod tests {
         // #241: a DMARC report is a single application/zip part. Base64 or
         // not, its bytes are a file, not a snippet.
         let zip = b"PK\x03\x04\x14\x00\x00\x00\x08\x00\x8a\x1eGoogle report\x00\x00\x12\x03\x00PK\x01\x02";
-        let b64 = crate::oauth::base64_encode(zip);
+        let b64 = crate::encoding::base64_encode(zip);
         assert_eq!(preview_from_part(b64.as_bytes(), None, Some("base64")), "");
         assert_eq!(preview_from_part(b64.as_bytes(), None, None), "");
         assert_eq!(preview_from_part(zip, None, Some("binary")), "");
@@ -720,7 +720,7 @@ mod tests {
         );
 
         // Base64 — shown raw this would be gibberish in the list.
-        let encoded = crate::oauth::base64_encode(
+        let encoded = crate::encoding::base64_encode(
             b"Base64 bodies are common from newsletters and phones alike.",
         );
         assert_eq!(
@@ -733,7 +733,7 @@ mod tests {
     fn preview_survives_being_cut_off_mid_stream() {
         // 2KB of a base64 part almost never lands on a group boundary; the
         // incomplete tail is dropped rather than decoded into noise.
-        let full = crate::oauth::base64_encode(
+        let full = crate::encoding::base64_encode(
             &b"The quick brown fox jumps over the lazy dog. ".repeat(4),
         );
         let truncated = &full[..full.len() - 3];
@@ -800,7 +800,7 @@ mod tests {
         );
         // Base64 is decoded to bytes first, then read in the charset.
         let b64 =
-            crate::oauth::base64_encode(b"Caf\xE9 meeting at three, bring the numbers please.");
+            crate::encoding::base64_encode(b"Caf\xE9 meeting at three, bring the numbers please.");
         assert_eq!(
             preview_from_part(b64.as_bytes(), Some("iso-8859-1"), None),
             "Café meeting at three, bring the numbers please."

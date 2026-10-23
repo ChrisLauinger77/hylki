@@ -1,6 +1,8 @@
 //! A raw message as the HTML the reader shows: every display part in order,
 //! inline and cid: images as data: URIs, plain text escaped and linkified.
 
+use crate::encoding::escape_html;
+
 /// Extract a renderable HTML body from a raw RFC 822 message. A lone HTML part is
 /// used directly; anything else is composed part by part.
 ///
@@ -93,7 +95,7 @@ pub fn extract_body(raw: &[u8]) -> String {
                         budget = left;
                         inner.push_str(&format!(
                             "<img class=\"hylki-inline\" src=\"data:{mime};base64,{}\">",
-                            crate::oauth::base64_encode(bytes)
+                            crate::encoding::base64_encode(bytes)
                         ));
                     }
                 }
@@ -176,7 +178,7 @@ pub(in crate::worker) fn inline_cid_images(
             .map_or(html.len(), |n| start + n);
         // `cid:` values are percent-encoded when they contain URI-reserved
         // characters (Gmail's ids embed an `@`, which some senders write as `%40`).
-        let key = normalize(&crate::percent::decode(&html[start..end], false));
+        let key = normalize(&crate::encoding::percent::decode(&html[start..end], false));
         if key.is_empty() {
             i = end.max(i + 1);
             continue;
@@ -195,7 +197,7 @@ pub(in crate::worker) fn inline_cid_images(
             embedded.push(part.content_id()?.to_string());
             Some(format!(
                 "data:{mime};base64,{}",
-                crate::oauth::base64_encode(data)
+                crate::encoding::base64_encode(data)
             ))
         });
 
@@ -242,11 +244,6 @@ pub(super) fn image_mime(part: &mail_parser::MessagePart) -> Option<String> {
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'));
     safe.then(|| format!("image/{}", subtype.to_ascii_lowercase()))
-}
-
-/// Escape text for HTML: element content or a quoted attribute alike.
-pub(in crate::worker) fn escape_html(text: &str) -> String {
-    gtk::glib::markup_escape_text(text).into()
 }
 
 /// HTML-escape plain text and turn bare URLs into clickable links. Runs on raw

@@ -41,7 +41,7 @@ pub(crate) fn render_raw(raw: &[u8]) -> (String, crate::models::SenderCheck, boo
 fn pgp_notice(status: &crate::models::PgpStatus) -> String {
     let mut text = status.summary();
     for n in &status.notes {
-        text.push_str("\n");
+        text.push('\n');
         text.push_str(n);
     }
     text

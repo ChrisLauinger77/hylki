@@ -19,6 +19,7 @@ mod desktop;
 mod directory;
 mod encoding;
 mod goa;
+mod graph_api;
 mod graph_directory;
 mod graph_labels;
 mod i18n;
@@ -62,8 +63,6 @@ mod worker;
 use relm4::RelmApp;
 
 use crate::app::AppModel;
-// The worker reads `crate::percent` (until the worker branch is merged).
-use crate::encoding::percent;
 pub(crate) use crate::single_instance::primary_instance_running;
 use crate::single_instance::{relay_to_primary, UriKind};
 

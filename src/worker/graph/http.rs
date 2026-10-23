@@ -4,17 +4,14 @@
 use std::time::Duration;
 
 use crate::config::AccountConfig;
+use crate::graph_api::bearer;
 use crate::worker::auth::fetch_oauth_token;
 use crate::worker::WorkerEvent;
 
-pub(super) const GRAPH_BASE: &str = "https://graph.microsoft.com/v1.0";
+pub(super) use crate::graph_api::GRAPH_BASE;
 
 /// How many times a throttled request waits and tries again.
 const GRAPH_THROTTLE_TRIES: u32 = 4;
-
-fn graph_auth(token: &str) -> String {
-    format!("Bearer {token}")
-}
 
 /// Read a ureq error into something a user can act on (status + body snippet).
 pub(super) fn graph_err(e: ureq::Error) -> String {
@@ -68,10 +65,7 @@ pub(super) fn graph_throttle_wait(e: &ureq::Error) -> Option<Duration> {
 fn graph_get(token: &str, url: &str) -> Result<ureq::Response, String> {
     let mut tries = 0;
     loop {
-        match ureq::get(url)
-            .set("Authorization", &graph_auth(token))
-            .call()
-        {
+        match ureq::get(url).set("Authorization", &bearer(token)).call() {
             Err(e) if tries < GRAPH_THROTTLE_TRIES => {
                 let Some(wait) = graph_throttle_wait(&e) else {
                     return Err(graph_err(e));
@@ -129,7 +123,7 @@ pub(super) fn graph_send_json(
 ) -> Result<serde_json::Value, String> {
     graph_wire(method, url);
     let resp = ureq::request(method, url)
-        .set("Authorization", &graph_auth(token))
+        .set("Authorization", &bearer(token))
         .send_json(body.clone())
         .map_err(graph_err);
     graph_wired(method, url, &resp);
@@ -147,11 +141,10 @@ pub(super) fn graph_post_mime(
     url: &str,
     raw: &[u8],
 ) -> Result<serde_json::Value, String> {
-    use base64::Engine;
-    let b64 = base64::engine::general_purpose::STANDARD.encode(raw);
+    let b64 = crate::encoding::base64_encode(raw);
     graph_wire("POST(mime)", url);
     let resp = ureq::post(url)
-        .set("Authorization", &graph_auth(token))
+        .set("Authorization", &bearer(token))
         .set("Content-Type", "text/plain")
         .send_string(&b64)
         .map_err(graph_err);
@@ -166,7 +159,7 @@ pub(super) fn graph_post_mime(
 pub(super) fn graph_delete_req(token: &str, url: &str) -> Result<(), String> {
     graph_wire("DELETE", url);
     let r = ureq::delete(url)
-        .set("Authorization", &graph_auth(token))
+        .set("Authorization", &bearer(token))
         .call()
         .map_err(graph_err)
         .map(|_| ());

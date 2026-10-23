@@ -1,9 +1,10 @@
 //! Taking a queued or saved message apart again for editing, and putting
 //! back the Bcc a sent copy or a retry needs.
 
+use crate::encoding::escape_html;
 use crate::worker::compose::recipients::mailbox;
 use crate::worker::render::attachments::attachment_parts;
-use crate::worker::render::body::{escape_html, inline_cid_images};
+use crate::worker::render::body::inline_cid_images;
 use crate::worker::{format_recipient, parse_recipients};
 
 /// Render an address header back into the form the composer's fields use —
@@ -67,7 +68,7 @@ fn unnamed_rcpts(envelope_rcpts: &[String], headers: &[&str]) -> Vec<String> {
 /// right for the recipients and wrong for the sender's own copy, the only
 /// place left that says who else was sent it. Header order is free, so it
 /// goes first.
-pub(crate) fn with_bcc(raw: &[u8], bcc: &str) -> Vec<u8> {
+pub(in crate::worker) fn with_bcc(raw: &[u8], bcc: &str) -> Vec<u8> {
     let mailboxes: lettre::message::Mailboxes = parse_recipients(bcc)
         .into_iter()
         .filter_map(|(name, addr)| mailbox(&name, &addr).ok())
@@ -84,7 +85,7 @@ pub(crate) fn with_bcc(raw: &[u8], bcc: &str) -> Vec<u8> {
 
 /// [`with_bcc`] for a queued message, whose Bcc recipients survive only in
 /// the stored envelope.
-pub(crate) fn queued_with_bcc(raw: &[u8], envelope_rcpts: &[String]) -> Vec<u8> {
+pub(in crate::worker) fn queued_with_bcc(raw: &[u8], envelope_rcpts: &[String]) -> Vec<u8> {
     let parsed = mail_parser::MessageParser::default().parse_headers(raw);
     let to = parsed
         .as_ref()
@@ -104,6 +105,50 @@ pub(crate) fn queued_with_bcc(raw: &[u8], envelope_rcpts: &[String]) -> Vec<u8> 
     )
 }
 
+/// The Message-IDs of an `In-Reply-To` or `References` header, without
+/// their angle brackets, space-separated.
+fn msgid_list(hv: &mail_parser::HeaderValue) -> String {
+    use mail_parser::HeaderValue;
+    let strip = |t: &str| {
+        t.trim()
+            .trim_start_matches('<')
+            .trim_end_matches('>')
+            .trim()
+            .to_string()
+    };
+    match hv {
+        HeaderValue::Text(t) => strip(t),
+        HeaderValue::TextList(v) => v.iter().map(|t| strip(t)).collect::<Vec<_>>().join(" "),
+        _ => String::new(),
+    }
+}
+
+/// The body as the composer edits it: the HTML part with its `cid:`
+/// pictures inlined (their Content-IDs noted in `embedded`), else the text
+/// part escaped, a `<div>` per line.
+fn editable_body(parsed: Option<&mail_parser::Message>, embedded: &mut Vec<String>) -> String {
+    let html = parsed
+        .and_then(|p| {
+            let html = p.body_html(0)?;
+            let mut budget = 16 * 1024 * 1024;
+            Some(inline_cid_images(&html, &p.parts, &mut budget, embedded))
+        })
+        .unwrap_or_default();
+    if html.trim().is_empty() {
+        let text = parsed
+            .and_then(|p| p.body_text(0).map(|b| b.to_string()))
+            .unwrap_or_default();
+        // The composer edits HTML, so plain text has to be escaped and its line
+        // breaks preserved — otherwise the whole body collapses into one line.
+        text.lines()
+            .map(|line| format!("<div>{}</div>", escape_html(line)))
+            .collect::<Vec<_>>()
+            .join("")
+    } else {
+        html
+    }
+}
+
 /// Take a queued message or a saved draft apart so it can be edited again.
 ///
 /// The stored bytes are the source of truth, but they are not quite the whole
@@ -112,7 +157,7 @@ pub(crate) fn queued_with_bcc(raw: &[u8], envelope_rcpts: &[String]) -> Vec<u8> 
 /// the envelope that isn't in To or Cc is therefore a Bcc recipient, and is
 /// restored as one. A draft keeps its `Bcc` header and has no envelope.
 pub fn editable_from_raw(raw: &[u8], envelope_rcpts: &[String]) -> EditableMessage {
-    use mail_parser::{HeaderValue, MessageParser, MimeHeaders};
+    use mail_parser::{MessageParser, MimeHeaders};
 
     let parsed = MessageParser::default().parse(raw);
     let from = parsed
@@ -139,27 +184,13 @@ pub fn editable_from_raw(raw: &[u8], envelope_rcpts: &[String]) -> EditableMessa
         .and_then(|p| p.subject())
         .unwrap_or_default()
         .to_string();
-    let ids = |hv: &HeaderValue| -> String {
-        let strip = |t: &str| {
-            t.trim()
-                .trim_start_matches('<')
-                .trim_end_matches('>')
-                .trim()
-                .to_string()
-        };
-        match hv {
-            HeaderValue::Text(t) => strip(t),
-            HeaderValue::TextList(v) => v.iter().map(|t| strip(t)).collect::<Vec<_>>().join(" "),
-            _ => String::new(),
-        }
-    };
     let in_reply_to = parsed
         .as_ref()
-        .map(|p| ids(p.in_reply_to()))
+        .map(|p| msgid_list(p.in_reply_to()))
         .unwrap_or_default();
     let references = parsed
         .as_ref()
-        .map(|p| ids(p.references()))
+        .map(|p| msgid_list(p.references()))
         .unwrap_or_default();
 
     let header_bcc = parsed
@@ -176,33 +207,7 @@ pub fn editable_from_raw(raw: &[u8], envelope_rcpts: &[String]) -> EditableMessa
     // come back into the text, and off the list of files, or the composer
     // would show a broken image and attach the picture a second time.
     let mut embedded: Vec<String> = Vec::new();
-    let html = parsed
-        .as_ref()
-        .and_then(|p| {
-            let html = p.body_html(0)?;
-            let mut budget = 16 * 1024 * 1024;
-            Some(inline_cid_images(
-                &html,
-                &p.parts,
-                &mut budget,
-                &mut embedded,
-            ))
-        })
-        .unwrap_or_default();
-    let body_html = if html.trim().is_empty() {
-        let text = parsed
-            .as_ref()
-            .and_then(|p| p.body_text(0).map(|b| b.to_string()))
-            .unwrap_or_default();
-        // The composer edits HTML, so plain text has to be escaped and its line
-        // breaks preserved — otherwise the whole body collapses into one line.
-        text.lines()
-            .map(|line| format!("<div>{}</div>", escape_html(line)))
-            .collect::<Vec<_>>()
-            .join("")
-    } else {
-        html
-    };
+    let body_html = editable_body(parsed.as_ref(), &mut embedded);
 
     let attachments = parsed
         .as_ref()

@@ -193,8 +193,9 @@ fn build_message(
         }
         let mut related = MultiPart::related().multipart(alt);
         for img in images {
-            let ct = ContentType::parse(&img.mime)
-                .unwrap_or_else(|_| ContentType::parse("application/octet-stream").unwrap());
+            let ct = ContentType::parse(&img.mime).unwrap_or_else(|_| {
+                ContentType::parse("application/octet-stream").expect("static content type")
+            });
             let part = match img.name {
                 Some(name) => Attachment::new_inline_with_name(img.cid, name),
                 None => Attachment::new_inline(img.cid),
@@ -310,7 +311,7 @@ fn extract_data_images(html: &str) -> (String, Vec<InlineImage>) {
             let uri = &html[start..start + len];
             let (meta, payload) = uri.split_once(',')?;
             let mime = meta.strip_prefix("data:")?.strip_suffix(";base64")?;
-            let data = crate::oauth::base64_decode(payload)?;
+            let data = crate::encoding::base64_decode(payload)?;
             Some((len, mime.to_string(), data))
         });
         match lifted {
@@ -683,7 +684,7 @@ mod tests {
         let line = raw
             .lines()
             .find(|l| l.starts_with("Message-ID:"))
-            .expect(&format!("a Message-ID is set: {raw}"));
+            .unwrap_or_else(|| panic!("a Message-ID is set: {raw}"));
         assert!(
             line.contains("@example.com>"),
             "in the sender's domain: {line}"
@@ -853,7 +854,7 @@ mod tests {
         ];
         let uri = format!(
             "data:image/png;base64,{}",
-            crate::oauth::base64_encode(&png)
+            crate::encoding::base64_encode(&png)
         );
         let msg = OutgoingMessage {
             to: "ada@example.com".into(),
@@ -878,7 +879,7 @@ mod tests {
         let png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00];
         let uri = format!(
             "data:image/png;base64,{}",
-            crate::oauth::base64_encode(&png)
+            crate::encoding::base64_encode(&png)
         );
         let raw_for = |img: String| {
             let msg = OutgoingMessage {

@@ -300,6 +300,47 @@ pub(super) async fn jmap_backfill_step(
     }
 }
 
+/// A folder's whole listing against the cache: its ids noted, the cached
+/// rows the server no longer lists dropped (when `prune`) and the list sent
+/// again, and the ids still to fetch.
+fn settle_listing(
+    account_id: u32,
+    cache: Option<&Cache>,
+    state: &mut JmapState,
+    path: &str,
+    folder_id: u32,
+    ids: &[String],
+    since: i64,
+    prune: bool,
+    emit: &impl Fn(WorkerEvent),
+) -> Vec<String> {
+    state
+        .listed_ids
+        .extend(ids.iter().map(|id| (hash_uid(id), id.clone())));
+    let cached = cache
+        .map(|c| c.cached_uid_times(account_id, path))
+        .unwrap_or_default();
+    let (gone, missing) = jmap_index_plan(ids, &cached, since, prune);
+    tracing::info!(
+        "[account {account_id}] index of {}: {} on the server, {} to fetch, {} gone",
+        path,
+        ids.len(),
+        missing.len(),
+        gone.len()
+    );
+    if let (Some(c), false) = (cache, gone.is_empty()) {
+        for uid in &gone {
+            c.delete_message(account_id, path, *uid);
+            state.uids.remove(uid);
+        }
+        emit(WorkerEvent::Messages {
+            folder_id,
+            messages: c.load_messages(account_id, path, folder_id),
+        });
+    }
+    missing
+}
+
 /// [`jmap_backfill_step`]'s work; false when the request failed.
 pub(super) async fn jmap_backfill_with(
     s: &JmapSession,
@@ -353,30 +394,9 @@ pub(super) async fn jmap_backfill_with(
                 return true;
             }
             let prune = *restarts != JMAP_UNSTEADY;
-            state
-                .listed_ids
-                .extend(ids.iter().map(|id| (hash_uid(id), id.clone())));
-            let cached = cache
-                .map(|c| c.cached_uid_times(account_id, &job.path))
-                .unwrap_or_default();
-            let (gone, missing) = jmap_index_plan(ids, &cached, *since, prune);
-            tracing::info!(
-                "[account {account_id}] index of {}: {} on the server, {} to fetch, {} gone",
-                job.path,
-                ids.len(),
-                missing.len(),
-                gone.len()
+            let missing = settle_listing(
+                account_id, cache, state, &job.path, folder_id, ids, *since, prune, emit,
             );
-            if let (Some(c), false) = (cache, gone.is_empty()) {
-                for uid in &gone {
-                    c.delete_message(account_id, &job.path, *uid);
-                    state.uids.remove(uid);
-                }
-                emit(WorkerEvent::Messages {
-                    folder_id,
-                    messages: c.load_messages(account_id, &job.path, folder_id),
-                });
-            }
             job.phase = JmapBackfillPhase::Fetching {
                 missing: missing.into(),
             };

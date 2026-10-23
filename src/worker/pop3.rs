@@ -10,14 +10,18 @@ use crate::models::{Folder, FolderKind, Message};
 use crate::worker::auth::{load_or_migrate_password, load_smtp_password, sign_in_password};
 use crate::worker::compose::build::restore_msgid_case;
 use crate::worker::ids::hash_uid;
-use crate::worker::imap::send::{flush_outbox, mark_answered};
-use crate::worker::outbox::{delete_queued, drop_superseded_outbox, emit_outbox, send_failed};
+use crate::worker::imap::send::flush_outbox;
+use crate::worker::outbox::{
+    delete_queued, drop_superseded_outbox, emit_outbox, note_answered, send_failed,
+};
 use crate::worker::pop3::client::Pop3;
 use crate::worker::render::attachments::{attachments_of, extract_attachments};
 use crate::worker::render::body_cacheable;
 use crate::worker::smtp::{send_smtp, smtp_refused};
 use crate::worker::strip::strip_refused;
-use crate::worker::{render_raw, summary_from_raw, MailRequest, OutgoingMessage, WorkerEvent};
+use crate::worker::{
+    answered_copies, render_raw, summary_from_raw, MailRequest, OutgoingMessage, WorkerEvent,
+};
 
 pub(super) mod client;
 
@@ -474,15 +478,14 @@ impl<E: Fn(WorkerEvent)> Pop3Worker<E> {
         match send_smtp(account, &message).await {
             Ok(_) => {
                 // Kept in the cache only: POP3 has no flags.
-                mark_answered(
-                    &mut None,
+                for (path, uid, forwarded) in answered_copies(
                     cache.as_ref(),
                     account_id,
                     &message.in_reply_to,
                     &message.forwards,
-                    emit,
-                )
-                .await;
+                ) {
+                    note_answered(cache.as_ref(), account_id, path, uid, forwarded, emit);
+                }
                 drop_superseded_outbox(cache.as_ref(), account_id, &message, emit);
                 emit(WorkerEvent::Sent);
                 emit(WorkerEvent::SendDone { ticket, sent: true });
@@ -542,7 +545,7 @@ async fn pop3_sync(
         .await?;
     let mut entries = pop.uidl().await?;
     // Newest first; bound how many we index.
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.0));
     entries.truncate(POP3_LIMIT);
 
     let cached: std::collections::HashMap<u32, Message> = cache
@@ -577,7 +580,7 @@ async fn pop3_sync(
     }
     pop.quit().await;
 
-    messages.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    messages.sort_by_key(|m| std::cmp::Reverse(m.timestamp));
     if let Some(c) = cache {
         c.save_messages(account_id, INBOX, &messages);
     }

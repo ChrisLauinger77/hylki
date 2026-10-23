@@ -76,13 +76,16 @@ fn jmap_msgids(v: &serde_json::Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// A summary as the list shows it, with its JMAP id and blob id.
+pub(super) type ListedEmail = (Message, String, String);
+
 /// Map one `Email/get` summary to a [`Message`]. Returns the JMAP id and
 /// blob id too, so the caller can index them.
 pub(super) fn jmap_message(
     v: &serde_json::Value,
     account_id: u32,
     folder_id: u32,
-) -> Option<(Message, String, String)> {
+) -> Option<ListedEmail> {
     let id = v["id"].as_str()?.to_string();
     let blob = v["blobId"].as_str().unwrap_or("").to_string();
     let uid = hash_uid(&id);
@@ -213,7 +216,7 @@ pub(super) fn jmap_get_messages(
     ids: &[String],
     account_id: u32,
     folder_id: u32,
-) -> Result<Vec<(Message, String, String)>, String> {
+) -> Result<Vec<ListedEmail>, String> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -243,7 +246,7 @@ pub(super) fn jmap_list_messages(
     mailbox_id: &str,
     account_id: u32,
     folder_id: u32,
-) -> Result<Vec<(Message, String, String)>, String> {
+) -> Result<Vec<ListedEmail>, String> {
     jmap_list_newest(s, mailbox_id, account_id, folder_id).map(|(list, _)| list)
 }
 
@@ -254,7 +257,7 @@ pub(super) fn jmap_list_newest(
     mailbox_id: &str,
     account_id: u32,
     folder_id: u32,
-) -> Result<(Vec<(Message, String, String)>, bool), String> {
+) -> Result<(Vec<ListedEmail>, bool), String> {
     let responses = jmap_call(
         s,
         &[CAP_CORE, CAP_MAIL],

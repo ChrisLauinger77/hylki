@@ -7,7 +7,7 @@ mod base64;
 pub mod percent;
 mod text_value;
 
-pub use self::base64::{base64_decode, base64_encode};
+pub use self::base64::{base64_decode, base64_encode, base64_lines};
 pub use text_value::{escape_text_value, unescape_text_value};
 
 /// Text escaped for HTML, for element content and quoted attribute values

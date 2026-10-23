@@ -172,7 +172,7 @@ fn demo_labels(id: u32) -> Vec<String> {
 /// A late reply into the demo's deep conversation (account 1's Inbox):
 /// what a sync brings in while that thread is open. `HYLKI_DEMO_ARRIVAL=<s>`
 /// has the mock worker deliver it after that many seconds.
-pub fn demo_arrival() -> Message {
+pub(crate) fn demo_arrival() -> Message {
     let mut m = build(&Spec {
         id: 90,
         account_id: 1,

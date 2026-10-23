@@ -187,7 +187,6 @@ async fn fetch_summaries_by_uid(
 /// upserts them into the cache, and emits them as an append to the UI's index.
 /// Requeues the job (at the back) if more remain. Reconnects and, if needed,
 /// disables ENVELOPE parsing (iCloud) on a parse failure.
-#[allow(clippy::too_many_arguments)]
 pub(super) async fn run_one_backfill(
     queue: &mut std::collections::VecDeque<Backfill>,
     session: &mut Option<ImapSession>,
@@ -207,14 +206,15 @@ pub(super) async fn run_one_backfill(
     };
 
     // Compute the worklist on first touch (with one reconnect on failure).
-    if job.remaining.is_none() {
-        match backfill_worklist(&mut s, account_id, &job.path, cache).await {
-            Ok(rem) => job.remaining = Some(rem),
+    let worklist = match job.remaining.take() {
+        Some(rem) => rem,
+        None => match backfill_worklist(&mut s, account_id, &job.path, cache).await {
+            Ok(rem) => rem,
             Err(_) => match connect(account).await {
                 Ok(fresh) => {
                     s = fresh;
                     match backfill_worklist(&mut s, account_id, &job.path, cache).await {
-                        Ok(rem) => job.remaining = Some(rem),
+                        Ok(rem) => rem,
                         Err(_) => {
                             *session = Some(s);
                             queue.push_back(job);
@@ -228,10 +228,10 @@ pub(super) async fn run_one_backfill(
                     return;
                 }
             },
-        }
-    }
+        },
+    };
 
-    let rem = job.remaining.as_mut().unwrap();
+    let rem = job.remaining.insert(worklist);
     if rem.is_empty() {
         emit(WorkerEvent::BackfillDone {
             folder_id: job.folder_id,

@@ -4,6 +4,7 @@
 use serde::Deserialize;
 
 use crate::config::OAuthSettings;
+use crate::graph_api::{bearer, GRAPH_BASE};
 
 use super::flow::Authorization;
 
@@ -74,13 +75,14 @@ pub fn microsoft_whoami(
     user: Option<&str>,
 ) -> Result<(String, String, String), String> {
     let fresh = refresh_access_token_as(settings, refresh, user)?;
-    let me: serde_json::Value =
-        ureq::get("https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName")
-            .set("Authorization", &format!("Bearer {}", fresh.access_token))
-            .call()
-            .map_err(|e| e.to_string())?
-            .into_json()
-            .map_err(|e| e.to_string())?;
+    let me: serde_json::Value = ureq::get(&format!(
+        "{GRAPH_BASE}/me?$select=displayName,mail,userPrincipalName"
+    ))
+    .set("Authorization", &bearer(&fresh.access_token))
+    .call()
+    .map_err(|e| e.to_string())?
+    .into_json()
+    .map_err(|e| e.to_string())?;
     let name = me["displayName"].as_str().unwrap_or_default().to_string();
     let address = me["mail"]
         .as_str()

@@ -147,7 +147,7 @@ pub(super) async fn emit_graph_body_hits(
         let term = format!("\"body:{}\"", needle.replace('"', " "));
         let url = format!(
             "{GRAPH_BASE}/me/mailFolders/{gid}/messages?$search={}&$select=id&$top=250",
-            crate::percent::encode(&term)
+            crate::encoding::percent::encode(&term)
         );
         let t = token.to_string();
         let found = blocking(move || graph_paged(&t, &url, 250)).await;

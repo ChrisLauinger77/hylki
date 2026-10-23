@@ -46,7 +46,9 @@ impl<E: Emit> ImapWorker<E> {
             refresh_folder_names(
                 self.account_id,
                 &self.account,
-                self.session.as_mut().unwrap(),
+                self.session
+                    .as_mut()
+                    .expect("the ladder checked for a session"),
                 self.cache.as_ref(),
                 &self.emit,
             )
@@ -150,7 +152,10 @@ impl<E: Emit> ImapWorker<E> {
     /// clean-up after it.
     async fn sweep_unread(&mut self) -> Idle {
         let account_id = self.account_id;
-        let sess = self.session.as_mut().unwrap();
+        let sess = self
+            .session
+            .as_mut()
+            .expect("the ladder sweeps only with a session");
         let (changed, complete) = refresh_unread_counts(
             account_id,
             sess,
@@ -256,7 +261,10 @@ impl<E: Emit> ImapWorker<E> {
     /// Push: resync the open folder once if work was done since the last
     /// look, then sit in IDLE on it.
     async fn idle_on_folder(&mut self) -> Idle {
-        let (fid, fpath) = self.idle_folder.clone().unwrap();
+        let (fid, fpath) = self
+            .idle_folder
+            .clone()
+            .expect("the ladder idles only with a folder to idle on");
         // Catch mail delivered while the connection was busy prefetching.
         if self.pending_resync {
             self.pending_resync = false;
@@ -292,7 +300,7 @@ impl<E: Emit> ImapWorker<E> {
                 // any request that arrives meanwhile goes first.
                 if self
                     .last_unread_sweep
-                    .map_or(true, |t| t.elapsed() >= UNREAD_SWEEP_MIN)
+                    .is_none_or(|t| t.elapsed() >= UNREAD_SWEEP_MIN)
                 {
                     self.sweep_due = true;
                 }

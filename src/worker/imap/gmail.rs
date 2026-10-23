@@ -10,7 +10,9 @@ use crate::config::AccountConfig;
 use crate::models::{Folder, FolderKind, Message};
 use crate::worker::imap::fetch_mode::is_parse_error;
 use crate::worker::imap::mutate::{flag_deleted_and_expunge, uid_move};
-use crate::worker::imap::wire::{cmd_head, search_uids, sel, store_uids, uid_set, wire, wired};
+use crate::worker::imap::wire::{
+    cmd_head, search_uids, sel, store_uids, uid_set, wire, wired, wired_err,
+};
 use crate::worker::imap::ImapSession;
 use crate::worker::WorkerEvent;
 
@@ -164,9 +166,9 @@ where
         let reply = match session.read_response().await {
             Some(Ok(reply)) => reply,
             Some(Err(e)) => {
-                let r: Result<(), _> = Err(async_imap::error::Error::Io(e));
-                wired(&cmd, &r);
-                return Err(r.unwrap_err());
+                let e = async_imap::error::Error::Io(e);
+                wired_err(&cmd, &e);
+                return Err(e);
             }
             None => {
                 wired::<()>(&cmd, &Err(async_imap::error::Error::ConnectionLost));
@@ -302,9 +304,8 @@ where
         let reply = match session.read_response().await {
             Some(Ok(reply)) => reply,
             Some(Err(e)) => {
-                let r: Result<(), _> = Err(async_imap::error::Error::Io(e));
-                wired(&cmd, &r);
-                let e = r.unwrap_err();
+                let e = async_imap::error::Error::Io(e);
+                wired_err(&cmd, &e);
                 if !is_parse_error(&e) {
                     return Err(e);
                 }

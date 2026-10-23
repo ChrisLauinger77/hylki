@@ -399,11 +399,11 @@ pub(super) fn crlf_line_endings(raw: &[u8]) -> std::borrow::Cow<'_, [u8]> {
         return std::borrow::Cow::Borrowed(raw);
     }
     let mut out = Vec::with_capacity(raw.len() + raw.len() / 32);
-    for i in 0..raw.len() {
+    for (i, &byte) in raw.iter().enumerate() {
         if bare(i) {
             out.push(b'\r');
         }
-        out.push(raw[i]);
+        out.push(byte);
     }
     std::borrow::Cow::Owned(out)
 }

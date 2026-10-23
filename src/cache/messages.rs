@@ -18,13 +18,30 @@ use super::{join_labels, message_columns, message_from_row, split_labels, Cache}
 /// message about to be sent gets its ids spelt back the way they arrived
 /// ([`Cache::exact_msgids`]). Only ids that actually differ from their
 /// lowercase form are kept.
+#[cfg(not(test))]
 static MSGID_CASE_PENDING: std::sync::OnceLock<
     std::sync::Mutex<std::collections::HashMap<String, String>>,
 > = std::sync::OnceLock::new();
 
+#[cfg(not(test))]
 pub(super) fn msgid_case_pending(
 ) -> &'static std::sync::Mutex<std::collections::HashMap<String, String>> {
     MSGID_CASE_PENDING.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Under test, a map per test thread. The tests run side by side, and any
+/// of them that parses mail notes into the map and any that saves messages
+/// drains it, so a test reading back its own notes (or checking that a
+/// batch drained them) could see another test's at any moment. Each test
+/// runs on a thread of its own, so its map holds only what it did.
+#[cfg(test)]
+pub(super) fn msgid_case_pending(
+) -> &'static std::sync::Mutex<std::collections::HashMap<String, String>> {
+    thread_local! {
+        static PENDING: &'static std::sync::Mutex<std::collections::HashMap<String, String>> =
+            Box::leak(Box::default());
+    }
+    PENDING.with(|pending| *pending)
 }
 
 /// The most a parse can note before a batch of messages carries it to disk;

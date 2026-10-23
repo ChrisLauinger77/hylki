@@ -16,8 +16,7 @@ use std::time::{Duration, Instant};
 
 use crate::config::{AccountConfig, Protocol};
 use crate::contacts::Suggestion;
-
-const GRAPH: &str = "https://graph.microsoft.com/v1.0";
+use crate::graph_api::{bearer, GRAPH_BASE};
 
 /// As many as the composer's list shows, and the point below which the
 /// tenant's whole list is asked as well.
@@ -77,7 +76,7 @@ fn quoted(text: &str) -> String {
 
 fn people_url(typed: &str) -> String {
     format!(
-        "{GRAPH}/me/people?$search={}&$top={TOP}&$select=displayName,scoredEmailAddresses",
+        "{GRAPH_BASE}/me/people?$search={}&$top={TOP}&$select=displayName,scoredEmailAddresses",
         crate::encoding::percent::encode(&quoted(typed))
     )
 }
@@ -91,7 +90,7 @@ fn users_url(typed: &str) -> String {
         quoted(&format!("mail:{typed}"))
     );
     format!(
-        "{GRAPH}/users?$search={}&$select=displayName,mail&$top={TOP}",
+        "{GRAPH_BASE}/users?$search={}&$select=displayName,mail&$top={TOP}",
         crate::encoding::percent::encode(&term)
     )
 }
@@ -288,9 +287,7 @@ fn get(token: &str, endpoint: Endpoint, typed: &str) -> Result<serde_json::Value
     };
     // The query is a person's name, so the log names only the list asked.
     tracing::debug!(target: "hylki::graph", "> GET {} (directory search)", endpoint.name());
-    let mut req = agent()
-        .get(&url)
-        .set("Authorization", &format!("Bearer {token}"));
+    let mut req = agent().get(&url).set("Authorization", &bearer(token));
     if let Some(level) = consistency {
         req = req.set("ConsistencyLevel", level);
     }
