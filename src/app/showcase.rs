@@ -18,7 +18,7 @@ mod settings;
 
 pub(crate) use capture::showcase_capture;
 pub(super) use capture::showcase_pgp;
-use capture::{showcase_at, showcase_log_focus};
+use capture::{input_after, showcase_at, showcase_log_focus};
 
 impl AppModel {
     /// Arms the probes that work on real profiles as much as the demo.
@@ -119,18 +119,12 @@ impl AppModel {
     /// instead of the main one.
     pub(super) fn install_showcase_overlays(&mut self, sender: &ComponentSender<Self>) {
         if std::env::var("HYLKI_SHOWCASE_ABOUT").is_ok() {
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(3, move || {
-                s.input(AppMsg::OpenAbout);
-            });
+            input_after(sender, 3, AppMsg::OpenAbout);
         }
         // Screenshot/dev hook: open the status bar console shortly after
         // launch (pref permitting) so captures can show it.
         if std::env::var("HYLKI_SHOWCASE_CONSOLE").is_ok() {
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(3, move || {
-                s.input(AppMsg::OpenConsole);
-            });
+            input_after(sender, 3, AppMsg::OpenConsole);
         }
     }
 }

@@ -43,6 +43,12 @@ pub(crate) fn showcase_capture(win: &gtk::Widget, path: &str) {
     }
 }
 
+/// Sends `msg` to the app `secs` seconds from now.
+pub(super) fn input_after(sender: &ComponentSender<AppModel>, secs: u32, msg: AppMsg) {
+    let s = sender.clone();
+    gtk::glib::timeout_add_seconds_local_once(secs, move || s.input(msg));
+}
+
 /// Showcase helper: scroll every scrolled window under `w` `frac` of the
 /// way down (1.0 = its end).
 fn scroll_all_to(w: &gtk::Widget, frac: f64) {
@@ -187,14 +193,8 @@ pub(super) fn stage_settings_window(sender: &ComponentSender<AppModel>, settings
         // HYLKI_SHOWCASE_SETTINGS_REOPEN=1 closes the window at
         // 5s and opens it again at 7s, to time a reopen.
         if std::env::var("HYLKI_SHOWCASE_SETTINGS_REOPEN").is_ok() {
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(5, move || {
-                s.input(AppMsg::DebugCloseSettings);
-            });
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(7, move || {
-                s.input(AppMsg::OpenAccounts);
-            });
+            input_after(sender, 5, AppMsg::DebugCloseSettings);
+            input_after(sender, 7, AppMsg::OpenAccounts);
         }
     }
 }

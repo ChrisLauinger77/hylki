@@ -158,6 +158,7 @@ pub(crate) use quote::{body_is_pre_wrap, message_text};
 use reader_toolbar::ReaderToolbarWidgets;
 use release_notes::release_notes_page;
 use search::default_scope;
+use send::machine_message;
 use send_morph::{MorphPending, Provisional};
 pub(crate) use showcase::showcase_capture;
 use showcase::showcase_pgp;

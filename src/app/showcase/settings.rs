@@ -11,10 +11,7 @@ pub(super) fn stage_shortcuts(sender: &ComponentSender<AppModel>) {
         .ok()
         .and_then(|v| v.parse::<i32>().ok())
     {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(4, move || {
-            s.input(AppMsg::ShowShortcuts);
-        });
+        input_after(sender, 4, AppMsg::ShowShortcuts);
         gtk::glib::timeout_add_seconds_local_once(5, move || {
             let tops = gtk::Window::toplevels();
             if let Some(w) = (0..tops.n_items())
@@ -39,10 +36,7 @@ pub(super) fn stage_new_account(sender: &ComponentSender<AppModel>) {
         .and_then(|v| v.strip_prefix("new").map(str::to_string))
     {
         let provider = rest.strip_prefix(':').map(str::to_string);
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(5, move || {
-            s.input(AppMsg::ShowcaseNewAccount(provider.clone()));
-        });
+        input_after(sender, 5, AppMsg::ShowcaseNewAccount(provider));
     }
 }
 
@@ -54,12 +48,11 @@ pub(super) fn stage_account_settings(sender: &ComponentSender<AppModel>) {
         .ok()
         .map(|v| v.parse::<u32>())
     {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(5, move || {
-            s.input(AppMsg::SidebarContext(CtxAction::OpenAccountSettings(
-                n + 1,
-            )));
-        });
+        input_after(
+            sender,
+            5,
+            AppMsg::SidebarContext(CtxAction::OpenAccountSettings(n + 1)),
+        );
     }
 }
 
@@ -68,10 +61,7 @@ pub(super) fn stage_account_settings(sender: &ComponentSender<AppModel>) {
 /// be exercised without a keyboard.
 pub(super) fn stage_editor_dirty(sender: &ComponentSender<AppModel>) {
     if std::env::var("HYLKI_SHOWCASE_EDITOR_DIRTY").is_ok() {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(7, move || {
-            s.input(AppMsg::ShowcaseDirtyEditor);
-        });
+        input_after(sender, 7, AppMsg::ShowcaseDirtyEditor);
     }
 }
 
@@ -79,10 +69,7 @@ pub(super) fn stage_editor_dirty(sender: &ComponentSender<AppModel>) {
 /// category at 8s, exactly as a click on its row does.
 pub(super) fn stage_settings_go(sender: &ComponentSender<AppModel>) {
     if let Ok(page) = std::env::var("HYLKI_SHOWCASE_SETTINGS_GO") {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(8, move || {
-            s.input(AppMsg::ShowSettingsPage(page.clone()));
-        });
+        input_after(sender, 8, AppMsg::ShowSettingsPage(page));
     }
 }
 
@@ -91,10 +78,7 @@ pub(super) fn stage_settings_go(sender: &ComponentSender<AppModel>) {
 /// HYLKI_SHOWCASE file, so the books it offers can be checked.
 pub(super) fn stage_add_contact(sender: &ComponentSender<AppModel>) {
     if let Ok(addr) = std::env::var("HYLKI_SHOWCASE_ADD_CONTACT") {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(6, move || {
-            s.input(AppMsg::AddContactAddr(addr));
-        });
+        input_after(sender, 6, AppMsg::AddContactAddr(addr));
         gtk::glib::timeout_add_seconds_local_once(10, move || {
             let tops = gtk::Window::toplevels();
             let dialog = (0..tops.n_items())
@@ -150,8 +134,7 @@ impl AppModel {
     /// selects the first n entries at 5s.
     pub(super) fn stage_contacts(&self, sender: &ComponentSender<AppModel>) {
         if let Ok(which) = std::env::var("HYLKI_SHOWCASE_CONTACTS") {
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::OpenContacts));
+            input_after(sender, 3, AppMsg::OpenContacts);
             let page = self.contacts_page.sender().clone();
             if which == "new" || which == "group" {
                 gtk::glib::timeout_add_seconds_local_once(5, move || {

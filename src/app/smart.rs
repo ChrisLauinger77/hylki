@@ -136,18 +136,24 @@ impl AppModel {
         }
     }
 
+    /// Lists a tag or smart folder view's rows as last assembled, or shows
+    /// the list loading while there are none yet.
+    pub(super) fn show_view_rows(&self, cached: Option<&Vec<Message>>) {
+        match cached {
+            Some(cached) => self.message_list.emit(MessageListInput::SetMessages {
+                messages: cached.clone(),
+            }),
+            None => self.message_list.emit(MessageListInput::SetLoading),
+        }
+    }
+
     /// Show the open smart folder from its last result at once (a loading
     /// list if it never ran); [`refresh_smart_view`] brings it up to date.
     pub(super) fn show_smart_view(&self) {
         let Some(id) = self.smart_view.as_ref() else {
             return;
         };
-        match self.smart_view_cache.get(id) {
-            Some(cached) => self.message_list.emit(MessageListInput::SetMessages {
-                messages: cached.clone(),
-            }),
-            None => self.message_list.emit(MessageListInput::SetLoading),
-        }
+        self.show_view_rows(self.smart_view_cache.get(id));
     }
 
     /// Read the open smart folder's rows from the on-disk index off the main

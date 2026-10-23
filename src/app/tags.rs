@@ -70,12 +70,7 @@ impl AppModel {
         let Some(key) = self.tag_view.as_ref() else {
             return;
         };
-        match self.tag_view_cache.get(key) {
-            Some(cached) => self.message_list.emit(MessageListInput::SetMessages {
-                messages: cached.clone(),
-            }),
-            None => self.message_list.emit(MessageListInput::SetLoading),
-        }
+        self.show_view_rows(self.tag_view_cache.get(key));
     }
 
     /// Read the open tag view's rows from the on-disk index off the main

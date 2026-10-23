@@ -3,7 +3,53 @@
 
 use super::*;
 
+/// A message the app writes itself (an answer to an invitation, an
+/// unsubscribe request): plain text, nothing attached, signed or quoted.
+pub(super) fn machine_message(
+    from_account_id: u32,
+    from_alias: Option<String>,
+    to: String,
+    subject: String,
+    body: String,
+    in_reply_to: String,
+) -> crate::worker::OutgoingMessage {
+    crate::worker::OutgoingMessage {
+        from_account_id,
+        from_alias,
+        to,
+        cc: String::new(),
+        bcc: String::new(),
+        reply_to: String::new(),
+        subject,
+        body,
+        html: String::new(),
+        attachments: Vec::new(),
+        in_reply_to,
+        references: String::new(),
+        forwards: String::new(),
+        draft_origin: None,
+        outbox_origin: None,
+        sign: false,
+        encrypt: false,
+        send_at: None,
+        calendar: None,
+    }
+}
+
 impl AppModel {
+    /// Sends a message the app wrote itself: no copy filed in Sent, no
+    /// ticket to follow it by (a failure still lands in the Outbox).
+    pub(super) fn send_unfiled(&self, out: crate::worker::OutgoingMessage) {
+        self.send_to(
+            out.from_account_id,
+            MailRequest::Send {
+                message: Box::new(out),
+                sent_path: None,
+                ticket: 0,
+            },
+        );
+    }
+
     /// Send's first stop (#434): the message waits out the Undo Send delay
     /// with Undo on offer in a toast, listed in the Outbox, then goes to its
     /// worker.

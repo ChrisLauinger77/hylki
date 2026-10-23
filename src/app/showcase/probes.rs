@@ -63,10 +63,7 @@ pub(super) fn probe_delete_attachment(sender: &ComponentSender<AppModel>) {
             .and_then(|v| v.parse().ok())
             .unwrap_or(10);
         if name.starts_with("gallery:") {
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(at.saturating_sub(4), move || {
-                s.input(AppMsg::ShowAttachments)
-            });
+            input_after(sender, at.saturating_sub(4), AppMsg::ShowAttachments);
         }
         let s = sender.clone();
         gtk::glib::timeout_add_seconds_local_once(at, move || {
@@ -196,8 +193,7 @@ pub(super) fn probe_notify(sender: &ComponentSender<AppModel>) {
             times.push(5);
         }
         for at in times {
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(at, move || s.input(AppMsg::ShowcaseNotify));
+            input_after(sender, at, AppMsg::ShowcaseNotify);
         }
     }
 }

@@ -121,40 +121,21 @@ impl AppModel {
                 i18n_f("{name} has declined this invitation.", &[("name", &who)])
             }
         };
-        let out = crate::worker::OutgoingMessage {
-            from_account_id: message.account_id,
+        let mut out = machine_message(
+            message.account_id,
             from_alias,
-            to: organizer,
-            cc: String::new(),
-            bcc: String::new(),
-            reply_to: String::new(),
+            organizer,
             subject,
             body,
-            html: String::new(),
-            attachments: Vec::new(),
             // An answer belongs to the conversation the invitation started,
             // so the organizer's client files it with the request.
-            in_reply_to: message.message_id.clone(),
-            references: String::new(),
-            forwards: String::new(),
-            draft_origin: None,
-            outbox_origin: None,
-            sign: false,
-            encrypt: false,
-            send_at: None,
-            calendar: Some(crate::worker::CalendarPart {
-                ics,
-                method: "REPLY".to_string(),
-            }),
-        };
-        self.send_to(
-            message.account_id,
-            MailRequest::Send {
-                message: Box::new(out),
-                sent_path: None,
-                ticket: 0,
-            },
+            message.message_id.clone(),
         );
+        out.calendar = Some(crate::worker::CalendarPart {
+            ics,
+            method: "REPLY".to_string(),
+        });
+        self.send_unfiled(out);
         self.record_invite_answer(invite, rsvp);
         self.notice(match rsvp {
             crate::models::Rsvp::Accepted => i18n("Your answer has been sent: accepted."),

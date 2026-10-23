@@ -35,8 +35,7 @@ pub(super) fn stage_folder(sender: &ComponentSender<AppModel>) {
     if let Ok(v) = std::env::var("HYLKI_SHOWCASE_FOLDER") {
         let (kind, at) = showcase_at(&v, 2);
         if kind == "outbox" {
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(at, move || s.input(AppMsg::ShowOutbox));
+            input_after(sender, at, AppMsg::ShowOutbox);
         }
         let kind = match kind {
             "drafts" => Some(FolderKind::Drafts),
@@ -203,10 +202,7 @@ pub(super) fn stage_compose_menu(sender: &ComponentSender<AppModel>) {
 /// source it was written in.
 pub(super) fn stage_compose_preview(sender: &ComponentSender<AppModel>) {
     if std::env::var("HYLKI_SHOWCASE_COMPOSE_PREVIEW").is_ok() {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(6, move || {
-            s.input(AppMsg::ShowcaseComposePreview);
-        });
+        input_after(sender, 6, AppMsg::ShowcaseComposePreview);
     }
 }
 
@@ -218,10 +214,7 @@ pub(super) fn stage_compose_from(sender: &ComponentSender<AppModel>) {
         .ok()
         .map(|v| v.parse::<u32>())
     {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(7, move || {
-            s.input(AppMsg::ShowcaseComposeFrom(n));
-        });
+        input_after(sender, 7, AppMsg::ShowcaseComposeFrom(n));
     }
 }
 
@@ -234,10 +227,7 @@ pub(super) fn stage_compose_close(sender: &ComponentSender<AppModel>) {
         .ok()
         .and_then(|v| v.parse::<u32>().ok())
     {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(at, move || {
-            s.input(AppMsg::ShowcaseComposeClose);
-        });
+        input_after(sender, at, AppMsg::ShowcaseComposeClose);
     }
 }
 
@@ -255,10 +245,7 @@ pub(super) fn stage_compose_format(sender: &ComponentSender<AppModel>) {
                 "plain" => config::ComposeFormat::Plain,
                 _ => continue,
             };
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(at, move || {
-                s.input(AppMsg::ShowcaseComposeFormat(format));
-            });
+            input_after(sender, at, AppMsg::ShowcaseComposeFormat(format));
         }
     }
 }
@@ -281,21 +268,12 @@ pub(super) fn stage_compose_undo(sender: &ComponentSender<AppModel>) {
             _ => None,
         };
         if let Some(format) = format {
-            let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(5, move || {
-                s.input(AppMsg::ShowcaseComposeFormat(format));
-            });
+            input_after(sender, 5, AppMsg::ShowcaseComposeFormat(format));
         }
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(7, move || {
-            s.input(AppMsg::ShowcaseComposeUndo);
-        });
+        input_after(sender, 7, AppMsg::ShowcaseComposeUndo);
         // …and drop the burger menu open over it near the end,
         // which is the state the entries are actually read in.
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(16, move || {
-            s.input(AppMsg::ShowcaseBurger);
-        });
+        input_after(sender, 16, AppMsg::ShowcaseBurger);
     }
 }
 
@@ -321,14 +299,15 @@ pub(super) fn stage_files(sender: &ComponentSender<AppModel>) {
 /// at 6 s, to check a live flip re-resolves those grounds.
 pub(super) fn stage_flip(sender: &ComponentSender<AppModel>) {
     if let Ok(flip) = std::env::var("HYLKI_SHOWCASE_FLIP") {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(6, move || {
-            s.input(AppMsg::Pref(PrefOutput::SetAppTheme(if flip == "dark" {
+        input_after(
+            sender,
+            6,
+            AppMsg::Pref(PrefOutput::SetAppTheme(if flip == "dark" {
                 config::AppTheme::Dark
             } else {
                 config::AppTheme::Light
-            })));
-        });
+            })),
+        );
     }
 }
 
@@ -337,9 +316,6 @@ pub(super) fn stage_flip(sender: &ComponentSender<AppModel>) {
 /// repaint (chrome, reader and composer) can be captured.
 pub(super) fn stage_theme(sender: &ComponentSender<AppModel>) {
     if let Ok(id) = std::env::var("HYLKI_SHOWCASE_THEME") {
-        let s = sender.clone();
-        gtk::glib::timeout_add_seconds_local_once(6, move || {
-            s.input(AppMsg::Pref(PrefOutput::SetTheme(id.clone())));
-        });
+        input_after(sender, 6, AppMsg::Pref(PrefOutput::SetTheme(id)));
     }
 }

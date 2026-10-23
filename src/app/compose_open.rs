@@ -227,6 +227,40 @@ impl AppModel {
         }
     }
 
+    /// Asks for what a copy of `m` (a forward, an edit as new) still
+    /// lacks: its body first, then its attachments. True when a request
+    /// went out; the caller holds `m` until the answer re-enters.
+    fn fetch_for_copy(&self, m: &Message) -> bool {
+        if m.body.is_empty() {
+            if let Some(path) = self.resolve_folder_path(m) {
+                self.send_to(
+                    m.account_id,
+                    MailRequest::LoadBody {
+                        message_id: m.id,
+                        path,
+                        uid: m.uid,
+                    },
+                );
+                return true;
+            }
+        }
+        if m.has_attachment && !self.attachment_cache.contains_key(&body_key(m)) {
+            if let Some(path) = self.resolve_folder_path(m) {
+                self.send_to(
+                    m.account_id,
+                    MailRequest::LoadAttachments {
+                        message_id: m.id,
+                        path,
+                        uid: m.uid,
+                        download: true,
+                    },
+                );
+                return true;
+            }
+        }
+        false
+    }
+
     /// Forward a message with its attachments (#240): the quoted original
     /// in the body, and every file that came with it attached to the new
     /// message, as Thunderbird, Apple Mail and Gmail do. Much of what gets
@@ -242,34 +276,9 @@ impl AppModel {
         if let Some(subject) = self.decrypted_subject(&m) {
             m.subject = subject;
         }
-        if m.body.is_empty() {
-            if let Some(path) = self.resolve_folder_path(&m) {
-                self.send_to(
-                    m.account_id,
-                    MailRequest::LoadBody {
-                        message_id: m.id,
-                        path,
-                        uid: m.uid,
-                    },
-                );
-                self.pending_forward = Some((m, inline));
-                return;
-            }
-        }
-        if m.has_attachment && !self.attachment_cache.contains_key(&body_key(&m)) {
-            if let Some(path) = self.resolve_folder_path(&m) {
-                self.send_to(
-                    m.account_id,
-                    MailRequest::LoadAttachments {
-                        message_id: m.id,
-                        path,
-                        uid: m.uid,
-                        download: true,
-                    },
-                );
-                self.pending_forward = Some((m, inline));
-                return;
-            }
+        if self.fetch_for_copy(&m) {
+            self.pending_forward = Some((m, inline));
+            return;
         }
         let attachments = self
             .attachment_cache
@@ -305,34 +314,9 @@ impl AppModel {
     /// is being copied is actually in hand.
     pub(super) fn edit_as_new(&mut self, m: Message, sender: &ComponentSender<Self>) {
         let m = self.with_cached_body(m);
-        if m.body.is_empty() {
-            if let Some(path) = self.resolve_folder_path(&m) {
-                self.send_to(
-                    m.account_id,
-                    MailRequest::LoadBody {
-                        message_id: m.id,
-                        path,
-                        uid: m.uid,
-                    },
-                );
-                self.pending_edit_as_new = Some(m);
-                return;
-            }
-        }
-        if m.has_attachment && !self.attachment_cache.contains_key(&body_key(&m)) {
-            if let Some(path) = self.resolve_folder_path(&m) {
-                self.send_to(
-                    m.account_id,
-                    MailRequest::LoadAttachments {
-                        message_id: m.id,
-                        path,
-                        uid: m.uid,
-                        download: true,
-                    },
-                );
-                self.pending_edit_as_new = Some(m);
-                return;
-            }
+        if self.fetch_for_copy(&m) {
+            self.pending_edit_as_new = Some(m);
+            return;
         }
         let attachments = self
             .attachment_cache

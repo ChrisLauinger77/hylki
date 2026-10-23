@@ -318,41 +318,21 @@ impl AppModel {
             return;
         };
         let (from_alias, _) = self.unsubscribe_from(&message);
-        let out = crate::worker::OutgoingMessage {
-            from_account_id: message.account_id,
+        let out = machine_message(
+            message.account_id,
             from_alias,
-            to: target.to,
-            cc: String::new(),
-            bcc: String::new(),
-            reply_to: String::new(),
-            subject: target.subject,
-            body: target.body,
-            html: String::new(),
-            attachments: Vec::new(),
+            target.to,
+            target.subject,
+            target.body,
             // A "reply with UNSUBSCRIBE" is a reply: the list matches it to
             // the message it sent. A `mailto:` handle is a fresh message.
-            in_reply_to: if info.mailto.is_some() {
+            if info.mailto.is_some() {
                 String::new()
             } else {
                 message.message_id.clone()
             },
-            references: String::new(),
-            forwards: String::new(),
-            draft_origin: None,
-            outbox_origin: None,
-            sign: false,
-            encrypt: false,
-            calendar: None,
-            send_at: None,
-        };
-        self.send_to(
-            message.account_id,
-            MailRequest::Send {
-                message: Box::new(out),
-                sent_path: None,
-                ticket: 0,
-            },
         );
+        self.send_unfiled(out);
         sender.input(AppMsg::UnsubscribeDone {
             message: Box::new(message),
             result: Ok(true),
