@@ -2,6 +2,7 @@
 //! fade that covers the swap.
 
 use super::MessageView;
+
 use adw::prelude::*;
 use relm4::prelude::*;
 use webkit6::prelude::WebViewExt;
@@ -270,5 +271,41 @@ impl MessageView {
             }
             load();
         });
+    }
+}
+
+impl MessageView {
+    /// While a document loads, keep the keyboard on the loading page rather
+    /// than in the web view, and give it back once the document is shown.
+    pub(super) fn hold_focus_while_loading(&self) {
+        let Some(page) = &self.loading_page else {
+            return;
+        };
+        let web: &gtk::Widget = self.webview.upcast_ref();
+        let focus = web.root().and_then(|r| r.focus());
+        if self.body_page() == "loading" {
+            if focus.is_some_and(|f| f == *web || f.is_ancestor(web)) {
+                page.grab_focus();
+                self.focus_held.set(true);
+            }
+        } else if self.focus_held.replace(false)
+            && focus.is_some_and(|f| f == *page.upcast_ref::<gtk::Widget>())
+        {
+            self.webview.grab_focus();
+        }
+    }
+
+    /// Which body-stack page to show: spinner while fetching, themed cover while
+    /// the WebView loads, then the rendered message(s).
+    pub(super) fn body_page(&self) -> &'static str {
+        // A document that has been handed over but hasn't painted yet is still
+        // loading as far as the reader is concerned. Showing the previous
+        // message in the meantime, or a bare cover between two spinners, is the
+        // flash this avoids.
+        if self.loading || !self.webview_ready {
+            "loading"
+        } else {
+            "body"
+        }
     }
 }
