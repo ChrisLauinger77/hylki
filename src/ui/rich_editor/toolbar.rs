@@ -188,16 +188,179 @@ pub(super) fn build_toolbar(
     group.add_css_class("format-bar");
     group.set_hexpand(true);
     let end = gtk::Box::new(gtk::Orientation::Horizontal, 2);
-    // Each group of tools wraps too, so a composer narrower than a group
-    // still takes its buttons one by one rather than growing past its pane.
-    let cluster = || {
-        let c = adw::WrapBox::new();
-        c.set_child_spacing(2);
-        c.set_line_spacing(2);
-        c
-    };
+    let (styles, style, font, size) = style_menus(webview);
 
-    // Paragraph style and font, each a menu whose label follows the caret.
+    let chars = cluster();
+    simple_buttons(
+        webview,
+        &chars,
+        &[
+            (
+                "format-text-bold-symbolic",
+                i18n_noop("Bold"),
+                "document.execCommand('bold')",
+            ),
+            (
+                "format-text-italic-symbolic",
+                i18n_noop("Italic"),
+                "document.execCommand('italic')",
+            ),
+            (
+                "format-text-underline-symbolic",
+                i18n_noop("Underline"),
+                "document.execCommand('underline')",
+            ),
+            (
+                "format-text-strikethrough-symbolic",
+                i18n_noop("Strikethrough"),
+                "document.execCommand('strikeThrough')",
+            ),
+        ],
+    );
+    group.append(&chars);
+
+    let colors = color_menus(webview);
+
+    // The block commands are toggles: the document reports whether the
+    // caret is inside one, and each command both opens and leaves its block
+    // (the lists through execCommand's own toggling, the quote through
+    // __hylkiQuote). A toggle shows the pressed look while the caret is in
+    // its block; the click flips it at once and the document's next state
+    // report settles it, so it never sticks wrong.
+    let mut toggles = Vec::new();
+    let lists = cluster();
+    lists.append(&block_toggle(
+        webview,
+        "view-list-bullet-symbolic",
+        i18n_noop("Bulleted list"),
+        "document.execCommand('insertUnorderedList')",
+        'u',
+        &mut toggles,
+    ));
+    lists.append(&block_toggle(
+        webview,
+        "view-list-ordered-symbolic",
+        i18n_noop("Numbered list"),
+        "document.execCommand('insertOrderedList')",
+        'o',
+        &mut toggles,
+    ));
+    group.append(&lists);
+    // Inside a list, indenting nests the items under the one above.
+    let indents = cluster();
+    simple_buttons(
+        webview,
+        &indents,
+        &[
+            (
+                "format-indent-less-symbolic",
+                i18n_noop("Decrease indent"),
+                "window.__hylkiIndent(false)",
+            ),
+            (
+                "format-indent-more-symbolic",
+                i18n_noop("Increase indent"),
+                "window.__hylkiIndent(true)",
+            ),
+        ],
+    );
+
+    let inserts = cluster();
+    // Adwaita has no blockquote glyph; the bubble with its quote marks
+    // reads as one.
+    inserts.append(&block_toggle(
+        webview,
+        "format-quote-symbolic",
+        i18n_noop("Quote"),
+        "window.__hylkiQuote()",
+        'q',
+        &mut toggles,
+    ));
+    let link = bar_button("insert-link-symbolic", i18n_noop("Insert link"));
+    {
+        let weak = webview.downgrade();
+        link.connect_clicked(move |b| {
+            if let Some(wv) = weak.upgrade() {
+                prompt_link(&wv, b);
+            }
+        });
+    }
+    inserts.append(&link);
+    group.append(&inserts);
+    let media = cluster();
+    let emoji = bar_button("face-smile-symbolic", i18n_noop("Insert emoji"));
+    {
+        let (weak, anchor) = (webview.downgrade(), anchor.downgrade());
+        emoji.connect_clicked(move |_| {
+            if let (Some(wv), Some(anchor)) = (weak.upgrade(), anchor.upgrade()) {
+                show_emoji_chooser(&wv, &anchor);
+            }
+        });
+    }
+    media.append(&emoji);
+    let picture = bar_button("insert-image-symbolic", i18n_noop("Insert picture"));
+    {
+        let (weak, cb) = (webview.downgrade(), attach_cb.clone());
+        picture.connect_clicked(move |b| {
+            let Some(wv) = weak.upgrade() else { return };
+            pick_pictures(&wv, b, &cb);
+        });
+    }
+    media.append(&picture);
+
+    let tail = cluster();
+    simple_buttons(
+        webview,
+        &tail,
+        &[(
+            "edit-clear-symbolic",
+            i18n_noop("Clear formatting"),
+            "document.execCommand('removeFormat')",
+        )],
+    );
+    group.append(&tail);
+
+    let more = chevron_tools(
+        &group,
+        &tail,
+        [&styles, &colors, &indents, &media],
+        expanded,
+    );
+    showcase_toolbar_toggle(&more);
+
+    group.set_end(&end);
+    (
+        group.clone(),
+        group,
+        end,
+        ToolbarState {
+            toggles,
+            style,
+            font,
+            size,
+        },
+    )
+}
+
+/// A group of tools that wraps on its own, so a composer narrower than a
+/// group takes its buttons one by one rather than growing past its pane.
+fn cluster() -> adw::WrapBox {
+    let c = adw::WrapBox::new();
+    c.set_child_spacing(2);
+    c.set_line_spacing(2);
+    c
+}
+
+/// Paragraph style, font and size, each a menu whose label follows the
+/// caret.
+fn style_menus(
+    webview: &webkit6::WebView,
+) -> (
+    adw::WrapBox,
+    gtk::MenuButton,
+    gtk::MenuButton,
+    gtk::MenuButton,
+) {
     let styles = cluster();
     let style_items: Vec<(String, String, Option<&str>)> = BLOCK_STYLES
         .iter()
@@ -315,53 +478,34 @@ pub(super) fn build_toolbar(
     styles.append(&style);
     styles.append(&font);
     styles.append(&size);
+    (styles, style, font, size)
+}
 
-    // (icon, tooltip, execCommand snippet).
-    let simple = |cluster: &adw::WrapBox, commands: &[(&str, &str, &str)]| {
-        for (icon, tip, cmd) in commands {
-            let btn = bar_button(icon, tip);
-            // Weak: the format-state handler the view's content manager
-            // owns reaches these buttons, so a strong view here would be a
-            // cycle.
-            let weak = webview.downgrade();
-            let cmd = cmd.to_string();
-            btn.connect_clicked(move |_| {
-                if let Some(wv) = weak.upgrade() {
-                    exec(&wv, &cmd);
-                }
-            });
-            cluster.append(&btn);
-        }
-    };
+/// Plain command buttons into `cluster`: (icon, tooltip, execCommand
+/// snippet).
+fn simple_buttons(
+    webview: &webkit6::WebView,
+    cluster: &adw::WrapBox,
+    commands: &[(&str, &str, &str)],
+) {
+    for (icon, tip, cmd) in commands {
+        let btn = bar_button(icon, tip);
+        // Weak: the format-state handler the view's content manager
+        // owns reaches these buttons, so a strong view here would be a
+        // cycle.
+        let weak = webview.downgrade();
+        let cmd = cmd.to_string();
+        btn.connect_clicked(move |_| {
+            if let Some(wv) = weak.upgrade() {
+                exec(&wv, &cmd);
+            }
+        });
+        cluster.append(&btn);
+    }
+}
 
-    let chars = cluster();
-    simple(
-        &chars,
-        &[
-            (
-                "format-text-bold-symbolic",
-                i18n_noop("Bold"),
-                "document.execCommand('bold')",
-            ),
-            (
-                "format-text-italic-symbolic",
-                i18n_noop("Italic"),
-                "document.execCommand('italic')",
-            ),
-            (
-                "format-text-underline-symbolic",
-                i18n_noop("Underline"),
-                "document.execCommand('underline')",
-            ),
-            (
-                "format-text-strikethrough-symbolic",
-                i18n_noop("Strikethrough"),
-                "document.execCommand('strikeThrough')",
-            ),
-        ],
-    );
-    group.append(&chars);
-
+/// The text color and highlight menus.
+fn color_menus(webview: &webkit6::WebView) -> adw::WrapBox {
     let colors = cluster();
     let text_chosen = std::rc::Rc::new(std::cell::RefCell::new(None));
     colors.append(&color_menu(
@@ -383,121 +527,43 @@ pub(super) fn build_toolbar(
         color_glyph(true, hl_chosen.clone()),
         hl_chosen,
     ));
+    colors
+}
 
-    // The block commands are toggles: the document reports whether the
-    // caret is inside one, and each command both opens and leaves its block
-    // (the lists through execCommand's own toggling, the quote through
-    // __hylkiQuote). A toggle shows the pressed look while the caret is in
-    // its block; the click flips it at once and the document's next state
-    // report settles it, so it never sticks wrong.
-    let mut toggles = Vec::new();
-    let toggle = |icon: &str,
-                  tip: &str,
-                  cmd: &str,
-                  key: char,
-                  toggles: &mut Vec<(char, gtk::ToggleButton)>| {
-        let t = gtk::ToggleButton::new();
-        t.set_icon_name(icon);
-        t.set_tooltip_text(Some(i18n(tip).as_str()));
-        t.set_can_focus(false);
-        t.add_css_class("flat");
-        let weak = webview.downgrade();
-        let cmd = cmd.to_string();
-        t.connect_clicked(move |_| {
-            if let Some(wv) = weak.upgrade() {
-                exec(&wv, &cmd);
-            }
-        });
-        toggles.push((key, t.clone()));
-        t
-    };
-    let lists = cluster();
-    lists.append(&toggle(
-        "view-list-bullet-symbolic",
-        i18n_noop("Bulleted list"),
-        "document.execCommand('insertUnorderedList')",
-        'u',
-        &mut toggles,
-    ));
-    lists.append(&toggle(
-        "view-list-ordered-symbolic",
-        i18n_noop("Numbered list"),
-        "document.execCommand('insertOrderedList')",
-        'o',
-        &mut toggles,
-    ));
-    group.append(&lists);
-    // Inside a list, indenting nests the items under the one above.
-    let indents = cluster();
-    simple(
-        &indents,
-        &[
-            (
-                "format-indent-less-symbolic",
-                i18n_noop("Decrease indent"),
-                "window.__hylkiIndent(false)",
-            ),
-            (
-                "format-indent-more-symbolic",
-                i18n_noop("Increase indent"),
-                "window.__hylkiIndent(true)",
-            ),
-        ],
-    );
+/// A block command as a toggle, recorded in `toggles` under the key the
+/// document reports it by.
+fn block_toggle(
+    webview: &webkit6::WebView,
+    icon: &str,
+    tip: &str,
+    cmd: &str,
+    key: char,
+    toggles: &mut Vec<(char, gtk::ToggleButton)>,
+) -> gtk::ToggleButton {
+    let t = gtk::ToggleButton::new();
+    t.set_icon_name(icon);
+    t.set_tooltip_text(Some(i18n(tip).as_str()));
+    t.set_can_focus(false);
+    t.add_css_class("flat");
+    let weak = webview.downgrade();
+    let cmd = cmd.to_string();
+    t.connect_clicked(move |_| {
+        if let Some(wv) = weak.upgrade() {
+            exec(&wv, &cmd);
+        }
+    });
+    toggles.push((key, t.clone()));
+    t
+}
 
-    let inserts = cluster();
-    // Adwaita has no blockquote glyph; the bubble with its quote marks
-    // reads as one.
-    inserts.append(&toggle(
-        "format-quote-symbolic",
-        i18n_noop("Quote"),
-        "window.__hylkiQuote()",
-        'q',
-        &mut toggles,
-    ));
-    let link = bar_button("insert-link-symbolic", i18n_noop("Insert link"));
-    {
-        let weak = webview.downgrade();
-        link.connect_clicked(move |b| {
-            if let Some(wv) = weak.upgrade() {
-                prompt_link(&wv, b);
-            }
-        });
-    }
-    inserts.append(&link);
-    group.append(&inserts);
-    let media = cluster();
-    let emoji = bar_button("face-smile-symbolic", i18n_noop("Insert emoji"));
-    {
-        let (weak, anchor) = (webview.downgrade(), anchor.downgrade());
-        emoji.connect_clicked(move |_| {
-            if let (Some(wv), Some(anchor)) = (weak.upgrade(), anchor.upgrade()) {
-                show_emoji_chooser(&wv, &anchor);
-            }
-        });
-    }
-    media.append(&emoji);
-    let picture = bar_button("insert-image-symbolic", i18n_noop("Insert picture"));
-    {
-        let (weak, cb) = (webview.downgrade(), attach_cb.clone());
-        picture.connect_clicked(move |b| {
-            let Some(wv) = weak.upgrade() else { return };
-            pick_pictures(&wv, b, &cb);
-        });
-    }
-    media.append(&picture);
-
-    let tail = cluster();
-    simple(
-        &tail,
-        &[(
-            "edit-clear-symbolic",
-            i18n_noop("Clear formatting"),
-            "document.execCommand('removeFormat')",
-        )],
-    );
-    group.append(&tail);
-
+/// Put `tools` behind the chevron at the end of `group`, after `tail`, open
+/// to begin with when `expanded`. Returns the chevron.
+fn chevron_tools(
+    group: &ToolFlow,
+    tail: &adw::WrapBox,
+    tools: [&adw::WrapBox; 4],
+    expanded: bool,
+) -> gtk::ToggleButton {
     // The rest (#358) behind a chevron, after everything above so showing
     // them moves nothing: paragraph style and font, colors, indents, emoji
     // and pictures. They slide out from the chevron, which rides along to
@@ -510,7 +576,7 @@ pub(super) fn build_toolbar(
     let extras = adw::WrapBox::new();
     extras.set_child_spacing(10);
     extras.set_line_spacing(2);
-    for e in [&styles, &colors, &indents, &media] {
+    for e in tools {
         extras.append(e);
     }
     let reveal = gtk::Revealer::new();
@@ -594,8 +660,12 @@ pub(super) fn build_toolbar(
     ride.append(&more);
     group.append(&breaker);
     group.append(&ride);
-    // HYLKI_SHOWCASE_TOOLBAR_TOGGLE=<ms>: press the chevron that long after
-    // the bar is built, so frames of the slide can be captured.
+    more
+}
+
+/// HYLKI_SHOWCASE_TOOLBAR_TOGGLE=<ms>: press the chevron that long after
+/// the bar is built, so frames of the slide can be captured.
+fn showcase_toolbar_toggle(more: &gtk::ToggleButton) {
     if let Some(ms) = std::env::var("HYLKI_SHOWCASE_TOOLBAR_TOGGLE")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
@@ -632,19 +702,6 @@ pub(super) fn build_toolbar(
             }
         });
     }
-
-    group.set_end(&end);
-    (
-        group.clone(),
-        group,
-        end,
-        ToolbarState {
-            toggles,
-            style,
-            font,
-            size,
-        },
-    )
 }
 
 /// Choose pictures to put in the message at the caret (#358), the way a
