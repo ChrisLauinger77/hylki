@@ -5,8 +5,9 @@ use lettre::transport::smtp::authentication::Credentials;
 
 use crate::config::AccountConfig;
 use crate::worker::auth::{fetch_oauth_token, oauth_user, sign_in_password};
+use crate::worker::pop3::client::Pop3;
 use crate::worker::smtp::{smtp_host, smtp_tls_parameters, SmtpTls};
-use crate::worker::{connect, jmap, Pop3};
+use crate::worker::{connect, jmap};
 
 /// Outcome of a credential/connection test for the Accounts window.
 #[derive(Debug)]

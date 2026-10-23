@@ -48,3 +48,24 @@ pub fn is_hostname_mismatch(error: &str) -> bool {
         || e.contains("invalid for name")
         || e.contains("notvalidforname")
 }
+
+#[cfg(test)]
+mod hostname_mismatch_tests {
+    use super::is_hostname_mismatch;
+
+    #[test]
+    fn names_the_name_check_only() {
+        assert!(is_hostname_mismatch(
+            "error:0A000086:SSL routines:tls_post_process_server_certificate:certificate verify failed: Hostname mismatch"
+        ));
+        assert!(is_hostname_mismatch(
+            "The certificate's CN name does not match the passed value"
+        ));
+        assert!(!is_hostname_mismatch(
+            "certificate verify failed: self-signed certificate"
+        ));
+        assert!(!is_hostname_mismatch(
+            "connecting to imap.example.org timed out after 30 seconds"
+        ));
+    }
+}

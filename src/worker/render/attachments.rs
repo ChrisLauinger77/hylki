@@ -199,3 +199,23 @@ pub(in crate::worker) fn guess_mime(name: &str) -> String {
         .filter(|m| m != "application/x-zerosize")
         .unwrap_or_else(|| "application/octet-stream".to_string())
 }
+
+#[cfg(test)]
+mod guess_mime_tests {
+    use super::guess_mime;
+
+    #[test]
+    fn types_attachments_by_suffix() {
+        assert_eq!(guess_mime("scan.PDF"), "application/pdf");
+        assert_eq!(guess_mime("photo.jpeg"), "image/jpeg");
+        assert_eq!(
+            guess_mime("report.docx"),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        assert_eq!(
+            guess_mime("budget.xlsx"),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+        assert_eq!(guess_mime("blob.zzqx"), "application/octet-stream");
+    }
+}

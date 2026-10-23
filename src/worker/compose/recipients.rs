@@ -174,3 +174,57 @@ pub(in crate::worker) fn mailbox(name: &str, addr: &str) -> Result<Mailbox, Smtp
         Ok(Mailbox::new(Some(name.to_string()), address))
     }
 }
+
+#[cfg(test)]
+mod recipient_tests {
+    use super::{format_recipient, parse_recipients};
+
+    fn pair(name: &str, email: &str) -> (String, String) {
+        (name.to_string(), email.to_string())
+    }
+
+    #[test]
+    fn a_comma_in_a_name_does_not_split_it() {
+        assert_eq!(
+            parse_recipients("\"Martin, Jason\" <j@x.example>, b@x.example"),
+            vec![
+                pair("Martin, Jason", "j@x.example"),
+                pair("", "b@x.example")
+            ]
+        );
+        assert_eq!(
+            parse_recipients("Martin, Jason <j@x.example>, Ann <a@x.example>,"),
+            vec![
+                pair("Martin, Jason", "j@x.example"),
+                pair("Ann", "a@x.example")
+            ]
+        );
+        assert_eq!(
+            parse_recipients("\"a \\\"b\\\" c\" <q@x.example>"),
+            vec![pair("a \"b\" c", "q@x.example")]
+        );
+        // A stray word stays its own (invalid) entry rather than joining a
+        // bare address, so the send still names it as the bad one.
+        assert_eq!(
+            parse_recipients("bob, a@x.example"),
+            vec![pair("", "bob"), pair("", "a@x.example")]
+        );
+    }
+
+    #[test]
+    fn formatted_recipients_read_back() {
+        for name in ["Jason Martin", "Martin, Jason", "J. \"Jay\" Martin", "a\\b"] {
+            let field = format!("{}, c@x.example", format_recipient(name, "j@x.example"));
+            assert_eq!(
+                parse_recipients(&field),
+                vec![pair(name, "j@x.example"), pair("", "c@x.example")],
+                "{field}"
+            );
+        }
+        assert_eq!(format_recipient("", "j@x.example"), "j@x.example");
+        assert_eq!(
+            format_recipient("Jason Martin", "j@x.example"),
+            "Jason Martin <j@x.example>"
+        );
+    }
+}

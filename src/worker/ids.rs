@@ -65,3 +65,17 @@ pub(super) fn hash_uid(uid: &str) -> u32 {
     uid.hash(&mut h);
     (h.finish() & 0x7fff_ffff) as u32
 }
+
+#[cfg(test)]
+mod hash_uid_tests {
+    use super::hash_uid;
+
+    /// The ids already in users' caches, as std's DefaultHasher derived them.
+    #[test]
+    fn ids_match_the_ones_already_stored() {
+        assert_eq!(hash_uid(""), 600129007);
+        assert_eq!(hash_uid("0000001a4f2c"), 673950292);
+        assert_eq!(hash_uid("M1b2c3d4e5f6@x"), 531181911);
+        assert_eq!(hash_uid("AAMkAGI2TG93AAA="), 581220562);
+    }
+}
