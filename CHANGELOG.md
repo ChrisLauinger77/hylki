@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.45.3 — 2026-10-24
+
+An account's chevron in the sidebar opens and folds the account again.
+
+- **Fixed: an account's chevron in the sidebar did nothing** (#525, reported
+  by Samuel Edlmeier). With "Fold accounts with one click" off, only a double
+  click on the header opened or folded an account. The chevron's button sits
+  inside the header's, and a button takes its click in the capture phase, so
+  the header claimed the release before the chevron saw it. The header now
+  hands a click on the chevron to the chevron.
+
 ## 1.45.2 — 2026-10-23
 
 A folder the server will not open no longer keeps the CPU busy.
