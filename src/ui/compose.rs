@@ -939,7 +939,9 @@ impl Component for Compose {
 
                 ComposeInput::ShowPreview(body) => {
                     let html = match self.format {
-                        ComposeFormat::Markdown => crate::mail::markdown::to_html(&body),
+                        ComposeFormat::Markdown => crate::mail::direction::stamp(
+                            &crate::mail::markdown::to_html(&body),
+                        ),
                         _ => body,
                     };
                     self.editor.show_preview(Some(&html));

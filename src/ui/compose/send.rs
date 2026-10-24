@@ -574,6 +574,13 @@ impl Compose {
     /// Handles [`ComposeInput::SendBody`].
     pub(super) fn on_send_body(&mut self, fields: OutgoingFields, sender: &ComponentSender<Self>) {
         let mut out = self.outgoing_message(fields);
+        // The direction of each line (#524) is written in only here, on
+        // the way out: a draft goes back into the editor, which finds it
+        // itself, and a `dir` kept there would outlast a line rewritten in
+        // another language. Hand-written HTML goes as it was written.
+        if matches!(self.format, ComposeFormat::Rich | ComposeFormat::Markdown) {
+            out.html = crate::mail::direction::stamp(&out.html);
+        }
         // A draft goes once it is sent; a template stays to be used
         // again.
         if self.template {

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Fixed: right-to-left mail arrived left to right** (#524, reported by
+  bjesus). The composer lays out each line in the direction of its own
+  text, but sent nothing that said so, and most mail clients showed Hebrew,
+  Arabic or Persian aligned to the left. A rich text or Markdown message now
+  goes out wrapped in `<div dir="rtl">` when it starts right to left, with a
+  `dir` on each line that runs the other way, so it reads as it did in the
+  composer. Mail with no right-to-left text is sent exactly as before, and
+  HTML written by hand is sent as written. The Markdown preview shows the
+  same.
+
 - **Translations:** French (PR #519 by frenchy82) brought up to date.
 
 - **Fixed: a picked LDAP directory showed nobody** (#307, reported by
